@@ -347,6 +347,17 @@ conditions, while the interpreter creates the address. SHARED remains
 fail-closed until cross-task storage can be durable. The selected-route test
 uses a compiled layout scaffold translated to the distinct typed IR identity;
 it does not claim an assembler source frontend or native executable memory.
+FREEMAIN64 is a distinct typed operation over the same checked arena. It
+requires the same invocation ABI and exactly one DATAPOINTER or DATA operand.
+DATAPOINTER reads an eight-byte pointer slot; DATA uses an explicit binding
+from a declared area to a live allocation, never the area's stored bytes as a
+pointer. The binding and allocation survive checkpoint v12. The provider
+returns a replay-bound release intent, which the interpreter applies only
+when the returned address matches the pending request. A freed identity stays
+stale after restart and its charged bytes and frame leave the task budget.
+Source-defined INVREQ 16/1 rejects invalid ownership or pointer identity;
+INVREQ 16/2 rejects user-key release of CICS-key storage. The checked route
+has no COBOL-source or native assembler execution claim.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so

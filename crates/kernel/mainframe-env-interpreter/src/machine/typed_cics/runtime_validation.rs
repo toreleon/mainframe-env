@@ -5,29 +5,33 @@ pub(super) fn validate_runtime_plan(
     operation: &Operation,
     plan: &CicsEffectPlan,
 ) -> Result<(), MachineProblem> {
-    if plan.operation == CicsPlanOperation::Getmain64
-        && machine
-            .invocation
-            .bindings
-            .get("cics.amode64.caller")
-            .is_none_or(|value| {
-                value.schema() != "mainframe-env.cics.amode64-caller@1"
-                    || value.bytes() != b"non-le-amode64"
-            })
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::Getmain64 | CicsPlanOperation::Freemain64
+    ) && machine
+        .invocation
+        .bindings
+        .get("cics.amode64.caller")
+        .is_none_or(|value| {
+            value.schema() != "mainframe-env.cics.amode64-caller@1"
+                || value.bytes() != b"non-le-amode64"
+        })
     {
         return Err(invalid_plan(
             "GETMAIN64 requires the checked non-LE AMODE(64) caller ABI",
         ));
     }
-    if plan.operation == CicsPlanOperation::Getmain64
-        && machine
-            .invocation
-            .bindings
-            .get("cics.amode64.taskdatakey")
-            .is_none_or(|value| {
-                value.schema() != "mainframe-env.cics.taskdatakey@1"
-                    || !matches!(value.bytes(), b"USER" | b"CICS")
-            })
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::Getmain64 | CicsPlanOperation::Freemain64
+    ) && machine
+        .invocation
+        .bindings
+        .get("cics.amode64.taskdatakey")
+        .is_none_or(|value| {
+            value.schema() != "mainframe-env.cics.taskdatakey@1"
+                || !matches!(value.bytes(), b"USER" | b"CICS")
+        })
     {
         return Err(invalid_plan("GETMAIN64 requires a checked TASKDATAKEY"));
     }

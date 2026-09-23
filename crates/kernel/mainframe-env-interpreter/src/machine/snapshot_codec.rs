@@ -1,37 +1,7 @@
 use super::*;
 
 pub(super) fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0011".to_vec();
-    bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
-    bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
-    bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
-    bytes.extend_from_slice(&snapshot.executed_steps.to_be_bytes());
-    push_bytes(&mut bytes, &snapshot.output)?;
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.base_storage.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for storage in &snapshot.base_storage {
-        push_bytes(&mut bytes, storage)?;
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.perform_stack.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for target in &snapshot.perform_stack {
-        bytes.extend_from_slice(&u64::try_from(*target).ok()?.to_be_bytes());
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.altered_targets.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (from, to) in &snapshot.altered_targets {
-        push_bytes(&mut bytes, from.as_bytes())?;
-        push_bytes(&mut bytes, to.as_bytes())?;
-    }
+    let mut bytes = encode_snapshot_prefix(snapshot)?;
     bytes.extend_from_slice(
         &u32::try_from(snapshot.loop_reentry.len())
             .ok()?
@@ -198,5 +168,94 @@ pub(super) fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         bytes.push(u8::from(allocation.attributes.executable));
         push_bytes(&mut bytes, &allocation.bytes)?;
     }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.storage64_area_bindings.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (name, address) in &snapshot.storage64_area_bindings {
+        push_bytes(&mut bytes, name.as_bytes())?;
+        bytes.extend_from_slice(&address.to_be_bytes());
+    }
     Some(bytes)
+}
+
+pub(super) fn decode_storage64(
+    input: &mut SnapshotInput<'_>,
+    header_version: u32,
+    max_frames: usize,
+    remaining_storage: &mut usize,
+) -> Result<(Storage64Snapshot, BTreeMap<String, u64>), MachineProblem> {
+    let mut storage64 = Storage64Snapshot {
+        next_id: 1,
+        next_loc24: 0x0000_1000,
+        next_loc31: 0x0100_0000,
+        allocations: Vec::new(),
+    };
+    let mut storage64_area_bindings = BTreeMap::new();
+    if header_version >= 11 {
+        storage64.next_id = input.u32()?;
+        storage64.next_loc24 = input.u64()?;
+        storage64.next_loc31 = input.u64()?;
+        let count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..count {
+            let address = input.u64()?;
+            let owner = snapshot_string(input, 4096)?;
+            let location = match input.take(1)?.first() {
+                Some(0) => Storage64Location::AboveBar,
+                Some(1) => Storage64Location::Loc24,
+                Some(2) => Storage64Location::Loc31,
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            let key = match input.take(1)?.first() {
+                Some(0) => Storage64Key::User,
+                Some(1) => Storage64Key::Cics,
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            let shared = match input.take(1)?.first() {
+                Some(0) => false,
+                Some(1) => true,
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            let executable = match input.take(1)?.first() {
+                Some(0) => false,
+                Some(1) => true,
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            let bytes = input.bytes(*remaining_storage)?;
+            *remaining_storage = (*remaining_storage)
+                .checked_sub(bytes.len())
+                .ok_or(MachineProblem::IncompatibleSnapshot)?;
+            storage64.allocations.push(Storage64Allocation {
+                address,
+                owner,
+                attributes: Storage64Attributes {
+                    location,
+                    key,
+                    shared,
+                    executable,
+                },
+                bytes,
+            });
+        }
+    }
+    if header_version >= 12 {
+        let count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if count > max_frames {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..count {
+            let name = snapshot_string(input, 4096)?;
+            let address = input.u64()?;
+            if storage64_area_bindings.insert(name, address).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+    }
+    Ok((storage64, storage64_area_bindings))
 }

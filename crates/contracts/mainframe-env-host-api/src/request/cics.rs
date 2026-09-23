@@ -50,6 +50,8 @@ pub enum CicsOperation {
     FormatTime,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
+    /// Release one checked AMODE(64) virtual allocation.
+    Freemain64,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
     /// Admit a checked non-LE AMODE(64) virtual allocation request.
@@ -153,6 +155,7 @@ impl CicsOperation {
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
             Self::Freemain => "Freemain",
+            Self::Freemain64 => "Freemain64",
             Self::Getmain => "Getmain",
             Self::Getmain64 => "Getmain64",
             Self::HandleAbend => "HandleAbend",
@@ -221,6 +224,7 @@ impl CicsOperation {
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
+                | Self::Freemain64
                 | Self::Getmain
                 | Self::Getmain64
                 | Self::Rewrite
@@ -294,6 +298,7 @@ impl CicsOperation {
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
             ("FREEMAIN", _) => Self::Freemain,
+            ("FREEMAIN64", _) => Self::Freemain64,
             ("GETMAIN", _) => Self::Getmain,
             ("GETMAIN64", _) => Self::Getmain64,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,

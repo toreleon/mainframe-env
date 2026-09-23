@@ -42,16 +42,38 @@ fn invocation() -> Invocation {
         IdempotencyKey::new("idem", limits).unwrap(),
         1,
         ResourceLimits::default(),
-        BTreeMap::new(),
+        BTreeMap::from([
+            (
+                "cics.amode64.caller".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.amode64-caller@1",
+                    b"non-le-amode64".to_vec(),
+                    limits,
+                )
+                .unwrap(),
+            ),
+            (
+                "cics.amode64.taskdatakey".into(),
+                BoundedPayload::new("mainframe-env.cics.taskdatakey@1", b"USER".to_vec(), limits)
+                    .unwrap(),
+            ),
+        ]),
         limits,
     )
     .unwrap()
 }
 
-fn translated_getmain64() -> Vec<u8> {
+fn translated_storage64(free_data: Option<bool>) -> Vec<u8> {
     // The COBOL frontend supplies layout and control-flow scaffolding. This
     // test adapter replaces GETMAIN with a distinct checked AMODE(64) plan.
-    let source = "PROCESS LP(64)\nIDENTIFICATION DIVISION. PROGRAM-ID. STOR64. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(9) COMP VALUE 17. 01 FLAG-X PIC X. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) END-EXEC. MOVE 'Q' TO FLAG-X. STOP RUN.";
+    let freemain = match free_data {
+        Some(false) => "EXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC.",
+        Some(true) => "EXEC CICS FREEMAIN DATA(AREA-X) END-EXEC.",
+        None => "",
+    };
+    let source = format!(
+        "PROCESS LP(64)\nIDENTIFICATION DIVISION. PROGRAM-ID. STOR64. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(9) COMP VALUE 17. 01 AREA-X PIC X(4). 01 FLAG-X PIC X. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) END-EXEC. MOVE 'Q' TO FLAG-X. {freemain} MOVE 'R' TO FLAG-X. STOP RUN."
+    );
     let source_limits = SourceLimits::default();
     let path = LogicalPath::new("STOR64.cbl", source_limits.max_path_bytes).unwrap();
     let file = SourceFile::input(
@@ -91,7 +113,8 @@ fn translated_getmain64() -> Vec<u8> {
             storage.id,
         );
     }
-    let mut selected = 0;
+    let mut selected_get = 0;
+    let mut selected_free = 0;
     for region in module.regions() {
         let new_region = builder.add_region().unwrap();
         for block in &region.blocks {
@@ -129,7 +152,41 @@ fn translated_getmain64() -> Vec<u8> {
                         mainframe_env_ir::CicsPlanOperation::Getmain64,
                     )
                     .identity();
-                    selected += 1;
+                    selected_get += 1;
+                } else if identity
+                    == mainframe_env_ir::cics_executable_descriptor(
+                        mainframe_env_ir::CicsPlanOperation::Freemain,
+                    )
+                    .identity()
+                {
+                    let mainframe_env_ir::Attribute::Bytes(bytes) = &attributes["cics_plan"] else {
+                        panic!("compiled FREEMAIN plan is missing");
+                    };
+                    let mut plan =
+                        decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap();
+                    plan.operation = mainframe_env_ir::CicsPlanOperation::Freemain64;
+                    plan.operands[0].name = if free_data == Some(true) {
+                        CicsOperandName::DataArea64
+                    } else {
+                        CicsOperandName::DataPointer64
+                    };
+                    plan.operands.push(CicsNamedOperand {
+                        name: CicsOperandName::Abi64,
+                        value: CicsOperandValue::Literal(
+                            b"mainframe-env.cics-amode64-nonle@1".to_vec(),
+                        ),
+                    });
+                    attributes.insert(
+                        "cics_plan".into(),
+                        mainframe_env_ir::Attribute::Bytes(
+                            encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap(),
+                        ),
+                    );
+                    identity = mainframe_env_ir::cics_executable_descriptor(
+                        mainframe_env_ir::CicsPlanOperation::Freemain64,
+                    )
+                    .identity();
+                    selected_free += 1;
                 }
                 builder
                     .add_operation(
@@ -146,32 +203,15 @@ fn translated_getmain64() -> Vec<u8> {
             }
         }
     }
-    assert_eq!(selected, 1);
+    assert_eq!(selected_get, 1);
+    assert_eq!(selected_free, usize::from(free_data.is_some()));
     encode_binary(&builder.finish().unwrap(), CodecLimits::default()).unwrap()
 }
 
 #[test]
 fn compiled_selected_route_writes_only_a_checked_64_bit_address() {
-    let binary = translated_getmain64();
-    let mut invocation = invocation();
-    invocation.bindings.insert(
-        "cics.amode64.caller".into(),
-        BoundedPayload::new(
-            "mainframe-env.cics.amode64-caller@1",
-            b"non-le-amode64".to_vec(),
-            InvocationLimits::default(),
-        )
-        .unwrap(),
-    );
-    invocation.bindings.insert(
-        "cics.amode64.taskdatakey".into(),
-        BoundedPayload::new(
-            "mainframe-env.cics.taskdatakey@1",
-            b"USER".to_vec(),
-            InvocationLimits::default(),
-        )
-        .unwrap(),
-    );
+    let binary = translated_storage64(None);
+    let invocation = invocation();
     let mut machine =
         ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default()).unwrap();
     let effect = loop {
@@ -255,5 +295,183 @@ fn compiled_selected_route_writes_only_a_checked_64_bit_address() {
             }
         }
         assert!(machine.read_storage64(address, 0, 1).is_err());
+    }
+}
+
+#[test]
+fn compiled_freemain64_pointer_and_bound_data_release_checkpointed_storage() {
+    for data_form in [false, true] {
+        let binary = translated_storage64(Some(data_form));
+        let invocation = invocation();
+        let mut machine =
+            ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default())
+                .unwrap();
+        let allocate = loop {
+            match machine.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
+                MachineDrive::Continue => continue,
+                MachineDrive::HostCall(effect) => break effect,
+                other => panic!("GETMAIN64 was not selected: {other:?}"),
+            }
+        };
+        let HostRequest::Cics(request) = &allocate.request else {
+            panic!("unexpected GETMAIN64 request");
+        };
+        assert_eq!(request.operation, CicsOperation::Getmain64);
+        let allocation = mainframe_env_host_api::CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "DEFAULT".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([(
+                "SET64".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.storage64-allocation@1",
+                    vec![0, 0, 0, 0, 0, 0, 0, 17],
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+            unit_of_work: None,
+        };
+        assert_eq!(
+            machine.drive(
+                MachineResume::HostResult(mainframe_env_host_api::EffectResult {
+                    sequence: allocate.sequence,
+                    outcome: Ok(HostResult::Cics(allocation)),
+                }),
+                Quantum::new(1, 1024).unwrap(),
+            ),
+            MachineDrive::Continue
+        );
+        let pointer = machine.variable("PTR-X").unwrap();
+        let address = u64::from_be_bytes(pointer.bytes().try_into().unwrap());
+        machine.write_storage64(address, 0, b"DATA").unwrap();
+        if data_form {
+            machine.bind_storage64_area("AREA-X", address).unwrap();
+        }
+        let checkpoint = machine.checkpoint().unwrap();
+        assert_eq!(
+            checkpoint.schema(),
+            "mainframe-env.reference-machine-checkpoint@12"
+        );
+        let mut restored =
+            ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default())
+                .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(restored.read_storage64(address, 0, 4).unwrap(), b"DATA");
+        assert_eq!(
+            restored.snapshot().storage64_area_bindings.len(),
+            usize::from(data_form)
+        );
+
+        let release = loop {
+            match restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
+                MachineDrive::Continue => continue,
+                MachineDrive::HostCall(effect) => break effect,
+                other => panic!("FREEMAIN64 was not selected: {other:?}"),
+            }
+        };
+        let HostRequest::Cics(request) = &release.request else {
+            panic!("unexpected FREEMAIN64 request");
+        };
+        assert_eq!(request.operation, CicsOperation::Freemain64);
+        let operand = if data_form { "DATA" } else { "DATAPOINTER" };
+        let release_pointer = request.arguments[operand].clone();
+        assert_eq!(
+            release_pointer.schema(),
+            "mainframe-env.cics.allocated-pointer64@1"
+        );
+        assert_eq!(release_pointer.bytes(), pointer.bytes());
+        if data_form {
+            assert_ne!(
+                restored.variable("AREA-X").unwrap().bytes(),
+                pointer.bytes()
+            );
+        }
+        let freed = mainframe_env_host_api::CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "DEFAULT".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([("FREEMAIN64.POINTER".into(), release_pointer)]),
+            unit_of_work: None,
+        };
+        if !data_form {
+            let mut forged =
+                ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default())
+                    .unwrap();
+            forged.restore_checkpoint(&checkpoint).unwrap();
+            let forged_effect = loop {
+                match forged.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
+                    MachineDrive::Continue => continue,
+                    MachineDrive::HostCall(effect) => break effect,
+                    other => panic!("forged release did not reach host: {other:?}"),
+                }
+            };
+            let mut wrong = freed.clone();
+            wrong.outputs.insert(
+                "FREEMAIN64.POINTER".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.allocated-pointer64@1",
+                    (address + 1).to_be_bytes().to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+            assert!(matches!(
+                forged.drive(
+                    MachineResume::HostResult(mainframe_env_host_api::EffectResult {
+                        sequence: forged_effect.sequence,
+                        outcome: Ok(HostResult::Cics(wrong)),
+                    }),
+                    Quantum::new(1, 1024).unwrap(),
+                ),
+                MachineDrive::Failed(_)
+            ));
+            assert_eq!(forged.read_storage64(address, 0, 4).unwrap(), b"DATA");
+        }
+        assert_eq!(
+            restored.drive(
+                MachineResume::HostResult(mainframe_env_host_api::EffectResult {
+                    sequence: release.sequence,
+                    outcome: Ok(HostResult::Cics(freed)),
+                }),
+                Quantum::new(1, 1024).unwrap(),
+            ),
+            MachineDrive::Continue
+        );
+        assert!(restored.read_storage64(address, 0, 1).is_err());
+        assert!(restored.snapshot().storage64.allocations.is_empty());
+        assert!(restored.snapshot().storage64_area_bindings.is_empty());
+        assert!(restored.bind_storage64_area("AREA-X", address).is_err());
+        let released_checkpoint = restored.checkpoint().unwrap();
+        let mut reopened =
+            ReferenceMachine::from_binary(&binary, invocation, CodecLimits::default()).unwrap();
+        reopened.restore_checkpoint(&released_checkpoint).unwrap();
+        assert!(reopened.read_storage64(address, 0, 1).is_err());
     }
 }

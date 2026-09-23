@@ -16,6 +16,7 @@ mod names;
 mod response;
 mod retrieve;
 mod runtime_validation;
+mod storage64;
 mod task_wait;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
@@ -44,13 +45,15 @@ pub(super) fn is_typed(operation: &Operation) -> bool {
 
 pub(super) fn write_response_state(
     machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    release64: Option<[u8; 8]>,
     response_target: Option<&CicsTarget>,
     response2_target: Option<&CicsTarget>,
     address_set: Option<&CicsAddressSet>,
     outputs: &BTreeMap<String, CicsTarget>,
-    operation: CicsOperation,
     response: &CicsResponse,
 ) -> Result<Option<usize>, MachineProblem> {
+    storage64::validate_release_response(operation, release64, response)?;
     for (target, value) in [
         (response_target, response.response),
         (response2_target, response.response2),
@@ -93,6 +96,9 @@ pub(super) fn write_runtime_output(
     value: &BoundedPayload,
 ) -> Result<bool, MachineProblem> {
     if retrieve::release_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
+    if storage64::release_output(machine, operation, name, value)? {
         return Ok(true);
     }
     if task_wait::apply_posted_output(machine, operation, name, value)? {
@@ -311,6 +317,12 @@ pub(super) fn execute(
             }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea => {
                 retrieve::freemain_data_argument(machine, slot)?
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataPointer64 => {
+                storage64::freemain_pointer_argument(machine, slot)?
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea64 => {
+                storage64::freemain_data_argument(machine, slot)?
             }
             CicsOperandValue::Storage(slot)
                 if matches!(
@@ -575,6 +587,7 @@ pub(super) fn execute(
         );
     }
     let argument_summary = argument_summary(&arguments);
+    let release64 = storage64::pending_release_pointer(host_operation, &arguments)?;
     machine.effect(
         HostRequest::Cics(CicsRequest {
             operation: host_operation,
@@ -584,6 +597,7 @@ pub(super) fn execute(
         }),
         PendingKind::Cics {
             operation: host_operation,
+            release64,
             argument_summary,
             into,
             outputs,
@@ -1023,11 +1037,22 @@ fn validate_machine_slot(
             "ADDRESS SET pointer operands must use POINTER or POINTER-32",
         ));
     }
-    if matches!(slot_use, SlotUse::Pointer64Output)
+    if matches!(slot_use, SlotUse::Pointer64Output | SlotUse::Pointer64Input)
         && (layout.category != LayoutCategory::Pointer || layout.length != 8)
     {
         return Err(invalid_plan(
             "AMODE(64) SET requires an eight-byte pointer slot",
+        ));
+    }
+    if matches!(slot_use, SlotUse::DataArea64Input)
+        && (layout.length == 0
+            || matches!(
+                layout.category,
+                LayoutCategory::Pointer | LayoutCategory::Pointer32
+            ))
+    {
+        return Err(invalid_plan(
+            "FREEMAIN64 DATA requires a declared nonpointer area",
         ));
     }
     if matches!(slot_use, SlotUse::AddressInput | SlotUse::AddressOutput)

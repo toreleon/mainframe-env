@@ -286,6 +286,7 @@ pub(crate) fn execute_legacy(
         }),
         PendingKind::Cics {
             operation,
+            release64: None,
             argument_summary,
             into,
             outputs,

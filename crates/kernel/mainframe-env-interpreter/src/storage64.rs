@@ -278,6 +278,20 @@ impl Storage64Arena {
         self.allocations.get(&address)
     }
 
+    #[must_use]
+    pub(crate) fn contains(&self, address: u64) -> bool {
+        self.allocations.contains_key(&address)
+    }
+
+    pub(crate) fn can_release(
+        &self,
+        address: u64,
+        task: &str,
+        caller_key: Storage64Key,
+    ) -> Result<(), Storage64Problem> {
+        self.access(address, task, caller_key).map(|_| ())
+    }
+
     pub fn read(
         &self,
         address: u64,
@@ -325,16 +339,7 @@ impl Storage64Arena {
         task: &str,
         caller_key: Storage64Key,
     ) -> Result<(), Storage64Problem> {
-        let allocation = self
-            .allocations
-            .get(&address)
-            .ok_or(Storage64Problem::InvalidPointer)?;
-        if !allocation.attributes.shared && allocation.owner != task {
-            return Err(Storage64Problem::InvalidPointer);
-        }
-        if allocation.attributes.key == Storage64Key::Cics && caller_key == Storage64Key::User {
-            return Err(Storage64Problem::KeyViolation);
-        }
+        self.can_release(address, task, caller_key)?;
         self.allocations.remove(&address);
         Ok(())
     }

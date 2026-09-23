@@ -1526,7 +1526,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 54);
+        assert_eq!(typed_hir.len(), 55);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1621,6 +1621,9 @@ mod tests {
                     panic!("GETMAIN64 must not originate from COBOL source")
                 }
                 CicsPlanOperation::Freemain => crate::HirCicsOperation::Freemain,
+                CicsPlanOperation::Freemain64 => {
+                    panic!("FREEMAIN64 must not originate from COBOL source")
+                }
                 CicsPlanOperation::ReceiveMap => crate::HirCicsOperation::ReceiveMap,
                 CicsPlanOperation::SendMap => crate::HirCicsOperation::SendMap,
                 CicsPlanOperation::SendText => crate::HirCicsOperation::SendText,
@@ -1856,7 +1859,7 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(operations.len(), 54);
+        assert_eq!(operations.len(), 55);
         assert_eq!(
             operations
                 .iter()
@@ -1869,6 +1872,12 @@ mod tests {
                 .collect::<BTreeSet<_>>(),
             CICS_EXECUTABLE_DESCRIPTORS
                 .iter()
+                .filter(|descriptor| {
+                    !matches!(
+                        descriptor.operation,
+                        CicsPlanOperation::Getmain64 | CicsPlanOperation::Freemain64
+                    )
+                })
                 .map(|descriptor| descriptor.identity().to_string())
                 .collect()
         );

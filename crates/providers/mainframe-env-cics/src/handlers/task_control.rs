@@ -248,6 +248,7 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
         CicsOperation::Freemain => super::storage_control::invoke(service, run, request),
+        CicsOperation::Freemain64 => super::storage_control::invoke(service, run, request),
         CicsOperation::Getmain => super::storage_control::invoke(service, run, request),
         CicsOperation::Getmain64 => super::storage_control::invoke(service, run, request),
         CicsOperation::HandleAid => handle_aid(service, run, request),

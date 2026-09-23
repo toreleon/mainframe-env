@@ -4746,7 +4746,7 @@ mod tests {
 
     #[test]
     fn cics_non_cobol_application_forms_fail_closed() {
-        for command in ["CICSMESSAGE", "GETMAIN64"] {
+        for command in ["CICSMESSAGE", "GETMAIN64", "FREEMAIN64"] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSCOB. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );

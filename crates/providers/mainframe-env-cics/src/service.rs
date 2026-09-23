@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 69);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 70);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5276,6 +5276,7 @@ mod tests {
             ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
             ("FREEMAIN", CicsOperation::Freemain),
+            ("FREEMAIN64", CicsOperation::Freemain64),
             ("GETMAIN", CicsOperation::Getmain),
             ("GETMAIN64", CicsOperation::Getmain64),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
@@ -6553,7 +6554,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 69);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 70);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -16546,6 +16547,195 @@ mod tests {
             ("INVREQ", 16, 1)
         );
         assert!(!invalid.outputs.contains_key("FREEMAIN.POINTER"));
+    }
+
+    #[test]
+    fn freemain64_releases_only_a_checked_64_bit_identity_with_exact_conditions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered_amode64(&service);
+        let pointer = |schema: &str| {
+            BoundedPayload::new(
+                schema,
+                vec![0xA0, 0, 0, 1, 0, 0, 0, 8],
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let abi = || cics_literal(b"mainframe-env.cics-amode64-nonle@1");
+        let valid = request(
+            CicsOperation::Freemain64,
+            BTreeMap::from([
+                ("ABI64".into(), abi()),
+                (
+                    "DATAPOINTER".into(),
+                    pointer("mainframe-env.cics.allocated-pointer64@1"),
+                ),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, valid.clone(), 1),
+                valid.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(
+            first.outputs["FREEMAIN64.POINTER"],
+            valid.arguments["DATAPOINTER"]
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, valid.clone(), 1), valid)
+                .unwrap(),
+            first
+        );
+        let data = request(
+            CicsOperation::Freemain64,
+            BTreeMap::from([
+                ("ABI64".into(), abi()),
+                (
+                    "DATA".into(),
+                    pointer("mainframe-env.cics.allocated-pointer64@1"),
+                ),
+            ]),
+            2,
+        );
+        let data = service
+            .invoke(&effect(&invocation.run_unit_id, data.clone(), 2), data)
+            .unwrap();
+        assert_eq!(data.response, 0);
+
+        for (sequence, schema, expected) in [
+            (3, "mainframe-env.cics.invalid-pointer64@1", 1),
+            (4, "mainframe-env.cics.key-violation64@1", 2),
+        ] {
+            let mut invalid = request(
+                CicsOperation::Freemain64,
+                BTreeMap::from([
+                    ("ABI64".into(), abi()),
+                    ("DATAPOINTER".into(), pointer(schema)),
+                ]),
+                sequence,
+            );
+            invalid.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("INVREQ", 16, expected)
+            );
+            assert!(!response.outputs.contains_key("FREEMAIN64.POINTER"));
+        }
+    }
+
+    #[test]
+    fn freemain64_replay_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-freemain64-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let request = request(
+            CicsOperation::Freemain64,
+            BTreeMap::from([
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                (
+                    "DATA".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.allocated-pointer64@1",
+                        vec![0xA0, 0, 0, 1, 0, 0, 0, 8],
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            1,
+        );
+        let (invocation, session, first) = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let (invocation, session) = registered_amode64(&service);
+            let first = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 1),
+                    request.clone(),
+                )
+                .unwrap();
+            (invocation, session, first)
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, request.clone(), 1),
+                        request
+                    )
+                    .unwrap(),
+                first
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn freemain64_requires_caller_abi_after_audited_authorization() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, _) = registered(&service);
+        let request = request(
+            CicsOperation::Freemain64,
+            BTreeMap::from([
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                (
+                    "DATAPOINTER".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.allocated-pointer64@1",
+                        vec![0xA0, 0, 0, 1, 0, 0, 0, 8],
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 1),
+                request
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            !store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.

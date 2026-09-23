@@ -158,6 +158,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("Freemain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0084"),
+    ("Freemain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0085"),
     ("Getmain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0094"),
     ("Getmain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0095"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
@@ -523,6 +524,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Enq",
         "FormatTime",
         "Freemain",
+        "Freemain64",
         "Getmain",
         "Getmain64",
         "HandleAbend",
@@ -780,6 +782,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "Freemain": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Freemain64": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReceiveMap": frozenset(
@@ -1041,6 +1046,7 @@ def _load_typed_execution_registrations(
         "DocumentSet",
         "Enq",
         "Freemain",
+        "Freemain64",
         "Getmain",
         "Getmain64",
         "HandleAid",
@@ -1377,6 +1383,7 @@ def load_catalog(
                 "DocumentSet",
                 "Enq",
                 "Freemain",
+                "Freemain64",
                 "Getmain",
                 "Getmain64",
                 "HandleAid",

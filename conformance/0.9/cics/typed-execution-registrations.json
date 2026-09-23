@@ -116,6 +116,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0084"
     },
     {
+      "operation": "Freemain64",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0085"
+    },
+    {
       "operation": "Getmain",
       "interface": "api",
       "family": "storage-control",

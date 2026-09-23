@@ -17,6 +17,8 @@ pub enum CicsPlanOperation {
     FormatTime,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
+    /// Release one checked AMODE(64) virtual allocation.
+    Freemain64,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
     /// Allocate a checked AMODE(64) virtual allocation.
@@ -237,8 +239,12 @@ pub enum CicsOperandName {
     InitImage,
     /// `DATAPOINTER(...)` virtual storage pointer returned by GETMAIN.
     DataPointer,
+    /// Eight-byte `DATAPOINTER(...)` value from the AMODE(64) arena.
+    DataPointer64,
     /// `DATA(...)` area whose virtual address identifies GETMAIN storage.
     DataArea,
+    /// Relocatable `DATA(...)` area bound to one AMODE(64) allocation.
+    DataArea64,
     /// `ECADDR(...)` pointer to one timer-event control area.
     EventControlAddress,
     /// Optional `NAME(...)` reason associated with an event wait.

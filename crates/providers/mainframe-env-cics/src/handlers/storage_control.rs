@@ -13,6 +13,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::Getmain => getmain(service, run, request),
         CicsOperation::Getmain64 => getmain64(service, run, request),
         CicsOperation::Freemain => freemain(service, run, request),
+        CicsOperation::Freemain64 => freemain64(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -317,6 +318,56 @@ fn freemain(
     Ok(response)
 }
 
+fn freemain64(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if run
+        .invocation
+        .bindings
+        .get("cics.amode64.caller")
+        .is_none_or(|value| {
+            value.schema() != "mainframe-env.cics.amode64-caller@1"
+                || value.bytes() != b"non-le-amode64"
+        })
+        || run
+            .invocation
+            .bindings
+            .get("cics.amode64.taskdatakey")
+            .is_none_or(|value| {
+                value.schema() != "mainframe-env.cics.taskdatakey@1"
+                    || !matches!(value.bytes(), b"USER" | b"CICS")
+            })
+    {
+        return Err(HostProblem::Unauthorized);
+    }
+    let pointer = validate_freemain64(request)?;
+    match pointer.schema() {
+        "mainframe-env.cics.invalid-pointer64@1" => {
+            return storage64_condition(service, run, request, "INVREQ", 16, 1);
+        }
+        "mainframe-env.cics.key-violation64@1" => {
+            return storage64_condition(service, run, request, "INVREQ", 16, 2);
+        }
+        _ => {}
+    }
+    let mut response = service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    response
+        .outputs
+        .insert("FREEMAIN64.POINTER".into(), pointer.clone());
+    Ok(response)
+}
+
 fn validate_getmain(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "FLENGTH",
@@ -380,6 +431,53 @@ fn validate_freemain(request: &CicsRequest) -> Result<&BoundedPayload, HostProbl
             !ALLOWED.contains(&name.as_str())
                 || match name.as_str() {
                     "DATA" | "DATAPOINTER" => value.schema() != pointer.schema(),
+                    "OPTION.NOHANDLE" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                    _ => true,
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(pointer)
+    }
+}
+
+fn validate_freemain64(request: &CicsRequest) -> Result<&BoundedPayload, HostProblem> {
+    const ALLOWED: &[&str] = &[
+        "ABI64",
+        "DATA",
+        "DATAPOINTER",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    let pointer = match (
+        request.arguments.get("DATA"),
+        request.arguments.get("DATAPOINTER"),
+    ) {
+        (Some(value), None) | (None, Some(value)) => value,
+        _ => return Err(HostProblem::Malformed),
+    };
+    if request.mutation.is_none()
+        || pointer.bytes().len() != 8
+        || !matches!(
+            pointer.schema(),
+            "mainframe-env.cics.allocated-pointer64@1"
+                | "mainframe-env.cics.invalid-pointer64@1"
+                | "mainframe-env.cics.key-violation64@1"
+        )
+        || request.arguments.get("ABI64").is_none_or(|value| {
+            value.schema() != "mainframe-env.cics.literal@1"
+                || value.bytes() != b"mainframe-env.cics-amode64-nonle@1"
+        })
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || match name.as_str() {
+                    "DATA" | "DATAPOINTER" => value.schema() != pointer.schema(),
+                    "ABI64" => value.schema() != "mainframe-env.cics.literal@1",
                     "OPTION.NOHANDLE" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }

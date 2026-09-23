@@ -584,6 +584,9 @@ fn validate_operation_shape(
         CicsPlanOperation::Freemain => {
             storage_control::invalid_freemain_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::Freemain64 => {
+            storage_control::invalid_freemain64_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
@@ -3375,10 +3378,13 @@ mod tests {
             }
         }
         assert_eq!(operation_tag(CicsPlanOperation::Getmain64), 72);
-        assert_eq!(operation_from_tag(73), Err(CicsPlanCodecProblem::Malformed));
+        assert_eq!(operation_tag(CicsPlanOperation::Freemain64), 73);
+        assert_eq!(operation_from_tag(73), Ok(CicsPlanOperation::Freemain64));
         assert_eq!(operand_tag(CicsOperandName::Flength64), 172);
         assert_eq!(operand_tag(CicsOperandName::Location64), 173);
         assert_eq!(operand_tag(CicsOperandName::Abi64), 174);
+        assert_eq!(operand_tag(CicsOperandName::DataPointer64), 175);
+        assert_eq!(operand_tag(CicsOperandName::DataArea64), 176);
         assert_eq!(option_tag(CicsPlanOption::CicsDataKey64), 108);
         assert_eq!(option_tag(CicsPlanOption::UserDataKey64), 109);
         assert_eq!(option_tag(CicsPlanOption::Shared64), 110);
@@ -3438,6 +3444,56 @@ mod tests {
         wrong_pointer.outputs[0].name = CicsOutputName::SetPointer;
         assert_eq!(
             encode_cics_effect_plan(&wrong_pointer, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn freemain64_requires_one_checked_pointer_or_bound_area() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Freemain64,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Abi64,
+                    value: CicsOperandValue::Literal(
+                        b"mainframe-env.cics-amode64-nonle@1".to_vec(),
+                    ),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::DataPointer64,
+                    value: CicsOperandValue::Storage(slot(1, "PTR64-X")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+        let mut area = plan.clone();
+        area.operands[1].name = CicsOperandName::DataArea64;
+        let bytes = encode_cics_effect_plan(&area, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), area);
+        let mut both = plan.clone();
+        both.operands.push(CicsNamedOperand {
+            name: CicsOperandName::DataArea64,
+            value: CicsOperandValue::Storage(slot(2, "AREA-X")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&both, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut old_pointer = plan.clone();
+        old_pointer.operands[1].name = CicsOperandName::DataPointer;
+        assert_eq!(
+            encode_cics_effect_plan(&old_pointer, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut missing_abi = plan;
+        missing_abi.operands.remove(0);
+        assert_eq!(
+            encode_cics_effect_plan(&missing_abi, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

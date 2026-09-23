@@ -106,3 +106,31 @@ pub(super) fn invalid_getmain64_shape(
             )
         })
 }
+
+pub(super) fn invalid_freemain64_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let pointer = BTreeSet::from([CicsOperandName::Abi64, CicsOperandName::DataPointer64]);
+    let data = BTreeSet::from([CicsOperandName::Abi64, CicsOperandName::DataArea64]);
+    (inputs != &pointer && inputs != &data)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::Abi64 => !matches!(
+                &operand.value,
+                CicsOperandValue::Literal(value) if value == AMODE64_ABI
+            ),
+            CicsOperandName::DataPointer64 | CicsOperandName::DataArea64 => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            _ => true,
+        })
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}

@@ -139,6 +139,15 @@ All notable changes to mainframe-env are documented here.
   storage, and no assembler source frontend or native executable storage is
   claimed.
 
+- Added the separate non-LE AMODE(64) FREEMAIN64 DATAPOINTER and DATA routes.
+  The interpreter accepts only a live eight-byte virtual allocation owned by
+  the current task, including a checkpointed DATA-area binding. Release is
+  tied to the pending replayed host request; stale, cross-width, and foreign
+  pointers return INVREQ 16/1, while a CICS-key allocation released from a
+  user-key task returns INVREQ 16/2. Checkpoint v12 preserves area bindings and
+  restored stale-pointer rejection. The route uses the existing authorization,
+  audit, cancellation, deadline, and Memory/SQLite replay boundary.
+
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal
   the current CICS system before authorization or mutation; unknown and

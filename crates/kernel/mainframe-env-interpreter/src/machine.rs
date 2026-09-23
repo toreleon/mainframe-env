@@ -348,6 +348,7 @@ enum PendingKind {
     },
     Cics {
         operation: CicsOperation,
+        release64: Option<[u8; 8]>,
         argument_summary: String,
         into: Option<typed_cics::CicsTarget>,
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
@@ -415,6 +416,7 @@ pub struct MachineSnapshot {
     pub freed_allocations: BTreeSet<usize>,
     pub random_state: Option<u64>,
     pub storage64: Storage64Snapshot,
+    pub storage64_area_bindings: BTreeMap<String, u64>,
 }
 
 pub type MachineSnapshotSortIo = (
@@ -464,6 +466,7 @@ pub struct ReferenceMachine {
     linkage_addresses: BTreeMap<String, Option<StorageView>>,
     freed_allocations: BTreeSet<usize>,
     storage64: Storage64Arena,
+    storage64_area_bindings: BTreeMap<String, u64>,
     random_state: Cell<Option<u64>>,
     pc: usize,
     output: Vec<u8>,
@@ -788,6 +791,7 @@ impl ReferenceMachine {
             linkage_addresses: BTreeMap::new(),
             freed_allocations: BTreeSet::new(),
             storage64: Storage64Arena::new(storage64_limits),
+            storage64_area_bindings: BTreeMap::new(),
             random_state: Cell::new(None),
             pc: 0,
             output: Vec::new(),
@@ -861,7 +865,7 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 11,
+            schema_version: 12,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -936,11 +940,12 @@ impl ReferenceMachine {
             freed_allocations: self.freed_allocations.clone(),
             random_state: self.random_state.get(),
             storage64: self.storage64.snapshot(),
+            storage64_area_bindings: self.storage64_area_bindings.clone(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=11)
+        if !matches!(snapshot.schema_version, 1..=12)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -955,15 +960,8 @@ impl ReferenceMachine {
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
-        let mut restored_storage64 = Storage64Arena::new(Storage64Limits {
-            max_allocations: self.invocation.limits.max_frames,
-            max_bytes: self.invocation.limits.max_storage_bytes,
-        });
-        if snapshot.schema_version >= 11 {
-            restored_storage64
-                .restore(snapshot.storage64.clone())
-                .map_err(|_| MachineProblem::IncompatibleSnapshot)?;
-        }
+        let mut restored_storage64 = self.new_storage64_arena();
+        self.restore_storage64_snapshot(&mut restored_storage64, &snapshot)?;
         let base_used = snapshot
             .base_storage
             .iter()
@@ -988,6 +986,7 @@ impl ReferenceMachine {
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
+        let area_bindings = self.restore_area64_bindings(&snapshot, &restored_storage64)?;
         self.pc = snapshot.program_counter;
         self.effect_sequence = snapshot.effect_sequence;
         self.executed_steps = if snapshot.schema_version < 6 {
@@ -1164,7 +1163,7 @@ impl ReferenceMachine {
         } else {
             None
         });
-        self.storage64 = restored_storage64;
+        self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -1184,6 +1183,7 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@9"
                 | "mainframe-env.reference-machine-checkpoint@10"
                 | "mainframe-env.reference-machine-checkpoint@11"
+                | "mainframe-env.reference-machine-checkpoint@12"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -1975,6 +1975,7 @@ impl ReferenceMachine {
             (
                 PendingKind::Cics {
                     operation,
+                    release64,
                     argument_summary: _,
                     into,
                     outputs,
@@ -1988,11 +1989,12 @@ impl ReferenceMachine {
                 let responded = response_target.is_some() || no_handle;
                 let load_base = typed_cics::write_response_state(
                     self,
+                    operation,
+                    release64,
                     response_target.as_ref(),
                     response2_target.as_ref(),
                     address_set.as_ref(),
                     &outputs,
-                    operation,
                     &response,
                 )?;
                 if let Some(target) = into
@@ -8399,16 +8401,14 @@ impl Machine for ReferenceMachine {
                 MachineResume::Start if self.pending.is_none() => {}
                 MachineResume::HostResult(result) => self.resume_host(result)?,
                 MachineResume::Cancelled => {
-                    self.storage64
-                        .end_task(self.invocation.run_unit_id.as_str());
+                    self.release_storage64_task();
                     return Ok(failure_drive(
                         FailureCategory::Cancelled,
                         "execution cancelled",
                     ));
                 }
                 MachineResume::TimedOut => {
-                    self.storage64
-                        .end_task(self.invocation.run_unit_id.as_str());
+                    self.release_storage64_task();
                     return Ok(failure_drive(
                         FailureCategory::TimedOut,
                         "execution timed out",
@@ -8490,7 +8490,7 @@ impl Machine for ReferenceMachine {
         }
         let bytes = snapshot_codec::encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@11",
+            "mainframe-env.reference-machine-checkpoint@12",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -8526,6 +8526,42 @@ fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
     Some(())
 }
 
+pub(super) fn encode_snapshot_prefix(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
+    let mut bytes = b"MECP0012".to_vec();
+    bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
+    let program_counter = u64::try_from(snapshot.program_counter).ok()?;
+    bytes.extend_from_slice(&program_counter.to_be_bytes());
+    bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
+    bytes.extend_from_slice(&snapshot.executed_steps.to_be_bytes());
+    push_bytes(&mut bytes, &snapshot.output)?;
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.base_storage.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for storage in &snapshot.base_storage {
+        push_bytes(&mut bytes, storage)?;
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.perform_stack.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for target in &snapshot.perform_stack {
+        bytes.extend_from_slice(&u64::try_from(*target).ok()?.to_be_bytes());
+    }
+    bytes.extend_from_slice(
+        &u32::try_from(snapshot.altered_targets.len())
+            .ok()?
+            .to_be_bytes(),
+    );
+    for (from, to) in &snapshot.altered_targets {
+        push_bytes(&mut bytes, from.as_bytes())?;
+        push_bytes(&mut bytes, to.as_bytes())?;
+    }
+    Some(bytes)
+}
+
 fn decode_snapshot(
     bytes: &[u8],
     max_storage: usize,
@@ -8546,6 +8582,7 @@ fn decode_snapshot(
         b"MECP0009" => 9,
         b"MECP0010" => 10,
         b"MECP0011" => 11,
+        b"MECP0012" => 12,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -8676,12 +8713,6 @@ fn decode_snapshot(
     let mut linkage_addresses = BTreeMap::new();
     let mut freed_allocations = BTreeSet::new();
     let mut random_state = None;
-    let mut storage64 = Storage64Snapshot {
-        next_id: 1,
-        next_loc24: 0x0000_1000,
-        next_loc31: 0x0100_0000,
-        allocations: Vec::new(),
-    };
     if header_version >= 8 {
         let dynamic_count =
             usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
@@ -8876,56 +8907,12 @@ fn decode_snapshot(
             _ => return Err(MachineProblem::IncompatibleSnapshot),
         };
     }
-    if header_version >= 11 {
-        storage64.next_id = input.u32()?;
-        storage64.next_loc24 = input.u64()?;
-        storage64.next_loc31 = input.u64()?;
-        let count =
-            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
-        if count > max_frames {
-            return Err(MachineProblem::IncompatibleSnapshot);
-        }
-        for _ in 0..count {
-            let address = input.u64()?;
-            let owner = snapshot_string(&mut input, 4096)?;
-            let location = match input.take(1)?.first() {
-                Some(0) => Storage64Location::AboveBar,
-                Some(1) => Storage64Location::Loc24,
-                Some(2) => Storage64Location::Loc31,
-                _ => return Err(MachineProblem::IncompatibleSnapshot),
-            };
-            let key = match input.take(1)?.first() {
-                Some(0) => Storage64Key::User,
-                Some(1) => Storage64Key::Cics,
-                _ => return Err(MachineProblem::IncompatibleSnapshot),
-            };
-            let shared = match input.take(1)?.first() {
-                Some(0) => false,
-                Some(1) => true,
-                _ => return Err(MachineProblem::IncompatibleSnapshot),
-            };
-            let executable = match input.take(1)?.first() {
-                Some(0) => false,
-                Some(1) => true,
-                _ => return Err(MachineProblem::IncompatibleSnapshot),
-            };
-            let bytes = input.bytes(remaining_storage)?;
-            remaining_storage = remaining_storage
-                .checked_sub(bytes.len())
-                .ok_or(MachineProblem::IncompatibleSnapshot)?;
-            storage64.allocations.push(Storage64Allocation {
-                address,
-                owner,
-                attributes: Storage64Attributes {
-                    location,
-                    key,
-                    shared,
-                    executable,
-                },
-                bytes,
-            });
-        }
-    }
+    let (storage64, storage64_area_bindings) = snapshot_codec::decode_storage64(
+        &mut input,
+        header_version,
+        max_frames,
+        &mut remaining_storage,
+    )?;
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -8954,6 +8941,7 @@ fn decode_snapshot(
         freed_allocations,
         random_state,
         storage64,
+        storage64_area_bindings,
     })
 }
 
@@ -12633,7 +12621,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@11"
+            "mainframe-env.reference-machine-checkpoint@12"
         );
         let mut restored =
             ReferenceMachine::from_binary(&binary(), test_invocation, CodecLimits::default())
@@ -12648,7 +12636,7 @@ mod tests {
         let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         assert_eq!(first_done, restored_done);
 
-        let mut version_nine = checkpoint.bytes()[..checkpoint.bytes().len() - 33].to_vec();
+        let mut version_nine = checkpoint.bytes()[..checkpoint.bytes().len() - 37].to_vec();
         version_nine[..8].copy_from_slice(b"MECP0009");
         version_nine[8..12].copy_from_slice(&9u32.to_be_bytes());
         let version_nine = BoundedPayload::new(
@@ -12755,8 +12743,20 @@ mod tests {
         let checkpoint = machine.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@11"
+            "mainframe-env.reference-machine-checkpoint@12"
         );
+        let mut previous_bytes = checkpoint.bytes()[..checkpoint.bytes().len() - 4].to_vec();
+        previous_bytes[..8].copy_from_slice(b"MECP0011");
+        previous_bytes[8..12].copy_from_slice(&11u32.to_be_bytes());
+        let previous = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@11",
+            previous_bytes,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut migrated = ReferenceMachine::from_binary(&binary, invocation(), limits).unwrap();
+        migrated.restore_checkpoint(&previous).unwrap();
+        assert_eq!(migrated.storage64.get(address).unwrap().bytes.len(), 17);
         let mut restored = ReferenceMachine::from_binary(&binary, invocation(), limits).unwrap();
         restored.restore_checkpoint(&checkpoint).unwrap();
         assert_eq!(restored.storage64.get(address).unwrap().bytes.len(), 17);
