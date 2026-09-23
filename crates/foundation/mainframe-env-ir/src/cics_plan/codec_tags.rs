@@ -87,6 +87,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WriteJournalName => 56,
         CicsPlanOperation::WriteJournalNum => 57,
         CicsPlanOperation::SpoolClose => 58,
+        CicsPlanOperation::SpoolOpenInput => 59,
     }
 }
 
@@ -161,6 +162,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         56 => Ok(CicsPlanOperation::WriteJournalName),
         57 => Ok(CicsPlanOperation::WriteJournalNum),
         58 => Ok(CicsPlanOperation::SpoolClose),
+        59 => Ok(CicsPlanOperation::SpoolOpenInput),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -275,6 +277,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::DataPointer64 => 175,
         CicsOperandName::DataArea64 => 176,
         CicsOperandName::SpoolToken => 112,
+        CicsOperandName::SpoolUserId => 113,
+        CicsOperandName::SpoolClass => 114,
     }
 }
 
@@ -388,6 +392,8 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         175 => Ok(CicsOperandName::DataPointer64),
         176 => Ok(CicsOperandName::DataArea64),
         112 => Ok(CicsOperandName::SpoolToken),
+        113 => Ok(CicsOperandName::SpoolUserId),
+        114 => Ok(CicsOperandName::SpoolClass),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -535,6 +541,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::TypeNamespaceLength => 231,
         CicsOutputName::JournalReqId => 201,
         CicsOutputName::SetPointer64 => 232,
+        CicsOutputName::SpoolToken => 208,
     }
 }
 
@@ -572,6 +579,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         231 => Ok(CicsOutputName::TypeNamespaceLength),
         201 => Ok(CicsOutputName::JournalReqId),
         232 => Ok(CicsOutputName::SetPointer64),
+        208 => Ok(CicsOutputName::SpoolToken),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

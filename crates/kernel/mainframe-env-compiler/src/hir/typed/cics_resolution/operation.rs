@@ -57,6 +57,7 @@ pub(super) fn resolve(
         ["REWRITE"] => HirCicsOperation::Rewrite,
         ["SET", "ASSOCIATION", "USERCORRDATA"] => HirCicsOperation::SetAssociationUserCorrData,
         ["SPOOLCLOSE"] => HirCicsOperation::SpoolClose,
+        ["SPOOLOPEN", "INPUT"] => HirCicsOperation::SpoolOpenInput,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,

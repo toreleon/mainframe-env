@@ -225,6 +225,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("SpoolClose", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0200"),
     (
+        "SpoolOpenInput",
+        "api",
+        "spool-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0201",
+    ),
+    (
         "SetFileStatus",
         "spi-compatibility",
         "file-control",
@@ -568,6 +575,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Rewrite",
         "SetAssociationUserCorrData",
         "SpoolClose",
+        "SpoolOpenInput",
         "Suspend",
         "WaitEvent",
         "WaitExternal",
@@ -825,6 +833,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "SpoolClose": frozenset(
         {"spool", "memory-read", "memory-write", "condition", "transaction"}
     ),
+    "SpoolOpenInput": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1068,6 +1079,7 @@ def _load_typed_execution_registrations(
         "ResetBrowse",
         "SetAssociationUserCorrData",
         "SpoolClose",
+        "SpoolOpenInput",
         "Start",
         "Suspend",
         "TransformDataToJson",
@@ -1404,6 +1416,7 @@ def load_catalog(
                 "ReadTransientData",
                 "SetAssociationUserCorrData",
                 "SpoolClose",
+                "SpoolOpenInput",
                 "Start",
                 "Suspend",
                 "WaitEvent",

@@ -36,6 +36,7 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::SpoolKeep | CicsPlanOption::SpoolDelete
         ),
+        CicsPlanOperation::SpoolOpenInput => !matches!(option, CicsPlanOption::NoHandle),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

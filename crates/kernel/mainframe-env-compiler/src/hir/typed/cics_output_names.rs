@@ -23,6 +23,7 @@ pub enum HirCicsOutputName {
     ReturnTermId,
     Queue,
     NumItems,
+    SpoolToken,
     JournalReqId,
     DocumentToken,
     DocumentSize,

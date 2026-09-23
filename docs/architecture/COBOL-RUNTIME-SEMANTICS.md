@@ -355,6 +355,14 @@ report transition, so recovery after a lost result returns the original
 response without applying a second disposition. Successful or handled
 negative completion records EIBFN `5610`.
 
+`EXEC CICS SPOOLOPEN INPUT` resolves USERID and optional CLASS before dispatch
+and writes the provider's exact eight-byte TOKEN only after normal completion.
+The provider checks the four-character APPLID prefix and JESSPOOL authority,
+then selects one durable available report and records run/principal ownership.
+The input interface is single-threaded across tasks and distinguishes current-
+owner from other-owner SPOLBUSY. Replay returns the same token without a second
+claim, including after SQLite reopen. The command records EIBFN `5602`.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

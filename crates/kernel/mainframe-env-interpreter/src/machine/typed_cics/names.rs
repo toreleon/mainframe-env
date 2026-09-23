@@ -28,6 +28,9 @@ pub(super) enum SlotUse {
     AddressOutput,
     AssignOutput(CicsAssignOutput),
     SpoolTokenInput,
+    SpoolTokenOutput,
+    SpoolUserIdInput,
+    SpoolClassInput,
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -75,6 +78,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::CharacterSet
         | CicsOperandName::SymbolValue => SlotUse::Input,
         CicsOperandName::SpoolToken => SlotUse::SpoolTokenInput,
+        CicsOperandName::SpoolUserId => SlotUse::SpoolUserIdInput,
+        CicsOperandName::SpoolClass => SlotUse::SpoolClassInput,
         _ => SlotUse::Input,
     }
 }
@@ -113,6 +118,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Assign(output) => SlotUse::AssignOutput(output),
         CicsOutputName::DocumentToken => SlotUse::Output,
         CicsOutputName::DocumentSize => SlotUse::NumericOutput,
+        CicsOutputName::SpoolToken => SlotUse::SpoolTokenOutput,
     }
 }
 
@@ -166,6 +172,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
         CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
         CicsPlanOperation::SpoolClose => CicsOperation::SpoolClose,
+        CicsPlanOperation::SpoolOpenInput => CicsOperation::SpoolOpenInput,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -300,6 +307,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::JournalPrefix => "PREFIX",
         CicsOperandName::JournalPfxLeng => "PFXLENG",
         CicsOperandName::SpoolToken => "TOKEN",
+        CicsOperandName::SpoolUserId => "USERID",
+        CicsOperandName::SpoolClass => "CLASS",
     }
 }
 
@@ -338,6 +347,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::TypeNamespace => "TYPENS",
         CicsOutputName::TypeNamespaceLength => "TYPENSLEN",
         CicsOutputName::JournalReqId => "REQID",
+        CicsOutputName::SpoolToken => "TOKEN",
     }
 }
 

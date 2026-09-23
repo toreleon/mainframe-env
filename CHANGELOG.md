@@ -149,6 +149,13 @@ All notable changes to mainframe-env are documented here.
   user-key task returns INVREQ 16/2. Checkpoint v12 preserves area bindings and
   restored stale-pointer rejection. The route uses the existing authorization,
   audit, cancellation, deadline, and Memory/SQLite replay boundary.
+- Added typed CICS `SPOOLOPEN INPUT` with operation tag 59, USERID/CLASS
+  operand tags 113–114, and non-ASSIGN TOKEN output tag 208. The provider
+  enforces APPLID-prefix authorization, JESSPOOL SAF/audit, the JES input
+  single-thread boundary with exact SPOLBUSY ownership codes, class-filtered
+  deterministic selection, durable token ownership, replay, and SQLite reopen.
+  The compiled route proves EIBFN `5602` and writable TOKEN delivery.
+
 - Added typed CICS `SPOOLCLOSE` over the shared bounded durable spool state.
   Append-only operation tag 58, TOKEN operand tag 112, and KEEP/DELETE option
   tags 72–73 preserve plan compatibility. Explicit input close defaults to

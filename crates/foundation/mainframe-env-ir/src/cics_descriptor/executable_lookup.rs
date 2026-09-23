@@ -75,5 +75,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Getmain64 => &CICS_EXECUTABLE_DESCRIPTORS[66],
         CicsPlanOperation::Freemain64 => &CICS_EXECUTABLE_DESCRIPTORS[67],
         CicsPlanOperation::SpoolClose => &CICS_EXECUTABLE_DESCRIPTORS[68],
+        CicsPlanOperation::SpoolOpenInput => &CICS_EXECUTABLE_DESCRIPTORS[69],
     }
 }

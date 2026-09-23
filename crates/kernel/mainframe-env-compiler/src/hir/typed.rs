@@ -195,6 +195,7 @@ pub enum HirCicsOperation {
     Rewrite,
     SetAssociationUserCorrData,
     SpoolClose,
+    SpoolOpenInput,
     Syncpoint,
     Unlock,
     Suspend,
@@ -324,6 +325,8 @@ pub enum HirCicsOperandName {
     JournalPrefix,
     JournalPfxLeng,
     SpoolToken,
+    SpoolUserId,
+    SpoolClass,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1110,23 +1113,6 @@ const fn is_numeric(category: DataCategory) -> bool {
 
 const fn is_add_corresponding_group(category: DataCategory) -> bool {
     matches!(category, DataCategory::Group | DataCategory::NationalGroup)
-}
-
-fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
-    let mut depth = 0usize;
-    for (index, token) in tokens.iter().enumerate().skip(open) {
-        match token.as_str() {
-            "(" => depth += 1,
-            ")" => {
-                depth = depth.checked_sub(1).ok_or(ResolutionFailure::Unsupported)?;
-                if depth == 0 {
-                    return Ok(index);
-                }
-            }
-            _ => {}
-        }
-    }
-    Err(ResolutionFailure::Unsupported)
 }
 
 pub(super) fn has_multiple_arithmetic_receivers(statement: &HirStatement) -> bool {
@@ -4017,6 +4003,65 @@ mod tests {
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPCL. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 BAD-TOKEN-X PIC X(7). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_spoolopen_input_resolves_selection_and_token_output() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SPIN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 USER-X PIC X(8) VALUE 'MEAPUSER'. 01 CLASS-X PIC X VALUE 'A'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SPOOLOPEN INPUT TOKEN(TOKEN-X) USERID(USER-X) CLASS(CLASS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SPOOLOPEN INPUT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SPOOLOPEN INPUT");
+        assert_eq!(command.operation, HirCicsOperation::SpoolOpenInput);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolUserId
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "USER-X")
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolClass
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "CLASS-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SpoolToken
+                && output.target.qualified_name == "TOKEN-X"
+        }));
+
+        for (command, expected) in [
+            ("SPOOLOPEN INPUT TOKEN(TOKEN-X) NOHANDLE", "requires USERID"),
+            (
+                "SPOOLOPEN INPUT TOKEN(TOKEN-X) USERID(USER-X)",
+                "requires RESP or NOHANDLE",
+            ),
+            (
+                "SPOOLOPEN INPUT TOKEN(BAD-TOKEN-X) USERID(USER-X) NOHANDLE",
+                "writable 8-character data area",
+            ),
+            (
+                "SPOOLOPEN INPUT TOKEN(TOKEN-X) USERID(BAD-USER-X) NOHANDLE",
+                "8-character value",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPIN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 BAD-TOKEN-X PIC X(7). 01 USER-X PIC X(8). 01 BAD-USER-X PIC X(7). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{command}");
             assert!(

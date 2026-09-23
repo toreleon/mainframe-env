@@ -612,6 +612,9 @@ fn validate_operation_shape(
         CicsPlanOperation::SpoolClose => {
             spool_control::invalid_close_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::SpoolOpenInput => {
+            spool_control::invalid_open_input_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2022,8 +2025,15 @@ mod tests {
 
     #[test]
     fn spool_control_reserved_tags_are_unique_and_round_trip() {
-        let operations = [(CicsPlanOperation::SpoolClose, 58)];
-        let operands = [(CicsOperandName::SpoolToken, 112)];
+        let operations = [
+            (CicsPlanOperation::SpoolClose, 58),
+            (CicsPlanOperation::SpoolOpenInput, 59),
+        ];
+        let operands = [
+            (CicsOperandName::SpoolToken, 112),
+            (CicsOperandName::SpoolUserId, 113),
+            (CicsOperandName::SpoolClass, 114),
+        ];
         let options = [
             (CicsPlanOption::SpoolKeep, 72),
             (CicsPlanOption::SpoolDelete, 73),
@@ -2052,6 +2062,15 @@ mod tests {
                 .len(),
             options.len()
         );
+        let outputs = [(CicsOutputName::SpoolToken, 208)];
+        assert_eq!(
+            outputs
+                .iter()
+                .map(|(_, tag)| *tag)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            outputs.len()
+        );
         for (operation, tag) in operations {
             assert!((58..=62).contains(&tag));
             assert_eq!(operation_tag(operation), tag);
@@ -2066,6 +2085,11 @@ mod tests {
             assert!((72..=83).contains(&tag));
             assert_eq!(option_tag(option), tag);
             assert_eq!(option_from_tag(tag), Ok(option));
+        }
+        for (output, tag) in outputs {
+            assert!((208..=215).contains(&tag));
+            assert_eq!(output_tag(output), tag);
+            assert_eq!(output_from_tag(tag), Ok(output));
         }
 
         let token = CicsStorageSlot {

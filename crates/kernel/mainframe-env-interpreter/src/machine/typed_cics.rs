@@ -16,6 +16,7 @@ mod names;
 mod response;
 mod retrieve;
 mod runtime_validation;
+mod spool_control;
 mod storage64;
 mod task_wait;
 pub(super) use address::CicsAddressSet;
@@ -478,6 +479,7 @@ pub(super) fn execute(
             | CicsOutputName::TypeNamespaceLength
             | CicsOutputName::JournalReqId
             | CicsOutputName::Token
+            | CicsOutputName::SpoolToken
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -678,7 +680,6 @@ pub(super) fn write_output(
         "ABSTIME"
             | "MILLISECONDS"
             | "LENGTH"
-            | "TOKEN"
             | "FLENGTH"
             | "NUMITEMS"
             | "ELEMNAMELEN"
@@ -686,10 +687,16 @@ pub(super) fn write_output(
             | "TYPENAMELEN"
             | "TYPENSLEN"
     ) && value.schema() != "mainframe-env.cics.decimal@1"
+        || name == "TOKEN"
+            && operation == CicsOperation::Read
+            && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
             "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
         ) && value.schema() != "mainframe-env.cics.payload@1"
+        || name == "TOKEN"
+            && operation == CicsOperation::SpoolOpenInput
+            && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(name, "ELEMNAME" | "ELEMNS" | "TYPENAME" | "TYPENS")
             && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(
@@ -931,6 +938,7 @@ fn validate_machine_slot(
             | SlotUse::Pointer64Output
             | SlotUse::AddressOutput
             | SlotUse::AssignOutput(_)
+            | SlotUse::SpoolTokenOutput
     ) && matches!(
         layout.category,
         LayoutCategory::Condition | LayoutCategory::Rename
@@ -992,17 +1000,7 @@ fn validate_machine_slot(
             "HANDLE ABEND PROGRAM input must be a 1-8 character field",
         ));
     }
-    if matches!(slot_use, SlotUse::SpoolTokenInput)
-        && (layout.length != 8
-            || !matches!(
-                layout.category,
-                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
-            ))
-    {
-        return Err(invalid_plan(
-            "CICS spool TOKEN input must be an 8-character field",
-        ));
-    }
+    spool_control::validate_slot(layout, slot_use)?;
     if matches!(slot_use, SlotUse::AbstimeInput | SlotUse::AbstimeOutput)
         && (layout.category != LayoutCategory::PackedDecimal
             || layout.length != 8

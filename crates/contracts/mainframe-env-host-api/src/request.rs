@@ -2460,6 +2460,7 @@ mod tests {
             CicsOperation::SetAssociationUserCorrData,
             CicsOperation::SetFileStatus,
             CicsOperation::SpoolClose,
+            CicsOperation::SpoolOpenInput,
             CicsOperation::StartBrowse,
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,

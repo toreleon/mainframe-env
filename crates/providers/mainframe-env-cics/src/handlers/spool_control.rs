@@ -3,7 +3,7 @@
 mod ingress;
 
 use super::{field, store_error};
-use crate::service::{CicsLimits, CicsService, Run};
+use crate::service::{CicsLimits, CicsService, Run, bounded};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
     HostRequest, canonical_request_digest,
@@ -36,8 +36,101 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::SpoolClose => close(service, run, request),
+        CicsOperation::SpoolOpenInput => open_input(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn open_input(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_open_input_request(request)?;
+    let user_id = spool_text(request, "USERID", 8)?;
+    let class = request
+        .arguments
+        .get("CLASS")
+        .map(|_| spool_text(request, "CLASS", 1))
+        .transpose()?
+        .map(|value| value.as_bytes()[0]);
+    let applid_prefix = run.applid.chars().take(4).collect::<String>();
+    if user_id.len() < 4 || !user_id[..4].eq_ignore_ascii_case(&applid_prefix) {
+        return Err(HostProblem::Unauthorized);
+    }
+    service.authorize(
+        run,
+        "JESSPOOL",
+        &format!(
+            "CICS.SPOOL.INPUT.{user_id}.{}",
+            class.map_or("*".into(), |class| char::from(class).to_string())
+        ),
+        AccessIntent::Update,
+    )?;
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    let mut state = service.lock()?;
+    if let Some(reply) = state
+        .spool
+        .replay(mutation.idempotency_key.as_str(), request_digest)?
+    {
+        return response(service, run, reply);
+    }
+    if let Some(open) = state
+        .spool
+        .reports
+        .values()
+        .find(|report| report.state == SpoolReportState::OpenInput)
+    {
+        return Err(spool_busy(
+            if open.owner_run_unit.as_deref() == Some(run.invocation.run_unit_id.as_str()) {
+                8
+            } else {
+                4
+            },
+        ));
+    }
+    let token = state
+        .spool
+        .reports
+        .iter()
+        .find(|(_, report)| {
+            report.state == SpoolReportState::AvailableInput
+                && report.user_id.eq_ignore_ascii_case(&user_id)
+                && class.is_none_or(|class| report.class.eq_ignore_ascii_case(&class))
+        })
+        .map(|(token, _)| token.clone())
+        .ok_or_else(|| HostProblem::Condition {
+            name: "NOTFND".into(),
+            response: 13,
+            response2: 4,
+        })?;
+    let current_version = state.spool.version;
+    let mut next = state.spool.clone();
+    let report = next
+        .reports
+        .get_mut(&token)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    report.state = SpoolReportState::OpenInput;
+    report.owner_run_unit = Some(run.invocation.run_unit_id.as_str().into());
+    report.owner_principal = Some(run.invocation.principal.id().as_str().into());
+    report.next_record = 0;
+    report.eof_seen = false;
+    let mut reply = SpoolReply::normal();
+    reply.token = Some(token.as_bytes().to_vec());
+    next.record_replay(
+        mutation.idempotency_key.as_str(),
+        request_digest,
+        reply.clone(),
+        service.limits,
+    )?;
+    persist_spool_state(service, current_version, &mut next)?;
+    state.spool = next;
+    response(service, run, reply)
 }
 
 fn close(
@@ -140,6 +233,59 @@ fn validate_close_request(request: &CicsRequest) -> Result<(), HostProblem> {
     Ok(())
 }
 
+fn validate_open_input_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    if !request.arguments.contains_key("TOKEN")
+        || !request.arguments.contains_key("USERID")
+        || (!request.arguments.contains_key("RESP")
+            && !request.arguments.contains_key("OPTION.NOHANDLE"))
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "USERID" | "CLASS" => !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                ),
+                "TOKEN" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(())
+}
+
+fn spool_text(request: &CicsRequest, name: &str, maximum: usize) -> Result<String, HostProblem> {
+    let value = request
+        .arguments
+        .get(name)
+        .ok_or(HostProblem::Malformed)?
+        .bytes();
+    let value = std::str::from_utf8(value)
+        .map_err(|_| HostProblem::Malformed)?
+        .trim()
+        .to_ascii_uppercase();
+    if value.is_empty()
+        || value.len() > maximum
+        || !value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return Err(if name == "CLASS" {
+            HostProblem::Condition {
+                name: "ILLOGIC".into(),
+                response: 21,
+                response2: 3,
+            }
+        } else {
+            HostProblem::Malformed
+        });
+    }
+    Ok(value)
+}
+
 fn spool_token(request: &CicsRequest) -> Result<String, HostProblem> {
     let value = request
         .arguments
@@ -162,12 +308,20 @@ fn not_open() -> HostProblem {
     }
 }
 
+fn spool_busy(response2: i32) -> HostProblem {
+    HostProblem::Condition {
+        name: "SPOLBUSY".into(),
+        response: 88,
+        response2,
+    }
+}
+
 fn response(
     service: &CicsService,
     run: &Run,
     reply: SpoolReply,
 ) -> Result<CicsResponse, HostProblem> {
-    service.response(
+    let mut response = service.response(
         run,
         CicsDisposition::Complete,
         &reply.condition,
@@ -176,7 +330,11 @@ fn response(
         None,
         None,
         reply.payload,
-    )
+    )?;
+    if let Some(token) = reply.token {
+        response.outputs.insert("TOKEN".into(), bounded(token)?);
+    }
+    Ok(response)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

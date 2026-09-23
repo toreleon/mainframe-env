@@ -12123,6 +12123,127 @@ mod tests {
     }
 
     #[test]
+    fn compiled_spoolopen_input_selects_report_and_returns_token() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "SPOPENI",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SPOPENI.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(8) VALUE SPACES.\n01 OPEN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SPOOLOPEN INPUT TOKEN(TOKEN-X) USERID('ME01USER') CLASS('A') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO OPEN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "spoolopen-input-class",
+                    "spoolopen-input-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(JESSPOOL)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("JESSPOOL", "CICS.SPOOL.INPUT.ME01USER.A", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "JESSPOOL",
+                "CICS.SPOOL.INPUT.ME01USER.A",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        let token = server
+            .cics
+            .stage_spool_input("ME01USER", b'A', &[b"SELECTED".to_vec()])
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SPOPENI".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SPIN".into(), "SPOPENI".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SPOPENI".into(),
+                    map: "SPOPENI".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("spoolopen-input-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SPIN", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SPIN",
+                24,
+                80,
+                "spoolopen-input-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SPOPENI", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            restored.variable("TOKEN-X").unwrap().bytes(),
+            token.as_bytes()
+        );
+        assert_eq!(restored.variable("OPEN-FN").unwrap().bytes(), &[0x56, 0x02]);
+        assert_eq!(
+            server.cics.spool_report_snapshot(&token).unwrap().state,
+            "open-input"
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SpoolOpenInput)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_set_allocates_checkpointed_record_storage() {
         let artifact = published_source_fixture(
             "READQSET",

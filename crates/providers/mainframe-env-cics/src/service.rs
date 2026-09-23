@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 71);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 72);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5307,6 +5307,7 @@ mod tests {
                 CicsOperation::SetAssociationUserCorrData,
             ),
             ("SPOOLCLOSE", CicsOperation::SpoolClose),
+            ("SPOOLOPEN INPUT", CicsOperation::SpoolOpenInput),
             ("START", CicsOperation::Start),
             ("STARTBR", CicsOperation::StartBrowse),
             ("SUSPEND", CicsOperation::Suspend),
@@ -6554,7 +6555,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 71);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 72);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -15109,6 +15110,119 @@ mod tests {
             service.spool_report_snapshot(&output).unwrap().state,
             "available-input"
         );
+    }
+
+    #[test]
+    fn spoolopen_input_is_single_threaded_replay_safe_and_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-spoolopen-input-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let token;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider: Arc<dyn ProviderStateStore> = store.clone();
+            let service = service(provider);
+            let (invocation, _) = registered(&service);
+            token = service
+                .stage_spool_input("MEAPUSER", b'A', &[b"INPUT".to_vec()])
+                .unwrap();
+            service
+                .stage_spool_input("MEAPUSER", b'B', &[b"LATER".to_vec()])
+                .unwrap();
+            let open = request(
+                CicsOperation::SpoolOpenInput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                    ("USERID".into(), cics_literal(b"MEAPUSER")),
+                    ("CLASS".into(), cics_literal(b"A")),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                1,
+            );
+            let opened = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, open.clone(), 1),
+                    open.clone(),
+                )
+                .unwrap();
+            assert_eq!(opened.outputs["TOKEN"].bytes(), token.as_bytes());
+            assert_eq!(
+                service.spool_report_snapshot(&token).unwrap().state,
+                "open-input"
+            );
+
+            store
+                .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+                    .unwrap(),
+                opened
+            );
+
+            let mut same_task = request(
+                CicsOperation::SpoolOpenInput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                    ("USERID".into(), cics_literal(b"MEAPUSER")),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                3,
+            );
+            same_task.condition_policy = CicsConditionPolicy::NoHandle;
+            let same_task = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, same_task.clone(), 3),
+                    same_task,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    same_task.condition.as_str(),
+                    same_task.response,
+                    same_task.response2
+                ),
+                ("SPOLBUSY", 88, 8)
+            );
+
+            let other = invocation_for("spoolopen-input-other", BTreeMap::new());
+            let other_session = SessionId::new("spoolopen-input-other", 64).unwrap();
+            service.create_session(&other_session, 24, 80).unwrap();
+            service
+                .register_run(other.clone(), &other_session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut busy = request(
+                CicsOperation::SpoolOpenInput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                    ("USERID".into(), cics_literal(b"MEAPUSER")),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                2,
+            );
+            busy.condition_policy = CicsConditionPolicy::NoHandle;
+            let busy = service
+                .invoke(&effect(&other.run_unit_id, busy.clone(), 2), busy)
+                .unwrap();
+            assert_eq!(
+                (busy.condition.as_str(), busy.response, busy.response2),
+                ("SPOLBUSY", 88, 4)
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let report = service.spool_report_snapshot(&token).unwrap();
+            assert_eq!(report.state, "open-input");
+            assert!(report.owner_run_unit.is_some());
+            assert_eq!(report.records, [b"INPUT".to_vec()]);
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

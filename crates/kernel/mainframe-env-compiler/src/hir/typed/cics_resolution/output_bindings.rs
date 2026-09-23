@@ -50,6 +50,7 @@ pub(super) fn resolve(
         ("RTRANSID", HirCicsOutputName::ReturnTransId),
         ("RTERMID", HirCicsOutputName::ReturnTermId),
         ("QUEUE", HirCicsOutputName::Queue),
+        ("TOKEN", HirCicsOutputName::SpoolToken),
         ("TIME", HirCicsOutputName::Time),
         ("YYDDD", HirCicsOutputName::Yyddd),
         ("YYMMDD", HirCicsOutputName::Yymmdd),
@@ -69,7 +70,7 @@ pub(super) fn resolve(
         {
             continue;
         }
-        if name == "TOKEN" && operation != HirCicsOperation::Read {
+        if identity == HirCicsOutputName::Token && operation != HirCicsOperation::Read {
             continue;
         }
         if name == "SET"
@@ -88,10 +89,15 @@ pub(super) fn resolve(
         {
             continue;
         }
+        if identity == HirCicsOutputName::SpoolToken
+            && operation != HirCicsOperation::SpoolOpenInput
+        {
+            continue;
+        }
         if let Some(value) = clauses.get(name) {
             let target = complete_data_reference(value, semantic)?;
             require_writable(&target)?;
-            if name == "TOKEN"
+            if identity == HirCicsOutputName::Token
                 && (target.category != DataCategory::Binary
                     || target.length != 4
                     || target.scale != 0)

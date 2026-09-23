@@ -332,6 +332,16 @@ digest/result ledger so a crash after state CAS but before the outer CICS replay
 row cannot duplicate or reverse the close. The route uses EIBFN `5610`; open,
 record transfer, implicit-close, and broader JES interface states are owned by
 the following spool-control slices.
+
+Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
+eight-character USERID value, optional one-character CLASS, and RESP or
+NOHANDLE. USERID must share the issuing CICS APPLID's first four characters.
+After JESSPOOL update authorization, the provider selects the first matching
+available report in token order and durably binds it to the exact run and
+principal. Only one input report can be open: another task receives SPOLBUSY
+88/4 and the current owner receives 88/8. A missing or held-equivalent report
+returns NOTFND 13/4 without mutation. The returned TOKEN is non-ASSIGN output
+tag 208, and the selected route uses EIBFN `5602`.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

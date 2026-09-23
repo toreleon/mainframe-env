@@ -101,6 +101,8 @@ pub enum CicsPlanOperation {
     SetAssociationUserCorrData,
     /// Close one task-owned spool report.
     SpoolClose,
+    /// Open one matching spool report for input.
+    SpoolOpenInput,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -357,6 +359,10 @@ pub enum CicsOperandName {
     JournalReqId,
     /// Eight-byte CICS spool report token.
     SpoolToken,
+    /// Spool external-writer or destination user identity.
+    SpoolUserId,
+    /// One-character spool class.
+    SpoolClass,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -519,4 +525,6 @@ pub enum CicsOutputName {
     TypeNamespaceLength,
     /// `REQID(...)` fullword token returned by asynchronous journal output.
     JournalReqId,
+    /// Eight-byte token returned by SPOOLOPEN.
+    SpoolToken,
 }
