@@ -17,6 +17,8 @@ pub(super) enum SlotUse {
     FormatTextOutput(usize),
     MillisecondsOutput,
     NumericOutput,
+    HalfwordOutput,
+    FullwordOutput,
     PointerInput,
     PointerOutput,
     AddressInput,
@@ -39,6 +41,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::EcbList => SlotUse::PointerInput,
         CicsOperandName::NumEvents | CicsOperandName::Purgeability => SlotUse::FullwordInput,
         CicsOperandName::Item => SlotUse::HalfwordInput,
+        CicsOperandName::LoadSet | CicsOperandName::Entry => SlotUse::PointerOutput,
+        CicsOperandName::LoadLength => SlotUse::HalfwordOutput,
+        CicsOperandName::LoadFlength => SlotUse::FullwordOutput,
         _ => SlotUse::Input,
     }
 }
@@ -85,6 +90,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
         CicsPlanOperation::InvokeApplication => CicsOperation::InvokeApplication,
+        CicsPlanOperation::Load => CicsOperation::Load,
         CicsPlanOperation::Link => CicsOperation::Link,
         CicsPlanOperation::Xctl => CicsOperation::Xctl,
         CicsPlanOperation::Return => CicsOperation::Return,
@@ -181,6 +187,10 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::MajorVersion => "MAJORVERSION",
         CicsOperandName::MinorVersion => "MINORVERSION",
         CicsOperandName::Channel => "CHANNEL",
+        CicsOperandName::LoadSet => "SET",
+        CicsOperandName::Entry => "ENTRY",
+        CicsOperandName::LoadLength => "LENGTH",
+        CicsOperandName::LoadFlength => "FLENGTH",
     }
 }
 
@@ -247,5 +257,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Main => "MAIN",
         CicsPlanOption::ExactMatch => "EXACTMATCH",
         CicsPlanOption::Minimum => "MINIMUM",
+        CicsPlanOption::Hold => "HOLD",
     }
 }

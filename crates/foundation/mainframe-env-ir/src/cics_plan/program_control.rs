@@ -91,6 +91,48 @@ pub(super) fn invalid_invoke_application_shape(
         || outputs.contains(&CicsOutputName::Into)
 }
 
+pub(super) fn invalid_load_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed_inputs = BTreeSet::from([
+        CicsOperandName::Program,
+        CicsOperandName::LoadSet,
+        CicsOperandName::Entry,
+        CicsOperandName::LoadLength,
+        CicsOperandName::LoadFlength,
+    ]);
+    let program = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::Program);
+    !inputs.contains(&CicsOperandName::Program)
+        || !inputs.is_subset(&allowed_inputs)
+        || inputs.contains(&CicsOperandName::LoadLength)
+            && inputs.contains(&CicsOperandName::LoadFlength)
+        || program.is_none_or(|operand| {
+            !matches!(&operand.value, CicsOperandValue::Literal(bytes) if valid_program_name(bytes))
+                && !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
+        || plan.operands.iter().any(|operand| {
+            matches!(
+                operand.name,
+                CicsOperandName::LoadSet
+                    | CicsOperandName::Entry
+                    | CicsOperandName::LoadLength
+                    | CicsOperandName::LoadFlength
+            ) && !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Hold))
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}
+
 pub(super) fn invalid_xctl_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,

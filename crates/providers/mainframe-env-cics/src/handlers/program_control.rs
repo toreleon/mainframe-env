@@ -19,6 +19,11 @@ const APPLICATION_ENTRY_NAMESPACE: &str = "cics-application-entry-v1";
 const PROGRAM_MAGIC: &[u8; 7] = b"MECPGD1";
 const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 
+mod load;
+pub(in crate::service) use load::{
+    ProgramLoadState, load_program_loads, release_task_program_loads,
+};
+
 /// One immutable installed program generation available to CICS program control.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsProgramDefinition {
@@ -148,6 +153,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::Inquire => inquire(service, run, request),
         CicsOperation::InvokeApplication => invoke_application(service, run, request),
+        CicsOperation::Load => load::invoke(service, run, request),
         CicsOperation::Link | CicsOperation::Xctl => transfer(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }

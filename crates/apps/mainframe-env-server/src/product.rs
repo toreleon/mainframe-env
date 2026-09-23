@@ -15058,6 +15058,177 @@ mod tests {
     }
 
     #[test]
+    fn online_load_crosses_compiled_selected_provider_route() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LOADROUT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SET-PTR-X POINTER.\n01 ENTRY-PTR-X POINTER.\n01 LENGTH-X PIC S9(4) COMP.\n01 SET-BYTES-X PIC X(4).\n01 ENTRY-BYTES-X PIC X(4).\n01 LOAD-FN PIC X(2).\nLINKAGE SECTION.\n01 SET-LINK-X PIC X(4).\n01 ENTRY-LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS LOAD PROGRAM('LOADPGM') SET(SET-PTR-X) ENTRY(ENTRY-PTR-X) LENGTH(LENGTH-X) HOLD END-EXEC.\nSET ADDRESS OF SET-LINK-X TO SET-PTR-X.\nSET ADDRESS OF ENTRY-LINK-X TO ENTRY-PTR-X.\nMOVE SET-LINK-X TO SET-BYTES-X.\nMOVE ENTRY-LINK-X TO ENTRY-BYTES-X.\nMOVE EIBFN TO LOAD-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("LOADROUT.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "LOADROUT.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("LOAD fixture did not publish");
+        };
+        assert!(artifact.payload().len() <= i16::MAX as usize);
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.PROGRAM.LOADPGM", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.PROGRAM.LOADPGM",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "LOADROUT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("LD00".into(), "LOADROUT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "LOADRT".into(),
+                    map: "LOADRT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[CicsProgramDefinition {
+                name: "LOADPGM".into(),
+                generation: 1,
+                artifact: artifact_ref.clone(),
+                semantic_identity: artifact.semantic_id().to_reference(),
+                entry_offset: 1,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
+            .unwrap();
+        let session = SessionId::new("typed-load-route", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "LD00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "LD00",
+                24,
+                80,
+                "typed-load-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "LOADROUT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "LOADROUT", 2)
+            .unwrap();
+
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("LOAD-FN").unwrap().bytes(), &[0x0e, 0x06]);
+        assert_eq!(
+            restored.variable("LENGTH-X").unwrap().bytes(),
+            &(artifact.payload().len() as i16).to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("SET-BYTES-X").unwrap().bytes(),
+            &artifact.payload()[..4]
+        );
+        assert_eq!(
+            restored.variable("ENTRY-BYTES-X").unwrap().bytes(),
+            &artifact.payload()[1..5]
+        );
+        assert!(
+            restored
+                .variable("SET-PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
+        );
+        assert!(
+            restored
+                .variable("ENTRY-PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+    }
+
+    #[test]
     fn online_link_updates_typed_commarea_through_selected_program_route() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";

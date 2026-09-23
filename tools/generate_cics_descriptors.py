@@ -138,6 +138,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
     ),
     ("Link", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0138"),
+    ("Load", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0142"),
     ("PopHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0146"),
     (
         "PurgeMessage",
@@ -428,6 +429,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "HandleCondition",
         "IgnoreCondition",
         "InvokeApplication",
+        "Load",
         "Link",
         "Xctl",
         "Return",
@@ -532,6 +534,15 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "InvokeApplication": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "Load": frozenset(
         {
             "memory-read",
             "memory-write",
@@ -855,6 +866,7 @@ def _load_typed_execution_registrations(
         "HandleAid",
         "IgnoreCondition",
         "InvokeApplication",
+        "Load",
         "PopHandle",
         "PurgeMessage",
         "PushHandle",
@@ -1171,6 +1183,7 @@ def load_catalog(
                 "Getmain",
                 "HandleAid",
                 "IgnoreCondition",
+                "Load",
                 "PopHandle",
                 "PurgeMessage",
                 "PushHandle",

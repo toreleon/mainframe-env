@@ -108,13 +108,13 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 12981,
+      "max_production_lines": 12943,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3679,
+      "max_production_lines": 3667,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -294,6 +294,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/protect.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/retrieve.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control/temporary_storage.rs",
       "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",

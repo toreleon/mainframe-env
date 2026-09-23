@@ -29,6 +29,9 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::ExactMatch | CicsPlanOption::Minimum
         ),
+        CicsPlanOperation::Load => {
+            !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Hold)
+        }
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

@@ -20,9 +20,25 @@ mod time;
 pub(in crate::service) mod transient_data;
 
 use super::{CicsService, Run};
-use mainframe_env_host_api::HostProblem;
+use mainframe_env_host_api::{CicsRequest, HostProblem};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
+
+pub(super) fn argument_bytes(request: &CicsRequest, name: &str) -> Option<Vec<u8>> {
+    request
+        .arguments
+        .get(name)
+        .map(|value| value.bytes().to_vec())
+}
+
+pub(super) fn argument_optional(request: &CicsRequest, name: &str) -> Option<String> {
+    argument_bytes(request, name).map(|value| String::from_utf8_lossy(&value).into_owned())
+}
+
+pub(super) fn argument_text(request: &CicsRequest, name: &str) -> Result<String, HostProblem> {
+    let value = argument_bytes(request, name).ok_or(HostProblem::Malformed)?;
+    String::from_utf8(value).map_err(|_| HostProblem::Malformed)
+}
 
 pub(crate) fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
     out.extend_from_slice(
@@ -61,7 +77,8 @@ pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval
 pub(super) use program_control::invoke as invoke_program_control;
 pub use program_control::{CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition};
 pub(super) use program_control::{
-    load_application_entries, load_program_definitions, validate_application_catalog,
+    ProgramLoadState, load_application_entries, load_program_definitions, load_program_loads,
+    validate_application_catalog,
 };
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
@@ -93,7 +110,8 @@ pub(in crate::service) use transient_data::{
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
-    interval_control::release_task(service, run)
+    interval_control::release_task(service, run)?;
+    program_control::release_task_program_loads(service, run)
 }
 
 pub(super) fn rollback_task(

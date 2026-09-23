@@ -194,3 +194,74 @@ pub(super) fn write_set_output(
     machine.bases.push(value.bytes().to_vec());
     machine.write_reference(&pointer, &address)
 }
+
+pub(super) fn prepare_load_allocation(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    response: &CicsResponse,
+    outputs: &BTreeMap<String, CicsTarget>,
+) -> Result<Option<usize>, MachineProblem> {
+    if operation != CicsOperation::Load {
+        return Ok(None);
+    }
+    let pointer_targets = ["SET", "ENTRY"]
+        .into_iter()
+        .filter_map(|name| outputs.get(name))
+        .collect::<Vec<_>>();
+    let content = response.outputs.get("LOAD.CONTENT");
+    if pointer_targets.is_empty() {
+        return if content.is_some() {
+            Err(MachineProblem::UnexpectedHostResult)
+        } else {
+            Ok(None)
+        };
+    }
+    if response.response != 0 {
+        return if content.is_some() {
+            Err(MachineProblem::UnexpectedHostResult)
+        } else {
+            Ok(None)
+        };
+    }
+    let content = content.ok_or(MachineProblem::UnexpectedHostResult)?;
+    if content.schema() != "mainframe-env.cics.payload@1"
+        || pointer_targets
+            .iter()
+            .map(|target| allocation_capacity(machine, target))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .any(|capacity| content.bytes().len() > capacity)
+    {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let base = machine.bases.len();
+    machine.bases.push(content.bytes().to_vec());
+    Ok(Some(base))
+}
+
+pub(super) fn write_load_pointer(
+    machine: &mut ReferenceMachine,
+    target: &CicsTarget,
+    value: &BoundedPayload,
+    base: usize,
+) -> Result<(), MachineProblem> {
+    if value.schema() != "mainframe-env.cics.load-offset@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let offset = std::str::from_utf8(value.bytes())
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|offset| {
+            machine
+                .bases
+                .get(base)
+                .is_some_and(|storage| *offset <= storage.len())
+        })
+        .ok_or(MachineProblem::UnexpectedHostResult)?;
+    let CicsTarget::Resolved(slot) = target else {
+        return Err(MachineProblem::UnexpectedHostResult);
+    };
+    let pointer = resolved_slot(machine, slot)?;
+    let address = machine.address_bytes_for(base, offset, pointer.length)?;
+    machine.write_reference(&pointer, &address)
+}

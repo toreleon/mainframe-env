@@ -574,7 +574,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 49] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 50] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -967,6 +967,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 49] = [
         effects: CONTROL_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Load,
+        namespace: "cics.program",
+        name: "load",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -1024,6 +1032,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::WaitExternal => &CICS_EXECUTABLE_DESCRIPTORS[46],
         CicsPlanOperation::WriteTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[47],
         CicsPlanOperation::InvokeApplication => &CICS_EXECUTABLE_DESCRIPTORS[48],
+        CicsPlanOperation::Load => &CICS_EXECUTABLE_DESCRIPTORS[49],
     }
 }
 

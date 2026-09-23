@@ -21,6 +21,7 @@ pub(super) fn resolve(
         ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
         ["INVOKE", "APPLICATION"] => HirCicsOperation::InvokeApplication,
+        ["LOAD"] => HirCicsOperation::Load,
         ["LINK"] => HirCicsOperation::Link,
         ["XCTL"] => HirCicsOperation::Xctl,
         ["RETURN"] => HirCicsOperation::Return,
@@ -96,6 +97,7 @@ pub(super) fn resolve_option(option: &str) -> HirCicsOption {
         "NOTPURGEABLE" => HirCicsOption::NotPurgeable,
         "EXACTMATCH" => HirCicsOption::ExactMatch,
         "MINIMUM" => HirCicsOption::Minimum,
+        "HOLD" => HirCicsOption::Hold,
         _ => unreachable!("allowed CICS option"),
     }
 }

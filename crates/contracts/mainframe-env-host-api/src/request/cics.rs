@@ -50,6 +50,8 @@ pub enum CicsOperation {
     Inquire,
     /// Select and invoke one installed application operation.
     InvokeApplication,
+    /// Load one immutable installed program generation for the issuing task.
+    Load,
     Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
@@ -117,6 +119,7 @@ impl CicsOperation {
             Self::IgnoreCondition => "IgnoreCondition",
             Self::Inquire => "Inquire",
             Self::InvokeApplication => "InvokeApplication",
+            Self::Load => "Load",
             Self::Link => "Link",
             Self::PopHandle => "PopHandle",
             Self::PushHandle => "PushHandle",
@@ -165,6 +168,7 @@ impl CicsOperation {
                 | Self::WriteTransientData
                 | Self::Link
                 | Self::InvokeApplication
+                | Self::Load
                 | Self::ReceiveMap
                 | Self::ReadTransientData
                 | Self::PurgeMessage
@@ -224,6 +228,7 @@ impl CicsOperation {
             ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
             ("INQUIRE", _) => Self::Inquire,
             ("INVOKE", Some("APPLICATION")) => Self::InvokeApplication,
+            ("LOAD", _) => Self::Load,
             ("LINK", _) => Self::Link,
             ("POP", Some("HANDLE")) => Self::PopHandle,
             ("PUSH", Some("HANDLE")) => Self::PushHandle,

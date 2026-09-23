@@ -165,6 +165,7 @@ pub enum HirCicsOperation {
     HandleCondition,
     IgnoreCondition,
     InvokeApplication,
+    Load,
     Link,
     Xctl,
     Return,
@@ -260,6 +261,10 @@ pub enum HirCicsOperandName {
     MajorVersion,
     MinorVersion,
     Channel,
+    LoadSet,
+    Entry,
+    LoadLength,
+    LoadFlength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -314,6 +319,7 @@ pub enum HirCicsOption {
     Main,
     ExactMatch,
     Minimum,
+    Hold,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -2585,6 +2591,50 @@ mod tests {
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADINVK. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16). PROCEDURE DIVISION. {invalid}. STOP RUN."
+            );
+            assert!(analyze(&source).hir.is_none(), "accepted {invalid}");
+        }
+    }
+
+    #[test]
+    fn cics_load_resolves_pointer_length_and_hold_contract() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLOAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 SET-X POINTER. 01 ENTRY-X POINTER-32. 01 LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS LOAD PROGRAM('PAYLOAD') SET(SET-X) ENTRY(ENTRY-X) LENGTH(LENGTH-X) HOLD END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("LOAD: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved LOAD command");
+        assert_eq!(command.operation, HirCicsOperation::Load);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Hold]));
+        for (name, qualified_name) in [
+            (HirCicsOperandName::LoadSet, "SET-X"),
+            (HirCicsOperandName::Entry, "ENTRY-X"),
+            (HirCicsOperandName::LoadLength, "LENGTH-X"),
+        ] {
+            assert!(command.operands.iter().any(|operand| {
+                operand.name == name
+                    && matches!(
+                        &operand.value,
+                        HirCicsValue::Data(reference)
+                            if reference.qualified_name == qualified_name
+                    )
+            }));
+        }
+
+        for invalid in [
+            "EXEC CICS LOAD PROGRAM('PAYLOAD') LENGTH(LENGTH-X) FLENGTH(FLENGTH-X) END-EXEC",
+            "EXEC CICS LOAD PROGRAM('PAYLOAD') SET(TEXT-X) END-EXEC",
+            "EXEC CICS LOAD PROGRAM('PAYLOAD') LENGTH(FLENGTH-X) END-EXEC",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADLOAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 SET-X POINTER. 01 TEXT-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP. 01 FLENGTH-X PIC S9(9) COMP. PROCEDURE DIVISION. {invalid}. STOP RUN."
             );
             assert!(analyze(&source).hir.is_none(), "accepted {invalid}");
         }

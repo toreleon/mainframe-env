@@ -41,6 +41,8 @@ pub enum CicsPlanOperation {
     Link,
     /// Select and invoke one installed application operation at the next logical level.
     InvokeApplication,
+    /// Make one immutable installed program generation available to the issuing task.
+    Load,
     /// Transfer to one installed program at the same logical level without returning.
     Xctl,
     /// Return from the current top-level task and optionally schedule its next transaction.
@@ -217,6 +219,14 @@ pub enum CicsOperandName {
     MinorVersion,
     /// `CHANNEL(...)` application invocation channel name.
     Channel,
+    /// `SET(...)` pointer target for LOAD.
+    LoadSet,
+    /// `ENTRY(...)` pointer target for LOAD.
+    Entry,
+    /// `LENGTH(...)` halfword output target for LOAD.
+    LoadLength,
+    /// `FLENGTH(...)` fullword output target for LOAD.
+    LoadFlength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -290,6 +300,8 @@ pub enum CicsPlanOption {
     ExactMatch,
     /// Select the highest minor version at or above the named minimum.
     Minimum,
+    /// Retain a LOAD ownership after the issuing task terminates.
+    Hold,
 }
 
 /// Named result binding written after the host result arrives.

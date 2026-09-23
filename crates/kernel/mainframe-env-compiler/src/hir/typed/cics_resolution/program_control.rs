@@ -20,6 +20,9 @@ pub(super) const INVOKE_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const LOAD_CLAUSES: &[&str] = &[
+    "PROGRAM", "SET", "ENTRY", "LENGTH", "FLENGTH", "RESP", "RESP2",
+];
 
 pub(super) fn validate(
     operation: HirCicsOperation,
@@ -33,6 +36,14 @@ pub(super) fn validate(
 fn validate_constraints(operation: HirCicsOperation, clauses: &Clauses) -> Resolution<()> {
     if operation == HirCicsOperation::InvokeApplication {
         validate_invoke_constraints(clauses)
+    } else if operation == HirCicsOperation::Load {
+        if clauses.contains_key("LENGTH") && clauses.contains_key("FLENGTH") {
+            Err(ResolutionFailure::Invalid(
+                "CICS LOAD accepts LENGTH or FLENGTH, not both".into(),
+            ))
+        } else {
+            Ok(())
+        }
     } else if matches!(
         operation,
         HirCicsOperation::Link | HirCicsOperation::Xctl | HirCicsOperation::Return
@@ -92,11 +103,60 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
         HirCicsOperation::InvokeApplication => invoke_operands(clauses, semantic),
+        HirCicsOperation::Load => load_operands(clauses, semantic),
         HirCicsOperation::Link => transfer_operands(clauses, semantic, "LINK"),
         HirCicsOperation::Xctl => transfer_operands(clauses, semantic, "XCTL"),
         HirCicsOperation::Return => return_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
+}
+
+fn load_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::Program,
+        value: program_name::value(&clauses["PROGRAM"], semantic, "LOAD")?,
+    }];
+    for (clause, name, pointer, bytes) in [
+        ("SET", HirCicsOperandName::LoadSet, true, 0),
+        ("ENTRY", HirCicsOperandName::Entry, true, 0),
+        ("LENGTH", HirCicsOperandName::LoadLength, false, 2),
+        ("FLENGTH", HirCicsOperandName::LoadFlength, false, 4),
+    ] {
+        let Some(tokens) = clauses.get(clause) else {
+            continue;
+        };
+        let target = complete_data_reference(tokens, semantic)?;
+        require_writable(&target)?;
+        if pointer
+            && !matches!(
+                target.usage,
+                crate::CobolUsage::Pointer | crate::CobolUsage::Pointer32
+            )
+            || !pointer
+                && (target.length != bytes
+                    || target.category != DataCategory::Binary
+                    || !matches!(target.usage, crate::CobolUsage::Binary))
+        {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS LOAD {clause} requires {}",
+                if pointer {
+                    "a POINTER or POINTER-32 reference"
+                } else if bytes == 2 {
+                    "a writable halfword-binary area"
+                } else {
+                    "a writable fullword-binary area"
+                }
+            )));
+        }
+        operands.push(HirCicsNamedOperand {
+            name,
+            value: HirCicsValue::Data(target),
+        });
+    }
+    Ok(operands)
 }
 
 fn validate_invoke_constraints(clauses: &Clauses) -> Resolution<()> {

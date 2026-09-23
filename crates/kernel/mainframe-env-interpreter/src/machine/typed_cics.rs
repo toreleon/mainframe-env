@@ -13,11 +13,13 @@ mod address;
 mod assign;
 mod legacy;
 mod names;
+mod response;
 mod retrieve;
 mod task_wait;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
+pub(super) use response::drive_response;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
@@ -43,8 +45,10 @@ pub(super) fn write_response_state(
     response_target: Option<&CicsTarget>,
     response2_target: Option<&CicsTarget>,
     address_set: Option<&CicsAddressSet>,
+    outputs: &BTreeMap<String, CicsTarget>,
+    operation: CicsOperation,
     response: &CicsResponse,
-) -> Result<(), MachineProblem> {
+) -> Result<Option<usize>, MachineProblem> {
     for (target, value) in [
         (response_target, response.response),
         (response2_target, response.response2),
@@ -66,7 +70,7 @@ pub(super) fn write_response_state(
     {
         address::apply(machine, action)?;
     }
-    Ok(())
+    retrieve::prepare_load_allocation(machine, operation, response, outputs)
 }
 
 pub(super) fn into_payload_schema<'a>(
@@ -245,6 +249,7 @@ pub(super) fn execute(
     let host_operation = names::host_operation(plan.operation);
     let address_set = address::action(&plan)?;
     let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
+    let mut operand_outputs = BTreeMap::new();
     for operand in &plan.operands {
         if matches!(
             operand.name,
@@ -289,6 +294,32 @@ pub(super) fn execute(
             }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea => {
                 retrieve::freemain_data_argument(machine, slot)?
+            }
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::LoadSet
+                        | CicsOperandName::Entry
+                        | CicsOperandName::LoadLength
+                        | CicsOperandName::LoadFlength
+                ) =>
+            {
+                let target = CicsTarget::Resolved(slot.clone());
+                if matches!(
+                    operand.name,
+                    CicsOperandName::LoadSet | CicsOperandName::Entry
+                ) {
+                    arguments.extend(retrieve::allocation_arguments(
+                        machine,
+                        &target,
+                        plan.operation,
+                    )?);
+                }
+                operand_outputs.insert(names::operand(operand.name).into(), target);
+                (
+                    "mainframe-env.cics.argument@1",
+                    slot.qualified_layout_name.as_bytes().to_vec(),
+                )
             }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
                 "mainframe-env.cics.storage-identity@1",
@@ -363,7 +394,7 @@ pub(super) fn execute(
     }
 
     let mut into = None;
-    let mut outputs = BTreeMap::new();
+    let mut outputs = operand_outputs;
     let mut response = None;
     let mut response2 = None;
     for output in &plan.outputs {
@@ -555,12 +586,20 @@ pub(super) fn write_output(
     name: &str,
     target: &CicsTarget,
     value: &BoundedPayload,
+    load_base: Option<usize>,
 ) -> Result<(), MachineProblem> {
+    if matches!(name, "SET" | "ENTRY")
+        && let Some(load_base) = load_base
+    {
+        return retrieve::write_load_pointer(machine, target, value, load_base);
+    }
     if name == "SET" {
         return retrieve::write_set_output(machine, operation, target, value);
     }
-    if matches!(name, "ABSTIME" | "MILLISECONDS" | "LENGTH" | "NUMITEMS")
-        && value.schema() != "mainframe-env.cics.decimal@1"
+    if matches!(
+        name,
+        "ABSTIME" | "MILLISECONDS" | "LENGTH" | "FLENGTH" | "NUMITEMS"
+    ) && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
             "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
@@ -829,6 +868,8 @@ fn validate_machine_slot(
             | SlotUse::FormatTextOutput(_)
             | SlotUse::MillisecondsOutput
             | SlotUse::NumericOutput
+            | SlotUse::HalfwordOutput
+            | SlotUse::FullwordOutput
             | SlotUse::PointerOutput
             | SlotUse::AddressOutput
             | SlotUse::AssignOutput(_)
@@ -840,6 +881,16 @@ fn validate_machine_slot(
     }
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if matches!(slot_use, SlotUse::HalfwordOutput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 2 || layout.scale != 0)
+    {
+        return Err(invalid_plan("LOAD LENGTH output must be halfword binary"));
+    }
+    if matches!(slot_use, SlotUse::FullwordOutput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
+    {
+        return Err(invalid_plan("LOAD FLENGTH output must be fullword binary"));
     }
     if matches!(slot_use, SlotUse::HalfwordInput)
         && (layout.category != LayoutCategory::Binary || layout.length != 2)
@@ -1196,6 +1247,7 @@ mod tests {
             "MMDDYY",
             &CicsTarget::Resolved(slot.clone()),
             &payload("mainframe-env.cics.payload@1", b"083026".to_vec()).unwrap(),
+            None,
         )
         .unwrap();
         assert_eq!(

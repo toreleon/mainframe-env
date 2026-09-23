@@ -225,6 +225,10 @@ impl PlanContext<'_> {
                 HirCicsOperandName::MajorVersion => CicsOperandName::MajorVersion,
                 HirCicsOperandName::MinorVersion => CicsOperandName::MinorVersion,
                 HirCicsOperandName::Channel => CicsOperandName::Channel,
+                HirCicsOperandName::LoadSet => CicsOperandName::LoadSet,
+                HirCicsOperandName::Entry => CicsOperandName::Entry,
+                HirCicsOperandName::LoadLength => CicsOperandName::LoadLength,
+                HirCicsOperandName::LoadFlength => CicsOperandName::LoadFlength,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -333,6 +337,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
         HirCicsOperation::InvokeApplication => CicsPlanOperation::InvokeApplication,
+        HirCicsOperation::Load => CicsPlanOperation::Load,
         HirCicsOperation::Link => CicsPlanOperation::Link,
         HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
         HirCicsOperation::Return => CicsPlanOperation::Return,
@@ -400,5 +405,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Main => CicsPlanOption::Main,
         HirCicsOption::ExactMatch => CicsPlanOption::ExactMatch,
         HirCicsOption::Minimum => CicsPlanOption::Minimum,
+        HirCicsOption::Hold => CicsPlanOption::Hold,
     }
 }

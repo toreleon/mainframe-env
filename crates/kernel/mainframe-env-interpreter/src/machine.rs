@@ -1936,11 +1936,13 @@ impl ReferenceMachine {
                 HostResult::Cics(response),
             ) => {
                 let responded = response_target.is_some() || no_handle;
-                typed_cics::write_response_state(
+                let load_base = typed_cics::write_response_state(
                     self,
                     response_target.as_ref(),
                     response2_target.as_ref(),
                     address_set.as_ref(),
+                    &outputs,
+                    operation,
                     &response,
                 )?;
                 if let Some(target) = into
@@ -1985,51 +1987,11 @@ impl ReferenceMachine {
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
-                    typed_cics::write_output(self, operation, name, target, value)?;
+                    typed_cics::write_output(self, operation, name, target, value, load_base)?;
                 }
                 eib::write_context(self, operation, &response)?;
-                self.deferred_drive = match response.disposition {
-                    CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
-                        MachineDrive::Condition(Condition {
-                            name: response.condition,
-                            response: response.response,
-                            response2: response.response2,
-                            handled: false,
-                        }),
-                    ),
-                    CicsDisposition::Ignored => None,
-                    CicsDisposition::Suspended => Some(typed_cics::suspension(
-                        self,
-                        operation,
-                        response.payload.bytes().len(),
-                    )),
-                    CicsDisposition::Transfer => {
-                        let target = response
-                            .target
-                            .ok_or(MachineProblem::UnexpectedHostResult)?;
-                        Some(MachineDrive::Transfer(Transfer {
-                            selector: Selector::new(target, InvocationLimits::default())
-                                .map_err(|_| MachineProblem::UnexpectedHostResult)?,
-                            payload: response.payload,
-                            replace_frame: true,
-                        }))
-                    }
-                    CicsDisposition::Handler => {
-                        let target = response
-                            .target
-                            .ok_or(MachineProblem::UnexpectedHostResult)?;
-                        self.pc = self
-                            .labels
-                            .get(&normalize(&target))
-                            .copied()
-                            .ok_or(MachineProblem::UnexpectedHostResult)?;
-                        None
-                    }
-                    CicsDisposition::Returned => Some(MachineDrive::Completed(self.complete()?)),
-                    CicsDisposition::Abended => Some(MachineDrive::Abend(
-                        typed_cics::abend_outcome(operation, &response)?,
-                    )),
-                };
+                self.deferred_drive =
+                    typed_cics::drive_response(self, operation, response, responded)?;
             }
             (
                 PendingKind::DatasetRead { .. }

@@ -8,6 +8,7 @@ use crate::retention::{
     UowRetentionMetadata,
 };
 pub use handlers::*;
+use handlers::{argument_bytes, argument_optional, argument_text};
 use handlers::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
@@ -267,6 +268,7 @@ struct State {
     programs: BTreeSet<String>,
     program_definitions: BTreeMap<String, BTreeMap<u64, CicsProgramDefinition>>,
     application_entries: Vec<CicsApplicationEntryDefinition>,
+    program_loads: BTreeMap<String, handlers::ProgramLoadState>,
     file_aliases: BTreeMap<String, CicsFileDefinition>,
     file_statuses: BTreeMap<String, DurableFileStatus>,
     enqueue_models: BTreeMap<String, CicsEnqueueModelDefinition>,
@@ -395,6 +397,7 @@ impl CicsService {
         let program_definitions = handlers::load_program_definitions(store.as_ref(), limits)?;
         let application_entries = handlers::load_application_entries(store.as_ref(), limits)?;
         handlers::validate_application_catalog(&program_definitions, &application_entries)?;
+        let program_loads = handlers::load_program_loads(store.as_ref(), limits)?;
         let mut file_aliases = BTreeMap::new();
         for row in store
             .list_provider_state("cics-file-alias", limits.max_file_aliases)
@@ -438,6 +441,7 @@ impl CicsService {
                 programs,
                 program_definitions,
                 application_entries,
+                program_loads,
                 file_aliases,
                 file_statuses,
                 enqueue_models,
@@ -1682,7 +1686,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 51);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 52);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -2488,22 +2492,6 @@ fn decode_map_payload(
         }
     }
     Ok(fields)
-}
-
-fn argument_bytes(request: &CicsRequest, name: &str) -> Option<Vec<u8>> {
-    request
-        .arguments
-        .get(name)
-        .map(|value| value.bytes().to_vec())
-}
-
-fn argument_optional(request: &CicsRequest, name: &str) -> Option<String> {
-    argument_bytes(request, name).map(|value| String::from_utf8_lossy(&value).into_owned())
-}
-
-fn argument_text(request: &CicsRequest, name: &str) -> Result<String, HostProblem> {
-    let value = argument_bytes(request, name).ok_or(HostProblem::Malformed)?;
-    String::from_utf8(value).map_err(|_| HostProblem::Malformed)
 }
 
 fn bounded(bytes: Vec<u8>) -> Result<BoundedPayload, HostProblem> {
@@ -3742,6 +3730,24 @@ mod tests {
         }
     }
 
+    impl ArtifactStore for FailCicsReplayCasStore {
+        fn health(&self) -> Result<mainframe_env_store_api::ArtifactStoreHealth, StoreError> {
+            self.inner.health()
+        }
+
+        fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
+            self.inner.put_artifact(record)
+        }
+
+        fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+            self.inner.get_artifact(id)
+        }
+
+        fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError> {
+            self.inner.delete_artifact(id)
+        }
+    }
+
     impl ProviderStateStore for FailCicsReplayCasStore {
         fn get_provider_state(
             &self,
@@ -4595,6 +4601,51 @@ mod tests {
         (artifact, semantic_identity)
     }
 
+    fn register_load_program(
+        cics: &CicsService,
+        store: &dyn ArtifactStore,
+        name: &str,
+        generation: u64,
+        bytes: &[u8],
+        entry_offset: u32,
+    ) -> ArtifactRef {
+        let (artifact, semantic_identity) = install_program_artifact(store, bytes);
+        cics.register_program_definitions(&[CicsProgramDefinition {
+            name: name.into(),
+            generation,
+            artifact: artifact.clone(),
+            semantic_identity,
+            entry_offset,
+            enabled: true,
+            remote: false,
+            reload: false,
+            java_status: CicsJavaStatus::NotJava,
+        }])
+        .unwrap();
+        artifact
+    }
+
+    fn load_arguments(
+        program: &str,
+        hold: bool,
+        fullword: bool,
+    ) -> BTreeMap<String, BoundedPayload> {
+        let mut arguments = BTreeMap::from([
+            ("PROGRAM".into(), cics_literal(program.as_bytes())),
+            ("SET".into(), argument(b"SET-X")),
+            ("ENTRY".into(), argument(b"ENTRY-X")),
+            ("SET.MAXLENGTH".into(), cics_decimal(1_048_576)),
+            (
+                if fullword { "FLENGTH" } else { "LENGTH" }.into(),
+                argument(b"LENGTH-X"),
+            ),
+        ]);
+        if hold {
+            arguments.insert("OPTION.HOLD".into(), cics_option());
+        }
+        arguments
+    }
+
     fn condition_list(names: &[&str]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.condition-list@1",
@@ -5205,8 +5256,343 @@ mod tests {
     }
 
     #[test]
+    fn load_selects_latest_content_and_enforces_hold_ownership_across_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = store.clone();
+        let cics = service(provider_store.clone());
+        cics.bind_artifact_store(artifact_store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "LOADPGM", 1, b"OLD", 0);
+        let latest = register_load_program(&cics, store.as_ref(), "LOADPGM", 2, b"PAYLOAD", 2);
+        let invocation = invocation_for("load-hold", BTreeMap::new());
+        let session = SessionId::new("load-hold-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let load = request(
+            CicsOperation::Load,
+            load_arguments("LOADPGM", true, false),
+            1,
+        );
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, load.clone(), 1),
+                load.clone(),
+            )
+            .unwrap();
+        assert_eq!(response.outputs["LOAD.CONTENT"].bytes(), b"PAYLOAD");
+        assert_eq!(response.outputs["SET"].bytes(), b"0");
+        assert_eq!(response.outputs["ENTRY"].bytes(), b"2");
+        assert_eq!(response.outputs["LENGTH"].bytes(), b"7");
+        assert_eq!(
+            response.outputs["PROGRAM.CONTENT"].bytes(),
+            latest.as_str().as_bytes()
+        );
+        register_load_program(&cics, store.as_ref(), "LOADPGM", 3, b"NEWEST!", 1);
+        let replay = cics
+            .invoke(&effect(&invocation.run_unit_id, load.clone(), 1), load)
+            .unwrap();
+        assert_eq!(replay, response);
+        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&cics, &run).unwrap();
+        assert_eq!(
+            cics.lock().unwrap().program_loads["LOADPGM"].events.len(),
+            1
+        );
+
+        drop(cics);
+        let reopened = service(provider_store);
+        reopened.bind_artifact_store(artifact_store).unwrap();
+        assert_eq!(
+            reopened.lock().unwrap().program_loads["LOADPGM"].events[0].generation,
+            2
+        );
+        let nonhold_invocation = invocation_for("load-task", BTreeMap::new());
+        let nonhold_session = SessionId::new("load-task-session", 64).unwrap();
+        reopened.create_session(&nonhold_session, 24, 80).unwrap();
+        reopened
+            .register_run(
+                nonhold_invocation.clone(),
+                &nonhold_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let load = request(
+            CicsOperation::Load,
+            load_arguments("LOADPGM", false, true),
+            2,
+        );
+        let response = reopened
+            .invoke(
+                &effect(&nonhold_invocation.run_unit_id, load.clone(), 2),
+                load,
+            )
+            .unwrap();
+        assert_eq!(response.outputs["FLENGTH"].bytes(), b"7");
+        assert_eq!(
+            reopened.lock().unwrap().program_loads["LOADPGM"]
+                .events
+                .len(),
+            2
+        );
+        let run = reopened.lock().unwrap().runs[&nonhold_invocation.run_unit_id].clone();
+        handlers::release_task_state(&reopened, &run).unwrap();
+        let state = reopened.lock().unwrap();
+        assert_eq!(state.program_loads["LOADPGM"].events.len(), 1);
+        assert!(state.program_loads["LOADPGM"].events[0].hold);
+    }
+
+    #[test]
+    fn load_replays_after_outer_receipt_failure_and_checks_bounds_and_saf() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = store.clone();
+        let cics = service(provider_store);
+        cics.bind_artifact_store(artifact_store).unwrap();
+        register_load_program(&cics, store.as_ref(), "REPLAY", 1, b"CONTENT", 0);
+        let (invocation, _) = registered(&cics);
+        let load = request(CicsOperation::Load, load_arguments("REPLAY", true, true), 1);
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, load.clone(), 1),
+                load.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(cics.lock().unwrap().program_loads["REPLAY"].events.len(), 1);
+        let response = cics
+            .invoke(&effect(&invocation.run_unit_id, load.clone(), 1), load)
+            .unwrap();
+        assert_eq!(response.outputs["FLENGTH"].bytes(), b"7");
+        assert_eq!(cics.lock().unwrap().program_loads["REPLAY"].events.len(), 1);
+
+        let memory = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(memory.clone());
+        cics.bind_artifact_store(memory.clone()).unwrap();
+        register_load_program(&cics, memory.as_ref(), "TOOBIG", 1, &vec![b'X'; 32_768], 0);
+        let (invocation, _) = registered(&cics);
+        let bounded = request(
+            CicsOperation::Load,
+            BTreeMap::from([
+                ("PROGRAM".into(), cics_literal(b"TOOBIG")),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, bounded.clone(), 2),
+                bounded,
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 19,
+            })
+        );
+        assert!(cics.lock().unwrap().program_loads.get("TOOBIG").is_none());
+
+        let denied_store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = command_authorities(true);
+        let denied = CicsService::open(host, denied_store.clone(), CicsLimits::default()).unwrap();
+        denied.bind_artifact_store(denied_store.clone()).unwrap();
+        register_load_program(&denied, denied_store.as_ref(), "DENIED", 1, b"NO", 0);
+        let (invocation, _) = registered(&denied);
+        let request = request(
+            CicsOperation::Load,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"DENIED"))]),
+            3,
+        );
+        assert_eq!(
+            denied.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 3),
+                request,
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(denied.lock().unwrap().program_loads.is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.PROGRAM.DENIED"
+                        && *intent == AccessIntent::Execute
+                })
+        );
+    }
+
+    #[test]
+    fn load_hold_state_reopens_from_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-load-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            cics.bind_artifact_store(store.clone()).unwrap();
+            register_load_program(&cics, store.as_ref(), "SQLLOAD", 9, b"SQLITE", 1);
+            let (invocation, _) = registered(&cics);
+            let load = request(
+                CicsOperation::Load,
+                load_arguments("SQLLOAD", true, true),
+                1,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, load.clone(), 1), load)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            cics.bind_artifact_store(store).unwrap();
+            let state = cics.lock().unwrap();
+            assert_eq!(state.program_loads["SQLLOAD"].events.len(), 1);
+            assert_eq!(state.program_loads["SQLLOAD"].events[0].generation, 9);
+            assert!(state.program_loads["SQLLOAD"].events[0].hold);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn load_reports_source_program_status_conditions_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let cics = service(provider_store.clone());
+        cics.bind_artifact_store(store.clone()).unwrap();
+        let mut definitions = Vec::new();
+        for (name, enabled, remote, java_status) in [
+            ("DISABLED", false, false, CicsJavaStatus::NotJava),
+            ("REMOTE", true, true, CicsJavaStatus::NotJava),
+            ("JAVAPGM", true, false, CicsJavaStatus::Available),
+            ("BADART", true, false, CicsJavaStatus::NotJava),
+        ] {
+            let (artifact, semantic_identity) =
+                install_program_artifact(store.as_ref(), name.as_bytes());
+            definitions.push(CicsProgramDefinition {
+                name: name.into(),
+                generation: 1,
+                artifact,
+                semantic_identity,
+                entry_offset: 0,
+                enabled,
+                remote,
+                reload: false,
+                java_status,
+            });
+        }
+        cics.register_program_definitions(&definitions).unwrap();
+        store.delete_artifact(&definitions[3].artifact).unwrap();
+        let (invocation, _) = registered(&cics);
+        for (sequence, program, name, response, response2) in [
+            (1, "MISSING", "PGMIDERR", 27, 1),
+            (2, "DISABLED", "PGMIDERR", 27, 2),
+            (3, "REMOTE", "PGMIDERR", 27, 9),
+            (4, "JAVAPGM", "PGMIDERR", 27, 42),
+            (5, "BADART", "PGMIDERR", 27, 3),
+        ] {
+            let request = request(
+                CicsOperation::Load,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(program.as_bytes()))]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                ),
+                Err(HostProblem::Condition {
+                    name: name.into(),
+                    response,
+                    response2,
+                })
+            );
+        }
+        assert!(cics.lock().unwrap().program_loads.is_empty());
+
+        let unbound = service(provider_store);
+        let invocation = invocation_for("load-unbound", BTreeMap::new());
+        let session = SessionId::new("load-unbound-session", 64).unwrap();
+        unbound.create_session(&session, 24, 80).unwrap();
+        unbound
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let disabled_request = request(
+            CicsOperation::Load,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"DISABLED"))]),
+            6,
+        );
+        assert_eq!(
+            unbound.invoke(
+                &effect(&invocation.run_unit_id, disabled_request.clone(), 6),
+                disabled_request,
+            ),
+            Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 2,
+            })
+        );
+        let remote_request = request(
+            CicsOperation::Load,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"REMOTE"))]),
+            7,
+        );
+        assert_eq!(
+            unbound.invoke(
+                &effect(&invocation.run_unit_id, remote_request.clone(), 7),
+                remote_request,
+            ),
+            Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 9,
+            })
+        );
+        let java_request = request(
+            CicsOperation::Load,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"JAVAPGM"))]),
+            8,
+        );
+        assert_eq!(
+            unbound.invoke(
+                &effect(&invocation.run_unit_id, java_request.clone(), 8),
+                java_request,
+            ),
+            Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 42,
+            })
+        );
+        let artifact_request = request(
+            CicsOperation::Load,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"BADART"))]),
+            9,
+        );
+        assert_eq!(
+            unbound.invoke(
+                &effect(&invocation.run_unit_id, artifact_request.clone(), 9),
+                artifact_request,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 30,
+            })
+        );
+    }
+
+    #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 51);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 52);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();

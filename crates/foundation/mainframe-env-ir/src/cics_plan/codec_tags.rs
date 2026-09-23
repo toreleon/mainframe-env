@@ -58,6 +58,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::ReadTemporaryStorage => 49,
         CicsPlanOperation::WriteTemporaryStorage => 50,
         CicsPlanOperation::InvokeApplication => 46,
+        CicsPlanOperation::Load => 47,
     }
 }
 
@@ -112,6 +113,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         49 => Ok(CicsPlanOperation::ReadTemporaryStorage),
         50 => Ok(CicsPlanOperation::WriteTemporaryStorage),
         46 => Ok(CicsPlanOperation::InvokeApplication),
+        47 => Ok(CicsPlanOperation::Load),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -176,6 +178,10 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::MajorVersion => 59,
         CicsOperandName::MinorVersion => 60,
         CicsOperandName::Channel => 61,
+        CicsOperandName::LoadSet => 62,
+        CicsOperandName::Entry => 63,
+        CicsOperandName::LoadLength => 64,
+        CicsOperandName::LoadFlength => 65,
     }
 }
 
@@ -239,6 +245,10 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         59 => Ok(CicsOperandName::MajorVersion),
         60 => Ok(CicsOperandName::MinorVersion),
         61 => Ok(CicsOperandName::Channel),
+        62 => Ok(CicsOperandName::LoadSet),
+        63 => Ok(CicsOperandName::Entry),
+        64 => Ok(CicsOperandName::LoadLength),
+        65 => Ok(CicsOperandName::LoadFlength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -281,6 +291,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Main => 47,
         CicsPlanOption::ExactMatch => 36,
         CicsPlanOption::Minimum => 37,
+        CicsPlanOption::Hold => 38,
     }
 }
 
@@ -322,6 +333,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         47 => Ok(CicsPlanOption::Main),
         36 => Ok(CicsPlanOption::ExactMatch),
         37 => Ok(CicsPlanOption::Minimum),
+        38 => Ok(CicsPlanOption::Hold),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
