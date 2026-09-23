@@ -454,6 +454,10 @@ pub(super) fn execute(
         match output.name {
             CicsOutputName::Abstime
             | CicsOutputName::TimerStatus
+            | CicsOutputName::EventName
+            | CicsOutputName::SubEventName
+            | CicsOutputName::EventType
+            | CicsOutputName::FireStatus
             | CicsOutputName::Commarea
             | CicsOutputName::Milliseconds
             | CicsOutputName::Mmddyy

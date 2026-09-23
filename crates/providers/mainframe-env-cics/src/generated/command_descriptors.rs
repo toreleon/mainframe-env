@@ -132,6 +132,27 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::RetrieveReattachEvent,
+        syntax: "RETRIEVE REATTACH EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0176",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::RetrieveSubevent,
+        syntax: "RETRIEVE SUBEVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0177",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::TestEvent,
+        syntax: "TEST EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0219",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::DefineCompositeEvent,
         syntax: "DEFINE COMPOSITE EVENT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0033",

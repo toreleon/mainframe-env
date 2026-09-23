@@ -22,6 +22,7 @@ const MAX_CAS_ATTEMPTS: usize = 8;
 
 mod composite;
 mod delete;
+mod retrieve;
 mod timer;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -229,6 +230,9 @@ pub(in crate::service) fn invoke(
         | CicsOperation::CheckTimer
         | CicsOperation::ForceTimer
         | CicsOperation::DeleteTimer => timer::invoke(service, run, request),
+        CicsOperation::RetrieveReattachEvent
+        | CicsOperation::RetrieveSubevent
+        | CicsOperation::TestEvent => retrieve::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

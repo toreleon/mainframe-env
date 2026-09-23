@@ -144,3 +144,39 @@ pub(super) fn invalid_timer_shape(
         _ => true,
     }
 }
+
+pub(super) fn invalid_retrieve_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    if plan
+        .options
+        .iter()
+        .any(|option| *option != CicsPlanOption::NoHandle)
+    {
+        return true;
+    }
+    match plan.operation {
+        super::CicsPlanOperation::RetrieveReattachEvent => {
+            !inputs.is_empty()
+                || !outputs.contains(&CicsOutputName::EventName)
+                || !outputs.contains(&CicsOutputName::EventType)
+        }
+        super::CicsPlanOperation::RetrieveSubevent | super::CicsPlanOperation::TestEvent => {
+            inputs.len() != 1
+                || !inputs.contains(&CicsOperandName::Event)
+                || !matches!(
+                    plan.operands.first(),
+                    Some(operand) if matches!(operand.value, CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_))
+                )
+                || if plan.operation == super::CicsPlanOperation::RetrieveSubevent {
+                    !outputs.contains(&CicsOutputName::SubEventName)
+                        || !outputs.contains(&CicsOutputName::EventType)
+                } else {
+                    !outputs.contains(&CicsOutputName::FireStatus)
+                }
+        }
+        _ => true,
+    }
+}

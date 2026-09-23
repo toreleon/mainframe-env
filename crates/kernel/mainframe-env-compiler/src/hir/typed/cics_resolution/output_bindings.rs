@@ -49,6 +49,44 @@ pub(super) fn resolve(
             target,
         });
     }
+    let event_outputs: &[(&str, HirCicsOutputName, bool)] = match operation {
+        HirCicsOperation::RetrieveReattachEvent => &[
+            ("EVENT", HirCicsOutputName::EventName, false),
+            ("EVENTTYPE", HirCicsOutputName::EventType, true),
+        ],
+        HirCicsOperation::RetrieveSubevent => &[
+            ("SUBEVENT", HirCicsOutputName::SubEventName, false),
+            ("EVENTTYPE", HirCicsOutputName::EventType, true),
+        ],
+        HirCicsOperation::TestEvent => &[("FIRESTATUS", HirCicsOutputName::FireStatus, true)],
+        _ => &[],
+    };
+    for (name, identity, binary) in event_outputs {
+        let target = complete_data_reference(&clauses[*name], semantic)?;
+        require_writable(&target)?;
+        let valid = if *binary {
+            target.category == DataCategory::Binary && target.length == 4 && target.scale == 0
+        } else {
+            matches!(
+                target.category,
+                DataCategory::Alphabetic | DataCategory::Alphanumeric
+            ) && target.length == 16
+        };
+        if !valid {
+            return Err(super::super::ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} {name} requires {}",
+                if *binary {
+                    "writable fullword binary storage"
+                } else {
+                    "writable 16-byte character storage"
+                }
+            )));
+        }
+        outputs.push(HirCicsOutputBinding {
+            name: *identity,
+            target,
+        });
+    }
     for (name, identity) in [
         ("ABSTIME", HirCicsOutputName::Abstime),
         ("INTO", HirCicsOutputName::Into),

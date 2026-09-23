@@ -40,6 +40,29 @@ pub(in crate::machine) fn write_output(
             }),
         );
     }
+    if matches!(name, "EVENTTYPE" | "FIRESTATUS") {
+        if value.schema() != "mainframe-env.cics.cvda@1" {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let code = match (name, value.bytes()) {
+            ("FIRESTATUS", b"NOTFIRED") => 0,
+            ("FIRESTATUS", b"FIRED") => 1,
+            ("EVENTTYPE", b"INPUT") => 1,
+            ("EVENTTYPE", b"COMPOSITE") => 2,
+            ("EVENTTYPE", b"TIMER") => 3,
+            ("EVENTTYPE", b"ACTIVITY") => 4,
+            ("EVENTTYPE", b"SYSTEM") => 5,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        };
+        return write_target(
+            machine,
+            target,
+            &CobolValue::Decimal(Decimal {
+                coefficient: code,
+                scale: 0,
+            }),
+        );
+    }
     if matches!(
         name,
         "ABSTIME"
@@ -58,7 +81,7 @@ pub(in crate::machine) fn write_output(
             && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
-            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
+            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE" | "EVENT" | "SUBEVENT"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && matches!(

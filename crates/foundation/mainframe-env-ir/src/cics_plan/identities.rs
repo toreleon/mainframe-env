@@ -109,6 +109,12 @@ pub enum CicsPlanOperation {
     DefineTimer,
     /// BTS timer state command.
     DeleteTimer,
+    /// BTS event retrieval or status command.
+    RetrieveReattachEvent,
+    /// BTS event retrieval or status command.
+    RetrieveSubevent,
+    /// BTS event retrieval or status command.
+    TestEvent,
     /// BTS timer state command.
     ForceTimer,
     /// Write one explicitly keyed file record.

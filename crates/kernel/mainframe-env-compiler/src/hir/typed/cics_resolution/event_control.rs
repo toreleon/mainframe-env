@@ -66,6 +66,21 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             options: &["NOHANDLE"],
             required: &["TIMER"],
         }),
+        HirCicsOperation::RetrieveReattachEvent => Some(CommandShape {
+            clauses: &["EVENT", "EVENTTYPE", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["EVENT", "EVENTTYPE"],
+        }),
+        HirCicsOperation::RetrieveSubevent => Some(CommandShape {
+            clauses: &["EVENT", "SUBEVENT", "EVENTTYPE", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["EVENT", "SUBEVENT", "EVENTTYPE"],
+        }),
+        HirCicsOperation::TestEvent => Some(CommandShape {
+            clauses: &["EVENT", "FIRESTATUS", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["EVENT", "FIRESTATUS"],
+        }),
         _ => None,
     }
 }
@@ -120,6 +135,9 @@ pub(super) fn operands(
             | HirCicsOperation::CheckTimer
             | HirCicsOperation::DeleteTimer
             | HirCicsOperation::ForceTimer
+            | HirCicsOperation::RetrieveReattachEvent
+            | HirCicsOperation::RetrieveSubevent
+            | HirCicsOperation::TestEvent
     ) {
         return Ok(Vec::new());
     }
@@ -134,6 +152,8 @@ pub(super) fn operands(
             name: HirCicsOperandName::Timer,
             value: cics_value(&clauses["TIMER"], semantic)?,
         }]
+    } else if operation == HirCicsOperation::RetrieveReattachEvent {
+        Vec::new()
     } else {
         vec![HirCicsNamedOperand {
             name: HirCicsOperandName::Event,

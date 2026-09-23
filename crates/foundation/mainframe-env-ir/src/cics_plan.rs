@@ -728,6 +728,11 @@ fn validate_operation_shape(
         | CicsPlanOperation::ForceTimer => {
             event_control::invalid_timer_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::RetrieveReattachEvent
+        | CicsPlanOperation::RetrieveSubevent
+        | CicsPlanOperation::TestEvent => {
+            event_control::invalid_retrieve_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -4474,6 +4479,9 @@ mod tests {
             (CicsPlanOperation::DefineTimer, 109),
             (CicsPlanOperation::DeleteTimer, 111),
             (CicsPlanOperation::ForceTimer, 112),
+            (CicsPlanOperation::RetrieveReattachEvent, 114),
+            (CicsPlanOperation::RetrieveSubevent, 115),
+            (CicsPlanOperation::TestEvent, 117),
         ] {
             assert_eq!(operation_tag(operation), tag);
             assert_eq!(operation_from_tag(tag), Ok(operation));
@@ -4484,6 +4492,14 @@ mod tests {
         assert_eq!(option_from_tag(254), Ok(CicsPlanOption::TimerAfter));
         assert_eq!(output_tag(CicsOutputName::TimerStatus), 376);
         assert_eq!(output_from_tag(376), Ok(CicsOutputName::TimerStatus));
+        assert_eq!(output_tag(CicsOutputName::EventName), 377);
+        assert_eq!(output_from_tag(377), Ok(CicsOutputName::EventName));
+        assert_eq!(output_tag(CicsOutputName::SubEventName), 378);
+        assert_eq!(output_from_tag(378), Ok(CicsOutputName::SubEventName));
+        assert_eq!(output_tag(CicsOutputName::EventType), 379);
+        assert_eq!(output_from_tag(379), Ok(CicsOutputName::EventType));
+        assert_eq!(output_tag(CicsOutputName::FireStatus), 380);
+        assert_eq!(output_from_tag(380), Ok(CicsOutputName::FireStatus));
         assert_eq!(operations.len(), crate::CICS_EXECUTABLE_DESCRIPTORS.len());
         for tag in 183..=191 {
             assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));

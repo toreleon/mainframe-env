@@ -113,6 +113,9 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("DefineTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0038"),
     ("DeleteTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0047"),
     ("ForceTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0079"),
+    ("RetrieveReattachEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0176"),
+    ("RetrieveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0177"),
+    ("TestEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0219"),
     ("DefineCompositeEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0033"),
     ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
@@ -618,6 +621,9 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DefineTimer",
         "DeleteTimer",
         "ForceTimer",
+        "RetrieveReattachEvent",
+        "RetrieveSubevent",
+        "TestEvent",
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
@@ -681,6 +687,11 @@ WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
 COMPOSITE_SUBEVENT_ROW = f"{OFFICIAL_BASELINE}:api-commands:0033"
 COMPOSITE_SUBEVENT_OPTIONS = tuple(f"SUBEVENT{index}" for index in range(1, 9))
 CHECK_TIMER_ROW = f"{OFFICIAL_BASELINE}:api-commands:0026"
+EVENT_RETRIEVAL_OUTPUTS = {
+    f"{OFFICIAL_BASELINE}:api-commands:0176": ("EVENT", "EVENTTYPE"),
+    f"{OFFICIAL_BASELINE}:api-commands:0177": ("SUBEVENT", "EVENTTYPE"),
+    f"{OFFICIAL_BASELINE}:api-commands:0219": ("FIRESTATUS",),
+}
 # Each profile is a reviewed compiler-only route to a pre-existing runtime
 # operation. It does not change application-registry readiness or counts.
 COMPILER_SPI_COMPATIBILITY = {
@@ -717,6 +728,9 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "RetrieveReattachEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "RetrieveSubevent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "TestEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "CheckTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "DefineTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "DeleteTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
@@ -2531,6 +2545,19 @@ def _option_contract(
             "markers": {"cvda"},
             "directions": {"output"},
             "stacks": {("STATUS",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
+
+    for name in EVENT_RETRIEVAL_OUTPUTS.get(command["official_row"], ()):
+        # The verified 6.x topics mark these as output areas/CVDAs, while the
+        # bounded diagram projection left their direction or marker ambiguous.
+        # Catalog rows 0176/0177/0219 are pinned in the v0.9 status table.
+        options[name] = {
+            "markers": {"cvda" if name in ("EVENTTYPE", "FIRESTATUS") else "data-area"},
+            "directions": {"output"},
+            "stacks": {(name,)},
             "authorities": {"command-source"},
             "source_bounds": set(),
             "legalities": {"structural"},

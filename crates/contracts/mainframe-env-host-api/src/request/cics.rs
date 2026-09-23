@@ -64,6 +64,12 @@ pub enum CicsOperation {
     DefineTimer,
     /// BTS timer state command.
     DeleteTimer,
+    /// BTS event retrieval or status command.
+    RetrieveReattachEvent,
+    /// BTS event retrieval or status command.
+    RetrieveSubevent,
+    /// BTS event retrieval or status command.
+    TestEvent,
     /// BTS timer state command.
     ForceTimer,
     /// Create one bounded transaction-owned document.
@@ -229,6 +235,9 @@ impl CicsOperation {
             Self::CheckTimer => "CheckTimer",
             Self::DefineTimer => "DefineTimer",
             Self::DeleteTimer => "DeleteTimer",
+            Self::RetrieveReattachEvent => "RetrieveReattachEvent",
+            Self::RetrieveSubevent => "RetrieveSubevent",
+            Self::TestEvent => "TestEvent",
             Self::ForceTimer => "ForceTimer",
             Self::DocumentCreate => "DocumentCreate",
             Self::DocumentDelete => "DocumentDelete",
@@ -339,6 +348,9 @@ impl CicsOperation {
                 | Self::CheckTimer
                 | Self::DefineTimer
                 | Self::DeleteTimer
+                | Self::RetrieveReattachEvent
+                | Self::RetrieveSubevent
+                | Self::TestEvent
                 | Self::ForceTimer
                 | Self::DocumentCreate
                 | Self::DocumentDelete
@@ -495,7 +507,10 @@ impl CicsOperation {
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
+            ("RETRIEVE", Some("REATTACH")) => Self::RetrieveReattachEvent,
+            ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
             ("RETRIEVE", _) => Self::Retrieve,
+            ("TEST", Some("EVENT")) => Self::TestEvent,
             ("RETURN", _) => Self::Return,
             ("RESETBR", _) => Self::ResetBrowse,
             ("REWRITE", _) => Self::Rewrite,

@@ -27792,4 +27792,127 @@ mod tests {
         assert!(state["timers"].get("LATER").is_none());
         assert!(state["events"].get("LATER").is_none());
     }
+
+    #[test]
+    fn bts_retrieval_resets_atomic_and_composite_subsource_status() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        for (sequence, name) in [(1, b"GO".as_slice()), (2, b"CHILD".as_slice())] {
+            let define = request(
+                CicsOperation::DefineInputEvent,
+                BTreeMap::from([("EVENT".into(), argument(name))]),
+                sequence,
+            );
+            cics.invoke(
+                &effect(&invocation.run_unit_id, define.clone(), sequence),
+                define,
+            )
+            .unwrap();
+        }
+        cics.post_input_event("CURRENT", "GO").unwrap();
+        let test = request(
+            CicsOperation::TestEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GO")),
+                ("FIRESTATUS".into(), argument(b"STATUS")),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, test.clone(), 3), test)
+                .unwrap()
+                .outputs["FIRESTATUS"]
+                .bytes(),
+            b"FIRED"
+        );
+        let retrieve = request(
+            CicsOperation::RetrieveReattachEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"EVENT-NAME")),
+                ("EVENTTYPE".into(), argument(b"TYPE")),
+            ]),
+            4,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, retrieve.clone(), 4),
+                retrieve,
+            )
+            .unwrap();
+        assert_eq!(first.outputs["EVENT"].bytes(), b"GO              ");
+        assert_eq!(first.outputs["EVENTTYPE"].bytes(), b"INPUT");
+        let test = request(
+            CicsOperation::TestEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GO")),
+                ("FIRESTATUS".into(), argument(b"STATUS")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, test.clone(), 5), test)
+                .unwrap()
+                .outputs["FIRESTATUS"]
+                .bytes(),
+            b"NOTFIRED"
+        );
+        let composite = request(
+            CicsOperation::DefineCompositeEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GROUP")),
+                ("SUBEVENT1".into(), argument(b"CHILD")),
+                ("OPTION.OR".into(), cics_option()),
+            ]),
+            6,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, composite.clone(), 6),
+            composite,
+        )
+        .unwrap();
+        cics.post_input_event("CURRENT", "CHILD").unwrap();
+        let retrieve = request(
+            CicsOperation::RetrieveReattachEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"EVENT-NAME")),
+                ("EVENTTYPE".into(), argument(b"TYPE")),
+            ]),
+            7,
+        );
+        let composite = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, retrieve.clone(), 7),
+                retrieve,
+            )
+            .unwrap();
+        assert_eq!(composite.outputs["EVENT"].bytes(), b"GROUP           ");
+        assert_eq!(composite.outputs["EVENTTYPE"].bytes(), b"COMPOSITE");
+        let subevent = request(
+            CicsOperation::RetrieveSubevent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GROUP")),
+                ("SUBEVENT".into(), argument(b"SUBEVENT-NAME")),
+                ("EVENTTYPE".into(), argument(b"TYPE")),
+            ]),
+            8,
+        );
+        let child = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, subevent.clone(), 8),
+                subevent,
+            )
+            .unwrap();
+        assert_eq!(child.outputs["SUBEVENT"].bytes(), b"CHILD           ");
+        assert_eq!(child.outputs["EVENTTYPE"].bytes(), b"INPUT");
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["events"]["GROUP"]["fired"], false);
+        assert_eq!(state["events"]["CHILD"]["fired"], false);
+    }
 }

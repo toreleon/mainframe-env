@@ -171,6 +171,24 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::RetrieveReattachEvent => matches!(
+            output,
+            CicsOutputName::EventName
+                | CicsOutputName::EventType
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::RetrieveSubevent => matches!(
+            output,
+            CicsOutputName::SubEventName
+                | CicsOutputName::EventType
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::TestEvent => matches!(
+            output,
+            CicsOutputName::FireStatus | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }
