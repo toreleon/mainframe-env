@@ -9,6 +9,7 @@ mod delay;
 mod post;
 mod protect;
 mod retrieve;
+mod start_attach;
 
 pub use delay::CICS_DELAY_WORK_GENERATION;
 pub use post::CICS_POST_WORK_GENERATION;
@@ -192,7 +193,8 @@ pub(in crate::service) fn invoke(
         CicsOperation::Cancel => cancel::invoke(service, run, request),
         CicsOperation::Delay => delay::invoke(service, run, request),
         CicsOperation::Post => post::invoke(service, run, request),
-        CicsOperation::Start => start(service, run, request),
+        CicsOperation::Start => start(service, run, request, false),
+        CicsOperation::StartAttach => start_attach::invoke(service, run, request),
         CicsOperation::Retrieve => retrieve::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
@@ -207,13 +209,19 @@ fn start(
     service: &CicsService,
     run: &mut Run,
     request: &CicsRequest,
+    attached: bool,
 ) -> Result<CicsResponse, HostProblem> {
-    validate_start_request(request)?;
+    if !attached {
+        validate_start_request(request)?;
+    }
     let mutation = request
         .mutation
         .as_ref()
         .ok_or(HostProblem::MissingIdempotency)?;
     let transaction = name_argument(request, "TRANSID", 4)?;
+    if attached {
+        service.local_transaction_program(&transaction)?;
+    }
     let producer_request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
         .map_err(|_| HostProblem::ResourceExhausted)?;
     let supplied_request_id = request
@@ -339,7 +347,9 @@ fn start(
         return_terminal,
         queue,
         fmh: request.arguments.contains_key("OPTION.FMH"),
-        state: if request.arguments.contains_key("OPTION.PROTECT") {
+        state: if attached {
+            IntervalStartState::AttachedPending
+        } else if request.arguments.contains_key("OPTION.PROTECT") {
             IntervalStartState::ProtectedPending
         } else {
             IntervalStartState::Pending
@@ -366,7 +376,10 @@ fn start(
             response2: 0,
         });
     }
-    if record.state == IntervalStartState::Pending {
+    if matches!(
+        record.state,
+        IntervalStartState::Pending | IntervalStartState::AttachedPending
+    ) {
         service.enqueue_interval_work(&record, run.invocation.priority)?;
     }
     post::supersede_for_run(service, run)?;
@@ -380,7 +393,7 @@ fn start(
         None,
         Vec::new(),
     )?;
-    if request_id_was_generated && !request.arguments.contains_key("OPTION.NOCHECK") {
+    if !attached && request_id_was_generated && !request.arguments.contains_key("OPTION.NOCHECK") {
         response.outputs.insert(
             "EIBREQID".into(),
             BoundedPayload::new(
@@ -589,6 +602,8 @@ pub(in crate::service) enum IntervalStartState {
     Ready,
     Consumed,
     Cancelled,
+    AttachedPending,
+    AttachedReady,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -712,7 +727,10 @@ pub(in crate::service) fn promote_due(
     let selected = records
         .values()
         .filter(|record| {
-            record.state == IntervalStartState::Pending && record.expiration_tick <= now_tick
+            matches!(
+                record.state,
+                IntervalStartState::Pending | IntervalStartState::AttachedPending
+            ) && record.expiration_tick <= now_tick
         })
         .map(|record| (record.expiration_tick, record.request_id.clone()))
         .collect::<std::collections::BTreeSet<_>>()
@@ -721,15 +739,12 @@ pub(in crate::service) fn promote_due(
         .map(|(_, request_id)| request_id)
         .collect::<Vec<_>>();
     for request_id in &selected {
-        replace_state(
-            store,
-            records,
-            request_id,
-            IntervalStartState::Ready,
-            None,
-            None,
-            limits,
-        )?;
+        let next_state = if records[request_id].state == IntervalStartState::AttachedPending {
+            IntervalStartState::AttachedReady
+        } else {
+            IntervalStartState::Ready
+        };
+        replace_state(store, records, request_id, next_state, None, None, limits)?;
     }
     Ok(selected.len())
 }
@@ -744,23 +759,26 @@ pub(in crate::service) fn promote_request(
     let current = records.get(request_id).ok_or(HostProblem::NotFound)?;
     if matches!(
         current.state,
-        IntervalStartState::Ready | IntervalStartState::Consumed
+        IntervalStartState::Ready
+            | IntervalStartState::Consumed
+            | IntervalStartState::AttachedReady
     ) && current.expiration_tick <= now_tick
     {
         return Ok(());
     }
-    if current.state != IntervalStartState::Pending || current.expiration_tick > now_tick {
+    if !matches!(
+        current.state,
+        IntervalStartState::Pending | IntervalStartState::AttachedPending
+    ) || current.expiration_tick > now_tick
+    {
         return Err(HostProblem::InfrastructureFailure);
     }
-    replace_state(
-        store,
-        records,
-        request_id,
-        IntervalStartState::Ready,
-        None,
-        None,
-        limits,
-    )
+    let next_state = if current.state == IntervalStartState::AttachedPending {
+        IntervalStartState::AttachedReady
+    } else {
+        IntervalStartState::Ready
+    };
+    replace_state(store, records, request_id, next_state, None, None, limits)
 }
 
 pub(in crate::service) fn consume_next(
@@ -918,6 +936,15 @@ fn validate(record: &IntervalStartRecord, limits: CicsLimits) -> Result<(), Host
         || record.expiration_tick == 0
         || record.version == 0
         || record.data.len() > limits.max_queue_bytes
+        || matches!(
+            record.state,
+            IntervalStartState::AttachedPending | IntervalStartState::AttachedReady
+        ) && (!record.data.is_empty()
+            || record.terminal.is_some()
+            || record.return_transaction.is_some()
+            || record.return_terminal.is_some()
+            || record.queue.is_some()
+            || record.fmh)
     {
         return Err(HostProblem::Malformed);
     }
@@ -991,6 +1018,8 @@ fn encode(record: &IntervalStartRecord, limits: CicsLimits) -> Result<Vec<u8>, H
         IntervalStartState::Ready => 3,
         IntervalStartState::Consumed => 4,
         IntervalStartState::Cancelled => 5,
+        IntervalStartState::AttachedPending => 6,
+        IntervalStartState::AttachedReady => 7,
     });
     field(&mut out, record.producer_effect_key.as_bytes())?;
     out.extend_from_slice(&record.producer_request_digest);
@@ -1032,6 +1061,8 @@ fn decode(
             3 => IntervalStartState::Ready,
             4 => IntervalStartState::Consumed,
             5 => IntervalStartState::Cancelled,
+            6 => IntervalStartState::AttachedPending,
+            7 => IntervalStartState::AttachedReady,
             _ => return Err(HostProblem::InfrastructureFailure),
         },
         producer_effect_key: reader.text(InvocationLimits::default().max_binding_bytes)?,
@@ -1167,6 +1198,70 @@ mod tests {
             consumer_request_digest: None,
             version: 1,
         }
+    }
+
+    #[test]
+    fn attached_state_tags_append_without_changing_legacy_rows() {
+        let limits = CicsLimits::default();
+        let ordinary = record("ORDINARY", 100, "ordinary-producer");
+        let legacy = encode(&ordinary, limits).unwrap();
+        assert_eq!(decode(&legacy, 1, limits), Ok(ordinary.clone()));
+        let mut attached = ordinary;
+        attached.request_id = "ATTACHED".into();
+        attached.data.clear();
+        attached.return_transaction = None;
+        attached.return_terminal = None;
+        attached.queue = None;
+        attached.state = IntervalStartState::AttachedPending;
+        let encoded = encode(&attached, limits).unwrap();
+        assert_eq!(decode(&encoded, 1, limits), Ok(attached.clone()));
+        let mut records = BTreeMap::from([(attached.request_id.clone(), attached.clone())]);
+        let store = MemoryStore::new(Default::default());
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: NAMESPACE.into(),
+                    key: attached.request_id.clone(),
+                    version: 1,
+                    payload: encoded.clone(),
+                },
+                None,
+            )
+            .unwrap();
+        promote_request(&store, &mut records, "ATTACHED", 100, limits).unwrap();
+        assert_eq!(records["ATTACHED"].state, IntervalStartState::AttachedReady);
+        let promoted = store
+            .get_provider_state(NAMESPACE, "ATTACHED")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            decode(&promoted.payload, promoted.version, limits),
+            Ok(records["ATTACHED"].clone())
+        );
+
+        let mut reader = RecordReader::new(&encoded);
+        reader.take(MAGIC.len()).unwrap();
+        reader.text(8).unwrap();
+        reader.text(4).unwrap();
+        reader.text(256).unwrap();
+        reader.text(256).unwrap();
+        reader.u64().unwrap();
+        reader.optional_text(4).unwrap();
+        reader.field(limits.max_queue_bytes).unwrap();
+        reader.optional_text(4).unwrap();
+        reader.optional_text(4).unwrap();
+        reader.optional_text(8).unwrap();
+        reader.boolean().unwrap();
+        let state_at = reader.at;
+        drop(reader);
+        let mut unknown = encoded;
+        unknown[state_at] = 8;
+        assert_eq!(
+            decode(&unknown, 1, limits),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        attached.data = b"copied".to_vec();
+        assert_eq!(encode(&attached, limits), Err(HostProblem::Malformed));
     }
 
     #[test]

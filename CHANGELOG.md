@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `START ATTACH` for the no-FROM local task form of row
+  `0206`. It resolves an installed target, authorizes before scheduling,
+  creates noncancelable durable work with STARTCODE `U`, leaves EIBREQID null,
+  and survives worker replay and SQLite reopen. FROM/LENGTH remain closed
+  until live parent storage can be shared without copying it.
+
 - Added a read-only durable local transaction lookup for the pending CICS
   `START ATTACH` and `START BREXIT` routes. It resolves installed targets from
   the existing server catalog, returns TRANSIDERR 28/0 for undefined names,

@@ -1656,6 +1656,7 @@ mod tests {
                 CicsPlanOperation::WaitExternal => crate::HirCicsOperation::WaitExternal,
                 CicsPlanOperation::WaitCics => crate::HirCicsOperation::WaitCics,
                 CicsPlanOperation::Start => crate::HirCicsOperation::Start,
+                CicsPlanOperation::StartAttach => crate::HirCicsOperation::StartAttach,
                 CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
                 CicsPlanOperation::DocumentCreate => crate::HirCicsOperation::DocumentCreate,
                 CicsPlanOperation::DocumentDelete => crate::HirCicsOperation::DocumentDelete,

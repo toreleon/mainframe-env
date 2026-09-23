@@ -17,6 +17,8 @@ pub struct CicsStartTask {
     pub principal: String,
     /// Principal facility requested for the task, when supported.
     pub terminal: Option<String>,
+    /// Whether this was a noncancelable START ATTACH with STARTCODE U.
+    pub attached: bool,
 }
 
 /// Retained terminal session selected by a terminal-associated START.
@@ -36,6 +38,7 @@ pub(in crate::service) fn from_interval_record(record: &IntervalStartRecord) -> 
         transaction: record.transaction.clone(),
         principal: record.principal.clone(),
         terminal: record.terminal.clone(),
+        attached: record.state == super::interval_control::IntervalStartState::AttachedReady,
     }
 }
 

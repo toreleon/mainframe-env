@@ -10610,6 +10610,125 @@ mod tests {
     }
 
     #[test]
+    fn compiled_start_attach_launches_non_cancelable_facilityless_target() {
+        let starter = published_source_fixture(
+            "ATSTART",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ATSTART.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 REQ-X PIC X(8).\n01 FN-X PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START ATTACH TRANSID('ATGT') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBREQID TO REQ-X.\nMOVE EIBFN TO FN-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "ATTARGET",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ATTARGET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 USER-X PIC X(8).\nPROCEDURE DIVISION.\nEXEC CICS ASSIGN USERID(USER-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let target_ref = artifact_ref(&target);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("ATSTART", &starter, starter_ref.clone()),
+                    program("ATTARGET", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("ATS0".into(), "ATSTART".into()),
+                    ("ATGT".into(), "ATTARGET".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ATSTART".into(),
+                    map: "ATSTART".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("attach-issuer", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "ATS0", Some(starter_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "ATS0",
+                24,
+                80,
+                "attach-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "ATSTART", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(starter.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("REQ-X").unwrap().bytes(), &[0; 8]);
+        assert_eq!(restored.variable("FN-X").unwrap().bytes(), &[0x10, 0x08]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
+        let work = server
+            .claim_jes_work("attach-worker")
+            .unwrap()
+            .expect("attach work");
+        let promoted = server
+            .cics
+            .promote_start_work(&work, server.jes_tick().unwrap())
+            .unwrap();
+        assert!(promoted.attached);
+        assert_eq!(promoted.transaction, "ATGT");
+        assert!(matches!(
+            server.process_claimed_jes_work(&work).unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        let execution = server
+            .store
+            .get_execution(&work.execution_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(execution.state, ExecutionState::Completed);
+        assert!(
+            server
+                .store
+                .audit_records(&work.execution_id, 1, 16)
+                .unwrap()
+                .iter()
+                .any(|record| {
+                    record.capability.as_str() == "host.cics.execute"
+                        && record.decision == mainframe_env_execution_api::AuditDecision::Success
+                })
+        );
+    }
+
+    #[test]
     fn due_local_start_launches_one_facilityless_target_across_worker_retry() {
         let starter = published_source_fixture(
             "AUTOSTRT",

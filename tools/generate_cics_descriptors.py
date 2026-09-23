@@ -259,6 +259,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
     ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
+    ("StartAttach", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0206"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
@@ -615,6 +616,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Syncpoint",
         "Unlock",
         "Start",
+        "StartAttach",
         "Retrieve",
         "TransformDataToJson",
         "TransformDataToXml",
@@ -898,6 +900,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Start": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
+    "StartAttach": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
     "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
     "TransformDataToJson": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
@@ -1142,6 +1147,7 @@ def _load_typed_execution_registrations(
         "SpoolRead",
         "SpoolWrite",
         "Start",
+        "StartAttach",
         "Suspend",
         "TransformDataToJson",
         "TransformDataToXml",

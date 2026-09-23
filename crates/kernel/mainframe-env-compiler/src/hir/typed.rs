@@ -5605,6 +5605,35 @@ mod tests {
     }
 
     #[test]
+    fn cics_start_attach_resolves_no_data_form_and_rejects_unshared_from() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ATSTART. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START ATTACH TRANSID('NX00') RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("START ATTACH: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed START ATTACH");
+        assert_eq!(command.operation, HirCicsOperation::StartAttach);
+        assert_eq!(command.operands.len(), 1);
+        for clauses in [
+            "TRANSID('NX00') FROM(DATA-X) LENGTH(4)",
+            "TRANSID('NX00') LENGTH(4)",
+            "FROM(DATA-X) LENGTH(4)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). PROCEDURE DIVISION. EXEC CICS START ATTACH {clauses} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clauses}");
+        }
+    }
+
+    #[test]
     fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. 01 MS-X PIC S9(9) COMP VALUE 250. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. EXEC CICS DELAY FOR MILLISECS(MS-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

@@ -1724,7 +1724,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 83);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 84);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 81);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 82);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9898,6 +9898,195 @@ mod tests {
             cics.local_transaction_program("NX00"),
             Err(HostProblem::InfrastructureFailure)
         );
+        drop(cics);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn start_attach_no_data_is_non_cancelable_and_promotes_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (artifact, _) = install_program_artifact(store.as_ref(), b"attach-target");
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "online-program".into(),
+                    key: "TARGET".into(),
+                    version: 1,
+                    payload: artifact.as_str().as_bytes().to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "online-transaction".into(),
+                    key: "NX00".into(),
+                    version: 1,
+                    payload: b"TARGET".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        cics.bind_artifact_store(store.clone()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let attach = request(
+            CicsOperation::StartAttach,
+            BTreeMap::from([
+                ("TRANSID".into(), cics_literal(b"NX00")),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            1,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, attach.clone(), 1),
+                attach.clone(),
+            )
+            .unwrap();
+        assert_eq!((result.response, result.response2), (0, 0));
+        assert!(!result.outputs.contains_key("EIBREQID"));
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, attach.clone(), 1), attach)
+                .unwrap(),
+            result
+        );
+        let id = cics
+            .lock()
+            .unwrap()
+            .interval_records
+            .keys()
+            .next()
+            .unwrap()
+            .clone();
+        let mut cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([("REQID".into(), cics_literal(id.as_bytes()))]),
+            2,
+        );
+        cancel.condition_policy = CicsConditionPolicy::NoHandle;
+        let denied = cics
+            .invoke(&effect(&invocation.run_unit_id, cancel.clone(), 2), cancel)
+            .unwrap();
+        assert_eq!((denied.condition.as_str(), denied.response), ("NOTFND", 13));
+        let from = request(
+            CicsOperation::StartAttach,
+            BTreeMap::from([
+                ("TRANSID".into(), cics_literal(b"NX00")),
+                ("FROM".into(), cics_literal(b"data")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, from.clone(), 3), from),
+            Err(HostProblem::Unsupported)
+        );
+        let work = store
+            .claim(
+                "attach-worker",
+                Some(CICS_START_WORK_GENERATION),
+                1_000,
+                30_000,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.payload, id.as_bytes());
+        let target = cics.promote_start_work(&work, 1_000).unwrap();
+        assert!(target.attached);
+        assert_eq!(target.transaction, "NX00");
+        assert_eq!(target.terminal, None);
+        assert_eq!(cics.promote_start_work(&work, 1_000).unwrap(), target);
+    }
+
+    #[test]
+    fn start_attach_promotion_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-start-attach-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (artifact, _) = install_program_artifact(store.as_ref(), b"attach-sqlite-target");
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "online-program".into(),
+                        key: "TARGET".into(),
+                        version: 1,
+                        payload: artifact.as_str().as_bytes().to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "online-transaction".into(),
+                        key: "NX00".into(),
+                        version: 1,
+                        payload: b"TARGET".to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            let (invocation, _) = registered(&cics);
+            let attach = request(
+                CicsOperation::StartAttach,
+                BTreeMap::from([("TRANSID".into(), cics_literal(b"NX00"))]),
+                1,
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, attach.clone(), 1), attach)
+                    .unwrap()
+                    .response,
+                0
+            );
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let work = store
+            .claim(
+                "attach-sqlite-worker",
+                Some(CICS_START_WORK_GENERATION),
+                1_000,
+                30_000,
+            )
+            .unwrap()
+            .unwrap();
+        let target = cics.promote_start_work(&work, 1_000).unwrap();
+        assert!(target.attached);
+        assert_eq!(target.transaction, "NX00");
+        assert_eq!(cics.promote_start_work(&work, 1_000).unwrap(), target);
         drop(cics);
         drop(store);
         std::fs::remove_dir_all(root).unwrap();

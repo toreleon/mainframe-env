@@ -114,7 +114,9 @@ pub(super) fn operands(
         HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
         HirCicsOperation::Delay => delay_operands(clauses, semantic, "DELAY"),
         HirCicsOperation::Post => delay_operands(clauses, semantic, "POST"),
-        HirCicsOperation::Start => start_operands(clauses, semantic),
+        HirCicsOperation::Start | HirCicsOperation::StartAttach => {
+            start_operands(clauses, semantic)
+        }
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }

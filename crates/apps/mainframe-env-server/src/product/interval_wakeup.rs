@@ -268,7 +268,7 @@ fn started_task_invocation(
         .map(|capability| (capability, "1".into()))
         .collect();
     let execution = work.execution_id.as_str();
-    let bindings = BTreeMap::from([(
+    let mut bindings = BTreeMap::from([(
         "cics.start-request".into(),
         BoundedPayload::new(
             "mainframe-env.cics.start-request@1",
@@ -277,6 +277,13 @@ fn started_task_invocation(
         )
         .map_err(|_| HostProblem::ResourceExhausted)?,
     )]);
+    if task.attached {
+        bindings.insert(
+            "cics.start-code".into(),
+            BoundedPayload::new("mainframe-env.cics.start-code@1", b"U".to_vec(), limits)
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
     Invocation::new(
         RequestId::new(format!("request-{execution}"), limits)
             .map_err(|_| HostProblem::InfrastructureFailure)?,

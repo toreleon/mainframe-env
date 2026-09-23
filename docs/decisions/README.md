@@ -19,6 +19,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0013](0013-cics-operator-reply-boundary.md) | durable CICS operator reply and console ingress boundary | Proposed |
 | [0014](0014-cics-tcpip-ingress-context.md) | trusted TCP/IP and client-certificate task context | Proposed |
 | [0015](0015-cics-immediate-start-target-authority.md) | durable local target admission for immediate CICS START | Proposed |
+| [0016](0016-cics-start-attach-lifetime.md) | noncancelable START ATTACH state and live-address boundary | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

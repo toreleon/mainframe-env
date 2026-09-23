@@ -306,6 +306,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/post.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/protect.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/retrieve.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/interval_control/start_attach.rs",
       "crates/providers/mainframe-env-cics/src/handlers/journal_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/limits.rs",
       "crates/providers/mainframe-env-cics/src/handlers/network_context.rs",

@@ -748,6 +748,14 @@ fn validate_operation_shape(
         CicsPlanOperation::PurgeMessage => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::StartAttach => {
+            inputs != &BTreeSet::from([CicsOperandName::TransId])
+                || !matches!(
+                    operand_value(plan, CicsOperandName::TransId),
+                    Some(CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_))
+                )
+                || scheduling_options
+        }
         CicsPlanOperation::Cancel
         | CicsPlanOperation::Delay
         | CicsPlanOperation::Start
@@ -3802,6 +3810,37 @@ mod tests {
         unknown[6..8].copy_from_slice(&165u16.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&unknown, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn start_attach_uses_reserved_v2_operation_tag_and_rejects_copied_data() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::StartAttach,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::TransId,
+                value: CicsOperandValue::Literal(b"NX00".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&bytes[4..8], &[0, 2, 0, 162]);
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut invalid = plan;
+        invalid.operands.push(CicsNamedOperand {
+            name: CicsOperandName::From,
+            value: CicsOperandValue::Literal(b"copied".to_vec()),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

@@ -70,6 +70,7 @@ pub enum HirCicsOperation {
     WaitExternal,
     WaitCics,
     Start,
+    StartAttach,
     Retrieve,
     DocumentCreate,
     DocumentDelete,

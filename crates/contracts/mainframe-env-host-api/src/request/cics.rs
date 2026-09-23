@@ -119,6 +119,8 @@ pub enum CicsOperation {
     SpoolWrite,
     /// Schedule one interval-control START record.
     Start,
+    /// Start one noncancelable local task immediately without copied data.
+    StartAttach,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
@@ -222,6 +224,7 @@ impl CicsOperation {
             Self::SpoolRead => "SpoolRead",
             Self::SpoolWrite => "SpoolWrite",
             Self::Start => "Start",
+            Self::StartAttach => "StartAttach",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
@@ -299,6 +302,7 @@ impl CicsOperation {
                 | Self::SpoolRead
                 | Self::SpoolWrite
                 | Self::Start
+                | Self::StartAttach
                 | Self::Retrieve
                 | Self::WaitEvent
                 | Self::WaitExternal
@@ -384,6 +388,7 @@ impl CicsOperation {
             ("SPOOLOPEN", Some("OUTPUT")) => Self::SpoolOpenOutput,
             ("SPOOLREAD", _) => Self::SpoolRead,
             ("SPOOLWRITE", _) => Self::SpoolWrite,
+            ("START", Some("ATTACH")) => Self::StartAttach,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

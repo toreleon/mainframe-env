@@ -74,6 +74,7 @@ pub(super) fn resolve(
         ["WAIT", "EXTERNAL"] => HirCicsOperation::WaitExternal,
         ["WAITCICS"] => HirCicsOperation::WaitCics,
         ["START"] => HirCicsOperation::Start,
+        ["START", "ATTACH"] => HirCicsOperation::StartAttach,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,
         ["DOCUMENT", "DELETE"] => HirCicsOperation::DocumentDelete,

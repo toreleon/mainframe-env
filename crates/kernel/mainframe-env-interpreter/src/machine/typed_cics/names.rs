@@ -226,6 +226,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
         CicsPlanOperation::Start => CicsOperation::Start,
+        CicsPlanOperation::StartAttach => CicsOperation::StartAttach,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
         CicsPlanOperation::DocumentDelete => CicsOperation::DocumentDelete,

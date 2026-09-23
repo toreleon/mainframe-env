@@ -474,6 +474,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Assign => CicsPlanOperation::Assign,
         HirCicsOperation::PurgeMessage => CicsPlanOperation::PurgeMessage,
         HirCicsOperation::Start => CicsPlanOperation::Start,
+        HirCicsOperation::StartAttach => CicsPlanOperation::StartAttach,
         HirCicsOperation::Retrieve => CicsPlanOperation::Retrieve,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,

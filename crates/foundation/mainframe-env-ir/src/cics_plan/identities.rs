@@ -137,6 +137,8 @@ pub enum CicsPlanOperation {
     PurgeMessage,
     /// Schedule one local interval-control START data record.
     Start,
+    /// Start one noncancelable facility-less local task immediately.
+    StartAttach,
     /// Consume one expired interval-control START data record.
     Retrieve,
     /// Create one bounded transaction-owned document.

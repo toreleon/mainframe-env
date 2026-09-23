@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 191,
+    "markdown_documents": 192,
     "navigation_groups": 5,
-    "normative_documents": 43,
+    "normative_documents": 44,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:3e11cc17fe0e1060c169ed692ae22ef740652f7e7db36faa5a4b9872bf3ad8ca",
+      "sha256": "sha256:ef3bdcaa942e43ccab4f820ad8d0cd6cca3d73ac2947d548c0a904ec7dedfdb3",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 78,
-      "sha256": "sha256:4de2d29c5bb6783e258503af3a4a3b706e6b2cc1108791770893ab95755a67c6",
+      "relative_links": 79,
+      "sha256": "sha256:a90c6f03fcaa60924fe291e54d7e1ffa1ea374e07fd9734cc365e20c805dc6aa",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -767,10 +767,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS, compiler, and runtime maintainers",
+      "path": "docs/decisions/0016-cics-start-attach-lifetime.md",
+      "relative_links": 0,
+      "scope": "START ATTACH row 0206",
+      "sha256": "sha256:82bd6a5685b4e869348911b108766c9459d148966926f40d8141b6e88328eee2",
+      "status": "Proposed for v0.9 development; FROM route pending",
+      "title": "ADR-0016: Keep START ATTACH work noncancelable and address-bearing",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 15,
-      "sha256": "sha256:84e656f8d9ad8a8fbd00718cc2c1943048ff117f8d38ce79e327881df1cf937c",
+      "relative_links": 16,
+      "sha256": "sha256:7febf16b5fe44b75eb87ca5f485cb5219bf02139d07beae750fd915ccf91c5b3",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1110,7 +1122,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:a54b39e9526cde36e478d51ceee84ca9deb2ef1948b80058f124fc85c0dc5ca0",
+      "sha256": "sha256:c59628bdb705aca9bb5b063848230ba83bb047d61cf0ee03b8bb3308af8b96a3",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1868,6 +1880,10 @@
           "path": "docs/decisions/0015-cics-immediate-start-target-authority.md"
         },
         {
+          "label": "ADR-0016: CICS START ATTACH lifetime",
+          "path": "docs/decisions/0016-cics-start-attach-lifetime.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2031,7 +2047,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:162d6766e20c1364825bb77410deecd2e9a5ddef06f8cd8b5bd72aaad11e05e2",
+  "registry_sha256": "sha256:b5b5907aedde34242ef702c9f5f38e8fc8fa95b60ef8dc47d2b779fc9896549a",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,
