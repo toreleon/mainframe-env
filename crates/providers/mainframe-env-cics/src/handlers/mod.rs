@@ -114,6 +114,7 @@ pub use diagnostics::{
 pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
 };
+pub use file_control::CicsFileDefinition;
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use file_tokens::FileUpdateState;
 pub(super) use handle_state::{
@@ -163,6 +164,8 @@ pub(super) use terminal_control::{
 };
 pub(in crate::service) use terminal_run::terminal_secret_digest;
 pub(super) use time::invoke as invoke_time;
+pub use web_control::{CicsWebEndpoint, CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion};
+pub(in crate::service) use web_control::{WebState, load_web_state};
 pub use web_service_control::CicsWebServiceDefinition;
 pub(super) fn invoke_extended_control(
     service: &CicsService,
@@ -236,6 +239,7 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     release_bms_message_for_task(service, run)?;
     release_outboard_task(service, run)?;
     release_partition_set_for_task(service, run)?;
+    web_control::release_task(service, run)?;
     interval_control::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)?;
     web_service_control::release_task(service, run)

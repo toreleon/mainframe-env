@@ -20,6 +20,7 @@ mod response_output;
 pub(super) use response_output::write_output;
 mod retrieve;
 mod runtime_validation;
+mod slot_access;
 use runtime_validation::validate_machine_slot;
 mod spool_control;
 mod storage64;
@@ -27,7 +28,7 @@ mod task_wait;
 mod web_control;
 mod web_service_control;
 pub(super) use address::CicsAddressSet;
-use diagnostics::argument_summary;
+use diagnostics::{argument_summary, invalid_plan};
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 #[cfg(test)]
@@ -36,6 +37,7 @@ use registry::{expected_effects, expected_operation};
 pub(super) use registry::{operation_identities, validate_module_operations};
 pub(super) use response::{drive_response, write_response_state, write_runtime_output};
 use runtime_validation::validate_runtime_plan;
+use slot_access::{read_integer_slot, read_slot};
 pub(super) use storage64::Storage64Intent;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
@@ -368,6 +370,7 @@ pub(super) fn execute(
                         | CicsOperandName::WebHostLength
                         | CicsOperandName::WebPathLength
                         | CicsOperandName::WebQueryStringLength
+                        | CicsOperandName::WebPortNumber
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -497,6 +500,9 @@ pub(super) fn execute(
             | CicsOutputName::WebPathLength
             | CicsOutputName::WebQueryString
             | CicsOutputName::WebQueryStringLength
+            | CicsOutputName::WebSessionToken
+            | CicsOutputName::WebHttpVNum
+            | CicsOutputName::WebHttpRNum
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -884,49 +890,9 @@ fn insert_slot(
     Ok(())
 }
 
-fn read_slot(
-    machine: &ReferenceMachine,
-    slot: &CicsStorageSlot,
-) -> Result<Vec<u8>, MachineProblem> {
-    let view = machine
-        .views_by_id
-        .get(&slot.storage)
-        .ok_or(MachineProblem::UnknownStorage)?;
-    let name_view = machine
-        .views
-        .get(&slot.qualified_layout_name)
-        .ok_or(MachineProblem::UnknownStorage)?;
-    if view != name_view {
-        return Err(invalid_plan("resolved operand storage view changed"));
-    }
-    machine.read(&slot.qualified_layout_name)
-}
-
-fn read_integer_slot(
-    machine: &ReferenceMachine,
-    slot: &CicsStorageSlot,
-) -> Result<i128, MachineProblem> {
-    let layout = machine
-        .layouts
-        .get(&slot.qualified_layout_name)
-        .ok_or(MachineProblem::UnknownStorage)?;
-    if !is_numeric(layout.category) {
-        return Err(MachineProblem::DataException);
-    }
-    let value = decode_decimal(layout, &read_slot(machine, slot)?)?;
-    if value.scale != 0 {
-        return Err(MachineProblem::DataException);
-    }
-    Ok(value.coefficient)
-}
-
 fn payload(schema: &str, bytes: Vec<u8>) -> Result<BoundedPayload, MachineProblem> {
     BoundedPayload::new(schema, bytes, InvocationLimits::default())
         .map_err(|_| MachineProblem::ResourceExhausted)
-}
-
-fn invalid_plan(detail: &str) -> MachineProblem {
-    MachineProblem::InvalidArtifact(format!("invalid typed CICS effect plan: {detail}"))
 }
 
 #[cfg(test)]

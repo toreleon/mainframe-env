@@ -2510,12 +2510,14 @@ mod tests {
             CicsOperation::TransformDataToXml,
             CicsOperation::TransformJsonToData,
             CicsOperation::TransformXmlToData,
+            CicsOperation::WebParseUrl,
+            CicsOperation::WebOpen,
             CicsOperation::Unlock,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 115);
+        assert_eq!(forms.len(), 117);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

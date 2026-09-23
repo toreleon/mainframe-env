@@ -6905,6 +6905,112 @@ mod tests {
     }
 
     #[test]
+    fn web_parse_url_lowers_fullword_lengths_and_rejects_invalid_pairs() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBPARSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 URL-X PIC X(64) VALUE 'http://example.com/a?x=1'. 01 URL-LEN PIC S9(9) COMP VALUE 24. 01 SCHEME-X PIC X(16). 01 HOST-X PIC X(32). 01 HOST-LEN PIC S9(9) COMP VALUE 32. 01 PORT-X PIC S9(9) COMP. 01 PATH-X PIC X(32). 01 PATH-LEN PIC S9(9) COMP VALUE 32. 01 QUERY-X PIC X(32). 01 QUERY-LEN PIC S9(9) COMP VALUE 32. PROCEDURE DIVISION. ";
+        let source = format!(
+            "{declarations}EXEC CICS WEB PARSE URL(URL-X) URLLENGTH(URL-LEN) SCHEMENAME(SCHEME-X) HOST(HOST-X) HOSTLENGTH(HOST-LEN) PORTNUMBER(PORT-X) PATH(PATH-X) PATHLENGTH(PATH-LEN) QUERYSTRING(QUERY-X) QUERYSTRLEN(QUERY-LEN) END-EXEC. STOP RUN."
+        );
+        let analysis = analyze(&source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WEB PARSE URL: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WEB PARSE URL");
+        assert_eq!(command.operation, HirCicsOperation::WebParseUrl);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::WebUrlLength
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::WebHostLength
+                && output.target.qualified_name == "HOST-LEN"
+        }));
+        for (command, expected) in [
+            (
+                "WEB PARSE URL(URL-X) HOST(HOST-X) HOSTLENGTH(HOST-LEN)",
+                "requires URLLENGTH",
+            ),
+            (
+                "WEB PARSE URL(URL-X) URLLENGTH(URL-LEN) HOST(HOST-X)",
+                "must occur together",
+            ),
+            (
+                "WEB PARSE URL(URL-X) URLLENGTH(URL-LEN) HOSTLENGTH(HOST-LEN)",
+                "must occur together",
+            ),
+        ] {
+            let source = format!("{declarations}EXEC CICS {command} END-EXEC. STOP RUN.");
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none());
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn web_open_lowers_bounded_direct_endpoint_and_session_token() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBOPEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 HOST-X PIC X(11) VALUE 'example.com'. 01 HOST-LEN PIC S9(9) COMP VALUE 11. 01 TOKEN-X PIC X(8). 01 VNUM-X PIC S9(4) COMP. 01 RNUM-X PIC S9(4) COMP. PROCEDURE DIVISION. ";
+        let source = format!(
+            "{declarations}EXEC CICS WEB OPEN HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(HTTP) SESSTOKEN(TOKEN-X) HTTPVNUM(VNUM-X) HTTPRNUM(RNUM-X) END-EXEC. STOP RUN."
+        );
+        let analysis = analyze(&source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WEB OPEN: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WEB OPEN");
+        assert_eq!(command.operation, HirCicsOperation::WebOpen);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::WebScheme
+                && matches!(&operand.value, HirCicsValue::Literal(value) if value == "HTTP")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::WebSessionToken
+                && output.target.qualified_name == "TOKEN-X"
+        }));
+        for (command, expected) in [
+            (
+                "WEB OPEN HOST(HOST-X) SCHEME(HTTP) SESSTOKEN(TOKEN-X)",
+                "requires HOSTLENGTH",
+            ),
+            (
+                "WEB OPEN HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(HTTP) URIMAP('MAPA') SESSTOKEN(TOKEN-X)",
+                "exactly one URIMAP or HOST",
+            ),
+        ] {
+            let source = format!("{declarations}EXEC CICS {command} END-EXEC. STOP RUN.");
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn document_delete_requires_one_sixteen_byte_token_input() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DOCDELET. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS DOCUMENT DELETE DOCTOKEN(TOKEN-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

@@ -129,6 +129,14 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WebOpen => matches!(
+            output,
+            CicsOutputName::WebSessionToken
+                | CicsOutputName::WebHttpVNum
+                | CicsOutputName::WebHttpRNum
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::DocumentInsert => matches!(
             output,
             CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2

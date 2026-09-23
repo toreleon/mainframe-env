@@ -250,6 +250,8 @@ pub enum CicsPlanOperation {
     TransformXmlToData,
     /// Parse one bounded URL without opening a web session.
     WebParseUrl,
+    /// Open one bounded task-owned HTTP client connection.
+    WebOpen,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -679,6 +681,18 @@ pub enum CicsOperandName {
     WebPathLength,
     /// Fullword input capacity for the returned query string.
     WebQueryStringLength,
+    /// Direct WEB OPEN host name.
+    WebHost,
+    /// Direct WEB OPEN TCP port.
+    WebPortNumber,
+    /// WEB OPEN HTTP or HTTPS scheme.
+    WebScheme,
+    /// Installed client URIMAP name.
+    WebUriMap,
+    /// TLS client certificate label.
+    WebCertificate,
+    /// Host-side connection code page.
+    WebCodePage,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -983,4 +997,10 @@ pub enum CicsOutputName {
     WebQueryString,
     /// Actual query string length, including on truncation.
     WebQueryStringLength,
+    /// Generated eight-byte client session token.
+    WebSessionToken,
+    /// Server HTTP major protocol number.
+    WebHttpVNum,
+    /// Server HTTP minor protocol number.
+    WebHttpRNum,
 }

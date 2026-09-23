@@ -405,6 +405,12 @@ impl PlanContext<'_> {
                 HirCicsOperandName::WebHostLength => CicsOperandName::WebHostLength,
                 HirCicsOperandName::WebPathLength => CicsOperandName::WebPathLength,
                 HirCicsOperandName::WebQueryStringLength => CicsOperandName::WebQueryStringLength,
+                HirCicsOperandName::WebHost => CicsOperandName::WebHost,
+                HirCicsOperandName::WebPortNumber => CicsOperandName::WebPortNumber,
+                HirCicsOperandName::WebScheme => CicsOperandName::WebScheme,
+                HirCicsOperandName::WebUriMap => CicsOperandName::WebUriMap,
+                HirCicsOperandName::WebCertificate => CicsOperandName::WebCertificate,
+                HirCicsOperandName::WebCodePage => CicsOperandName::WebCodePage,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -485,6 +491,9 @@ impl PlanContext<'_> {
                 HirCicsOutputName::WebPathLength => CicsOutputName::WebPathLength,
                 HirCicsOutputName::WebQueryString => CicsOutputName::WebQueryString,
                 HirCicsOutputName::WebQueryStringLength => CicsOutputName::WebQueryStringLength,
+                HirCicsOutputName::WebSessionToken => CicsOutputName::WebSessionToken,
+                HirCicsOutputName::WebHttpVNum => CicsOutputName::WebHttpVNum,
+                HirCicsOutputName::WebHttpRNum => CicsOutputName::WebHttpRNum,
             },
             target: self.slot(&output.target)?,
         })
@@ -652,6 +661,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::TransformJsonToData => CicsPlanOperation::TransformJsonToData,
         HirCicsOperation::TransformXmlToData => CicsPlanOperation::TransformXmlToData,
         HirCicsOperation::WebParseUrl => CicsPlanOperation::WebParseUrl,
+        HirCicsOperation::WebOpen => CicsPlanOperation::WebOpen,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,

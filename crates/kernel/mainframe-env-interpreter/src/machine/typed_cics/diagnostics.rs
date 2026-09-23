@@ -105,3 +105,6 @@ pub(super) fn argument_summary(arguments: &BTreeMap<String, BoundedPayload>) -> 
         .collect::<Vec<_>>()
         .join(",")
 }
+pub(super) fn invalid_plan(detail: &str) -> MachineProblem {
+    MachineProblem::InvalidArtifact(format!("invalid typed CICS effect plan: {detail}"))
+}

@@ -620,6 +620,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0236"
     },
     {
+      "operation": "WebOpen",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0244"
+    },
+    {
       "operation": "WebParseUrl",
       "interface": "api",
       "family": "web-control",

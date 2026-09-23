@@ -1,3 +1,9 @@
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsFileDefinition {
+    pub dataset: DatasetName,
+    pub ccsid: Option<u16>,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(in crate::service) struct DurableFileStatus {
     pub(in crate::service) status: CicsFileStatus,

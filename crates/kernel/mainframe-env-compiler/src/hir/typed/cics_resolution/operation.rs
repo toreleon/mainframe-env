@@ -131,6 +131,7 @@ pub(super) fn resolve(
         ["TRANSFORM", "JSONTODATA"] => HirCicsOperation::TransformJsonToData,
         ["TRANSFORM", "XMLTODATA"] => HirCicsOperation::TransformXmlToData,
         ["WEB", "PARSE", "URL"] => HirCicsOperation::WebParseUrl,
+        ["WEB", "OPEN"] => HirCicsOperation::WebOpen,
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
         ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,

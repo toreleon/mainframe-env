@@ -231,6 +231,8 @@ pub enum CicsOperation {
     TransformXmlToData,
     /// Split a bounded URL into its scheme, host, port, path, and query components.
     WebParseUrl,
+    /// Establish one task-owned HTTP client session and return its token.
+    WebOpen,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -373,6 +375,7 @@ impl CicsOperation {
             Self::TransformJsonToData => "TransformJsonToData",
             Self::TransformXmlToData => "TransformXmlToData",
             Self::WebParseUrl => "WebParseUrl",
+            Self::WebOpen => "WebOpen",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -426,6 +429,7 @@ impl CicsOperation {
                 | Self::DocumentDelete
                 | Self::DocumentInsert
                 | Self::DocumentSet
+                | Self::WebOpen
                 | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
@@ -646,6 +650,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
             ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
             ("WEB", Some("PARSE")) => Self::WebParseUrl,
+            ("WEB", Some("OPEN")) => Self::WebOpen,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

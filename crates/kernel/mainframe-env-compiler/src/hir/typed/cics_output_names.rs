@@ -62,4 +62,7 @@ pub enum HirCicsOutputName {
     WebPathLength,
     WebQueryString,
     WebQueryStringLength,
+    WebSessionToken,
+    WebHttpVNum,
+    WebHttpRNum,
 }

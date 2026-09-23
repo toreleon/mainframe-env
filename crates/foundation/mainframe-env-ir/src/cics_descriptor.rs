@@ -2,11 +2,13 @@
 
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
 
+mod effects;
 mod executable_entries;
 mod executable_lookup;
 mod executable_registry;
 mod registry_lookup;
 mod terminal_effects;
+use effects::*;
 pub use executable_entries::CICS_EXECUTABLE_DESCRIPTORS;
 pub use executable_lookup::cics_executable_descriptor;
 pub use executable_registry::*;
@@ -17,296 +19,6 @@ use terminal_effects::{
 
 /// Runtime import required by every executable operation in this dialect.
 pub const CICS_RUNTIME_IMPORT: &str = "host.cics";
-
-const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
-const TRACE_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const MONITOR_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Clock,
-    Effect::Condition,
-    Effect::Transaction,
-];
-
-const READ_EFFECTS: &[Effect] = &[
-    Effect::DatasetRead,
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const REWRITE_EFFECTS: &[Effect] = &[
-    Effect::DatasetWrite,
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const SYNCPOINT_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const DEQ_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const ENQ_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const CHANGE_TASK_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-];
-const SUSPEND_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-];
-const WAIT_EVENT_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const SET_ASSOCIATION_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-];
-const ADDRESS_SET_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-];
-const STORAGE_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const ASKTIME_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Clock,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-];
-const FORMAT_TIME_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-];
-const ABEND_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::ProgramControl,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const CONTROL_TRANSFER_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::ProgramControl,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const HANDLE_STACK_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-];
-const IGNORE_CONDITION_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-];
-const QUEUE_WRITE_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const JOURNAL_WAIT_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const TEMPORARY_QUEUE_WRITE_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const TERMINAL_RECEIVE_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::TerminalRead,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const TERMINAL_SEND_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::TerminalWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const ASSIGN_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const PURGE_MESSAGE_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const START_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Clock,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const RETRIEVE_EFFECTS: &[Effect] = &[
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const CANCEL_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const DELAY_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const DOCUMENT_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const EVENT_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
-const EVENT_TIMER_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Clock,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const TRANSFORM_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
-const WEB_SERVICE_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
-const WEB_PARSE_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
-const SPOOL_EFFECTS: &[Effect] = &[
-    Effect::Spool,
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const COUNTER_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];
-const COUNTER_QUERY_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-];
 
 /// Resolves an executable descriptor without accepting adjacent legacy CICS
 /// operation identities.
@@ -366,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 128);
+        assert_eq!(typed.len(), 129);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -384,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 135);
+        assert_eq!(unready.len(), 134);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -608,6 +320,7 @@ mod tests {
                 CicsPlanOperation::SpoolRead,
                 CicsPlanOperation::SpoolWrite,
                 CicsPlanOperation::WebParseUrl,
+                CicsPlanOperation::WebOpen,
                 CicsPlanOperation::SendPartnset,
                 CicsPlanOperation::ReceivePartn,
                 CicsPlanOperation::SendControl,

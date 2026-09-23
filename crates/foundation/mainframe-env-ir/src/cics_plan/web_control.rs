@@ -69,3 +69,51 @@ pub(super) fn invalid_parse_url_shape(
             _ => true,
         })
 }
+
+pub(super) fn invalid_open_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let urimap = inputs.contains(&CicsOperandName::WebUriMap);
+    let direct = inputs.contains(&CicsOperandName::WebHost)
+        && inputs.contains(&CicsOperandName::WebHostLength)
+        && inputs.contains(&CicsOperandName::WebScheme);
+    let allowed = BTreeSet::from([
+        CicsOperandName::WebUriMap,
+        CicsOperandName::WebHost,
+        CicsOperandName::WebHostLength,
+        CicsOperandName::WebPortNumber,
+        CicsOperandName::WebScheme,
+        CicsOperandName::WebCertificate,
+        CicsOperandName::WebCodePage,
+    ]);
+    !inputs.is_subset(&allowed)
+        || urimap == direct
+        || urimap && inputs.len() != 1 && inputs != &BTreeSet::from([
+            CicsOperandName::WebUriMap,
+            CicsOperandName::WebCodePage,
+        ])
+        || !outputs.contains(&CicsOutputName::WebSessionToken)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::WebHost
+            | CicsOperandName::WebScheme
+            | CicsOperandName::WebUriMap
+            | CicsOperandName::WebCertificate
+            | CicsOperandName::WebCodePage => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::WebHostLength | CicsOperandName::WebPortNumber => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            ),
+            _ => true,
+        })
+        || operand_value(plan, CicsOperandName::WebHostLength)
+            .is_some_and(|value| matches!(value, CicsOperandValue::Integer(number) if *number < 1))
+        || operand_value(plan, CicsOperandName::WebPortNumber)
+            .is_some_and(|value| matches!(value, CicsOperandValue::Integer(number) if !(1..=65535).contains(number)))
+}

@@ -638,6 +638,7 @@ fn validate_operation_shape(
             transform_control::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::WebParseUrl => web_control::invalid_parse_url_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebOpen => web_control::invalid_open_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -1953,6 +1954,65 @@ mod tests {
             outputs: vec![CicsOutputBinding {
                 name: CicsOutputName::WebSchemeName,
                 target: slot(1, "SCHEME-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_open_uses_reserved_v2_tags_and_rejects_legacy_encoding() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebOpen), 92);
+        assert_eq!(operation_from_tag(92), Ok(CicsPlanOperation::WebOpen));
+        for (name, tag) in [
+            (CicsOperandName::WebHost, 261),
+            (CicsOperandName::WebPortNumber, 262),
+            (CicsOperandName::WebScheme, 263),
+            (CicsOperandName::WebUriMap, 264),
+            (CicsOperandName::WebCertificate, 265),
+            (CicsOperandName::WebCodePage, 266),
+        ] {
+            assert!((256..=319).contains(&tag));
+            assert_eq!(operand_tag(name), tag);
+            assert_eq!(operand_from_tag(tag), Ok(name));
+        }
+        for (name, tag) in [
+            (CicsOutputName::WebSessionToken, 321),
+            (CicsOutputName::WebHttpVNum, 322),
+            (CicsOutputName::WebHttpRNum, 323),
+        ] {
+            assert!((312..=375).contains(&tag));
+            assert_eq!(output_tag(name), tag);
+            assert_eq!(output_from_tag(tag), Ok(name));
+        }
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebOpen,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::WebHostLength,
+                    value: CicsOperandValue::Integer(11),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebHost,
+                    value: CicsOperandValue::Literal(b"example.com".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebScheme,
+                    value: CicsOperandValue::Literal(b"HTTP".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::WebSessionToken,
+                target: slot(1, "TOKEN-X"),
             }],
             condition: CicsCondition::Default,
         };

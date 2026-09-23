@@ -278,6 +278,9 @@ fn validate_candidate(
                 ));
             }
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
+                if web_control::reviewed_ambiguous_shape(descriptor, name, has_value) {
+                    continue;
+                }
                 return Err(format!(
                     "CICS {} option {name} has a source-bounded operand shape",
                     operation::command_label(descriptor)
@@ -634,6 +637,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_CLAUSES,
         HirCicsOperation::DocumentSet => document_control::SET_CLAUSES,
         HirCicsOperation::WebParseUrl => web_control::PARSE_URL_CLAUSES,
+        HirCicsOperation::WebOpen => web_control::OPEN_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -738,6 +742,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_OPTIONS,
         HirCicsOperation::DocumentSet => document_control::ALLOWED_OPTIONS,
         HirCicsOperation::WebParseUrl => &["NOHANDLE"],
+        HirCicsOperation::WebOpen => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -907,6 +912,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentRetrieve => &["DOCTOKEN", "INTO", "LENGTH"][..],
         HirCicsOperation::DocumentSet => &["DOCTOKEN", "LENGTH"][..],
         HirCicsOperation::WebParseUrl => &["URL", "URLLENGTH"][..],
+        HirCicsOperation::WebOpen => &["SESSTOKEN"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],

@@ -69,13 +69,12 @@ pub struct CicsLimits {
     pub max_diagnostic_bytes: usize,
     pub max_diagnostic_replays: usize,
     pub max_diagnostic_payload_bytes: usize,
+    pub max_web_sessions: usize,
+    pub max_web_bytes: usize,
+    pub max_web_headers: usize,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CicsFileDefinition {
-    pub dataset: DatasetName,
-    pub ccsid: Option<u16>,
-}
+pub use handlers::CicsFileDefinition;
 
 /// Durable document-template definition used by `DOCUMENT CREATE` and `INSERT`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -278,6 +277,9 @@ struct State {
     transform_bytes: usize,
     journals: BTreeMap<String, handlers::JournalRecord>,
     spool: handlers::SpoolState,
+    web: handlers::WebState,
+    // Internal authority for the declared records-core slice. Command handlers
+    // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
     interval_records: BTreeMap<String, handlers::IntervalStartRecord>,
     #[cfg(feature = "fault-injection")]
@@ -435,6 +437,8 @@ impl CicsService {
         let (transform_containers, transform_bytes) =
             handlers::load_transform_containers(store.as_ref(), limits)?;
         let spool = handlers::load_spool_state(store.as_ref(), limits)?;
+        let web = handlers::load_web_state(store.as_ref(), limits)?;
+        debug_assert!(spool.reports.len() <= limits.max_spool_reports);
         Ok(Arc::new(Self {
             host,
             store: Arc::clone(&store),
@@ -465,6 +469,7 @@ impl CicsService {
                 transform_bytes,
                 journals: handlers::load_journals(store.as_ref(), limits)?,
                 spool,
+                web,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -3870,6 +3875,7 @@ mod tests {
         deny_event: bool,
         deny_counter: bool,
         deny_diagnostic: bool,
+        deny_web: bool,
         deny_dataset: bool,
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
@@ -4010,6 +4016,7 @@ mod tests {
                             || self.deny_event && matches!(class.as_str(), "BTSEVENT" | "EVENT")
                             || self.deny_counter && class == "COUNTER"
                             || self.deny_diagnostic && class == "CICSDIAG"
+                            || self.deny_web && class == "URIMAP"
                             || self.deny_dataset && class == "DATASET"
                             || self.deny_surrogate && class == "SURROGAT"
                         {
@@ -4318,6 +4325,7 @@ mod tests {
             deny_event: false,
             deny_counter: false,
             deny_diagnostic: false,
+            deny_web: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4347,6 +4355,7 @@ mod tests {
             deny_event: false,
             deny_counter: false,
             deny_diagnostic: false,
+            deny_web: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4373,6 +4382,7 @@ mod tests {
             deny_event: false,
             deny_counter: false,
             deny_diagnostic: false,
+            deny_web: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4399,6 +4409,34 @@ mod tests {
             deny_event,
             deny_counter: false,
             deny_diagnostic: false,
+            deny_web: false,
+            deny_dataset: false,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
+    }
+
+    fn web_authorities(deny_web: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command: false,
+            deny_transform: false,
+            deny_journal: false,
+            deny_event: false,
+            deny_counter: false,
+            deny_diagnostic: false,
+            deny_web,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4439,6 +4477,7 @@ mod tests {
             deny_event: false,
             deny_counter,
             deny_diagnostic,
+            deny_web: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4468,6 +4507,7 @@ mod tests {
             deny_event: false,
             deny_counter: false,
             deny_diagnostic: false,
+            deny_web: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4501,6 +4541,7 @@ mod tests {
                 deny_event: false,
                 deny_counter: false,
                 deny_diagnostic: false,
+                deny_web: false,
                 deny_dataset: false,
                 deny_surrogate,
                 principal_decision,
@@ -4557,6 +4598,7 @@ mod tests {
             deny_event: false,
             deny_counter: false,
             deny_diagnostic: false,
+            deny_web: false,
             deny_dataset: true,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -6665,6 +6707,7 @@ mod tests {
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
         assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 130);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 77);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7547,6 +7590,580 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn web_parse_url_returns_exact_parts_and_source_conditions() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let invocation = invocation_for("web-parse-url", BTreeMap::new());
+        let session = SessionId::new("web-parse-url", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let web_url = b"https://[::1]:8443/a%20b?x=%2F";
+        let mut parse = request(
+            CicsOperation::WebParseUrl,
+            BTreeMap::from([
+                ("URL".into(), cics_literal(web_url)),
+                ("URLLENGTH".into(), cics_decimal(web_url.len() as i64)),
+                ("SCHEMENAME".into(), argument(b"SCHEME-X")),
+                ("HOST".into(), argument(b"HOST-X")),
+                ("HOSTLENGTH".into(), cics_decimal(32)),
+                ("HOSTTYPE".into(), argument(b"TYPE-X")),
+                ("PORTNUMBER".into(), argument(b"PORT-X")),
+                ("PATH".into(), argument(b"PATH-X")),
+                ("PATHLENGTH".into(), cics_decimal(32)),
+                ("QUERYSTRING".into(), argument(b"QUERY-X")),
+                ("QUERYSTRLEN".into(), cics_decimal(32)),
+            ]),
+            1,
+        );
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, parse.clone(), 1),
+                parse.clone(),
+            )
+            .unwrap();
+        assert_eq!((result.response, result.response2), (0, 0));
+        assert_eq!(result.outputs["SCHEMENAME"].bytes(), b"HTTPS");
+        assert_eq!(result.outputs["HOST"].bytes(), b"::1");
+        assert_eq!(result.outputs["HOSTLENGTH"].bytes(), b"3");
+        assert_eq!(result.outputs["PORTNUMBER"].bytes(), b"8443");
+        assert_eq!(result.outputs["PATH"].bytes(), b"/a%20b");
+        assert_eq!(result.outputs["QUERYSTRING"].bytes(), b"x=%2F");
+
+        parse.arguments.insert("HOSTLENGTH".into(), cics_decimal(2));
+        parse.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let short = service
+            .invoke(
+                &effect(&invocation.run_unit_id, parse.clone(), 2),
+                parse.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (short.condition.as_str(), short.response, short.response2),
+            ("LENGERR", 22, 29)
+        );
+        assert_eq!(short.outputs["HOST"].bytes(), b"::");
+        assert_eq!(short.outputs["HOSTLENGTH"].bytes(), b"3");
+
+        parse
+            .arguments
+            .insert("URL".into(), cics_literal(b"http://example.com/%G0"));
+        parse.arguments.insert("URLLENGTH".into(), cics_decimal(22));
+        let invalid = service
+            .invoke(&effect(&invocation.run_unit_id, parse.clone(), 3), parse)
+            .unwrap();
+        assert_eq!(
+            (
+                invalid.condition.as_str(),
+                invalid.response,
+                invalid.response2
+            ),
+            ("INVREQ", 16, 65)
+        );
+    }
+
+    #[test]
+    fn web_open_establishes_durable_task_session_and_replays_without_reopening() {
+        struct TransportProbe(AtomicUsize);
+        impl CicsWebTransport for TransportProbe {
+            fn open(
+                &self,
+                endpoint: &CicsWebEndpoint,
+                invocation: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                assert_eq!(
+                    (
+                        endpoint.scheme.as_str(),
+                        endpoint.host.as_str(),
+                        endpoint.port
+                    ),
+                    ("HTTP", "example.com", 80)
+                );
+                assert!(!invocation.cancellation_requested());
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let transport = Arc::new(TransportProbe(AtomicUsize::new(0)));
+        service.install_web_transport(transport.clone()).unwrap();
+        let invocation = invocation_for("web-open", BTreeMap::new());
+        let session = SessionId::new("web-open", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("HOST".into(), cics_literal(b"example.com")),
+                ("HOSTLENGTH".into(), cics_decimal(11)),
+                ("SCHEME".into(), cics_literal(b"HTTP")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+                ("HTTPVNUM".into(), argument(b"VNUM-X")),
+                ("HTTPRNUM".into(), argument(b"RNUM-X")),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, open.clone(), 1),
+                open.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.response, first.response2), (0, 0));
+        assert_eq!(first.outputs["SESSTOKEN"].bytes().len(), 8);
+        assert_eq!(first.outputs["HTTPVNUM"].bytes(), b"1");
+        assert_eq!(first.outputs["HTTPRNUM"].bytes(), b"1");
+        assert_eq!(transport.0.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, open.clone(), 1),
+                    open.clone()
+                )
+                .unwrap(),
+            first
+        );
+        assert_eq!(transport.0.load(Ordering::SeqCst), 1);
+        let reopened =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        assert_eq!(reopened.lock().unwrap().web.sessions.len(), 1);
+        let pending = request(CicsOperation::WebOpen, open.arguments.clone(), 2);
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, pending.clone(), 2),
+                pending.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(transport.0.load(Ordering::SeqCst), 2);
+        let reconciled = service
+            .invoke(
+                &effect(&invocation.run_unit_id, pending.clone(), 2),
+                pending,
+            )
+            .unwrap();
+        assert_eq!(reconciled.condition, "NORMAL");
+        assert_eq!(transport.0.load(Ordering::SeqCst), 2);
+        let mut invalid = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("HOST".into(), cics_literal(b"example.com")),
+                ("HOSTLENGTH".into(), cics_decimal(12)),
+                ("SCHEME".into(), cics_literal(b"HTTP")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            3,
+        );
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let failed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (failed.condition.as_str(), failed.response, failed.response2),
+            ("LENGERR", 22, 21)
+        );
+        assert_eq!(transport.0.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .len(),
+            2
+        );
+        service
+            .register_web_urimaps(&[CicsWebUriMapDefinition {
+                name: "mapa".into(),
+                enabled: true,
+                scheme: "HTTP".into(),
+                host: "example.com".into(),
+                port: 0,
+                path: "example".into(),
+                pooled: true,
+                certificate: None,
+            }])
+            .unwrap();
+        let reopened =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        assert_eq!(
+            reopened.lock().unwrap().web.urimaps["MAPA"].path,
+            "/example"
+        );
+        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn web_open_urimap_state_survives_sqlite_reopen() {
+        struct StaticTransport;
+        impl CicsWebTransport for StaticTransport {
+            fn open(
+                &self,
+                endpoint: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                assert_eq!(endpoint.default_path, "/orders");
+                assert_eq!(endpoint.urimap.as_deref(), Some("ORDERS"));
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+        }
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-web-open-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let service =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        service
+            .install_web_transport(Arc::new(StaticTransport))
+            .unwrap();
+        let definition = CicsWebUriMapDefinition {
+            name: "orders".into(),
+            enabled: true,
+            scheme: "HTTP".into(),
+            host: "example.com".into(),
+            port: 0,
+            path: "orders".into(),
+            pooled: true,
+            certificate: None,
+        };
+        service.register_web_urimaps(&[definition.clone()]).unwrap();
+        service.register_web_urimaps(&[definition]).unwrap();
+        let invocation = invocation_for("web-open-sqlite", BTreeMap::new());
+        let session = SessionId::new("web-open-sqlite", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("URIMAP".into(), cics_literal(b"ORDERS")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+            .unwrap();
+        assert_eq!(response.outputs["SESSTOKEN"].bytes().len(), 8);
+        drop(service);
+        drop(store);
+        let reopened_store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let reopened =
+            CicsService::open(authorities(), reopened_store, CicsLimits::default()).unwrap();
+        let state = reopened.lock().unwrap();
+        assert_eq!(state.web.sessions.len(), 1);
+        assert_eq!(state.web.urimaps["ORDERS"].path, "/orders");
+        assert!(state.web.sessions.values().next().unwrap().pooled);
+        drop(state);
+        drop(reopened);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn web_open_urimap_saf_denial_is_audited_before_transport_dispatch() {
+        struct DeniedTransport(AtomicUsize);
+        impl CicsWebTransport for DeniedTransport {
+            fn open(
+                &self,
+                _: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = web_authorities(true);
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let transport = Arc::new(DeniedTransport(AtomicUsize::new(0)));
+        service.install_web_transport(transport.clone()).unwrap();
+        service
+            .register_web_urimaps(&[CicsWebUriMapDefinition {
+                name: "DENIED".into(),
+                enabled: true,
+                scheme: "HTTP".into(),
+                host: "example.com".into(),
+                port: 0,
+                path: "/".into(),
+                pooled: false,
+                certificate: None,
+            }])
+            .unwrap();
+        let invocation = invocation_for("web-open-denied", BTreeMap::new());
+        let session = SessionId::new("web-open-denied", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("URIMAP".into(), cics_literal(b"DENIED")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            1,
+        );
+        open.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let denied = service
+            .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+            .unwrap();
+        assert_eq!(
+            (denied.condition.as_str(), denied.response),
+            ("NOTAUTH", 70)
+        );
+        assert_eq!(transport.0.load(Ordering::SeqCst), 0);
+        assert!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(seen.lock().unwrap().contains(&(
+            "URIMAP".into(),
+            "DENIED".into(),
+            AccessIntent::Read,
+        )));
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == AuditDecision::Deny)
+        );
+    }
+
+    #[test]
+    fn web_open_transport_failure_is_audited_without_durable_session() {
+        struct FailingTransport;
+        impl CicsWebTransport for FailingTransport {
+            fn open(
+                &self,
+                _: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                Err(HostProblem::ProviderFailure)
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .install_web_transport(Arc::new(FailingTransport))
+            .unwrap();
+        let invocation = invocation_for("web-open-failure", BTreeMap::new());
+        let session = SessionId::new("web-open-failure", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("HOST".into(), cics_literal(b"example.com")),
+                ("HOSTLENGTH".into(), cics_decimal(11)),
+                ("SCHEME".into(), cics_literal(b"HTTP")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            1,
+        );
+        open.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let failed = service
+            .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+            .unwrap();
+        assert_eq!(
+            (failed.condition.as_str(), failed.response, failed.response2),
+            ("IOERR", 17, 42)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == AuditDecision::ProviderFailure)
+        );
+    }
+
+    #[test]
+    fn web_open_live_cancellation_and_deadline_after_dispatch_return_unknown() {
+        use mainframe_env_execution_api::CancellationProbe;
+        struct RacingTransport {
+            probe: Option<CancellationProbe>,
+            clock: Option<Arc<TestCicsClock>>,
+            releases: AtomicUsize,
+        }
+        impl CicsWebTransport for RacingTransport {
+            fn open(
+                &self,
+                _: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                if let Some(probe) = &self.probe {
+                    probe.request();
+                }
+                if let Some(clock) = &self.clock {
+                    clock.tick.store(100, Ordering::SeqCst);
+                }
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                self.releases.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        for cancel in [true, false] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let clock = Arc::new(TestCicsClock::fixed(1));
+            let service = CicsService::open_with_replay_clock(
+                authorities(),
+                store.clone(),
+                CicsLimits::default(),
+                clock.clone(),
+            )
+            .unwrap();
+            let probe = CancellationProbe::new();
+            let transport = Arc::new(RacingTransport {
+                probe: cancel.then_some(probe.clone()),
+                clock: (!cancel).then_some(clock),
+                releases: AtomicUsize::new(0),
+            });
+            service.install_web_transport(transport.clone()).unwrap();
+            let invocation = invocation_for(
+                if cancel { "web-cancel" } else { "web-deadline" },
+                BTreeMap::new(),
+            )
+            .with_cancellation_probe(probe);
+            let session =
+                SessionId::new(if cancel { "web-cancel" } else { "web-deadline" }, 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let open = request(
+                CicsOperation::WebOpen,
+                BTreeMap::from([
+                    ("HOST".into(), cics_literal(b"example.com")),
+                    ("HOSTLENGTH".into(), cics_decimal(11)),
+                    ("SCHEME".into(), cics_literal(b"HTTP")),
+                    ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+                ]),
+                1,
+            );
+            assert_eq!(
+                service.invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open),
+                Err(HostProblem::UnknownOutcome)
+            );
+            assert_eq!(transport.releases.load(Ordering::SeqCst), 1);
+            assert!(
+                store
+                    .list_provider_state("cics-web-session-v1", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+            assert!(
+                store
+                    .get_provider_state("cics-effect-replay-v1", "outer-1")
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                store
+                    .audit_records(&invocation.execution_id, 0, 16)
+                    .unwrap()
+                    .iter()
+                    .any(|record| record.decision == AuditDecision::UnknownOutcome)
+            );
+        }
     }
 
     #[test]

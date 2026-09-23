@@ -131,6 +131,7 @@ impl Canonical for CicsOperation {
             Self::TransformJsonToData => out.variant("CicsOperation", "TransformJsonToData", 0),
             Self::TransformXmlToData => out.variant("CicsOperation", "TransformXmlToData", 0),
             Self::WebParseUrl => out.variant("CicsOperation", "WebParseUrl", 0),
+            Self::WebOpen => out.variant("CicsOperation", "WebOpen", 0),
             Self::WaitJournalName => out.variant("CicsOperation", "WaitJournalName", 0),
             Self::WaitJournalNum => out.variant("CicsOperation", "WaitJournalNum", 0),
             Self::WriteJournalName => out.variant("CicsOperation", "WriteJournalName", 0),

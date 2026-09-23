@@ -166,6 +166,9 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebPathLength
         | HirCicsOutputName::WebQueryString
         | HirCicsOutputName::WebQueryStringLength
+        | HirCicsOutputName::WebSessionToken
+        | HirCicsOutputName::WebHttpVNum
+        | HirCicsOutputName::WebHttpRNum
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

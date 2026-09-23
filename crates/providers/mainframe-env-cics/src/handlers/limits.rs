@@ -30,6 +30,9 @@ impl Default for CicsLimits {
             max_diagnostic_bytes: 4 * 1024 * 1024,
             max_diagnostic_replays: 65_536,
             max_diagnostic_payload_bytes: 1024 * 1024,
+            max_web_sessions: 32_768,
+            max_web_bytes: 64 * 1024 * 1024,
+            max_web_headers: 256,
         }
     }
 }

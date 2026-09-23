@@ -150,6 +150,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::WebHostLength
         | CicsOperandName::WebPathLength
         | CicsOperandName::WebQueryStringLength => SlotUse::FullwordInput,
+        CicsOperandName::WebPortNumber => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -214,6 +215,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::WebPortNumber
         | CicsOutputName::WebPathLength
         | CicsOutputName::WebQueryStringLength => SlotUse::FullwordOutput,
+        CicsOutputName::WebSessionToken => SlotUse::Output,
+        CicsOutputName::WebHttpVNum | CicsOutputName::WebHttpRNum => SlotUse::HalfwordOutput,
     }
 }
 
@@ -347,6 +350,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WriteJournalName => CicsOperation::WriteJournalName,
         CicsPlanOperation::WriteJournalNum => CicsOperation::WriteJournalNum,
         CicsPlanOperation::WebParseUrl => CicsOperation::WebParseUrl,
+        CicsPlanOperation::WebOpen => CicsOperation::WebOpen,
     }
 }
 
@@ -580,6 +584,12 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebHostLength => "HOSTLENGTH",
         CicsOperandName::WebPathLength => "PATHLENGTH",
         CicsOperandName::WebQueryStringLength => "QUERYSTRLEN",
+        CicsOperandName::WebHost => "HOST",
+        CicsOperandName::WebPortNumber => "PORTNUMBER",
+        CicsOperandName::WebScheme => "SCHEME",
+        CicsOperandName::WebUriMap => "URIMAP",
+        CicsOperandName::WebCertificate => "CERTIFICATE",
+        CicsOperandName::WebCodePage => "CODEPAGE",
     }
 }
 
@@ -666,6 +676,9 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::WebPathLength => "PATHLENGTH",
         CicsOutputName::WebQueryString => "QUERYSTRING",
         CicsOutputName::WebQueryStringLength => "QUERYSTRLEN",
+        CicsOutputName::WebSessionToken => "SESSTOKEN",
+        CicsOutputName::WebHttpVNum => "HTTPVNUM",
+        CicsOutputName::WebHttpRNum => "HTTPRNUM",
     }
 }
 

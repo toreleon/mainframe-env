@@ -38,6 +38,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB OPEN` with source-fenced direct-host or installed
+  client URIMAP selection, an eight-byte task-owned session token,
+  transport-confirmed HTTP version, bounded durable state and replay, and a
+  selected compiled route. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0244` binds
+  `dfhp4_webopen.html` at
+  `sha256:10e939b391746c2bf19e08d52bf7e22cdad2270b983d2502b4e009771da7490a`.
+
 - Added typed CICS `WEB PARSE URL` with bounded URL parsing, escaped query
   preservation, IPv4/IPv6 host classification, fullword buffer lengths, source
   conditions, and a selected compiled COBOL route. IBM CICS TS 6.x baseline
