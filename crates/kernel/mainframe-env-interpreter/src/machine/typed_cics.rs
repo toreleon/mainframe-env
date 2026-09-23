@@ -318,11 +318,13 @@ pub(super) fn execute(
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea => {
                 retrieve::freemain_data_argument(machine, slot)?
             }
-            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataPointer64 => {
-                storage64::freemain_pointer_argument(machine, slot)?
-            }
-            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea64 => {
-                storage64::freemain_data_argument(machine, slot)?
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::DataPointer64 | CicsOperandName::DataArea64
+                ) =>
+            {
+                storage64::freemain_argument(machine, slot, operand.name)?
             }
             CicsOperandValue::Storage(slot)
                 if matches!(
@@ -1037,24 +1039,7 @@ fn validate_machine_slot(
             "ADDRESS SET pointer operands must use POINTER or POINTER-32",
         ));
     }
-    if matches!(slot_use, SlotUse::Pointer64Output | SlotUse::Pointer64Input)
-        && (layout.category != LayoutCategory::Pointer || layout.length != 8)
-    {
-        return Err(invalid_plan(
-            "AMODE(64) SET requires an eight-byte pointer slot",
-        ));
-    }
-    if matches!(slot_use, SlotUse::DataArea64Input)
-        && (layout.length == 0
-            || matches!(
-                layout.category,
-                LayoutCategory::Pointer | LayoutCategory::Pointer32
-            ))
-    {
-        return Err(invalid_plan(
-            "FREEMAIN64 DATA requires a declared nonpointer area",
-        ));
-    }
+    storage64::validate_slot(slot_use, layout)?;
     if matches!(slot_use, SlotUse::AddressInput | SlotUse::AddressOutput)
         && matches!(
             layout.category,

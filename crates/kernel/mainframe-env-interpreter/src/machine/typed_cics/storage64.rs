@@ -91,6 +91,43 @@ pub(super) fn freemain_data_argument(
     classified_pointer(machine, address.to_be_bytes().to_vec())
 }
 
+pub(super) fn freemain_argument(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+    name: CicsOperandName,
+) -> Result<(&'static str, Vec<u8>), MachineProblem> {
+    match name {
+        CicsOperandName::DataPointer64 => freemain_pointer_argument(machine, slot),
+        CicsOperandName::DataArea64 => freemain_data_argument(machine, slot),
+        _ => Err(invalid_plan("FREEMAIN64 requires DATA or DATAPOINTER")),
+    }
+}
+
+pub(super) fn validate_slot(
+    slot_use: SlotUse,
+    layout: &LayoutMetadata,
+) -> Result<(), MachineProblem> {
+    if matches!(slot_use, SlotUse::Pointer64Output | SlotUse::Pointer64Input)
+        && (layout.category != LayoutCategory::Pointer || layout.length != 8)
+    {
+        return Err(invalid_plan(
+            "AMODE(64) SET requires an eight-byte pointer slot",
+        ));
+    }
+    if matches!(slot_use, SlotUse::DataArea64Input)
+        && (layout.length == 0
+            || matches!(
+                layout.category,
+                LayoutCategory::Pointer | LayoutCategory::Pointer32
+            ))
+    {
+        return Err(invalid_plan(
+            "FREEMAIN64 DATA requires a declared nonpointer area",
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn release_output(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
