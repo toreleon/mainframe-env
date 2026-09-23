@@ -39,9 +39,10 @@ pub(super) fn operands(
         return Ok(Vec::new());
     }
     let pointer = complete_data_reference(&clauses["ECADDR"], semantic)?;
-    if pointer.usage != CobolUsage::Pointer32 || pointer.length != 4 {
+    if !matches!(pointer.usage, CobolUsage::Pointer | CobolUsage::Pointer32) || pointer.length != 4
+    {
         return Err(ResolutionFailure::Invalid(
-            "CICS WAIT EVENT ECADDR requires a four-byte POINTER-32 reference".into(),
+            "CICS WAIT EVENT ECADDR requires a four-byte POINTER or POINTER-32 reference".into(),
         ));
     }
     let mut operands = vec![HirCicsNamedOperand {

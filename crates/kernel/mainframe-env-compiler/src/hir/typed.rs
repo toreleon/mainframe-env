@@ -1982,7 +1982,7 @@ mod tests {
 
     #[test]
     fn cics_wait_event_resolves_pointer_name_and_rejects_invalid_forms() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITONE. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-X PIC S9(9) COMP VALUE 0. 01 ECB-PTR POINTER-32. PROCEDURE DIVISION. SET ECB-PTR TO ADDRESS OF ECB-X. EXEC CICS WAIT EVENT ECADDR(ECB-PTR) NAME('EVENT001') END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITONE. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-X PIC S9(9) COMP VALUE 0. 01 ECB-PTR POINTER. PROCEDURE DIVISION. SET ECB-PTR TO ADDRESS OF ECB-X. EXEC CICS WAIT EVENT ECADDR(ECB-PTR) NAME('EVENT001') END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed WAIT EVENT HIR");
         let command = hir
             .statements
@@ -2014,9 +2014,9 @@ mod tests {
 
         for (declaration, command, expected) in [
             (
-                "01 ECB-PTR POINTER.",
+                "01 ECB-PTR PIC X(4).",
                 "WAIT EVENT ECADDR(ECB-PTR)",
-                "four-byte POINTER-32",
+                "four-byte POINTER or POINTER-32",
             ),
             (
                 "01 ECB-PTR POINTER-32.",

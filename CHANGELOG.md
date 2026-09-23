@@ -31,11 +31,13 @@ All notable changes to mainframe-env are documented here.
   purge behavior, task cleanup, replay, and SQLite reopen are covered through
   the compiled EIBFN `5E22` route.
 
-- Added typed CICS `WAIT EVENT` over checked POINTER-32 event control areas.
+- Added typed CICS `WAIT EVENT` over checked four-byte POINTER or POINTER-32
+  event control areas.
   Append-only operation tag 43 and operand tags 46–47 preserve existing plans;
-  zero-valued events suspend and reissue through the durable coordinator, a
-  standard post survives SQLite reopen, completion marks the ECB and advances
-  with exact EIBFN `1202`, and task cleanup removes the retained wait row.
+  events without the first-byte `X'40'` POST bit suspend and reissue through the
+  durable coordinator, a standard post survives SQLite reopen, completion marks
+  the ECB and advances with exact EIBFN `1202`, and task cleanup removes the
+  retained wait row.
 
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
@@ -741,6 +743,11 @@ All notable changes to mainframe-env are documented here.
   0.8.2 tag.
 
 ### Fixed
+
+- Corrected typed CICS `WAIT EVENT` to test only the first-byte `X'40'` ECB
+  POST bit instead of treating any nonzero fullword as posted, and accept both
+  POINTER and POINTER-32 only when the resolved pointer storage is exactly four
+  bytes.
 
 - Apply typed CICS `WRITE LENGTH`/`KEYLENGTH` through persisted records, resolve
   dynamic legacy `SEND LENGTH` operands, preserve typed `SEND MAP` ownership

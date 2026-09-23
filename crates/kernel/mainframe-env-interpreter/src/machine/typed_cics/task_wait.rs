@@ -67,7 +67,7 @@ fn wait_event_arguments(
             "EVENT.POSTED".into(),
             payload(
                 "mainframe-env.cics.event-posted@1",
-                vec![u8::from(event != [0, 0, 0, 0])],
+                vec![u8::from(event[0] & POSTED_ECB[0] != 0)],
             )?,
         ),
     ]))
