@@ -11,6 +11,7 @@ mod interval;
 mod interval_control;
 mod journal_control;
 mod limits;
+mod network_context;
 mod operator_control;
 mod program_control;
 mod queue_control;
@@ -87,6 +88,10 @@ pub(super) use document_control::{
 };
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use file_tokens::FileUpdateState;
+pub use network_context::{
+    CicsCertificateName, CicsClientCertificate, CicsTcpipAuthenticate, CicsTcpipContext,
+    CicsTcpipPrivacy, CicsTcpipSslType,
+};
 pub use operator_control::CICS_OPERATOR_WORK_GENERATION;
 pub use operator_control::CicsOperatorMessageView;
 pub(super) use operator_control::invoke as invoke_operator;
@@ -98,6 +103,7 @@ pub(super) fn validate_owned_stores(
     task_enqueue::validate_store(store, limits)?;
     operator_control::load_operator_messages(store, limits)?;
     operator_control::validate_active_operator_commands(store, limits)?;
+    network_context::validate_store(store, limits)?;
     Ok(())
 }
 pub(super) use handle_state::{
@@ -211,6 +217,7 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     task_wait::release_task(service, run)?;
     document_control::release_task(service, run)?;
     interval_control::release_task(service, run)?;
+    network_context::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)
 }
 

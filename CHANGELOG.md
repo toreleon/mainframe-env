@@ -23,6 +23,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a strict task-owned TCP/IP ingress and client-certificate context for
+  the pending `EXTRACT TCPIP` and `EXTRACT CERTIFICATE` routes. Trusted host
+  registration is immutable, survives SQLite reopen, rejects malformed
+  connection/certificate envelopes, and releases with the CICS task. Both
+  command rows remain unready while typed outputs and their source numeric
+  CVDA representations are completed.
+
 - Added typed CICS `WRITE OPERATOR` for row `0256`. It persists a bounded
   console message with reviewed routing and action codes, displays long text
   in source-bounded console lines, and optionally suspends for a SAF-gated

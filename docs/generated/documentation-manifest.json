@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 189,
+    "markdown_documents": 190,
     "navigation_groups": 5,
-    "normative_documents": 41,
+    "normative_documents": 42,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:7a5f230224ea6accb2cbf1f45840b3e48ef79bdc8cd9d7055a4f47dc573254c1",
+      "sha256": "sha256:669332e6ffbebb7923ec69b32a622130ab99bf259b522e7080c5d0380208155d",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 76,
-      "sha256": "sha256:9f12b28d346df95a055d44b01d94ebef9977c740327877fe2e4f1339abb343c0",
+      "relative_links": 77,
+      "sha256": "sha256:4916df061cfe9dc35d91c09ab504d3e87b100961598db1ce5a58fb5b056d92f2",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -743,10 +743,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and network maintainers",
+      "path": "docs/decisions/0014-cics-tcpip-ingress-context.md",
+      "relative_links": 0,
+      "scope": "EXTRACT TCPIP and EXTRACT CERTIFICATE task context",
+      "sha256": "sha256:c97af9811901a24cf9c76322fa08e2e05affa31dfbdc046cac3eba5f77f72461",
+      "status": "Proposed for v0.9 development; executable routes pending",
+      "title": "ADR-0014: Keep CICS TCP/IP and certificate facts in trusted ingress context",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 13,
-      "sha256": "sha256:9e3f5ae84265da6e810219becbd546846e523025ec7f18fd607434b1db964e01",
+      "relative_links": 14,
+      "sha256": "sha256:dd017dbf470215fa45150615008d9e314c71f786916a91bccd540e43dc3e6b17",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1086,7 +1098,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:20c6b44f19c0f09b989074956cf7ac39a4be326f1e941f0569c5532a2b8f1273",
+      "sha256": "sha256:acc88a002868a93fcbe70771d72b794695569585dcb0e91f4109d67081c910a4",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1836,6 +1848,10 @@
           "path": "docs/decisions/0013-cics-operator-reply-boundary.md"
         },
         {
+          "label": "ADR-0014: CICS TCP/IP ingress context",
+          "path": "docs/decisions/0014-cics-tcpip-ingress-context.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -1999,7 +2015,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:d512c281a3f6c72ba7d83d46dd5bd8f462fb619460945f851cb658f27403a227",
+  "registry_sha256": "sha256:fa9de13ac25021fdd2e4f78fa572508133ecc3c6dbe825529b0ec1c7a3c55c3a",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

@@ -11976,6 +11976,86 @@ mod tests {
     }
 
     #[test]
+    fn trusted_tcpip_context_is_immutable_and_recovers_from_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-tcpip-context-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("tcpip-sqlite", BTreeMap::new());
+        let session = SessionId::new("tcpip-sqlite", 64).unwrap();
+        let context = CicsTcpipContext {
+            client_address: Some("192.0.2.10".parse().unwrap()),
+            server_address: Some("2001:db8::1".parse().unwrap()),
+            client_name: Some("client.example".into()),
+            server_name: Some("server.example".into()),
+            tcpip_service: "HTTP0001".into(),
+            port: 443,
+            authenticate: CicsTcpipAuthenticate::Noauthentic,
+            privacy: CicsTcpipPrivacy::Required,
+            ssl_type: CicsTcpipSslType::Ssl,
+            max_data_length: 65_536,
+            certificate: None,
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics =
+                CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.bind_tcpip_context(&invocation, context.clone())
+                .unwrap();
+            cics.bind_tcpip_context(&invocation, context.clone())
+                .unwrap();
+            let mut changed = context.clone();
+            changed.port = 444;
+            assert_eq!(
+                cics.bind_tcpip_context(&invocation, changed),
+                Err(HostProblem::IdempotencyConflict)
+            );
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let run = cics
+            .lock()
+            .unwrap()
+            .runs
+            .get(&invocation.run_unit_id)
+            .unwrap()
+            .clone();
+        assert_eq!(cics.current_tcpip_context(&run).unwrap(), Some(context));
+        drop(cics);
+        let row = store
+            .get_provider_state("cics-tcpip-context-v1", invocation.run_unit_id.as_str())
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(&row.namespace, &row.key, row.version)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: 1,
+                    payload: b"{\"schema\":\"wrong\"}".to_vec(),
+                    ..row
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn post_cancel_from_other_task_posts_and_delay_supersedes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

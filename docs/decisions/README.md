@@ -17,6 +17,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0011](0011-typed-language-hir-and-semantic-ir.md) | language-specific HIR, semantic IR dialects, and typed host effects | Accepted |
 | [0012](0012-checked-amode64-storage-boundary.md) | checked AMODE(64) virtual storage and checkpoint boundary | Proposed |
 | [0013](0013-cics-operator-reply-boundary.md) | durable CICS operator reply and console ingress boundary | Proposed |
+| [0014](0014-cics-tcpip-ingress-context.md) | trusted TCP/IP and client-certificate task context | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.
