@@ -13,6 +13,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Rebased the six CICS diagnostics commands onto terminal control and updated
+  the shared descriptor, compiler, and generated contract boundaries to 127
+  typed, 0 legacy, and 136 unready application rows. Existing terminal and
+  other family tag values remain fixed.
+
 - Rebased CICS diagnostics onto the integrated event-control family and split
   the 112-entry executable registry into bounded modules. Generated contracts
   and ratchets now report 112 typed, 0 legacy, and 151 unready application

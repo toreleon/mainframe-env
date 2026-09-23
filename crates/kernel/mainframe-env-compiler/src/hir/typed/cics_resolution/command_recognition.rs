@@ -1,6 +1,8 @@
 //! Top-level command-head tokens carried into valued CICS clauses.
 
-use mainframe_env_ir::CicsApplicationRegistryDescriptor;
+use super::{compatibility_alias_target, journal_control};
+use crate::SemanticModel;
+use mainframe_env_ir::{CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor};
 
 pub(super) fn clause_tokens(
     body: &[String],
@@ -18,4 +20,55 @@ pub(super) fn clause_tokens(
     }
     tokens.extend_from_slice(remainder);
     tokens
+}
+
+pub(super) fn option_value_shape(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    name: &str,
+) -> Option<CicsApplicationOptionValueShape> {
+    if matches!(
+        descriptor.label_tokens,
+        ["ISSUE", "ABORT" | "END" | "SEND" | "WAIT"]
+    ) && matches!(name, "WPMEDIA2" | "WPMEDIA3" | "WPMEDIA4")
+    {
+        // The pinned prose explicitly lists all four media; the projected
+        // syntax diagram currently materializes only WPMEDIA1.
+        return Some(CicsApplicationOptionValueShape::Flag);
+    }
+    journal_control::option_value_shape(descriptor, name).or_else(|| {
+        descriptor
+            .options
+            .iter()
+            .find(|option| option.name == name)
+            .map(|option| option.value_shape)
+            .or_else(|| {
+                compatibility_alias_target(descriptor, name).and_then(|canonical| {
+                    descriptor
+                        .options
+                        .iter()
+                        .find(|option| option.name == canonical)
+                        .map(|option| option.value_shape)
+                })
+            })
+    })
+}
+
+pub(super) fn statically_known_value_bytes(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Option<usize> {
+    if let [literal] = tokens
+        && literal.len() >= 2
+        && let Some(quote) = literal.chars().next()
+        && matches!(quote, '\'' | '"')
+        && literal.ends_with(quote)
+    {
+        let contents = &literal[quote.len_utf8()..literal.len() - quote.len_utf8()];
+        let escaped = format!("{quote}{quote}");
+        return Some(contents.replace(&escaped, &quote.to_string()).len());
+    }
+    semantic
+        .resolve(&tokens.join(" "))
+        .ok()
+        .map(|layout| layout.length)
 }

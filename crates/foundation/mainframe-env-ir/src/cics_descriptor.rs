@@ -6,10 +6,14 @@ mod executable_entries;
 mod executable_lookup;
 mod executable_registry;
 mod registry_lookup;
+mod terminal_effects;
 pub use executable_entries::CICS_EXECUTABLE_DESCRIPTORS;
 pub use executable_lookup::cics_executable_descriptor;
 pub use executable_registry::*;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
+use terminal_effects::{
+    OUTBOARD_READ_EFFECTS, OUTBOARD_WAIT_EFFECTS, OUTBOARD_WRITE_EFFECTS, ROUTE_EFFECTS,
+};
 
 /// Runtime import required by every executable operation in this dialect.
 pub const CICS_RUNTIME_IMPORT: &str = "host.cics";
@@ -361,7 +365,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 121);
+        assert_eq!(typed.len(), 127);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -379,7 +383,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 142);
+        assert_eq!(unready.len(), 136);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));

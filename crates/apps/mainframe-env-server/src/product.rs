@@ -6313,9 +6313,8 @@ mod tests {
     };
     use mainframe_env_cics::{
         CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
-        CicsEventPostMode, CicsJavaStatus, CicsPartitionDefinition, CicsPartitionSetDefinition,
         CicsEventPostMode, CicsJavaStatus, CicsMonitorAction, CicsMonitorPointDefinition,
-        CicsProgramDefinition,
+        CicsPartitionDefinition, CicsPartitionSetDefinition, CicsProgramDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{

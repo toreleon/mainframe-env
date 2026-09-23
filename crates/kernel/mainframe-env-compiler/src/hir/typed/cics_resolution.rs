@@ -216,7 +216,7 @@ fn validate_candidate(
     let mut condition_clause_count = 0usize;
     let mut aid_clause_count = 0usize;
     for name in present {
-        let Some(shape) = option_value_shape(descriptor, name) else {
+        let Some(shape) = command_recognition::option_value_shape(descriptor, name) else {
             if let Some(condition_clauses) = descriptor.condition_clauses
                 && is_condition_name(name)
             {
@@ -420,7 +420,7 @@ fn validate_candidate(
         else {
             continue;
         };
-        if let Some(bytes) = statically_known_value_bytes(value, semantic)
+        if let Some(bytes) = command_recognition::statically_known_value_bytes(value, semantic)
             && bytes > limit
         {
             return Err(format!(
@@ -437,7 +437,7 @@ fn validate_candidate(
 }
 
 fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -> bool {
-    option_value_shape(descriptor, name).is_some()
+    command_recognition::option_value_shape(descriptor, name).is_some()
         || (descriptor.condition_clauses.is_some() && is_condition_name(name))
         || (descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name))
 }
@@ -456,37 +456,6 @@ fn is_single_condition_label(tokens: &[String]) -> bool {
     matches!(tokens, [label] if !label.is_empty() && label.chars().all(|character| {
         character.is_ascii_alphanumeric() || character == '-'
     }))
-}
-
-fn option_value_shape(
-    descriptor: &CicsApplicationRegistryDescriptor,
-    name: &str,
-) -> Option<CicsApplicationOptionValueShape> {
-    if matches!(
-        descriptor.label_tokens,
-        ["ISSUE", "ABORT" | "END" | "SEND" | "WAIT"]
-    ) && matches!(name, "WPMEDIA2" | "WPMEDIA3" | "WPMEDIA4")
-    {
-        // The pinned prose explicitly lists all four media; the projected
-        // syntax diagram currently materializes only WPMEDIA1.
-        return Some(CicsApplicationOptionValueShape::Flag);
-    }
-    journal_control::option_value_shape(descriptor, name).or_else(|| {
-        descriptor
-            .options
-            .iter()
-            .find(|option| option.name == name)
-            .map(|option| option.value_shape)
-            .or_else(|| {
-                compatibility_alias_target(descriptor, name).and_then(|canonical| {
-                    descriptor
-                        .options
-                        .iter()
-                        .find(|option| option.name == canonical)
-                        .map(|option| option.value_shape)
-                })
-            })
-    })
 }
 
 fn compatibility_alias_target(
@@ -544,23 +513,6 @@ fn validate_legacy_execution_subset(
         ));
     }
     Ok(())
-}
-
-fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> Option<usize> {
-    if let [literal] = tokens
-        && literal.len() >= 2
-        && let Some(quote) = literal.chars().next()
-        && matches!(quote, '\'' | '"')
-        && literal.ends_with(quote)
-    {
-        let contents = &literal[quote.len_utf8()..literal.len() - quote.len_utf8()];
-        let escaped = format!("{quote}{quote}");
-        return Some(contents.replace(&escaped, &quote.to_string()).len());
-    }
-    semantic
-        .resolve(&tokens.join(" "))
-        .ok()
-        .map(|layout| layout.length)
 }
 
 pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {

@@ -1,6 +1,5 @@
 use super::*;
 
-
 /// Complete registry for the bounded typed CICS executable pilot.
 pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 127] = [
     CicsExecutableDescriptor {

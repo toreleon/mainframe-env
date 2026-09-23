@@ -5846,10 +5846,7 @@ mod tests {
             )
         ));
 
-        for (command, expected_label) in [
-            ("ISSUE ERASEAUP", "ISSUE ERASEAUP"),
-            ("SEND PAGE RETAIN", "SEND PAGE"),
-        ] {
+        for (command, expected_label) in [("ISSUE ERASEAUP", "ISSUE ERASEAUP")] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALT. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );
@@ -5864,6 +5861,19 @@ mod tests {
                 analysis.diagnostics
             );
         }
+        let page = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPAGE. PROCEDURE DIVISION. EXEC CICS SEND PAGE RETAIN END-EXEC. STOP RUN.",
+        );
+        let hir = page
+            .hir
+            .unwrap_or_else(|| panic!("SEND PAGE RETAIN: {:?}", page.diagnostics));
+        assert!(hir.statements.iter().any(|statement| matches!(
+            statement.resolved,
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::SendPage,
+                ..
+            }))
+        )));
         let trace = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTRCE. PROCEDURE DIVISION. EXEC CICS TRACE OFF USER END-EXEC. STOP RUN.",
         );

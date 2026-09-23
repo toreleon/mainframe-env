@@ -25,7 +25,7 @@ pub(super) fn clauses(
                 && !clauses.contains_key(&name)
                 && descriptor.is_some_and(|descriptor| {
                     matches!(
-                        option_value_shape(descriptor, &name),
+                        command_recognition::option_value_shape(descriptor, &name),
                         Some(CicsApplicationOptionValueShape::Flag)
                     )
                 });
