@@ -195,7 +195,6 @@ pub(super) fn write_set64_output(
         },
         shared: match bytes[2] {
             0 => false,
-            1 => true,
             _ => return Err(MachineProblem::UnexpectedHostResult),
         },
         executable: match bytes[3] {

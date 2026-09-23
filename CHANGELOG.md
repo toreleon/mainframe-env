@@ -136,7 +136,8 @@ All notable changes to mainframe-env are documented here.
   and stale-address rejection. Fullword FLENGTH, NOSUSPEND, the common response
   policy, exact LENGERR/NOSTG/INVREQ paths, replay, and Memory/SQLite provider
   operation are covered. SHARED remains fail-closed pending durable cross-task
-  storage, and no assembler source frontend or native executable storage is
+  storage: the interpreter rejects forged shared allocation results and
+  snapshots. No assembler source frontend or native executable storage is
   claimed.
 
 - Added the separate non-LE AMODE(64) FREEMAIN64 DATAPOINTER and DATA routes.

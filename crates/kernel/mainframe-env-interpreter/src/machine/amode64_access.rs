@@ -23,6 +23,14 @@ impl ReferenceMachine {
         snapshot: &MachineSnapshot,
     ) -> Result<(), MachineProblem> {
         if snapshot.schema_version >= 11 {
+            if snapshot
+                .storage64
+                .allocations
+                .iter()
+                .any(|allocation| allocation.attributes.shared)
+            {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
             restored_storage64
                 .restore(snapshot.storage64.clone())
                 .map_err(|_| MachineProblem::IncompatibleSnapshot)?;

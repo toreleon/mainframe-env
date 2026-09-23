@@ -16287,6 +16287,27 @@ mod tests {
             ("INVREQ", 16, 2)
         );
 
+        let mut shared = base.clone();
+        shared.insert("OPTION.SHARED".into(), cics_option());
+        let shared = request(CicsOperation::Getmain64, shared, 8);
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, shared.clone(), 8), shared),
+            Err(HostProblem::Unsupported)
+        );
+
+        let mut no_suspend = base.clone();
+        no_suspend.insert("OPTION.NOSUSPEND".into(), cics_option());
+        no_suspend.insert("OPTION.USERDATAKEY".into(), cics_option());
+        let no_suspend = request(CicsOperation::Getmain64, no_suspend, 9);
+        let no_suspend = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_suspend.clone(), 9),
+                no_suspend,
+            )
+            .unwrap();
+        assert_eq!(no_suspend.condition, "NORMAL");
+        assert_eq!(no_suspend.outputs["SET64"].bytes()[1], 0);
+
         let mut location = base;
         location.insert("LOCATION".into(), cics_literal(b"LOC31"));
         location.insert("SET64.DSALIMIT".into(), cics_decimal(2_130_706_432));
