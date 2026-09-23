@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added durable local CICS TDQUEUE definitions for typed WRITEQ TD, READQ TD,
+  and DELETEQ TD. Installed intrapartition and extrapartition definitions now
+  drive enabled/open direction, record-size and per-queue capacity checks with
+  exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR, QIDERR, and QZERO
+  conditions across SQLite reopen.
+
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal
   the current CICS system before authorization or mutation; unknown and

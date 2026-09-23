@@ -262,13 +262,11 @@ Typed local WRITEQ TD captures a 1–4 character QUEUE name and one FROM storage
 area. An omitted LENGTH selects the complete area; a present integer LENGTH
 selects that exact leading byte count and raises LENGERR before mutation when
 it exceeds the captured area. The persisted prefix and mutation identity drive
-idempotent replay, and normal completion updates EIBFN to `0802`. Remote SYSID
-and unavailable queue-definition state remain outside this typed subset.
+idempotent replay, and normal completion updates EIBFN to `0802`.
 Typed local DELETEQ TD captures the same bounded QUEUE name, requires update
 authorization for that queue resource, and atomically removes its durable
 records and retained-byte accounting. A missing queue returns QIDERR 44/0;
-remote SYSID and definition-driven extrapartition, disabled, or locked states
-remain outside this typed subset.
+extrapartition DELETE returns INVREQ.
 Typed local READQ TD accepts exactly one INTO or SET destination and an optional
 writable halfword LENGTH. INTO uses either the supplied positive maximum or the
 compiler-derived area extent. SET returns a checked POINTER/POINTER-32 address
@@ -276,9 +274,14 @@ to interpreter-owned storage containing the complete record and survives a
 checkpoint restore. Zero length and INTO truncation consume the record and
 return LENGERR 22/0; a negative length or insufficient SET allocation capacity
 does not consume. Missing and empty queues remain distinct as QIDERR 44/0 and
-QZERO 23/0. All three typed TDQ commands accept an explicit local-system SYSID;
-any other name returns SYSIDERR 53/0 before authorization or mutation. Remote
-routing, NOSUSPEND, and definition-driven modes remain fail-closed.
+QZERO 23/0. Durable installed TDQUEUE definitions select intrapartition or
+local extrapartition behavior, enabled/open direction, record-size rules, and
+per-queue record/byte bounds. Definition state survives provider reopen and
+produces exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR, QIDERR, and
+QZERO conditions. All three typed TDQ commands accept an explicit local-system
+SYSID; any other name returns SYSIDERR 53/0 before authorization or mutation.
+Remote routing, NOSUSPEND/QBUSY, indoubt locking, and external data set
+integration remain fail-closed.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

@@ -17,6 +17,7 @@ mod task_wait;
 mod terminal_control;
 mod terminal_run;
 mod time;
+pub(in crate::service) mod transient_data;
 
 use super::{CicsService, Run};
 use mainframe_env_host_api::HostProblem;
@@ -77,6 +78,13 @@ pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
+#[allow(unused_imports)]
+pub use transient_data::{
+    CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
+};
+pub(in crate::service) use transient_data::{
+    TransientDataState, load as load_transient_data, register as register_transient_data,
+};
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;

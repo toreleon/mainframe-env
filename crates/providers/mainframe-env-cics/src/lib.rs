@@ -24,7 +24,8 @@ pub use service::{
     CicsContinuation, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus,
     CicsIntervalError, CicsIntervalMode, CicsIntervalTime, CicsLimits, CicsReplayClock,
     CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot,
-    CicsTraceEntry, cics_provider,
+    CicsTraceEntry, CicsTransientDataQueueDefinition, CicsTransientDataQueueKind,
+    CicsTransientDataQueueOpen, cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

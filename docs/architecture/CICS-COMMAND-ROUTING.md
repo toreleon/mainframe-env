@@ -243,11 +243,15 @@ compiler-resolved INTO extent. SET returns a checked virtual address to an
 interpreter-owned copy of the complete record and participates in checkpoint
 restore. Zero or truncated INTO reads consume and return LENGERR 22/0, while
 negative length or insufficient SET capacity preserves the queue. Missing and
-empty queues return QIDERR 44/0 and QZERO 23/0. SYSID, NOSUSPEND, remote
-routing, and TDQUEUE definition-state conditions remain deferred. WRITEQ TD,
-READQ TD, and DELETEQ TD accept SYSID only when it identifies the current
-system; an unknown or unsupported remote name returns SYSIDERR 53/0 before
-authorization or queue mutation.
+empty queues return QIDERR 44/0 and QZERO 23/0. Durable installed TDQUEUE
+definitions select intrapartition or local extrapartition direction, enabled
+and open state, record-size policy, and bounded per-queue capacity. Those
+definitions drive exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR,
+QIDERR, and QZERO outcomes across reopen. WRITEQ TD, READQ TD, and DELETEQ TD
+accept SYSID only when it identifies the current system; an unknown or
+unsupported remote name returns SYSIDERR 53/0 before authorization or queue
+mutation. NOSUSPEND/QBUSY, indoubt locking, remote routing, and external data
+set integration remain deferred.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

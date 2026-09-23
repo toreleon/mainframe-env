@@ -306,7 +306,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/task_wait.rs",
       "crates/providers/mainframe-env-cics/src/handlers/terminal_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/terminal_run.rs",
-      "crates/providers/mainframe-env-cics/src/handlers/time.rs"
+      "crates/providers/mainframe-env-cics/src/handlers/time.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/transient_data.rs"
     ]
   }
 }

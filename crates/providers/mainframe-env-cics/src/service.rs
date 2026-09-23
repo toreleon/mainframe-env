@@ -254,9 +254,9 @@ struct DurableContinuation {
 }
 
 #[derive(Clone, Debug)]
-struct TransientQueue {
-    records: Vec<(String, Vec<u8>)>,
-    version: u64,
+pub(in crate::service) struct TransientQueue {
+    pub records: Vec<(String, Vec<u8>)>,
+    pub version: u64,
 }
 
 struct State {
@@ -268,8 +268,7 @@ struct State {
     file_statuses: BTreeMap<String, DurableFileStatus>,
     enqueue_models: BTreeMap<String, CicsEnqueueModelDefinition>,
     continuations: BTreeMap<String, DurableContinuation>,
-    transient: BTreeMap<String, TransientQueue>,
-    transient_bytes: usize,
+    transient: handlers::TransientDataState,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
@@ -414,26 +413,7 @@ impl CicsService {
             );
         }
         let enqueue_models = handlers::load_enqueue_models(store.as_ref(), limits)?;
-        let mut transient = BTreeMap::new();
-        let mut transient_bytes = 0usize;
-        for row in store
-            .list_provider_state("cics-tdq", limits.max_queue_records)
-            .map_err(store_error)?
-        {
-            let queue = decode_transient(&row.payload, row.version, limits)?;
-            transient_bytes = transient_bytes
-                .checked_add(
-                    queue
-                        .records
-                        .iter()
-                        .map(|(_, value)| value.len())
-                        .sum::<usize>(),
-                )
-                .ok_or(HostProblem::ResourceExhausted)?;
-            if transient.insert(row.key, queue).is_some() {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-        }
+        let transient = handlers::load_transient_data(store.as_ref(), limits)?;
         handlers::validate_enqueue_store(store.as_ref(), limits)?;
         let interval_records = handlers::load_interval_records(store.as_ref(), limits)?;
         Ok(Arc::new(Self {
@@ -453,7 +433,6 @@ impl CicsService {
                 enqueue_models,
                 continuations,
                 transient,
-                transient_bytes,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -1414,6 +1393,7 @@ impl CicsService {
         let state = self.lock()?;
         Ok(state
             .transient
+            .queues
             .get(&queue.to_ascii_uppercase())
             .map(|queue| {
                 queue
@@ -1423,6 +1403,26 @@ impl CicsService {
                     .collect()
             })
             .unwrap_or_default())
+    }
+
+    pub fn register_transient_data_queues(
+        &self,
+        definitions: &[CicsTransientDataQueueDefinition],
+    ) -> Result<(), HostProblem> {
+        let mut state = self.lock()?;
+        handlers::register_transient_data(
+            self.store.as_ref(),
+            &mut state.transient,
+            definitions,
+            self.limits,
+        )
+    }
+
+    /// Return installed-definition, materialized-queue, and retained-byte counts.
+    pub fn transient_data_counts(&self) -> Result<(usize, usize, usize), HostProblem> {
+        let state = self.lock()?;
+        let counts = state.transient.counts();
+        Ok(counts)
     }
 
     pub fn invoke(
@@ -2727,7 +2727,7 @@ fn decode_continuation(
     })
 }
 
-fn encode_transient(queue: &TransientQueue) -> Result<Vec<u8>, HostProblem> {
+pub(in crate::service) fn encode_transient(queue: &TransientQueue) -> Result<Vec<u8>, HostProblem> {
     let mut out = b"MECT2".to_vec();
     out.extend_from_slice(
         &u32::try_from(queue.records.len())
@@ -2741,7 +2741,7 @@ fn encode_transient(queue: &TransientQueue) -> Result<Vec<u8>, HostProblem> {
     Ok(out)
 }
 
-fn decode_transient(
+pub(in crate::service) fn decode_transient(
     bytes: &[u8],
     version: u64,
     limits: CicsLimits,
@@ -2774,7 +2774,7 @@ fn decode_transient(
         }
         records.push((key, value));
     }
-    if reader.at != bytes.len() || records.is_empty() || version == 0 {
+    if reader.at != bytes.len() || version == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
     Ok(TransientQueue { records, version })
@@ -4664,6 +4664,26 @@ mod tests {
             enqueue_name: enqueue_name.into(),
             enqueue_scope: enqueue_scope.map(str::to_string),
             enabled,
+        }
+    }
+
+    fn tdq_definition(
+        name: &str,
+        kind: CicsTransientDataQueueKind,
+        enabled: bool,
+        open: Option<CicsTransientDataQueueOpen>,
+        record_size: Option<usize>,
+        max_records: usize,
+        max_bytes: usize,
+    ) -> CicsTransientDataQueueDefinition {
+        CicsTransientDataQueueDefinition {
+            name: name.into(),
+            kind,
+            enabled,
+            open,
+            record_size,
+            max_records,
+            max_bytes,
         }
     }
 
@@ -9490,6 +9510,280 @@ mod tests {
         service
             .invoke(&effect(&invocation.run_unit_id, delete.clone(), 7), delete)
             .unwrap();
+    }
+
+    #[test]
+    fn transient_data_definitions_drive_exact_local_conditions_and_io_failures() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        service
+            .register_transient_data_queues(&[
+                tdq_definition(
+                    "INTR",
+                    CicsTransientDataQueueKind::Intrapartition,
+                    true,
+                    None,
+                    Some(4),
+                    1,
+                    4,
+                ),
+                tdq_definition(
+                    "DSBL",
+                    CicsTransientDataQueueKind::Intrapartition,
+                    false,
+                    None,
+                    None,
+                    4,
+                    16,
+                ),
+                tdq_definition(
+                    "XIN1",
+                    CicsTransientDataQueueKind::Extrapartition,
+                    true,
+                    Some(CicsTransientDataQueueOpen::Input),
+                    Some(4),
+                    4,
+                    16,
+                ),
+                tdq_definition(
+                    "XOU1",
+                    CicsTransientDataQueueKind::Extrapartition,
+                    true,
+                    Some(CicsTransientDataQueueOpen::Output),
+                    Some(4),
+                    1,
+                    4,
+                ),
+                tdq_definition(
+                    "XCL1",
+                    CicsTransientDataQueueKind::Extrapartition,
+                    true,
+                    Some(CicsTransientDataQueueOpen::Closed),
+                    Some(4),
+                    4,
+                    16,
+                ),
+                tdq_definition(
+                    "IOQ1",
+                    CicsTransientDataQueueKind::Intrapartition,
+                    true,
+                    None,
+                    None,
+                    4,
+                    32,
+                ),
+            ])
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let write = |queue: &[u8], value: &[u8], sequence| {
+            request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(queue)),
+                    ("FROM".into(), argument(value)),
+                ]),
+                sequence,
+            )
+        };
+        let read = |queue: &[u8], sequence| {
+            request(
+                CicsOperation::ReadTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(queue)),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ]),
+                sequence,
+            )
+        };
+        let delete = |queue: &[u8], sequence| {
+            request(
+                CicsOperation::DeleteTransientData,
+                BTreeMap::from([("QUEUE".into(), argument(queue))]),
+                sequence,
+            )
+        };
+        let assert_condition = |request: CicsRequest, sequence, name: &str, response| {
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                ),
+                Err(HostProblem::Condition {
+                    name: name.into(),
+                    response,
+                    response2: 0,
+                })
+            );
+        };
+
+        assert_condition(write(b"NONE", b"DATA", 1), 1, "QIDERR", 44);
+        assert_condition(write(b"DSBL", b"DATA", 2), 2, "DISABLED", 84);
+        assert_condition(write(b"XIN1", b"DATA", 3), 3, "INVREQ", 16);
+        assert_condition(write(b"XCL1", b"DATA", 4), 4, "NOTOPEN", 19);
+        assert_condition(read(b"XCL1", 5), 5, "NOTOPEN", 19);
+        assert_condition(read(b"XOU1", 6), 6, "INVREQ", 16);
+        assert_condition(delete(b"XOU1", 7), 7, "INVREQ", 16);
+        assert_condition(write(b"XOU1", b"BAD", 8), 8, "LENGERR", 22);
+        let output = write(b"XOU1", b"DATA", 9);
+        service
+            .invoke(&effect(&invocation.run_unit_id, output.clone(), 9), output)
+            .unwrap();
+        assert_condition(write(b"XOU1", b"MORE", 10), 10, "NOSPACE", 18);
+
+        let intra = write(b"INTR", b"DATA", 11);
+        service
+            .invoke(&effect(&invocation.run_unit_id, intra.clone(), 11), intra)
+            .unwrap();
+        assert_condition(write(b"INTR", b"MORE", 12), 12, "NOSPACE", 18);
+        let intra_read = read(b"INTR", 13);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, intra_read.clone(), 13),
+                    intra_read,
+                )
+                .unwrap()
+                .payload
+                .bytes(),
+            b"DATA"
+        );
+        assert_condition(read(b"INTR", 14), 14, "QZERO", 23);
+
+        for (sequence, value) in [(15, b"BAD1".as_slice()), (16, b"GOOD".as_slice())] {
+            let queued = write(b"IOQ1", value, sequence);
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, queued.clone(), sequence),
+                    queued,
+                )
+                .unwrap();
+        }
+        service.lock().unwrap().transient.io_failure =
+            Some((CicsOperation::ReadTransientData, "IOQ1".into()));
+        assert_condition(read(b"IOQ1", 17), 17, "IOERR", 17);
+        assert_eq!(
+            service.transient_records("IOQ1").unwrap(),
+            [b"GOOD".to_vec()]
+        );
+        service.lock().unwrap().transient.io_failure =
+            Some((CicsOperation::WriteTransientData, "IOQ1".into()));
+        assert_condition(write(b"IOQ1", b"FAIL", 18), 18, "IOERR", 17);
+        assert_eq!(
+            service.transient_records("IOQ1").unwrap(),
+            [b"GOOD".to_vec()]
+        );
+    }
+
+    #[test]
+    fn transient_data_definitions_survive_sqlite_reopen_and_reject_conflicts() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-tdq-definitions-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let definition = tdq_definition(
+            "PERS",
+            CicsTransientDataQueueKind::Intrapartition,
+            true,
+            None,
+            Some(4),
+            2,
+            8,
+        );
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .register_transient_data_queues(std::slice::from_ref(&definition))
+                .unwrap();
+            service
+                .register_transient_data_queues(std::slice::from_ref(&definition))
+                .unwrap();
+            let mut conflicting = definition.clone();
+            conflicting.max_records = 1;
+            assert_eq!(
+                service.register_transient_data_queues(&[conflicting]),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(service.transient_data_counts().unwrap(), (1, 0, 0));
+
+            let (invocation, _) = registered(&service);
+            let write = request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"PERS")),
+                    ("FROM".into(), argument(b"DATA")),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+                .unwrap();
+            assert_eq!(service.transient_data_counts().unwrap(), (1, 1, 4));
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            assert_eq!(service.transient_data_counts().unwrap(), (1, 1, 4));
+            assert_eq!(
+                service.transient_records("PERS").unwrap(),
+                [b"DATA".to_vec()]
+            );
+            service
+                .register_transient_data_queues(std::slice::from_ref(&definition))
+                .unwrap();
+
+            let invocation = invocation_for("tdq-definition-reopen", BTreeMap::new());
+            let session = SessionId::new("tdq-definition-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut read = request(
+                CicsOperation::ReadTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"PERS")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ]),
+                1,
+            );
+            read.mutation.as_mut().unwrap().idempotency_key =
+                IdempotencyKey::new("tdq-definition-read-1", InvocationLimits::default()).unwrap();
+            service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+                .unwrap();
+            assert_eq!(service.transient_data_counts().unwrap(), (1, 1, 0));
+
+            let missing = request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"MISS")),
+                    ("FROM".into(), argument(b"DATA")),
+                ]),
+                2,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, missing.clone(), 2),
+                    missing,
+                ),
+                Err(HostProblem::Condition {
+                    name: "QIDERR".into(),
+                    response: 44,
+                    response2: 0,
+                })
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            assert_eq!(service.transient_data_counts().unwrap(), (1, 1, 0));
+            assert!(service.transient_records("PERS").unwrap().is_empty());
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
