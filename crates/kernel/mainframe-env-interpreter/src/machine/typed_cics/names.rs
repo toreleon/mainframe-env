@@ -27,6 +27,7 @@ pub(super) enum SlotUse {
     AddressInput,
     AddressOutput,
     AssignOutput(CicsAssignOutput),
+    SpoolTokenInput,
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -73,6 +74,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::ToBookmark
         | CicsOperandName::CharacterSet
         | CicsOperandName::SymbolValue => SlotUse::Input,
+        CicsOperandName::SpoolToken => SlotUse::SpoolTokenInput,
         _ => SlotUse::Input,
     }
 }
@@ -163,6 +165,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Read => CicsOperation::Read,
         CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
         CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
+        CicsPlanOperation::SpoolClose => CicsOperation::SpoolClose,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -296,6 +299,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::JournalFlength => "FLENGTH",
         CicsOperandName::JournalPrefix => "PREFIX",
         CicsOperandName::JournalPfxLeng => "PFXLENG",
+        CicsOperandName::SpoolToken => "TOKEN",
     }
 }
 
@@ -382,5 +386,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::UserDataKey64 => "USERDATAKEY",
         CicsPlanOption::Shared64 => "SHARED",
         CicsPlanOption::Executable64 => "EXECUTABLE",
+        CicsPlanOption::SpoolKeep => "KEEP",
+        CicsPlanOption::SpoolDelete => "DELETE",
     }
 }

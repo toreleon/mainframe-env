@@ -2459,6 +2459,7 @@ mod tests {
             CicsOperation::SendMap,
             CicsOperation::SetAssociationUserCorrData,
             CicsOperation::SetFileStatus,
+            CicsOperation::SpoolClose,
             CicsOperation::StartBrowse,
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,

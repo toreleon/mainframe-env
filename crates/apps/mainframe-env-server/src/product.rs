@@ -19513,4 +19513,116 @@ mod tests {
             "XFERTO did not run after the XFFR -> XFTO transaction hand-off"
         );
     }
+    #[test]
+    fn compiled_spoolclose_selects_5610_and_reports_unopened_token() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "SPCLOSE",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SPCLOSE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(8) VALUE 'SP999999'.\n01 CLOSE-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SPOOLCLOSE TOKEN(TOKEN-X) KEEP RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO CLOSE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "spoolclose-class",
+                    "spoolclose-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(JESSPOOL)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("JESSPOOL", "CICS.SPOOL.SP999999", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "JESSPOOL",
+                "CICS.SPOOL.SP999999",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SPCLOSE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SPCL".into(), "SPCLOSE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SPCLOSE".into(),
+                    map: "SPCLOSE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("spoolclose-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SPCL", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SPCL",
+                24,
+                80,
+                "spoolclose-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SPCLOSE", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("CLOSE-FN").unwrap().bytes(),
+            &[0x56, 0x10]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 19]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 8]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SpoolClose)
+                .count(),
+            1
+        );
+    }
 }

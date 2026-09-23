@@ -3,8 +3,11 @@
 mod ingress;
 
 use super::{field, store_error};
-use crate::service::{CicsLimits, CicsService};
-use mainframe_env_host_api::HostProblem;
+use crate::service::{CicsLimits, CicsService, Run};
+use mainframe_env_host_api::{
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+    HostRequest, canonical_request_digest,
+};
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore};
 use std::collections::BTreeMap;
 
@@ -25,6 +28,156 @@ pub(crate) const SPOOL_NAMESPACE: &str = "cics-spool-control";
 pub(crate) const SPOOL_KEY: &str = "state";
 const SPOOL_MAGIC: &[u8; 8] = b"MECSP001";
 const MAX_TEXT_BYTES: usize = 256;
+
+pub(in crate::service) fn invoke(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    match request.operation {
+        CicsOperation::SpoolClose => close(service, run, request),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn close(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_close_request(request)?;
+    let token = spool_token(request)?;
+    service.authorize(
+        run,
+        "JESSPOOL",
+        &format!("CICS.SPOOL.{token}"),
+        AccessIntent::Update,
+    )?;
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    let mut state = service.lock()?;
+    if let Some(reply) = state
+        .spool
+        .replay(mutation.idempotency_key.as_str(), request_digest)?
+    {
+        return response(service, run, reply);
+    }
+    let report = state
+        .spool
+        .reports
+        .get(&token)
+        .cloned()
+        .ok_or_else(not_open)?;
+    if !matches!(
+        report.state,
+        SpoolReportState::OpenInput | SpoolReportState::OpenOutput
+    ) || report.owner_run_unit.as_deref() != Some(run.invocation.run_unit_id.as_str())
+        || report.owner_principal.as_deref() != Some(run.invocation.principal.id().as_str())
+    {
+        return Err(not_open());
+    }
+    let keep = request.arguments.contains_key("OPTION.KEEP")
+        || (!request.arguments.contains_key("OPTION.DELETE")
+            && report.state == SpoolReportState::OpenOutput);
+    let current_version = state.spool.version;
+    let mut next = state.spool.clone();
+    if keep {
+        let report = next
+            .reports
+            .get_mut(&token)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        report.state = SpoolReportState::AvailableInput;
+        report.owner_run_unit = None;
+        report.owner_principal = None;
+        report.next_record = 0;
+        report.eof_seen = false;
+    } else {
+        next.reports.remove(&token);
+    }
+    let reply = SpoolReply::normal();
+    next.record_replay(
+        mutation.idempotency_key.as_str(),
+        request_digest,
+        reply.clone(),
+        service.limits,
+    )?;
+    persist_spool_state(service, current_version, &mut next)?;
+    state.spool = next;
+    response(service, run, reply)
+}
+
+fn validate_close_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    let mut dispositions = 0usize;
+    if request.arguments.contains_key("OPTION.KEEP") {
+        dispositions += 1;
+    }
+    if request.arguments.contains_key("OPTION.DELETE") {
+        dispositions += 1;
+    }
+    if dispositions > 1
+        || !request.arguments.contains_key("TOKEN")
+        || (!request.arguments.contains_key("RESP")
+            && !request.arguments.contains_key("OPTION.NOHANDLE"))
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "TOKEN" => value.schema() != "mainframe-env.cics.storage-value@1",
+                "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.KEEP" | "OPTION.DELETE" | "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(())
+}
+
+fn spool_token(request: &CicsRequest) -> Result<String, HostProblem> {
+    let value = request
+        .arguments
+        .get("TOKEN")
+        .ok_or(HostProblem::Malformed)?
+        .bytes();
+    if value.len() != 8 || !value.iter().all(u8::is_ascii_alphanumeric) {
+        return Err(HostProblem::Malformed);
+    }
+    String::from_utf8(value.to_vec())
+        .map(|value| value.to_ascii_uppercase())
+        .map_err(|_| HostProblem::Malformed)
+}
+
+fn not_open() -> HostProblem {
+    HostProblem::Condition {
+        name: "NOTOPEN".into(),
+        response: 19,
+        response2: 8,
+    }
+}
+
+fn response(
+    service: &CicsService,
+    run: &Run,
+    reply: SpoolReply,
+) -> Result<CicsResponse, HostProblem> {
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        &reply.condition,
+        reply.response,
+        reply.response2,
+        None,
+        None,
+        reply.payload,
+    )
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SpoolReportState {

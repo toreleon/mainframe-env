@@ -12,7 +12,7 @@
   "inputs": {
     "command_descriptors": {
       "path": "conformance/0.9/cics/command-descriptors.json",
-      "file_sha256": "sha256:ca98d3d958d1d63a81a9576421f6abd23379e60b69ec6cecee9d1b029729fc13",
+      "file_sha256": "sha256:08dab052e2be177224c320cbcc390c67626f2d3c635afe10a591ed3d71b07717",
       "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
     }
   },
@@ -687,8 +687,8 @@
     "id": "INT-1601.cics-participant",
     "status": "bounded-ambiguity",
     "owner": "shared-execution-coordinator-and-cics-provider",
-    "mutating_rows": 46,
-    "bounded_effect_rows": 195,
+    "mutating_rows": 47,
+    "bounded_effect_rows": 194,
     "explicit_uow_boundary_rows": 1,
     "bounded_uow_rows": 240,
     "execution_credit": 0,
@@ -758,10 +758,10 @@
   },
   "registry": {
     "shape_commands": 263,
-    "typed_handlers": 68,
+    "typed_handlers": 69,
     "legacy_compatibility_handlers": 0,
-    "advertised_commands": 68,
-    "unready_handlers": 195,
+    "advertised_commands": 69,
+    "unready_handlers": 194,
     "automatic_registration": false,
     "default_handler": null,
     "unready_result": "explicit-unsupported",
@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:fb9ff6320620eb791620131d9cb88c91bd1c98f3dbd1d39ff37b24768df7c5d3"
+    "registry_sha256": "sha256:49fc678db3df52c18f57806fe56ffad7da138588c543bbb1cd4460e942d30231"
   },
   "counts": {
     "batches": 3,
@@ -806,11 +806,11 @@
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
-    "runtime_backed_commands": 68,
-    "typed_runtime_commands": 68,
+    "runtime_backed_commands": 69,
+    "typed_runtime_commands": 69,
     "legacy_compatibility_commands": 0,
-    "advertised_commands": 68,
-    "unready_commands": 195
+    "advertised_commands": 69,
+    "unready_commands": 194
   },
   "batches": [
     {
@@ -325947,9 +325947,9 @@
           "eibfn": "5610",
           "source_status": "verified",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "SpoolClose",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -326539,7 +326539,7 @@
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -326555,15 +326555,15 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
@@ -326575,12 +326575,8 @@
             "operand-direction",
             "option-bounds",
             "resource-key",
-            "capability-intent",
             "eib-response",
             "conditions",
-            "effect-class",
-            "cancellation",
-            "audit",
             "recovery"
           ],
           "source_issue_ids": [],
@@ -327133,7 +327129,7 @@
             },
             "resource": {
               "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "scope": "spool",
               "selectors": [],
               "ambiguous_selectors": [
                 {
@@ -327145,49 +327141,58 @@
                 }
               ],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
+              "selector_authority": "source-bound-runtime",
               "selector_completeness": "bounded-ambiguity",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "update",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
                 "host.cics.execute",
-                "host.security.authorize"
+                "host.security.authorize",
+                "host.spool.write"
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "mutating",
+              "mutating": true,
+              "ir_effects": [
+                "audit",
+                "condition",
+                "memory-read",
+                "memory-write",
+                "security",
+                "spool",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
               "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
+              "durable_effect_intent": true,
               "uow_participation": "bounded-ambiguity",
               "prepare": "bounded-ambiguity",
               "rollback": "bounded-ambiguity",
               "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
               "fenced_reconciliation": null,
               "retention_protected": null
@@ -327195,15 +327200,15 @@
             "registry": {
               "family": "spool-control",
               "handler_id": "mainframe-env-cics.handlers.spool-control.spoolclose@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "SpoolClose",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:d1148940b8c2ff3fce8ea62f220098dbc9ddb3088605692da9cd73fe55179f66"
+              "unready_result": null,
+              "handler_sha256": "sha256:05863cf5a6a8d85d9e72b52b20f949a6cde152f0ae12034f88973b82ba114ede"
             }
           },
-          "row_contract_sha256": "sha256:bc0924fbaa118d88f2a85bd926e58dfef15bc049bc18f9a20d996255b211843d"
+          "row_contract_sha256": "sha256:eb47350a6a6e26cb32cacaf64e7d24b7001e6d539680cf2e54c644831a40e59e"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0201",
@@ -446686,5 +446691,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:41862417ee4385e1dbf7a573df0ff8a31a9674b065a52fc8f69854c218241365"
+  "contract_sha256": "sha256:c1c2ca83c9f72e1b9e85ea1f80ad2b20b22045cec2db62e167d0dbeb1548b8f7"
 }

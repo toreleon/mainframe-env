@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 70);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 71);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -1742,8 +1742,8 @@ impl CicsService {
             CicsCommandFamily::Recovery => {
                 handlers::invoke_recovery(self, run, &request, retention_tick)
             }
-            CicsCommandFamily::IntervalControl => {
-                handlers::invoke_interval_control(self, run, &request)
+            CicsCommandFamily::IntervalControl | CicsCommandFamily::SpoolControl => {
+                handlers::invoke_interval_or_spool_control(self, run, &request, descriptor.family)
             }
             CicsCommandFamily::DocumentControl => {
                 handlers::invoke_document_control(self, run, &request, retention_tick)
@@ -5306,6 +5306,7 @@ mod tests {
                 "SET ASSOCIATION USERCORRDATA(DATA-X)",
                 CicsOperation::SetAssociationUserCorrData,
             ),
+            ("SPOOLCLOSE", CicsOperation::SpoolClose),
             ("START", CicsOperation::Start),
             ("STARTBR", CicsOperation::StartBrowse),
             ("SUSPEND", CicsOperation::Suspend),
@@ -6553,7 +6554,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 70);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 71);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -14988,6 +14989,126 @@ mod tests {
             assert_eq!(report.records, [b"ONE".to_vec(), b"TWO".to_vec()]);
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn open_staged_spool_report(
+        service: &CicsService,
+        invocation: &Invocation,
+        token: &str,
+        state_kind: handlers::SpoolReportState,
+    ) {
+        let mut state = service.lock().unwrap();
+        let current_version = state.spool.version;
+        let mut next = state.spool.clone();
+        let report = next.reports.get_mut(token).unwrap();
+        report.state = state_kind;
+        report.owner_run_unit = Some(invocation.run_unit_id.as_str().into());
+        report.owner_principal = Some(invocation.principal.id().as_str().into());
+        handlers::persist_spool_state(service, current_version, &mut next).unwrap();
+        state.spool = next;
+    }
+
+    #[test]
+    fn spoolclose_applies_directional_defaults_and_replays_after_commit_gap() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        let (invocation, _) = registered(&service);
+
+        let deleted = service
+            .stage_spool_input("MEAPUSER", b'A', &[b"DELETE-ME".to_vec()])
+            .unwrap();
+        open_staged_spool_report(
+            &service,
+            &invocation,
+            &deleted,
+            handlers::SpoolReportState::OpenInput,
+        );
+        let close = request(
+            CicsOperation::SpoolClose,
+            BTreeMap::from([
+                ("TOKEN".into(), enqueue_value(deleted.as_bytes())),
+                ("OPTION.NOHANDLE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let closed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, close.clone(), 1),
+                close.clone(),
+            )
+            .unwrap();
+        assert_eq!((closed.condition.as_str(), closed.response), ("NORMAL", 0));
+        assert_eq!(
+            service.spool_report_snapshot(&deleted),
+            Err(HostProblem::NotFound)
+        );
+
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+            .unwrap();
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 1), close)
+            .unwrap();
+        assert_eq!(replayed, closed);
+        assert_eq!(
+            service.spool_report_snapshot(&deleted),
+            Err(HostProblem::NotFound)
+        );
+
+        let kept = service
+            .stage_spool_input("MEAPUSER", b'A', &[b"KEEP-ME".to_vec()])
+            .unwrap();
+        open_staged_spool_report(
+            &service,
+            &invocation,
+            &kept,
+            handlers::SpoolReportState::OpenInput,
+        );
+        let keep = request(
+            CicsOperation::SpoolClose,
+            BTreeMap::from([
+                ("TOKEN".into(), enqueue_value(kept.as_bytes())),
+                ("OPTION.KEEP".into(), cics_option()),
+                ("OPTION.NOHANDLE".into(), cics_option()),
+            ]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, keep.clone(), 2), keep)
+            .unwrap();
+        assert_eq!(
+            service.spool_report_snapshot(&kept).unwrap().state,
+            "available-input"
+        );
+
+        let output = service
+            .stage_spool_input("MEAPUSER", b'A', &[b"OUTPUT".to_vec()])
+            .unwrap();
+        open_staged_spool_report(
+            &service,
+            &invocation,
+            &output,
+            handlers::SpoolReportState::OpenOutput,
+        );
+        let close_output = request(
+            CicsOperation::SpoolClose,
+            BTreeMap::from([
+                ("TOKEN".into(), enqueue_value(output.as_bytes())),
+                ("OPTION.NOHANDLE".into(), cics_option()),
+            ]),
+            3,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, close_output.clone(), 3),
+                close_output,
+            )
+            .unwrap();
+        assert_eq!(
+            service.spool_report_snapshot(&output).unwrap().state,
+            "available-input"
+        );
     }
 
     #[test]

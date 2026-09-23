@@ -1636,6 +1636,7 @@ mod tests {
                 CicsPlanOperation::SetAssociationUserCorrData => {
                     crate::HirCicsOperation::SetAssociationUserCorrData
                 }
+                CicsPlanOperation::SpoolClose => crate::HirCicsOperation::SpoolClose,
                 CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
                 CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
                 CicsPlanOperation::WaitEvent => crate::HirCicsOperation::WaitEvent,

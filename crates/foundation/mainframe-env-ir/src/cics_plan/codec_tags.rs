@@ -86,6 +86,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
         CicsPlanOperation::WriteJournalNum => 57,
+        CicsPlanOperation::SpoolClose => 58,
     }
 }
 
@@ -159,6 +160,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
         57 => Ok(CicsPlanOperation::WriteJournalNum),
+        58 => Ok(CicsPlanOperation::SpoolClose),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -272,6 +274,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Abi64 => 174,
         CicsOperandName::DataPointer64 => 175,
         CicsOperandName::DataArea64 => 176,
+        CicsOperandName::SpoolToken => 112,
     }
 }
 
@@ -384,6 +387,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         174 => Ok(CicsOperandName::Abi64),
         175 => Ok(CicsOperandName::DataPointer64),
         176 => Ok(CicsOperandName::DataArea64),
+        112 => Ok(CicsOperandName::SpoolToken),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -433,6 +437,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::UserDataKey64 => 109,
         CicsPlanOption::Shared64 => 110,
         CicsPlanOption::Executable64 => 111,
+        CicsPlanOption::SpoolKeep => 72,
+        CicsPlanOption::SpoolDelete => 73,
     }
 }
 
@@ -481,6 +487,8 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         109 => Ok(CicsPlanOption::UserDataKey64),
         110 => Ok(CicsPlanOption::Shared64),
         111 => Ok(CicsPlanOption::Executable64),
+        72 => Ok(CicsPlanOption::SpoolKeep),
+        73 => Ok(CicsPlanOption::SpoolDelete),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

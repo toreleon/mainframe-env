@@ -992,6 +992,17 @@ fn validate_machine_slot(
             "HANDLE ABEND PROGRAM input must be a 1-8 character field",
         ));
     }
+    if matches!(slot_use, SlotUse::SpoolTokenInput)
+        && (layout.length != 8
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "CICS spool TOKEN input must be an 8-character field",
+        ));
+    }
     if matches!(slot_use, SlotUse::AbstimeInput | SlotUse::AbstimeOutput)
         && (layout.category != LayoutCategory::PackedDecimal
             || layout.length != 8

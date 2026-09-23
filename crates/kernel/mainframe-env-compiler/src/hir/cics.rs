@@ -284,6 +284,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::JournalFlength => CicsOperandName::JournalFlength,
                 HirCicsOperandName::JournalPrefix => CicsOperandName::JournalPrefix,
                 HirCicsOperandName::JournalPfxLeng => CicsOperandName::JournalPfxLeng,
+                HirCicsOperandName::SpoolToken => CicsOperandName::SpoolToken,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -393,6 +394,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SetAssociationUserCorrData => {
             CicsPlanOperation::SetAssociationUserCorrData
         }
+        HirCicsOperation::SpoolClose => CicsPlanOperation::SpoolClose,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -490,5 +492,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Minimum => CicsPlanOption::Minimum,
         HirCicsOption::Hold => CicsPlanOption::Hold,
         HirCicsOption::Unescaped => CicsPlanOption::Unescaped,
+        HirCicsOption::SpoolKeep => CicsPlanOption::SpoolKeep,
+        HirCicsOption::SpoolDelete => CicsPlanOption::SpoolDelete,
     }
 }

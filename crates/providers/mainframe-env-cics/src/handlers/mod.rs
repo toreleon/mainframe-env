@@ -28,6 +28,7 @@ mod transform_control;
 pub(in crate::service) mod transient_data;
 
 use super::{CicsService, Run};
+use crate::generated::CicsCommandFamily;
 use mainframe_env_host_api::{CicsRequest, CicsResponse, HostProblem};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
@@ -96,6 +97,7 @@ pub(super) use program_control::{
 };
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
+pub(super) use spool_control::invoke as invoke_spool_control;
 pub(super) use spool_control::{
     SpoolRecord, SpoolRecordMode, SpoolReport, SpoolReportState, SpoolState, load_spool_state,
     persist_spool_state,
@@ -151,6 +153,19 @@ pub use transient_data::{
 pub(in crate::service) use transient_data::{
     TransientDataState, load as load_transient_data, register as register_transient_data,
 };
+
+pub(super) fn invoke_interval_or_spool_control(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    family: CicsCommandFamily,
+) -> Result<CicsResponse, HostProblem> {
+    match family {
+        CicsCommandFamily::IntervalControl => invoke_interval_control(service, run, request),
+        CicsCommandFamily::SpoolControl => invoke_spool_control(service, run, request),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;

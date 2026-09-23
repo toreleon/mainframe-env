@@ -238,6 +238,15 @@ const DOCUMENT_EFFECTS: &[Effect] = &[
     Effect::Transaction,
 ];
 const TRANSFORM_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
+const SPOOL_EFFECTS: &[Effect] = &[
+    Effect::Spool,
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -582,7 +591,7 @@ mod registry_lookup;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 68] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 69] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1127,6 +1136,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 68] = [
         effects: STORAGE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SpoolClose,
+        namespace: "cics.spool",
+        name: "close",
+        major: 1,
+        effects: SPOOL_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves an executable descriptor without accepting adjacent legacy CICS
@@ -1187,7 +1204,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 68);
+        assert_eq!(typed.len(), 69);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1205,7 +1222,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 195);
+        assert_eq!(unready.len(), 194);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1442,6 +1459,7 @@ mod tests {
                 CicsPlanOperation::Getmain,
                 CicsPlanOperation::Freemain,
                 CicsPlanOperation::Freemain64,
+                CicsPlanOperation::SpoolClose,
                 CicsPlanOperation::ReceiveMap,
                 CicsPlanOperation::SendMap,
                 CicsPlanOperation::SendText,

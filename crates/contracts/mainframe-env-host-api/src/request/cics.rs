@@ -93,6 +93,8 @@ pub enum CicsOperation {
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
     SetFileStatus,
+    /// Close one task-owned CICS spool report.
+    SpoolClose,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -183,6 +185,7 @@ impl CicsOperation {
             Self::SendMap => "SendMap",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
             Self::SetFileStatus => "SetFileStatus",
+            Self::SpoolClose => "SpoolClose",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -252,6 +255,7 @@ impl CicsOperation {
                 | Self::TransformXmlToData
                 | Self::Unlock
                 | Self::SetFileStatus
+                | Self::SpoolClose
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -325,6 +329,7 @@ impl CicsOperation {
             ("SEND", Some("MAP")) => Self::SendMap,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
+            ("SPOOLCLOSE", _) => Self::SpoolClose,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

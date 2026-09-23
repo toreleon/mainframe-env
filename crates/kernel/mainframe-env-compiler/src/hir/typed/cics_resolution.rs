@@ -32,6 +32,7 @@ mod output_bindings;
 mod program_control;
 mod program_name;
 mod queue_control;
+mod spool_control;
 mod storage_control;
 mod task_wait;
 mod terminal_control;
@@ -190,7 +191,7 @@ fn validate_candidate(
     {
         return Err(format!(
             "CICS {} has an unfrozen source contract",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
 
@@ -200,7 +201,7 @@ fn validate_candidate(
         if let Some(existing) = canonical_spellings.insert(canonical, name) {
             return Err(format!(
                 "CICS {} options {existing} and {name} are aliases and mutually exclusive",
-                command_label(descriptor)
+                operation::command_label(descriptor)
             ));
         }
     }
@@ -220,14 +221,14 @@ fn validate_candidate(
                     {
                         return Err(format!(
                             "CICS {} condition {name} requires one label operand",
-                            command_label(descriptor)
+                            operation::command_label(descriptor)
                         ));
                     }
                     (CicsApplicationConditionLabelOperand::Optional, _) => {}
                     (CicsApplicationConditionLabelOperand::Forbidden, Some(_)) => {
                         return Err(format!(
                             "CICS {} condition {name} forbids a label operand",
-                            command_label(descriptor)
+                            operation::command_label(descriptor)
                         ));
                     }
                     (CicsApplicationConditionLabelOperand::Forbidden, None) => {}
@@ -248,7 +249,7 @@ fn validate_candidate(
             }
             return Err(format!(
                 "CICS {} has unknown or unreviewed top-level option {name}",
-                command_label(descriptor)
+                operation::command_label(descriptor)
             ));
         };
         let has_value = clauses.contains_key(*name);
@@ -256,19 +257,19 @@ fn validate_candidate(
             (CicsApplicationOptionValueShape::Flag, true) => {
                 return Err(format!(
                     "CICS {} option {name} is a flag and rejects a parenthesized operand",
-                    command_label(descriptor)
+                    operation::command_label(descriptor)
                 ));
             }
             (CicsApplicationOptionValueShape::Value, false) => {
                 return Err(format!(
                     "CICS {} option {name} requires a parenthesized operand",
-                    command_label(descriptor)
+                    operation::command_label(descriptor)
                 ));
             }
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
                 return Err(format!(
                     "CICS {} option {name} has a source-bounded operand shape",
-                    command_label(descriptor)
+                    operation::command_label(descriptor)
                 ));
             }
             _ => {}
@@ -280,7 +281,7 @@ fn validate_candidate(
     {
         return Err(format!(
             "CICS {} requires {}..={} EIBRESP condition clauses, found {condition_clause_count}",
-            command_label(descriptor),
+            operation::command_label(descriptor),
             condition_clauses.minimum_occurrences,
             condition_clauses.maximum_occurrences,
         ));
@@ -298,7 +299,7 @@ fn validate_candidate(
     {
         return Err(format!(
             "CICS {} is missing a required command discriminator",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
     if let Some(name) = descriptor
@@ -308,7 +309,7 @@ fn validate_candidate(
     {
         return Err(format!(
             "CICS {} forbids discriminator {name}",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
     if descriptor.required_discriminator_options.is_empty()
@@ -321,7 +322,7 @@ fn validate_candidate(
     {
         return Err(format!(
             "CICS {} is missing a source-reviewed command discriminator",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
 
@@ -330,14 +331,14 @@ fn validate_candidate(
         CicsApplicationCobolApplicability::NotApplicable => {
             return Err(format!(
                 "CICS {} is not applicable to COBOL",
-                command_label(descriptor)
+                operation::command_label(descriptor)
             ));
         }
         CicsApplicationCobolApplicability::Conditional
         | CicsApplicationCobolApplicability::BoundedAmbiguity => {
             return Err(format!(
                 "CICS {} has no unconditional source-reviewed COBOL form",
-                command_label(descriptor)
+                operation::command_label(descriptor)
             ));
         }
     }
@@ -354,7 +355,7 @@ fn validate_candidate(
     {
         return Err(format!(
             "CICS {} requires option {name}",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
     for alternative in descriptor.alternative_groups {
@@ -366,7 +367,7 @@ fn validate_candidate(
         if alternative.required && count == 0 {
             return Err(format!(
                 "CICS {} requires one of {}",
-                command_label(descriptor),
+                operation::command_label(descriptor),
                 alternative.members.join(", ")
             ));
         }
@@ -380,7 +381,7 @@ fn validate_candidate(
         {
             return Err(format!(
                 "CICS {} option {} requires {required}",
-                command_label(descriptor),
+                operation::command_label(descriptor),
                 dependency.option
             ));
         }
@@ -394,7 +395,7 @@ fn validate_candidate(
         if selected.len() > 1 {
             return Err(format!(
                 "CICS {} options {} are mutually exclusive",
-                command_label(descriptor),
+                operation::command_label(descriptor),
                 selected.join(", ")
             ));
         }
@@ -414,7 +415,7 @@ fn validate_candidate(
         {
             return Err(format!(
                 "CICS {} option {name} exceeds its source maximum of {limit} bytes",
-                command_label(descriptor)
+                operation::command_label(descriptor)
             ));
         }
     }
@@ -504,7 +505,7 @@ fn validate_legacy_execution_subset(
     if descriptor.legacy_execution_options.is_empty() {
         return Err(format!(
             "CICS {} has no frozen legacy execution option subset",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
     let unready = present
@@ -519,15 +520,11 @@ fn validate_legacy_execution_subset(
     if !unready.is_empty() {
         return Err(format!(
             "CICS {} is catalog-known but legacy execution is unready for {}",
-            command_label(descriptor),
+            operation::command_label(descriptor),
             unready.join(", ")
         ));
     }
     Ok(())
-}
-
-fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
-    descriptor.label_tokens.join(" ")
 }
 
 fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> Option<usize> {
@@ -686,6 +683,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
+        HirCicsOperation::SpoolClose => spool_control::allowed_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -760,6 +758,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
+        HirCicsOperation::SpoolClose => spool_control::allowed_options(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -870,6 +869,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
+        HirCicsOperation::SpoolClose => spool_control::required(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -883,6 +883,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             )));
         }
     }
+    operands.extend(spool_control::operands(
+        &clauses,
+        &raw_options,
+        operation,
+        semantic,
+    )?);
     if operation == HirCicsOperation::Abend
         && let Some(operand) = abend::operand(&clauses, semantic)?
     {

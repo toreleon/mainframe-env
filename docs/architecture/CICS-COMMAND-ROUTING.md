@@ -320,6 +320,18 @@ writer. It reuses the reviewed WRITE JOURNALNAME record options and condition
 path with a numeric selector. The pinned 0255 page identifies the compatibility
 successor without an option diagram, so this local option mapping remains an
 explicit bounded inference rather than a source-projected equivalence claim.
+
+
+Typed `SPOOLCLOSE` captures an exact eight-character TOKEN and requires RESP or
+NOHANDLE. The provider verifies task/principal ownership and `JESSPOOL` update
+authority before one versioned state transition. KEEP returns either direction
+to the available-input queue; DELETE purges it. When neither option is present,
+an explicitly closed input report defaults to DELETE and an explicitly closed
+output report defaults to KEEP. The same provider row retains a bounded request
+digest/result ledger so a crash after state CAS but before the outer CICS replay
+row cannot duplicate or reverse the close. The route uses EIBFN `5610`; open,
+record transfer, implicit-close, and broader JES interface states are owned by
+the following spool-control slices.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
@@ -493,7 +505,9 @@ differentials, or make 0.9.0 release-ready.
 | `storage-control` | bounded task-local virtual storage allocation and release |
 | `journal-control` | durable named-journal output state and task synchronization |
 
-This table describes the ten families present in the 50-operation runtime
+| `spool-control` | durable CICS spool report open/read/write/close lifecycle |
+
+This table describes the runtime families in the typed operation
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

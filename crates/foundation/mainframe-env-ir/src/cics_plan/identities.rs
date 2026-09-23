@@ -99,6 +99,8 @@ pub enum CicsPlanOperation {
     Unlock,
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
+    /// Close one task-owned spool report.
+    SpoolClose,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -353,6 +355,8 @@ pub enum CicsOperandName {
     JournalPfxLeng,
     /// `REQID(...)` fullword token in the journal-control identity domain.
     JournalReqId,
+    /// Eight-byte CICS spool report token.
+    SpoolToken,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -440,6 +444,10 @@ pub enum CicsPlanOption {
     Shared64,
     /// Request an executable DSA for a below-bar location.
     Executable64,
+    /// Retain a closed spool report.
+    SpoolKeep,
+    /// Delete a closed spool report.
+    SpoolDelete,
 }
 
 /// Named result binding written after the host result arrives.

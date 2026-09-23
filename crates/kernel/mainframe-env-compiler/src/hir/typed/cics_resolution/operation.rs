@@ -1,6 +1,10 @@
 use super::super::{HirCicsOperation, HirCicsOption, Resolution, ResolutionFailure};
 use mainframe_env_ir::CicsApplicationRegistryDescriptor;
 
+pub(super) fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
+    descriptor.label_tokens.join(" ")
+}
+
 pub(super) fn resolve(
     descriptor: &CicsApplicationRegistryDescriptor,
 ) -> Resolution<HirCicsOperation> {
@@ -52,6 +56,7 @@ pub(super) fn resolve(
         ["READ"] => HirCicsOperation::Read,
         ["REWRITE"] => HirCicsOperation::Rewrite,
         ["SET", "ASSOCIATION", "USERCORRDATA"] => HirCicsOperation::SetAssociationUserCorrData,
+        ["SPOOLCLOSE"] => HirCicsOperation::SpoolClose,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,
@@ -115,6 +120,6 @@ pub(super) fn resolve_option(option: &str) -> HirCicsOption {
         "EXACTMATCH" => HirCicsOption::ExactMatch,
         "MINIMUM" => HirCicsOption::Minimum,
         "HOLD" => HirCicsOption::Hold,
-        _ => unreachable!("allowed CICS option"),
+        _ => super::spool_control::option(option).expect("allowed CICS option"),
     }
 }

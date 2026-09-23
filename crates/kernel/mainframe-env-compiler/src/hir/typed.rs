@@ -194,6 +194,7 @@ pub enum HirCicsOperation {
     Read,
     Rewrite,
     SetAssociationUserCorrData,
+    SpoolClose,
     Syncpoint,
     Unlock,
     Suspend,
@@ -322,6 +323,7 @@ pub enum HirCicsOperandName {
     JournalFlength,
     JournalPrefix,
     JournalPfxLeng,
+    SpoolToken,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -378,6 +380,8 @@ pub enum HirCicsOption {
     Minimum,
     Hold,
     Unescaped,
+    SpoolKeep,
+    SpoolDelete,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -461,7 +465,7 @@ fn resolve_statement(
                 .map(HirResolvedStatement::Compute)
         }
         StatementKind::ExecCics => {
-            resolve_cics(&statement.arguments, semantic).map(HirResolvedStatement::Cics)
+            cics_resolution::resolve(&statement.arguments, semantic).map(HirResolvedStatement::Cics)
         }
         _ => return Ok(None),
     };
@@ -1106,10 +1110,6 @@ const fn is_numeric(category: DataCategory) -> bool {
 
 const fn is_add_corresponding_group(category: DataCategory) -> bool {
     matches!(category, DataCategory::Group | DataCategory::NationalGroup)
-}
-
-fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {
-    cics_resolution::resolve(tokens, semantic)
 }
 
 fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
@@ -3965,6 +3965,58 @@ mod tests {
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADRTD. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). 01 BAD-LENGTH-X PIC S9(9) COMP. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_spoolclose_resolves_token_and_disposition() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SPCL. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8) VALUE 'SP000001'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SPOOLCLOSE TOKEN(TOKEN-X) KEEP RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SPOOLCLOSE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SPOOLCLOSE");
+        assert_eq!(command.operation, HirCicsOperation::SpoolClose);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolToken
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "TOKEN-X"
+                )
+        }));
+        assert!(command.options.contains(&HirCicsOption::SpoolKeep));
+
+        for (command, expected) in [
+            ("SPOOLCLOSE KEEP NOHANDLE", "requires TOKEN"),
+            ("SPOOLCLOSE TOKEN(TOKEN-X)", "requires RESP or NOHANDLE"),
+            (
+                "SPOOLCLOSE TOKEN(TOKEN-X) KEEP DELETE NOHANDLE",
+                "at most one of KEEP or DELETE",
+            ),
+            (
+                "SPOOLCLOSE TOKEN(BAD-TOKEN-X) NOHANDLE",
+                "8-character data area",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPCL. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 BAD-TOKEN-X PIC X(7). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{command}");
             assert!(

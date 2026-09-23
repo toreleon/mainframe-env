@@ -18,6 +18,7 @@ mod option_shape;
 mod output_shape;
 mod program_control;
 mod queue_control;
+mod spool_control;
 mod storage_control;
 mod task_wait;
 mod terminal_control;
@@ -607,6 +608,9 @@ fn validate_operation_shape(
             (inputs.len() != 1 || !inputs.contains(&CicsOperandName::UserCorrData))
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
+        }
+        CicsPlanOperation::SpoolClose => {
+            spool_control::invalid_close_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
@@ -2013,6 +2017,75 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn spool_control_reserved_tags_are_unique_and_round_trip() {
+        let operations = [(CicsPlanOperation::SpoolClose, 58)];
+        let operands = [(CicsOperandName::SpoolToken, 112)];
+        let options = [
+            (CicsPlanOption::SpoolKeep, 72),
+            (CicsPlanOption::SpoolDelete, 73),
+        ];
+        assert_eq!(
+            operations
+                .iter()
+                .map(|(_, tag)| *tag)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            operations.len()
+        );
+        assert_eq!(
+            operands
+                .iter()
+                .map(|(_, tag)| *tag)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            operands.len()
+        );
+        assert_eq!(
+            options
+                .iter()
+                .map(|(_, tag)| *tag)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            options.len()
+        );
+        for (operation, tag) in operations {
+            assert!((58..=62).contains(&tag));
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        for (operand, tag) in operands {
+            assert!((112..=131).contains(&tag));
+            assert_eq!(operand_tag(operand), tag);
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        for (option, tag) in options {
+            assert!((72..=83).contains(&tag));
+            assert_eq!(option_tag(option), tag);
+            assert_eq!(option_from_tag(tag), Ok(option));
+        }
+
+        let token = CicsStorageSlot {
+            storage: StorageId::from_index(0).unwrap(),
+            qualified_layout_name: "TOKEN-X".into(),
+        };
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::SpoolClose,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::SpoolToken,
+                value: CicsOperandValue::Storage(token),
+            }],
+            options: BTreeSet::from([CicsPlanOption::NoHandle, CicsPlanOption::SpoolKeep]),
+            outputs: Vec::new(),
+            condition: CicsCondition::NoHandle,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan)
         );
     }
 

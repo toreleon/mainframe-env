@@ -346,6 +346,14 @@ numeric 1–99 selector, maps that selector to `DFHJnn`, and uses the same local
 record, output token, WAIT, NOSUSPEND, and condition rules as the named form.
 The pinned compatibility page has no full option syntax; this bounded option
 mapping is inferred from the adjacent named WRITE contract.
+`EXEC CICS SPOOLCLOSE` lowers through the typed spool-control route with one
+eight-character TOKEN input and optional KEEP or DELETE. RESP or NOHANDLE is
+mandatory. The provider applies owner and JESSPOOL checks before its bounded
+durable CAS; explicit input close defaults to DELETE while explicit output
+close defaults to KEEP. A request-digest replay entry is committed with the
+report transition, so recovery after a lost result returns the original
+response without applying a second disposition. Successful or handled
+negative completion records EIBFN `5610`.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

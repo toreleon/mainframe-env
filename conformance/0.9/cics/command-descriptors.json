@@ -1380,6 +1380,11 @@
         "id": "transform-control",
         "rust_variant": "TransformControl",
         "responsibility": "Bounded deterministic application-data, JSON, and XML transformation semantics."
+      },
+      {
+        "id": "spool-control",
+        "rust_variant": "SpoolControl",
+        "responsibility": "Bounded durable CICS spool report lifecycle and record semantics."
       }
     ],
     "operations": [
