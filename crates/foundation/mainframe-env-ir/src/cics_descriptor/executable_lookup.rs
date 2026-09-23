@@ -82,5 +82,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::ConvertTime => &CICS_EXECUTABLE_DESCRIPTORS[73],
         CicsPlanOperation::BifDeedit => &CICS_EXECUTABLE_DESCRIPTORS[74],
         CicsPlanOperation::BifDigest => &CICS_EXECUTABLE_DESCRIPTORS[75],
+        CicsPlanOperation::WaitCics => &CICS_EXECUTABLE_DESCRIPTORS[76],
     }
 }

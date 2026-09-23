@@ -455,6 +455,7 @@ fn option_value_shape(
     name: &str,
 ) -> Option<CicsApplicationOptionValueShape> {
     builtin_function::option_value_shape(descriptor, name)
+        .or_else(|| task_wait::option_value_shape(descriptor, name))
         .or_else(|| journal_control::option_value_shape(descriptor, name))
         .or_else(|| {
             descriptor
@@ -685,7 +686,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
-        op @ (HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal) => task_wait::names(op),
+        op @ (HirCicsOperation::WaitEvent
+        | HirCicsOperation::WaitExternal
+        | HirCicsOperation::WaitCics) => task_wait::names(op),
         HirCicsOperation::Start => &[
             "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
             "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
@@ -746,7 +749,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend
         | HirCicsOperation::WaitEvent => &["NOHANDLE"],
-        HirCicsOperation::WaitExternal => task_wait::WAIT_EXTERNAL_OPTIONS,
+        HirCicsOperation::WaitExternal | HirCicsOperation::WaitCics => {
+            task_wait::WAIT_EXTERNAL_OPTIONS
+        }
         HirCicsOperation::ReadTemporaryStorage => &["NEXT", "NOHANDLE"],
         HirCicsOperation::WriteTemporaryStorage => {
             &["AUXILIARY", "MAIN", "NOSUSPEND", "REWRITE", "NOHANDLE"]
@@ -878,7 +883,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend
         | HirCicsOperation::InvokeApplication => &[][..],
-        HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
+        HirCicsOperation::WaitEvent
+        | HirCicsOperation::WaitExternal
+        | HirCicsOperation::WaitCics => &[][..],
         HirCicsOperation::Load => &["PROGRAM"][..],
         HirCicsOperation::Release => &["PROGRAM"][..],
         HirCicsOperation::DocumentCreate => &["DOCTOKEN"][..],

@@ -259,6 +259,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
+    ("WaitCics", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0239"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     (
         "TransformDataToJson",
@@ -600,6 +601,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Suspend",
         "WaitEvent",
         "WaitExternal",
+        "WaitCics",
         "Syncpoint",
         "Unlock",
         "Start",
@@ -876,6 +878,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WaitExternal": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "WaitCics": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "Start": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
@@ -1130,6 +1135,7 @@ def _load_typed_execution_registrations(
         "WaitExternal",
         "WaitJournalName",
         "WaitJournalNum",
+        "WaitCics",
         "WriteJournalName",
         "WriteJournalNum",
         "WriteTemporaryStorage",
@@ -1466,6 +1472,7 @@ def load_catalog(
                 "Suspend",
                 "WaitEvent",
                 "WaitExternal",
+                "WaitCics",
                 "WaitJournalName",
                 "WaitJournalNum",
                 "WriteJournalName",

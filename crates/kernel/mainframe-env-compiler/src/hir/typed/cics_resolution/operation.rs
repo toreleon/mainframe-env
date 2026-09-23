@@ -68,6 +68,7 @@ pub(super) fn resolve(
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,
         ["WAIT", "EXTERNAL"] => HirCicsOperation::WaitExternal,
+        ["WAITCICS"] => HirCicsOperation::WaitCics,
         ["START"] => HirCicsOperation::Start,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,

@@ -2048,6 +2048,37 @@ mod tests {
     }
 
     #[test]
+    fn cics_waitcics_resolves_the_mvs_ecb_list_without_raw_fallback() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITCIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-LIST-PTR POINTER-32. 01 EVENT-COUNT PIC S9(9) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS WAITCICS ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT) NOTPURGEABLE NAME('MVSPOST') END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WAITCICS: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WAITCICS");
+        assert_eq!(command.operation, HirCicsOperation::WaitCics);
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::EcbList)
+        );
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::NumEvents)
+        );
+        assert!(command.options.contains(&HirCicsOption::NotPurgeable));
+    }
+
+    #[test]
     fn cics_address_set_resolves_both_virtual_pointer_directions() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 PTR-X POINTER. LINKAGE SECTION. 01 LINK-X PIC X(8). PROCEDURE DIVISION USING LINK-X. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF DATA-X) END-EXEC. EXEC CICS ADDRESS SET(ADDRESS OF LINK-X) USING(PTR-X) NOHANDLE END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed ADDRESS SET HIR");

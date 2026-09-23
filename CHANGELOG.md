@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WAITCICS` for row `0239`. It waits on one or more checked
+  MVS-format ECBs, admits standard or hand posting, honors purgeability, and
+  persists the wait through SQLite reopen. MCEP v2 uses operation tag 157 and
+  the existing ECB-list operand identities. Terminal cleanup now releases task
+  state outside the CICS mutex so completed waits can finish.
+
 - Added typed CICS `BIF DIGEST` for row `0014`. An explicit HEX, BINARY,
   BASE64, or named DIGESTTYPE selector returns the reviewed SHA-1 representation
   into a bounded caller result area. Bad record lengths and selectors return

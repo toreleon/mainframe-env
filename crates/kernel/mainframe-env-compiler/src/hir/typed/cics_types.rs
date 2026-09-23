@@ -64,6 +64,7 @@ pub enum HirCicsOperation {
     Suspend,
     WaitEvent,
     WaitExternal,
+    WaitCics,
     Start,
     Retrieve,
     DocumentCreate,

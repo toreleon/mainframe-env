@@ -16,6 +16,7 @@ const MAX_CAS_ATTEMPTS: usize = 8;
 enum WaitKind {
     Event,
     External,
+    Cics,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -179,7 +180,8 @@ impl CicsService {
             if record.session != session.as_str() || record.run_unit != run_unit {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            if mode == CicsEventPostMode::Hand || record.kind == WaitKind::Event && event_index != 0
+            if mode == CicsEventPostMode::Hand && record.kind != WaitKind::Cics
+                || record.kind == WaitKind::Event && event_index != 0
             {
                 return Err(HostProblem::Malformed);
             }
@@ -332,7 +334,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     ];
     if !matches!(
         request.operation,
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics
     ) || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request
             .arguments
@@ -387,7 +389,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
                             && matches!(value.bytes(), [0] | [1])
                     }))
         }
-        CicsOperation::WaitExternal => {
+        CicsOperation::WaitExternal | CicsOperation::WaitCics => {
             request.arguments.contains_key("ECBLIST")
                 && request.arguments.contains_key("NUMEVENTS")
                 && !request.arguments.contains_key("ECADDR")
@@ -412,7 +414,7 @@ fn invalid_response2(request: &CicsRequest) -> Result<Option<u8>, HostProblem> {
         .arguments
         .get(match request.operation {
             CicsOperation::WaitEvent => "ECADDR",
-            CicsOperation::WaitExternal => "ECBLIST",
+            CicsOperation::WaitExternal | CicsOperation::WaitCics => "ECBLIST",
             _ => return Err(HostProblem::InfrastructureFailure),
         })
         .filter(|value| value.schema() == "mainframe-env.cics.invalid-event-list@1")
@@ -467,7 +469,15 @@ fn request_events(
             )
         }
     };
-    Ok((WaitKind::External, events, selected_index))
+    Ok((
+        if request.operation == CicsOperation::WaitCics {
+            WaitKind::Cics
+        } else {
+            WaitKind::External
+        },
+        events,
+        selected_index,
+    ))
 }
 
 fn purgeability(request: &CicsRequest) -> Result<bool, HostProblem> {
@@ -510,7 +520,7 @@ fn validate_identity(
         || record.name.as_deref() != name
         || record.purgeable != purgeable
     {
-        return if kind == WaitKind::External {
+        return if matches!(kind, WaitKind::External | WaitKind::Cics) {
             Err(invreq(1))
         } else {
             Err(HostProblem::IdempotencyConflict)
@@ -639,6 +649,7 @@ fn encode(record: &WaitRecord) -> Result<Vec<u8>, HostProblem> {
     out.push(match record.kind {
         WaitKind::Event => 0,
         WaitKind::External => 1,
+        WaitKind::Cics => 2,
     });
     field(&mut out, record.execution.as_bytes())?;
     field(&mut out, record.run_unit.as_bytes())?;
@@ -692,6 +703,7 @@ fn decode(bytes: &[u8], version: u64) -> Result<WaitRecord, HostProblem> {
     let kind = match reader.byte()? {
         0 => WaitKind::Event,
         1 => WaitKind::External,
+        2 => WaitKind::Cics,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let execution = reader.text(256)?;

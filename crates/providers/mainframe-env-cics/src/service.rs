@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 78);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 79);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 78);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 79);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -20643,6 +20643,149 @@ mod tests {
         drop(service);
         drop(store);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn waitcics_reopens_and_accepts_hand_posted_ecb() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-waitcics-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("waitcics-reopen", BTreeMap::new());
+        let session = SessionId::new("waitcics-reopen", 64).unwrap();
+        let events = [(0, [0, 0x10, 0, 4]), (1, [0, 0x10, 0, 8])];
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = self::service(store);
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let wait = request(
+                CicsOperation::WaitCics,
+                wait_external_arguments(&events, None, 2, false),
+                500,
+            );
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, wait.clone(), 500), wait)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+            assert!(
+                !service
+                    .purge_task_event(
+                        &session,
+                        invocation.principal.id(),
+                        2,
+                        CicsEventPurgeMode::DeadlockTimeout
+                    )
+                    .unwrap()
+            );
+        }
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service = self::service(store);
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .post_task_event(
+                &session,
+                invocation.principal.id(),
+                3,
+                1,
+                CicsEventPostMode::Hand,
+            )
+            .unwrap();
+        let resumed = request(
+            CicsOperation::WaitCics,
+            wait_external_arguments(&events, None, 2, false),
+            501,
+        );
+        for _ in 0..2 {
+            let complete = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, resumed.clone(), 501),
+                    resumed.clone(),
+                )
+                .unwrap();
+            assert_eq!(complete.disposition, CicsDisposition::Complete);
+            assert_eq!(complete.outputs["EVENT.POSTED"].bytes(), b"1");
+        }
+        drop(service);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn waitcics_rejects_invalid_count_ecb_and_purgeability_before_wait_state() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let events = [(0, [0, 0x10, 0, 4])];
+        let count = request(
+            CicsOperation::WaitCics,
+            wait_external_arguments(&events, None, 0, true),
+            510,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, count.clone(), 510), count),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 3
+            })
+        );
+        let mut purge_args = wait_external_arguments(&events, None, 1, true);
+        purge_args.remove("OPTION.PURGEABLE");
+        purge_args.insert("PURGEABILITY".into(), cics_literal(b"UNKNOWN"));
+        let purge = request(CicsOperation::WaitCics, purge_args, 511);
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, purge.clone(), 511), purge),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 4
+            })
+        );
+        let invalid = request(
+            CicsOperation::WaitCics,
+            BTreeMap::from([
+                (
+                    "ECBLIST".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.invalid-event-list@1",
+                        vec![1],
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("NUMEVENTS".into(), cics_decimal(1)),
+            ]),
+            512,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 512),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1
+            })
+        );
+        assert!(
+            service
+                .store
+                .list_provider_state("cics-task-wait-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

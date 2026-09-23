@@ -118,6 +118,8 @@ pub enum CicsOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
     Syncpoint,
     /// Convert one BIT-mode application-data container to canonical JSON.
     TransformDataToJson,
@@ -212,6 +214,7 @@ impl CicsOperation {
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
             Self::WaitExternal => "WaitExternal",
+            Self::WaitCics => "WaitCics",
             Self::Syncpoint => "Syncpoint",
             Self::TransformDataToJson => "TransformDataToJson",
             Self::TransformDataToXml => "TransformDataToXml",
@@ -285,6 +288,7 @@ impl CicsOperation {
                 | Self::Retrieve
                 | Self::WaitEvent
                 | Self::WaitExternal
+                | Self::WaitCics
         )
     }
 
@@ -367,6 +371,7 @@ impl CicsOperation {
             ("SUSPEND", _) => Self::Suspend,
             ("WAIT", Some("EVENT")) => Self::WaitEvent,
             ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
+            ("WAITCICS", _) => Self::WaitCics,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,

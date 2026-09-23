@@ -121,6 +121,8 @@ pub enum CicsPlanOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
     /// Discard the current full-BMS logical message, if one is being built.

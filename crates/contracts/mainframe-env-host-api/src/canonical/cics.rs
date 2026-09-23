@@ -74,6 +74,7 @@ impl Canonical for CicsOperation {
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),
             Self::WaitEvent => out.variant("CicsOperation", "WaitEvent", 0),
             Self::WaitExternal => out.variant("CicsOperation", "WaitExternal", 0),
+            Self::WaitCics => out.variant("CicsOperation", "WaitCics", 0),
             Self::Syncpoint => out.variant("CicsOperation", "Syncpoint", 0),
             Self::TransformDataToJson => out.variant("CicsOperation", "TransformDataToJson", 0),
             Self::TransformDataToXml => out.variant("CicsOperation", "TransformDataToXml", 0),

@@ -203,6 +203,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
         CicsPlanOperation::WaitExternal => CicsOperation::WaitExternal,
+        CicsPlanOperation::WaitCics => CicsOperation::WaitCics,
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
         CicsPlanOperation::Start => CicsOperation::Start,

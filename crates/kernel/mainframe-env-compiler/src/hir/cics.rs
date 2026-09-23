@@ -423,6 +423,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
         HirCicsOperation::WaitExternal => CicsPlanOperation::WaitExternal,
+        HirCicsOperation::WaitCics => CicsPlanOperation::WaitCics,
         HirCicsOperation::Deq => CicsPlanOperation::Deq,
         HirCicsOperation::Enq => CicsPlanOperation::Enq,
         HirCicsOperation::HandleAid => CicsPlanOperation::HandleAid,

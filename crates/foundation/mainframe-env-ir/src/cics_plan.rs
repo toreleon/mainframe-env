@@ -153,6 +153,9 @@ fn encode_cics_effect_plan_version(
     version: u16,
 ) -> Result<Vec<u8>, CicsPlanCodecProblem> {
     validate_plan(plan, limits)?;
+    if version == LEGACY_VERSION && (154..=164).contains(&operation_tag(plan.operation)) {
+        return Err(CicsPlanCodecProblem::Malformed);
+    }
     let mut writer = Writer::new(limits.max_encoded_bytes);
     writer.extend(MAGIC)?;
     writer.u16(version)?;
@@ -215,7 +218,11 @@ pub fn decode_cics_effect_plan(
     if !matches!(version, LEGACY_VERSION | VERSION) {
         return Err(CicsPlanCodecProblem::UnsupportedVersion);
     }
-    let operation = operation_from_tag(reader.tag(version)?)?;
+    let operation_tag = reader.tag(version)?;
+    if version == LEGACY_VERSION && (154..=164).contains(&operation_tag) {
+        return Err(CicsPlanCodecProblem::Malformed);
+    }
+    let operation = operation_from_tag(operation_tag)?;
 
     let operand_count = reader.count(limits.max_operands)?;
     let mut operands = Vec::with_capacity(operand_count);
@@ -690,7 +697,7 @@ fn validate_operation_shape(
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::WaitEvent => task_wait::invalid_wait_event_shape(plan, inputs, outputs),
-        CicsPlanOperation::WaitExternal => {
+        CicsPlanOperation::WaitExternal | CicsPlanOperation::WaitCics => {
             task_wait::invalid_wait_external_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::WaitJournalName => {
@@ -3532,6 +3539,44 @@ mod tests {
         malformed.options = BTreeSet::from([CicsPlanOption::Purgeable]);
         assert_eq!(
             encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn waitcics_is_v2_only_and_reuses_the_reviewed_ecb_shape() {
+        let limits = CicsPlanLimits::default();
+        let external = CicsEffectPlan {
+            operation: CicsPlanOperation::WaitExternal,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::EcbList,
+                    value: CicsOperandValue::Storage(slot(1, "WAIT.ECB-LIST-POINTER")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::NumEvents,
+                    value: CicsOperandValue::Integer(2),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::Purgeable]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let mut plan = external.clone();
+        plan.operation = CicsPlanOperation::WaitCics;
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[6..8], &157u16.to_be_bytes());
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits).unwrap(), encoded);
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut forged_v1 =
+            encode_cics_effect_plan_version(&external, limits, LEGACY_VERSION).unwrap();
+        forged_v1[6] = 157;
+        assert_eq!(
+            decode_cics_effect_plan(&forged_v1, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

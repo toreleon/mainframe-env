@@ -109,8 +109,19 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        if let Some(run) = state.runs.get(&run_id).cloned() {
+        let run = state.runs.get(&run_id).cloned();
+        drop(state);
+        if let Some(run) = &run {
             handlers::release_task_state(self, &run)?;
+        }
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_some_and(|current| {
+            run.as_ref().is_none_or(|run| {
+                current.session != run.session
+                    || current.invocation.principal.id() != run.invocation.principal.id()
+            })
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
         }
         state.runs.remove(&run_id);
         Ok(trace)
@@ -170,7 +181,15 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
+        drop(state);
         handlers::release_task_state(self, &run)?;
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_none_or(|current| {
+            current.session != run.session
+                || current.invocation.principal.id() != run.invocation.principal.id()
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         state.runs.remove(&run_id);
         Ok(())
     }

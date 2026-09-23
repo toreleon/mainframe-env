@@ -2471,6 +2471,7 @@ mod tests {
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,
             CicsOperation::WaitExternal,
+            CicsOperation::WaitCics,
             CicsOperation::Syncpoint,
             CicsOperation::TransformDataToJson,
             CicsOperation::TransformDataToXml,
@@ -2481,7 +2482,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 71);
+        assert_eq!(forms.len(), 72);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

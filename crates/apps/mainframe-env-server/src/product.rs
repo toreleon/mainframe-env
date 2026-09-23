@@ -15571,6 +15571,130 @@ mod tests {
     }
 
     #[test]
+    fn online_waitcics_accepts_hand_post_on_compiled_selected_route() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITCIC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ECB-X PIC S9(9) COMP VALUE 0.\n01 ECB-Y PIC S9(9) COMP VALUE 0.\n01 ECB-LIST.\n 05 ECB-ADDR-1 POINTER-32.\n 05 ECB-ADDR-2 POINTER-32.\n01 ECB-LIST-PTR POINTER-32.\n01 EVENT-COUNT PIC S9(9) COMP VALUE 2.\n01 WAIT-FN PIC X(2).\n01 DONE-X PIC X VALUE '0'.\nPROCEDURE DIVISION.\nSET ECB-ADDR-1 TO ADDRESS OF ECB-X.\nSET ECB-ADDR-2 TO ADDRESS OF ECB-Y.\nSET ECB-LIST-PTR TO ADDRESS OF ECB-LIST.\nEXEC CICS WAITCICS ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT) NAME('MVSPOST') END-EXEC.\nMOVE EIBFN TO WAIT-FN.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let artifact = published_source_fixture("WAITCIC", std::str::from_utf8(source).unwrap());
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "WAITCIC".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("WC00".into(), "WAITCIC".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "WAITCIC".into(),
+                    map: "WAITCIC".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("typed-waitcics", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "WC00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "WC00",
+                24,
+                80,
+                "typed-waitcics-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "WAITCIC", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "WAITCIC", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+        server
+            .cics
+            .post_task_event(&session, &principal, 3, 1, CicsEventPostMode::Hand)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "WAITCIC", 3)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("WAIT-FN").unwrap().bytes(), &[0x5e, 0x32]);
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(
+            restored.variable("ECB-Y").unwrap().bytes(),
+            &[0x40, 0, 0, 0]
+        );
+        assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x12, 0x08]);
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 8)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .count(),
+            3
+        );
+        server
+            .run_online_exchange(&session, &principal, "WAITCIC", 4)
+            .unwrap();
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-task-wait-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn online_task_scheduling_yields_once_and_retains_changed_priority() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 OBSERVED-PRIORITY PIC S9(4) COMP.\n01 ABCODE-X PIC X(4) VALUE 'ZZZZ'.\n01 ABDUMP-X PIC X VALUE 'Z'.\n01 ABOFFSET-X PIC S9(9) COMP VALUE 1.\n01 ABPROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 ALTERNATE-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 ALTERNATE-WIDTH-X PIC S9(4) COMP VALUE 1.\n01 APPLICATION-X PIC X(64).\n01 APPL-X PIC X(8).\n01 ASRA-PSW-X PIC X(8) VALUE ALL 'Z'.\n01 ASRA-PSW16-X PIC X(16) VALUE ALL 'Z'.\n01 ASRA-REGS-X PIC X(64) VALUE ALL 'Z'.\n01 ASRA-REGS64-X PIC X(128) VALUE ALL 'Z'.\n01 BRIDGE-X PIC X(4) VALUE 'ZZZZ'.\n01 CAPABILITY-X PIC X VALUE 'Z'.\n01 CHANNEL-X PIC X(16).\n01 CMDSEC-X PIC X.\n01 CWA-LENGTH-X PIC S9(4) COMP.\n01 DEFAULT-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 DEFAULT-WIDTH-X PIC S9(4) COMP VALUE 1.\n01 DS3270-X PIC X VALUE 'Z'.\n01 DSSCS-X PIC X VALUE 'Z'.\n01 FCI-X PIC X VALUE 'Z'.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.\n01 INITPARM-LENGTH-X PIC S9(4) COMP.\n01 LINK-LEVEL-X PIC S9(4) COMP.\n01 MAJOR-X PIC S9(9) COMP.\n01 MICRO-X PIC S9(9) COMP.\n01 MINOR-X PIC S9(9) COMP.\n01 NEXT-TRANS-X PIC X(4) VALUE 'ZZZZ'.\n01 OPERATION-X PIC X(64).\n01 OPERKEYS-X PIC X(8).\n01 OPSECURITY-X PIC X(3).\n01 PARTITION-SET-X PIC X(6) VALUE 'ZZZZZZ'.\n01 PLATFORM-X PIC X(64).\n01 RESTART-X PIC X.\n01 RESSEC-X PIC X.\n01 SCREEN-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 SCREEN-WIDTH-X PIC S9(4) COMP VALUE 1.\n01 SYS-X PIC X(4).\n01 TCTUA-LENGTH-X PIC S9(4) COMP.\n01 TWA-LENGTH-X PIC S9(4) COMP.\n01 USER-X PIC X(8).\n01 ASSIGN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APPLICATION(APPLICATION-X) APPLID(APPL-X) BRIDGE(BRIDGE-X) CHANNEL(CHANNEL-X) MAJORVERSION(MAJOR-X) MICROVERSION(MICRO-X) MINORVERSION(MINOR-X) OPERATION(OPERATION-X) PLATFORM(PLATFORM-X) SCRNHT(SCREEN-HEIGHT-X) SCRNWD(SCREEN-WIDTH-X) SYSID(SYS-X) TASKPRIORITY(OBSERVED-PRIORITY) USERID(USER-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN ALTSCRNHT(ALTERNATE-HEIGHT-X) ALTSCRNWD(ALTERNATE-WIDTH-X) CWALENG(CWA-LENGTH-X) DEFSCRNHT(DEFAULT-HEIGHT-X) DEFSCRNWD(DEFAULT-WIDTH-X) DS3270(DS3270-X) DSSCS(DSSCS-X) FCI(FCI-X) LINKLEVEL(LINK-LEVEL-X) OPERKEYS(OPERKEYS-X) PARTNSET(PARTITION-SET-X) RESTART(RESTART-X) TWALENG(TWA-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APLKYBD(CAPABILITY-X) APLTEXT(CAPABILITY-X) BTRANS(CAPABILITY-X) COLOR(CAPABILITY-X) EWASUPP(CAPABILITY-X) EXTDS(CAPABILITY-X) GMMI(CAPABILITY-X) HILIGHT(CAPABILITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN KATAKANA(CAPABILITY-X) MSRCONTROL(CAPABILITY-X) OUTLINE(CAPABILITY-X) PARTNS(CAPABILITY-X) PS(CAPABILITY-X) SOSI(CAPABILITY-X) TEXTKYBD(CAPABILITY-X) TEXTPRINT(CAPABILITY-X) VALIDATION(CAPABILITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN CMDSEC(CMDSEC-X) OPSECURITY(OPSECURITY-X) RESSEC(RESSEC-X) TCTUALENG(TCTUA-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN INITPARM(INITPARM-X) INITPARMLEN(INITPARM-LENGTH-X) NEXTTRANSID(NEXT-TRANS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN ABCODE(ABCODE-X) ABDUMP(ABDUMP-X) ABOFFSET(ABOFFSET-X) ABPROGRAM(ABPROGRAM-X) ASRAPSW(ASRA-PSW-X) ASRAPSW16(ASRA-PSW16-X) ASRAREGS(ASRA-REGS-X) ASRAREGS64(ASRA-REGS64-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO ASSIGN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
