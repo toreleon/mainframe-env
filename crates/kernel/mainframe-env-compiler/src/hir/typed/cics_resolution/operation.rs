@@ -99,6 +99,7 @@ pub(super) fn resolve(
         ["RETRIEVE", "REATTACH", "EVENT"] => HirCicsOperation::RetrieveReattachEvent,
         ["RETRIEVE", "SUBEVENT"] => HirCicsOperation::RetrieveSubevent,
         ["TEST", "EVENT"] => HirCicsOperation::TestEvent,
+        ["SIGNAL", "EVENT"] => HirCicsOperation::SignalEvent,
         ["FORCE", "TIMER"] => HirCicsOperation::ForceTimer,
         ["DOCUMENT", "DELETE"] => HirCicsOperation::DocumentDelete,
         ["DOCUMENT", "INSERT"] => HirCicsOperation::DocumentInsert,

@@ -1190,6 +1190,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "RETRIEVE REATTACH EVENT",
                 "RETRIEVE SUBEVENT",
                 "TEST EVENT",
+                "SIGNAL EVENT",
                 "DOCUMENT CREATE",
                 "DOCUMENT DELETE",
                 "DOCUMENT INSERT",

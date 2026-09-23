@@ -303,6 +303,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/event_control/delete.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/timer.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/retrieve.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/event_control/state_validation.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/signal_event.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_tokens.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_unlock.rs",

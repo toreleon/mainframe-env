@@ -15,6 +15,7 @@ mod limits;
 mod program_control;
 mod queue_control;
 mod recovery;
+mod signal_event;
 mod spool_control;
 mod start_task;
 mod storage_control;
@@ -124,6 +125,7 @@ pub(super) use program_control::{
 };
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
+pub use signal_event::{CicsSignalCaptureSpec, CicsSignalEmission};
 pub(super) use spool_control::invoke as invoke_spool_control;
 pub(super) use spool_control::{
     SpoolRecord, SpoolRecordMode, SpoolReport, SpoolReportState, SpoolState, load_spool_state,

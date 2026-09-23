@@ -180,3 +180,47 @@ pub(super) fn invalid_retrieve_shape(
         _ => true,
     }
 }
+
+pub(super) fn invalid_signal_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    if !inputs.contains(&CicsOperandName::Event)
+        || inputs.len() > 4
+        || inputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOperandName::Event
+                    | CicsOperandName::SignalFrom
+                    | CicsOperandName::SignalFromLength
+                    | CicsOperandName::SignalFromChannel
+            )
+        })
+        || inputs.contains(&CicsOperandName::SignalFrom)
+            && inputs.contains(&CicsOperandName::SignalFromChannel)
+        || inputs.contains(&CicsOperandName::SignalFromLength)
+            && !inputs.contains(&CicsOperandName::SignalFrom)
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+    {
+        return true;
+    }
+    plan.operands.iter().any(|operand| match operand.name {
+        CicsOperandName::Event | CicsOperandName::SignalFromChannel => !matches!(
+            operand.value,
+            CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+        ),
+        CicsOperandName::SignalFrom => !matches!(operand.value, CicsOperandValue::Storage(_)),
+        CicsOperandName::SignalFromLength => !matches!(
+            operand.value,
+            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+        ),
+        _ => true,
+    })
+}

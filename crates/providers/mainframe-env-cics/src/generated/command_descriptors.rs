@@ -153,6 +153,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::SignalEvent,
+        syntax: "SIGNAL EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0194",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::DefineCompositeEvent,
         syntax: "DEFINE COMPOSITE EVENT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0033",

@@ -116,6 +116,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("RetrieveReattachEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0176"),
     ("RetrieveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0177"),
     ("TestEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0219"),
+    ("SignalEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0194"),
     ("DefineCompositeEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0033"),
     ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
@@ -624,6 +625,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "RetrieveReattachEvent",
         "RetrieveSubevent",
         "TestEvent",
+        "SignalEvent",
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
@@ -728,6 +730,7 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "SignalEvent": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "RetrieveReattachEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "RetrieveSubevent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "TestEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),

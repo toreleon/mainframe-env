@@ -115,6 +115,8 @@ pub enum CicsPlanOperation {
     RetrieveSubevent,
     /// BTS event retrieval or status command.
     TestEvent,
+    /// Emit matching business events from an application capture point.
+    SignalEvent,
     /// BTS timer state command.
     ForceTimer,
     /// Write one explicitly keyed file record.
@@ -231,6 +233,12 @@ pub enum CicsOperandName {
     SubEvent6,
     SubEvent7,
     SubEvent8,
+    /// SIGNAL EVENT capture data area.
+    SignalFrom,
+    /// SIGNAL EVENT captured byte length.
+    SignalFromLength,
+    /// SIGNAL EVENT source channel.
+    SignalFromChannel,
     Timer,
     TimerDays,
     TimerHours,

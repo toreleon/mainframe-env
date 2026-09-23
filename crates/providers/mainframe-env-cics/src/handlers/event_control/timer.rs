@@ -19,6 +19,7 @@ pub(super) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
     let context = context(service, run)?;
+    let local_utc_offset_minutes = context.local_utc_offset_minutes;
     let timer = name(request, "TIMER", 14)?;
     let activity = if request.operation == CicsOperation::ForceTimer {
         if request.arguments.contains_key("OPTION.ACQPROCESS") {
@@ -43,7 +44,7 @@ pub(super) fn invoke(
     };
     let now = clock_millis(service, run)?;
     let due = if request.operation == CicsOperation::DefineTimer {
-        Some(due_millis(request, now)?)
+        Some(due_millis(request, now, local_utc_offset_minutes)?)
     } else {
         None
     };
@@ -208,7 +209,15 @@ fn name(request: &CicsRequest, key: &str, invalid: i32) -> Result<String, HostPr
         .arguments
         .get(key)
         .ok_or(HostProblem::Malformed)
-        .and_then(|value| std::str::from_utf8(value.bytes()).map_err(|_| timererr(invalid)))
+        .and_then(|value| {
+            std::str::from_utf8(value.bytes()).map_err(|_| {
+                if key == "EVENT" {
+                    event_error(invalid)
+                } else {
+                    timererr(invalid)
+                }
+            })
+        })
         .and_then(|value| {
             event_name(value).map_err(|_| {
                 if key == "EVENT" {
@@ -251,7 +260,11 @@ fn number(
         .transpose()
 }
 
-fn due_millis(request: &CicsRequest, now: u64) -> Result<u64, HostProblem> {
+fn due_millis(
+    request: &CicsRequest,
+    now: u64,
+    local_utc_offset_minutes: i32,
+) -> Result<u64, HostProblem> {
     let after = request.arguments.contains_key("OPTION.AFTER");
     let at = request.arguments.contains_key("OPTION.AT");
     let on = request.arguments.contains_key("OPTION.ON");
@@ -280,19 +293,26 @@ fn due_millis(request: &CicsRequest, now: u64) -> Result<u64, HostProblem> {
             .ok_or_else(|| invreq(11))?;
         return now.checked_add(interval as u64).ok_or_else(|| invreq(11));
     }
-    let current = super::super::time::instant_from_absolute(now as i64)?;
+    let offset_millis = i64::from(local_utc_offset_minutes) * 60_000;
+    let local_now = i64::try_from(now)
+        .ok()
+        .and_then(|now| now.checked_add(offset_millis))
+        .ok_or_else(|| invreq(12))?;
+    let current = super::super::time::instant_from_absolute(local_now)?;
     let year = number(request, "YEAR", 2110, 12)?.unwrap_or(current.year);
     let month = number(request, "MONTH", 12, 12)?.unwrap_or(i64::from(current.month));
     let day = number(request, "DAYOFMONTH", 31, 12)?.unwrap_or(i64::from(current.day));
     let ordinal = number(request, "DAYOFYEAR", 366, 12)?;
-    if year < 1 || month < 1 || day < 1 || ordinal == Some(0) {
+    if month < 1 || day < 1 || ordinal == Some(0) {
         return Err(invreq(12));
     }
     if !on
         && ["YEAR", "MONTH", "DAYOFMONTH", "DAYOFYEAR"]
             .iter()
             .any(|name| request.arguments.contains_key(*name))
-        || ordinal.is_some() && request.arguments.contains_key("DAYOFMONTH")
+        || ordinal.is_some()
+            && (request.arguments.contains_key("MONTH")
+                || request.arguments.contains_key("DAYOFMONTH"))
     {
         return Err(invreq(12));
     }
@@ -320,7 +340,14 @@ fn due_millis(request: &CicsRequest, now: u64) -> Result<u64, HostProblem> {
         second: seconds as u32,
         millisecond: 0,
     };
-    u64::try_from(absolute_milliseconds(instant)?).map_err(|_| invreq(12))
+    let absolute = absolute_milliseconds(instant)?
+        .checked_sub(offset_millis)
+        .ok_or_else(|| invreq(12))?;
+    if absolute <= 0 {
+        Ok(0)
+    } else {
+        u64::try_from(absolute).map_err(|_| invreq(12))
+    }
 }
 
 pub(super) fn refresh_due(state: &mut ActivityState, now: u64) -> Result<(), HostProblem> {

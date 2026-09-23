@@ -41,6 +41,7 @@ pub enum HirCicsOperation {
     RetrieveReattachEvent,
     RetrieveSubevent,
     TestEvent,
+    SignalEvent,
     ForceTimer,
     Write,
     WriteTransientData,

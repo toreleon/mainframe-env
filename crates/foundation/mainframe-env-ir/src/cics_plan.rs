@@ -733,6 +733,9 @@ fn validate_operation_shape(
         | CicsPlanOperation::TestEvent => {
             event_control::invalid_retrieve_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::SignalEvent => {
+            event_control::invalid_signal_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -4482,12 +4485,22 @@ mod tests {
             (CicsPlanOperation::RetrieveReattachEvent, 114),
             (CicsPlanOperation::RetrieveSubevent, 115),
             (CicsPlanOperation::TestEvent, 117),
+            (CicsPlanOperation::SignalEvent, 116),
         ] {
             assert_eq!(operation_tag(operation), tag);
             assert_eq!(operation_from_tag(tag), Ok(operation));
         }
         assert_eq!(operand_tag(CicsOperandName::Timer), 330);
         assert_eq!(operand_from_tag(330), Ok(CicsOperandName::Timer));
+        assert_eq!(operand_tag(CicsOperandName::SignalFrom), 339);
+        assert_eq!(operand_from_tag(339), Ok(CicsOperandName::SignalFrom));
+        assert_eq!(operand_tag(CicsOperandName::SignalFromLength), 340);
+        assert_eq!(operand_from_tag(340), Ok(CicsOperandName::SignalFromLength));
+        assert_eq!(operand_tag(CicsOperandName::SignalFromChannel), 341);
+        assert_eq!(
+            operand_from_tag(341),
+            Ok(CicsOperandName::SignalFromChannel)
+        );
         assert_eq!(option_tag(CicsPlanOption::TimerAfter), 254);
         assert_eq!(option_from_tag(254), Ok(CicsPlanOption::TimerAfter));
         assert_eq!(output_tag(CicsOutputName::TimerStatus), 376);

@@ -27791,6 +27791,81 @@ mod tests {
         let state: serde_json::Value = serde_json::from_slice(&snapshot.payload).unwrap();
         assert!(state["timers"].get("LATER").is_none());
         assert!(state["events"].get("LATER").is_none());
+
+        let historic = request(
+            CicsOperation::DefineTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"HISTORIC")),
+                ("OPTION.AT".into(), cics_option()),
+                ("OPTION.ON".into(), cics_option()),
+                ("HOURS".into(), cics_decimal(0)),
+                ("YEAR".into(), cics_decimal(0)),
+                ("DAYOFYEAR".into(), cics_decimal(1)),
+            ]),
+            7,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, historic.clone(), 7),
+            historic,
+        )
+        .unwrap();
+        let check = request(
+            CicsOperation::CheckTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"HISTORIC")),
+                ("STATUS".into(), argument(b"STATUS")),
+            ]),
+            8,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, check.clone(), 8), check)
+                .unwrap()
+                .outputs["STATUS"]
+                .bytes(),
+            b"EXPIRED"
+        );
+    }
+
+    #[test]
+    fn bts_absolute_timer_uses_bound_region_local_clock() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity_with_local_offset(
+            &invocation.run_unit_id,
+            "LOCAL",
+            None,
+            None,
+            120,
+        )
+        .unwrap();
+        let define = request(
+            CicsOperation::DefineTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"LOCALTIME")),
+                ("OPTION.AT".into(), cics_option()),
+                ("HOURS".into(), cics_decimal(14)),
+                ("MINUTES".into(), cics_decimal(30)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let check = request(
+            CicsOperation::CheckTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"LOCALTIME")),
+                ("STATUS".into(), argument(b"STATUS")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, check.clone(), 2), check)
+                .unwrap()
+                .outputs["STATUS"]
+                .bytes(),
+            b"EXPIRED"
+        );
     }
 
     #[test]
@@ -27914,5 +27989,498 @@ mod tests {
         let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         assert_eq!(state["events"]["GROUP"]["fired"], false);
         assert_eq!(state["events"]["CHILD"]["fired"], false);
+    }
+
+    #[test]
+    fn signal_event_emits_only_matching_active_capture_specs_and_reopens() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.register_signal_capture(CicsSignalCaptureSpec {
+            capture_id: "capture-from".into(),
+            business_event: "ORDER-AUDIT".into(),
+            event: "ORDER:READY".into(),
+            enabled: true,
+            from_prefix: Some(b"AB".to_vec()),
+            from_channel: None,
+            container_equals: BTreeMap::new(),
+        })
+        .unwrap();
+        let command = |sequence, bytes: &[u8]| {
+            request(
+                CicsOperation::SignalEvent,
+                BTreeMap::from([
+                    ("EVENT".into(), cics_literal(b"ORDER:READY")),
+                    ("FROM".into(), enqueue_value(bytes)),
+                    ("FROMLENGTH".into(), cics_decimal(2)),
+                ]),
+                sequence,
+            )
+        };
+        let inactive = command(1, b"ABCD");
+        cics.invoke(
+            &effect(&invocation.run_unit_id, inactive.clone(), 1),
+            inactive,
+        )
+        .unwrap();
+        assert!(cics.captured_signal_events().unwrap().is_empty());
+        cics.set_signal_event_processing(true).unwrap();
+        let matching = command(2, b"ABCD");
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, matching.clone(), 2),
+                matching.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, matching.clone(), 2),
+                matching
+            )
+            .unwrap(),
+            first
+        );
+        let mismatch = command(3, b"ZZCD");
+        cics.invoke(
+            &effect(&invocation.run_unit_id, mismatch.clone(), 3),
+            mismatch,
+        )
+        .unwrap();
+        let emitted = cics.captured_signal_events().unwrap();
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted[0].business_event, "ORDER-AUDIT");
+        assert_eq!(emitted[0].from.as_deref(), Some(b"AB".as_slice()));
+
+        cics.put_transform_container(
+            "WORK",
+            "RECORD",
+            CicsTransformContainerMode::Bit,
+            b"DATA".to_vec(),
+        )
+        .unwrap();
+        cics.register_signal_capture(CicsSignalCaptureSpec {
+            capture_id: "capture-channel".into(),
+            business_event: "CHANNEL-AUDIT".into(),
+            event: "ORDER:READY".into(),
+            enabled: true,
+            from_prefix: None,
+            from_channel: Some("WORK".into()),
+            container_equals: BTreeMap::from([("RECORD".into(), b"DATA".to_vec())]),
+        })
+        .unwrap();
+        let channel = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([
+                ("EVENT".into(), cics_literal(b"ORDER:READY")),
+                ("FROMCHANNEL".into(), cics_literal(b"WORK")),
+            ]),
+            4,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, channel.clone(), 4),
+            channel,
+        )
+        .unwrap();
+        let emitted = cics.captured_signal_events().unwrap();
+        assert_eq!(emitted.len(), 2);
+        assert_eq!(emitted[1].business_event, "CHANNEL-AUDIT");
+        assert_eq!(emitted[1].containers["RECORD"], b"DATA");
+        let missing = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([
+                ("EVENT".into(), cics_literal(b"ORDER:READY")),
+                ("FROMCHANNEL".into(), cics_literal(b"MISSING")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 5),
+                missing
+            ),
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 2,
+            })
+        );
+        let zero_length = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([
+                ("EVENT".into(), cics_literal(b"ORDER:READY")),
+                ("FROM".into(), enqueue_value(b"AB")),
+                ("FROMLENGTH".into(), cics_decimal(0)),
+            ]),
+            6,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, zero_length.clone(), 6),
+                zero_length
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 3,
+            })
+        );
+        let invalid = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([("EVENT".into(), cics_literal(b"BAD NAME"))]),
+            7,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 7),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "EVENTERR".into(),
+                response: 111,
+                response2: 6,
+            })
+        );
+        cics.set_signal_capture_enabled("capture-from", false)
+            .unwrap();
+        let suppressed = command(8, b"ABCD");
+        cics.invoke(
+            &effect(&invocation.run_unit_id, suppressed.clone(), 8),
+            suppressed,
+        )
+        .unwrap();
+        assert_eq!(cics.captured_signal_events().unwrap(), emitted);
+        cics.set_signal_capture_enabled("capture-from", true)
+            .unwrap();
+        let resumed = command(9, b"ABCD");
+        cics.invoke(
+            &effect(&invocation.run_unit_id, resumed.clone(), 9),
+            resumed,
+        )
+        .unwrap();
+        let emitted = cics.captured_signal_events().unwrap();
+        assert_eq!(emitted.len(), 3);
+        cics.register_signal_channel("EMPTY").unwrap();
+        let empty_channel = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([
+                ("EVENT".into(), cics_literal(b"ORDER:READY")),
+                ("FROMCHANNEL".into(), cics_literal(b"EMPTY")),
+            ]),
+            10,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, empty_channel.clone(), 10),
+            empty_channel,
+        )
+        .unwrap();
+        assert_eq!(service(store).captured_signal_events().unwrap(), emitted);
+    }
+
+    #[test]
+    fn bts_activity_rejects_broken_persisted_parent_links() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"GO"))]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let mut payload: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        payload["events"]["GO"]["parent"] = serde_json::json!("MISSING");
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: row.namespace,
+                    key: row.key,
+                    version: row.version + 1,
+                    payload: serde_json::to_vec(&payload).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        assert_eq!(
+            cics.post_input_event("CURRENT", "GO"),
+            Err(HostProblem::InfrastructureFailure)
+        );
+    }
+
+    #[test]
+    fn event_timer_and_signal_capture_survive_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-event-signal-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = service(store);
+            let (invocation, _) = registered(&cics);
+            cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+                .unwrap();
+            let define = request(
+                CicsOperation::DefineTimer,
+                BTreeMap::from([
+                    ("TIMER".into(), argument(b"LATER")),
+                    ("OPTION.AFTER".into(), cics_option()),
+                    ("SECONDS".into(), cics_decimal(5)),
+                ]),
+                1,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+                .unwrap();
+            cics.register_signal_capture(CicsSignalCaptureSpec {
+                capture_id: "sqlite-capture".into(),
+                business_event: "SQLITE-AUDIT".into(),
+                event: "ORDER:GO".into(),
+                enabled: true,
+                from_prefix: None,
+                from_channel: Some("WORK".into()),
+                container_equals: BTreeMap::from([("DATA".into(), b"VALUE".to_vec())]),
+            })
+            .unwrap();
+            cics.put_transform_container(
+                "WORK",
+                "DATA",
+                CicsTransformContainerMode::Bit,
+                b"VALUE".to_vec(),
+            )
+            .unwrap();
+            cics.set_signal_event_processing(true).unwrap();
+            let signal = request(
+                CicsOperation::SignalEvent,
+                BTreeMap::from([
+                    ("EVENT".into(), cics_literal(b"ORDER:GO")),
+                    ("FROMCHANNEL".into(), cics_literal(b"WORK")),
+                ]),
+                2,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, signal.clone(), 2), signal)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = service(store);
+            let emitted = cics.captured_signal_events().unwrap();
+            assert_eq!(emitted.len(), 1);
+            assert_eq!(emitted[0].business_event, "SQLITE-AUDIT");
+            assert_eq!(emitted[0].containers["DATA"], b"VALUE");
+            let invocation = invocation_for("event-signal-sqlite-reopen", BTreeMap::new());
+            let session = SessionId::new("event-signal-sqlite-reopen", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+                .unwrap();
+            let force = request(
+                CicsOperation::ForceTimer,
+                BTreeMap::from([("TIMER".into(), argument(b"LATER"))]),
+                3,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, force.clone(), 3), force)
+                .unwrap();
+            let check = request(
+                CicsOperation::CheckTimer,
+                BTreeMap::from([
+                    ("TIMER".into(), argument(b"LATER")),
+                    ("STATUS".into(), argument(b"STATUS")),
+                ]),
+                4,
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, check.clone(), 4), check)
+                    .unwrap()
+                    .outputs["STATUS"]
+                    .bytes(),
+                b"FORCED"
+            );
+        }
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn signal_event_saf_denial_is_traced_before_capture_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, security) = event_authorities(true);
+        let cics = CicsService::open(host, store, CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        cics.register_signal_capture(CicsSignalCaptureSpec {
+            capture_id: "denied".into(),
+            business_event: "DENIED-AUDIT".into(),
+            event: "ORDER:GO".into(),
+            enabled: true,
+            from_prefix: None,
+            from_channel: None,
+            container_equals: BTreeMap::new(),
+        })
+        .unwrap();
+        cics.set_signal_event_processing(true).unwrap();
+        let signal = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([("EVENT".into(), cics_literal(b"ORDER:GO"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, signal.clone(), 1), signal),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(cics.captured_signal_events().unwrap().is_empty());
+        assert!(
+            security
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "EVENT"
+                        && resource == "CICS.SIGNAL.4F524445523A474F"
+                        && *intent == AccessIntent::Update
+                })
+        );
+        assert!(
+            cics.lock().unwrap().runs[&invocation.run_unit_id]
+                .trace
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::SignalEvent
+                    && entry.outcome.contains("Unauthorized"))
+        );
+    }
+
+    #[test]
+    fn signal_event_outer_deadline_and_live_cancellation_prevent_capture() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let invocation = invocation_for("signal-event-stop", BTreeMap::new());
+        let session = SessionId::new("signal-event-stop", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        cics.register_signal_capture(CicsSignalCaptureSpec {
+            capture_id: "cancelled".into(),
+            business_event: "STOP-AUDIT".into(),
+            event: "ORDER:GO".into(),
+            enabled: true,
+            from_prefix: None,
+            from_channel: None,
+            container_equals: BTreeMap::new(),
+        })
+        .unwrap();
+        cics.set_signal_event_processing(true).unwrap();
+        let provider = cics_provider(cics.clone(), InvocationLimits::default());
+        let outer = ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+            ),
+            HostLimits::default(),
+        );
+        let signal = |sequence| {
+            request(
+                CicsOperation::SignalEvent,
+                BTreeMap::from([("EVENT".into(), cics_literal(b"ORDER:GO"))]),
+                sequence,
+            )
+        };
+        let expired = signal(1);
+        assert_eq!(
+            outer
+                .invoke(
+                    &invocation,
+                    invocation.deadline_tick,
+                    false,
+                    effect(&invocation.run_unit_id, expired, 1),
+                )
+                .into_transaction_parts()
+                .0
+                .outcome,
+            Err(HostProblem::TimedOut)
+        );
+        let cancelled = signal(2);
+        assert_eq!(
+            outer
+                .invoke(
+                    &invocation,
+                    1,
+                    true,
+                    effect(&invocation.run_unit_id, cancelled, 2),
+                )
+                .into_transaction_parts()
+                .0
+                .outcome,
+            Err(HostProblem::Cancelled)
+        );
+        assert!(cics.captured_signal_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn event_and_signal_local_ledgers_recover_after_outer_receipt_failure() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        cics.register_signal_capture(CicsSignalCaptureSpec {
+            capture_id: "replay".into(),
+            business_event: "REPLAY-AUDIT".into(),
+            event: "ORDER:GO".into(),
+            enabled: true,
+            from_prefix: None,
+            from_channel: None,
+            container_equals: BTreeMap::new(),
+        })
+        .unwrap();
+        cics.set_signal_event_processing(true).unwrap();
+        let signal = request(
+            CicsOperation::SignalEvent,
+            BTreeMap::from([("EVENT".into(), cics_literal(b"ORDER:GO"))]),
+            1,
+        );
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, signal.clone(), 1),
+                signal.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(cics.captured_signal_events().unwrap().len(), 1);
+        cics.invoke(&effect(&invocation.run_unit_id, signal.clone(), 1), signal)
+            .unwrap();
+        assert_eq!(cics.captured_signal_events().unwrap().len(), 1);
+
+        let define = request(
+            CicsOperation::DefineTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"CLOCK")),
+                ("OPTION.AFTER".into(), cics_option()),
+                ("SECONDS".into(), cics_decimal(5)),
+            ]),
+            2,
+        );
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, define.clone(), 2),
+                define.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 2), define)
+            .unwrap();
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["timers"].as_object().unwrap().len(), 1);
     }
 }

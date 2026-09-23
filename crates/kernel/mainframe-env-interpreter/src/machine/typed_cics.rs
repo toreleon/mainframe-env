@@ -365,6 +365,7 @@ pub(super) fn execute(
                         | CicsOperandName::TimerMonth
                         | CicsOperandName::TimerDayOfMonth
                         | CicsOperandName::TimerDayOfYear
+                        | CicsOperandName::SignalFromLength
                         | CicsOperandName::Milliseconds
                         | CicsOperandName::Flength
                         | CicsOperandName::Flength64
@@ -1612,6 +1613,81 @@ mod tests {
         assert!(request.is_mutating());
         assert!(request.mutation.is_some());
         assert_eq!(request.arguments["FILE"].bytes(), b"ACCTDAT");
+    }
+
+    #[test]
+    fn selected_timer_and_signal_routes_emit_distinct_mutating_host_effects() {
+        for (plan, operation, operand, expected) in [
+            (
+                CicsEffectPlan {
+                    operation: CicsPlanOperation::DefineTimer,
+                    operands: vec![
+                        mainframe_env_ir::CicsNamedOperand {
+                            name: CicsOperandName::Timer,
+                            value: CicsOperandValue::Literal(b"CLOCK".to_vec()),
+                        },
+                        mainframe_env_ir::CicsNamedOperand {
+                            name: CicsOperandName::TimerSeconds,
+                            value: CicsOperandValue::Integer(5),
+                        },
+                    ],
+                    options: BTreeSet::from([CicsPlanOption::TimerAfter]),
+                    outputs: Vec::new(),
+                    condition: CicsCondition::Default,
+                },
+                CicsOperation::DefineTimer,
+                "TIMER",
+                b"CLOCK".as_slice(),
+            ),
+            (
+                CicsEffectPlan {
+                    operation: CicsPlanOperation::SignalEvent,
+                    operands: vec![mainframe_env_ir::CicsNamedOperand {
+                        name: CicsOperandName::Event,
+                        value: CicsOperandValue::Literal(b"ORDER:GO".to_vec()),
+                    }],
+                    options: BTreeSet::new(),
+                    outputs: Vec::new(),
+                    condition: CicsCondition::Default,
+                },
+                CicsOperation::SignalEvent,
+                "EVENT",
+                b"ORDER:GO".as_slice(),
+            ),
+        ] {
+            let descriptor = cics_executable_descriptor(plan.operation);
+            let module = module(
+                descriptor.identity(),
+                &plan,
+                descriptor.effects.to_vec(),
+                false,
+                false,
+                |bytes| bytes,
+            );
+            assert!(super::super::validate_module(&module).is_ok());
+            let bytes = mainframe_env_ir::encode_binary(&module, CodecLimits::default()).unwrap();
+            let mut machine = ReferenceMachine::from_binary(
+                &bytes,
+                super::super::tests::invocation(),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let selected = machine
+                .operations
+                .iter()
+                .find(|candidate| candidate.identity == descriptor.identity())
+                .unwrap()
+                .clone();
+            let Step::Effect(effect) = execute(&mut machine, &selected).unwrap() else {
+                panic!("selected event route must emit a host effect");
+            };
+            let HostRequest::Cics(request) = effect.request else {
+                panic!("selected event route must use CICS");
+            };
+            assert_eq!(request.operation, operation);
+            assert!(request.is_mutating() && request.mutation.is_some());
+            assert_eq!(request.arguments[operand].bytes(), expected);
+        }
     }
 
     #[test]

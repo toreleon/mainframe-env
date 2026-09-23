@@ -2463,6 +2463,7 @@ mod tests {
             CicsOperation::RetrieveReattachEvent,
             CicsOperation::RetrieveSubevent,
             CicsOperation::TestEvent,
+            CicsOperation::SignalEvent,
             CicsOperation::ReceiveMap,
             CicsOperation::Retrieve,
             CicsOperation::Return,

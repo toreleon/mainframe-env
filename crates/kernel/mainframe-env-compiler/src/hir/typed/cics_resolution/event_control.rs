@@ -1,8 +1,11 @@
 use super::super::{
-    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, Resolution, ResolutionFailure,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
+    ResolutionFailure,
 };
-use super::{Clauses, cics_integer_value, cics_value, shape::CommandShape};
-use crate::SemanticModel;
+use super::{
+    Clauses, cics_integer_value, cics_value, complete_data_reference, shape::CommandShape,
+};
+use crate::{DataCategory, SemanticModel};
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
     match operation {
@@ -81,6 +84,18 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             options: &["NOHANDLE"],
             required: &["EVENT", "FIRESTATUS"],
         }),
+        HirCicsOperation::SignalEvent => Some(CommandShape {
+            clauses: &[
+                "EVENT",
+                "FROM",
+                "FROMLENGTH",
+                "FROMCHANNEL",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["NOHANDLE"],
+            required: &["EVENT"],
+        }),
         _ => None,
     }
 }
@@ -138,6 +153,7 @@ pub(super) fn operands(
             | HirCicsOperation::RetrieveReattachEvent
             | HirCicsOperation::RetrieveSubevent
             | HirCicsOperation::TestEvent
+            | HirCicsOperation::SignalEvent
     ) {
         return Ok(Vec::new());
     }
@@ -183,6 +199,43 @@ pub(super) fn operands(
                     value: cics_integer_value(value, semantic)?,
                 });
             }
+        }
+    }
+    if operation == HirCicsOperation::SignalEvent {
+        if clauses.contains_key("FROM") && clauses.contains_key("FROMCHANNEL")
+            || clauses.contains_key("FROMLENGTH") && !clauses.contains_key("FROM")
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SIGNAL EVENT accepts FROM/FROMLENGTH or FROMCHANNEL".into(),
+            ));
+        }
+        if let Some(value) = clauses.get("FROM") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::SignalFrom,
+                value: HirCicsValue::Data(complete_data_reference(value, semantic)?),
+            });
+        }
+        if let Some(value) = clauses.get("FROMLENGTH") {
+            let resolved = cics_integer_value(value, semantic)?;
+            if let HirCicsValue::Data(reference) = &resolved
+                && (reference.category != DataCategory::Binary
+                    || reference.length != 4
+                    || reference.scale != 0)
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS SIGNAL EVENT FROMLENGTH requires fullword binary storage".into(),
+                ));
+            }
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::SignalFromLength,
+                value: resolved,
+            });
+        }
+        if let Some(value) = clauses.get("FROMCHANNEL") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::SignalFromChannel,
+                value: cics_value(value, semantic)?,
+            });
         }
     }
     if operation == HirCicsOperation::DefineCompositeEvent {

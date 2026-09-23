@@ -23,6 +23,7 @@ const MAX_CAS_ATTEMPTS: usize = 8;
 mod composite;
 mod delete;
 mod retrieve;
+mod state_validation;
 mod timer;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -31,6 +32,8 @@ pub(super) struct EventContext {
     pub(super) activity: String,
     pub(super) acquired_process: Option<String>,
     pub(super) acquired_activity: Option<String>,
+    #[serde(default)]
+    pub(super) local_utc_offset_minutes: i32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -111,10 +114,35 @@ impl CicsService {
         acquired_process: Option<&str>,
         acquired_activity: Option<&str>,
     ) -> Result<(), HostProblem> {
+        self.bind_event_activity_with_local_offset(
+            run_unit,
+            activity,
+            acquired_process,
+            acquired_activity,
+            0,
+        )
+    }
+
+    /// Bind the active BTS activity with its region local-time UTC offset.
+    ///
+    /// Absolute AT/ON timer values are interpreted in this region-local clock;
+    /// a zero offset is the UTC-region default used by `bind_event_activity`.
+    pub fn bind_event_activity_with_local_offset(
+        &self,
+        run_unit: &RunUnitId,
+        activity: &str,
+        acquired_process: Option<&str>,
+        acquired_activity: Option<&str>,
+        local_utc_offset_minutes: i32,
+    ) -> Result<(), HostProblem> {
+        if !(-840..=840).contains(&local_utc_offset_minutes) {
+            return Err(HostProblem::Malformed);
+        }
         let context = EventContext {
             activity: event_name(activity)?,
             acquired_process: acquired_process.map(event_name).transpose()?,
             acquired_activity: acquired_activity.map(event_name).transpose()?,
+            local_utc_offset_minutes,
         };
         if !self.lock()?.runs.contains_key(run_unit) {
             return Err(HostProblem::Unauthorized);
@@ -394,6 +422,7 @@ fn decode_context(payload: &[u8]) -> Result<EventContext, HostProblem> {
     let context: EventContext =
         serde_json::from_slice(payload).map_err(|_| HostProblem::InfrastructureFailure)?;
     if event_name(&context.activity)? != context.activity
+        || !(-840..=840).contains(&context.local_utc_offset_minutes)
         || context
             .acquired_process
             .as_deref()
@@ -463,37 +492,7 @@ pub(super) fn persist_activity(
 }
 
 fn validate_activity(state: &ActivityState) -> Result<(), HostProblem> {
-    if state.events.len() > MAX_EVENTS
-        || state.timers.len() > MAX_TIMERS
-        || state.reattach.len() > MAX_QUEUE
-        || state.replays.len() > MAX_REPLAYS
-    {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    for (name, event) in &state.events {
-        if event_name(name).ok().as_deref() != Some(name)
-            || event
-                .parent
-                .as_deref()
-                .is_some_and(|parent| event_name(parent).ok().as_deref() != Some(parent))
-        {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        match &event.kind {
-            EventKind::Composite {
-                children,
-                fired_queue,
-                ..
-            } if children.len() > MAX_EVENTS || fired_queue.len() > MAX_QUEUE => {
-                return Err(HostProblem::ResourceExhausted);
-            }
-            EventKind::Timer { timer } if !state.timers.contains_key(timer) => {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-            _ => {}
-        }
-    }
-    Ok(())
+    state_validation::validate(state)
 }
 
 pub(super) fn event_name(name: &str) -> Result<String, HostProblem> {

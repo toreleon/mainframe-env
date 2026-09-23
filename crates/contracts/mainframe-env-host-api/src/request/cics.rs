@@ -70,6 +70,8 @@ pub enum CicsOperation {
     RetrieveSubevent,
     /// BTS event retrieval or status command.
     TestEvent,
+    /// Emit matching business events from an application capture point.
+    SignalEvent,
     /// BTS timer state command.
     ForceTimer,
     /// Create one bounded transaction-owned document.
@@ -238,6 +240,7 @@ impl CicsOperation {
             Self::RetrieveReattachEvent => "RetrieveReattachEvent",
             Self::RetrieveSubevent => "RetrieveSubevent",
             Self::TestEvent => "TestEvent",
+            Self::SignalEvent => "SignalEvent",
             Self::ForceTimer => "ForceTimer",
             Self::DocumentCreate => "DocumentCreate",
             Self::DocumentDelete => "DocumentDelete",
@@ -351,6 +354,7 @@ impl CicsOperation {
                 | Self::RetrieveReattachEvent
                 | Self::RetrieveSubevent
                 | Self::TestEvent
+                | Self::SignalEvent
                 | Self::ForceTimer
                 | Self::DocumentCreate
                 | Self::DocumentDelete
@@ -511,6 +515,7 @@ impl CicsOperation {
             ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
             ("RETRIEVE", _) => Self::Retrieve,
             ("TEST", Some("EVENT")) => Self::TestEvent,
+            ("SIGNAL", Some("EVENT")) => Self::SignalEvent,
             ("RETURN", _) => Self::Return,
             ("RESETBR", _) => Self::ResetBrowse,
             ("REWRITE", _) => Self::Rewrite,

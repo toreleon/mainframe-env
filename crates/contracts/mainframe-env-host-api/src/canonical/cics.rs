@@ -38,6 +38,7 @@ impl Canonical for CicsOperation {
             Self::RetrieveReattachEvent => out.variant("CicsOperation", "RetrieveReattachEvent", 0),
             Self::RetrieveSubevent => out.variant("CicsOperation", "RetrieveSubevent", 0),
             Self::TestEvent => out.variant("CicsOperation", "TestEvent", 0),
+            Self::SignalEvent => out.variant("CicsOperation", "SignalEvent", 0),
             Self::ForceTimer => out.variant("CicsOperation", "ForceTimer", 0),
             Self::DocumentCreate => out.variant("CicsOperation", "DocumentCreate", 0),
             Self::DocumentDelete => out.variant("CicsOperation", "DocumentDelete", 0),
