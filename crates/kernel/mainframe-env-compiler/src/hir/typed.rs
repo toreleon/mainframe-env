@@ -208,6 +208,7 @@ pub enum HirCicsOperation {
     TransformDataToXml,
     TransformJsonToData,
     TransformXmlToData,
+    WaitJournalName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -307,6 +308,8 @@ pub enum HirCicsOperandName {
     TypeNameLength,
     TypeNamespace,
     TypeNamespaceLength,
+    JournalName,
+    JournalReqId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -6686,6 +6689,63 @@ mod tests {
                     .diagnostics
                     .iter()
                     .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+    #[test]
+    fn cics_wait_journalname_selects_the_typed_route_and_fullword_reqid() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITJNL. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQUEST-X PIC S9(9) COMP VALUE 7. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WAIT JOURNALNAME('ACCOUNTS') REQID(REQUEST-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WAIT JOURNALNAME: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WAIT JOURNALNAME");
+        assert_eq!(command.operation, HirCicsOperation::WaitJournalName);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::JournalName
+                && operand.value == HirCicsValue::Literal("ACCOUNTS".into())
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::JournalReqId
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "REQUEST-X"
+                )
+        }));
+
+        for (command, expected) in [
+            (
+                "WAIT JOURNALNAME('TOO-LONG9')",
+                "requires a 1- to 8-character journal name",
+            ),
+            (
+                "WAIT JOURNALNAME('ACCTS') REQID(BAD-REQID)",
+                "REQID requires fullword binary storage",
+            ),
+            (
+                "WAIT JOURNALNAME('ACCTS') REQID(7)",
+                "REQID requires fullword binary storage",
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADWAIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 BAD-REQID PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
                 "{command}: {:?}",
                 analysis.diagnostics
             );

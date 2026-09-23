@@ -78,6 +78,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::TransformDataToXml => 69,
         CicsPlanOperation::TransformJsonToData => 70,
         CicsPlanOperation::TransformXmlToData => 71,
+        CicsPlanOperation::WaitJournalName => 54,
     }
 }
 
@@ -143,6 +144,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         69 => Ok(CicsPlanOperation::TransformDataToXml),
         70 => Ok(CicsPlanOperation::TransformJsonToData),
         71 => Ok(CicsPlanOperation::TransformXmlToData),
+        54 => Ok(CicsPlanOperation::WaitJournalName),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -242,6 +244,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::TypeNameLength => 165,
         CicsOperandName::TypeNamespace => 166,
         CicsOperandName::TypeNamespaceLength => 167,
+        CicsOperandName::JournalName => 96,
+        CicsOperandName::JournalReqId => 97,
     }
 }
 
@@ -340,6 +344,8 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         165 => Ok(CicsOperandName::TypeNameLength),
         166 => Ok(CicsOperandName::TypeNamespace),
         167 => Ok(CicsOperandName::TypeNamespaceLength),
+        96 => Ok(CicsOperandName::JournalName),
+        97 => Ok(CicsOperandName::JournalReqId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -509,7 +515,10 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),
-        96..=u8::MAX => value
+        // Reserved non-ASSIGN journal outputs must remain ahead of the
+        // open-ended ASSIGN extension decoder.
+        201..=207 => Err(CicsPlanCodecProblem::Malformed),
+        96..=200 | 208..=u8::MAX => value
             .checked_sub(ASSIGN_OUTPUT_EXTENSION_TAG_BASE)
             .and_then(|tag| tag.checked_add(ASSIGN_OUTPUT_LEGACY_COUNT))
             .and_then(CicsAssignOutput::from_tag)

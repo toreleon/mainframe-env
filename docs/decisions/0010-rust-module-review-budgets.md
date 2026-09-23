@@ -91,10 +91,22 @@ and `service.rs` set must live in one of those two layers. The pre-adoption
 `retention.rs` module is a provider-lifecycle codec and dependency boundary,
 not a command-description or command-semantics family. Descriptor modules have
 a readable catalog/schema authority and contain no handwritten behavior. The
-task, time, program, terminal, file, queue, and recovery handler modules contain
+task, time, program, terminal, file, queue, recovery, interval, storage, and
+journal handler modules contain
 reviewed semantics, are never generated, and remain subject to the 1,200-line
 hard limit. This establishes the layout before CIC-901 adds broad families
 rather than promising a later cleanup.
+
+### Amendment: journal-control family (2026-09-23)
+
+The reviewed CICS handler inventory now includes
+`handlers/journal_control.rs`. It owns one bounded durable named-journal
+authority for WAIT/WRITE command slices; it does not add a crate, provider,
+dispatch bypass, condition authority, or second state owner. The readable
+typed-execution registration declares `journal-control`, the descriptor
+generator emits its route, and `module-budgets.json` admits the module under the unchanged
+1,200-production-line limit. This amendment is limited to that family boundary
+and does not authorize rows that remain unready.
 
 ## Consequences
 

@@ -105,6 +105,8 @@ pub enum CicsOperation {
     TransformJsonToData,
     /// Query XML metadata or convert an XML container to application data.
     TransformXmlToData,
+    /// Synchronize this task with output for one named journal.
+    WaitJournalName,
     Write,
     WriteTransientData,
     Xctl,
@@ -174,6 +176,7 @@ impl CicsOperation {
             Self::TransformDataToXml => "TransformDataToXml",
             Self::TransformJsonToData => "TransformJsonToData",
             Self::TransformXmlToData => "TransformXmlToData",
+            Self::WaitJournalName => "WaitJournalName",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -302,6 +305,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,
             ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
             ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
+            ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:8d020bca70dcdca92a1039b74099794b901e4e3c154980d3e86dcfdcec929188",
+      "sha256": "sha256:80488e11ac18e90ec3dc82068676008221d19e3c49e1a18c512563afa3b30e57",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:95cb60125369615ff75c07c9e622a6519d3492ad4b10e96e818db964aeec6906",
+      "sha256": "sha256:84959f3848524fc787bb120b5b8e6add8f271e358b347a3b876fa4debd6bee3a",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:ea65b4e2650b273bfcc0bbe79a05ddc236e802beb13911aa0bc0aa94e8e39ea2",
+      "sha256": "sha256:1ace3e36133ce13bfc35bb46f8a44149ca65e5e740338f534417e76016ebe63d",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -701,7 +701,7 @@
       "path": "docs/decisions/0010-rust-module-review-budgets.md",
       "relative_links": 1,
       "scope": "Rust production-module size, crate facades, generated sources, and CICS family growth",
-      "sha256": "sha256:c8387c5f638bd0454095d669f6ebc3cc8464e70733b27605d67051c4082c6a5d",
+      "sha256": "sha256:27a5c37fa1c6758e5c46ff2283df9f3fc0f1209e46eb32c7e3dfb44a4921e4c4",
       "status": "Accepted by repository owner",
       "title": "ADR-0010: Enforce Rust module review budgets and stable split boundaries",
       "xtask_commands": 1
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:1bb98e5335744a14c969912914c8fd177fe9b5a3cffa0456a3ba90c3d96e6eaf",
+      "sha256": "sha256:68a8fc24954948dcb9633a7c83f89e73a4c4e050c672008fe8979345539d8647",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

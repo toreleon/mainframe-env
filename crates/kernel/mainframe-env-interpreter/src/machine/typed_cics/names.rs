@@ -38,7 +38,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::ElementNameLength
         | CicsOperandName::ElementNamespaceLength
         | CicsOperandName::TypeNameLength
-        | CicsOperandName::TypeNamespaceLength => SlotUse::FullwordInput,
+        | CicsOperandName::TypeNamespaceLength
+        | CicsOperandName::JournalReqId => SlotUse::FullwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataArea => SlotUse::Input,
         CicsOperandName::EventControlAddress => SlotUse::PointerInput,
@@ -163,6 +164,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::TransformDataToXml => CicsOperation::TransformDataToXml,
         CicsPlanOperation::TransformJsonToData => CicsOperation::TransformJsonToData,
         CicsPlanOperation::TransformXmlToData => CicsOperation::TransformXmlToData,
+        CicsPlanOperation::WaitJournalName => CicsOperation::WaitJournalName,
     }
 }
 
@@ -261,6 +263,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::TypeNameLength => "TYPENAMELEN",
         CicsOperandName::TypeNamespace => "TYPENS",
         CicsOperandName::TypeNamespaceLength => "TYPENSLEN",
+        CicsOperandName::JournalName => "JOURNALNAME",
+        CicsOperandName::JournalReqId => "REQID",
     }
 }
 

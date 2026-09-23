@@ -13,6 +13,7 @@ mod file_mutation;
 mod handle_abend;
 mod identities;
 mod interval_control;
+mod journal_control;
 mod option_shape;
 mod output_shape;
 mod program_control;
@@ -605,6 +606,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WaitEvent => task_wait::invalid_wait_event_shape(plan, inputs, outputs),
         CicsPlanOperation::WaitExternal => {
             task_wait::invalid_wait_external_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::WaitJournalName => {
+            journal_control::invalid_wait_journal_name_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Assign => {
             !inputs.is_empty()
@@ -1779,6 +1783,87 @@ mod tests {
             encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn journal_tag_envelopes_remain_disjoint_from_existing_identities() {
+        let operations = crate::CICS_EXECUTABLE_DESCRIPTORS
+            .iter()
+            .map(|descriptor| descriptor.operation)
+            .collect::<BTreeSet<_>>();
+        let tags = operations
+            .iter()
+            .copied()
+            .map(operation_tag)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(tags.len(), operations.len());
+        assert_eq!(operation_tag(CicsPlanOperation::WaitJournalName), 54);
+        for tag in 55..=57 {
+            assert_eq!(
+                operation_from_tag(tag),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+        assert_eq!(operand_tag(CicsOperandName::JournalName), 96);
+        assert_eq!(operand_tag(CicsOperandName::JournalReqId), 97);
+        for tag in 98..=111 {
+            assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 60..=71 {
+            assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 201..=207 {
+            assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+    }
+
+    #[test]
+    fn wait_journal_name_plan_round_trips_only_the_bounded_shape() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WaitJournalName,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::JournalName,
+                    value: CicsOperandValue::Literal(b"ACCOUNTS".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::JournalReqId,
+                    value: CicsOperandValue::Storage(slot(54, "WAIT.REQID")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        for malformed in [
+            CicsNamedOperand {
+                name: CicsOperandName::JournalName,
+                value: CicsOperandValue::Literal(Vec::new()),
+            },
+            CicsNamedOperand {
+                name: CicsOperandName::JournalName,
+                value: CicsOperandValue::Literal(b"TOO-LONG9".to_vec()),
+            },
+            CicsNamedOperand {
+                name: CicsOperandName::JournalReqId,
+                value: CicsOperandValue::Integer(7),
+            },
+        ] {
+            let mut invalid = plan.clone();
+            invalid
+                .operands
+                .retain(|operand| operand.name != malformed.name);
+            invalid.operands.push(malformed);
+            assert_eq!(
+                encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
     }
 
     #[test]

@@ -123,6 +123,8 @@ pub enum CicsPlanOperation {
     TransformJsonToData,
     /// Query XML metadata or convert XML to BIT-mode application data.
     TransformXmlToData,
+    /// Synchronize the issuing task with one named journal output request.
+    WaitJournalName,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -309,6 +311,10 @@ pub enum CicsOperandName {
     TypeNameLength,
     /// Type-namespace buffer length.
     TypeNamespaceLength,
+    /// `JOURNALNAME(...)` named journal identity.
+    JournalName,
+    /// `REQID(...)` fullword token in the journal-control identity domain.
+    JournalReqId,
 }
 
 /// Flag option accepted by the typed CICS pilot.

@@ -89,7 +89,10 @@ EXPECTED_FAMILIES = {
     "storage-control": "StorageControl",
     "transform-control": "TransformControl",
 }
-TYPED_EXECUTION_FAMILIES = {"document-control": "DocumentControl"}
+TYPED_EXECUTION_FAMILIES = {
+    "document-control": "DocumentControl",
+    "journal-control": "JournalControl",
+}
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
     ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
@@ -256,6 +259,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         "transform-control",
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0224",
+    ),
+    (
+        "WaitJournalName",
+        "api",
+        "journal-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0235",
     ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
@@ -537,6 +547,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "TransformDataToXml",
         "TransformJsonToData",
         "TransformXmlToData",
+        "WaitJournalName",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -674,6 +685,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "ReadTransientData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WaitJournalName": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "EndBrowse": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -999,6 +1013,7 @@ def _load_typed_execution_registrations(
         "TransformXmlToData",
         "WaitEvent",
         "WaitExternal",
+        "WaitJournalName",
         "WriteTemporaryStorage",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -1255,6 +1270,7 @@ def load_catalog(
     if interface_counts != {"api": 23, "spi-compatibility": 2}:
         raise DescriptorError(f"CICS runtime interface split drifted: {interface_counts}")
     if include_runtime_admission:
+        families = {**families, **TYPED_EXECUTION_FAMILIES}
         normalized_operations.extend(
             _load_typed_execution_registrations(
                 root, normalized_commands, families, normalized_operations
@@ -1322,6 +1338,7 @@ def load_catalog(
                 "Suspend",
                 "WaitEvent",
                 "WaitExternal",
+                "WaitJournalName",
             }
         ]
     )

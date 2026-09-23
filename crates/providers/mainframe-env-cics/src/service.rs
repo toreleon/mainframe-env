@@ -84,7 +84,6 @@ impl Default for CicsLimits {
         }
     }
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsFileDefinition {
     pub dataset: DatasetName,
@@ -114,7 +113,6 @@ pub enum CicsFileStatus {
     /// The file is disabled; this is distinct from the CLOSED + UNENABLED state.
     Disabled,
 }
-
 pub(crate) struct CicsEffectReplay {
     pub(crate) effect_key: Option<String>,
     pub(crate) owner_execution: Option<String>,
@@ -275,6 +273,7 @@ struct State {
     transform_resources: BTreeMap<(CicsTransformFormat, String), handlers::CicsTransformDefinition>,
     transform_containers: BTreeMap<(String, String), handlers::TransformContainer>,
     transform_bytes: usize,
+    journals: BTreeMap<String, handlers::JournalRecord>,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
@@ -434,7 +433,7 @@ impl CicsService {
             handlers::load_transform_containers(store.as_ref(), limits)?;
         Ok(Arc::new(Self {
             host,
-            store,
+            store: Arc::clone(&store),
             limits,
             replay_clock,
             work_store,
@@ -459,6 +458,7 @@ impl CicsService {
                 transform_resources,
                 transform_containers,
                 transform_bytes,
+                journals: handlers::load_journals(store.as_ref(), limits)?,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 62);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 63);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -1748,8 +1748,8 @@ impl CicsService {
             CicsCommandFamily::DocumentControl => {
                 handlers::invoke_document_control(self, run, &request, retention_tick)
             }
-            CicsCommandFamily::TransformControl => {
-                handlers::invoke_transform_control(self, run, &request)
+            CicsCommandFamily::TransformControl | CicsCommandFamily::JournalControl => {
+                handlers::invoke_extended_control(self, run, &request, descriptor.family)
             }
         }
         .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
@@ -3865,6 +3865,7 @@ mod tests {
         descriptor: CapabilityDescriptor,
         deny_command: bool,
         deny_transform: bool,
+        deny_journal: bool,
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
         seen: CommandSecurityTrace,
@@ -4000,6 +4001,7 @@ mod tests {
                     Ok(HostResult::Security(
                         if self.deny_command && class == "FACILITY"
                             || self.deny_transform && class == "TRANSFORM"
+                            || self.deny_journal && class == "JOURNAL"
                             || self.deny_surrogate && class == "SURROGAT"
                         {
                             SecurityDecision::Deny
@@ -4294,6 +4296,7 @@ mod tests {
             descriptor: descriptor("host.security.authorize"),
             deny_command,
             deny_transform: false,
+            deny_journal: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
@@ -4317,6 +4320,29 @@ mod tests {
             descriptor: descriptor("host.security.authorize"),
             deny_command: false,
             deny_transform,
+            deny_journal: false,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
+    }
+
+    fn journal_authorities(deny_journal: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command: false,
+            deny_transform: false,
+            deny_journal,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
@@ -4340,6 +4366,7 @@ mod tests {
             descriptor: descriptor("host.security.authorize"),
             deny_command,
             deny_transform: false,
+            deny_journal: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: Arc::new(Mutex::new(Vec::new())),
@@ -4367,6 +4394,7 @@ mod tests {
                 descriptor: descriptor("host.security.authorize"),
                 deny_command: false,
                 deny_transform: false,
+                deny_journal: false,
                 deny_surrogate,
                 principal_decision,
                 seen: seen.clone(),
@@ -5205,6 +5233,7 @@ mod tests {
             ("TRANSFORM DATATOXML", CicsOperation::TransformDataToXml),
             ("TRANSFORM JSONTODATA", CicsOperation::TransformJsonToData),
             ("TRANSFORM XMLTODATA", CicsOperation::TransformXmlToData),
+            ("WAIT JOURNALNAME('ACCTS')", CicsOperation::WaitJournalName),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6436,7 +6465,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 62);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 63);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8881,6 +8910,257 @@ mod tests {
                     AccessIntent::Update,
                 )
         }));
+    }
+
+    #[test]
+    fn wait_journalname_enforces_saf_conditions_and_current_buffer_scope() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = journal_authorities(false);
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (issuer, _) = registered(&service);
+        service
+            .register_journals(&BTreeSet::from(["ACCOUNTS".into(), "EMPTY".into()]))
+            .unwrap();
+        service
+            .seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 7, "hardened")
+            .unwrap();
+
+        let wait = |name: &str, request_id: Option<i64>| {
+            let mut arguments = BTreeMap::from([
+                ("JOURNALNAME".into(), cics_literal(name.as_bytes())),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]);
+            if let Some(request_id) = request_id {
+                arguments.insert("REQID".into(), cics_decimal(request_id));
+            }
+            let mut request = request(CicsOperation::WaitJournalName, arguments, 1);
+            request.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            request
+        };
+
+        let completed = wait("ACCOUNTS", Some(7));
+        let response = service
+            .invoke(
+                &effect(&issuer.run_unit_id, completed.clone(), 1),
+                completed,
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!((response.response, response.response2), (0, 0));
+        service
+            .seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 0, "hardened")
+            .unwrap();
+        let zero_token = wait("ACCOUNTS", Some(0));
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&issuer.run_unit_id, zero_token.clone(), 1),
+                    zero_token,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+
+        let other = RunUnitId::new("another-task", InvocationLimits::default()).unwrap();
+        service
+            .seed_journal_output("ACCOUNTS", &other, 8, "pending")
+            .unwrap();
+        let current_buffer = wait("ACCOUNTS", None);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&issuer.run_unit_id, current_buffer.clone(), 2),
+                    current_buffer,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended,
+            "a journal-wide current-buffer wait is not scoped to the writer task"
+        );
+        let wrong_owner = wait("ACCOUNTS", Some(8));
+        let response = service
+            .invoke(
+                &effect(&issuer.run_unit_id, wrong_owner.clone(), 3),
+                wrong_owner,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("JIDERR", 43)
+        );
+
+        for (name, expected) in [("UNKNOWN", ("JIDERR", 43)), ("EMPTY", ("NOTOPEN", 19))] {
+            let request = wait(name, None);
+            let response = service
+                .invoke(&effect(&issuer.run_unit_id, request.clone(), 4), request)
+                .unwrap();
+            assert_eq!((response.condition.as_str(), response.response), expected);
+        }
+        service
+            .seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 9, "io-error")
+            .unwrap();
+        let io_error = wait("ACCOUNTS", Some(9));
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, io_error.clone(), 5), io_error)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("IOERR", 17)
+        );
+        service
+            .set_journal_availability("ACCOUNTS", "disabled")
+            .unwrap();
+        let disabled = wait("ACCOUNTS", None);
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, disabled.clone(), 6), disabled)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NOTOPEN", 19)
+        );
+
+        assert!(seen.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "JOURNAL".into(),
+                    "CICS.JOURNAL.ACCOUNTS".into(),
+                    AccessIntent::Read,
+                )
+        }));
+        assert!(
+            !store
+                .audit_records(&issuer.execution_id, 0, 64)
+                .unwrap()
+                .is_empty()
+        );
+
+        let (denied_host, denied_seen) = journal_authorities(true);
+        let denied_store = Arc::new(MemoryStore::new(Default::default()));
+        let denied = CicsService::open(denied_host, denied_store, CicsLimits::default()).unwrap();
+        let (denied_invocation, _) = registered(&denied);
+        let request = wait("ACCOUNTS", None);
+        let response = denied
+            .invoke(
+                &effect(&denied_invocation.run_unit_id, request.clone(), 1),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NOTAUTH", 70)
+        );
+        assert!(
+            denied_seen
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|entry| entry.0 == "JOURNAL")
+        );
+    }
+
+    #[test]
+    fn wait_journalname_pending_and_completion_survive_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-journal-wait-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let issuer = invocation_for("journal-reopen", BTreeMap::new());
+        let session = SessionId::new("journal-reopen-session", 64).unwrap();
+        let make_wait = || {
+            request(
+                CicsOperation::WaitJournalName,
+                BTreeMap::from([
+                    ("JOURNALNAME".into(), cics_literal(b"ACCOUNTS")),
+                    ("REQID".into(), cics_decimal(17)),
+                ]),
+                1,
+            )
+        };
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(issuer.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            service
+                .register_journals(&BTreeSet::from(["ACCOUNTS".into()]))
+                .unwrap();
+            service
+                .seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 17, "pending")
+                .unwrap();
+            let wait = make_wait();
+            assert_eq!(
+                service
+                    .invoke(&effect(&issuer.run_unit_id, wait.clone(), 1), wait)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
+            service
+                .register_run(issuer.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let wait = make_wait();
+            assert_eq!(
+                service
+                    .invoke(&effect(&issuer.run_unit_id, wait.clone(), 1), wait)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+            service
+                .seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 17, "hardened")
+                .unwrap();
+            let completed = make_wait();
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&issuer.run_unit_id, completed.clone(), 2),
+                        completed,
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn journal_live_and_reopen_output_bounds_are_identical() {
+        let limits = CicsLimits {
+            max_queue_records: 1,
+            ..CicsLimits::default()
+        };
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(authorities(), store.clone(), limits).unwrap();
+        let (issuer, _) = registered(&service);
+        service
+            .register_journals(&BTreeSet::from(["ACCOUNTS".into()]))
+            .unwrap();
+        service
+            .seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 1, "pending")
+            .unwrap();
+        assert_eq!(
+            service.seed_journal_output("ACCOUNTS", &issuer.run_unit_id, 2, "pending"),
+            Err(HostProblem::ResourceExhausted)
+        );
+        drop(service);
+        assert!(CicsService::open(authorities(), store, limits).is_ok());
     }
 
     #[test]

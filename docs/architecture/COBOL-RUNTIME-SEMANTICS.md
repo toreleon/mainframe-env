@@ -322,6 +322,14 @@ mode and UNESCAPED keeps value bytes literal. The provider applies
 case-sensitive symbol updates to the transaction-owned document with a
 versioned document-plus-replay write. Existing inserted segments are not
 rewritten when a symbol definition changes.
+Typed WAIT JOURNALNAME accepts one 1–8 character named journal and an optional
+fullword-binary REQID. The explicit token is task-owned; without it, the command
+synchronizes the journal's current buffer even when another task created the
+latest record. Completed output returns immediately, pending output suspends
+and reissues the same typed statement under the execution deadline and
+cancellation fence, and the durable provider authority maps IOERR, JIDERR,
+NOTOPEN, and SAF denial to exact EIB response codes. The authority survives a
+SQLite reopen without turning this non-mutating wait into a replayed mutation.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

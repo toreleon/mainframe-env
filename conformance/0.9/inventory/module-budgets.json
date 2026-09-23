@@ -300,6 +300,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/delay.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/protect.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/retrieve.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/journal_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",

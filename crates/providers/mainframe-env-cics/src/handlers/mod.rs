@@ -6,6 +6,7 @@ mod handle_state;
 mod host_boundary;
 mod interval;
 mod interval_control;
+mod journal_control;
 mod program_control;
 mod queue_control;
 mod recovery;
@@ -23,7 +24,7 @@ mod transform_control;
 pub(in crate::service) mod transient_data;
 
 use super::{CicsService, Run};
-use mainframe_env_host_api::{CicsRequest, HostProblem};
+use mainframe_env_host_api::{CicsRequest, CicsResponse, HostProblem};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
 
@@ -81,6 +82,7 @@ pub(super) use interval_control::IntervalStartState;
 pub(super) use interval_control::load as load_interval_records;
 pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
+pub(super) use journal_control::{JournalRecord, load as load_journals};
 pub(super) use program_control::invoke as invoke_program_control;
 pub use program_control::{CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition};
 pub(super) use program_control::{
@@ -106,7 +108,23 @@ pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
-pub(super) use transform_control::invoke as invoke_transform_control;
+pub(super) fn invoke_extended_control(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    family: crate::generated::CicsCommandFamily,
+) -> Result<CicsResponse, HostProblem> {
+    match family {
+        crate::generated::CicsCommandFamily::TransformControl => {
+            transform_control::invoke(service, run, request)
+        }
+        crate::generated::CicsCommandFamily::JournalControl => {
+            journal_control::invoke(service, run, request)
+        }
+        _ => unreachable!("only extended control families delegate here"),
+    }
+}
+
 #[allow(unused_imports)]
 pub use transform_control::{
     CicsTransformContainerMode, CicsTransformDefinition, CicsTransformFieldDefinition,

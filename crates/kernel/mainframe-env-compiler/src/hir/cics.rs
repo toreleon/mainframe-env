@@ -275,6 +275,8 @@ impl PlanContext<'_> {
                 HirCicsOperandName::TypeName => CicsOperandName::TypeName,
                 HirCicsOperandName::TypeNamespace => CicsOperandName::TypeNamespace,
                 HirCicsOperandName::TypeNamespaceLength => CicsOperandName::TypeNamespaceLength,
+                HirCicsOperandName::JournalName => CicsOperandName::JournalName,
+                HirCicsOperandName::JournalReqId => CicsOperandName::JournalReqId,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -430,6 +432,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::TransformDataToXml => CicsPlanOperation::TransformDataToXml,
         HirCicsOperation::TransformJsonToData => CicsPlanOperation::TransformJsonToData,
         HirCicsOperation::TransformXmlToData => CicsPlanOperation::TransformXmlToData,
+        HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
     }
 }
 

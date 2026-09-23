@@ -283,6 +283,18 @@ the shared token, symbol, value, list, delimiter and length operands. It
 replaces case-sensitive symbol definitions atomically with the effect replay;
 previously inserted bytes retain their materialized values. The unused
 operand, option and output tags in the reserved ranges remain unassigned.
+Typed `WAIT JOURNALNAME` uses the journal-control family and a single durable
+`cics-journal-v1` authority shared with the later journal writes. A literal or
+storage-backed name is normalized to 1–8 uppercase alphanumeric, `$`, `@`, or
+`#` characters and authorized as `JOURNAL/CICS.JOURNAL.<name>`. An explicit
+fullword `REQID` selects only a token created by the issuing task; omission
+waits on the named journal's current buffer without inheriting the writer's
+task ownership. Hardened output returns immediately, pending output suspends
+and reissues through the coordinator (therefore retaining its cancellation and
+deadline fence), and durable I/O, unknown-journal, and unavailable states map
+to IOERR 17, JIDERR 43, and NOTOPEN 19. Denial maps to NOTAUTH 70. The bounded
+authority and completion state survive SQLite reopen; WAIT itself is
+non-mutating and therefore creates no independent mutation replay ledger.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
@@ -430,8 +442,9 @@ differentials, or make 0.9.0 release-ready.
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 | `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
 | `storage-control` | bounded task-local virtual storage allocation and release |
+| `journal-control` | durable named-journal output state and task synchronization |
 
-This table describes the nine families already present in the 43-operation runtime
+This table describes the ten families present in the 47-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

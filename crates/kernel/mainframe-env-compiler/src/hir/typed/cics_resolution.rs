@@ -18,11 +18,13 @@ mod abend;
 mod address;
 mod assign_validation;
 mod clause_parser;
+mod command_recognition;
 mod document_control;
 mod file_operands;
 mod format_time;
 mod handle_abend;
 mod interval_control;
+mod journal_control;
 mod legacy_compatibility;
 mod numeric_value;
 mod operation;
@@ -70,7 +72,8 @@ pub(super) fn validated_command(
     let mut valid = BTreeMap::<&'static str, ValidatedCandidate>::new();
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {
-        let tokens = clause_tokens(body, candidate.head_tokens, candidate.descriptor);
+        let tokens =
+            command_recognition::clause_tokens(body, candidate.head_tokens, candidate.descriptor);
         let (clauses, options) = match clauses(&tokens, Some(candidate.descriptor)) {
             Ok(parsed) => parsed,
             Err(ResolutionFailure::Invalid(detail)) => {
@@ -173,23 +176,6 @@ fn keep_best_failure(best: &mut Option<CandidateFailure>, candidate: CandidateFa
     {
         *best = Some(candidate);
     }
-}
-
-fn clause_tokens(
-    body: &[String],
-    head: &[&str],
-    descriptor: &CicsApplicationRegistryDescriptor,
-) -> Vec<String> {
-    let remainder = &body[head.len()..];
-    let mut tokens = Vec::with_capacity(remainder.len() + 1);
-    if remainder.first().is_some_and(|token| token == "(")
-        && let Some(last) = head.last()
-        && descriptor.options.iter().any(|option| option.name == *last)
-    {
-        tokens.push((*last).into());
-    }
-    tokens.extend_from_slice(remainder);
-    tokens
 }
 
 fn validate_candidate(
@@ -725,6 +711,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Retrieve => &[
             "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
         ],
+        HirCicsOperation::WaitJournalName => journal_control::allowed_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -793,6 +780,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Read => &["EQUAL", "GENERIC", "GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
+        HirCicsOperation::WaitJournalName => journal_control::allowed_options(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -897,6 +885,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
         HirCicsOperation::Syncpoint => &[][..],
+        HirCicsOperation::WaitJournalName => journal_control::required_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -1019,6 +1008,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
+    operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {

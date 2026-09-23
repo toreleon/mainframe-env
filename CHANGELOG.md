@@ -87,6 +87,15 @@ All notable changes to mainframe-env are documented here.
   canonical JSON, named channel containers persist in BIT/CHAR modes, SAF
   protects the transformer, exact source conditions are retained, and an
   atomic transform ledger makes output replacement replay-safe across reopen.
+- Added typed CICS `WAIT JOURNALNAME` through the new generated
+  `journal-control` family and one durable authority shared with the remaining
+  journal commands. Explicit fullword REQID tokens are task-owned; omission
+  synchronizes the journal-wide current buffer. Hardened output completes
+  immediately, pending output suspends/reissues under coordinator
+  cancellation/deadline control, and IOERR 17, JIDERR 43, NOTOPEN 19, and
+  NOTAUTH 70 are preserved with SAF/audit and SQLite reopen coverage. Operation
+  tag 54 and operand tags 96–97 are append-only; the remaining journal tag
+  envelopes stay reserved and collision-tested.
 
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal
