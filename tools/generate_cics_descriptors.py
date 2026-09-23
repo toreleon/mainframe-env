@@ -1183,6 +1183,7 @@ def load_catalog(
                 "Getmain",
                 "HandleAid",
                 "IgnoreCondition",
+                "InvokeApplication",
                 "Load",
                 "PopHandle",
                 "PurgeMessage",

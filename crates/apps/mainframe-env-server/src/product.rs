@@ -14919,17 +14919,84 @@ mod tests {
         else {
             panic!("INVOKE APPLICATION fixture did not publish");
         };
+        let child_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. APPCHLD.\nDATA DIVISION.\nLINKAGE SECTION.\n01 CHILD-AREA PIC X(160).\nPROCEDURE DIVISION USING CHILD-AREA.\nMOVE 'CHILD' TO CHILD-AREA.\nGOBACK.\n";
+        let child_path = LogicalPath::new("APPCHLD.cbl", limits.max_path_bytes).unwrap();
+        let child_bundle = SourceBundle::new(
+            &child_path,
+            vec![
+                SourceFile::input(
+                    "APPCHLD.cbl",
+                    child_source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published {
+            artifact: child_artifact,
+            ..
+        } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: child_bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("INVOKE APPLICATION child fixture did not publish");
+        };
+        let latest_source = std::str::from_utf8(child_source)
+            .unwrap()
+            .replace("MOVE 'CHILD'", "MOVE 'LATEST'");
+        let latest_bundle = SourceBundle::new(
+            &child_path,
+            vec![
+                SourceFile::input(
+                    "APPCHLD.cbl",
+                    latest_source.into_bytes(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published {
+            artifact: latest_artifact,
+            ..
+        } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: latest_bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("INVOKE APPLICATION latest fixture did not publish");
+        };
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
         server
             .racf
-            .define_profile("FACILITY", "CICS.PROGRAM.IEFBR14", "IBMUSER", None)
+            .define_profile("FACILITY", "CICS.PROGRAM.APPCHLD", "IBMUSER", None)
             .unwrap();
         server
             .racf
             .permit(
                 "FACILITY",
-                "CICS.PROGRAM.IEFBR14",
+                "CICS.PROGRAM.APPCHLD",
                 "IBMUSER",
                 AccessIntent::Execute,
             )
@@ -14939,15 +15006,34 @@ mod tests {
             InvocationLimits::default(),
         )
         .unwrap();
+        let child_artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(child_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let latest_artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(latest_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
-                programs: vec![OnlineProgramDefinition {
-                    name: "APPINVOK".into(),
-                    artifact: artifact_ref.clone(),
-                    payload: artifact.payload().to_vec(),
-                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
-                    semantic_identity: artifact.semantic_id().to_reference(),
-                }],
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "APPINVOK".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "APPCHLD".into(),
+                        artifact: child_artifact_ref.clone(),
+                        payload: child_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(child_artifact.manifest().clone()),
+                        semantic_identity: child_artifact.semantic_id().to_reference(),
+                    },
+                ],
                 transactions: BTreeMap::from([("IV00".into(), "APPINVOK".into())]),
                 maps: vec![BmsMapDefinition {
                     mapset: "APPINVK".into(),
@@ -14961,18 +15047,54 @@ mod tests {
             })
             .unwrap();
         server
+            .artifacts
+            .put_artifact(
+                crate::cobol::artifact::published_artifact_record(&latest_artifact).unwrap(),
+            )
+            .unwrap();
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "online-program".into(),
+                    key: "APPCHLD".into(),
+                    version: 2,
+                    payload: latest_artifact_ref.as_str().as_bytes().to_vec(),
+                },
+                Some(1),
+            )
+            .unwrap();
+        server
+            .online_programs
+            .lock()
+            .unwrap()
+            .insert("APPCHLD".into(), latest_artifact_ref.clone());
+        server
             .cics
-            .register_program_definitions(&[CicsProgramDefinition {
-                name: "IEFBR14".into(),
-                generation: 1,
-                artifact: artifact_ref.clone(),
-                semantic_identity: artifact.semantic_id().to_reference(),
-                entry_offset: 0,
-                enabled: true,
-                remote: false,
-                reload: false,
-                java_status: CicsJavaStatus::NotJava,
-            }])
+            .register_program_definitions(&[
+                CicsProgramDefinition {
+                    name: "APPCHLD".into(),
+                    generation: 1,
+                    artifact: child_artifact_ref.clone(),
+                    semantic_identity: child_artifact.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                },
+                CicsProgramDefinition {
+                    name: "APPCHLD".into(),
+                    generation: 2,
+                    artifact: latest_artifact_ref,
+                    semantic_identity: latest_artifact.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                },
+            ])
             .unwrap();
         server
             .cics
@@ -14983,9 +15105,9 @@ mod tests {
                 minor_version: 0,
                 micro_version: 0,
                 operation: "RUN".into(),
-                program: "IEFBR14".into(),
+                program: "APPCHLD".into(),
                 program_generation: 1,
-                program_artifact: artifact_ref.clone(),
+                program_artifact: child_artifact_ref.clone(),
                 application_identity: format!(
                     "sha256:{:x}",
                     Sha256::digest(b"PAYMENTS-BANKING-1.0.0")
@@ -15044,7 +15166,7 @@ mod tests {
                 .variable("INVOKE-AREA")
                 .unwrap()
                 .bytes()
-                .starts_with(b"{\"return_code\":0")
+                .starts_with(b"CHILD")
         );
         assert_eq!(
             server

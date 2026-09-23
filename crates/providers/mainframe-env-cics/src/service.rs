@@ -3859,6 +3859,7 @@ mod tests {
     }
 
     type CommandSecurityTrace = Arc<Mutex<Vec<(String, String, AccessIntent)>>>;
+    type ProgramLinkTrace = Arc<Mutex<Vec<ProgramRequest>>>;
 
     struct CommandSecurityAuthority {
         descriptor: CapabilityDescriptor,
@@ -3866,6 +3867,11 @@ mod tests {
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
         seen: CommandSecurityTrace,
+    }
+
+    struct TracedProgramAuthority {
+        descriptor: CapabilityDescriptor,
+        seen: ProgramLinkTrace,
     }
 
     #[derive(Default)]
@@ -4002,6 +4008,26 @@ mod tests {
                 }
                 HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
                     Ok(HostResult::Security(self.principal_decision.clone()))
+                }
+                _ => Err(HostProblem::Unsupported),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
+    impl HostProvider for TracedProgramAuthority {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Program(request @ ProgramRequest::Link { .. }) => {
+                    self.seen.lock().unwrap().push(request);
+                    Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -4278,6 +4304,30 @@ mod tests {
             )),
             seen,
         )
+    }
+
+    fn invoke_authorities(
+        deny_command: bool,
+        program_links: ProgramLinkTrace,
+    ) -> Arc<ScopedHostService> {
+        let security = Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen: Arc::new(Mutex::new(Vec::new())),
+        }) as Arc<dyn HostProvider>;
+        let programs = Arc::new(TracedProgramAuthority {
+            descriptor: descriptor("host.program.invoke"),
+            seen: program_links,
+        }) as Arc<dyn HostProvider>;
+        Arc::new(ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![security, programs], InvocationLimits::default())
+                    .unwrap(),
+            ),
+            HostLimits::default(),
+        ))
     }
 
     fn start_authorities(
@@ -5004,16 +5054,22 @@ mod tests {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let artifact_store: Arc<dyn ArtifactStore> = store.clone();
-        let cics = service(provider_store.clone());
+        let program_links = Arc::new(Mutex::new(Vec::new()));
+        let cics = CicsService::open(
+            invoke_authorities(false, program_links.clone()),
+            provider_store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
         cics.bind_artifact_store(artifact_store.clone()).unwrap();
         let (first_artifact, first_semantic) = install_program_artifact(store.as_ref(), b"FIRST");
         let (second_artifact, second_semantic) =
             install_program_artifact(store.as_ref(), b"SECOND");
         let (major_artifact, major_semantic) = install_program_artifact(store.as_ref(), b"MAJOR");
         let programs = [
-            ("APPV1", 1, first_artifact.clone(), first_semantic),
-            ("APPV2", 2, second_artifact.clone(), second_semantic),
-            ("APPV3", 3, major_artifact.clone(), major_semantic),
+            ("APPMAIN", 1, first_artifact.clone(), first_semantic),
+            ("APPMAIN", 2, second_artifact.clone(), second_semantic),
+            ("APPMAIN", 3, major_artifact.clone(), major_semantic),
         ]
         .map(
             |(name, generation, artifact, semantic_identity)| CicsProgramDefinition {
@@ -5038,9 +5094,9 @@ mod tests {
                 minor_version: 0,
                 micro_version: 4,
                 operation: "AUTHORIZE".into(),
-                program: "APPV1".into(),
+                program: "APPMAIN".into(),
                 program_generation: 1,
-                program_artifact: first_artifact,
+                program_artifact: first_artifact.clone(),
                 application_identity: identity(1),
                 available: true,
             },
@@ -5051,9 +5107,9 @@ mod tests {
                 minor_version: 2,
                 micro_version: 1,
                 operation: "AUTHORIZE".into(),
-                program: "APPV2".into(),
+                program: "APPMAIN".into(),
                 program_generation: 2,
-                program_artifact: second_artifact,
+                program_artifact: second_artifact.clone(),
                 application_identity: identity(2),
                 available: true,
             },
@@ -5064,9 +5120,9 @@ mod tests {
                 minor_version: 0,
                 micro_version: 3,
                 operation: "AUTHORIZE".into(),
-                program: "APPV3".into(),
+                program: "APPMAIN".into(),
                 program_generation: 3,
-                program_artifact: major_artifact,
+                program_artifact: major_artifact.clone(),
                 application_identity: identity(3),
                 available: true,
             },
@@ -5099,7 +5155,7 @@ mod tests {
                 default_request,
             )
             .unwrap();
-        assert_eq!(default_response.target.as_deref(), Some("APPV3"));
+        assert_eq!(default_response.target.as_deref(), Some("APPMAIN"));
         assert_eq!(
             default_response.outputs["APPLICATION.VERSION"].bytes(),
             b"2.0.3"
@@ -5117,10 +5173,15 @@ mod tests {
                 minimum_request,
             )
             .unwrap();
-        assert_eq!(minimum_response.target.as_deref(), Some("APPV2"));
+        assert_eq!(minimum_response.target.as_deref(), Some("APPMAIN"));
 
         drop(cics);
-        let reopened = service(provider_store);
+        let reopened = CicsService::open(
+            invoke_authorities(false, program_links.clone()),
+            provider_store,
+            CicsLimits::default(),
+        )
+        .unwrap();
         reopened.bind_artifact_store(artifact_store).unwrap();
         let restarted = invocation_for(
             "invoke-restart",
@@ -5156,11 +5217,265 @@ mod tests {
                 exact_request,
             )
             .unwrap();
-        assert_eq!(exact_response.target.as_deref(), Some("APPV1"));
+        assert_eq!(exact_response.target.as_deref(), Some("APPMAIN"));
         assert_eq!(
             exact_response.outputs["APPLICATION.VERSION"].bytes(),
             b"1.0.4"
         );
+        let selected = |index| {
+            let requests = program_links.lock().unwrap();
+            match &requests[index] {
+                ProgramRequest::Link {
+                    program,
+                    selection: Some(selection),
+                    ..
+                } => (program.as_str().to_string(), selection.clone()),
+                request => panic!("unexpected selected request: {request:?}"),
+            }
+        };
+        for (index, artifact, generation, content_identity) in [
+            (0, major_artifact, 3, identity(3)),
+            (1, second_artifact, 2, identity(2)),
+            (2, first_artifact, 1, identity(1)),
+        ] {
+            let (program, selection) = selected(index);
+            assert_eq!(program, "APPMAIN");
+            assert_eq!(selection.artifact, artifact);
+            assert_eq!(selection.generation, generation);
+            assert_eq!(selection.content_identity, content_identity);
+        }
+    }
+
+    #[test]
+    fn invoke_application_condition_matrix_rejects_before_program_dispatch() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = store.clone();
+        let program_links = Arc::new(Mutex::new(Vec::new()));
+        let cics = CicsService::open(
+            invoke_authorities(false, program_links.clone()),
+            provider_store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        cics.bind_artifact_store(artifact_store.clone()).unwrap();
+
+        let (good_artifact, good_semantic) = install_program_artifact(store.as_ref(), b"GOOD");
+        let (disabled_artifact, disabled_semantic) =
+            install_program_artifact(store.as_ref(), b"DISABLED");
+        let (class_artifact, class_semantic) = install_program_artifact(store.as_ref(), b"CLASS");
+        let (server_artifact, server_semantic) =
+            install_program_artifact(store.as_ref(), b"SERVER");
+        let (stopped_artifact, stopped_semantic) =
+            install_program_artifact(store.as_ref(), b"STOPPED");
+        let (mismatch_artifact, _) = install_program_artifact(store.as_ref(), b"MISMATCH");
+        cics.register_program_definitions(&[
+            CicsProgramDefinition {
+                name: "GOOD".into(),
+                generation: 1,
+                artifact: good_artifact.clone(),
+                semantic_identity: good_semantic,
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            },
+            CicsProgramDefinition {
+                name: "DISABLED".into(),
+                generation: 1,
+                artifact: disabled_artifact.clone(),
+                semantic_identity: disabled_semantic,
+                entry_offset: 0,
+                enabled: false,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            },
+            CicsProgramDefinition {
+                name: "JCLASS".into(),
+                generation: 1,
+                artifact: class_artifact.clone(),
+                semantic_identity: class_semantic,
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::ClassUnavailable,
+            },
+            CicsProgramDefinition {
+                name: "JSERVER".into(),
+                generation: 1,
+                artifact: server_artifact.clone(),
+                semantic_identity: server_semantic,
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::ServerNotFound,
+            },
+            CicsProgramDefinition {
+                name: "JSTOPPED".into(),
+                generation: 1,
+                artifact: stopped_artifact.clone(),
+                semantic_identity: stopped_semantic,
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::ServerDisabled,
+            },
+        ])
+        .unwrap();
+        let identity = |marker: u8| format!("sha256:{:064x}", marker);
+        let entry = |application: &str, program: &str, artifact: ArtifactRef, marker: u8| {
+            CicsApplicationEntryDefinition {
+                application: application.into(),
+                platform: "BANKING".into(),
+                major_version: 1,
+                minor_version: 0,
+                micro_version: 0,
+                operation: "RUN".into(),
+                program: program.into(),
+                program_generation: 1,
+                program_artifact: artifact,
+                application_identity: identity(marker),
+                available: true,
+            }
+        };
+        cics.register_application_entries(&[
+            entry("VALID", "GOOD", good_artifact.clone(), 1),
+            entry("DISABLED", "DISABLED", disabled_artifact, 2),
+            entry("JCLASS", "JCLASS", class_artifact, 3),
+            entry("JSERVER", "JSERVER", server_artifact, 4),
+            entry("JSTOPPED", "JSTOPPED", stopped_artifact, 5),
+            entry("MISMATCH", "GOOD", good_artifact, 6),
+        ])
+        .unwrap();
+        cics.lock()
+            .unwrap()
+            .application_entries
+            .iter_mut()
+            .find(|entry| entry.application == "MISMATCH")
+            .unwrap()
+            .program_artifact = mismatch_artifact;
+
+        let platform = BoundedPayload::new(
+            "mainframe-env.cics.platform@1",
+            b"BANKING".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let invocation = invocation_for(
+            "invoke-errors",
+            BTreeMap::from([("cics.platform".into(), platform)]),
+        );
+        let session = SessionId::new("invoke-errors-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let no_platform = invocation_for("invoke-no-platform", BTreeMap::new());
+        let no_platform_session = SessionId::new("invoke-no-platform-session", 64).unwrap();
+        cics.create_session(&no_platform_session, 24, 80).unwrap();
+        cics.register_run(
+            no_platform.clone(),
+            &no_platform_session,
+            "MENU",
+            "MEAPPL",
+            "MESYS",
+        )
+        .unwrap();
+        let arguments = |application: &[u8]| {
+            BTreeMap::from([
+                ("APPLICATION".into(), cics_literal(application)),
+                ("OPERATION".into(), cics_literal(b"RUN")),
+                ("PLATFORM".into(), cics_literal(b"BANKING")),
+                ("COMMAREA".into(), task_value(b"DATA")),
+            ])
+        };
+        macro_rules! rejected {
+            ($run:expr, $arguments:expr, $sequence:expr, $name:literal, $response:expr, $response2:expr) => {{
+                let before = program_links.lock().unwrap().len();
+                let request = request(CicsOperation::InvokeApplication, $arguments, $sequence);
+                assert_eq!(
+                    cics.invoke(
+                        &effect(&$run.run_unit_id, request.clone(), $sequence),
+                        request,
+                    ),
+                    Err(HostProblem::Condition {
+                        name: $name.into(),
+                        response: $response,
+                        response2: $response2,
+                    })
+                );
+                assert_eq!(program_links.lock().unwrap().len(), before);
+            }};
+        }
+
+        let mut exact = arguments(b"VALID");
+        exact.insert("MAJORVERSION".into(), cics_decimal(9));
+        exact.insert("MINORVERSION".into(), cics_decimal(9));
+        exact.insert("OPTION.EXACTMATCH".into(), cics_option());
+        rejected!(invocation, exact, 1, "APPNOTFOUND", 127, 1);
+        let mut minimum = arguments(b"VALID");
+        minimum.insert("MAJORVERSION".into(), cics_decimal(1));
+        minimum.insert("MINORVERSION".into(), cics_decimal(9));
+        minimum.insert("OPTION.MINIMUM".into(), cics_option());
+        rejected!(invocation, minimum, 2, "APPNOTFOUND", 127, 2);
+        rejected!(invocation, arguments(b"UNKNOWN"), 3, "APPNOTFOUND", 127, 3);
+        let mut channel = arguments(b"VALID");
+        channel.remove("COMMAREA");
+        channel.insert("CHANNEL".into(), cics_literal(b"BAD NAME"));
+        rejected!(invocation, channel, 4, "CHANNELERR", 122, 1);
+        let mut missing_platform = arguments(b"VALID");
+        missing_platform.remove("PLATFORM");
+        rejected!(no_platform, missing_platform, 5, "INVREQ", 16, 1);
+        rejected!(invocation, arguments(b"JCLASS"), 6, "INVREQ", 16, 2);
+        rejected!(invocation, arguments(b"JSERVER"), 7, "INVREQ", 16, 3);
+        rejected!(invocation, arguments(b"JSTOPPED"), 8, "INVREQ", 16, 4);
+        let mut bad_length = arguments(b"VALID");
+        bad_length.insert("LENGTH".into(), cics_decimal(0));
+        rejected!(invocation, bad_length, 9, "LENGERR", 22, 11);
+        let mut null_commarea = arguments(b"VALID");
+        null_commarea.remove("COMMAREA");
+        null_commarea.insert("LENGTH".into(), cics_decimal(1));
+        rejected!(invocation, null_commarea, 10, "LENGERR", 22, 26);
+        rejected!(invocation, arguments(b"DISABLED"), 11, "PGMIDERR", 27, 1);
+        rejected!(invocation, arguments(b"MISMATCH"), 12, "PGMIDERR", 27, 2);
+        assert!(program_links.lock().unwrap().is_empty());
+
+        let denied = CicsService::open(
+            invoke_authorities(true, program_links.clone()),
+            provider_store,
+            CicsLimits::default(),
+        )
+        .unwrap();
+        denied.bind_artifact_store(artifact_store).unwrap();
+        let denied_invocation = invocation_for("invoke-denied", BTreeMap::new());
+        let denied_session = SessionId::new("invoke-denied-session", 64).unwrap();
+        denied.create_session(&denied_session, 24, 80).unwrap();
+        denied
+            .register_run(
+                denied_invocation.clone(),
+                &denied_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let denied_request = request(CicsOperation::InvokeApplication, arguments(b"VALID"), 13);
+        assert_eq!(
+            denied.invoke(
+                &effect(&denied_invocation.run_unit_id, denied_request.clone(), 13,),
+                denied_request,
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            })
+        );
+        assert!(program_links.lock().unwrap().is_empty());
     }
 
     #[test]

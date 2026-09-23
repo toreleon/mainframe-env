@@ -50,6 +50,56 @@ fn principal_validation_is_a_frozen_named_security_variant() {
 }
 
 #[test]
+fn selected_program_link_is_additive_identity_bound_and_validated() {
+    let limits = mainframe_env_execution_api::InvocationLimits::default();
+    let program = ProgramName::new("APPMAIN", 128).unwrap();
+    let payload = BoundedPayload::new("payload@1", b"DATA".to_vec(), limits).unwrap();
+    let artifact = ArtifactRef::new(format!("sha256:{:064x}", 1), limits).unwrap();
+    let plain = HostRequest::Program(ProgramRequest::Link {
+        program: program.clone(),
+        payload: payload.clone(),
+        selection: None,
+    });
+    let selected = HostRequest::Program(ProgramRequest::Link {
+        program: program.clone(),
+        payload: payload.clone(),
+        selection: Some(ProgramLinkSelection {
+            artifact: artifact.clone(),
+            generation: 7,
+            content_identity: format!("sha256:{:064x}", 2),
+        }),
+    });
+    assert_eq!(plain.validate(HostLimits::default()), Ok(()));
+    assert_eq!(selected.validate(HostLimits::default()), Ok(()));
+    assert_ne!(
+        canonical_request_digest(&plain).unwrap(),
+        canonical_request_digest(&selected).unwrap()
+    );
+    for selection in [
+        ProgramLinkSelection {
+            artifact: artifact.clone(),
+            generation: 0,
+            content_identity: format!("sha256:{:064x}", 2),
+        },
+        ProgramLinkSelection {
+            artifact,
+            generation: 7,
+            content_identity: "sha256:not-a-content-identity".into(),
+        },
+    ] {
+        assert_eq!(
+            HostRequest::Program(ProgramRequest::Link {
+                program: program.clone(),
+                payload: payload.clone(),
+                selection: Some(selection),
+            })
+            .validate(HostLimits::default()),
+            Err(HostProblem::Malformed)
+        );
+    }
+}
+
+#[test]
 fn cics_additive_wire_identities_are_frozen_named_variants() {
     assert_eq!(
         hex(&bytes(&CicsOperation::AddressSet, b"")),

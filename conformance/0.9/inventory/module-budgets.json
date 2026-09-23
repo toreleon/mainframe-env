@@ -37,8 +37,8 @@
     {
       "path": "crates/apps/mainframe-env-server/src/cobol.rs",
       "max_production_lines": 1452,
-      "responsibility": "Server-side COBOL program routing, runtime service binding, and installed-program lifecycle helpers remain co-located.",
-      "split_boundary": "Separate runtime service binding, installed-program lookup, and program execution adapters around the existing router."
+      "responsibility": "Server-side COBOL execution and runtime service helpers remain co-located while provider routing and selected-link adapters live in focused modules.",
+      "split_boundary": "Continue separating runtime service binding, installed-program lookup, and program execution adapters."
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
@@ -60,9 +60,9 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2333,
-      "responsibility": "Owned host request and response records for all provider families are declared in one compatibility boundary.",
-      "split_boundary": "Move family-owned request records into dataset, CICS, security, Db2, IMS, and MQ contract modules with stable re-exports."
+      "max_production_lines": 2300,
+      "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
+      "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
     },
     {
       "path": "crates/kernel/mainframe-env-application/src/package_v2.rs",
@@ -294,6 +294,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/protect.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/retrieve.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control/temporary_storage.rs",

@@ -86,7 +86,14 @@ All notable changes to mainframe-env are documented here.
   version selection, immutable program artifact/semantic identity checks,
   exact/minimum matching, bounded COMMAREA or channel identity, SAF/audit,
   restart-safe catalog reads, and compiled selected-route EIBFN `0E10` proof.
-  RELEASE remains fail-closed pending its own program-control slice.
+  Nested LINK dispatch now carries the exact selected artifact, program
+  generation, and application content identity; the production router executes
+  that artifact even when a newer generation owns the program name. Mismatch
+  and multi-generation regressions plus the documented RESP/RESP2 failure matrix prevent
+  program dispatch on rejected requests. For a missing current platform, the
+  implementation follows the command's Conditions table (`INVREQ` 16/1), not
+  the conflicting description text (`APPNOTFOUND`). RELEASE remains fail-closed
+  pending its own program-control slice.
 
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact

@@ -5,10 +5,7 @@ use crate::dataset::{
     DatasetLockTarget, DatasetProviderCapabilities, DatasetSnapshot, TvsRecordOperation,
     TvsUnitOfWorkReceipt,
 };
-use crate::{
-    ClassName, DatasetName, JobName, MemberName, MethodName, ProgramName, ResourceName,
-    RuntimeServiceName, SessionId,
-};
+use crate::{DatasetName, JobName, MemberName, ResourceName, RuntimeServiceName, SessionId};
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
 };
@@ -588,42 +585,6 @@ pub enum DatasetResult {
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ProgramRequest {
-    Inquire {
-        program: ProgramName,
-    },
-    Call {
-        program: ProgramName,
-        payload: BoundedPayload,
-        service: Option<RuntimeServiceSelector>,
-    },
-    Invoke {
-        class: ClassName,
-        method: MethodName,
-        receiver: BoundedPayload,
-        payload: BoundedPayload,
-    },
-    Link {
-        program: ProgramName,
-        payload: BoundedPayload,
-    },
-    Xctl {
-        program: ProgramName,
-        payload: BoundedPayload,
-    },
-    Return {
-        next_transaction: Option<String>,
-        payload: BoundedPayload,
-    },
-    Cancel {
-        programs: Vec<ProgramName>,
-    },
-    Abend {
-        code: String,
-    },
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum RuntimeServiceKind {
     LanguageEnvironment,
@@ -952,6 +913,8 @@ pub struct MqResult {
 
 mod cics;
 pub use cics::*;
+mod program;
+pub use program::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HostRequest {
@@ -1136,6 +1099,10 @@ impl HostRequest {
                 service: Some(service),
                 ..
             }) if service.abi_version == 0 => Err(HostProblem::Malformed),
+            Self::Program(ProgramRequest::Link {
+                selection: Some(selection),
+                ..
+            }) if !selection.is_valid() => Err(HostProblem::Malformed),
             Self::Program(ProgramRequest::Cancel { programs })
                 if programs.is_empty() || programs.len() > limits.max_fields =>
             {

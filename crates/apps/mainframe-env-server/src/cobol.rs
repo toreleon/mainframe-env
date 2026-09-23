@@ -37,6 +37,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod artifact;
 mod runtime;
+mod selected_link;
 use artifact::{AdmittedProgram, admit_published_artifact};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
@@ -102,7 +103,6 @@ impl DefaultProgramRouter {
             .map_err(|_| HostProblem::IdempotencyConflict)
     }
 }
-
 impl HostProvider for DefaultProgramRouter {
     fn descriptor(&self) -> &CapabilityDescriptor {
         self.router.descriptor()
@@ -141,7 +141,7 @@ impl HostProvider for DefaultProgramRouter {
                 sequence: effect.sequence,
                 outcome: self
                     .cobol
-                    .execute_installed_effect(invocation, &effect, program.as_str(), payload)
+                    .execute_installed_effect(invocation, &effect, program.as_str(), payload, None)
                     .map(HostResult::Program),
             };
         }
@@ -160,11 +160,11 @@ impl HostProvider for DefaultProgramRouter {
                 sequence: effect.sequence,
                 outcome: self
                     .cobol
-                    .execute_installed_effect(invocation, &effect, program.as_str(), payload)
+                    .execute_installed_effect(invocation, &effect, program.as_str(), payload, None)
                     .map(HostResult::Program),
             };
         }
-        self.router.invoke(invocation, effect)
+        selected_link::dispatch(self, invocation, effect)
     }
 }
 
@@ -1076,7 +1076,7 @@ mod tests {
     use super::*;
     use mainframe_env_batch::DdPlan;
     use mainframe_env_execution_api::{PrincipalId, ResourceLimits, ServiceClass};
-    use mainframe_env_host_api::{HostLimits, RegistrySnapshot};
+    use mainframe_env_host_api::{HostLimits, HostProvider, RegistrySnapshot};
     use mainframe_env_store::MemoryStore;
     use mainframe_env_store_api::{ExecutionState, PlatformStore};
     use std::collections::BTreeSet;
