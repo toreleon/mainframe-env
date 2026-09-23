@@ -20,6 +20,7 @@ const DOCUMENT_MAGIC: &[u8; 8] = b"MECDOC01";
 const TEMPLATE_MAGIC: &[u8; 8] = b"MECTPL01";
 
 mod insert;
+mod retrieve;
 mod transport;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,6 +58,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::DocumentCreate => create(service, run, request, retention_tick),
         CicsOperation::DocumentDelete => delete(service, run, request, retention_tick),
         CicsOperation::DocumentInsert => insert::invoke(service, run, request, retention_tick),
+        CicsOperation::DocumentRetrieve => retrieve::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -648,7 +650,6 @@ fn replay_write(
 }
 
 impl DocumentRecord {
-    #[cfg(test)]
     pub(in crate::service) fn content_bytes(&self) -> Vec<u8> {
         self.segments
             .iter()

@@ -201,6 +201,7 @@ pub enum HirCicsOperation {
     DocumentCreate,
     DocumentDelete,
     DocumentInsert,
+    DocumentRetrieve,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -6457,5 +6458,43 @@ mod tests {
                 analysis.diagnostics
             );
         }
+    }
+
+    #[test]
+    fn document_retrieve_lowers_buffer_length_and_dataonly() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DOCRETRV. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 INTO-X PIC X(8). 01 LENGTH-X PIC S9(9) COMP. 01 MAX-X PIC S9(9) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS DOCUMENT RETRIEVE DOCTOKEN(TOKEN-X) INTO(INTO-X) LENGTH(LENGTH-X) MAXLENGTH(MAX-X) DATAONLY END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DOCUMENT RETRIEVE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DOCUMENT RETRIEVE");
+        assert_eq!(command.operation, HirCicsOperation::DocumentRetrieve);
+        assert!(command.options.contains(&HirCicsOption::DataOnly));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::MaximumLength
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "MAX-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Into && output.target.qualified_name == "INTO-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Length && output.target.qualified_name == "LENGTH-X"
+        }));
+        let missing_length = source.replace(" LENGTH(LENGTH-X)", "");
+        let invalid = analyze(&missing_length);
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic.public_message().contains("requires LENGTH")
+                || diagnostic
+                    .public_message()
+                    .contains("requires option LENGTH")
+        }));
     }
 }

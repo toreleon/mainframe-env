@@ -11446,6 +11446,100 @@ mod tests {
     }
 
     #[test]
+    fn compiled_document_retrieve_reports_truncation_and_required_length() {
+        let artifact = published_source_fixture(
+            "DOCRETRV",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DOCRETRV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(16).\n01 TEXT-X PIC X(4) VALUE 'DATA'.\n01 INTO-X PIC X(8).\n01 LENGTH-X PIC S9(9) COMP.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\n01 RETRIEVE-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS DOCUMENT CREATE DOCTOKEN(TOKEN-X) TEXT(TEXT-X) LENGTH(4) END-EXEC.\nEXEC CICS DOCUMENT RETRIEVE DOCTOKEN(TOKEN-X) INTO(INTO-X) LENGTH(LENGTH-X) MAXLENGTH(2) DATAONLY RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO RETRIEVE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DOCRETRV".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DOCR".into(), "DOCRETRV".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DOCRETRV".into(),
+                    map: "DOCRETRV".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("document-retrieve-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DOCR", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DOCR",
+                24,
+                80,
+                "document-retrieve-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DOCRETRV", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert!(
+            restored
+                .variable("INTO-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"DA")
+        );
+        assert_eq!(
+            restored.variable("LENGTH-X").unwrap().bytes(),
+            &[0, 0, 0, 4]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 22]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 2]);
+        assert_eq!(
+            restored.variable("RETRIEVE-FN").unwrap().bytes(),
+            &[0x3C, 0x06]
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::DocumentRetrieve)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_consumes_into_and_returns_original_length() {
         let artifact = published_source_fixture(
             "READQTD",

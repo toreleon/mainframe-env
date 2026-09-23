@@ -2393,6 +2393,7 @@ mod tests {
             CicsOperation::DocumentCreate,
             CicsOperation::DocumentDelete,
             CicsOperation::DocumentInsert,
+            CicsOperation::DocumentRetrieve,
             CicsOperation::DeleteTransientData,
             CicsOperation::DeleteTemporaryStorage,
             CicsOperation::ReadTemporaryStorage,

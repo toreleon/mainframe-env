@@ -688,9 +688,9 @@
     "status": "bounded-ambiguity",
     "owner": "shared-execution-coordinator-and-cics-provider",
     "mutating_rows": 35,
-    "bounded_effect_rows": 209,
+    "bounded_effect_rows": 208,
     "explicit_uow_boundary_rows": 1,
-    "bounded_uow_rows": 243,
+    "bounded_uow_rows": 242,
     "execution_credit": 0,
     "prepare_before_dispatch": {
       "durable_effect_intent": true,
@@ -758,10 +758,10 @@
   },
   "registry": {
     "shape_commands": 263,
-    "typed_handlers": 54,
+    "typed_handlers": 55,
     "legacy_compatibility_handlers": 0,
-    "advertised_commands": 54,
-    "unready_handlers": 209,
+    "advertised_commands": 55,
+    "unready_handlers": 208,
     "automatic_registration": false,
     "default_handler": null,
     "unready_result": "explicit-unsupported",
@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:57ee6b04ce3b5fcb50c31a4927c573cb764bcc101617f09c57629061e99c446e"
+    "registry_sha256": "sha256:7fc5f99770bb2f682325e662ca4e90e5bd75f39a9c96f82e5e8ad4bcdde56940"
   },
   "counts": {
     "batches": 3,
@@ -806,11 +806,11 @@
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
-    "runtime_backed_commands": 54,
-    "typed_runtime_commands": 54,
+    "runtime_backed_commands": 55,
+    "typed_runtime_commands": 55,
     "legacy_compatibility_commands": 0,
-    "advertised_commands": 54,
-    "unready_commands": 209
+    "advertised_commands": 55,
+    "unready_commands": 208
   },
   "batches": [
     {
@@ -92159,9 +92159,9 @@
           "eibfn": "3C06",
           "source_status": "bounded-ambiguity",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "DocumentRetrieve",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -92875,7 +92875,7 @@
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -92891,19 +92891,19 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             }
           ],
           "unresolved_dimensions": [],
@@ -92912,13 +92912,8 @@
             "operand-direction",
             "option-bounds",
             "resource-key",
-            "capability-intent",
             "eib-response",
-            "conditions",
-            "effect-class",
-            "cancellation",
-            "audit",
-            "recovery"
+            "conditions"
           ],
           "source_issue_ids": [
             "cics-a-issue-0054-prose-option-legality-not-structured-62c809e0dd36",
@@ -93518,7 +93513,7 @@
             },
             "resource": {
               "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "scope": "document",
               "selectors": [],
               "ambiguous_selectors": [
                 {
@@ -93530,14 +93525,14 @@
                 }
               ],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
+              "selector_authority": "source-bound-runtime",
               "selector_completeness": "bounded-ambiguity",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "read",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
@@ -93546,49 +93541,56 @@
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "observational",
+              "mutating": false,
+              "ir_effects": [
+                "audit",
+                "condition",
+                "memory-read",
+                "memory-write",
+                "security",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "cancelled"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": false
             },
             "recovery": {
-              "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
-              "uow_participation": "bounded-ambiguity",
-              "prepare": "bounded-ambiguity",
-              "rollback": "bounded-ambiguity",
-              "compensation": "bounded-ambiguity",
+              "status": "resolved",
+              "durable_effect_intent": false,
+              "uow_participation": "not-applicable",
+              "prepare": "not-applicable",
+              "rollback": "not-applicable",
+              "compensation": "not-applicable",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "not-applicable",
               "automatic_redispatch": false,
-              "fenced_reconciliation": null,
-              "retention_protected": null
+              "fenced_reconciliation": false,
+              "retention_protected": false
             },
             "registry": {
               "family": "document-control",
               "handler_id": "mainframe-env-cics.handlers.document-control.document-retrieve@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "DocumentRetrieve",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:54e31c213c9a7834bb437d2cb5a27a94732c476d92b5b5fb7ba55020b090ab8d"
+              "unready_result": null,
+              "handler_sha256": "sha256:7a2d4ba72b1632f6b16b4ac0a5befcfc8a1e8e05af6a48616ca74f8f0d436a7e"
             }
           },
-          "row_contract_sha256": "sha256:b751643e5c091db0e99c58cb90f874788076411c3a201cc88fff9daa5407b5a5"
+          "row_contract_sha256": "sha256:9f7e30878d3888ab7c409bf97ceae99589445ad80d05d7c89bf5f9d297455887"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0055",
@@ -446651,5 +446653,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:2461ee4ca00e76f735b708c4272dd80afb6f2547ae9f4bef8006a3640ddf4a7f"
+  "contract_sha256": "sha256:61288825e853f3253199247f9fb3e0d459468145fe574b6528ce04d8438a766a"
 }

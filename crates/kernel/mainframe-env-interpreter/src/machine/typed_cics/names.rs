@@ -145,6 +145,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
         CicsPlanOperation::DocumentDelete => CicsOperation::DocumentDelete,
         CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
+        CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
     }
 }
 
@@ -285,6 +286,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::NoCheck => "NOCHECK",
         CicsPlanOption::MapOnly => "MAPONLY",
         CicsPlanOption::DataOnly => "DATAONLY",
+        CicsPlanOption::DocumentDataOnly => "DATAONLY",
         CicsPlanOption::Generic => "GENERIC",
         CicsPlanOption::Equal => "EQUAL",
         CicsPlanOption::Terminal => "TERMINAL",

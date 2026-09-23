@@ -631,6 +631,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DocumentInsert => {
             document_control::invalid_insert_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DocumentRetrieve => {
+            document_control::invalid_retrieve_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1672,6 +1675,55 @@ mod tests {
             .retain(|operand| operand.name != CicsOperandName::Length);
         assert_eq!(
             encode_cics_effect_plan(&missing_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn document_retrieve_tag_and_dataonly_round_trip() {
+        assert_eq!(operation_tag(CicsPlanOperation::DocumentRetrieve), 66);
+        assert_eq!(
+            operation_from_tag(66),
+            Ok(CicsPlanOperation::DocumentRetrieve)
+        );
+        assert_eq!(option_tag(CicsPlanOption::DocumentDataOnly), 85);
+        assert_eq!(option_from_tag(85), Ok(CicsPlanOption::DocumentDataOnly));
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DocumentRetrieve,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::DocumentToken,
+                    value: CicsOperandValue::Storage(slot(1, "DOCUMENT.TOKEN")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::MaximumLength,
+                    value: CicsOperandValue::Integer(4),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::DocumentDataOnly]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Into,
+                    target: slot(2, "DOCUMENT.INTO"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(3, "DOCUMENT.LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut missing = plan;
+        missing
+            .outputs
+            .retain(|output| output.name != CicsOutputName::Length);
+        assert_eq!(
+            encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

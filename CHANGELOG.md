@@ -13,6 +13,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `DOCUMENT RETRIEVE` with DATAONLY or bounded tagged output,
+  optional CHARACTERSET conversion, MAXLENGTH probing and truncation, exact
+  required LENGTH reporting, and compiled EIBFN `3C06` routing.
+
 - Added typed CICS `DOCUMENT INSERT` for text, binary, template, symbol,
   `FROMDOC`, and retrieved-buffer content. Bounded bookmark insertion and
   AT/TO overlay preserve conversion blocks; the document and replay update

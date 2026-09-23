@@ -40,6 +40,16 @@ pub(super) const INSERT_CLAUSES: &[&str] = &[
     "TEXT",
     "TO",
 ];
+pub(super) const RETRIEVE_CLAUSES: &[&str] = &[
+    "CHARACTERSET",
+    "DOCTOKEN",
+    "INTO",
+    "LENGTH",
+    "MAXLENGTH",
+    "RESP",
+    "RESP2",
+];
+pub(super) const RETRIEVE_OPTIONS: &[&str] = &["DATAONLY", "NOHANDLE"];
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
@@ -47,6 +57,9 @@ pub(super) fn validate_constraints(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::DocumentRetrieve {
+        return validate_retrieve(clauses, semantic);
+    }
     if operation == HirCicsOperation::DocumentInsert {
         return validate_insert(clauses, semantic);
     }
@@ -137,6 +150,9 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::DocumentRetrieve {
+        return retrieve_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::DocumentInsert {
         return insert_operands(clauses, semantic);
     }
@@ -197,6 +213,12 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation == HirCicsOperation::DocumentRetrieve {
+        return Ok(vec![HirCicsOutputBinding {
+            name: HirCicsOutputName::Length,
+            target: complete_data_reference(&clauses["LENGTH"], semantic)?,
+        }]);
+    }
     if operation == HirCicsOperation::DocumentInsert {
         return clauses
             .get("DOCSIZE")
@@ -344,6 +366,80 @@ fn insert_operands(
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,
             value,
+        });
+    }
+    Ok(operands)
+}
+
+fn validate_retrieve(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    let token = clauses.get("DOCTOKEN").ok_or_else(|| {
+        ResolutionFailure::Invalid("CICS DOCUMENT RETRIEVE requires DOCTOKEN".into())
+    })?;
+    let token = complete_data_reference(token, semantic)?;
+    if token.length != 16
+        || !matches!(
+            token.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric | DataCategory::Group
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DOCUMENT RETRIEVE DOCTOKEN requires a 16-byte area".into(),
+        ));
+    }
+    let into = clauses
+        .get("INTO")
+        .ok_or_else(|| ResolutionFailure::Invalid("CICS DOCUMENT RETRIEVE requires INTO".into()))?;
+    let into = complete_data_reference(into, semantic)?;
+    require_writable(&into)?;
+    if !matches!(
+        into.category,
+        DataCategory::Alphabetic | DataCategory::Alphanumeric | DataCategory::Group
+    ) {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DOCUMENT RETRIEVE INTO requires a writable byte area".into(),
+        ));
+    }
+    let length = clauses.get("LENGTH").ok_or_else(|| {
+        ResolutionFailure::Invalid("CICS DOCUMENT RETRIEVE requires LENGTH".into())
+    })?;
+    require_fullword_output(length, semantic, "RETRIEVE", "LENGTH")?;
+    if let Some(tokens) = clauses.get("MAXLENGTH") {
+        length_value(tokens, semantic)?;
+    }
+    if let Some(tokens) = clauses.get("CHARACTERSET") {
+        let value = cics_value(tokens, semantic)?;
+        let length = match value {
+            HirCicsValue::Literal(value) => value.len(),
+            HirCicsValue::Data(reference) => reference.length,
+            _ => 0,
+        };
+        if !(1..=40).contains(&length) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS DOCUMENT RETRIEVE CHARACTERSET requires 1-40 bytes".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn retrieve_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::DocumentToken,
+        value: HirCicsValue::Data(complete_data_reference(&clauses["DOCTOKEN"], semantic)?),
+    }];
+    if let Some(tokens) = clauses.get("MAXLENGTH") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::MaximumLength,
+            value: length_value(tokens, semantic)?,
+        });
+    }
+    if let Some(tokens) = clauses.get("CHARACTERSET") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::CharacterSet,
+            value: cics_value(tokens, semantic)?,
         });
     }
     Ok(operands)

@@ -1678,7 +1678,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 56);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 57);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4996,6 +4996,7 @@ mod tests {
             ("DOCUMENT CREATE", CicsOperation::DocumentCreate),
             ("DOCUMENT DELETE", CicsOperation::DocumentDelete),
             ("DOCUMENT INSERT", CicsOperation::DocumentInsert),
+            ("DOCUMENT RETRIEVE", CicsOperation::DocumentRetrieve),
             ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
@@ -6264,7 +6265,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 56);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 57);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6307,6 +6308,186 @@ mod tests {
             document_insert.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0053"
         );
+        let document_retrieve = command_descriptor(CicsOperation::DocumentRetrieve);
+        assert_eq!(document_retrieve.syntax, "DOCUMENT RETRIEVE");
+        assert_eq!(
+            document_retrieve.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0054"
+        );
+    }
+
+    #[test]
+    fn document_retrieve_reports_required_length_and_truncates_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-retrieve", BTreeMap::new());
+        let session = SessionId::new("document-retrieve", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(b"ABCD")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let created = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        let token = created.outputs["DOCTOKEN"].bytes().to_vec();
+        let retrieve = |maximum: i64, sequence: u64| {
+            request(
+                CicsOperation::DocumentRetrieve,
+                BTreeMap::from([
+                    ("DOCTOKEN".into(), task_value(&token)),
+                    ("INTO".into(), argument(b"INTO-X")),
+                    ("LENGTH".into(), argument(b"LENGTH-X")),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                    ("MAXLENGTH".into(), cics_decimal(maximum)),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let short = retrieve(2, 2);
+        let truncated = service
+            .invoke(&effect(&invocation.run_unit_id, short.clone(), 2), short)
+            .unwrap();
+        assert_eq!(truncated.condition, "LENGERR");
+        assert_eq!((truncated.response, truncated.response2), (22, 2));
+        assert_eq!(truncated.payload.bytes(), b"AB");
+        assert_eq!(truncated.outputs["LENGTH"].bytes(), b"4");
+        let query = retrieve(0, 3);
+        let zero = service
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 3), query)
+            .unwrap();
+        assert_eq!(zero.condition, "LENGERR");
+        assert!(zero.payload.bytes().is_empty());
+        assert_eq!(zero.outputs["LENGTH"].bytes(), b"4");
+        let full = retrieve(8, 4);
+        let complete = service
+            .invoke(&effect(&invocation.run_unit_id, full.clone(), 4), full)
+            .unwrap();
+        assert_eq!(complete.condition, "NORMAL");
+        assert_eq!(complete.payload.bytes(), b"ABCD");
+        let invalid = retrieve(-1, 5);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 5),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 1,
+            })
+        );
+        assert_eq!(
+            store.list_provider_state("cics-document-v1", 8).unwrap()[0].version,
+            1
+        );
+        let bookmark = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("BOOKMARK".into(), cics_literal(b"Mark")),
+            ]),
+            6,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, bookmark.clone(), 6),
+                bookmark,
+            )
+            .unwrap();
+        let tagged = request(
+            CicsOperation::DocumentRetrieve,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("INTO".into(), argument(b"INTO-X")),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(128)),
+            ]),
+            7,
+        );
+        let tagged = service
+            .invoke(&effect(&invocation.run_unit_id, tagged.clone(), 7), tagged)
+            .unwrap();
+        assert!(tagged.payload.bytes().starts_with(b"MECRTV01"));
+        assert_eq!(
+            tagged.outputs["LENGTH"].bytes(),
+            tagged.payload.bytes().len().to_string().as_bytes()
+        );
+    }
+
+    #[test]
+    fn document_retrieve_utf8_reports_expanded_length() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let invocation = invocation_for("document-charset", BTreeMap::new());
+        let session = SessionId::new("document-charset", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let ebcdic = mainframe_env_encoding::CodePage::Cp037
+            .encode("é", 8)
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(&ebcdic)),
+                ("LENGTH".into(), cics_decimal(1)),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            1,
+        );
+        let created = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        assert_eq!(created.outputs["DOCSIZE"].bytes(), b"1");
+        let token = created.outputs["DOCTOKEN"].bytes();
+        let query = request(
+            CicsOperation::DocumentRetrieve,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(token)),
+                ("INTO".into(), argument(b"INTO-X")),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("MAXLENGTH".into(), cics_decimal(0)),
+                ("CHARACTERSET".into(), cics_literal(b"UTF-8")),
+                ("OPTION.DATAONLY".into(), cics_option()),
+            ]),
+            2,
+        );
+        let needed = service
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 2), query)
+            .unwrap();
+        assert_eq!((needed.response, needed.response2), (22, 2));
+        assert_eq!(needed.outputs["LENGTH"].bytes(), b"2");
+        let full = request(
+            CicsOperation::DocumentRetrieve,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(token)),
+                ("INTO".into(), argument(b"INTO-X")),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("CHARACTERSET".into(), cics_literal(b"UTF-8")),
+                ("OPTION.DATAONLY".into(), cics_option()),
+            ]),
+            3,
+        );
+        let converted = service
+            .invoke(&effect(&invocation.run_unit_id, full.clone(), 3), full)
+            .unwrap();
+        assert_eq!(converted.condition, "NORMAL");
+        assert_eq!(converted.payload.bytes(), "é".as_bytes());
+        assert_eq!(converted.outputs["LENGTH"].bytes(), b"2");
     }
 
     #[test]

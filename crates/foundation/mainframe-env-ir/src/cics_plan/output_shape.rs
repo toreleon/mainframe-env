@@ -85,6 +85,13 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::DocumentRetrieve => matches!(
+            output,
+            CicsOutputName::Into
+                | CicsOutputName::Length
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

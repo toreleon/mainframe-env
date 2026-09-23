@@ -88,6 +88,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0053"
     },
     {
+      "operation": "DocumentRetrieve",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0054"
+    },
+    {
       "operation": "Enq",
       "interface": "api",
       "family": "task-control",

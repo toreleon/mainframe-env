@@ -63,6 +63,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DocumentCreate => 63,
         CicsPlanOperation::DocumentDelete => 64,
         CicsPlanOperation::DocumentInsert => 65,
+        CicsPlanOperation::DocumentRetrieve => 66,
     }
 }
 
@@ -122,6 +123,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         63 => Ok(CicsPlanOperation::DocumentCreate),
         64 => Ok(CicsPlanOperation::DocumentDelete),
         65 => Ok(CicsPlanOperation::DocumentInsert),
+        66 => Ok(CicsPlanOperation::DocumentRetrieve),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -333,6 +335,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Minimum => 37,
         CicsPlanOption::Hold => 38,
         CicsPlanOption::Unescaped => 84,
+        CicsPlanOption::DocumentDataOnly => 85,
     }
 }
 
@@ -376,6 +379,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         37 => Ok(CicsPlanOption::Minimum),
         38 => Ok(CicsPlanOption::Hold),
         84 => Ok(CicsPlanOption::Unescaped),
+        85 => Ok(CicsPlanOption::DocumentDataOnly),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

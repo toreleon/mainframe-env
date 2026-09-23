@@ -751,6 +751,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentCreate => document_control::ALLOWED_CLAUSES,
         HirCicsOperation::DocumentDelete => document_control::DELETE_CLAUSES,
         HirCicsOperation::DocumentInsert => document_control::INSERT_CLAUSES,
+        HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -837,6 +838,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             &["AUXILIARY", "MAIN", "NOSUSPEND", "REWRITE", "NOHANDLE"]
         }
         HirCicsOperation::DocumentCreate => document_control::ALLOWED_OPTIONS,
+        HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_OPTIONS,
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -942,6 +944,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentCreate => &["DOCTOKEN"][..],
         HirCicsOperation::DocumentDelete => &["DOCTOKEN"][..],
         HirCicsOperation::DocumentInsert => &["DOCTOKEN"][..],
+        HirCicsOperation::DocumentRetrieve => &["DOCTOKEN", "INTO", "LENGTH"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],

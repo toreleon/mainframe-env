@@ -274,8 +274,12 @@ bookmark interval. It applies source-specific conversion marks, copies
 FROMDOC bookmarks, and keeps a bounded internal tagged retrieval form for
 FROM round trips. Each insert updates the versioned document and effect replay
 atomically. Document symbol names preserve case, and template expansion is
-bounded before persistence.
-The rest of the reserved ranges remain available to rows 0054–0055.
+bounded before persistence. `DOCUMENT RETRIEVE` uses tag 66, input operand
+tags 132/145/146, and document DATAONLY option tag 85. It copies tagged or
+data-only content to a bounded application buffer, returns the exact required
+LENGTH on a short buffer, and performs the supported CP037 character-set
+conversions without changing document state. The rest of the reserved ranges
+remain available to row 0055.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

@@ -143,7 +143,20 @@ pub(crate) fn encode_statement(
     let plan = CicsEffectPlan {
         operation: plan_operation(command.operation),
         operands,
-        options: command.options.iter().copied().map(plan_option).collect(),
+        options: command
+            .options
+            .iter()
+            .copied()
+            .map(|option| {
+                if command.operation == HirCicsOperation::DocumentRetrieve
+                    && option == HirCicsOption::DataOnly
+                {
+                    CicsPlanOption::DocumentDataOnly
+                } else {
+                    plan_option(option)
+                }
+            })
+            .collect(),
         outputs,
         condition,
     };
@@ -386,6 +399,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DocumentCreate => CicsPlanOperation::DocumentCreate,
         HirCicsOperation::DocumentDelete => CicsPlanOperation::DocumentDelete,
         HirCicsOperation::DocumentInsert => CicsPlanOperation::DocumentInsert,
+        HirCicsOperation::DocumentRetrieve => CicsPlanOperation::DocumentRetrieve,
     }
 }
 

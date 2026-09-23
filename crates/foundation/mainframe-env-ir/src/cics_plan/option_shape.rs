@@ -43,6 +43,10 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         CicsPlanOperation::DocumentCreate => {
             !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Unescaped)
         }
+        CicsPlanOperation::DocumentRetrieve => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::DocumentDataOnly
+        ),
         _ => !matches!(option, CicsPlanOption::NoHandle),
     })
 }

@@ -308,6 +308,14 @@ substitution, and atomic versioned persistence with replay. Its internal
 tagged buffer preserves conversion blocks and bookmarks when a document from
 this runtime is supplied through FROM.
 
+`DOCUMENT RETRIEVE` lowers a 16-byte input DOCTOKEN, writable INTO byte area,
+and writable fullword LENGTH. Optional fullword MAXLENGTH is capped by the
+actual INTO extent; DATAONLY uses reserved document option tag 85. The
+interpreter writes the available prefix and required LENGTH even on LENGERR
+22/2. The provider emits a bounded tagged or data-only copy, converts the
+supported CP037 client character sets on request, and leaves the source
+document unchanged.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

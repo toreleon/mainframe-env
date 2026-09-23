@@ -181,3 +181,42 @@ pub(super) fn invalid_insert_shape(
             )
         })
 }
+
+pub(super) fn invalid_retrieve_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.is_subset(&BTreeSet::from([
+        CicsOperandName::DocumentToken,
+        CicsOperandName::MaximumLength,
+        CicsOperandName::CharacterSet,
+    ])) || !inputs.contains(&CicsOperandName::DocumentToken)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::DocumentToken => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::MaximumLength => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            ),
+            CicsOperandName::CharacterSet => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            _ => true,
+        })
+        || !outputs.contains(&CicsOutputName::Into)
+        || !outputs.contains(&CicsOutputName::Length)
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::Into
+                    | CicsOutputName::Length
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+}

@@ -77,8 +77,10 @@ pub(super) fn into_payload_schema(
     operation: CicsOperation,
     response: &CicsResponse,
 ) -> Option<&str> {
-    (operation != CicsOperation::ReadTransientData
-        || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
+    (!matches!(
+        operation,
+        CicsOperation::ReadTransientData | CicsOperation::DocumentRetrieve
+    ) || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
     .then(|| response.payload.schema())
 }
 
@@ -437,7 +439,10 @@ pub(super) fn execute(
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => {
-                if plan.operation == CicsPlanOperation::ReadTransientData {
+                if matches!(
+                    plan.operation,
+                    CicsPlanOperation::ReadTransientData | CicsPlanOperation::DocumentRetrieve
+                ) {
                     let CicsTarget::Resolved(slot) = &target else {
                         return Err(MachineProblem::UnexpectedHostResult);
                     };

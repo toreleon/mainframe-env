@@ -111,6 +111,8 @@ pub enum CicsPlanOperation {
     DocumentDelete,
     /// Insert content or bookmarks into one transaction-owned document.
     DocumentInsert,
+    /// Copy one transaction-owned document into an application buffer.
+    DocumentRetrieve,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -344,6 +346,8 @@ pub enum CicsPlanOption {
     Hold,
     /// Preserve percent escapes and plus signs in document symbol lists.
     Unescaped,
+    /// Omit bookmark and conversion tags from a document retrieval.
+    DocumentDataOnly,
 }
 
 /// Named result binding written after the host result arrives.

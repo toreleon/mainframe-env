@@ -30,6 +30,8 @@ pub enum CicsOperation {
     DocumentDelete,
     /// Insert content or bookmarks into one transaction-owned document.
     DocumentInsert,
+    /// Copy one transaction-owned document into an application buffer.
+    DocumentRetrieve,
     /// Delete every record from one local transient-data queue.
     DeleteTransientData,
     /// Delete every item from one local temporary-storage queue.
@@ -115,6 +117,7 @@ impl CicsOperation {
             Self::DocumentCreate => "DocumentCreate",
             Self::DocumentDelete => "DocumentDelete",
             Self::DocumentInsert => "DocumentInsert",
+            Self::DocumentRetrieve => "DocumentRetrieve",
             Self::DeleteTransientData => "DeleteTransientData",
             Self::DeleteTemporaryStorage => "DeleteTemporaryStorage",
             Self::ReadTemporaryStorage => "ReadTemporaryStorage",
@@ -232,6 +235,7 @@ impl CicsOperation {
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,
             ("DOCUMENT", Some("INSERT")) => Self::DocumentInsert,
+            ("DOCUMENT", Some("RETRIEVE")) => Self::DocumentRetrieve,
             ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
             ("DELETEQ", Some("TS")) => Self::DeleteTemporaryStorage,
             ("READQ", Some("TS")) => Self::ReadTemporaryStorage,
