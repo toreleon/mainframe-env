@@ -1,5 +1,7 @@
 #[path = "handlers/mod.rs"]
 mod handlers;
+#[path = "handlers/task_identity.rs"]
+mod task_identity;
 
 use crate::generated::CicsCommandFamily;
 #[cfg(test)]
@@ -1042,7 +1044,7 @@ impl CicsService {
             .get("cics.retrieve")
             .map(|value| value.bytes().to_vec())
             .unwrap_or_default();
-        let originating_task = originating_task_for(
+        let originating_task = task_identity::originating_task_for(
             state
                 .sessions
                 .get(session.as_str())
@@ -1182,7 +1184,7 @@ impl CicsService {
             transaction: next.transaction.clone(),
             commarea: next.commarea.clone(),
         };
-        let originating_task = originating_task_for(
+        let originating_task = task_identity::originating_task_for(
             state
                 .sessions
                 .get(session.as_str())
@@ -2252,14 +2254,6 @@ pub fn cics_provider(service: Arc<CicsService>, limits: InvocationLimits) -> Arc
             ready: true,
         },
     })
-}
-
-fn originating_task_for(session: &Session, invocation: &Invocation) -> String {
-    if session.run_unit.is_empty() {
-        invocation.run_unit_id.as_str().to_string()
-    } else {
-        session.run_unit.clone()
-    }
 }
 
 fn terminal_snapshot(session: &str, value: &Session) -> CicsTerminalSnapshot {
@@ -9794,7 +9788,8 @@ mod tests {
         drop(store);
         let reopened_store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
         let reopened =
-            CicsService::open(authorities(), reopened_store, CicsLimits::default()).unwrap();
+            CicsService::open(authorities(), reopened_store.clone(), CicsLimits::default())
+                .unwrap();
         let state = reopened.lock().unwrap();
         assert_eq!(state.web.sessions.len(), 1);
         assert_eq!(state.web.urimaps["ORDERS"].path, "/orders");

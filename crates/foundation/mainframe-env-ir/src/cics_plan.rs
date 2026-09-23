@@ -8,6 +8,7 @@ mod address;
 mod assign;
 mod browse;
 mod codec_tags;
+mod condition_handlers;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -38,6 +39,7 @@ use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
     output_from_tag, output_tag,
 };
+use condition_handlers::{valid_aid_handlers, valid_condition_handlers, valid_condition_list};
 
 /// Stable wire identity for a typed CICS effect plan.
 pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@2";
@@ -856,84 +858,6 @@ pub(super) fn output_target(
         .map(|output| &output.target)
 }
 
-fn valid_condition_list(bytes: &[u8]) -> bool {
-    let Ok(text) = std::str::from_utf8(bytes) else {
-        return false;
-    };
-    let names = text.split('\n').collect::<Vec<_>>();
-    let unique = names.iter().copied().collect::<BTreeSet<_>>();
-    matches!(names.len(), 1..=16)
-        && unique.len() == names.len()
-        && names.iter().all(|name| {
-            crate::CICS_APPLICATION_CONDITION_NAMES
-                .binary_search(name)
-                .is_ok()
-        })
-}
-
-fn valid_condition_handlers(bytes: &[u8]) -> bool {
-    let Ok(text) = std::str::from_utf8(bytes) else {
-        return false;
-    };
-    let entries = text
-        .split('\n')
-        .map(|entry| entry.split_once('\t'))
-        .collect::<Option<Vec<_>>>();
-    let Some(entries) = entries else {
-        return false;
-    };
-    let unique = entries
-        .iter()
-        .map(|(name, _)| *name)
-        .collect::<BTreeSet<_>>();
-    matches!(entries.len(), 1..=16)
-        && unique.len() == entries.len()
-        && entries.windows(2).all(|pair| pair[0].0 < pair[1].0)
-        && entries.iter().all(|(name, label)| {
-            crate::CICS_APPLICATION_CONDITION_NAMES
-                .binary_search(name)
-                .is_ok()
-                && (label.is_empty()
-                    || label.bytes().all(|byte| {
-                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-'
-                    }))
-        })
-}
-
-fn valid_aid_handlers(bytes: &[u8]) -> bool {
-    let Ok(text) = std::str::from_utf8(bytes) else {
-        return false;
-    };
-    let entries = if text.is_empty() {
-        Vec::new()
-    } else {
-        let entries = text
-            .split('\n')
-            .map(|entry| entry.split_once('\t'))
-            .collect::<Option<Vec<_>>>();
-        let Some(entries) = entries else {
-            return false;
-        };
-        entries
-    };
-    let unique = entries
-        .iter()
-        .map(|(name, _)| *name)
-        .collect::<BTreeSet<_>>();
-    entries.len() <= 16
-        && unique.len() == entries.len()
-        && entries.windows(2).all(|pair| pair[0].0 < pair[1].0)
-        && entries.iter().all(|(name, label)| {
-            crate::CICS_APPLICATION_AID_NAMES
-                .binary_search(name)
-                .is_ok()
-                && (label.is_empty()
-                    || label.bytes().all(|byte| {
-                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-'
-                    }))
-        })
-}
-
 fn validate_slot(
     slot: &CicsStorageSlot,
     limits: CicsPlanLimits,
@@ -1330,7 +1254,7 @@ mod tests {
         let mut read = encode_cics_effect_plan(&read_plan(), limits).unwrap();
         for offset in [6, 12] {
             let saved = [read[offset], read[offset + 1]];
-            read[offset..offset + 2].copy_from_slice(&256u16.to_be_bytes());
+            read[offset..offset + 2].copy_from_slice(&u16::MAX.to_be_bytes());
             assert_eq!(
                 decode_cics_effect_plan(&read, limits),
                 Err(CicsPlanCodecProblem::Malformed)
@@ -1345,7 +1269,7 @@ mod tests {
             condition: CicsCondition::Default,
         };
         let mut options = encode_cics_effect_plan(&options_plan, limits).unwrap();
-        options[16..18].copy_from_slice(&256u16.to_be_bytes());
+        options[16..18].copy_from_slice(&u16::MAX.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&options, limits),
             Err(CicsPlanCodecProblem::Malformed)
@@ -1372,7 +1296,7 @@ mod tests {
             condition: CicsCondition::Default,
         };
         let mut outputs = encode_cics_effect_plan(&output_plan, limits).unwrap();
-        outputs[20..22].copy_from_slice(&256u16.to_be_bytes());
+        outputs[20..22].copy_from_slice(&u16::MAX.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&outputs, limits),
             Err(CicsPlanCodecProblem::Malformed)
@@ -5410,7 +5334,7 @@ mod tests {
         assert_eq!(option_from_tag(124), Ok(CicsPlanOption::AsIs));
         assert_eq!(output_tag(CicsOutputName::Partn), 248);
         assert_eq!(output_from_tag(248), Ok(CicsOutputName::Partn));
-        for tag in [91] {
+        for tag in [u16::MAX] {
             assert_eq!(
                 operation_from_tag(tag),
                 Err(CicsPlanCodecProblem::Malformed)

@@ -105,17 +105,24 @@ def check(root: Path) -> None:
     cics_descriptor_entries = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries.rs")
     )
+    cics_descriptor_effects = production(
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/effects.rs")
+    )
     for required in [
         "mod executable_registry;",
         "pub use executable_registry::*;",
         "mod executable_entries;",
+        "mod effects;",
+        "use effects::*;",
         "pub use executable_entries::CICS_EXECUTABLE_DESCRIPTORS;",
         'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
-        "Effect::DatasetRead",
-        "Effect::DatasetWrite",
-        "Effect::Transaction",
     ]:
         require(required in cics_descriptor_root, f"typed CICS descriptor facade omits {required}")
+    for required in ["Effect::DatasetRead", "Effect::DatasetWrite", "Effect::Transaction"]:
+        require(
+            required in cics_descriptor_effects,
+            f"typed CICS descriptor effects omit {required}",
+        )
     for required in [
         "pub const CICS_EXECUTABLE_DESCRIPTORS",
         'namespace: "cics.file"',
@@ -200,7 +207,21 @@ def check(root: Path) -> None:
         ],
         "typed CICS runtime",
     )
-    validation = between(cics_runtime, "fn plan(operation: &Operation)", "fn invalid_plan(")
+    cics_runtime_validation = production(
+        read(root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics/runtime_validation.rs")
+    )
+    require(
+        "fn plan(operation: &Operation)" in cics_runtime,
+        "typed CICS plan validation is missing",
+    )
+    require(
+        "fn validate_runtime_plan" in cics_runtime_validation,
+        "typed CICS runtime validation is missing",
+    )
+    validation = (
+        cics_runtime.split("fn plan(operation: &Operation)", 1)[1]
+        + cics_runtime_validation
+    )
     reject(
         validation,
         ["CicsOperation::from_tokens", "legacy_arguments(", "legacy_destination("],

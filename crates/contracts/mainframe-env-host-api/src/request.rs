@@ -2512,12 +2512,24 @@ mod tests {
             CicsOperation::TransformXmlToData,
             CicsOperation::WebParseUrl,
             CicsOperation::WebOpen,
+            CicsOperation::WebClose,
+            CicsOperation::WebExtract,
+            CicsOperation::ExtractWeb,
+            CicsOperation::WebRead,
+            CicsOperation::WebStartBrowse,
+            CicsOperation::WebReadNext,
+            CicsOperation::WebEndBrowse,
+            CicsOperation::WebWrite,
+            CicsOperation::WebSend,
+            CicsOperation::WebRetrieve,
+            CicsOperation::WebReceive,
+            CicsOperation::WebConverse,
             CicsOperation::Unlock,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 117);
+        assert_eq!(forms.len(), 119);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

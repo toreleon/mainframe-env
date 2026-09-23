@@ -33,8 +33,9 @@ pub use service::{
     CicsTraceEntry, CicsTransformContainerMode, CicsTransformDefinition,
     CicsTransformFieldDefinition, CicsTransformFieldKind, CicsTransformFormat,
     CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
-    CicsWebEndpoint, CicsWebInboundRequest, CicsWebServiceDefinition, CicsWebTransport,
-    CicsWebUriMapDefinition, CicsWebVersion, CicsXmlTransformMetadata, cics_provider,
+    CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
+    CicsWebServiceDefinition, CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
+    CicsXmlTransformMetadata, cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]
