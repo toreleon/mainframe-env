@@ -65,6 +65,18 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::ConversationIuType
+        | CicsOperandName::ConversationDataStream
+        | CicsOperandName::ConversationRecordFormat
+        | CicsOperandName::ConversationProcLength
+        | CicsOperandName::ConversationPipLength
+        | CicsOperandName::ConversationSyncLevel
+        | CicsOperandName::ConversationFromLength
+        | CicsOperandName::ConversationMaxLength
+        | CicsOperandName::ConversationToLength => SlotUse::HalfwordInput,
+        CicsOperandName::ConversationFromFullLength
+        | CicsOperandName::ConversationMaxFullLength
+        | CicsOperandName::ConversationToFullLength => SlotUse::FullwordInput,
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
@@ -166,6 +178,16 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::ConversationState => SlotUse::FullwordOutput,
+        CicsOutputName::ConversationToLength => SlotUse::HalfwordOutput,
+        CicsOutputName::ConversationToFullLength => SlotUse::FullwordOutput,
+        CicsOutputName::ConversationSet => SlotUse::PointerOutput,
+        CicsOutputName::ConversationConvid
+        | CicsOutputName::ConversationRetcode
+        | CicsOutputName::ConversationPrinConvid
+        | CicsOutputName::ConversationPrinSysid
+        | CicsOutputName::ConversationConvData
+        | CicsOutputName::ConversationInto => SlotUse::Output,
         CicsOutputName::CounterValue
         | CicsOutputName::CounterMinimum
         | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
@@ -280,8 +302,17 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     }
 }
 
-pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
-    match operation {
+pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsOperation> {
+    Some(match operation {
+        CicsPlanOperation::AllocateConversation
+        | CicsPlanOperation::GdsAllocateConversation
+        | CicsPlanOperation::GdsAssignConversation
+        | CicsPlanOperation::BuildAttach
+        | CicsPlanOperation::ConnectProcess
+        | CicsPlanOperation::GdsConnectProcess
+        | CicsPlanOperation::Converse
+        | CicsPlanOperation::FreeConversation
+        | CicsPlanOperation::GdsFreeConversation => return None,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
@@ -433,11 +464,38 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebRetrieve => CicsOperation::WebRetrieve,
         CicsPlanOperation::WebReceive => CicsOperation::WebReceive,
         CicsPlanOperation::WebConverse => CicsOperation::WebConverse,
-    }
+    })
 }
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::ConversationSysid => "SYSID",
+        CicsOperandName::ConversationPartner => "PARTNER",
+        CicsOperandName::ConversationProfile => "PROFILE",
+        CicsOperandName::ConversationSession => "SESSION",
+        CicsOperandName::ConversationModeName => "MODENAME",
+        CicsOperandName::ConversationConvid => "CONVID",
+        CicsOperandName::ConversationAttachId => "ATTACHID",
+        CicsOperandName::ConversationProcess => "PROCESS",
+        CicsOperandName::ConversationResource => "RESOURCE",
+        CicsOperandName::ConversationReturnProcess => "RPROCESS",
+        CicsOperandName::ConversationReturnResource => "RRESOURCE",
+        CicsOperandName::ConversationQueue => "QUEUE",
+        CicsOperandName::ConversationIuType => "IUTYPE",
+        CicsOperandName::ConversationDataStream => "DATASTR",
+        CicsOperandName::ConversationRecordFormat => "RECFM",
+        CicsOperandName::ConversationProcName => "PROCNAME",
+        CicsOperandName::ConversationProcLength => "PROCLENGTH",
+        CicsOperandName::ConversationPipList => "PIPLIST",
+        CicsOperandName::ConversationPipLength => "PIPLENGTH",
+        CicsOperandName::ConversationSyncLevel => "SYNCLEVEL",
+        CicsOperandName::ConversationFrom => "FROM",
+        CicsOperandName::ConversationFromLength => "FROMLENGTH",
+        CicsOperandName::ConversationFromFullLength => "FROMFLENGTH",
+        CicsOperandName::ConversationMaxLength => "MAXLENGTH",
+        CicsOperandName::ConversationMaxFullLength => "MAXFLENGTH",
+        CicsOperandName::ConversationToLength => "TOLENGTH",
+        CicsOperandName::ConversationToFullLength => "TOFLENGTH",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -743,6 +801,16 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::ConversationState => "STATE",
+        CicsOutputName::ConversationConvid => "CONVID",
+        CicsOutputName::ConversationRetcode => "RETCODE",
+        CicsOutputName::ConversationPrinConvid => "PRINCONVID",
+        CicsOutputName::ConversationPrinSysid => "PRINSYSID",
+        CicsOutputName::ConversationConvData => "CONVDATA",
+        CicsOutputName::ConversationInto => "INTO",
+        CicsOutputName::ConversationSet => "SET",
+        CicsOutputName::ConversationToLength => "TOLENGTH",
+        CicsOutputName::ConversationToFullLength => "TOFLENGTH",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",
@@ -860,6 +928,10 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::ConversationNoQueue => "NOQUEUE",
+        CicsPlanOption::ConversationNotruncate => "NOTRUNCATE",
+        CicsPlanOption::ConversationDefresp => "DEFRESP",
+        CicsPlanOption::ConversationFmh => "FMH",
         CicsPlanOption::DefResp => "DEFRESP",
         CicsPlanOption::NoWait => "NOWAIT",
         CicsPlanOption::Rrn => "RRN",
@@ -989,5 +1061,31 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::WebNotruncate => "NOTRUNCATE",
         CicsPlanOption::WebNoClientConvert => "NOCLICONVERT",
         CicsPlanOption::WebNoServerConvert => "NOSRVCONVERT",
+    }
+}
+
+#[cfg(test)]
+mod conversation_tests {
+    use super::*;
+
+    #[test]
+    fn conversation_plans_have_no_host_alias_until_handlers_are_registered() {
+        for operation in [
+            CicsPlanOperation::AllocateConversation,
+            CicsPlanOperation::GdsAllocateConversation,
+            CicsPlanOperation::GdsAssignConversation,
+            CicsPlanOperation::BuildAttach,
+            CicsPlanOperation::ConnectProcess,
+            CicsPlanOperation::GdsConnectProcess,
+            CicsPlanOperation::Converse,
+            CicsPlanOperation::FreeConversation,
+            CicsPlanOperation::GdsFreeConversation,
+        ] {
+            assert_eq!(host_operation(operation), None);
+        }
+        assert_eq!(
+            host_operation(CicsPlanOperation::Read),
+            Some(CicsOperation::Read)
+        );
     }
 }
