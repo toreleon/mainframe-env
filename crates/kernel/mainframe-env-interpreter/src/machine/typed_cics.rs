@@ -13,6 +13,7 @@ mod address;
 mod assign;
 mod legacy;
 mod names;
+mod registry;
 mod response;
 mod response_output;
 pub(super) use response_output::write_output;
@@ -25,6 +26,10 @@ mod web_service_control;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
+#[cfg(test)]
+use registry::operation_schema;
+use registry::{expected_effects, expected_operation};
+pub(super) use registry::{operation_identities, validate_module_operations};
 pub(super) use response::drive_response;
 use runtime_validation::validate_runtime_plan;
 pub(super) use storage64::Storage64Intent;
@@ -35,13 +40,6 @@ const PLAN_ATTRIBUTE: &str = "cics_plan";
 pub(super) enum CicsTarget {
     Legacy(String),
     Resolved(CicsStorageSlot),
-}
-
-pub(super) fn operation_identities() -> Vec<OperationIdentity> {
-    CICS_EXECUTABLE_DESCRIPTORS
-        .iter()
-        .map(|descriptor| descriptor.identity())
-        .collect()
 }
 
 pub(super) fn is_typed(operation: &Operation) -> bool {
@@ -167,6 +165,7 @@ pub(super) fn suspension(
         CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
+        operation if operation.is_counter() => ("cics-counter", true),
         CicsOperation::WriteJournalName => ("cics-journal", true),
         CicsOperation::WriteJournalNum => ("cics-journal", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
@@ -183,30 +182,6 @@ pub(super) fn suspension(
         ),
         state_bytes: state_bytes as u64,
     })
-}
-
-pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineProblem> {
-    let mut catalog = OperationCatalog::default();
-    for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
-        catalog
-            .register(operation_schema(descriptor))
-            .expect("unique typed CICS identity");
-    }
-    verify_semantic_contracts(module, &catalog)
-        .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))
-}
-
-fn operation_schema(descriptor: CicsExecutableDescriptor) -> OperationSchema {
-    let mut schema = OperationSchema::pure(descriptor.identity(), 0, 0);
-    schema.required_attributes = [PLAN_ATTRIBUTE.into()].into_iter().collect();
-    schema.allowed_effects = descriptor.effects.iter().copied().collect();
-    schema.runtime_import = Some(descriptor.runtime_import.into());
-    schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
-        plan_attribute: PLAN_ATTRIBUTE.into(),
-        expected_operation: Some(descriptor.operation),
-        layout_definition_operation: Some(cobol_layout_definition_identity()),
-    });
-    schema
 }
 
 pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), MachineProblem> {
@@ -346,7 +321,10 @@ pub(super) fn execute(
                         plan.operation,
                     )?);
                 }
-                operand_outputs.insert(names::operand(operand.name).into(), target);
+                operand_outputs.insert(
+                    names::operand_for(plan.operation, operand.name).into(),
+                    target,
+                );
                 (
                     "mainframe-env.cics.argument@1",
                     slot.qualified_layout_name.as_bytes().to_vec(),
@@ -401,6 +379,9 @@ pub(super) fn execute(
                         | CicsOperandName::SpoolRecordLength
                         | CicsOperandName::SpoolMaxFlength
                         | CicsOperandName::SpoolFlength
+                        | CicsOperandName::CounterValue
+                        | CicsOperandName::CounterMinimum
+                        | CicsOperandName::CounterMaximum
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -439,7 +420,10 @@ pub(super) fn execute(
                 read_slot(machine, slot)?.len().to_string().into_bytes(),
             ),
         };
-        arguments.insert(names::operand(operand.name).into(), payload(schema, bytes)?);
+        arguments.insert(
+            names::operand_for(plan.operation, operand.name).into(),
+            payload(schema, bytes)?,
+        );
     }
 
     let mut into = None;
@@ -901,6 +885,22 @@ fn validate_machine_slot(
     {
         return Err(invalid_plan("fullword CICS input must be fullword binary"));
     }
+    if matches!(slot_use, SlotUse::CounterNumber) {
+        let (length, signed) = match expected_operation(&operation.identity) {
+            Some(CicsPlanOperation::DefineCounter) => (4, true),
+            Some(CicsPlanOperation::DefineDCounter) => (8, false),
+            _ => return Err(invalid_plan("counter number belongs to another operation")),
+        };
+        if layout.category != LayoutCategory::Binary
+            || layout.length != length
+            || layout.scale != 0
+            || layout.signed != signed
+        {
+            return Err(invalid_plan(
+                "counter number has the wrong binary width or sign",
+            ));
+        }
+    }
     if matches!(slot_use, SlotUse::FullwordOutput)
         && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
     {
@@ -1082,14 +1082,6 @@ fn read_integer_slot(
         return Err(MachineProblem::DataException);
     }
     Ok(value.coefficient)
-}
-
-fn expected_operation(identity: &OperationIdentity) -> Option<CicsPlanOperation> {
-    cics_executable_descriptor_for_identity(identity).map(|descriptor| descriptor.operation)
-}
-
-fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
-    cics_executable_descriptor(operation).effects
 }
 
 fn payload(schema: &str, bytes: Vec<u8>) -> Result<BoundedPayload, MachineProblem> {

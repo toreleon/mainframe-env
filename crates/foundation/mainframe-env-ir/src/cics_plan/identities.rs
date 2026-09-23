@@ -29,6 +29,10 @@ pub enum CicsPlanOperation {
     Cancel,
     /// Complete a source-defined zero-delay request without suspension.
     Delay,
+    /// Define one signed fullword named counter.
+    DefineCounter,
+    /// Define one unsigned doubleword named counter.
+    DefineDCounter,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -441,6 +445,16 @@ pub enum CicsOperandName {
     TypeNameLength,
     /// Type-namespace buffer length.
     TypeNamespaceLength,
+    /// `COUNTER(...)` or `DCOUNTER(...)` named-counter identity.
+    CounterName,
+    /// `POOL(...)` named-counter pool selector.
+    CounterPool,
+    /// `VALUE(...)` initial named-counter value.
+    CounterValue,
+    /// `MINIMUM(...)` named-counter lower bound.
+    CounterMinimum,
+    /// `MAXIMUM(...)` named-counter upper bound.
+    CounterMaximum,
     /// `JOURNALNAME(...)` named journal identity.
     JournalName,
     /// `JOURNALNUM(...)` numeric journal identity from 1 to 99.
@@ -562,6 +576,8 @@ pub enum CicsPlanOption {
     Shared64,
     /// Request an executable DSA for a below-bar location.
     Executable64,
+    /// Fail immediately while the selected counter pool is rebuilding.
+    CounterNoSuspend,
     /// Retain a closed spool report.
     SpoolKeep,
     /// Delete a closed spool report.

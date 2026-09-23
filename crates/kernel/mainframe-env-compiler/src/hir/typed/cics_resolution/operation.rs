@@ -19,6 +19,8 @@ pub(super) fn resolve(
         ["GETMAIN"] => HirCicsOperation::Getmain,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
+        ["DEFINE", "COUNTER"] => HirCicsOperation::DefineCounter,
+        ["DEFINE", "DCOUNTER"] => HirCicsOperation::DefineDCounter,
         ["ENQ"] => HirCicsOperation::Enq,
         ["HANDLE", "ABEND"] => HirCicsOperation::HandleAbend,
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,

@@ -8,6 +8,7 @@ mod address;
 mod assign;
 mod browse;
 mod codec_tags;
+mod counter_control;
 mod document_control;
 mod file_mutation;
 mod handle_abend;
@@ -639,6 +640,9 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::SpoolRead => spool_control::invalid_read_shape(plan, inputs, outputs),
         CicsPlanOperation::SpoolWrite => spool_control::invalid_write_shape(plan, inputs, outputs),
+        CicsPlanOperation::DefineCounter | CicsPlanOperation::DefineDCounter => {
+            counter_control::invalid_define_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }

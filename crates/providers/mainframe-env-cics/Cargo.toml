@@ -16,6 +16,7 @@ mainframe-env-host-api.workspace = true
 mainframe-env-store-api.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 mainframe-env-store = { path = "../../stores/mainframe-env-store" }

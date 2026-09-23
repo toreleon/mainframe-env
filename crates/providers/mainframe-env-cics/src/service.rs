@@ -1,9 +1,9 @@
 #[path = "handlers/mod.rs"]
 mod handlers;
 
+use crate::generated::CicsCommandFamily;
 #[cfg(test)]
-use crate::generated::command_descriptor;
-use crate::generated::{CICS_COMMAND_DESCRIPTORS, CicsCommandFamily};
+use crate::generated::{CICS_COMMAND_DESCRIPTORS, command_descriptor};
 use crate::retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
@@ -1718,7 +1718,6 @@ impl CicsService {
             return Err(HostProblem::IdempotencyConflict);
         }
         let descriptor = handlers::authorize_and_describe(self, run, &request)?;
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 83);
         handlers::assert_descriptor(descriptor, &request);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -1733,6 +1732,7 @@ impl CicsService {
             }
             CicsCommandFamily::FileControl => handlers::invoke_file_control(self, run, &request),
             CicsCommandFamily::QueueControl => handlers::invoke_queue_control(self, run, &request),
+            CicsCommandFamily::CounterControl => handlers::invoke_counter(self, run, &request),
             CicsCommandFamily::Recovery => {
                 handlers::invoke_recovery(self, run, &request, retention_tick)
             }
@@ -26530,6 +26530,77 @@ mod tests {
         assert_eq!(
             store.list_provider_state("cics-web-channel-v1", 8).unwrap(),
             rows
+        );
+    }
+
+    #[test]
+    fn named_counter_define_is_durable_fenced_and_checks_bounds() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"ORDERA")),
+                ("POOL".into(), cics_literal(b"POOLA")),
+                ("VALUE".into(), cics_decimal(5)),
+                ("MINIMUM".into(), cics_decimal(5)),
+                ("MAXIMUM".into(), cics_decimal(6)),
+            ]),
+            1,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, define.clone(), 1),
+                define.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, define.clone(), 1),
+                define.clone()
+            )
+            .unwrap(),
+            first
+        );
+        let duplicate = request(CicsOperation::DefineCounter, define.arguments.clone(), 2);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, duplicate.clone(), 2),
+                duplicate
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 202,
+            })
+        );
+        let row = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["records"]["POOLA/ORDERA"]["current"], 5);
+        let invalid = request(
+            CicsOperation::DefineDCounter,
+            BTreeMap::from([
+                ("DCOUNTER".into(), cics_literal(b"ORDERB")),
+                ("VALUE".into(), cics_decimal(2)),
+                ("MINIMUM".into(), cics_decimal(3)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 406,
+            })
         );
     }
 }

@@ -248,6 +248,15 @@ const SPOOL_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const COUNTER_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -652,7 +661,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 81);
+        assert_eq!(typed.len(), 83);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -670,7 +679,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 182);
+        assert_eq!(unready.len(), 180);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -892,6 +901,8 @@ mod tests {
                 CicsPlanOperation::SpoolOpenOutput,
                 CicsPlanOperation::SpoolRead,
                 CicsPlanOperation::SpoolWrite,
+                CicsPlanOperation::DefineCounter,
+                CicsPlanOperation::DefineDCounter,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
                 CicsPlanOperation::StartBrowse,

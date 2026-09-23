@@ -1,5 +1,6 @@
 mod bms_map;
 mod condition;
+mod counter_control;
 mod document_control;
 mod file_control;
 mod file_tokens;
@@ -98,6 +99,7 @@ pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
 pub(super) use condition::respond as condition;
+pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
 };

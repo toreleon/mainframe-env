@@ -19,6 +19,7 @@ mod address;
 mod assign_validation;
 mod clause_parser;
 mod command_recognition;
+mod counter_control;
 mod document_control;
 mod file_operands;
 mod format_time;
@@ -695,6 +696,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
+        HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter => {
+            counter_control::allowed_clauses(operation)
+        }
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -782,6 +786,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
+        HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter => {
+            counter_control::allowed_options()
+        }
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -906,6 +913,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
+        HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter => {
+            counter_control::required(operation)
+        }
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -1043,6 +1053,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         &clauses, operation, semantic,
     )?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
+    operands.extend(counter_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -1107,7 +1118,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             ) && is_condition_name(option))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
         })
-        .map(|option| operation::resolve_option(option))
+        .map(|option| {
+            counter_control::option(operation, option)
+                .unwrap_or_else(|| operation::resolve_option(option))
+        })
         .collect::<BTreeSet<_>>();
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();
     let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();

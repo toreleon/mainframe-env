@@ -8,6 +8,7 @@ pub(super) enum SlotUse {
     Input,
     HalfwordInput,
     FullwordInput,
+    CounterNumber,
     AbcodeInput,
     ProgramNameInput,
     AbstimeInput,
@@ -104,6 +105,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::SpoolMaxFlength => SlotUse::SpoolMaxFlengthInput,
         CicsOperandName::SpoolFrom => SlotUse::Input,
         CicsOperandName::SpoolFlength => SlotUse::SpoolMaxFlengthInput,
+        CicsOperandName::CounterValue
+        | CicsOperandName::CounterMinimum
+        | CicsOperandName::CounterMaximum => SlotUse::CounterNumber,
         _ => SlotUse::Input,
     }
 }
@@ -164,6 +168,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::FormatTime => CicsOperation::FormatTime,
         CicsPlanOperation::Cancel => CicsOperation::Cancel,
         CicsPlanOperation::Delay => CicsOperation::Delay,
+        CicsPlanOperation::DefineCounter => CicsOperation::DefineCounter,
+        CicsPlanOperation::DefineDCounter => CicsOperation::DefineDCounter,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -397,6 +403,24 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::SpoolMaxFlength => "MAXFLENGTH",
         CicsOperandName::SpoolFrom => "FROM",
         CicsOperandName::SpoolFlength => "FLENGTH",
+        CicsOperandName::CounterName => "COUNTER",
+        CicsOperandName::CounterPool => "POOL",
+        CicsOperandName::CounterValue => "VALUE",
+        CicsOperandName::CounterMinimum => "MINIMUM",
+        CicsOperandName::CounterMaximum => "MAXIMUM",
+    }
+}
+
+pub(super) const fn operand_for(
+    operation: CicsPlanOperation,
+    name: CicsOperandName,
+) -> &'static str {
+    if matches!(operation, CicsPlanOperation::DefineDCounter)
+        && matches!(name, CicsOperandName::CounterName)
+    {
+        "DCOUNTER"
+    } else {
+        operand(name)
     }
 }
 
@@ -458,6 +482,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Task => "TASK",
         CicsPlanOption::Uow => "UOW",
         CicsPlanOption::NoSuspend => "NOSUSPEND",
+        CicsPlanOption::CounterNoSuspend => "NOSUSPEND",
         CicsPlanOption::Erase => "ERASE",
         CicsPlanOption::Cursor => "CURSOR",
         CicsPlanOption::DateSep => "DATESEP",

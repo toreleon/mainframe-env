@@ -34,6 +34,11 @@ All notable changes to mainframe-env are documented here.
 - WSACONTEXT now resolves ADDRESS, METADATA, and REFPARMS from a complete
   endpoint reference and rebuilds ALL after a partial field replacement.
 
+- Added typed CICS DEFINE COUNTER and DEFINE DCOUNTER over a durable,
+  versioned named-counter pool authority with source-defined bounds,
+  duplicate and pool-rebuild conditions, SAF authorization, fenced replay,
+  and compiled COBOL routing. IBM CICS TS 6.x application API
+  `dfhp4_definecounter.html`, catalog rows 0034 and 0035.
 
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse

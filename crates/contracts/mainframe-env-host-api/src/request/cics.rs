@@ -22,6 +22,10 @@ pub enum CicsOperation {
     ChangeTask,
     /// Complete the source-defined zero-delay interval-control boundary.
     Delay,
+    /// Define a named signed fullword counter in a selected pool.
+    DefineCounter,
+    /// Define a named unsigned doubleword counter in a selected pool.
+    DefineDCounter,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -166,6 +170,8 @@ impl CicsOperation {
             Self::Cancel => "Cancel",
             Self::ChangeTask => "ChangeTask",
             Self::Delay => "Delay",
+            Self::DefineCounter => "DefineCounter",
+            Self::DefineDCounter => "DefineDCounter",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -243,6 +249,12 @@ impl CicsOperation {
         }
     }
 
+    /// Whether this operation belongs to the named-counter family.
+    #[must_use]
+    pub const fn is_counter(self) -> bool {
+        matches!(self, Self::DefineCounter | Self::DefineDCounter)
+    }
+
     /// Whether the operation may change durable or task-local state.
     #[must_use]
     pub const fn is_mutating(self) -> bool {
@@ -260,6 +272,8 @@ impl CicsOperation {
                 | Self::WriteTemporaryStorage
                 | Self::Cancel
                 | Self::Delay
+                | Self::DefineCounter
+                | Self::DefineDCounter
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -335,6 +349,8 @@ impl CicsOperation {
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
+            ("DEFINE", Some("COUNTER")) => Self::DefineCounter,
+            ("DEFINE", Some("DCOUNTER")) => Self::DefineDCounter,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,

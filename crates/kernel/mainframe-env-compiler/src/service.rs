@@ -1579,6 +1579,8 @@ mod tests {
                 CicsPlanOperation::FormatTime => crate::HirCicsOperation::FormatTime,
                 CicsPlanOperation::Cancel => crate::HirCicsOperation::Cancel,
                 CicsPlanOperation::Delay => crate::HirCicsOperation::Delay,
+                CicsPlanOperation::DefineCounter => crate::HirCicsOperation::DefineCounter,
+                CicsPlanOperation::DefineDCounter => crate::HirCicsOperation::DefineDCounter,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
                 CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
                 CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,

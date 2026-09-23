@@ -99,6 +99,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::SpoolOpenOutput => 60,
         CicsPlanOperation::SpoolRead => 61,
         CicsPlanOperation::SpoolWrite => 62,
+        CicsPlanOperation::DefineCounter => 118,
+        CicsPlanOperation::DefineDCounter => 119,
     }
 }
 
@@ -185,6 +187,8 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         60 => Ok(CicsPlanOperation::SpoolOpenOutput),
         61 => Ok(CicsPlanOperation::SpoolRead),
         62 => Ok(CicsPlanOperation::SpoolWrite),
+        118 => Ok(CicsPlanOperation::DefineCounter),
+        119 => Ok(CicsPlanOperation::DefineDCounter),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -346,6 +350,11 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::SpoolMaxFlength => 118,
         CicsOperandName::SpoolFrom => 119,
         CicsOperandName::SpoolFlength => 120,
+        CicsOperandName::CounterName => 384,
+        CicsOperandName::CounterPool => 385,
+        CicsOperandName::CounterValue => 386,
+        CicsOperandName::CounterMinimum => 387,
+        CicsOperandName::CounterMaximum => 388,
     }
 }
 
@@ -506,6 +515,11 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         118 => Ok(CicsOperandName::SpoolMaxFlength),
         119 => Ok(CicsOperandName::SpoolFrom),
         120 => Ok(CicsOperandName::SpoolFlength),
+        384 => Ok(CicsOperandName::CounterName),
+        385 => Ok(CicsOperandName::CounterPool),
+        386 => Ok(CicsOperandName::CounterValue),
+        387 => Ok(CicsOperandName::CounterMinimum),
+        388 => Ok(CicsOperandName::CounterMaximum),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -564,6 +578,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::SpoolPunch => 78,
         CicsPlanOption::SpoolLine => 79,
         CicsPlanOption::SpoolPage => 80,
+        CicsPlanOption::CounterNoSuspend => 316,
     }
 }
 
@@ -621,6 +636,7 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         78 => Ok(CicsPlanOption::SpoolPunch),
         79 => Ok(CicsPlanOption::SpoolLine),
         80 => Ok(CicsPlanOption::SpoolPage),
+        316 => Ok(CicsPlanOption::CounterNoSuspend),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

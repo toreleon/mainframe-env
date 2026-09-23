@@ -96,6 +96,7 @@ TYPED_EXECUTION_FAMILIES = {
     "document-control": "DocumentControl",
     "journal-control": "JournalControl",
     "web-service-control": "WebServiceControl",
+    "counter-control": "CounterControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -107,6 +108,8 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
+    ("DefineCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0034"),
+    ("DefineDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0035"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
     (
         "DeleteTransientData",
@@ -547,6 +550,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Cancel",
         "ChangeTask",
         "Delay",
+        "DefineCounter",
+        "DefineDCounter",
         "AddressSet",
         "Asktime",
         "AsktimeEib",
@@ -774,6 +779,12 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "ReadTransientData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DefineCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "DefineDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "WaitJournalName": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1102,6 +1113,8 @@ def _load_typed_execution_registrations(
         "Cancel",
         "ChangeTask",
         "Delay",
+        "DefineCounter",
+        "DefineDCounter",
         "DeleteTemporaryStorage",
         "DeleteTransientData",
         "Deq",
@@ -1450,6 +1463,8 @@ def load_catalog(
                 "AsktimeEib",
                 "Cancel",
                 "Delay",
+                "DefineCounter",
+                "DefineDCounter",
                 "Deq",
                 "DeleteTransientData",
                 "DeleteTemporaryStorage",
