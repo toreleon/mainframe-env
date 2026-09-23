@@ -130,6 +130,7 @@ pub enum HirCicsOperation {
     SendPartnset,
     WebExtract,
     ExtractWeb,
+    WebRead,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -369,6 +370,11 @@ pub enum HirCicsOperandName {
     WebMethodLength,
     WebVersionLength,
     WebRealmLength,
+    WebHttpHeaderName,
+    WebQueryParmName,
+    WebFormFieldName,
+    WebNameLength,
+    WebValueLength,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

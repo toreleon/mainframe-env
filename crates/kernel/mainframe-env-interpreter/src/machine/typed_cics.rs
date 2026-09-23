@@ -373,6 +373,8 @@ pub(super) fn execute(
                         | CicsOperandName::WebMethodLength
                         | CicsOperandName::WebVersionLength
                         | CicsOperandName::WebRealmLength
+                        | CicsOperandName::WebNameLength
+                        | CicsOperandName::WebValueLength
                         | CicsOperandName::WebPortNumber
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
@@ -515,6 +517,8 @@ pub(super) fn execute(
             | CicsOutputName::WebUriMap
             | CicsOutputName::WebRealm
             | CicsOutputName::WebRealmLength
+            | CicsOutputName::WebValue
+            | CicsOutputName::WebValueLength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

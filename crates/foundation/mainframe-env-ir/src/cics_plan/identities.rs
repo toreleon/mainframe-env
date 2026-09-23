@@ -258,6 +258,8 @@ pub enum CicsPlanOperation {
     WebExtract,
     /// EXTRACT WEB spelling of the checked Web metadata command.
     ExtractWeb,
+    /// Read one bounded HTTP header, query parameter, or form field.
+    WebRead,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -707,6 +709,16 @@ pub enum CicsOperandName {
     WebVersionLength,
     /// Fullword input capacity for the HTTP authentication realm result.
     WebRealmLength,
+    /// HTTP header name to read.
+    WebHttpHeaderName,
+    /// Query parameter name to read.
+    WebQueryParmName,
+    /// Form field name to read.
+    WebFormFieldName,
+    /// Fullword byte length of a Web read name.
+    WebNameLength,
+    /// Fullword receiving capacity for a Web read value.
+    WebValueLength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -1035,4 +1047,8 @@ pub enum CicsOutputName {
     WebRealm,
     /// Actual realm length.
     WebRealmLength,
+    /// Value returned by WEB READ.
+    WebValue,
+    /// Actual WEB READ value length.
+    WebValueLength,
 }

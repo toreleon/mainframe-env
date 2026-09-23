@@ -9,6 +9,7 @@ mod extract;
 mod model;
 mod open;
 mod parse_url;
+mod read;
 pub use model::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
     CicsWebVersion,
@@ -267,6 +268,7 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::WebExtract => extract::invoke(service, run, request),
         CicsOperation::ExtractWeb => extract::invoke(service, run, request),
+        CicsOperation::WebRead => read::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

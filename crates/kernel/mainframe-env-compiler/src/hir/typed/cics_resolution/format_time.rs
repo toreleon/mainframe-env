@@ -178,6 +178,8 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebUriMap
         | HirCicsOutputName::WebRealm
         | HirCicsOutputName::WebRealmLength
+        | HirCicsOutputName::WebValue
+        | HirCicsOutputName::WebValueLength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

@@ -239,6 +239,8 @@ pub enum CicsOperation {
     WebExtract,
     /// EXTRACT WEB spelling of the checked Web metadata command.
     ExtractWeb,
+    /// Read one HTTP header, query parameter, or form field by name.
+    WebRead,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -385,6 +387,7 @@ impl CicsOperation {
             Self::WebClose => "WebClose",
             Self::WebExtract => "WebExtract",
             Self::ExtractWeb => "ExtractWeb",
+            Self::WebRead => "WebRead",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -664,6 +667,7 @@ impl CicsOperation {
             ("WEB", Some("CLOSE")) => Self::WebClose,
             ("WEB", Some("EXTRACT")) => Self::WebExtract,
             ("EXTRACT", Some("WEB")) => Self::ExtractWeb,
+            ("WEB", Some("READ")) => Self::WebRead,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

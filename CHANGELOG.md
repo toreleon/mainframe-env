@@ -38,6 +38,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB READ` for HTTP headers, escaped query parameters, and
+  URL-encoded form fields, with checked value lengths and a compiled route.
+  IBM CICS TS 6.x baseline `ibm-cics-ts-6x-2026-08-31:api-commands` row
+  `0246` binds `dfhp4_webreadhttpheader.html` at
+  `sha256:f1bc6891f4891da46ef10f847406f1ed8d70c9e8712c1f1f89599f09927747d1`,
+  `dfhp4_webreadqueryparm.html` at
+  `sha256:5494c4412e6656b35342cd16392e37fb423c657cd0d2aa5c583c3094ab83d9eb`,
+  and `dfhp4_webreadformfield.html` at
+  `sha256:fed30f534facad037e9dfe724e518c263efed5bf544eccf54080b73e070e4943`.
+
 - Added typed CICS `EXTRACT WEB` as the separately registered synonym of
   `WEB EXTRACT`, with the same checked server/client metadata behavior and a
   distinct compiled route. IBM CICS TS 6.x baseline

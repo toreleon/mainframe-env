@@ -6960,6 +6960,47 @@ mod tests {
     }
 
     #[test]
+    fn web_read_lowers_selected_header_and_rejects_ambiguous_sources() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBREAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADER-X PIC X(6) VALUE 'X-Test'. 01 VALUE-X PIC X(16). 01 VALUE-LEN PIC S9(9) COMP VALUE 16. PROCEDURE DIVISION. ";
+        let source = format!(
+            "{declarations}EXEC CICS WEB READ HTTPHEADER(HEADER-X) NAMELENGTH(6) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN) END-EXEC. STOP RUN."
+        );
+        let analysis = analyze(&source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WEB READ: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WEB READ");
+        assert_eq!(command.operation, HirCicsOperation::WebRead);
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| { operand.name == HirCicsOperandName::WebHttpHeaderName })
+        );
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::WebValueLength
+                && output.target.qualified_name == "VALUE-LEN"
+        }));
+        for command in [
+            "WEB READ HTTPHEADER(HEADER-X) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+            "WEB READ HTTPHEADER(HEADER-X) QUERYPARM(HEADER-X) NAMELENGTH(6) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+            "WEB READ QUERYPARM(HEADER-X) SESSTOKEN(HEADER-X) NAMELENGTH(6) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
     fn web_extract_lowers_server_outputs_and_client_token() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBEXTRACT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 HOST-X PIC X(32). 01 HOST-LEN PIC S9(9) COMP VALUE 32. 01 PATH-X PIC X(32). 01 PATH-LEN PIC S9(9) COMP VALUE 32. 01 METHOD-X PIC X(8). 01 METHOD-LEN PIC S9(9) COMP VALUE 8. 01 SCHEME-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
         for command in [

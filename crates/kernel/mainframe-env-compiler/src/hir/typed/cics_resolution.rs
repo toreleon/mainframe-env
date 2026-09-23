@@ -640,6 +640,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebOpen => web_control::OPEN_CLAUSES,
         HirCicsOperation::WebClose => web_control::CLOSE_CLAUSES,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => web_control::EXTRACT_CLAUSES,
+        HirCicsOperation::WebRead => web_control::READ_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -747,6 +748,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebOpen => &["NOHANDLE"],
         HirCicsOperation::WebClose => &["NOHANDLE"],
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &["NOHANDLE"],
+        HirCicsOperation::WebRead => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -919,6 +921,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebOpen => &["SESSTOKEN"][..],
         HirCicsOperation::WebClose => &["SESSTOKEN"][..],
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &[][..],
+        HirCicsOperation::WebRead => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],

@@ -840,13 +840,14 @@ class CicsDescriptorTests(unittest.TestCase):
 
         for label in (
             "GET CONTAINER",
-            "WEB READ",
             "GDS EXTRACT ATTRIBUTES",
         ):
             with self.subTest(label=label):
                 effect = rows[label]["contract"]["effect"]
                 self.assertEqual(effect["status"], "bounded-ambiguity")
                 self.assertIsNone(effect["mutating"])
+        self.assertEqual(rows["WEB READ"]["contract"]["effect"]["status"], "resolved")
+        self.assertFalse(rows["WEB READ"]["contract"]["effect"]["mutating"])
         self.assertEqual(rows["WAIT JOURNALNAME"]["contract"]["effect"]["status"], "resolved")
         self.assertFalse(rows["WAIT JOURNALNAME"]["contract"]["effect"]["mutating"])
         self.assertEqual(rows["WAIT JOURNALNUM"]["contract"]["effect"]["status"], "resolved")
@@ -1287,6 +1288,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "WEB EXTRACT",
                 "WEB OPEN",
                 "WEB PARSE URL",
+                "WEB READ",
                 "WRITE JOURNALNAME",
                 "WRITE JOURNALNUM",
                 "WSACONTEXT BUILD",

@@ -153,6 +153,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::WebMethodLength
         | CicsOperandName::WebVersionLength
         | CicsOperandName::WebRealmLength => SlotUse::FullwordInput,
+        CicsOperandName::WebNameLength | CicsOperandName::WebValueLength => SlotUse::FullwordInput,
         CicsOperandName::WebPortNumber => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
@@ -216,7 +217,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::WebHttpMethod
         | CicsOutputName::WebHttpVersion
         | CicsOutputName::WebUriMap
-        | CicsOutputName::WebRealm => SlotUse::Output,
+        | CicsOutputName::WebRealm
+        | CicsOutputName::WebValue => SlotUse::Output,
         CicsOutputName::WebHostLength
         | CicsOutputName::WebHostType
         | CicsOutputName::WebPortNumber
@@ -226,7 +228,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::WebMethodLength
         | CicsOutputName::WebVersionLength
         | CicsOutputName::WebRequestType
-        | CicsOutputName::WebRealmLength => SlotUse::FullwordOutput,
+        | CicsOutputName::WebRealmLength
+        | CicsOutputName::WebValueLength => SlotUse::FullwordOutput,
         CicsOutputName::WebSessionToken => SlotUse::Output,
         CicsOutputName::WebHttpVNum | CicsOutputName::WebHttpRNum => SlotUse::HalfwordOutput,
     }
@@ -366,6 +369,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebClose => CicsOperation::WebClose,
         CicsPlanOperation::WebExtract => CicsOperation::WebExtract,
         CicsPlanOperation::ExtractWeb => CicsOperation::ExtractWeb,
+        CicsPlanOperation::WebRead => CicsOperation::WebRead,
     }
 }
 
@@ -604,6 +608,11 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebMethodLength => "METHODLENGTH",
         CicsOperandName::WebVersionLength => "VERSIONLEN",
         CicsOperandName::WebRealmLength => "REALMLEN",
+        CicsOperandName::WebHttpHeaderName => "HTTPHEADER",
+        CicsOperandName::WebQueryParmName => "QUERYPARM",
+        CicsOperandName::WebFormFieldName => "FORMFIELD",
+        CicsOperandName::WebNameLength => "NAMELENGTH",
+        CicsOperandName::WebValueLength => "VALUELENGTH",
         CicsOperandName::WebPortNumber => "PORTNUMBER",
         CicsOperandName::WebScheme => "SCHEME",
         CicsOperandName::WebUriMap => "URIMAP",
@@ -707,6 +716,8 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::WebUriMap => "URIMAP",
         CicsOutputName::WebRealm => "REALM",
         CicsOutputName::WebRealmLength => "REALMLEN",
+        CicsOutputName::WebValue => "VALUE",
+        CicsOutputName::WebValueLength => "VALUELENGTH",
     }
 }
 

@@ -135,6 +135,7 @@ impl Canonical for CicsOperation {
             Self::WebClose => out.variant("CicsOperation", "WebClose", 0),
             Self::WebExtract => out.variant("CicsOperation", "WebExtract", 0),
             Self::ExtractWeb => out.variant("CicsOperation", "ExtractWeb", 0),
+            Self::WebRead => out.variant("CicsOperation", "WebRead", 0),
             Self::WaitJournalName => out.variant("CicsOperation", "WaitJournalName", 0),
             Self::WaitJournalNum => out.variant("CicsOperation", "WaitJournalNum", 0),
             Self::WriteJournalName => out.variant("CicsOperation", "WriteJournalName", 0),

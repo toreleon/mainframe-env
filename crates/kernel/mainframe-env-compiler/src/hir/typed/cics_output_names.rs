@@ -74,4 +74,6 @@ pub enum HirCicsOutputName {
     WebUriMap,
     WebRealm,
     WebRealmLength,
+    WebValue,
+    WebValueLength,
 }

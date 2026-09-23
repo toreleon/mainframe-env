@@ -159,6 +159,13 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WebRead => matches!(
+            output,
+            CicsOutputName::WebValue
+                | CicsOutputName::WebValueLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::DocumentInsert => matches!(
             output,
             CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2

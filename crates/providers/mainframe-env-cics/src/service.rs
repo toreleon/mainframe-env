@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 134);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 135);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7827,6 +7827,116 @@ mod tests {
                 .list_provider_state("cics-web-session-v1", 8)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn web_read_selects_header_query_and_form_values_with_source_lengths() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let invocation = invocation_for("web-read", BTreeMap::new());
+        let session = SessionId::new("web-read", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "WEBR", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: "q=hello+world&n=%2F".into(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: vec![("X-Test".into(), "alpha".into())],
+                },
+            )
+            .unwrap();
+        for (selector, name, length, expected) in [
+            ("HTTPHEADER", b"x-test".as_slice(), 6, b"alpha".as_slice()),
+            ("QUERYPARM", b"n".as_slice(), 1, b"/".as_slice()),
+            ("FORMFIELD", b"q".as_slice(), 1, b"hello world".as_slice()),
+        ] {
+            let read = request(
+                CicsOperation::WebRead,
+                BTreeMap::from([
+                    (selector.into(), cics_literal(name)),
+                    ("NAMELENGTH".into(), cics_decimal(length)),
+                    ("VALUE".into(), argument(b"VALUE-X")),
+                    ("VALUELENGTH".into(), cics_decimal(32)),
+                ]),
+                1,
+            );
+            let result = service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+                .unwrap();
+            assert_eq!(result.outputs["VALUE"].bytes(), expected);
+            assert_eq!(
+                result.outputs["VALUELENGTH"].bytes(),
+                expected.len().to_string().as_bytes()
+            );
+        }
+        let mut short = request(
+            CicsOperation::WebRead,
+            BTreeMap::from([
+                ("QUERYPARM".into(), cics_literal(b"q")),
+                ("NAMELENGTH".into(), cics_decimal(1)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(5)),
+            ]),
+            2,
+        );
+        short.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let truncated = service
+            .invoke(&effect(&invocation.run_unit_id, short.clone(), 2), short)
+            .unwrap();
+        assert_eq!(
+            (
+                truncated.condition.as_str(),
+                truncated.response,
+                truncated.response2
+            ),
+            ("LENGERR", 22, 5)
+        );
+        assert_eq!(truncated.outputs["VALUE"].bytes(), b"hello");
+        assert_eq!(truncated.outputs["VALUELENGTH"].bytes(), b"11");
+        let mut invalid = request(
+            CicsOperation::WebRead,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-Test")),
+                ("SESSTOKEN".into(), argument(b"BADTOKEN")),
+                ("NAMELENGTH".into(), cics_decimal(6)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(16)),
+            ]),
+            3,
+        );
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let missing = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                missing.condition.as_str(),
+                missing.response,
+                missing.response2
+            ),
+            ("NOTOPEN", 19, 27)
         );
     }
 

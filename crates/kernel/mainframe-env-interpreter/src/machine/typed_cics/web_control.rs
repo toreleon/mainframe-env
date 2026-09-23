@@ -12,6 +12,7 @@ pub(super) fn output_capacity(
         CicsOutputName::WebHttpMethod => "HTTPMETHOD.MAXLENGTH",
         CicsOutputName::WebHttpVersion => "HTTPVERSION.MAXLENGTH",
         CicsOutputName::WebRealm => "REALM.MAXLENGTH",
+        CicsOutputName::WebValue => "VALUE.MAXLENGTH",
         _ => return Ok(None),
     };
     let CicsTarget::Resolved(slot) = target else {

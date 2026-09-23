@@ -642,6 +642,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WebClose => web_control::invalid_close_shape(plan, inputs, outputs),
         CicsPlanOperation::WebExtract => web_control::invalid_extract_shape(plan, inputs, outputs),
         CicsPlanOperation::ExtractWeb => web_control::invalid_extract_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebRead => web_control::invalid_read_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2103,6 +2104,76 @@ mod tests {
         invalid.outputs.remove(1);
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_read_codec_keeps_selector_and_length_binding_in_v2() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebRead), 96);
+        assert_eq!(operation_from_tag(96), Ok(CicsPlanOperation::WebRead));
+        for (name, tag) in [
+            (CicsOperandName::WebHttpHeaderName, 271),
+            (CicsOperandName::WebQueryParmName, 272),
+            (CicsOperandName::WebFormFieldName, 273),
+            (CicsOperandName::WebNameLength, 274),
+            (CicsOperandName::WebValueLength, 275),
+        ] {
+            assert_eq!(operand_tag(name), tag);
+            assert_eq!(operand_from_tag(tag), Ok(name));
+        }
+        for (name, tag) in [
+            (CicsOutputName::WebValue, 333),
+            (CicsOutputName::WebValueLength, 334),
+        ] {
+            assert_eq!(output_tag(name), tag);
+            assert_eq!(output_from_tag(tag), Ok(name));
+        }
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebRead,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::WebHttpHeaderName,
+                    value: CicsOperandValue::Literal(b"X-Test".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebNameLength,
+                    value: CicsOperandValue::Integer(6),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebValueLength,
+                    value: CicsOperandValue::Storage(slot(1, "VALUE-LEN")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::WebValue,
+                    target: slot(2, "VALUE-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebValueLength,
+                    target: slot(1, "VALUE-LEN"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut ambiguous = plan;
+        ambiguous.operands.push(CicsNamedOperand {
+            name: CicsOperandName::WebQueryParmName,
+            value: CicsOperandValue::Literal(b"q".to_vec()),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&ambiguous, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

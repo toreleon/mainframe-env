@@ -20,6 +20,9 @@ pub(super) fn reviewed_ambiguous_shape(
     {
         return true;
     }
+    if has_value && descriptor.label_tokens == ["WEB", "READ"] && READ_CLAUSES.contains(&name) {
+        return true;
+    }
     has_value
         && matches!(
             (descriptor.label_tokens, name),
@@ -79,6 +82,17 @@ pub(super) const EXTRACT_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const READ_CLAUSES: &[&str] = &[
+    "HTTPHEADER",
+    "QUERYPARM",
+    "FORMFIELD",
+    "NAMELENGTH",
+    "SESSTOKEN",
+    "VALUE",
+    "VALUELENGTH",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -90,6 +104,9 @@ pub(super) fn validate(
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
     ) {
         return validate_extract(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebRead {
+        return validate_read(clauses, semantic);
     }
     if operation == HirCicsOperation::WebClose {
         let tokens = clauses.get("SESSTOKEN").ok_or_else(|| {
@@ -333,6 +350,9 @@ pub(super) fn operands(
     ) {
         return extract_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::WebRead {
+        return read_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::WebClose {
         return Ok(vec![HirCicsNamedOperand {
             name: HirCicsOperandName::WebSessionToken,
@@ -418,6 +438,9 @@ pub(super) fn outputs(
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
     ) {
         return extract_outputs(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebRead {
+        return read_outputs(clauses, semantic);
     }
     if operation == HirCicsOperation::WebOpen {
         return open_outputs(clauses, semantic);
@@ -615,4 +638,116 @@ fn extract_outputs(
         }
     }
     Ok(outputs)
+}
+
+fn validate_read(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    let selectors = ["HTTPHEADER", "QUERYPARM", "FORMFIELD"];
+    let selected = selectors
+        .iter()
+        .filter(|name| clauses.contains_key(**name))
+        .count();
+    if selected != 1 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READ requires exactly one HTTPHEADER, QUERYPARM, or FORMFIELD".into(),
+        ));
+    }
+    if clauses.contains_key("SESSTOKEN") && !clauses.contains_key("HTTPHEADER") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READ SESSTOKEN applies only to HTTPHEADER".into(),
+        ));
+    }
+    for name in ["NAMELENGTH", "VALUE", "VALUELENGTH"] {
+        if !clauses.contains_key(name) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS WEB READ requires {name}"
+            )));
+        }
+    }
+    let selector = selectors
+        .into_iter()
+        .find(|name| clauses.contains_key(*name))
+        .ok_or(ResolutionFailure::Unsupported)?;
+    let name = cics_value(&clauses[selector], semantic)?;
+    if !matches!(name, HirCicsValue::Literal(_) | HirCicsValue::Data(_)) {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READ name requires character input".into(),
+        ));
+    }
+    let length = cics_integer_value(&clauses["NAMELENGTH"], semantic)?;
+    if matches!(length, HirCicsValue::Integer(number) if number < 1) {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READ NAMELENGTH must be positive".into(),
+        ));
+    }
+    if let HirCicsValue::Data(reference) = length
+        && (reference.usage != CobolUsage::Binary || reference.length != 4 || reference.scale != 0)
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READ NAMELENGTH requires fullword binary input".into(),
+        ));
+    }
+    fullword_target(&clauses["VALUELENGTH"], semantic, "VALUELENGTH")?;
+    let value = complete_data_reference(&clauses["VALUE"], semantic)?;
+    require_writable(&value)?;
+    if value.length == 0 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READ VALUE requires receiving storage".into(),
+        ));
+    }
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        let value = cics_value(tokens, semantic)?;
+        if !matches!(&value, HirCicsValue::Data(reference) if reference.length == 8)
+            && !matches!(&value, HirCicsValue::Literal(bytes) if bytes.len() == 8)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB READ SESSTOKEN requires eight bytes".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn read_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = Vec::new();
+    for (source, name) in [
+        ("HTTPHEADER", HirCicsOperandName::WebHttpHeaderName),
+        ("QUERYPARM", HirCicsOperandName::WebQueryParmName),
+        ("FORMFIELD", HirCicsOperandName::WebFormFieldName),
+        ("SESSTOKEN", HirCicsOperandName::WebSessionToken),
+    ] {
+        if let Some(tokens) = clauses.get(source) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: cics_value(tokens, semantic)?,
+            });
+        }
+    }
+    operands.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::WebNameLength,
+        value: cics_integer_value(&clauses["NAMELENGTH"], semantic)?,
+    });
+    operands.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::WebValueLength,
+        value: HirCicsValue::Data(complete_data_reference(&clauses["VALUELENGTH"], semantic)?),
+    });
+    Ok(operands)
+}
+
+fn read_outputs(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    Ok(vec![
+        HirCicsOutputBinding {
+            name: HirCicsOutputName::WebValue,
+            target: complete_data_reference(&clauses["VALUE"], semantic)?,
+        },
+        HirCicsOutputBinding {
+            name: HirCicsOutputName::WebValueLength,
+            target: complete_data_reference(&clauses["VALUELENGTH"], semantic)?,
+        },
+    ])
 }
