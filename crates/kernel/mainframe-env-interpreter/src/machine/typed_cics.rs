@@ -3,10 +3,10 @@ use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
     CICS_ASSIGN_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
     CicsExecutableDescriptor, CicsOperandName, CicsOperandValue, CicsOperationContract,
-    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsStorageSlot, Effect, Module,
-    OperationCatalog, OperationSchema, OperationSemanticContract, cics_executable_descriptor,
-    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
-    decode_cics_effect_plan, verify_semantic_contracts,
+    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
+    Module, OperationCatalog, OperationSchema, OperationSemanticContract,
+    cics_executable_descriptor, cics_executable_descriptor_for_identity,
+    cobol_layout_definition_identity, decode_cics_effect_plan, verify_semantic_contracts,
 };
 
 mod address;
@@ -242,7 +242,6 @@ pub(super) fn execute(
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
     }
-
     let host_operation = names::host_operation(plan.operation);
     let address_set = address::action(&plan)?;
     let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
@@ -429,6 +428,16 @@ pub(super) fn execute(
                 outputs.insert(key.into(), target);
             }
         }
+    }
+    if plan.operation == CicsPlanOperation::WriteTemporaryStorage
+        && !plan.options.contains(&CicsPlanOption::RewriteTemporary)
+        && let Some(CicsOperandValue::Storage(slot)) = plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::Item)
+            .map(|operand| &operand.value)
+    {
+        outputs.insert("ITEM".into(), CicsTarget::Resolved(slot.clone()));
     }
     for option in &plan.options {
         arguments.insert(

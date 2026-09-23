@@ -2654,6 +2654,111 @@ mod tests {
     }
 
     #[test]
+    fn cics_writeq_ts_crosses_the_compiled_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITETS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. 01 ITEM-X PIC S9(4) COMP VALUE 0. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 COUNT-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) ITEM(ITEM-X) LENGTH(LENGTH-X) NUMITEMS(COUNT-X) MAIN NOSUSPEND SYSID('S001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS WRITEQ TS QNAME(QNAME-X) FROM(DATA-X) ITEM(ITEM-X) REWRITE AUXILIARY END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(append) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WRITEQ TS append did not call host");
+        };
+        assert!(matches!(
+            &append.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WriteTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QUEUE"].bytes() == b"TEMPQ"
+                && arguments["FROM"].bytes() == b"PAYLOAD "
+                && arguments["ITEM"].bytes() == b"0"
+                && arguments["LENGTH"].bytes() == b"7"
+                && arguments["SYSID"].bytes() == b"S001"
+                && arguments["OPTION.MAIN"].bytes().is_empty()
+                && arguments["OPTION.NOSUSPEND"].bytes().is_empty()
+                && arguments.contains_key("NUMITEMS")
+                && !arguments.contains_key("OPTION.REWRITE")
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response =
+            |outputs: BTreeMap<String, mainframe_env_execution_api::BoundedPayload>| CicsResponse {
+                disposition: CicsDisposition::Complete,
+                condition: "NORMAL".into(),
+                response: 0,
+                response2: 0,
+                applid: "APP".into(),
+                sysid: "S001".into(),
+                transaction: "T001".into(),
+                aid: 0,
+                target: None,
+                next_transaction: None,
+                payload: payload("mainframe-env.cics.payload@1", &[]),
+                outputs,
+                unit_of_work: None,
+            };
+        let MachineDrive::HostCall(rewrite) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: append.sequence,
+                outcome: Ok(HostResult::Cics(response(BTreeMap::from([
+                    ("ITEM".into(), payload("mainframe-env.cics.decimal@1", b"1")),
+                    (
+                        "NUMITEMS".into(),
+                        payload("mainframe-env.cics.decimal@1", b"1"),
+                    ),
+                ])))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("WRITEQ TS rewrite did not call host");
+        };
+        assert_eq!(machine.variable("ITEM-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(machine.variable("COUNT-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x02]);
+        assert!(matches!(
+            &rewrite.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WriteTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QNAME"].bytes() == b"LONG-QUEUE      "
+                && arguments["ITEM"].bytes() == b"1"
+                && arguments["OPTION.REWRITE"].bytes().is_empty()
+                && arguments["OPTION.AUXILIARY"].bytes().is_empty()
+                && !arguments.contains_key("NUMITEMS")
+        ));
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: rewrite.sequence,
+                    outcome: Ok(HostResult::Cics(response(BTreeMap::new()))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x02]);
+    }
+
+    #[test]
     fn cics_receive_map_terminal_crosses_the_compiled_selected_route() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

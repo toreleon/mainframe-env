@@ -741,6 +741,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::ReadTemporaryStorage => &[
             "QNAME", "QUEUE", "INTO", "SET", "LENGTH", "NUMITEMS", "ITEM", "SYSID", "RESP", "RESP2",
         ],
+        HirCicsOperation::WriteTemporaryStorage => &[
+            "QNAME", "QUEUE", "FROM", "LENGTH", "NUMITEMS", "ITEM", "SYSID", "RESP", "RESP2",
+        ],
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -818,6 +821,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitEvent => &["NOHANDLE"],
         HirCicsOperation::WaitExternal => task_wait::WAIT_EXTERNAL_OPTIONS,
         HirCicsOperation::ReadTemporaryStorage => &["NEXT", "NOHANDLE"],
+        HirCicsOperation::WriteTemporaryStorage => {
+            &["AUXILIARY", "MAIN", "NOSUSPEND", "REWRITE", "NOHANDLE"]
+        }
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -905,6 +911,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::DeleteTransientData
         | HirCicsOperation::DeleteTemporaryStorage
         | HirCicsOperation::ReadTemporaryStorage
+        | HirCicsOperation::WriteTemporaryStorage
         | HirCicsOperation::Freemain
         | HirCicsOperation::Getmain
         | HirCicsOperation::ReceiveMap
@@ -1117,6 +1124,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "EQUAL" => HirCicsOption::Equal,
             "TERMINAL" => HirCicsOption::Terminal,
             "NEXT" => HirCicsOption::Next,
+            "REWRITE" => HirCicsOption::RewriteTemporary,
+            "AUXILIARY" => HirCicsOption::Auxiliary,
+            "MAIN" => HirCicsOption::Main,
             "FMH" => HirCicsOption::Fmh,
             "PROTECT" => HirCicsOption::Protect,
             "WAIT" => HirCicsOption::Wait,

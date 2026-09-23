@@ -191,6 +191,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0257",
     ),
+    (
+        "WriteTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0258",
+    ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
 ]
 
@@ -427,6 +434,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DeleteTransientData",
         "DeleteTemporaryStorage",
         "ReadTemporaryStorage",
+        "WriteTemporaryStorage",
         "ReceiveMap",
         "SendMap",
         "SendText",
@@ -574,6 +582,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "ReadTemporaryStorage": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WriteTemporaryStorage": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "Getmain": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
@@ -836,6 +847,7 @@ def _load_typed_execution_registrations(
         "Suspend",
         "WaitEvent",
         "WaitExternal",
+        "WriteTemporaryStorage",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -1135,6 +1147,7 @@ def load_catalog(
                 "DeleteTransientData",
                 "DeleteTemporaryStorage",
                 "ReadTemporaryStorage",
+                "WriteTemporaryStorage",
                 "Enq",
                 "Freemain",
                 "Getmain",

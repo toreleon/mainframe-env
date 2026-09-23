@@ -34,6 +34,7 @@ pub(super) fn resolve(
         ["DELETEQ", "TD"] => HirCicsOperation::DeleteTransientData,
         ["DELETEQ", "TS"] => HirCicsOperation::DeleteTemporaryStorage,
         ["READQ", "TS"] => HirCicsOperation::ReadTemporaryStorage,
+        ["WRITEQ", "TS"] => HirCicsOperation::WriteTemporaryStorage,
         ["RECEIVE", "MAP"] => HirCicsOperation::ReceiveMap,
         ["SEND", "MAP"] => HirCicsOperation::SendMap,
         ["SEND", "TEXT"] => HirCicsOperation::SendText,

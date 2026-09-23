@@ -178,6 +178,7 @@ pub enum HirCicsOperation {
     DeleteTransientData,
     DeleteTemporaryStorage,
     ReadTemporaryStorage,
+    WriteTemporaryStorage,
     ReceiveMap,
     SendMap,
     SendText,
@@ -301,6 +302,9 @@ pub enum HirCicsOption {
     Purgeable,
     NotPurgeable,
     Next,
+    RewriteTemporary,
+    Auxiliary,
+    Main,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3795,6 +3799,74 @@ mod tests {
             );
             let accepted = analyze(&source);
             assert!(accepted.hir.is_some(), "{item}: {:?}", accepted.diagnostics);
+        }
+    }
+
+    #[test]
+    fn cics_writeq_ts_local_forms_are_typed() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WRITETS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. 01 ITEM-X PIC S9(4) COMP VALUE 1. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 COUNT-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) ITEM(ITEM-X) LENGTH(LENGTH-X) NUMITEMS(COUNT-X) MAIN NOSUSPEND SYSID('S001') END-EXEC. EXEC CICS WRITEQ TS QNAME(QNAME-X) FROM(DATA-X) ITEM(ITEM-X) REWRITE AUXILIARY END-EXEC. STOP RUN.",
+        );
+        assert!(
+            analysis.hir.is_some(),
+            "WRITEQ TS should lower through typed HIR: {:?}",
+            analysis.diagnostics
+        );
+
+        for (command, expected) in [
+            ("WRITEQ TS QUEUE('TEMPQ')", "requires FROM"),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) REWRITE",
+                "REWRITE requires ITEM",
+            ),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) ITEM(ITEM-X) NUMITEMS(COUNT-X) REWRITE",
+                "NUMITEMS is not valid with REWRITE",
+            ),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) SYSID('S001')",
+                "SYSID requires LENGTH",
+            ),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) AUXILIARY MAIN",
+                "AUXILIARY and MAIN are mutually exclusive",
+            ),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) LENGTH(9)",
+                "LENGTH exceeds the FROM data area",
+            ),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) LENGTH(FULL-X)",
+                "LENGTH requires a halfword binary data item",
+            ),
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) NUMITEMS(DATA-X)",
+                "NUMITEMS requires a halfword binary data item",
+            ),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADWTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 ITEM-X PIC S9(4) COMP VALUE 1. 01 COUNT-X PIC S9(4) COMP. 01 FULL-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
+        for length in ["0", "-1", "32764"] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. WTSLENGTH. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) LENGTH({length}) END-EXEC. STOP RUN."
+            );
+            let accepted = analyze(&source);
+            assert!(
+                accepted.hir.is_some(),
+                "{length}: {:?}",
+                accepted.diagnostics
+            );
         }
     }
 

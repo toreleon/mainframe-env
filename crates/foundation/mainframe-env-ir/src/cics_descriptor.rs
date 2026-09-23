@@ -146,6 +146,15 @@ const QUEUE_WRITE_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const TEMPORARY_QUEUE_WRITE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 const TERMINAL_RECEIVE_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,
@@ -565,7 +574,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 47] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 48] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -942,6 +951,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 47] = [
         effects: WAIT_EVENT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WriteTemporaryStorage,
+        namespace: "cics.queue",
+        name: "write-temporary-storage",
+        major: 1,
+        effects: TEMPORARY_QUEUE_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -997,6 +1014,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::ReadTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[44],
         CicsPlanOperation::WaitEvent => &CICS_EXECUTABLE_DESCRIPTORS[45],
         CicsPlanOperation::WaitExternal => &CICS_EXECUTABLE_DESCRIPTORS[46],
+        CicsPlanOperation::WriteTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[47],
     }
 }
 
@@ -1058,7 +1076,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 47);
+        assert_eq!(typed.len(), 48);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1076,7 +1094,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 216);
+        assert_eq!(unready.len(), 215);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1304,6 +1322,7 @@ mod tests {
                 CicsPlanOperation::DeleteTransientData,
                 CicsPlanOperation::DeleteTemporaryStorage,
                 CicsPlanOperation::ReadTemporaryStorage,
+                CicsPlanOperation::WriteTemporaryStorage,
                 CicsPlanOperation::Getmain,
                 CicsPlanOperation::Freemain,
                 CicsPlanOperation::ReceiveMap,

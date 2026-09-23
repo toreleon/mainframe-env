@@ -97,6 +97,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
         CicsPlanOperation::DeleteTemporaryStorage => CicsOperation::DeleteTemporaryStorage,
         CicsPlanOperation::ReadTemporaryStorage => CicsOperation::ReadTemporaryStorage,
+        CicsPlanOperation::WriteTemporaryStorage => CicsOperation::WriteTemporaryStorage,
         CicsPlanOperation::Getmain => CicsOperation::Getmain,
         CicsPlanOperation::Freemain => CicsOperation::Freemain,
         CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,
@@ -233,5 +234,8 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Purgeable => "PURGEABLE",
         CicsPlanOption::NotPurgeable => "NOTPURGEABLE",
         CicsPlanOption::Next => "NEXT",
+        CicsPlanOption::RewriteTemporary => "REWRITE",
+        CicsPlanOption::Auxiliary => "AUXILIARY",
+        CicsPlanOption::Main => "MAIN",
     }
 }

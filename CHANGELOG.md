@@ -18,6 +18,15 @@ All notable changes to mainframe-env are documented here.
   exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR, QIDERR, and QZERO
   conditions across SQLite reopen.
 
+- Added typed local CICS TS 6.x `WRITEQ TS` for row `0258`, including
+  QUEUE/QNAME and exact-local SYSID routing, generated or explicit bounded
+  LENGTH, append ITEM/NUMITEMS compatibility, ITEM+REWRITE replacement,
+  MAIN/AUXILIARY placement, NOSUSPEND capacity handling, exact local
+  conditions, update SAF/audit, crash-safe effect replay, legacy-row migration,
+  SQLite reopen, and compiled EIBFN `0A02` proof. Remote/shared pools, TSMODEL
+  routing, recoverable-UOW coupling, PostgreSQL restart, and licensed
+  differential remain explicit pending boundaries.
+
 - Added typed local CICS TS 6.x `READQ TS` for row `0160`, including
   QUEUE/QNAME and exact-local SYSID routing, explicit ITEM and queue-wide
   default/NEXT addressing, INTO or task-owned SET delivery, in/out LENGTH,

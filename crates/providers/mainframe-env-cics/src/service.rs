@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 49);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 50);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4549,6 +4549,48 @@ mod tests {
         .unwrap()
     }
 
+    fn writeq_request(
+        queue_argument: &str,
+        queue: &[u8],
+        value: &[u8],
+        length: i64,
+        sequence: u64,
+    ) -> CicsRequest {
+        request(
+            CicsOperation::WriteTemporaryStorage,
+            BTreeMap::from([
+                (queue_argument.into(), cics_literal(queue)),
+                ("FROM".into(), task_value(value)),
+                ("LENGTH".into(), cics_decimal(length)),
+            ]),
+            sequence,
+        )
+    }
+
+    fn responding(mut request: CicsRequest) -> CicsRequest {
+        request.arguments.insert("RESP".into(), argument(b"RESP-X"));
+        request
+            .arguments
+            .insert("RESP2".into(), argument(b"RESP2-X"));
+        request.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        request
+    }
+
+    fn temporary_payload(lock: u8, items: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut payload = b"METS1".to_vec();
+        payload.extend_from_slice(&[0, lock]);
+        payload.extend_from_slice(&0_u32.to_be_bytes());
+        payload.extend_from_slice(&u32::try_from(items.len()).unwrap().to_be_bytes());
+        for (effect_key, value) in items {
+            field(&mut payload, effect_key.as_bytes()).unwrap();
+            field(&mut payload, value).unwrap();
+        }
+        payload
+    }
+
     fn condition_list(names: &[&str]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.condition-list@1",
@@ -4886,6 +4928,7 @@ mod tests {
             ("SYNCPOINT", CicsOperation::Syncpoint),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
+            ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
             ("XCTL", CicsOperation::Xctl),
         ];
         for (source, expected) in cases {
@@ -4899,7 +4942,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 49);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 50);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -10620,6 +10663,525 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
+        );
+    }
+
+    #[test]
+    fn writeq_ts_recovers_exactly_after_replay_journal_failure() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let service = service(store.clone());
+        let (invocation, _) = registered(&service);
+        let mut append = writeq_request("QUEUE", b"RECOVER", b"DATA", 4, 1);
+        append.arguments.insert("ITEM".into(), cics_decimal(0));
+        append
+            .arguments
+            .insert("NUMITEMS".into(), argument(b"COUNT-X"));
+
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, append.clone(), 1),
+                append.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let after_failure = store
+            .get_provider_state("cics-tsq", "RECOVER")
+            .unwrap()
+            .unwrap();
+        assert_eq!(after_failure.version, 1);
+        assert!(after_failure.payload.starts_with(b"METS1"));
+        assert!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-1")
+                .unwrap()
+                .is_none()
+        );
+
+        let mut conflicting = append.clone();
+        conflicting
+            .arguments
+            .insert("FROM".into(), task_value(b"FAIL"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, conflicting.clone(), 1),
+                conflicting,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+
+        let recovered = service
+            .invoke(
+                &effect(&invocation.run_unit_id, append.clone(), 1),
+                append.clone(),
+            )
+            .unwrap();
+        assert_eq!(recovered.outputs["ITEM"].bytes(), b"1");
+        assert_eq!(recovered.outputs["NUMITEMS"].bytes(), b"1");
+        assert_eq!(
+            store
+                .get_provider_state("cics-tsq", "RECOVER")
+                .unwrap()
+                .unwrap()
+                .version,
+            1
+        );
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, append.clone(), 1), append)
+            .unwrap();
+        assert_eq!(replayed, recovered);
+        assert_eq!(
+            store
+                .get_provider_state("cics-tsq", "RECOVER")
+                .unwrap()
+                .unwrap()
+                .version,
+            1
+        );
+    }
+
+    #[test]
+    fn writeq_ts_append_rewrite_migration_and_sqlite_reopen_are_exact() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-writeq-ts-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: "LEGACYQ".into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![("legacy-seed".into(), b"OLD".to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+            let service = service(store.clone());
+            let invocation = invocation_for("writeq-ts", BTreeMap::new());
+            let session = SessionId::new("writeq-ts", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+                .unwrap();
+
+            let mut append = writeq_request("QUEUE", b"TEMPQ", b"ABCDE", 4, 1);
+            append.arguments.extend(BTreeMap::from([
+                ("ITEM".into(), cics_decimal(0)),
+                ("NUMITEMS".into(), argument(b"COUNT-X")),
+                ("SYSID".into(), cics_literal(b"S001")),
+                ("OPTION.MAIN".into(), cics_option()),
+            ]));
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, append.clone(), 1), append)
+                .unwrap();
+            assert_eq!(response.outputs["ITEM"].bytes(), b"1");
+            assert_eq!(response.outputs["NUMITEMS"].bytes(), b"1");
+            let row = store
+                .get_provider_state("cics-tsq", "TEMPQ")
+                .unwrap()
+                .unwrap();
+            assert_eq!(&row.payload[..7], b"METS1\x01\x00");
+
+            let mut migrate = writeq_request("QNAME", b"LEGACYQ", b"NEW", 3, 2);
+            migrate
+                .arguments
+                .insert("OPTION.AUXILIARY".into(), cics_option());
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, migrate.clone(), 2),
+                    migrate,
+                )
+                .unwrap();
+            let migrated = store
+                .get_provider_state("cics-tsq", "LEGACYQ")
+                .unwrap()
+                .unwrap();
+            assert_eq!(migrated.version, 2);
+            assert!(migrated.payload.starts_with(b"METS1"));
+
+            let mut rewrite = writeq_request("QUEUE", b"TEMPQ", b"XY", 2, 3);
+            rewrite.arguments.extend(BTreeMap::from([
+                ("ITEM".into(), cics_decimal(1)),
+                ("OPTION.REWRITE".into(), cics_option()),
+            ]));
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, rewrite.clone(), 3),
+                    rewrite.clone(),
+                )
+                .unwrap();
+            assert!(response.outputs.is_empty());
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, rewrite.clone(), 3),
+                        rewrite
+                    )
+                    .unwrap(),
+                response
+            );
+            assert!(
+                store
+                    .audit_records(&invocation.execution_id, 0, 64)
+                    .unwrap()
+                    .iter()
+                    .any(|record| {
+                        record.capability.as_str() == "host.security.authorize"
+                            && record.decision
+                                == mainframe_env_execution_api::AuditDecision::Success
+                    })
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let invocation = invocation_for("writeq-ts-reopen", BTreeMap::new());
+            let session = SessionId::new("writeq-ts-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+                .unwrap();
+            for (sequence, queue, item, expected) in [
+                (4, b"TEMPQ".as_slice(), 1, b"XY".as_slice()),
+                (5, b"LEGACYQ".as_slice(), 2, b"NEW".as_slice()),
+            ] {
+                let read = request(
+                    CicsOperation::ReadTemporaryStorage,
+                    BTreeMap::from([
+                        ("QUEUE".into(), cics_literal(queue)),
+                        ("INTO".into(), argument(b"DATA-X")),
+                        ("ITEM".into(), cics_decimal(item)),
+                        ("LENGTH".into(), cics_decimal(8)),
+                    ]),
+                    sequence,
+                );
+                let response = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, read.clone(), sequence),
+                        read,
+                    )
+                    .unwrap();
+                assert_eq!(response.payload.bytes(), expected);
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn writeq_ts_conditions_capacity_locks_and_security_are_exact() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        for (key, lock) in [("OPENQ", 0), ("RECOVERY", 1), ("INDOUBT", 2)] {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: temporary_payload(lock, &[("seed", b"A")]),
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        let service = service(store.clone());
+        let invocation = invocation_for("writeq-ts-conditions", BTreeMap::new());
+        let session = SessionId::new("writeq-ts-conditions", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+            .unwrap();
+
+        let mut cases = Vec::new();
+        cases.push((
+            responding(writeq_request("QUEUE", b"RECOVERY", b"B", 1, 1)),
+            "INVREQ",
+            16,
+            0,
+        ));
+        cases.push((
+            responding(writeq_request("QUEUE", b"INDOUBT", b"B", 1, 2)),
+            "LOCKED",
+            100,
+            0,
+        ));
+        let mut missing = writeq_request("QUEUE", b"MISSING", b"B", 1, 3);
+        missing.arguments.extend(BTreeMap::from([
+            ("ITEM".into(), cics_decimal(1)),
+            ("OPTION.REWRITE".into(), cics_option()),
+        ]));
+        cases.push((responding(missing), "QIDERR", 44, 0));
+        let mut bad_item = writeq_request("QUEUE", b"OPENQ", b"B", 1, 4);
+        bad_item.arguments.extend(BTreeMap::from([
+            ("ITEM".into(), cics_decimal(2)),
+            ("OPTION.REWRITE".into(), cics_option()),
+        ]));
+        cases.push((responding(bad_item), "ITEMERR", 26, 0));
+        cases.push((
+            responding(writeq_request("QUEUE", b"OPENQ", b"B", 0, 5)),
+            "LENGERR",
+            22,
+            0,
+        ));
+        cases.push((
+            responding(writeq_request("QUEUE", &[0; 8], b"B", 1, 6)),
+            "INVREQ",
+            16,
+            0,
+        ));
+        cases.push((
+            responding(writeq_request("QUEUE", b"DFQUEUE", b"B", 1, 7)),
+            "INVREQ",
+            16,
+            0,
+        ));
+        let mut remote = writeq_request("QUEUE", b"OPENQ", b"B", 1, 8);
+        remote
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        cases.push((responding(remote), "SYSIDERR", 53, 4));
+        for (request, condition, response, response2) in cases {
+            let sequence = request.mutation.as_ref().unwrap().sequence;
+            let result = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (result.condition.as_str(), result.response, result.response2,),
+                (condition, response, response2)
+            );
+        }
+        for (sequence, length) in [(12, -1), (13, 32_764)] {
+            let invalid = responding(writeq_request("QUEUE", b"OPENQ", b"B", length, sequence));
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                )
+                .unwrap();
+            assert_eq!(
+                (response.condition.as_str(), response.response),
+                ("LENGERR", 22)
+            );
+        }
+
+        let capacity_store = Arc::new(MemoryStore::new(Default::default()));
+        let capacity_service = CicsService::open(
+            authorities(),
+            capacity_store.clone(),
+            CicsLimits {
+                max_queue_records: 1,
+                max_queue_bytes: 1,
+                ..CicsLimits::default()
+            },
+        )
+        .unwrap();
+        let capacity_invocation = invocation_for("writeq-ts-capacity", BTreeMap::new());
+        let capacity_session = SessionId::new("writeq-ts-capacity", 64).unwrap();
+        capacity_service
+            .create_session(&capacity_session, 24, 80)
+            .unwrap();
+        capacity_service
+            .register_run(
+                capacity_invocation.clone(),
+                &capacity_session,
+                "MENU",
+                "MEAPPL",
+                "S001",
+            )
+            .unwrap();
+        let first = writeq_request("QUEUE", b"CAPQ", b"A", 1, 9);
+        capacity_service
+            .invoke(
+                &effect(&capacity_invocation.run_unit_id, first.clone(), 9),
+                first,
+            )
+            .unwrap();
+        let before = capacity_store
+            .get_provider_state("cics-tsq", "CAPQ")
+            .unwrap()
+            .unwrap();
+        let mut full = writeq_request("QUEUE", b"CAPQ", b"B", 1, 10);
+        full.arguments
+            .insert("OPTION.NOSUSPEND".into(), cics_option());
+        let full = responding(full);
+        let response = capacity_service
+            .invoke(
+                &effect(&capacity_invocation.run_unit_id, full.clone(), 10),
+                full,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "NOSPACE", 18, 0)
+        );
+        assert_eq!(
+            capacity_store
+                .get_provider_state("cics-tsq", "CAPQ")
+                .unwrap()
+                .unwrap(),
+            before
+        );
+
+        let denied_store = Arc::new(MemoryStore::new(Default::default()));
+        let provider = Arc::new(QueueSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+        }) as Arc<dyn HostProvider>;
+        let denied_host = Arc::new(ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+            ),
+            HostLimits::default(),
+        ));
+        let denied =
+            CicsService::open(denied_host, denied_store.clone(), CicsLimits::default()).unwrap();
+        let denied_invocation = invocation_for("writeq-ts-denied", BTreeMap::new());
+        let denied_session = SessionId::new("writeq-ts-denied", 64).unwrap();
+        denied.create_session(&denied_session, 24, 80).unwrap();
+        denied
+            .register_run(
+                denied_invocation.clone(),
+                &denied_session,
+                "MENU",
+                "MEAPPL",
+                "S001",
+            )
+            .unwrap();
+        let denied_request = responding(writeq_request("QUEUE", b"DENIEDQ", b"A", 1, 11));
+        let response = denied
+            .invoke(
+                &effect(&denied_invocation.run_unit_id, denied_request.clone(), 11),
+                denied_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            ("NOTAUTH", 70, 101)
+        );
+        assert!(
+            denied_store
+                .get_provider_state("cics-tsq", "DENIEDQ")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            denied_store
+                .audit_records(&denied_invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
+        );
+    }
+
+    #[test]
+    fn tsq_literal_item_errors_and_storage_shapes_follow_the_command_pages() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, _) = registered(&service);
+        let append = writeq_request("QUEUE", b"TEMPQ", b"DATA", 4, 1);
+        service
+            .invoke(&effect(&invocation.run_unit_id, append.clone(), 1), append)
+            .unwrap();
+        let before = store
+            .get_provider_state("cics-tsq", "TEMPQ")
+            .unwrap()
+            .unwrap();
+
+        let item_zero = responding(request(
+            CicsOperation::ReadTemporaryStorage,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("ITEM".into(), cics_decimal(0)),
+                ("LENGTH".into(), cics_decimal(8)),
+            ]),
+            2,
+        ));
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, item_zero.clone(), 2),
+                item_zero,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("ITEMERR", 26)
+        );
+
+        for (sequence, operation, arguments) in [
+            (
+                3,
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), task_value(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("LENGTH".into(), cics_decimal(8)),
+                ]),
+            ),
+            (
+                4,
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QNAME".into(), task_value(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("LENGTH".into(), cics_decimal(8)),
+                ]),
+            ),
+            (
+                5,
+                CicsOperation::WriteTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), task_value(b"TEMPQ")),
+                    ("FROM".into(), task_value(b"DATA")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]),
+            ),
+            (
+                6,
+                CicsOperation::WriteTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                    ("FROM".into(), cics_literal(b"DATA")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]),
+            ),
+        ] {
+            let invalid = request(operation, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        let after = store
+            .get_provider_state("cics-tsq", "TEMPQ")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (after.version, after.payload),
+            (before.version, before.payload)
         );
     }
 

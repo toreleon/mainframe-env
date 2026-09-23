@@ -370,6 +370,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::WriteTemporaryStorage,
+        syntax: "WRITEQ TS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0258",
+        family: CicsCommandFamily::QueueControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Xctl,
         syntax: "XCTL",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0263",
@@ -428,6 +435,7 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[45],
         CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[46],
         CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[47],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[48],
+        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[48],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[49],
     }
 }

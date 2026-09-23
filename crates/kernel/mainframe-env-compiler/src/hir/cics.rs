@@ -340,6 +340,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DeleteTransientData => CicsPlanOperation::DeleteTransientData,
         HirCicsOperation::DeleteTemporaryStorage => CicsPlanOperation::DeleteTemporaryStorage,
         HirCicsOperation::ReadTemporaryStorage => CicsPlanOperation::ReadTemporaryStorage,
+        HirCicsOperation::WriteTemporaryStorage => CicsPlanOperation::WriteTemporaryStorage,
         HirCicsOperation::Getmain => CicsPlanOperation::Getmain,
         HirCicsOperation::Freemain => CicsPlanOperation::Freemain,
         HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,
@@ -387,5 +388,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Purgeable => CicsPlanOption::Purgeable,
         HirCicsOption::NotPurgeable => CicsPlanOption::NotPurgeable,
         HirCicsOption::Next => CicsPlanOption::Next,
+        HirCicsOption::RewriteTemporary => CicsPlanOption::RewriteTemporary,
+        HirCicsOption::Auxiliary => CicsPlanOption::Auxiliary,
+        HirCicsOption::Main => CicsPlanOption::Main,
     }
 }

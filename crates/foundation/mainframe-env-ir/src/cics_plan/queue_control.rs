@@ -249,3 +249,118 @@ pub(super) fn invalid_read_temporary_storage_shape(
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::Next | CicsPlanOption::NoHandle))
 }
+
+pub(super) fn invalid_write_temporary_storage_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let identity = if inputs.contains(&CicsOperandName::Qname) {
+        CicsOperandName::Qname
+    } else {
+        CicsOperandName::Queue
+    };
+    let maximum = if identity == CicsOperandName::Qname {
+        16
+    } else {
+        8
+    };
+    let mut required_inputs =
+        BTreeSet::from([identity, CicsOperandName::From, CicsOperandName::Length]);
+    let has_item = inputs.contains(&CicsOperandName::Item);
+    let has_sysid = inputs.contains(&CicsOperandName::SysId);
+    if has_item {
+        required_inputs.insert(CicsOperandName::Item);
+    }
+    if has_sysid {
+        required_inputs.insert(CicsOperandName::SysId);
+    }
+    let rewrite = plan.options.contains(&CicsPlanOption::RewriteTemporary);
+    let auxiliary = plan.options.contains(&CicsPlanOption::Auxiliary);
+    let main = plan.options.contains(&CicsPlanOption::Main);
+    let allowed_outputs = BTreeSet::from([
+        CicsOutputName::NumItems,
+        CicsOutputName::Resp,
+        CicsOutputName::Resp2,
+    ]);
+    inputs.contains(&CicsOperandName::Queue) == inputs.contains(&CicsOperandName::Qname)
+        || *inputs != required_inputs
+        || !outputs.is_subset(&allowed_outputs)
+        || rewrite && !has_item
+        || rewrite && outputs.contains(&CicsOutputName::NumItems)
+        || auxiliary && main
+        || match plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == identity)
+            .map(|operand| &operand.value)
+        {
+            Some(CicsOperandValue::Literal(value)) => {
+                !(1..=maximum).contains(&value.len())
+                    || !value
+                        .iter()
+                        .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+            }
+            Some(CicsOperandValue::Storage(_)) => false,
+            _ => true,
+        }
+        || !matches!(
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::From)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Storage(_))
+        )
+        || !matches!(
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Length)
+                .map(|operand| &operand.value),
+            Some(
+                CicsOperandValue::Integer(-32_768..=32_767)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            )
+        )
+        || match (
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::From)
+                .map(|operand| &operand.value),
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Length)
+                .map(|operand| &operand.value),
+        ) {
+            (Some(CicsOperandValue::Storage(from)), Some(CicsOperandValue::LengthOf(length))) => {
+                from != length
+            }
+            _ => false,
+        }
+        || plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::Item)
+            .is_some_and(|operand| !matches!(operand.value, CicsOperandValue::Storage(_)))
+        || plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::SysId)
+            .is_some_and(|operand| match &operand.value {
+                CicsOperandValue::Literal(value) => {
+                    !matches!(value.len(), 1..=4) || !value.iter().all(u8::is_ascii_alphanumeric)
+                }
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            })
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::RewriteTemporary
+                    | CicsPlanOption::Auxiliary
+                    | CicsPlanOption::Main
+                    | CicsPlanOption::NoSuspend
+                    | CicsPlanOption::NoHandle
+            )
+        })
+}

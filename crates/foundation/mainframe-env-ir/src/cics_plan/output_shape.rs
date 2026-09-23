@@ -26,6 +26,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WriteTemporaryStorage => matches!(
+            output,
+            CicsOutputName::NumItems | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Getmain => matches!(
             output,
             CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2

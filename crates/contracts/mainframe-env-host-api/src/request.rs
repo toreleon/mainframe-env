@@ -2426,6 +2426,7 @@ mod tests {
             CicsOperation::DeleteTransientData,
             CicsOperation::DeleteTemporaryStorage,
             CicsOperation::ReadTemporaryStorage,
+            CicsOperation::WriteTemporaryStorage,
             CicsOperation::Enq,
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
@@ -2461,7 +2462,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 46);
+        assert_eq!(forms.len(), 47);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

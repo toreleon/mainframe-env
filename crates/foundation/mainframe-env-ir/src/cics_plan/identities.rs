@@ -71,6 +71,8 @@ pub enum CicsPlanOperation {
     ReadTransientData,
     /// Read one item from a local temporary-storage queue.
     ReadTemporaryStorage,
+    /// Append or replace one item in a local temporary-storage queue.
+    WriteTemporaryStorage,
     /// Receive one mapped terminal input message.
     ReceiveMap,
     /// Send one mapped terminal output message.
@@ -264,6 +266,12 @@ pub enum CicsPlanOption {
     NotPurgeable,
     /// Read the next temporary-storage item after the queue-wide cursor.
     Next,
+    /// Replace an existing temporary-storage item instead of appending.
+    RewriteTemporary,
+    /// Select auxiliary storage when creating a temporary-storage queue.
+    Auxiliary,
+    /// Select main storage when creating a temporary-storage queue.
+    Main,
 }
 
 /// Named result binding written after the host result arrives.

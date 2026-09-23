@@ -56,6 +56,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WaitEvent => 43,
         CicsPlanOperation::WaitExternal => 44,
         CicsPlanOperation::ReadTemporaryStorage => 49,
+        CicsPlanOperation::WriteTemporaryStorage => 50,
     }
 }
 
@@ -108,6 +109,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         43 => Ok(CicsPlanOperation::WaitEvent),
         44 => Ok(CicsPlanOperation::WaitExternal),
         49 => Ok(CicsPlanOperation::ReadTemporaryStorage),
+        50 => Ok(CicsPlanOperation::WriteTemporaryStorage),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -260,6 +262,9 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Purgeable => 28,
         CicsPlanOption::NotPurgeable => 29,
         CicsPlanOption::Next => 44,
+        CicsPlanOption::RewriteTemporary => 45,
+        CicsPlanOption::Auxiliary => 46,
+        CicsPlanOption::Main => 47,
     }
 }
 
@@ -296,6 +301,9 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         28 => Ok(CicsPlanOption::Purgeable),
         29 => Ok(CicsPlanOption::NotPurgeable),
         44 => Ok(CicsPlanOption::Next),
+        45 => Ok(CicsPlanOption::RewriteTemporary),
+        46 => Ok(CicsPlanOption::Auxiliary),
+        47 => Ok(CicsPlanOption::Main),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
