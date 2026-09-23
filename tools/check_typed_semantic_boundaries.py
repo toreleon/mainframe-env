@@ -103,11 +103,13 @@ def check(root: Path) -> None:
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
     )
     cics_descriptor_entries = production(
-        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_registry.rs")
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries.rs")
     )
     for required in [
         "mod executable_registry;",
         "pub use executable_registry::*;",
+        "mod executable_entries;",
+        "pub use executable_entries::CICS_EXECUTABLE_DESCRIPTORS;",
         'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
         "Effect::DatasetRead",
         "Effect::DatasetWrite",

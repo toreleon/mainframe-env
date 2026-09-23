@@ -4371,6 +4371,7 @@ mod tests {
             deny_journal,
             deny_event: false,
             deny_counter: false,
+            deny_diagnostic: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -6674,7 +6675,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 16);
+        assert_eq!(families.len(), 17);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(

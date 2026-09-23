@@ -127,11 +127,11 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::RetrieveSubevent => &CICS_EXECUTABLE_DESCRIPTORS[103],
         CicsPlanOperation::TestEvent => &CICS_EXECUTABLE_DESCRIPTORS[104],
         CicsPlanOperation::SignalEvent => &CICS_EXECUTABLE_DESCRIPTORS[105],
-        CicsPlanOperation::EnterTraceNum => &CICS_EXECUTABLE_DESCRIPTORS[106],
-        CicsPlanOperation::Monitor => &CICS_EXECUTABLE_DESCRIPTORS[107],
-        CicsPlanOperation::DumpTransaction => &CICS_EXECUTABLE_DESCRIPTORS[108],
-        CicsPlanOperation::Dump => &CICS_EXECUTABLE_DESCRIPTORS[109],
-        CicsPlanOperation::Trace => &CICS_EXECUTABLE_DESCRIPTORS[110],
-        CicsPlanOperation::EnterTraceId => &CICS_EXECUTABLE_DESCRIPTORS[111],
+        CicsPlanOperation::EnterTraceNum => &CICS_EXECUTABLE_DESCRIPTORS[121],
+        CicsPlanOperation::Monitor => &CICS_EXECUTABLE_DESCRIPTORS[122],
+        CicsPlanOperation::DumpTransaction => &CICS_EXECUTABLE_DESCRIPTORS[123],
+        CicsPlanOperation::Dump => &CICS_EXECUTABLE_DESCRIPTORS[124],
+        CicsPlanOperation::Trace => &CICS_EXECUTABLE_DESCRIPTORS[125],
+        CicsPlanOperation::EnterTraceId => &CICS_EXECUTABLE_DESCRIPTORS[126],
     }
 }

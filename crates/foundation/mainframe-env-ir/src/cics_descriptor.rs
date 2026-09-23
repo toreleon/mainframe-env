@@ -2,15 +2,35 @@
 
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
 
+mod executable_entries;
 mod executable_lookup;
 mod executable_registry;
 mod registry_lookup;
+pub use executable_entries::CICS_EXECUTABLE_DESCRIPTORS;
 pub use executable_lookup::cics_executable_descriptor;
 pub use executable_registry::*;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
 
 /// Runtime import required by every executable operation in this dialect.
 pub const CICS_RUNTIME_IMPORT: &str = "host.cics";
+
+const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
+const TRACE_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const MONITOR_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Clock,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 const READ_EFFECTS: &[Effect] = &[
     Effect::DatasetRead,
@@ -615,6 +635,19 @@ mod tests {
                 CicsPlanOperation::Dump,
                 CicsPlanOperation::Trace,
                 CicsPlanOperation::EnterTraceId,
+                CicsPlanOperation::AddSubevent,
+                CicsPlanOperation::CheckTimer,
+                CicsPlanOperation::DefineCompositeEvent,
+                CicsPlanOperation::DefineInputEvent,
+                CicsPlanOperation::DefineTimer,
+                CicsPlanOperation::DeleteEvent,
+                CicsPlanOperation::DeleteTimer,
+                CicsPlanOperation::ForceTimer,
+                CicsPlanOperation::RemoveSubevent,
+                CicsPlanOperation::RetrieveReattachEvent,
+                CicsPlanOperation::RetrieveSubevent,
+                CicsPlanOperation::SignalEvent,
+                CicsPlanOperation::TestEvent,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
                 CicsPlanOperation::StartBrowse,

@@ -735,6 +735,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::EnterTraceNum,
+        syntax: "ENTER TRACENUM",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0066",
+        family: CicsCommandFamily::Diagnostics,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Monitor,
         syntax: "MONITOR",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0143",

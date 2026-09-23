@@ -13,6 +13,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Rebased CICS diagnostics onto the integrated event-control family and split
+  the 112-entry executable registry into bounded modules. Generated contracts
+  and ratchets now report 112 typed, 0 legacy, and 151 unready application
+  rows while keeping all existing tag ranges and protected roots.
+
 - Rebased all six typed CICS diagnostics routes onto the integrated web-service
   and counter-control families. Reconciled generated descriptors, codec tags,
   schema ratchets, and compiled routing to 99 typed, 0 legacy, and 164 unready
