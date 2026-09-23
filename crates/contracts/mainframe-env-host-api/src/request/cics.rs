@@ -162,6 +162,8 @@ pub enum CicsOperation {
     IssueReplace,
     /// Transmit one bounded outboard record or media message.
     IssueSend,
+    /// Route one full-BMS logical message to eligible terminal recipients.
+    Route,
     /// Complete one pending outboard send.
     IssueWait,
     /// Complete and dispatch the active BMS logical message.
@@ -321,6 +323,7 @@ impl CicsOperation {
             Self::IssueReceive => "IssueReceive",
             Self::IssueReplace => "IssueReplace",
             Self::IssueSend => "IssueSend",
+            Self::Route => "Route",
             Self::IssueWait => "IssueWait",
             Self::SendPage => "SendPage",
             Self::SendPartnset => "SendPartnset",
@@ -457,6 +460,7 @@ impl CicsOperation {
                 | Self::IssueReceive
                 | Self::IssueReplace
                 | Self::IssueSend
+                | Self::Route
                 | Self::IssueWait
                 | Self::SendPage
                 | Self::SendText
@@ -587,6 +591,7 @@ impl CicsOperation {
             ("ISSUE", Some("RECEIVE")) => Self::IssueReceive,
             ("ISSUE", Some("REPLACE")) => Self::IssueReplace,
             ("ISSUE", Some("SEND")) => Self::IssueSend,
+            ("ROUTE", _) => Self::Route,
             ("ISSUE", Some("WAIT")) => Self::IssueWait,
             ("SEND", Some("PAGE")) => Self::SendPage,
             ("SEND", Some("PARTNSET")) => Self::SendPartnset,

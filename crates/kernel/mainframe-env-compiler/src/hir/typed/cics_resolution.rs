@@ -35,6 +35,7 @@ mod output_bindings;
 mod program_control;
 mod program_name;
 mod queue_control;
+mod route;
 mod shape;
 mod spool_control;
 mod storage_control;
@@ -634,6 +635,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WsaEprCreate) => {
             web_service_control::shape(op).expect("web shape").clauses
         }
+        HirCicsOperation::Route => route::ALLOWED_CLAUSES,
         HirCicsOperation::Load => program_control::LOAD_CLAUSES,
         HirCicsOperation::Release => program_control::RELEASE_CLAUSES,
         HirCicsOperation::Link | HirCicsOperation::Xctl => &[
@@ -695,13 +697,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
         op @ (HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal) => task_wait::names(op),
-        HirCicsOperation::Start => &[
-            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
-            "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
-        ],
-        HirCicsOperation::Retrieve => &[
-            "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
-        ],
+        HirCicsOperation::Start => interval_control::START_CLAUSES,
+        HirCicsOperation::Retrieve => interval_control::RETRIEVE_CLAUSES,
         HirCicsOperation::WaitJournalName
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
@@ -734,6 +731,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WsaContextDelete
         | HirCicsOperation::WsaContextGet
         | HirCicsOperation::WsaEprCreate => &["NOHANDLE"],
+        HirCicsOperation::Route => route::ALLOWED_OPTIONS,
         HirCicsOperation::Load => &["HOLD", "NOHANDLE"],
         HirCicsOperation::Release => &["NOHANDLE"],
         HirCicsOperation::Address
@@ -855,6 +853,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
+    route::validate_constraints(&clauses, &raw_options, operation)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
@@ -917,7 +916,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::IssueReceive
         | HirCicsOperation::IssueReplace
         | HirCicsOperation::IssueSend
-        | HirCicsOperation::IssueWait => &[][..],
+        | HirCicsOperation::IssueWait
+        | HirCicsOperation::Route => &[][..],
         HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
         HirCicsOperation::InvokeService
         | HirCicsOperation::SoapFaultAdd
@@ -1075,6 +1075,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
+    operands.extend(route::operands(&clauses, operation, semantic)?);
     operands.extend(outboard::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);

@@ -166,6 +166,7 @@ pub enum CicsPlanOperation {
     /// Outboard batch data interchange send operation.
     IssueSend,
     /// Outboard batch data interchange wait operation.
+    Route,
     IssueWait,
     /// Complete a full-BMS logical message and dispatch its final page.
     SendPage,
@@ -345,6 +346,14 @@ pub enum CicsOperandName {
     /// Outboard NumRec input.
     NumRec,
     /// Outboard KeyNumber input.
+    /// Terminal notified for an undeliverable routed message.
+    Errterm,
+    /// Bounded BMS route title.
+    RouteTitle,
+    /// Local fixed-width list of terminal or operator targets.
+    RouteList,
+    /// Three-byte operator-class bit mask.
+    Opclass,
     KeyNumber,
     /// `RESOURCE(...)` enqueue identity.
     Resource,
@@ -662,6 +671,7 @@ pub enum CicsPlanOption {
     WpMedia1,
     WpMedia2,
     WpMedia3,
+    Nleom,
     WpMedia4,
     /// Retain lowercase bytes on a subsequent 8775 partition receive.
     AsIs,

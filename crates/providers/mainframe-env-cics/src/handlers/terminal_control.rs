@@ -73,6 +73,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::ReceivePartn => partition_set::invoke_receive(service, run, request),
         CicsOperation::SendControl => bms::invoke_control(service, run, request),
         CicsOperation::SendPage => bms::invoke_page(service, run, request),
+        CicsOperation::Route => bms::invoke_route(service, run, request),
         CicsOperation::IssueAbort
         | CicsOperation::IssueAdd
         | CicsOperation::IssueEnd

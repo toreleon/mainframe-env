@@ -93,6 +93,7 @@ impl Canonical for CicsOperation {
             Self::IssueReceive => out.variant("CicsOperation", "IssueReceive", 0),
             Self::IssueReplace => out.variant("CicsOperation", "IssueReplace", 0),
             Self::IssueSend => out.variant("CicsOperation", "IssueSend", 0),
+            Self::Route => out.variant("CicsOperation", "Route", 0),
             Self::IssueWait => out.variant("CicsOperation", "IssueWait", 0),
             Self::SendPage => out.variant("CicsOperation", "SendPage", 0),
             Self::ReceivePartn => out.variant("CicsOperation", "ReceivePartn", 0),

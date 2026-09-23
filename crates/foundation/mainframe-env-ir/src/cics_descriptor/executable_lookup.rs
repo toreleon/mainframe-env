@@ -93,6 +93,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::IssueReplace => &CICS_EXECUTABLE_DESCRIPTORS[117],
         CicsPlanOperation::IssueSend => &CICS_EXECUTABLE_DESCRIPTORS[118],
         CicsPlanOperation::IssueWait => &CICS_EXECUTABLE_DESCRIPTORS[119],
+        CicsPlanOperation::Route => &CICS_EXECUTABLE_DESCRIPTORS[120],
         CicsPlanOperation::InvokeService => &CICS_EXECUTABLE_DESCRIPTORS[73],
         CicsPlanOperation::SoapFaultAdd => &CICS_EXECUTABLE_DESCRIPTORS[74],
         CicsPlanOperation::SoapFaultCreate => &CICS_EXECUTABLE_DESCRIPTORS[75],

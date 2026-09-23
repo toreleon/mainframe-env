@@ -30,3 +30,15 @@ pub(super) const OUTBOARD_WAIT_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+
+pub(super) const ROUTE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalWrite,
+    Effect::Clock,
+    Effect::Suspension,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];

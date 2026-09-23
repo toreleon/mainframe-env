@@ -20429,6 +20429,138 @@ mod tests {
     }
 
     #[test]
+    fn compiled_route_dispatches_selected_program_bms_message() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "ROUTEP",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ROUTEP.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PAGE-X PIC X(5) VALUE 'HELLO'.\n01 LIST-X PIC X(16) VALUE 'T000            '.\n01 ROUTE-FN PIC X(2).\n01 RC PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SEND TEXT FROM(PAGE-X) LENGTH(5) END-EXEC.\nEXEC CICS SEND CONTROL ACCUM END-EXEC.\nEXEC CICS ROUTE LIST(LIST-X) INTERVAL(0) RESP(RC) END-EXEC.\nMOVE EIBFN TO ROUTE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "route-class",
+                    "route-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(FACILITY)",
+            )
+            .unwrap();
+        for resource in [
+            "CICS.TERMINAL.CONTROL",
+            "CICS.TERMINAL.ROUTE",
+            "CICS.TERMINAL.ROUTE.T000",
+        ] {
+            server
+                .racf
+                .define_profile("FACILITY", resource, "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit("FACILITY", resource, "IBMUSER", AccessIntent::Update)
+                .unwrap();
+        }
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "ROUTEP".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("RT00".into(), "ROUTEP".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ROUTEP".into(),
+                    map: "ROUTEP".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![],
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let target = SessionId::new("route-product-target", 64).unwrap();
+        let target_invocation = server
+            .cics_invocation("IBMUSER", "RT00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                target_invocation,
+                &target,
+                "RT00",
+                24,
+                80,
+                "route-target-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let source = SessionId::new("route-product-source", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "RT00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &source,
+                "RT00",
+                24,
+                80,
+                "route-source-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&source, &principal, "ROUTEP", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .cics
+                .terminal_snapshot(&target, &principal, 3)
+                .unwrap()
+                .screen,
+            b"HELLO"
+        );
+        assert_eq!(
+            server.cics.last_route(&source).unwrap().unwrap().1,
+            vec!["T000"]
+        );
+        let continuation = server
+            .online_machine_continuation(&source)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("ROUTE-FN").unwrap().bytes(),
+            &[0x18, 0x0c]
+        );
+        assert_eq!(restored.variable("RC").unwrap().bytes(), &[0, 0, 0, 0]);
+    }
+
+    #[test]
     fn compiled_issue_outboard_add_query_receive_and_assign_selected_program() {
         use mainframe_env_racf::CommandContext;
 

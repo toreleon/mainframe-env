@@ -11,6 +11,7 @@ use mainframe_env_store_api::{ProviderStateMutation, ProviderStateRecord, Provid
 
 mod control;
 mod page;
+mod route;
 
 const STATE_NAMESPACE: &str = "cics-terminal-bms-v1";
 const RECEIPT_NAMESPACE: &str = "cics-terminal-bms-receipt-v1";
@@ -48,7 +49,8 @@ pub struct CicsBmsControlSnapshot {
     pub last_page: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct ControlFrame {
     pub flags: u16,
     pub cursor: Option<u16>,
@@ -160,6 +162,14 @@ pub(super) fn invoke_page(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     page::invoke(service, run, request)
+}
+
+pub(super) fn invoke_route(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    route::invoke(service, run, request)
 }
 
 pub(super) fn purge(

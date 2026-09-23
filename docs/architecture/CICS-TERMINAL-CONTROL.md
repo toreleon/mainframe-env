@@ -142,3 +142,45 @@ matched its committed SHA, then the repository `ibm_docs.py` `PlainText`
 parser read it. The selected `ibm_docs.py search` and `read` calls used the
 verified offline cache. Unavailable unrelated scope topics are non-candidate
 infrastructure evidence; no browser or network refresh was used.
+
+## ROUTE
+
+`ROUTE` consumes an active full-BMS logical message built with `SEND CONTROL
+ACCUM` and dispatches its bounded page to eligible active terminal sessions.
+It checks the source `FACILITY` resource `CICS.TERMINAL.ROUTE` and each selected
+`CICS.TERMINAL.ROUTE.<terminal>` before changing session state. An empty
+recipient set yields RTEFAIL 33; partial selection or delivery yields RTESOME
+34. Invalid error terminals, LDCs, and mismatched REQID values yield the
+source conditions INVERRTERM 37, INVLDC 41, and IGREQID 39. NLEOM is ignored
+for the local screen terminal type, as the source permits for non-printers.
+
+The local LIST contract accepts bounded 16-byte entries: a 4-byte terminal
+identity or 4-byte operator identity, a 2-byte LDC, and six trailing blanks.
+The ROUTE topic specifies that bytes 10–15 must be blank. The separately linked
+IBM "Route list format" topic has no committed raw hash in this checkout, so
+the other field positions remain a documented local contract rather than an
+IBM-equivalence claim. `OPCLASS` uses the source's three-byte reverse class
+mask; `register_route_operator_classes` supplies immutable local class
+assignments. `TITLE` and selected recipients remain in durable route history.
+
+INTERVAL, TIME, AFTER, and AT are checked as exclusive timing forms, with
+source RESP2 values for invalid hours, minutes, and seconds. Delayed deliveries
+are durable and bounded. `deliver_due_routes(now_tick)` advances virtual time,
+delivers each due page once, and sends a bounded failure notice to ERRTERM
+when a target is no longer available. Queue and session writes use atomic
+provider-state mutations. Replay returns the original response without another
+dispatch; the common CICS effect layer handles post-dispatch UnknownOutcome.
+The MCEP v2 additions are operation tag 87, operand tags 207–210, and NLEOM
+option tag 157. No MCEP v1 tag changes.
+
+Source: IBM CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0182`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_route.html`, raw HTML
+SHA-256 `49856c59b55edcd7d22691e3b9aca93dafccbb0c15625c8a867a50573f61e74a`.
+The exact file under
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/49/49856c59b55edcd7d22691e3b9aca93dafccbb0c15625c8a867a50573f61e74a.html`
+matched the committed SHA and was parsed with the repository `ibm_docs.py`
+`PlainText` parser. Offline `search` and `read` succeeded for this topic;
+other uncached scope topics are non-candidate infrastructure evidence. No
+browser or network refresh was used.

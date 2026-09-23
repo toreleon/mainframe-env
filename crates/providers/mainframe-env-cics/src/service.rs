@@ -29716,4 +29716,449 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    #[test]
+    fn route_full_bms_list_delivers_once_and_rejects_malformed_entries() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let origin = invocation_for("route-origin", BTreeMap::new());
+        let source = SessionId::new("route-source", 64).unwrap();
+        cics.launch_terminal(
+            origin.clone(),
+            &source,
+            "MENU",
+            24,
+            80,
+            "route-csrf-1",
+            1,
+            10_000,
+        )
+        .unwrap();
+        let destination = invocation_for("route-destination", BTreeMap::new());
+        let target = SessionId::new("route-target", 64).unwrap();
+        cics.launch_terminal(
+            destination,
+            &target,
+            "MENU",
+            24,
+            80,
+            "route-csrf-2",
+            1,
+            10_000,
+        )
+        .unwrap();
+        let send = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), enqueue_value(b"HELLO")),
+                ("LENGTH".into(), cics_decimal(5)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        let control = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OPTION.ACCUM".into(), cics_option()),
+                ("OPTION.ALARM".into(), cics_option()),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, control.clone(), 2), control)
+            .unwrap();
+        let mut list = b"T001".to_vec();
+        list.extend_from_slice(&[b' '; 12]);
+        let malformed = request(
+            CicsOperation::Route,
+            BTreeMap::from([("LIST".into(), enqueue_value(&[&list[..15], b"X"].concat()))]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&origin.run_unit_id, malformed.clone(), 3),
+                malformed
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0
+            })
+        );
+        assert!(
+            cics.terminal_control_snapshot(&source)
+                .unwrap()
+                .pending_logical_message
+        );
+        let route = request(
+            CicsOperation::Route,
+            BTreeMap::from([
+                ("LIST".into(), enqueue_value(&list)),
+                ("TITLE".into(), enqueue_value(b"REPORT")),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            4,
+        );
+        let response = cics
+            .invoke(
+                &effect(&origin.run_unit_id, route.clone(), 4),
+                route.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(
+            cics.terminal_snapshot(&target, &principal, 2)
+                .unwrap()
+                .screen,
+            b"HELLO"
+        );
+        assert_eq!(
+            cics.terminal_control_snapshot(&target).unwrap().alarm_count,
+            1
+        );
+        assert_eq!(
+            cics.invoke(&effect(&origin.run_unit_id, route.clone(), 4), route)
+                .unwrap(),
+            response
+        );
+        assert_eq!(
+            cics.terminal_snapshot(&target, &principal, 2)
+                .unwrap()
+                .screen,
+            b"HELLO"
+        );
+        assert_eq!(
+            cics.last_route(&source).unwrap(),
+            Some((b"REPORT".to_vec(), vec!["T001".into()], 0))
+        );
+        assert!(
+            !cics
+                .terminal_control_snapshot(&source)
+                .unwrap()
+                .pending_logical_message
+        );
+        let control = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("OPTION.ACCUM".into(), cics_option())]),
+            5,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, control.clone(), 5), control)
+            .unwrap();
+        for (sequence, arguments, name, code) in [
+            (
+                6,
+                BTreeMap::from([("REQID".into(), cics_literal(b"NO"))]),
+                "IGREQID",
+                39,
+            ),
+            (
+                7,
+                BTreeMap::from([("ERRTERM".into(), cics_literal(b"XXXX"))]),
+                "INVERRTERM",
+                37,
+            ),
+            (
+                8,
+                BTreeMap::from([("LDC".into(), cics_literal(b"AA"))]),
+                "INVLDC",
+                41,
+            ),
+            (
+                9,
+                BTreeMap::from([("LIST".into(), enqueue_value(b"T000            "))]),
+                "RTEFAIL",
+                33,
+            ),
+        ] {
+            let rejected = request(CicsOperation::Route, arguments, sequence);
+            assert_eq!(
+                cics.invoke(
+                    &effect(&origin.run_unit_id, rejected.clone(), sequence),
+                    rejected
+                ),
+                Err(HostProblem::Condition {
+                    name: name.into(),
+                    response: code,
+                    response2: 0
+                })
+            );
+        }
+        let mut mixed = list.clone();
+        mixed.extend_from_slice(b"T999            ");
+        let partial = request(
+            CicsOperation::Route,
+            BTreeMap::from([("LIST".into(), enqueue_value(&mixed))]),
+            10,
+        );
+        let partial = cics
+            .invoke(&effect(&origin.run_unit_id, partial.clone(), 10), partial)
+            .unwrap();
+        assert_eq!(
+            (partial.condition.as_str(), partial.response),
+            ("RTESOME", 34)
+        );
+        cics.register_route_operator_classes(&[("IBMUSER".into(), vec![1])])
+            .unwrap();
+        let control = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("OPTION.ACCUM".into(), cics_option())]),
+            11,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, control.clone(), 11), control)
+            .unwrap();
+        let class_route = request(
+            CicsOperation::Route,
+            BTreeMap::from([("OPCLASS".into(), enqueue_value(&[0, 0, 1]))]),
+            12,
+        );
+        cics.invoke(
+            &effect(&origin.run_unit_id, class_route.clone(), 12),
+            class_route,
+        )
+        .unwrap();
+        assert_eq!(cics.last_route(&source).unwrap().unwrap().1, vec!["T001"]);
+    }
+
+    #[test]
+    fn route_saf_denial_is_audited_before_message_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let allow = service(store.clone());
+        let origin = invocation_for("route-denied-origin", BTreeMap::new());
+        let source = SessionId::new("route-denied-source", 64).unwrap();
+        allow
+            .launch_terminal(
+                origin.clone(),
+                &source,
+                "MENU",
+                24,
+                80,
+                "route-denied-csrf-1",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let target = SessionId::new("route-denied-target", 64).unwrap();
+        allow
+            .launch_terminal(
+                invocation_for("route-denied-target-run", BTreeMap::new()),
+                &target,
+                "MENU",
+                24,
+                80,
+                "route-denied-csrf-2",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let control = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("OPTION.ACCUM".into(), cics_option())]),
+            1,
+        );
+        allow
+            .invoke(&effect(&origin.run_unit_id, control.clone(), 1), control)
+            .unwrap();
+        drop(allow);
+        let (authorities, seen) = command_authorities(true);
+        let denied = CicsService::open(authorities, store.clone(), CicsLimits::default()).unwrap();
+        denied
+            .register_run(origin.clone(), &source, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let route = request(CicsOperation::Route, BTreeMap::new(), 2);
+        assert_eq!(
+            denied.invoke(&effect(&origin.run_unit_id, route.clone(), 2), route),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            denied
+                .terminal_control_snapshot(&source)
+                .unwrap()
+                .pending_logical_message
+        );
+        assert!(
+            denied
+                .terminal_snapshot(&target, origin.principal.id(), 2)
+                .unwrap()
+                .screen
+                .is_empty()
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| class == "FACILITY"
+                    && resource == "CICS.TERMINAL.ROUTE"
+                    && *intent == AccessIntent::Update)
+        );
+        assert!(
+            store
+                .audit_records(&origin.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
+        );
+    }
+
+    #[test]
+    fn route_delayed_target_failure_notifies_errterm_once() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let origin = invocation_for("route-notify-origin", BTreeMap::new());
+        let source = SessionId::new("route-notify-source", 64).unwrap();
+        cics.launch_terminal(
+            origin.clone(),
+            &source,
+            "MENU",
+            24,
+            80,
+            "route-notify-csrf-1",
+            1,
+            10_000,
+        )
+        .unwrap();
+        let target = SessionId::new("route-notify-target", 64).unwrap();
+        cics.launch_terminal(
+            invocation_for("route-notify-destination", BTreeMap::new()),
+            &target,
+            "MENU",
+            24,
+            80,
+            "route-notify-csrf-2",
+            1,
+            2,
+        )
+        .unwrap();
+        let send = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), enqueue_value(b"HELLO")),
+                ("LENGTH".into(), cics_decimal(5)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        let control = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("OPTION.ACCUM".into(), cics_option())]),
+            2,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, control.clone(), 2), control)
+            .unwrap();
+        let route = request(
+            CicsOperation::Route,
+            BTreeMap::from([
+                ("OPTION.AFTER".into(), cics_option()),
+                ("SECONDS".into(), cics_decimal(5)),
+                ("ERRTERM".into(), cics_literal(b"T000")),
+                ("TITLE".into(), enqueue_value(b"REPORT")),
+            ]),
+            3,
+        );
+        cics.invoke(&effect(&origin.run_unit_id, route.clone(), 3), route)
+            .unwrap();
+        assert_eq!(cics.deliver_due_routes(5).unwrap(), 0);
+        assert_eq!(cics.pending_route_count().unwrap(), 0);
+        assert_eq!(
+            cics.terminal_snapshot(&source, &principal, 5)
+                .unwrap()
+                .screen,
+            b"ROUTE FAILED T001 REPORT"
+        );
+        assert_eq!(cics.deliver_due_routes(5).unwrap(), 0);
+    }
+
+    #[test]
+    fn route_schedules_bounded_delivery_and_resumes_after_sqlite_reopen() {
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-route-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let source = SessionId::new("route-sqlite-origin", 64).unwrap();
+        let target = SessionId::new("route-sqlite-target", 64).unwrap();
+        {
+            let cics = service(Arc::new(
+                SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+            ));
+            let origin = invocation_for("route-sqlite-run", BTreeMap::new());
+            cics.launch_terminal(
+                origin.clone(),
+                &source,
+                "MENU",
+                24,
+                80,
+                "route-sqlite-csrf-1",
+                1,
+                10_000,
+            )
+            .unwrap();
+            cics.launch_terminal(
+                invocation_for("route-sqlite-other", BTreeMap::new()),
+                &target,
+                "MENU",
+                24,
+                80,
+                "route-sqlite-csrf-2",
+                1,
+                10_000,
+            )
+            .unwrap();
+            let send = request(
+                CicsOperation::SendText,
+                BTreeMap::from([
+                    ("FROM".into(), enqueue_value(b"LATER")),
+                    ("LENGTH".into(), cics_decimal(5)),
+                ]),
+                1,
+            );
+            cics.invoke(&effect(&origin.run_unit_id, send.clone(), 1), send)
+                .unwrap();
+            let control = request(
+                CicsOperation::SendControl,
+                BTreeMap::from([("OPTION.ACCUM".into(), cics_option())]),
+                2,
+            );
+            cics.invoke(&effect(&origin.run_unit_id, control.clone(), 2), control)
+                .unwrap();
+            let route = request(
+                CicsOperation::Route,
+                BTreeMap::from([
+                    ("OPTION.AFTER".into(), cics_option()),
+                    ("SECONDS".into(), cics_decimal(5)),
+                ]),
+                3,
+            );
+            cics.invoke(&effect(&origin.run_unit_id, route.clone(), 3), route)
+                .unwrap();
+            assert_eq!(cics.pending_route_count().unwrap(), 1);
+            assert!(
+                cics.terminal_snapshot(&target, &principal, 2)
+                    .unwrap()
+                    .screen
+                    .is_empty()
+            );
+        }
+        {
+            let cics = service(Arc::new(
+                SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+            ));
+            assert_eq!(cics.pending_route_count().unwrap(), 1);
+            assert_eq!(cics.deliver_due_routes(4).unwrap(), 0);
+            assert_eq!(cics.deliver_due_routes(5).unwrap(), 1);
+            assert_eq!(
+                cics.terminal_snapshot(&target, &principal, 2)
+                    .unwrap()
+                    .screen,
+                b"LATER"
+            );
+            assert_eq!(cics.pending_route_count().unwrap(), 0);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

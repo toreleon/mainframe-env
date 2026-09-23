@@ -1490,6 +1490,44 @@ mod tests {
     }
 
     #[test]
+    fn route_compiles_full_bms_list_and_timing_into_v2_tag() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ROUTEP. DATA DIVISION. WORKING-STORAGE SECTION. 01 LIST-X PIC X(16). 01 TITLE-X PIC X(12). 01 RC PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ROUTE LIST(LIST-X) TITLE(TITLE-X) INTERVAL(0) REQID('**') RESP(RC) END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let hir = analysis.hir.unwrap();
+        let plan = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(plan.operation, CicsPlanOperation::Route);
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(u16::from_be_bytes([encoded[6], encoded[7]]), 87);
+        let delayed = source.replace("INTERVAL(0)", "AFTER SECONDS(5) NLEOM");
+        let delayed = CobolCompiler::default().analyze(&bundle(&delayed));
+        assert!(delayed.diagnostics.is_empty(), "{:?}", delayed.diagnostics);
+        let bad = source.replace("INTERVAL(0)", "INTERVAL(0) TIME(120000)");
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(&bad))
+                .diagnostics
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn issue_family_compiles_ten_typed_v2_plans_and_rejects_bad_selection() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTBD. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). 01 RID-X PIC S9(9) COMP. 01 LEN-X PIC S9(4) COMP VALUE 4. 01 PTR-X POINTER-32. 01 RC PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ISSUE ADD DESTID('DISK1') FROM(DATA-X) LENGTH(4) RESP(RC) END-EXEC. EXEC CICS ISSUE QUERY DESTID('DISK1') END-EXEC. EXEC CICS ISSUE RECEIVE INTO(DATA-X) LENGTH(LEN-X) END-EXEC. EXEC CICS ISSUE NOTE DESTID('REL1') RIDFLD(RID-X) RRN END-EXEC. EXEC CICS ISSUE ERASE DESTID('REL1') RIDFLD(RID-X) RRN END-EXEC. EXEC CICS ISSUE REPLACE DESTID('REL1') FROM(DATA-X) LENGTH(4) RIDFLD(RID-X) RRN END-EXEC. EXEC CICS ISSUE SEND CONSOLE FROM(DATA-X) LENGTH(4) NOWAIT END-EXEC. EXEC CICS ISSUE WAIT CONSOLE END-EXEC. EXEC CICS ISSUE END DESTID('DISK1') END-EXEC. EXEC CICS ISSUE ABORT DESTID('REL1') END-EXEC.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
@@ -1788,6 +1826,7 @@ mod tests {
                 CicsPlanOperation::IssueReceive => crate::HirCicsOperation::IssueReceive,
                 CicsPlanOperation::IssueReplace => crate::HirCicsOperation::IssueReplace,
                 CicsPlanOperation::IssueSend => crate::HirCicsOperation::IssueSend,
+                CicsPlanOperation::Route => crate::HirCicsOperation::Route,
                 CicsPlanOperation::IssueWait => crate::HirCicsOperation::IssueWait,
                 CicsPlanOperation::Load => crate::HirCicsOperation::Load,
                 CicsPlanOperation::Release => crate::HirCicsOperation::Release,

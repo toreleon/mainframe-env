@@ -176,6 +176,7 @@ pub enum HirCicsOption {
     WpMedia2,
     WpMedia3,
     WpMedia4,
+    Nleom,
     Accum,
     Formfeed,
     DefaultScreen,

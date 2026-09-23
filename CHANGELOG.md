@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ROUTE` with full-BMS terminal selection, bounded
+  LIST/OPCLASS routing, checked timing, durable delayed delivery, ERRTERM
+  notification, SAF authorization, and atomic replay. Source: IBM CICS TS
+  6.x application API sources-c, `dfhp4_route.html`, row 0182.
+
 - Added ten typed CICS ISSUE outboard commands with bounded local sequential,
   keyed, relative, and media destinations; durable record and task state;
   QUERY/RECEIVE, NOTE, WAIT, END/ABORT, SAF checks, and atomic replay.

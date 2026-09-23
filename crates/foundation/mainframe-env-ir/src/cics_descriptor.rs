@@ -619,7 +619,7 @@ mod registry_lookup;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
 
 mod terminal_effects;
-use terminal_effects::{OUTBOARD_READ_EFFECTS, OUTBOARD_WAIT_EFFECTS, OUTBOARD_WRITE_EFFECTS};
+use terminal_effects::{OUTBOARD_READ_EFFECTS, OUTBOARD_WAIT_EFFECTS, OUTBOARD_WRITE_EFFECTS, ROUTE_EFFECTS};
 mod executable;
 pub use executable::CICS_EXECUTABLE_DESCRIPTORS;
 
@@ -681,7 +681,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 120);
+        assert_eq!(typed.len(), 121);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -699,7 +699,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 143);
+        assert_eq!(unready.len(), 142);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -936,6 +936,7 @@ mod tests {
                 CicsPlanOperation::IssueReplace,
                 CicsPlanOperation::IssueSend,
                 CicsPlanOperation::IssueWait,
+                CicsPlanOperation::Route,
                 CicsPlanOperation::DefineCounter,
                 CicsPlanOperation::DefineDCounter,
                 CicsPlanOperation::DeleteCounter,

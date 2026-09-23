@@ -21,6 +21,7 @@ mod outboard;
 mod output_shape;
 mod program_control;
 mod queue_control;
+mod route;
 mod spool_control;
 mod storage_control;
 mod task_wait;
@@ -619,6 +620,7 @@ fn validate_operation_shape(
         | CicsPlanOperation::IssueReplace
         | CicsPlanOperation::IssueSend
         | CicsPlanOperation::IssueWait => outboard::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::Route => route::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::InvokeService
         | CicsPlanOperation::SoapFaultAdd
         | CicsPlanOperation::SoapFaultCreate
@@ -4506,6 +4508,7 @@ mod tests {
             (CicsPlanOperation::IssueReceive, 82),
             (CicsPlanOperation::IssueReplace, 83),
             (CicsPlanOperation::IssueSend, 84),
+            (CicsPlanOperation::Route, 87),
             (CicsPlanOperation::IssueWait, 85),
         ] {
             assert_eq!(operation_tag(operation), tag);
@@ -4561,7 +4564,7 @@ mod tests {
         assert_eq!(option_from_tag(124), Ok(CicsPlanOption::AsIs));
         assert_eq!(output_tag(CicsOutputName::Partn), 248);
         assert_eq!(output_from_tag(248), Ok(CicsOutputName::Partn));
-        for tag in [87] {
+        for tag in [91] {
             assert_eq!(
                 operation_from_tag(tag),
                 Err(CicsPlanCodecProblem::Malformed)

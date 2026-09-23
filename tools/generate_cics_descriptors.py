@@ -254,6 +254,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("ResetBrowse", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0171"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
+    ("Route", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0182"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
     ("SendControl", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0188"),
@@ -631,6 +632,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "IssueWait",
         "Load",
         "Release",
+        "Route",
         "Link",
         "Xctl",
         "Return",
@@ -1019,6 +1021,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "ReceivePartn": frozenset(
         {"memory-read", "memory-write", "terminal-read", "suspension", "condition", "transaction"}
     ),
+    "Route": frozenset({"clock", "memory-read", "memory-write", "terminal-write", "suspension", "condition", "transaction"}),
     "SendMap": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
@@ -1334,6 +1337,7 @@ def _load_typed_execution_registrations(
         "Release",
         "RemoveSubevent",
         "ResetBrowse",
+        "Route",
         "SendControl",
         "SendPage",
         "SendPartnset",
@@ -1711,6 +1715,7 @@ def load_catalog(
                 "IssueWait",
                 "Load",
                 "Release",
+                "Route",
                 "PopHandle",
                 "PurgeMessage",
                 "PushHandle",

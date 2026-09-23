@@ -61,6 +61,7 @@ pub enum HirCicsOperation {
     IssueReplace,
     IssueSend,
     IssueWait,
+    Route,
     SendControl,
     SendPage,
     SendPartnset,
