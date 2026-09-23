@@ -2464,6 +2464,18 @@ mod tests {
             CicsOperation::RetrieveSubevent,
             CicsOperation::TestEvent,
             CicsOperation::SignalEvent,
+            CicsOperation::DefineCounter,
+            CicsOperation::DefineDCounter,
+            CicsOperation::DeleteCounter,
+            CicsOperation::DeleteDCounter,
+            CicsOperation::GetCounter,
+            CicsOperation::GetDCounter,
+            CicsOperation::QueryCounter,
+            CicsOperation::QueryDCounter,
+            CicsOperation::RewindCounter,
+            CicsOperation::RewindDCounter,
+            CicsOperation::UpdateCounter,
+            CicsOperation::UpdateDCounter,
             CicsOperation::ReceiveMap,
             CicsOperation::Retrieve,
             CicsOperation::Return,
@@ -2499,7 +2511,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 71);
+        assert_eq!(forms.len(), 101);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

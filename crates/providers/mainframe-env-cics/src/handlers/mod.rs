@@ -57,7 +57,9 @@ pub(super) fn authorize_and_describe(
         &format!("CICS.{}", run.transaction),
         AccessIntent::Execute,
     )?;
-    Ok(crate::generated::command_descriptor(request.operation))
+    let descriptor = crate::generated::command_descriptor(request.operation);
+    assert_descriptor(descriptor, request);
+    Ok(descriptor)
 }
 
 pub(super) fn argument_bytes(request: &CicsRequest, name: &str) -> Option<Vec<u8>> {
@@ -165,6 +167,13 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::WebServiceControl => {
             web_service_control::invoke(service, run, request, retention_tick)
+        }
+        crate::generated::CicsCommandFamily::EventControl => {
+            if request.operation == mainframe_env_host_api::CicsOperation::SignalEvent {
+                signal_event::invoke(service, run, request)
+            } else {
+                event_control::invoke(service, run, request)
+            }
         }
         _ => unreachable!("only extended control families delegate here"),
     }

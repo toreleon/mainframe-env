@@ -674,6 +674,13 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::SpoolPunch => 78,
         CicsPlanOption::SpoolLine => 79,
         CicsPlanOption::SpoolPage => 80,
+        CicsPlanOption::EventAnd => 252,
+        CicsPlanOption::EventOr => 253,
+        CicsPlanOption::TimerAfter => 254,
+        CicsPlanOption::TimerAt => 255,
+        CicsPlanOption::TimerOn => 256,
+        CicsPlanOption::AcqActivity => 257,
+        CicsPlanOption::AcqProcess => 258,
         CicsPlanOption::CounterNoSuspend => 316,
         CicsPlanOption::CounterReduce => 317,
         CicsPlanOption::CounterWrap => 318,
@@ -734,6 +741,13 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         78 => Ok(CicsPlanOption::SpoolPunch),
         79 => Ok(CicsPlanOption::SpoolLine),
         80 => Ok(CicsPlanOption::SpoolPage),
+        252 => Ok(CicsPlanOption::EventAnd),
+        253 => Ok(CicsPlanOption::EventOr),
+        254 => Ok(CicsPlanOption::TimerAfter),
+        255 => Ok(CicsPlanOption::TimerAt),
+        256 => Ok(CicsPlanOption::TimerOn),
+        257 => Ok(CicsPlanOption::AcqActivity),
+        258 => Ok(CicsPlanOption::AcqProcess),
         316 => Ok(CicsPlanOption::CounterNoSuspend),
         317 => Ok(CicsPlanOption::CounterReduce),
         318 => Ok(CicsPlanOption::CounterWrap),
@@ -743,6 +757,11 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
 
 pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
+        CicsOutputName::TimerStatus => 376,
+        CicsOutputName::EventName => 377,
+        CicsOutputName::SubEventName => 378,
+        CicsOutputName::EventType => 379,
+        CicsOutputName::FireStatus => 380,
         CicsOutputName::Into => 0,
         CicsOutputName::CounterValue => 440,
         CicsOutputName::CounterMinimum => 441,
@@ -800,6 +819,11 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
 
 pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
+        376 => Ok(CicsOutputName::TimerStatus),
+        377 => Ok(CicsOutputName::EventName),
+        378 => Ok(CicsOutputName::SubEventName),
+        379 => Ok(CicsOutputName::EventType),
+        380 => Ok(CicsOutputName::FireStatus),
         0 => Ok(CicsOutputName::Into),
         440 => Ok(CicsOutputName::CounterValue),
         441 => Ok(CicsOutputName::CounterMinimum),

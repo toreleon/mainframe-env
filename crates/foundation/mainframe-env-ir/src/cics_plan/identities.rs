@@ -694,6 +694,16 @@ pub enum CicsPlanOption {
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    /// Status returned by CHECK TIMER.
+    TimerStatus,
+    /// Event name returned by RETRIEVE REATTACH EVENT.
+    EventName,
+    /// Child name returned by RETRIEVE SUBEVENT.
+    SubEventName,
+    /// Event type returned by an event retrieval.
+    EventType,
+    /// Status returned by TEST EVENT.
+    FireStatus,
     /// Current named-counter value returned by GET or QUERY.
     CounterValue,
     /// Defined named-counter lower bound returned by QUERY.

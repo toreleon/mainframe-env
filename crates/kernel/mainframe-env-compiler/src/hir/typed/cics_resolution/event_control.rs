@@ -1,11 +1,22 @@
 use super::super::{
-    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
-    ResolutionFailure,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption, HirCicsValue,
+    Resolution, ResolutionFailure,
 };
 use super::{
     Clauses, cics_integer_value, cics_value, complete_data_reference, shape::CommandShape,
 };
 use crate::{DataCategory, SemanticModel};
+
+pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsOption> {
+    match (operation, name) {
+        (HirCicsOperation::DefineTimer, "AFTER") => Some(HirCicsOption::TimerAfter),
+        (HirCicsOperation::DefineTimer, "AT") => Some(HirCicsOption::TimerAt),
+        (HirCicsOperation::DefineTimer, "ON") => Some(HirCicsOption::TimerOn),
+        (HirCicsOperation::ForceTimer, "ACQACTIVITY") => Some(HirCicsOption::AcqActivity),
+        (HirCicsOperation::ForceTimer, "ACQPROCESS") => Some(HirCicsOption::AcqProcess),
+        _ => None,
+    }
+}
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
     match operation {

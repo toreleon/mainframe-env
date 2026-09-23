@@ -23,6 +23,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Completed thirteen typed CICS event-control rows, including input and
+  composite events, timer definition/check/force/delete, reattachment and
+  subevent retrieval, TEST EVENT, and SIGNAL EVENT capture specifications.
+  Activity and capture state are durable and replayable across memory and
+  SQLite; the selected COBOL routes use reserved MCEP v2 tags while v1
+  decoding remains compatible. IBM baseline, catalog rows, topic paths, and
+  verified SHA-256 identities are recorded in the v0.9 status document.
+
 - Added typed CICS UPDATE COUNTER and UPDATE DCOUNTER with conditional
   compare, one-past-maximum value, source-defined bounds, atomic durable
   replacement, SAF, and fenced replay. IBM CICS TS 6.x application API

@@ -1289,6 +1289,15 @@ def _load_typed_execution_registrations(
         "WsaContextDelete",
         "WsaContextGet",
         "WsaEprCreate",
+        "DeleteEvent",
+        "CheckTimer",
+        "DefineTimer",
+        "DeleteTimer",
+        "ForceTimer",
+        "RetrieveReattachEvent",
+        "RetrieveSubevent",
+        "TestEvent",
+        "SignalEvent",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized

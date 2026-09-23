@@ -2,6 +2,11 @@ use mainframe_env_ir::CicsAssignOutput;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
+    TimerStatus,
+    EventName,
+    SubEventName,
+    EventType,
+    FireStatus,
     CounterValue,
     CounterMinimum,
     CounterMaximum,

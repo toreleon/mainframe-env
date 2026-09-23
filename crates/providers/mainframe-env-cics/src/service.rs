@@ -1718,7 +1718,6 @@ impl CicsService {
             return Err(HostProblem::IdempotencyConflict);
         }
         let descriptor = handlers::authorize_and_describe(self, run, &request)?;
-        handlers::assert_descriptor(descriptor, &request);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
                 handlers::invoke_task_control(self, run, &request, retention_tick)
@@ -1744,7 +1743,8 @@ impl CicsService {
             }
             CicsCommandFamily::TransformControl
             | CicsCommandFamily::JournalControl
-            | CicsCommandFamily::WebServiceControl => handlers::invoke_extended_control(
+            | CicsCommandFamily::WebServiceControl
+            | CicsCommandFamily::EventControl => handlers::invoke_extended_control(
                 self,
                 run,
                 &request,
@@ -3866,6 +3866,7 @@ mod tests {
         deny_command: bool,
         deny_transform: bool,
         deny_journal: bool,
+        deny_event: bool,
         deny_counter: bool,
         deny_dataset: bool,
         deny_surrogate: bool,
@@ -4004,6 +4005,7 @@ mod tests {
                         if self.deny_command && class == "FACILITY"
                             || self.deny_transform && class == "TRANSFORM"
                             || self.deny_journal && class == "JOURNAL"
+                            || self.deny_event && matches!(class.as_str(), "BTSEVENT" | "EVENT")
                             || self.deny_counter && class == "COUNTER"
                             || self.deny_dataset && class == "DATASET"
                             || self.deny_surrogate && class == "SURROGAT"
@@ -4309,6 +4311,8 @@ mod tests {
             deny_command,
             deny_transform: false,
             deny_journal: false,
+
+            deny_event: false,
             deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
@@ -4335,6 +4339,8 @@ mod tests {
             deny_command: false,
             deny_transform,
             deny_journal: false,
+
+            deny_event: false,
             deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
@@ -4359,6 +4365,32 @@ mod tests {
             deny_command: false,
             deny_transform: false,
             deny_journal,
+            deny_event: false,
+            deny_counter: false,
+            deny_dataset: false,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
+    }
+
+    fn event_authorities(deny_event: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command: false,
+            deny_transform: false,
+            deny_journal: false,
+            deny_event,
             deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
@@ -4383,6 +4415,8 @@ mod tests {
             deny_command: false,
             deny_transform: false,
             deny_journal: false,
+
+            deny_event: false,
             deny_counter,
             deny_dataset: false,
             deny_surrogate: false,
@@ -4409,6 +4443,8 @@ mod tests {
             deny_command,
             deny_transform: false,
             deny_journal: false,
+
+            deny_event: false,
             deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
@@ -4439,6 +4475,8 @@ mod tests {
                 deny_command: false,
                 deny_transform: false,
                 deny_journal: false,
+
+                deny_event: false,
                 deny_counter: false,
                 deny_dataset: false,
                 deny_surrogate,
@@ -4492,6 +4530,8 @@ mod tests {
             deny_command: false,
             deny_transform: false,
             deny_journal: false,
+
+            deny_event: false,
             deny_counter: false,
             deny_dataset: true,
             deny_surrogate: false,
@@ -6600,7 +6640,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 83);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 108);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6612,7 +6652,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 10);
+        assert_eq!(families.len(), 16);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
@@ -27352,6 +27392,197 @@ mod tests {
             .expect("isolated PostgreSQL 18 test URL");
         let store = Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
         concurrent_counter_get(store);
+    }
+
+    #[test]
+    fn define_input_event_requires_activity_and_replays_after_reopen() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let unbound = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, unbound.clone(), 1),
+                unbound
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            })
+        );
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            2,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, define.clone(), 2),
+                define.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (first.condition.as_str(), first.response, first.response2),
+            ("NORMAL", 0, 0)
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 2), define)
+                .unwrap(),
+            first
+        );
+        assert!(
+            store
+                .get_provider_state("cics-event-activity-v1", "CURRENT")
+                .unwrap()
+                .is_some()
+        );
+
+        let reopened = service(store);
+        let after_restart = invocation_for("event-after-restart", BTreeMap::new());
+        let session = SessionId::new("event-after-restart", 64).unwrap();
+        reopened.create_session(&session, 24, 80).unwrap();
+        reopened
+            .register_run(after_restart.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        reopened
+            .bind_event_activity(&after_restart.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        let duplicate = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            3,
+        );
+        assert_eq!(
+            reopened.invoke(
+                &effect(&after_restart.run_unit_id, duplicate.clone(), 3),
+                duplicate
+            ),
+            Err(HostProblem::Condition {
+                name: "EVENTERR".into(),
+                response: 111,
+                response2: 7,
+            })
+        );
+        let invalid = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"BAD NAME"))]),
+            4,
+        );
+        assert_eq!(
+            reopened.invoke(
+                &effect(&after_restart.run_unit_id, invalid.clone(), 4),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "EVENTERR".into(),
+                response: 111,
+                response2: 6,
+            })
+        );
+    }
+
+    #[test]
+    fn define_input_event_denial_precedes_mutation_and_is_traced() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, security) = event_authorities(true);
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-event-activity-v1", "CURRENT")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            security
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "BTSEVENT"
+                        && resource == "CICS.BTS.CURRENT.READY"
+                        && *intent == AccessIntent::Update
+                })
+        );
+        assert!(
+            cics.lock().unwrap().runs[&invocation.run_unit_id]
+                .trace
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::DefineInputEvent
+                    && entry.outcome.contains("Unauthorized"))
+        );
+    }
+
+    #[test]
+    fn define_input_event_survives_sqlite_backend_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-input-event-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = service(store);
+            let (invocation, _) = registered(&cics);
+            cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+                .unwrap();
+            let define = request(
+                CicsOperation::DefineInputEvent,
+                BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+                1,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = service(store);
+            let invocation = invocation_for("event-sqlite-reopen", BTreeMap::new());
+            let session = SessionId::new("event-sqlite-reopen", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+                .unwrap();
+            let duplicate = request(
+                CicsOperation::DefineInputEvent,
+                BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+                2,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, duplicate.clone(), 2),
+                    duplicate
+                ),
+                Err(HostProblem::Condition {
+                    name: "EVENTERR".into(),
+                    response: 111,
+                    response2: 7,
+                })
+            );
+        }
+        let _ = std::fs::remove_file(directory.join("state.db"));
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]

@@ -171,6 +171,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::CheckTimer => matches!(
+            output,
+            CicsOutputName::TimerStatus | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::RetrieveReattachEvent => matches!(
             output,
             CicsOutputName::EventName

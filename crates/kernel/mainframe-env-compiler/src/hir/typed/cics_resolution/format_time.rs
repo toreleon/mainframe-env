@@ -150,6 +150,11 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::CounterValue
         | HirCicsOutputName::CounterMinimum
         | HirCicsOutputName::CounterMaximum
+        | HirCicsOutputName::TimerStatus
+        | HirCicsOutputName::EventName
+        | HirCicsOutputName::SubEventName
+        | HirCicsOutputName::EventType
+        | HirCicsOutputName::FireStatus
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

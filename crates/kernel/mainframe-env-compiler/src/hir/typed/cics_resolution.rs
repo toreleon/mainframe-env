@@ -581,6 +581,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let operation = operation::resolve(descriptor)?;
     let transform_shape = transform_control::shape(operation);
     let web_shape = web_service_control::shape(operation);
+    let event_shape = event_control::shape(operation);
+    let command_shape = transform_shape.as_ref().or(event_shape.as_ref());
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
         HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
@@ -846,6 +848,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
     let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     transform_control::validate_constraints(&clauses, operation)?;
+    event_control::validate_constraints(operation, &raw_options)?;
     web_service_control::validate(&clauses, operation)?;
     for required in match operation {
         HirCicsOperation::Address => &["COMMAREA"][..],
@@ -1049,6 +1052,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
+    operands.extend(event_control::operands(&clauses, operation, semantic)?);
     operands.extend(web_service_control::operands(
         &clauses, operation, semantic,
     )?);
@@ -1121,6 +1125,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         })
         .map(|option| {
             counter_control::option(operation, option)
+                .or_else(|| event_control::option(operation, option))
                 .unwrap_or_else(|| operation::resolve_option(option))
         })
         .collect::<BTreeSet<_>>();

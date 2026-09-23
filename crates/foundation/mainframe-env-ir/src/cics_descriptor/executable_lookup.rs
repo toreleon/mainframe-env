@@ -99,5 +99,18 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::RewindDCounter => &CICS_EXECUTABLE_DESCRIPTORS[90],
         CicsPlanOperation::UpdateCounter => &CICS_EXECUTABLE_DESCRIPTORS[91],
         CicsPlanOperation::UpdateDCounter => &CICS_EXECUTABLE_DESCRIPTORS[92],
+        CicsPlanOperation::DefineInputEvent => &CICS_EXECUTABLE_DESCRIPTORS[93],
+        CicsPlanOperation::DefineCompositeEvent => &CICS_EXECUTABLE_DESCRIPTORS[94],
+        CicsPlanOperation::AddSubevent => &CICS_EXECUTABLE_DESCRIPTORS[95],
+        CicsPlanOperation::RemoveSubevent => &CICS_EXECUTABLE_DESCRIPTORS[96],
+        CicsPlanOperation::DeleteEvent => &CICS_EXECUTABLE_DESCRIPTORS[97],
+        CicsPlanOperation::CheckTimer => &CICS_EXECUTABLE_DESCRIPTORS[98],
+        CicsPlanOperation::DefineTimer => &CICS_EXECUTABLE_DESCRIPTORS[99],
+        CicsPlanOperation::DeleteTimer => &CICS_EXECUTABLE_DESCRIPTORS[100],
+        CicsPlanOperation::ForceTimer => &CICS_EXECUTABLE_DESCRIPTORS[101],
+        CicsPlanOperation::RetrieveReattachEvent => &CICS_EXECUTABLE_DESCRIPTORS[102],
+        CicsPlanOperation::RetrieveSubevent => &CICS_EXECUTABLE_DESCRIPTORS[103],
+        CicsPlanOperation::TestEvent => &CICS_EXECUTABLE_DESCRIPTORS[104],
+        CicsPlanOperation::SignalEvent => &CICS_EXECUTABLE_DESCRIPTORS[105],
     }
 }

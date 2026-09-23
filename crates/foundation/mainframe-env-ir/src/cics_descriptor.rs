@@ -2,9 +2,6 @@
 
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
 
-mod executables;
-pub use executables::CICS_EXECUTABLE_DESCRIPTORS;
-
 /// Runtime import required by every executable operation in this dialect.
 pub const CICS_RUNTIME_IMPORT: &str = "host.cics";
 
@@ -682,7 +679,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 93);
+        assert_eq!(typed.len(), 106);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -700,7 +697,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 170);
+        assert_eq!(unready.len(), 157);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
