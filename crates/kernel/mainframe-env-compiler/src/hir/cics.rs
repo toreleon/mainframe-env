@@ -472,6 +472,14 @@ impl PlanContext<'_> {
                 HirCicsOutputName::SecurityInvalidCount => CicsOutputName::SecurityInvalidCount,
                 HirCicsOutputName::SecurityLastUseTime => CicsOutputName::SecurityLastUseTime,
                 HirCicsOutputName::SecurityPassTicket => CicsOutputName::SecurityPassTicket,
+                HirCicsOutputName::SecurityIsUserId => CicsOutputName::SecurityIsUserId,
+                HirCicsOutputName::SecurityEncryptKey => CicsOutputName::SecurityEncryptKey,
+                HirCicsOutputName::SecurityOutToken => CicsOutputName::SecurityOutToken,
+                HirCicsOutputName::SecurityOutTokenLength => CicsOutputName::SecurityOutTokenLength,
+                HirCicsOutputName::SecurityEncryptPassTicket => {
+                    CicsOutputName::SecurityEncryptPassTicket
+                }
+                HirCicsOutputName::SecurityEncryptLength => CicsOutputName::SecurityEncryptLength,
                 HirCicsOutputName::SecurityLangInUse => CicsOutputName::SecurityLangInUse,
                 HirCicsOutputName::SecurityNatLangInUse => CicsOutputName::SecurityNatLangInUse,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
@@ -757,6 +765,11 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
 
 const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
+        HirCicsOption::SecurityBasicAuth => CicsPlanOption::SecurityBasicAuth,
+        HirCicsOption::SecurityJwt => CicsPlanOption::SecurityJwt,
+        HirCicsOption::SecurityKerberos => CicsPlanOption::SecurityKerberos,
+        HirCicsOption::SecurityBit => CicsPlanOption::SecurityBit,
+        HirCicsOption::SecurityBase64 => CicsPlanOption::SecurityBase64,
         HirCicsOption::Cancel => CicsPlanOption::Cancel,
         HirCicsOption::AsIs => CicsPlanOption::AsIs,
         HirCicsOption::Accum => CicsPlanOption::Accum,

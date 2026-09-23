@@ -869,6 +869,20 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::RequestEncryptPassTicket,
+        syntax: "REQUEST ENCRYPTPTKT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0167",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::VerifyToken,
+        syntax: "VERIFY TOKEN",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0230",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Signon,
         syntax: "SIGNON",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0196",

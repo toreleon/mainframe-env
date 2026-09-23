@@ -15,7 +15,7 @@ pub(in crate::machine) fn write_output(
     {
         return retrieve::write_load_pointer(machine, target, value, load_base);
     }
-    if name == "SET" {
+    if matches!(name, "SET" | "OUTTOKEN" | "ENCRYPTPTKT") {
         return retrieve::write_set_output(machine, operation, target, value);
     }
     if name == "SET64" {

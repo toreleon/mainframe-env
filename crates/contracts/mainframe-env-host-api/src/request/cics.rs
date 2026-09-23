@@ -133,6 +133,8 @@ pub enum CicsOperation {
     QuerySecurity,
     /// Request one bounded RACF PassTicket for the current task principal.
     RequestPassTicket,
+    /// Issue an encrypted PassTicket using the current task's VERIFY TOKEN key.
+    RequestEncryptPassTicket,
     /// Associate a verified user with the current terminal for subsequent tasks.
     Signon,
     /// Restore the terminal default identity without changing this task principal.
@@ -283,6 +285,8 @@ pub enum CicsOperation {
     VerifyPassword,
     /// Verify a length-selected password or phrase with the installed SAF authority.
     VerifyPhrase,
+    /// Verify a bounded BasicAuth, JWT, or registered Kerberos token through SAF.
+    VerifyToken,
     Write,
     WriteTransientData,
     Xctl,
@@ -360,6 +364,7 @@ impl CicsOperation {
             Self::PurgeMessage => "PurgeMessage",
             Self::QuerySecurity => "QuerySecurity",
             Self::RequestPassTicket => "RequestPassTicket",
+            Self::RequestEncryptPassTicket => "RequestEncryptPassTicket",
             Self::Signon => "Signon",
             Self::Signoff => "Signoff",
             Self::Read => "Read",
@@ -441,6 +446,7 @@ impl CicsOperation {
             Self::Unlock => "Unlock",
             Self::VerifyPassword => "VerifyPassword",
             Self::VerifyPhrase => "VerifyPhrase",
+            Self::VerifyToken => "VerifyToken",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -684,6 +690,7 @@ impl CicsOperation {
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("QUERY", Some("SECURITY")) => Self::QuerySecurity,
             ("REQUEST", Some("PASSTICKET")) => Self::RequestPassTicket,
+            ("REQUEST", Some("ENCRYPTPTKT")) => Self::RequestEncryptPassTicket,
             ("SIGNON", _) => Self::Signon,
             ("SIGNOFF", _) => Self::Signoff,
             ("READ", _) => Self::Read,
@@ -760,6 +767,7 @@ impl CicsOperation {
             ("UNLOCK", _) => Self::Unlock,
             ("VERIFY", Some("PASSWORD")) => Self::VerifyPassword,
             ("VERIFY", Some("PHRASE")) => Self::VerifyPhrase,
+            ("VERIFY", Some("TOKEN")) => Self::VerifyToken,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

@@ -41,7 +41,8 @@ pub use service::{
     CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
     CicsCredentialRequest, CicsCredentialVerification, CicsPassTicketFailure,
     CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority,
+    CicsSecurityAuthority, CicsSecurityTokenKind, CicsTokenFailure, CicsTokenVerification,
+    CicsTokenVerificationRequest,
 };
 
 #[cfg(feature = "fault-injection")]

@@ -18,7 +18,6 @@ use mainframe_env_host_api::{HostProblem, SecretRef};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SafRequestContext {
     caller: PrincipalId,
@@ -89,7 +88,6 @@ impl SafRequestContext {
         self.tick
     }
 }
-
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AccessEnvironment {
     pub terminal: Option<String>,
@@ -370,6 +368,7 @@ pub enum RacrouteResult {
     TokenBuilt(TokenMetadata),
     TokenMapped {
         token_id: String,
+        kind: TokenKind,
         acee: AceeSummary,
     },
     TokenExtracted(TokenMetadata),
@@ -1338,6 +1337,7 @@ fn apply_request(
                 status_for_reason(DecisionReason::Granted),
                 RacrouteResult::TokenMapped {
                     token_id: token.id,
+                    kind: token.kind,
                     acee: acee_summary(&acee),
                 },
             ))

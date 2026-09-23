@@ -8052,4 +8052,75 @@ mod tests {
                 .is_none()
         );
     }
+
+    #[test]
+    fn cics_verify_token_resolves_type_length_key_and_rejects_literal_token() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. VTOKEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOK-X PIC X(21) VALUE 'KRB5:CONF:LOCAL-TOKEN'. 01 LEN-X PIC S9(9) COMP VALUE 21. 01 KEY-X PIC X(4). 01 USER-X PIC X(8). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS VERIFY TOKEN(TOK-X) TOKENLEN(LEN-X) TOKENTYPE(DFHVALUE(KERBEROS)) ENCRYPTKEY(KEY-X) ISUSERID(USER-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("VERIFY TOKEN: {:?}", analysis.diagnostics));
+        let verify = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed VERIFY TOKEN");
+        assert_eq!(verify.operation, HirCicsOperation::VerifyToken);
+        assert!(
+            verify
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::SecurityTokenData)
+        );
+        assert!(
+            analyze(&source.replace("TOKEN(TOK-X)", "TOKEN('KRB5:CONF:LOCAL-TOKEN')"))
+                .hir
+                .is_none()
+        );
+        assert!(
+            analyze(&source.replace("TOKENLEN(LEN-X)", "TOKENLEN(65536)"))
+                .hir
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn cics_request_encryptptkt_requires_pointer_and_key_shapes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. EPTKT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(4). 01 APP-X PIC X(8) VALUE 'APP1'. 01 OUT-X POINTER. 01 LEN-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS REQUEST ENCRYPTPTKT(OUT-X) FLENGTH(LEN-X) ESMAPPNAME(APP-X) ENCRYPTKEY(KEY-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("REQUEST ENCRYPTPTKT: {:?}", analysis.diagnostics));
+        let request = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed REQUEST ENCRYPTPTKT");
+        assert_eq!(
+            request.operation,
+            HirCicsOperation::RequestEncryptPassTicket
+        );
+        assert!(
+            request
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::SecurityEncryptPassTicket)
+        );
+        assert!(
+            analyze(&source.replace("OUT-X POINTER", "OUT-X PIC X(4)"))
+                .hir
+                .is_none()
+        );
+        assert!(
+            analyze(&source.replace("KEY-X PIC X(4)", "KEY-X PIC X(5)"))
+                .hir
+                .is_none()
+        );
+    }
 }

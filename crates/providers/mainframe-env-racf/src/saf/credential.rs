@@ -735,6 +735,45 @@ fn passticket_digest(
     )
 }
 
+impl RacfService {
+    /// Check whether a borrowed eight-character ticket has a live SAF record.
+    /// Redemption remains the audited authority and can still lose a race.
+    pub fn has_active_passticket(
+        &self,
+        user: &PrincipalId,
+        application: &str,
+        ticket: &[u8],
+        tick: u64,
+    ) -> Result<bool, HostProblem> {
+        if ticket.len() != 8 || application.is_empty() || application.len() > 8 {
+            return Ok(false);
+        }
+        let snapshot = self.database.read()?;
+        let Some(principal) = snapshot.principals.get(user.as_str()) else {
+            return Ok(false);
+        };
+        if principal.state != PrincipalState::Active {
+            return Ok(false);
+        }
+        let Some(verifier) = principal
+            .credential
+            .as_ref()
+            .or(principal.phrase_credential.as_ref())
+        else {
+            return Ok(false);
+        };
+        let digest = passticket_digest(verifier, user.as_str(), application, ticket);
+        Ok(snapshot.tokens.values().any(|token| {
+            token.kind == TokenKind::PassTicket
+                && token.owner == user.as_str()
+                && token.audience.as_deref() == Some(application)
+                && token.token_digest == digest
+                && token.state == TokenState::Active
+                && token.expires_tick.is_some_and(|expiry| tick < expiry)
+        }))
+    }
+}
+
 pub(super) fn build_mfa_proof(
     service: &RacfService,
     user: &str,

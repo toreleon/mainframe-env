@@ -438,6 +438,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0168"
     },
     {
+      "operation": "RequestEncryptPassTicket",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0167"
+    },
+    {
       "operation": "ReadTransientData",
       "interface": "api",
       "family": "queue-control",
@@ -632,6 +639,13 @@
       "family": "security-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0229"
+    },
+    {
+      "operation": "VerifyToken",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0230"
     },
     {
       "operation": "WaitEvent",

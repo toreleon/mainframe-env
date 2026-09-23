@@ -3,16 +3,20 @@
 use super::super::{CicsService, Run, decimal_payload};
 mod authority;
 mod change;
+mod encrypted_passticket;
 mod passticket;
 mod signoff;
 mod signon;
 mod terminal_state;
+mod token;
+mod token_key;
 mod verify;
 pub use authority::{
     CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
     CicsCredentialRequest, CicsCredentialVerification, CicsPassTicketFailure,
     CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority,
+    CicsSecurityAuthority, CicsSecurityTokenKind, CicsTokenFailure, CicsTokenVerification,
+    CicsTokenVerificationRequest,
 };
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{
@@ -40,13 +44,21 @@ pub(in crate::service) fn invoke(
         CicsOperation::ChangePassword => change::password(service, run, request, tick),
         CicsOperation::ChangePhrase => change::phrase(service, run, request, tick),
         CicsOperation::RequestPassTicket => passticket::issue(service, run, request, tick),
+        CicsOperation::RequestEncryptPassTicket => {
+            encrypted_passticket::issue(service, run, request, tick)
+        }
         CicsOperation::Signon => signon::invoke(service, run, request, tick),
         CicsOperation::Signoff => signoff::invoke(service, run, request, tick),
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
         CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
         CicsOperation::VerifyPhrase => verify::phrase(service, run, request, tick),
+        CicsOperation::VerifyToken => token::verify(service, run, request, tick),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+pub(super) fn release_task_token_key(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    token_key::release_task(service, run)
 }
 
 fn query_security(

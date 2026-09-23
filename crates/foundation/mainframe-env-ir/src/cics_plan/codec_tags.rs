@@ -845,6 +845,11 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
 
 pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
     match value {
+        CicsPlanOption::SecurityBasicAuth => 380,
+        CicsPlanOption::SecurityJwt => 381,
+        CicsPlanOption::SecurityKerberos => 382,
+        CicsPlanOption::SecurityBit => 383,
+        CicsPlanOption::SecurityBase64 => 384,
         CicsPlanOption::Update => 0,
         CicsPlanOption::Rollback => 1,
         CicsPlanOption::NoHandle => 2,
@@ -974,6 +979,11 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
 
 pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
+        380 => Ok(CicsPlanOption::SecurityBasicAuth),
+        381 => Ok(CicsPlanOption::SecurityJwt),
+        382 => Ok(CicsPlanOption::SecurityKerberos),
+        383 => Ok(CicsPlanOption::SecurityBit),
+        384 => Ok(CicsPlanOption::SecurityBase64),
         0 => Ok(CicsPlanOption::Update),
         1 => Ok(CicsPlanOption::Rollback),
         2 => Ok(CicsPlanOption::NoHandle),

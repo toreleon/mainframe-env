@@ -131,6 +131,78 @@ pub struct CicsPassTicketOutcome {
     pub esm_reason: i64,
 }
 
+/// Token format selected by the CICS VERIFY TOKEN command.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsSecurityTokenKind {
+    /// User ID and credential separated by one colon.
+    BasicAuth,
+    /// A signed, RACF-registered JSON Web Token.
+    Jwt,
+    /// A RACF-registered opaque Kerberos token.
+    Kerberos,
+}
+
+/// Borrowed token verification input for the installed SAF authority.
+pub struct CicsTokenVerificationRequest<'a> {
+    /// Issuing task principal.
+    pub actor: &'a PrincipalId,
+    /// Decoded token bytes for one bounded verification.
+    pub token: &'a [u8],
+    /// Source token type.
+    pub kind: CicsSecurityTokenKind,
+    /// Current CICS application identity for scoped PassTickets.
+    pub application: &'a str,
+    /// Canonical CICS request digest.
+    pub binding_digest: [u8; 32],
+    /// Durable SAF replay identity.
+    pub idempotency_key: &'a str,
+    /// Redacted audit correlation.
+    pub correlation: &'a str,
+    /// Observed finite logical time.
+    pub tick: u64,
+}
+
+/// Source-distinct SAF token rejection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsTokenFailure {
+    /// Token syntax is malformed or unsigned.
+    Malformed,
+    /// JWT is unsigned or uses an unsupported signing algorithm.
+    UnsignedJwt,
+    /// Kerberos token has malformed local framing.
+    MalformedKerberos,
+    /// Token signature or credential is not accepted.
+    Rejected,
+    /// Token belongs to a revoked principal.
+    Revoked,
+    /// Token refers to an unknown principal.
+    UnknownUser,
+    /// No JWT authority is active for this token.
+    JwtUnavailable,
+    /// No Kerberos authority is active for this token.
+    KerberosUnavailable,
+    /// SAF cannot evaluate the token.
+    PolicyUnavailable,
+}
+
+/// Nonsecret token status returned by SAF, with a scoped optional output token.
+pub struct CicsTokenVerification {
+    /// Authenticated user ID, present only after success.
+    pub user: Option<String>,
+    /// Source-distinct failure, absent on success.
+    pub failure: Option<CicsTokenFailure>,
+    /// Kerberos token can encrypt a returned PassTicket.
+    pub confidential: bool,
+    /// Kerberos token requires an output authenticator.
+    pub mutual: bool,
+    /// Redacted output authenticator if mutual authentication is required.
+    pub out_token: Option<BoundedPayload>,
+    /// External security manager response code.
+    pub esm_response: i64,
+    /// External security manager reason code.
+    pub esm_reason: i64,
+}
+
 /// Source-distinct SAF credential failures used for CICS condition translation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsCredentialFailure {
@@ -225,6 +297,15 @@ pub trait CicsSecurityAuthority: Send + Sync {
         tick: u64,
         allowed: bool,
     ) -> Result<(), HostProblem>;
+
+    /// Verify one BasicAuth, JWT, or registered Kerberos token through SAF.
+    fn verify_token(
+        &self,
+        request: CicsTokenVerificationRequest<'_>,
+    ) -> Result<CicsTokenVerification, HostProblem> {
+        let _ = request;
+        Err(HostProblem::InfrastructureFailure)
+    }
 }
 
 impl CicsService {

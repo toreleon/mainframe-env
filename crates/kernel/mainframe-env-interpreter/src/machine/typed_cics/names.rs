@@ -177,6 +177,9 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::Partn => SlotUse::Output,
         CicsOutputName::SetPointer => SlotUse::PointerOutput,
+        CicsOutputName::SecurityOutToken | CicsOutputName::SecurityEncryptPassTicket => {
+            SlotUse::PointerOutput
+        }
         CicsOutputName::SetPointer64 => SlotUse::Pointer64Output,
         CicsOutputName::WebEprSet => SlotUse::PointerOutput,
         CicsOutputName::WebEprLength => SlotUse::FullwordOutput,
@@ -212,6 +215,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::SecurityExpiryTime
         | CicsOutputName::SecurityInvalidCount
         | CicsOutputName::SecurityLastUseTime
+        | CicsOutputName::SecurityOutTokenLength
+        | CicsOutputName::SecurityEncryptLength
         | CicsOutputName::Resp2
         | CicsOutputName::Length
         | CicsOutputName::NumItems
@@ -379,9 +384,11 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::ChangePassword => CicsOperation::ChangePassword,
         CicsPlanOperation::ChangePhrase => CicsOperation::ChangePhrase,
         CicsPlanOperation::RequestPassTicket => CicsOperation::RequestPassTicket,
+        CicsPlanOperation::RequestEncryptPassTicket => CicsOperation::RequestEncryptPassTicket,
         CicsPlanOperation::Signon => CicsOperation::Signon,
         CicsPlanOperation::Signoff => CicsOperation::Signoff,
         CicsPlanOperation::VerifyPhrase => CicsOperation::VerifyPhrase,
+        CicsPlanOperation::VerifyToken => CicsOperation::VerifyToken,
         CicsPlanOperation::Start => CicsOperation::Start,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
@@ -438,6 +445,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::SecurityNewPhrase => "NEWPHRASE",
         CicsOperandName::SecurityNewPhraseLen => "NEWPHRASELEN",
         CicsOperandName::SecurityEsmAppName => "ESMAPPNAME",
+        CicsOperandName::SecurityTokenData => "TOKEN",
+        CicsOperandName::SecurityTokenLength => "TOKENLEN",
+        CicsOperandName::SecurityEncryptKey => "ENCRYPTKEY",
         CicsOperandName::SecurityLanguageCode => "LANGUAGECODE",
         CicsOperandName::SecurityNatLang => "NATLANG",
         CicsOperandName::SecurityOidCard => "OIDCARD",

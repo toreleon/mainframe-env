@@ -390,7 +390,10 @@ pub(super) fn write_set_output(
         let pointer = resolved_slot(machine, slot)?;
         return machine.write_reference(&pointer, &vec![0; pointer.length]);
     }
-    if value.schema() != "mainframe-env.cics.payload@1" {
+    if value.schema() != "mainframe-env.cics.payload@1"
+        && !(operation == CicsOperation::VerifyToken
+            && value.schema() == "mainframe-env.cics.secret@1")
+    {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let capacity = allocation_capacity(machine, target)?;

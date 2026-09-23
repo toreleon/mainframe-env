@@ -1,17 +1,19 @@
 //! Product binding from CICS security controls to the accepted RACF/SAF authority.
 
+mod cics_token;
 use super::*;
 use mainframe_env_cics::{
     CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
     CicsCredentialRequest, CicsCredentialVerification, CicsPassTicketFailure,
     CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority,
+    CicsSecurityAuthority, CicsSecurityTokenKind, CicsTokenFailure, CicsTokenVerification,
+    CicsTokenVerificationRequest,
 };
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_racf::{
     AccessEnvironment, AccessLevel, CredentialFailure, CredentialKind, DecisionOutcome,
-    DecisionReason, RacfService, RacrouteRequest, RacrouteResult, SafRequestContext,
+    DecisionReason, RacfService, RacrouteRequest, RacrouteResult, SafRequestContext, TokenKind,
 };
 use std::sync::Arc;
 
@@ -267,6 +269,13 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
         } else {
             Err(HostProblem::ProviderFailure)
         }
+    }
+
+    fn verify_token(
+        &self,
+        request: CicsTokenVerificationRequest<'_>,
+    ) -> Result<CicsTokenVerification, HostProblem> {
+        cics_token::verify(self, request)
     }
 }
 

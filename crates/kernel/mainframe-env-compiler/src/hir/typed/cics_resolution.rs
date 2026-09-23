@@ -432,6 +432,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::ChangePassword => security_control::CHANGE_PASSWORD_CLAUSES,
         HirCicsOperation::ChangePhrase => security_control::CHANGE_PHRASE_CLAUSES,
         HirCicsOperation::RequestPassTicket => security_control::PASSTICKET_CLAUSES,
+        HirCicsOperation::RequestEncryptPassTicket => security_control::ENCRYPTPTKT_CLAUSES,
+        HirCicsOperation::VerifyToken => security_control::VERIFY_TOKEN_CLAUSES,
         HirCicsOperation::Signon => security_control::SIGNON_CLAUSES,
         HirCicsOperation::Signoff => &["RESP", "RESP2"],
         HirCicsOperation::VerifyPhrase => security_control::VERIFY_PHRASE_CLAUSES,
@@ -513,6 +515,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ChangePassword
         | HirCicsOperation::ChangePhrase
         | HirCicsOperation::RequestPassTicket
+        | HirCicsOperation::RequestEncryptPassTicket
         | HirCicsOperation::Signon
         | HirCicsOperation::Signoff
         | HirCicsOperation::VerifyPhrase
@@ -521,6 +524,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend
         | HirCicsOperation::WaitEvent => &["NOHANDLE"],
+        HirCicsOperation::VerifyToken => &["NOHANDLE"],
         HirCicsOperation::WaitExternal => task_wait::WAIT_EXTERNAL_OPTIONS,
         HirCicsOperation::ReadTemporaryStorage => &["NEXT", "NOHANDLE"],
         HirCicsOperation::WriteTemporaryStorage => {
@@ -738,6 +742,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             &["PHRASE", "PHRASELEN", "NEWPHRASE", "NEWPHRASELEN", "USERID"][..]
         }
         HirCicsOperation::RequestPassTicket => &["PASSTICKET", "ESMAPPNAME"][..],
+        HirCicsOperation::RequestEncryptPassTicket => {
+            &["ENCRYPTKEY", "ENCRYPTPTKT", "FLENGTH", "ESMAPPNAME"][..]
+        }
+        HirCicsOperation::VerifyToken => &["TOKEN", "TOKENLEN"][..],
         HirCicsOperation::Signon => &["USERID"][..],
         HirCicsOperation::Signoff => &[][..],
         HirCicsOperation::VerifyPhrase => &["PHRASE", "PHRASELEN", "USERID"][..],

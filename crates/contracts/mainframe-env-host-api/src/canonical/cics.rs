@@ -74,6 +74,9 @@ impl Canonical for CicsOperation {
             Self::PurgeMessage => out.variant("CicsOperation", "PurgeMessage", 0),
             Self::QuerySecurity => out.variant("CicsOperation", "QuerySecurity", 0),
             Self::RequestPassTicket => out.variant("CicsOperation", "RequestPassTicket", 0),
+            Self::RequestEncryptPassTicket => {
+                out.variant("CicsOperation", "RequestEncryptPassTicket", 0)
+            }
             Self::Signon => out.variant("CicsOperation", "Signon", 0),
             Self::Signoff => out.variant("CicsOperation", "Signoff", 0),
             Self::Read => out.variant("CicsOperation", "Read", 0),
@@ -157,6 +160,7 @@ impl Canonical for CicsOperation {
             Self::Unlock => out.variant("CicsOperation", "Unlock", 0),
             Self::VerifyPassword => out.variant("CicsOperation", "VerifyPassword", 0),
             Self::VerifyPhrase => out.variant("CicsOperation", "VerifyPhrase", 0),
+            Self::VerifyToken => out.variant("CicsOperation", "VerifyToken", 0),
             Self::Write => out.variant("CicsOperation", "Write", 0),
             Self::WriteTransientData => out.variant("CicsOperation", "WriteTransientData", 0),
             Self::Xctl => out.variant("CicsOperation", "Xctl", 0),

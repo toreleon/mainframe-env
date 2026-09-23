@@ -1256,6 +1256,7 @@ dependencies = [
 name = "mainframe-env-cics"
 version = "0.8.3"
 dependencies = [
+ "base64",
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
@@ -1266,6 +1267,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "zeroize",
 ]
 
 [[package]]

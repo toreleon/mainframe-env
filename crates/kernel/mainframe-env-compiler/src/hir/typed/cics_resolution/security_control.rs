@@ -111,6 +111,30 @@ pub(super) const VERIFY_PHRASE_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const VERIFY_TOKEN_CLAUSES: &[&str] = &[
+    "TOKEN",
+    "TOKENLEN",
+    "TOKENTYPE",
+    "DATATYPE",
+    "ISUSERID",
+    "ENCRYPTKEY",
+    "OUTTOKEN",
+    "OUTTOKENLEN",
+    "ESMRESP",
+    "ESMREASON",
+    "RESP",
+    "RESP2",
+];
+pub(super) const ENCRYPTPTKT_CLAUSES: &[&str] = &[
+    "ENCRYPTKEY",
+    "ENCRYPTPTKT",
+    "FLENGTH",
+    "ESMAPPNAME",
+    "ESMRESP",
+    "ESMREASON",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -134,6 +158,12 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::VerifyPhrase {
         return validate_verify_phrase(clauses, semantic);
+    }
+    if operation == HirCicsOperation::VerifyToken {
+        return validate_verify_token(clauses, semantic);
+    }
+    if operation == HirCicsOperation::RequestEncryptPassTicket {
+        return validate_encryptptkt(clauses, semantic);
     }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(());
@@ -210,6 +240,36 @@ pub(super) fn operands(
     if operation == HirCicsOperation::VerifyPhrase {
         return verify_phrase_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::VerifyToken {
+        let mut out = Vec::new();
+        for (name, identity) in [
+            ("TOKEN", HirCicsOperandName::SecurityTokenData),
+            ("TOKENLEN", HirCicsOperandName::SecurityTokenLength),
+        ] {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: if name == "TOKEN" {
+                    cics_value(&clauses[name], semantic)?
+                } else {
+                    cics_integer_value(&clauses[name], semantic)?
+                },
+            });
+        }
+        return Ok(out);
+    }
+    if operation == HirCicsOperation::RequestEncryptPassTicket {
+        let mut out = Vec::new();
+        for (name, identity) in [
+            ("ENCRYPTKEY", HirCicsOperandName::SecurityEncryptKey),
+            ("ESMAPPNAME", HirCicsOperandName::SecurityEsmAppName),
+        ] {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: cics_value(&clauses[name], semantic)?,
+            });
+        }
+        return Ok(out);
+    }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(Vec::new());
     }
@@ -248,6 +308,12 @@ pub(super) fn outputs(
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
     if operation == HirCicsOperation::RequestPassTicket {
         return passticket_outputs(clauses, semantic);
+    }
+    if matches!(
+        operation,
+        HirCicsOperation::VerifyToken | HirCicsOperation::RequestEncryptPassTicket
+    ) {
+        return token_outputs(clauses, operation, semantic);
     }
     if operation == HirCicsOperation::Signon {
         let mut out = verify_credential_outputs(clauses, semantic, operation)?;
@@ -373,6 +439,165 @@ fn fullword(reference: &HirDataReference, name: &str) -> Resolution<()> {
         )));
     }
     Ok(())
+}
+
+fn validate_verify_token(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    for name in ["TOKEN", "TOKENLEN", "TOKENTYPE"] {
+        if !clauses.contains_key(name) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS VERIFY TOKEN requires {name}"
+            )));
+        }
+    }
+    let HirCicsValue::Data(token) = cics_value(&clauses["TOKEN"], semantic)? else {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY TOKEN requires token storage".into(),
+        ));
+    };
+    if token.length == 0 || token.length > 65_535 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY TOKEN token storage exceeds 65535 bytes".into(),
+        ));
+    }
+    match cics_integer_value(&clauses["TOKENLEN"], semantic)? {
+        HirCicsValue::Integer(length) if length < 1 || length > token.length as i64 => {
+            return Err(ResolutionFailure::Invalid(
+                "CICS VERIFY TOKEN TOKENLEN exceeds token storage".into(),
+            ));
+        }
+        HirCicsValue::Data(reference) => fullword(&reference, "TOKENLEN")?,
+        _ => {}
+    }
+    if clauses.contains_key("OUTTOKEN") != clauses.contains_key("OUTTOKENLEN") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY TOKEN OUTTOKEN requires OUTTOKENLEN".into(),
+        ));
+    }
+    let token_type = token_cvda(clauses, "TOKENTYPE")?;
+    if !matches!(token_type.as_str(), "BASICAUTH" | "JWT" | "KERBEROS") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY TOKEN TOKENTYPE is invalid".into(),
+        ));
+    }
+    if clauses.contains_key("DATATYPE") {
+        let datatype = token_cvda(clauses, "DATATYPE")?;
+        if !matches!(datatype.as_str(), "BIT" | "BASE64")
+            || datatype == "BASE64" && token_type == "JWT"
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS VERIFY TOKEN DATATYPE is invalid for TOKENTYPE".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn token_cvda(clauses: &Clauses, name: &str) -> Resolution<String> {
+    let tokens = clauses
+        .get(name)
+        .ok_or_else(|| ResolutionFailure::Invalid(format!("CICS VERIFY TOKEN requires {name}")))?;
+    let symbol = match tokens.as_slice() {
+        [symbol] => symbol.as_str(),
+        [function, open, symbol, close]
+            if function.eq_ignore_ascii_case("DFHVALUE") && open == "(" && close == ")" =>
+        {
+            symbol.as_str()
+        }
+        _ => {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS VERIFY TOKEN {name} requires a reviewed CVDA symbol"
+            )));
+        }
+    };
+    Ok(symbol.to_ascii_uppercase())
+}
+
+fn validate_encryptptkt(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    for name in ["ENCRYPTKEY", "ENCRYPTPTKT", "FLENGTH", "ESMAPPNAME"] {
+        if !clauses.contains_key(name) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS REQUEST ENCRYPTPTKT requires {name}"
+            )));
+        }
+    }
+    let HirCicsValue::Data(key) = cics_value(&clauses["ENCRYPTKEY"], semantic)? else {
+        return Err(ResolutionFailure::Invalid(
+            "CICS ENCRYPTKEY requires storage".into(),
+        ));
+    };
+    if key.length != 4 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS ENCRYPTKEY requires four-byte storage".into(),
+        ));
+    }
+    match cics_value(&clauses["ESMAPPNAME"], semantic)? {
+        HirCicsValue::Data(app) if app.length == 8 => {}
+        HirCicsValue::Literal(value) if !value.is_empty() && value.len() <= 8 => {}
+        _ => {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ESMAPPNAME requires at most eight characters".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn token_outputs(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    let names: &[(&str, HirCicsOutputName)] = if operation == HirCicsOperation::VerifyToken {
+        &[
+            ("ISUSERID", HirCicsOutputName::SecurityIsUserId),
+            ("ENCRYPTKEY", HirCicsOutputName::SecurityEncryptKey),
+            ("OUTTOKEN", HirCicsOutputName::SecurityOutToken),
+            ("OUTTOKENLEN", HirCicsOutputName::SecurityOutTokenLength),
+            ("ESMRESP", HirCicsOutputName::SecurityEsmResp),
+            ("ESMREASON", HirCicsOutputName::SecurityEsmReason),
+        ]
+    } else {
+        &[
+            ("ENCRYPTPTKT", HirCicsOutputName::SecurityEncryptPassTicket),
+            ("FLENGTH", HirCicsOutputName::SecurityEncryptLength),
+            ("ESMRESP", HirCicsOutputName::SecurityEsmResp),
+            ("ESMREASON", HirCicsOutputName::SecurityEsmReason),
+        ]
+    };
+    let mut out = Vec::new();
+    for (name, identity) in names {
+        if let Some(value) = clauses.get(*name) {
+            let reference = complete_data_reference(value, semantic)?;
+            require_writable(&reference)?;
+            match *name {
+                "ISUSERID" if reference.length != 8 => {
+                    return Err(ResolutionFailure::Invalid(
+                        "CICS ISUSERID requires eight characters".into(),
+                    ));
+                }
+                "ENCRYPTKEY" if reference.length != 4 => {
+                    return Err(ResolutionFailure::Invalid(
+                        "CICS ENCRYPTKEY requires four bytes".into(),
+                    ));
+                }
+                "OUTTOKEN" | "ENCRYPTPTKT"
+                    if !matches!(reference.usage, CobolUsage::Pointer | CobolUsage::Pointer32)
+                        || reference.length != 4 =>
+                {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS {name} requires a four-byte pointer"
+                    )));
+                }
+                "OUTTOKENLEN" | "FLENGTH" | "ESMRESP" | "ESMREASON" => fullword(&reference, name)?,
+                _ => {}
+            }
+            out.push(HirCicsOutputBinding {
+                name: *identity,
+                target: reference,
+            });
+        }
+    }
+    Ok(out)
 }
 
 fn validate_verify_password(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {

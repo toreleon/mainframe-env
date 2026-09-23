@@ -212,6 +212,8 @@ pub enum CicsPlanOperation {
     QuerySecurity,
     /// Issue a one-use PassTicket for the current task principal.
     RequestPassTicket,
+    /// Issue an encrypted PassTicket using a task-scoped token key.
+    RequestEncryptPassTicket,
     /// Authenticate a user and bind that identity to the terminal.
     Signon,
     /// Clear the terminal's signed-on identity for future tasks.
@@ -220,6 +222,8 @@ pub enum CicsPlanOperation {
     VerifyPassword,
     /// Verify a password or phrase selected by its explicit length.
     VerifyPhrase,
+    /// Verify one bounded token through the installed SAF authority.
+    VerifyToken,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
     /// Schedule one local interval-control START data record.

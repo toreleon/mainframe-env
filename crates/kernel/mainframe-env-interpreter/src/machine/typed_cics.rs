@@ -419,7 +419,11 @@ pub(super) fn execute(
                 )
             }
             CicsOperandValue::Storage(slot) => (
-                "mainframe-env.cics.storage-value@1",
+                if operand.name == CicsOperandName::SecurityTokenData {
+                    "mainframe-env.cics.secret@1"
+                } else {
+                    "mainframe-env.cics.storage-value@1"
+                },
                 read_slot(machine, slot)?,
             ),
             CicsOperandValue::Integer(value) => (
@@ -582,6 +586,14 @@ pub(super) fn execute(
                 into = Some(target);
             }
             CicsOutputName::SetPointer => {
+                arguments.extend(retrieve::allocation_arguments(
+                    machine,
+                    &target,
+                    plan.operation,
+                )?);
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::SecurityOutToken | CicsOutputName::SecurityEncryptPassTicket => {
                 arguments.extend(retrieve::allocation_arguments(
                     machine,
                     &target,

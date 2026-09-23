@@ -805,6 +805,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "ChangePhrase",
         "VerifyPhrase",
         "RequestPassTicket",
+        "RequestEncryptPassTicket",
+        "VerifyToken",
         "Signon",
         "Signoff",
         "Start",
@@ -1181,6 +1183,12 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
     "RequestPassTicket": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "RequestEncryptPassTicket": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "VerifyToken": frozenset(
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
     "Signon": frozenset(
@@ -1577,6 +1585,7 @@ def _load_typed_execution_registrations(
         "Unlock",
         "VerifyPassword",
         "VerifyPhrase",
+        "VerifyToken",
         "WaitEvent",
         "WaitExternal",
         "WaitJournalName",
@@ -3037,6 +3046,19 @@ def _option_contract(
                 "host_max_value_bytes": _host_option_value_limit(markers),
             }
         )
+        if command["official_row"] == f"{OFFICIAL_BASELINE}:api-commands:0230":
+            # Pinned VERIFY TOKEN syntax has DATATYPE(cvda) and TOKENTYPE(cvda).
+            # Flattened diagram tokens must retain their parenthesized shape.
+            if name in {"DATATYPE", "TOKENTYPE"}:
+                entries[-1]["value_shape"] = "value"
+                entries[-1]["directions"] = ["input"]
+                entries[-1]["direction_status"] = "resolved"
+            elif name == "TOKEN":
+                entries[-1]["directions"] = ["input"]
+                entries[-1]["direction_status"] = "resolved"
+            elif name == "ENCRYPTKEY":
+                entries[-1]["directions"] = ["output"]
+                entries[-1]["direction_status"] = "resolved"
     source_direction_status = _source_contract_status(direction_dimension)
     if not applicable:
         direction_status = "not-applicable"

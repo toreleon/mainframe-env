@@ -741,6 +741,8 @@ fn validate_operation_shape(
         CicsPlanOperation::RequestPassTicket => {
             security_control::invalid_request_passticket_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::VerifyToken => security_control::invalid_verify_token_shape(plan, inputs, outputs),
+        CicsPlanOperation::RequestEncryptPassTicket => security_control::invalid_request_encrypt_passticket_shape(plan, inputs, outputs),
         CicsPlanOperation::Signon => security_control::invalid_signon_shape(plan, inputs, outputs),
         CicsPlanOperation::Signoff => security_control::invalid_signoff_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
