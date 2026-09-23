@@ -56,6 +56,7 @@ pub(super) fn resolve(
         ["WAIT", "EXTERNAL"] => HirCicsOperation::WaitExternal,
         ["START"] => HirCicsOperation::Start,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
+        ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,
         _ => return Err(ResolutionFailure::Unsupported),
     })
 }
@@ -90,6 +91,7 @@ pub(super) fn resolve_option(option: &str) -> HirCicsOption {
         "NOCHECK" => HirCicsOption::NoCheck,
         "MAPONLY" => HirCicsOption::MapOnly,
         "DATAONLY" => HirCicsOption::DataOnly,
+        "UNESCAPED" => HirCicsOption::Unescaped,
         "NEXT" => HirCicsOption::Next,
         "REWRITE" => HirCicsOption::RewriteTemporary,
         "AUXILIARY" => HirCicsOption::Auxiliary,

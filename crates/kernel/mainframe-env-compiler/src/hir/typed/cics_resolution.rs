@@ -17,6 +17,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
 mod assign_validation;
+mod document_control;
 mod file_operands;
 mod format_time;
 mod handle_abend;
@@ -747,6 +748,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WriteTemporaryStorage => &[
             "QNAME", "QUEUE", "FROM", "LENGTH", "NUMITEMS", "ITEM", "SYSID", "RESP", "RESP2",
         ],
+        HirCicsOperation::DocumentCreate => document_control::ALLOWED_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -830,6 +832,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WriteTemporaryStorage => {
             &["AUXILIARY", "MAIN", "NOSUSPEND", "REWRITE", "NOHANDLE"]
         }
+        HirCicsOperation::DocumentCreate => document_control::ALLOWED_OPTIONS,
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -888,6 +891,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
+    document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
     let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     for required in match operation {
         HirCicsOperation::Address => &["COMMAREA"][..],
@@ -931,6 +935,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
         HirCicsOperation::Load => &["PROGRAM"][..],
         HirCicsOperation::Release => &["PROGRAM"][..],
+        HirCicsOperation::DocumentCreate => &["DOCTOKEN"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1052,6 +1057,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
+    operands.extend(document_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -1090,6 +1096,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

@@ -1634,6 +1634,7 @@ mod tests {
                 CicsPlanOperation::WaitExternal => crate::HirCicsOperation::WaitExternal,
                 CicsPlanOperation::Start => crate::HirCicsOperation::Start,
                 CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
+                CicsPlanOperation::DocumentCreate => crate::HirCicsOperation::DocumentCreate,
             };
             assert_eq!(
                 operation.effects,

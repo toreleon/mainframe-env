@@ -57,7 +57,7 @@ coverage, semantic and differential credit.
 
 The contract also binds one 121-name EIBRESP authority for dynamic
 `HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
-records 20 known mutating rows, 225 bounded-effect rows, one explicit UOW
+records 26 known mutating rows, 218 bounded-effect rows, one explicit UOW
 boundary and 244 bounded-UOW rows. Those values describe current contract
 certainty; they are not execution or conformance counts.
 
@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 38 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 45 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 225 `unready` rows that are recognized but fail explicitly as unsupported.
+- 218 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 38 API routes are the only advertised application commands.
+The current 45 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -255,6 +255,18 @@ WRITEQ TD, READQ TD, and DELETEQ TD accept SYSID only when it identifies the
 current system; an unknown or unsupported remote name returns SYSIDERR 53/0
 before authorization or queue mutation. NOSUSPEND/QBUSY, indoubt locking,
 remote routing, and external data set integration remain deferred.
+Typed `DOCUMENT CREATE` starts the document-control family on a bounded durable
+authority owned by the issuing execution, run unit, and transaction. It returns
+a deterministic 16-byte token and optional fullword DOCSIZE for empty, FROM,
+TEXT, BINARY, FROMDOC, or registered-template content. Symbol-list length,
+delimiter and unescaping rules are checked before persistence. Template use
+performs a DOCTEMPLATE READ decision against the registered resource name.
+The document row and canonical outer replay are one atomic store mutation, so
+an unknown result replays the same token without duplicating content; rows
+reload from SQLite and are deleted when their owning task ends. Operation tag
+63, operand tags 132–147, option tag 84, and non-ASSIGN output tags 216–217 are
+append-only; the rest of the reserved ranges remain available to rows
+0052–0055.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

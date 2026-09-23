@@ -198,6 +198,7 @@ pub enum HirCicsOperation {
     WaitExternal,
     Start,
     Retrieve,
+    DocumentCreate,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -266,6 +267,22 @@ pub enum HirCicsOperandName {
     Entry,
     LoadLength,
     LoadFlength,
+    DocumentToken,
+    Text,
+    Binary,
+    FromDocument,
+    Template,
+    SymbolList,
+    ListLength,
+    Delimiter,
+    HostCodePage,
+    Bookmark,
+    Symbol,
+    AtBookmark,
+    ToBookmark,
+    MaximumLength,
+    CharacterSet,
+    SymbolValue,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -321,6 +338,7 @@ pub enum HirCicsOption {
     ExactMatch,
     Minimum,
     Hold,
+    Unescaped,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -345,6 +363,8 @@ pub enum HirCicsOutputName {
     ReturnTermId,
     Queue,
     NumItems,
+    DocumentToken,
+    DocumentSize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -6256,5 +6276,79 @@ mod tests {
                 .public_message()
                 .contains("option NOHANDLE is duplicated")
         }));
+    }
+
+    #[test]
+    fn document_create_lowers_bounded_inputs_and_generated_outputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DOCCREAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 TEXT-X PIC X(8) VALUE 'DOCUMENT'. 01 LENGTH-X PIC S9(9) COMP VALUE 4. 01 SIZE-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DOCUMENT CREATE DOCTOKEN(TOKEN-X) TEXT(TEXT-X) LENGTH(LENGTH-X) DOCSIZE(SIZE-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DOCUMENT CREATE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DOCUMENT CREATE");
+        assert_eq!(command.operation, HirCicsOperation::DocumentCreate);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Text
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "TEXT-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::DocumentToken
+                && output.target.qualified_name == "TOKEN-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::DocumentSize
+                && output.target.qualified_name == "SIZE-X"
+        }));
+
+        for (command, expected) in [
+            ("DOCUMENT CREATE", "requires DOCTOKEN"),
+            (
+                "DOCUMENT CREATE DOCTOKEN(TOKEN-X) TEXT(TEXT-X)",
+                "requires LENGTH",
+            ),
+            (
+                "DOCUMENT CREATE DOCTOKEN(TOKEN-X) TEXT(TEXT-X) LENGTH(4) BINARY(TEXT-X)",
+                "at most one content source",
+            ),
+            (
+                "DOCUMENT CREATE DOCTOKEN(TOKEN-X) DELIMITER('|')",
+                "require SYMBOLLIST",
+            ),
+            (
+                "DOCUMENT CREATE DOCTOKEN(TOKEN-X) SYMBOLLIST(TEXT-X)",
+                "requires LISTLENGTH",
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDOC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 TEXT-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
     }
 }

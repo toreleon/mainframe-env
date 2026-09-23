@@ -105,6 +105,8 @@ pub enum CicsPlanOperation {
     Start,
     /// Consume one expired interval-control START data record.
     Retrieve,
+    /// Create one bounded transaction-owned document.
+    DocumentCreate,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -229,6 +231,38 @@ pub enum CicsOperandName {
     LoadLength,
     /// `FLENGTH(...)` fullword output target for LOAD.
     LoadFlength,
+    /// `DOCTOKEN(...)` identifies one transaction-owned document.
+    DocumentToken,
+    /// `TEXT(...)` bytes marked for client-code-page conversion.
+    Text,
+    /// `BINARY(...)` bytes retained without client-code-page conversion.
+    Binary,
+    /// `FROMDOC(...)` identifies a source document.
+    FromDocument,
+    /// `TEMPLATE(...)` names a registered document template.
+    Template,
+    /// `SYMBOLLIST(...)` supplies document symbol definitions.
+    SymbolList,
+    /// `LISTLENGTH(...)` bounds a symbol-list input.
+    ListLength,
+    /// `DELIMITER(...)` selects the symbol-list separator.
+    Delimiter,
+    /// `HOSTCODEPAGE(...)` names the source EBCDIC CCSID.
+    HostCodePage,
+    /// `BOOKMARK(...)` names a bookmark to create.
+    Bookmark,
+    /// `SYMBOL(...)` names one document symbol.
+    Symbol,
+    /// `AT(...)` names the insertion start bookmark.
+    AtBookmark,
+    /// `TO(...)` names the overlay end bookmark.
+    ToBookmark,
+    /// `MAXLENGTH(...)` bounds a document retrieval destination.
+    MaximumLength,
+    /// `CHARACTERSET(...)` names a retrieval target encoding.
+    CharacterSet,
+    /// `VALUE(...)` supplies one document symbol value.
+    SymbolValue,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -304,6 +338,8 @@ pub enum CicsPlanOption {
     Minimum,
     /// Retain a LOAD ownership after the issuing task terminates.
     Hold,
+    /// Preserve percent escapes and plus signs in document symbol lists.
+    Unescaped,
 }
 
 /// Named result binding written after the host result arrives.
@@ -349,4 +385,8 @@ pub enum CicsOutputName {
     Queue,
     /// Current temporary-storage queue item count.
     NumItems,
+    /// Generated 16-byte document token destination.
+    DocumentToken,
+    /// Current maximum retrieval size destination.
+    DocumentSize,
 }

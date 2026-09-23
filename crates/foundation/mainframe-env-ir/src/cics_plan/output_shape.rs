@@ -74,6 +74,13 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Assign(_) | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::DocumentCreate => matches!(
+            output,
+            CicsOutputName::DocumentToken
+                | CicsOutputName::DocumentSize
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

@@ -24,6 +24,8 @@ pub enum CicsOperation {
     /// Release one matching task enqueue ownership level.
     Deq,
     Delete,
+    /// Create one bounded transaction-owned document.
+    DocumentCreate,
     /// Delete every record from one local transient-data queue.
     DeleteTransientData,
     /// Delete every item from one local temporary-storage queue.
@@ -106,6 +108,7 @@ impl CicsOperation {
             Self::Delay => "Delay",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
+            Self::DocumentCreate => "DocumentCreate",
             Self::DeleteTransientData => "DeleteTransientData",
             Self::DeleteTemporaryStorage => "DeleteTemporaryStorage",
             Self::ReadTemporaryStorage => "ReadTemporaryStorage",
@@ -156,6 +159,7 @@ impl CicsOperation {
         matches!(
             self,
             Self::Delete
+                | Self::DocumentCreate
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
                 | Self::ReadTemporaryStorage
@@ -217,6 +221,7 @@ impl CicsOperation {
             ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
+            ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
             ("DELETEQ", Some("TS")) => Self::DeleteTemporaryStorage,
             ("READQ", Some("TS")) => Self::ReadTemporaryStorage,

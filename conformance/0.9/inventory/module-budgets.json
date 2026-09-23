@@ -277,6 +277,7 @@
       "crates/providers/mainframe-env-cics/src/abi.rs",
       "crates/providers/mainframe-env-cics/src/event_wait.rs",
       "crates/providers/mainframe-env-cics/src/lib.rs",
+      "crates/providers/mainframe-env-cics/src/limits.rs",
       "crates/providers/mainframe-env-cics/src/retention.rs",
       "crates/providers/mainframe-env-cics/src/service.rs"
     ],
@@ -285,6 +286,7 @@
     "handler_modules": [
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/document_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval.rs",

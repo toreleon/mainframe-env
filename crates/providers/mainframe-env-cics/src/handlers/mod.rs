@@ -1,5 +1,6 @@
 mod bms_map;
 mod condition;
+mod document_control;
 mod file_control;
 mod handle_state;
 mod interval;
@@ -64,6 +65,9 @@ pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
 pub(super) use condition::respond as condition;
+pub(super) use document_control::{
+    DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
+};
 pub(super) use file_control::invoke as invoke_file_control;
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
@@ -110,6 +114,7 @@ pub(in crate::service) use transient_data::{
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
+    document_control::release_task(service, run)?;
     interval_control::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)
 }

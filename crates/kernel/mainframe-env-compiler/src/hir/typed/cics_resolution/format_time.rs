@@ -126,6 +126,8 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::ReturnTermId
         | HirCicsOutputName::Queue
         | HirCicsOutputName::NumItems
+        | HirCicsOutputName::DocumentToken
+        | HirCicsOutputName::DocumentSize
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

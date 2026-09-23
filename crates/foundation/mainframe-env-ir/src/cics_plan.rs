@@ -8,6 +8,7 @@ mod address;
 mod assign;
 mod browse;
 mod codec_tags;
+mod document_control;
 mod file_mutation;
 mod handle_abend;
 mod identities;
@@ -287,7 +288,10 @@ fn validate_plan(
         }
         let numeric_length = matches!(
             operand.name,
-            CicsOperandName::Length | CicsOperandName::KeyLength
+            CicsOperandName::Length
+                | CicsOperandName::KeyLength
+                | CicsOperandName::ListLength
+                | CicsOperandName::MaximumLength
         );
         if (numeric_length && matches!(&operand.value, CicsOperandValue::Literal(_)))
             || (!numeric_length && matches!(&operand.value, CicsOperandValue::LengthOf(_)))
@@ -617,6 +621,9 @@ fn validate_operation_shape(
         | CicsPlanOperation::Start
         | CicsPlanOperation::Retrieve => {
             interval_control::invalid_shape(plan, inputs, outputs, scheduling_options)
+        }
+        CicsPlanOperation::DocumentCreate => {
+            document_control::invalid_create_shape(plan, inputs, outputs)
         }
     };
     if unexpected_output
@@ -1509,6 +1516,82 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan(&rewrite_without_item, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn document_create_tags_are_unique_reserved_and_round_trip() {
+        assert_eq!(operation_tag(CicsPlanOperation::DocumentCreate), 63);
+        assert_eq!(
+            operation_from_tag(63),
+            Ok(CicsPlanOperation::DocumentCreate)
+        );
+        let operands = [
+            (CicsOperandName::DocumentToken, 132),
+            (CicsOperandName::Text, 133),
+            (CicsOperandName::Binary, 134),
+            (CicsOperandName::FromDocument, 135),
+            (CicsOperandName::Template, 136),
+            (CicsOperandName::SymbolList, 137),
+            (CicsOperandName::ListLength, 138),
+            (CicsOperandName::Delimiter, 139),
+            (CicsOperandName::HostCodePage, 140),
+            (CicsOperandName::Bookmark, 141),
+            (CicsOperandName::Symbol, 142),
+            (CicsOperandName::AtBookmark, 143),
+            (CicsOperandName::ToBookmark, 144),
+            (CicsOperandName::MaximumLength, 145),
+            (CicsOperandName::CharacterSet, 146),
+            (CicsOperandName::SymbolValue, 147),
+        ];
+        let mut operand_tags = BTreeSet::new();
+        for (operand, tag) in operands {
+            assert!((132..=151).contains(&tag));
+            assert!(operand_tags.insert(tag));
+            assert_eq!(operand_tag(operand), tag);
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        assert_eq!(option_tag(CicsPlanOption::Unescaped), 84);
+        assert_eq!(option_from_tag(84), Ok(CicsPlanOption::Unescaped));
+        for (output, tag) in [
+            (CicsOutputName::DocumentToken, 216),
+            (CicsOutputName::DocumentSize, 217),
+        ] {
+            assert!((216..=223).contains(&tag));
+            assert_eq!(output_tag(output), tag);
+            assert_eq!(output_from_tag(tag), Ok(output));
+            assert!(!matches!(output, CicsOutputName::Assign(_)));
+        }
+
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DocumentCreate,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(4),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Text,
+                    value: CicsOperandValue::Storage(slot(1, "DOCUMENT.TEXT")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::NoHandle]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::DocumentToken,
+                    target: slot(2, "DOCUMENT.TOKEN"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::DocumentSize,
+                    target: slot(3, "DOCUMENT.SIZE"),
+                },
+            ],
+            condition: CicsCondition::NoHandle,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
         );
     }
 

@@ -37,36 +37,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CicsLimits {
-    pub max_sessions: usize,
-    pub max_runs: usize,
-    pub max_maps: usize,
-    pub max_programs: usize,
-    pub max_file_aliases: usize,
-    pub max_enqueue_models: usize,
-    pub max_fields: usize,
-    pub max_screen_bytes: usize,
-    pub max_queue_records: usize,
-    pub max_queue_bytes: usize,
-}
-
-impl Default for CicsLimits {
-    fn default() -> Self {
-        Self {
-            max_sessions: 4096,
-            max_runs: 4096,
-            max_maps: 1024,
-            max_programs: 4096,
-            max_file_aliases: 1024,
-            max_enqueue_models: 1024,
-            max_fields: 512,
-            max_screen_bytes: 4 * 1024 * 1024,
-            max_queue_records: 65536,
-            max_queue_bytes: 64 * 1024 * 1024,
-        }
-    }
-}
+pub(crate) use crate::limits::CicsLimits;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BmsFieldDefinition {
@@ -103,6 +74,19 @@ pub struct BmsMapDefinition {
 pub struct CicsFileDefinition {
     pub dataset: DatasetName,
     pub ccsid: Option<u16>,
+}
+
+/// Durable document-template definition used by `DOCUMENT CREATE` and `INSERT`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsDocumentTemplateDefinition {
+    /// Up-to-48-byte application-visible template name.
+    pub name: String,
+    /// SAF DOCTEMPLATE resource definition name.
+    pub resource: String,
+    /// Exact template bytes before symbol substitution.
+    pub content: Vec<u8>,
+    /// EBCDIC host code page associated with the template bytes.
+    pub host_code_page: u16,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -274,6 +258,9 @@ struct State {
     enqueue_models: BTreeMap<String, CicsEnqueueModelDefinition>,
     continuations: BTreeMap<String, DurableContinuation>,
     transient: handlers::TransientDataState,
+    documents: BTreeMap<String, handlers::DocumentRecord>,
+    document_templates: BTreeMap<String, CicsDocumentTemplateDefinition>,
+    document_bytes: usize,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
@@ -425,6 +412,8 @@ impl CicsService {
         let enqueue_models = handlers::load_enqueue_models(store.as_ref(), limits)?;
         let transient = handlers::load_transient_data(store.as_ref(), limits)?;
         handlers::validate_enqueue_store(store.as_ref(), limits)?;
+        let (documents, document_templates, document_bytes) =
+            handlers::load_document_authority(store.as_ref(), limits)?;
         let interval_records = handlers::load_interval_records(store.as_ref(), limits)?;
         Ok(Arc::new(Self {
             host,
@@ -447,6 +436,9 @@ impl CicsService {
                 enqueue_models,
                 continuations,
                 transient,
+                documents,
+                document_templates,
+                document_bytes,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -1686,7 +1678,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 53);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 54);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -1708,6 +1700,9 @@ impl CicsService {
             }
             CicsCommandFamily::IntervalControl => {
                 handlers::invoke_interval_control(self, run, &request)
+            }
+            CicsCommandFamily::DocumentControl => {
+                handlers::invoke_document_control(self, run, &request, retention_tick)
             }
         }
         .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
@@ -4998,6 +4993,7 @@ mod tests {
             ("DEQ", CicsOperation::Deq),
             ("DELAY", CicsOperation::Delay),
             ("DELETE", CicsOperation::Delete),
+            ("DOCUMENT CREATE", CicsOperation::DocumentCreate),
             ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
@@ -6266,7 +6262,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 53);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 54);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6278,7 +6274,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 9);
+        assert_eq!(families.len(), 10);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
@@ -6291,6 +6287,260 @@ mod tests {
             bare_asktime.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
         );
+        let document = command_descriptor(CicsOperation::DocumentCreate);
+        assert_eq!(document.syntax, "DOCUMENT CREATE");
+        assert_eq!(
+            document.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0051"
+        );
+    }
+
+    #[test]
+    fn document_create_is_bounded_durable_and_exactly_replayable() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-create", BTreeMap::new());
+        let session = SessionId::new("document-create", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(b"DOCUMENT")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, create.clone(), 1),
+                create.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.outputs["DOCTOKEN"].bytes().len(), 16);
+        assert_eq!(first.outputs["DOCSIZE"].bytes(), b"4");
+        assert_eq!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-1")
+                .unwrap()
+                .is_some()
+        );
+
+        let replayed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, create.clone(), 1),
+                create.clone(),
+            )
+            .unwrap();
+        assert_eq!(replayed, first);
+        assert_eq!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let mut conflict = create;
+        conflict
+            .arguments
+            .insert("TEXT".into(), task_value(b"CHANGED!"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, conflict.clone(), 1),
+                conflict,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let finish = request(CicsOperation::Return, BTreeMap::new(), 2);
+        service
+            .invoke(&effect(&invocation.run_unit_id, finish.clone(), 2), finish)
+            .unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn document_create_enforces_aggregate_bounds_without_partial_state() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            authorities(),
+            store.clone(),
+            CicsLimits {
+                max_document_bytes: 3,
+                ..CicsLimits::default()
+            },
+        )
+        .unwrap();
+        let invocation = invocation_for("document-bound", BTreeMap::new());
+        let session = SessionId::new("document-bound", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("BINARY".into(), task_value(b"DATA")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create,),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-1")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn document_create_deadline_and_cancellation_stop_before_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-control-stop", BTreeMap::new());
+        let session = SessionId::new("document-control-stop", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let provider = cics_provider(service, InvocationLimits::default());
+        let outer = ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+            ),
+            HostLimits::default(),
+        );
+        let create = |sequence| {
+            request(
+                CicsOperation::DocumentCreate,
+                BTreeMap::from([("DOCTOKEN".into(), argument(b"TOKEN-X"))]),
+                sequence,
+            )
+        };
+        let expired = create(1);
+        assert_eq!(
+            outer
+                .invoke(
+                    &invocation,
+                    invocation.deadline_tick,
+                    false,
+                    effect(&invocation.run_unit_id, expired.clone(), 1),
+                )
+                .into_transaction_parts()
+                .0
+                .outcome,
+            Err(HostProblem::TimedOut)
+        );
+        let cancelled = create(2);
+        assert_eq!(
+            outer
+                .invoke(
+                    &invocation,
+                    1,
+                    true,
+                    effect(&invocation.run_unit_id, cancelled.clone(), 2),
+                )
+                .into_transaction_parts()
+                .0
+                .outcome,
+            Err(HostProblem::Cancelled)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn document_create_template_authorizes_definition_and_survives_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-document-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let (host, seen) = command_authorities(false);
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        service
+            .register_document_templates(&[CicsDocumentTemplateDefinition {
+                name: "WELCOME".into(),
+                resource: "WELCOME-RDO".into(),
+                content: b"HELLO &USER;".to_vec(),
+                host_code_page: 37,
+            }])
+            .unwrap();
+        let invocation = invocation_for("document-template", BTreeMap::new());
+        let session = SessionId::new("document-template", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEMPLATE".into(), cics_literal(b"WELCOME")),
+                ("SYMBOLLIST".into(), task_value(b"USER=IBMUSER")),
+                ("LISTLENGTH".into(), cics_decimal(12)),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        assert_eq!(response.outputs["DOCSIZE"].bytes(), b"13");
+        assert!(seen.lock().unwrap().contains(&(
+            "DOCTEMPLATE".into(),
+            "CICS.DOCTEMPLATE.WELCOME-RDO".into(),
+            AccessIntent::Read,
+        )));
+        drop(service);
+        let reopened = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
+        assert_eq!(reopened.lock().unwrap().documents.len(), 1);
+        assert_eq!(reopened.lock().unwrap().document_templates.len(), 1);
+        drop(reopened);
+        let _ = std::fs::remove_file(directory.join("state.db"));
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]

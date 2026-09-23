@@ -44,6 +44,21 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::LoadSet | CicsOperandName::Entry => SlotUse::PointerOutput,
         CicsOperandName::LoadLength => SlotUse::HalfwordOutput,
         CicsOperandName::LoadFlength => SlotUse::FullwordOutput,
+        CicsOperandName::ListLength | CicsOperandName::MaximumLength => SlotUse::FullwordInput,
+        CicsOperandName::DocumentToken
+        | CicsOperandName::Text
+        | CicsOperandName::Binary
+        | CicsOperandName::FromDocument
+        | CicsOperandName::Template
+        | CicsOperandName::SymbolList
+        | CicsOperandName::Delimiter
+        | CicsOperandName::HostCodePage
+        | CicsOperandName::Bookmark
+        | CicsOperandName::Symbol
+        | CicsOperandName::AtBookmark
+        | CicsOperandName::ToBookmark
+        | CicsOperandName::CharacterSet
+        | CicsOperandName::SymbolValue => SlotUse::Input,
         _ => SlotUse::Input,
     }
 }
@@ -69,6 +84,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::Length
         | CicsOutputName::NumItems => SlotUse::NumericOutput,
         CicsOutputName::Assign(output) => SlotUse::AssignOutput(output),
+        CicsOutputName::DocumentToken => SlotUse::Output,
+        CicsOutputName::DocumentSize => SlotUse::NumericOutput,
     }
 }
 
@@ -125,6 +142,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
         CicsPlanOperation::Start => CicsOperation::Start,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
+        CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
     }
 }
 
@@ -192,6 +210,22 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Entry => "ENTRY",
         CicsOperandName::LoadLength => "LENGTH",
         CicsOperandName::LoadFlength => "FLENGTH",
+        CicsOperandName::DocumentToken => "DOCTOKEN",
+        CicsOperandName::Text => "TEXT",
+        CicsOperandName::Binary => "BINARY",
+        CicsOperandName::FromDocument => "FROMDOC",
+        CicsOperandName::Template => "TEMPLATE",
+        CicsOperandName::SymbolList => "SYMBOLLIST",
+        CicsOperandName::ListLength => "LISTLENGTH",
+        CicsOperandName::Delimiter => "DELIMITER",
+        CicsOperandName::HostCodePage => "HOSTCODEPAGE",
+        CicsOperandName::Bookmark => "BOOKMARK",
+        CicsOperandName::Symbol => "SYMBOL",
+        CicsOperandName::AtBookmark => "AT",
+        CicsOperandName::ToBookmark => "TO",
+        CicsOperandName::MaximumLength => "MAXLENGTH",
+        CicsOperandName::CharacterSet => "CHARACTERSET",
+        CicsOperandName::SymbolValue => "VALUE",
     }
 }
 
@@ -217,6 +251,8 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::ReturnTermId => "RTERMID",
         CicsOutputName::Queue => "QUEUE",
         CicsOutputName::NumItems => "NUMITEMS",
+        CicsOutputName::DocumentToken => "DOCTOKEN",
+        CicsOutputName::DocumentSize => "DOCSIZE",
     }
 }
 
@@ -259,5 +295,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::ExactMatch => "EXACTMATCH",
         CicsPlanOption::Minimum => "MINIMUM",
         CicsPlanOption::Hold => "HOLD",
+        CicsPlanOption::Unescaped => "UNESCAPED",
     }
 }

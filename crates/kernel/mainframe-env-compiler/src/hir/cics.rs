@@ -229,6 +229,22 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Entry => CicsOperandName::Entry,
                 HirCicsOperandName::LoadLength => CicsOperandName::LoadLength,
                 HirCicsOperandName::LoadFlength => CicsOperandName::LoadFlength,
+                HirCicsOperandName::DocumentToken => CicsOperandName::DocumentToken,
+                HirCicsOperandName::Text => CicsOperandName::Text,
+                HirCicsOperandName::Binary => CicsOperandName::Binary,
+                HirCicsOperandName::FromDocument => CicsOperandName::FromDocument,
+                HirCicsOperandName::Template => CicsOperandName::Template,
+                HirCicsOperandName::SymbolList => CicsOperandName::SymbolList,
+                HirCicsOperandName::ListLength => CicsOperandName::ListLength,
+                HirCicsOperandName::Delimiter => CicsOperandName::Delimiter,
+                HirCicsOperandName::HostCodePage => CicsOperandName::HostCodePage,
+                HirCicsOperandName::Bookmark => CicsOperandName::Bookmark,
+                HirCicsOperandName::Symbol => CicsOperandName::Symbol,
+                HirCicsOperandName::AtBookmark => CicsOperandName::AtBookmark,
+                HirCicsOperandName::ToBookmark => CicsOperandName::ToBookmark,
+                HirCicsOperandName::MaximumLength => CicsOperandName::MaximumLength,
+                HirCicsOperandName::CharacterSet => CicsOperandName::CharacterSet,
+                HirCicsOperandName::SymbolValue => CicsOperandName::SymbolValue,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -269,6 +285,8 @@ impl PlanContext<'_> {
                 HirCicsOutputName::ReturnTermId => CicsOutputName::ReturnTermId,
                 HirCicsOutputName::Queue => CicsOutputName::Queue,
                 HirCicsOutputName::NumItems => CicsOutputName::NumItems,
+                HirCicsOutputName::DocumentToken => CicsOutputName::DocumentToken,
+                HirCicsOutputName::DocumentSize => CicsOutputName::DocumentSize,
             },
             target: self.slot(&output.target)?,
         })
@@ -365,6 +383,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Retrieve => CicsPlanOperation::Retrieve,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
+        HirCicsOperation::DocumentCreate => CicsPlanOperation::DocumentCreate,
     }
 }
 
@@ -407,5 +426,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::ExactMatch => CicsPlanOption::ExactMatch,
         HirCicsOption::Minimum => CicsPlanOption::Minimum,
         HirCicsOption::Hold => CicsPlanOption::Hold,
+        HirCicsOption::Unescaped => CicsPlanOption::Unescaped,
     }
 }

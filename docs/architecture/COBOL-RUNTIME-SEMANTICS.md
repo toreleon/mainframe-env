@@ -286,6 +286,15 @@ SYSID; any other name returns SYSIDERR 53/0 before authorization or mutation.
 Remote routing, NOSUSPEND/QBUSY, indoubt locking, and external data set
 integration remain fail-closed.
 
+`DOCUMENT CREATE` lowers to a typed document plan whose DOCTOKEN is a writable
+16-byte output and whose optional DOCSIZE is writable fullword binary storage.
+Exactly one content source may be selected; buffer sources require a fullword
+LENGTH, and SYMBOLLIST requires LISTLENGTH. The interpreter captures all input
+bytes before dispatch and writes only typed DOCTOKEN/DOCSIZE outputs. The CICS
+provider owns the bounded durable document/template state, source conditions,
+template SAF decision, transaction ownership, atomic replay, SQLite reload and
+task-end reclamation.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

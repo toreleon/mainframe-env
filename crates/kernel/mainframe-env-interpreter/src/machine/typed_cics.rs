@@ -73,10 +73,10 @@ pub(super) fn write_response_state(
     retrieve::prepare_load_allocation(machine, operation, response, outputs)
 }
 
-pub(super) fn into_payload_schema<'a>(
+pub(super) fn into_payload_schema(
     operation: CicsOperation,
-    response: &'a CicsResponse,
-) -> Option<&'a str> {
+    response: &CicsResponse,
+) -> Option<&str> {
     (operation != CicsOperation::ReadTransientData
         || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
     .then(|| response.payload.schema())
@@ -220,7 +220,11 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
                             | CicsOperandName::KeyLength
                             | CicsOperandName::Item
                     ) {
-                    SlotUse::HalfwordInput
+                    if plan.operation == CicsPlanOperation::DocumentCreate {
+                        SlotUse::FullwordInput
+                    } else {
+                        SlotUse::HalfwordInput
+                    }
                 } else {
                     names::input_slot_use(operand.name)
                 };
@@ -352,6 +356,8 @@ pub(super) fn execute(
                         | CicsOperandName::Item
                         | CicsOperandName::MajorVersion
                         | CicsOperandName::MinorVersion
+                        | CicsOperandName::ListLength
+                        | CicsOperandName::MaximumLength
                 ) =>
             {
                 (
@@ -423,6 +429,7 @@ pub(super) fn execute(
             | CicsOutputName::ReturnTermId
             | CicsOutputName::Queue
             | CicsOutputName::NumItems
+            | CicsOutputName::DocumentToken
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -458,6 +465,9 @@ pub(super) fn execute(
             CicsOutputName::Resp => response = Some(target),
             CicsOutputName::Resp2 => response2 = Some(target),
             CicsOutputName::Length => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::DocumentSize => {
                 outputs.insert(key.into(), target);
             }
         }
@@ -787,7 +797,11 @@ fn validate_runtime_plan(
                     operand.name,
                     CicsOperandName::Length | CicsOperandName::KeyLength | CicsOperandName::Item
                 ) {
-                SlotUse::HalfwordInput
+                if plan.operation == CicsPlanOperation::DocumentCreate {
+                    SlotUse::FullwordInput
+                } else {
+                    SlotUse::HalfwordInput
+                }
             } else {
                 names::input_slot_use(operand.name)
             };
@@ -902,7 +916,7 @@ fn validate_machine_slot(
     if matches!(slot_use, SlotUse::FullwordInput)
         && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
     {
-        return Err(invalid_plan("FLENGTH input must be fullword binary"));
+        return Err(invalid_plan("fullword CICS input must be fullword binary"));
     }
     if let SlotUse::AssignOutput(output) = slot_use {
         assign::validate_output(layout, output)?;

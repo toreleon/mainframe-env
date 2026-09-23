@@ -60,6 +60,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::InvokeApplication => 46,
         CicsPlanOperation::Load => 47,
         CicsPlanOperation::Release => 48,
+        CicsPlanOperation::DocumentCreate => 63,
     }
 }
 
@@ -116,6 +117,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         46 => Ok(CicsPlanOperation::InvokeApplication),
         47 => Ok(CicsPlanOperation::Load),
         48 => Ok(CicsPlanOperation::Release),
+        63 => Ok(CicsPlanOperation::DocumentCreate),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -184,6 +186,22 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Entry => 63,
         CicsOperandName::LoadLength => 64,
         CicsOperandName::LoadFlength => 65,
+        CicsOperandName::DocumentToken => 132,
+        CicsOperandName::Text => 133,
+        CicsOperandName::Binary => 134,
+        CicsOperandName::FromDocument => 135,
+        CicsOperandName::Template => 136,
+        CicsOperandName::SymbolList => 137,
+        CicsOperandName::ListLength => 138,
+        CicsOperandName::Delimiter => 139,
+        CicsOperandName::HostCodePage => 140,
+        CicsOperandName::Bookmark => 141,
+        CicsOperandName::Symbol => 142,
+        CicsOperandName::AtBookmark => 143,
+        CicsOperandName::ToBookmark => 144,
+        CicsOperandName::MaximumLength => 145,
+        CicsOperandName::CharacterSet => 146,
+        CicsOperandName::SymbolValue => 147,
     }
 }
 
@@ -251,6 +269,22 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         63 => Ok(CicsOperandName::Entry),
         64 => Ok(CicsOperandName::LoadLength),
         65 => Ok(CicsOperandName::LoadFlength),
+        132 => Ok(CicsOperandName::DocumentToken),
+        133 => Ok(CicsOperandName::Text),
+        134 => Ok(CicsOperandName::Binary),
+        135 => Ok(CicsOperandName::FromDocument),
+        136 => Ok(CicsOperandName::Template),
+        137 => Ok(CicsOperandName::SymbolList),
+        138 => Ok(CicsOperandName::ListLength),
+        139 => Ok(CicsOperandName::Delimiter),
+        140 => Ok(CicsOperandName::HostCodePage),
+        141 => Ok(CicsOperandName::Bookmark),
+        142 => Ok(CicsOperandName::Symbol),
+        143 => Ok(CicsOperandName::AtBookmark),
+        144 => Ok(CicsOperandName::ToBookmark),
+        145 => Ok(CicsOperandName::MaximumLength),
+        146 => Ok(CicsOperandName::CharacterSet),
+        147 => Ok(CicsOperandName::SymbolValue),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -294,6 +328,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::ExactMatch => 36,
         CicsPlanOption::Minimum => 37,
         CicsPlanOption::Hold => 38,
+        CicsPlanOption::Unescaped => 84,
     }
 }
 
@@ -336,6 +371,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         36 => Ok(CicsPlanOption::ExactMatch),
         37 => Ok(CicsPlanOption::Minimum),
         38 => Ok(CicsPlanOption::Hold),
+        84 => Ok(CicsPlanOption::Unescaped),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -369,6 +405,8 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Queue => 94,
         CicsOutputName::SetPointer => 95,
         CicsOutputName::NumItems => 200,
+        CicsOutputName::DocumentToken => 216,
+        CicsOutputName::DocumentSize => 217,
     }
 }
 
@@ -393,6 +431,8 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         94 => Ok(CicsOutputName::Queue),
         95 => Ok(CicsOutputName::SetPointer),
         200 => Ok(CicsOutputName::NumItems),
+        216 => Ok(CicsOutputName::DocumentToken),
+        217 => Ok(CicsOutputName::DocumentSize),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

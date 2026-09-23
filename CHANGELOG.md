@@ -40,6 +40,11 @@ All notable changes to mainframe-env are documented here.
   normal-only NUMITEMS, exact local conditions, queue SAF/audit, effect replay,
   legacy-row migration, SQLite reopen, and compiled EIBFN `0A04` proof.
   Remote/shared pools and TSMODEL routing remain explicit fail-closed paths.
+- Added typed CICS `DOCUMENT CREATE` over a bounded durable transaction-owned
+  document authority. Empty, text, binary, retrieved-document and registered
+  template sources produce deterministic 16-byte tokens and optional DOCSIZE;
+  symbol lists, host code pages, template READ authorization, atomic replay,
+  task cleanup, capacity failure, and SQLite reopen are covered.
 
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal
