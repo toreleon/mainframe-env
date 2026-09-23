@@ -13,6 +13,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Rebased all six typed CICS diagnostics routes onto the integrated web-service
+  and counter-control families. Reconciled generated descriptors, codec tags,
+  schema ratchets, and compiled routing to 99 typed, 0 legacy, and 164 unready
+  application rows while preserving protected module ceilings.
+
 - Aligned the frozen CICS command-contract readiness schema with the integrated
   73 typed, 0 legacy, and 190 unready application routes.
 

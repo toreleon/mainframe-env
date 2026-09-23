@@ -14643,6 +14643,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn current_cics_application_contract_satisfies_its_schema() {
+        let root = repository_root().expect("repository root");
+        let catalog =
+            root.join("conformance/0.9/generated/cics-application-command-contracts.json");
+        let schema =
+            root.join("conformance/0.9/schemas/cics-application-command-contracts.schema.json");
+        validate_schema_instance(&json(&schema).unwrap(), &json(&catalog).unwrap(), &catalog)
+            .unwrap();
+    }
+
+    #[test]
     fn dataset_reference_simulation_cannot_satisfy_the_licensed_receipt_gate() {
         let root = repository_root().expect("repository root");
         let pending = check_dataset_oracle_receipt(&root, None)

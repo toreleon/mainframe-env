@@ -5849,7 +5849,6 @@ mod tests {
         for (command, expected_label) in [
             ("ISSUE ERASEAUP", "ISSUE ERASEAUP"),
             ("SEND PAGE RETAIN", "SEND PAGE"),
-            ("TRACE OFF", "TRACE"),
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALT. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
@@ -5865,6 +5864,19 @@ mod tests {
                 analysis.diagnostics
             );
         }
+        let trace = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTRCE. PROCEDURE DIVISION. EXEC CICS TRACE OFF USER END-EXEC. STOP RUN.",
+        );
+        let hir = trace
+            .hir
+            .unwrap_or_else(|| panic!("TRACE OFF USER: {:?}", trace.diagnostics));
+        assert!(hir.statements.iter().any(|statement| matches!(
+            statement.resolved,
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::Trace,
+                ..
+            }))
+        )));
     }
 
     #[test]

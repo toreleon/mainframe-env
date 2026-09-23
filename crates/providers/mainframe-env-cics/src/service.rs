@@ -278,7 +278,6 @@ struct State {
     transform_bytes: usize,
     journals: BTreeMap<String, handlers::JournalRecord>,
     spool: handlers::SpoolState,
-    // Internal interval-control records authority.
     #[allow(dead_code)]
     interval_records: BTreeMap<String, handlers::IntervalStartRecord>,
     #[cfg(feature = "fault-injection")]
@@ -4418,7 +4417,9 @@ mod tests {
         counter_and_diagnostic_authorities(deny_counter, false)
     }
 
-    fn diagnostic_authorities(deny_diagnostic: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+    fn diagnostic_authorities(
+        deny_diagnostic: bool,
+    ) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
         counter_and_diagnostic_authorities(false, deny_diagnostic)
     }
 

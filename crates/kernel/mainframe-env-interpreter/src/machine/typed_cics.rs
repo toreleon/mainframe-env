@@ -358,7 +358,7 @@ pub(super) fn execute(
                         | CicsOperandName::CounterMaximum
                         | CicsOperandName::TraceNum
                         | CicsOperandName::TraceFromLength
-                | CicsOperandName::MonitorPoint
+                        | CicsOperandName::MonitorPoint
                         | CicsOperandName::DumpLength
                         | CicsOperandName::DumpFlength
                         | CicsOperandName::DumpNumSegments

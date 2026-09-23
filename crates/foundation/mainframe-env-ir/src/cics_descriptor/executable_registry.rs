@@ -1099,6 +1099,9 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 127] = [
         name: "update-dcounter",
         major: 1,
         effects: COUNTER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
         operation: CicsPlanOperation::EnterTraceNum,
         namespace: "cics.diagnostics",
         name: "enter-tracenum",
