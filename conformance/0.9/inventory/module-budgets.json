@@ -309,6 +309,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/limits.rs",
       "crates/providers/mainframe-env-cics/src/handlers/operator_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/operator_control/authority.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/operator_control/active.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/operator_control/write.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",

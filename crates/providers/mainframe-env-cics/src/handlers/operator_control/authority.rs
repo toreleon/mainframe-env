@@ -2,7 +2,9 @@
 
 use crate::service::{CicsLimits, store_error};
 use mainframe_env_host_api::HostProblem;
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -111,6 +113,18 @@ pub(super) fn put(
         }
         Err(error) => Err(store_error(error)),
     }
+}
+
+pub(super) fn staged_put(record: &OperatorMessage) -> Result<ProviderStateWrite, HostProblem> {
+    Ok(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: NAMESPACE.into(),
+            key: record.key.clone(),
+            version: 1,
+            payload: encode(record)?,
+        },
+        expected_version: None,
+    })
 }
 
 pub(super) fn read(

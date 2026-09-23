@@ -96,6 +96,7 @@ TYPED_EXECUTION_FAMILIES = {
     "builtin-function-control": "BuiltinFunctionControl",
     "document-control": "DocumentControl",
     "journal-control": "JournalControl",
+    "operator-control": "OperatorControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -261,6 +262,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
     ("WaitCics", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0239"),
+    ("WriteOperator", "api", "operator-control", True, f"{OFFICIAL_BASELINE}:api-commands:0256"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     (
         "TransformDataToJson",
@@ -591,6 +593,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "PurgeMessage",
         "PopHandle",
         "Post",
+        "WriteOperator",
         "PushHandle",
         "Read",
         "Rewrite",
@@ -848,6 +851,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
     "Post": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "WriteOperator": frozenset({"memory-read", "memory-write", "terminal-write", "clock", "condition", "transaction"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -1142,6 +1146,7 @@ def _load_typed_execution_registrations(
         "WaitCics",
         "WriteJournalName",
         "WriteJournalNum",
+        "WriteOperator",
         "WriteTemporaryStorage",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -1464,6 +1469,7 @@ def load_catalog(
                 "Release",
                 "PopHandle",
                 "Post",
+                "WriteOperator",
                 "PurgeMessage",
                 "PushHandle",
                 "ReadTransientData",

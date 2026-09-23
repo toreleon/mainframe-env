@@ -24,6 +24,7 @@ mod storage_control;
 mod task_wait;
 mod terminal_control;
 mod transform_control;
+mod write_operator;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
 pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
@@ -503,6 +504,7 @@ fn validate_operation_shape(
                 || scheduling_options
         }
         CicsPlanOperation::Post => post::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::WriteOperator => write_operator::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -3611,6 +3613,78 @@ mod tests {
         no_set.outputs.clear();
         assert_eq!(
             encode_cics_effect_plan(&no_set, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn write_operator_uses_reserved_v2_tags_and_rejects_illegal_reply_shape() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WriteOperator,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::OperatorText,
+                    value: CicsOperandValue::Literal(b"HELLO".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::OperatorMaxLength,
+                    value: CicsOperandValue::Integer(8),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::OperatorTimeout,
+                    value: CicsOperandValue::Integer(2),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::OperatorImmediate]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::OperatorReply,
+                    target: slot(1, "OPERATOR.REPLY"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::OperatorReplyLength,
+                    target: slot(2, "OPERATOR.REPLYLENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&bytes[4..8], &[0, 2, 0, 159]);
+        assert_eq!(operand_tag(CicsOperandName::OperatorText), 645);
+        assert_eq!(option_tag(CicsPlanOption::OperatorImmediate), 575);
+        assert_eq!(output_tag(CicsOutputName::OperatorReply), 698);
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits), Ok(bytes.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut unknown = bytes.clone();
+        unknown[6..8].copy_from_slice(&165u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&unknown, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        assert_eq!(
+            decode_cics_effect_plan(&bytes[..bytes.len() - 1], limits),
+            Err(CicsPlanCodecProblem::Truncated)
+        );
+        let mut missing_max = plan.clone();
+        missing_max
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::OperatorMaxLength);
+        assert_eq!(
+            encode_cics_effect_plan(&missing_max, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut conflicting_action = plan;
+        conflicting_action.operands.push(CicsNamedOperand {
+            name: CicsOperandName::OperatorAction,
+            value: CicsOperandValue::Integer(2),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&conflicting_action, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

@@ -207,6 +207,17 @@ const START_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const OPERATOR_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalWrite,
+    Effect::Clock,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 const RETRIEVE_EFFECTS: &[Effect] = &[
     Effect::MemoryWrite,
     Effect::Security,
@@ -652,7 +663,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 78);
+        assert_eq!(typed.len(), 79);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -670,7 +681,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 185);
+        assert_eq!(unready.len(), 184);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -882,6 +893,7 @@ mod tests {
                 CicsPlanOperation::BifDigest,
                 CicsPlanOperation::WaitCics,
                 CicsPlanOperation::Post,
+                CicsPlanOperation::WriteOperator,
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,

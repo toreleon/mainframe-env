@@ -3,7 +3,7 @@
 use super::*;
 
 /// Complete registry of executable typed CICS operations.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 78] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 79] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -626,6 +626,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 78] = [
         name: "post",
         major: 1,
         effects: START_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WriteOperator,
+        namespace: "cics.operator",
+        name: "write-operator",
+        major: 1,
+        effects: OPERATOR_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];

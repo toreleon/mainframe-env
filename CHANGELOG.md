@@ -23,11 +23,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
-- Added a bounded durable operator-message and reply authority for the pending
-  CICS `WRITE OPERATOR` route. It validates console names, route codes, action
-  codes, text and reply limits, strict record encoding, deadline transitions,
-  replay, and SQLite recovery. The command remains unready until its compiled
-  dispatch, console ingress, and wait/wakeup semantics are connected.
+- Added typed CICS `WRITE OPERATOR` for row `0256`. It persists a bounded
+  console message with reviewed routing and action codes, displays long text
+  in source-bounded console lines, and optionally suspends for a SAF-gated
+  reply or durable timeout. Reply truncation returns LENGERR 22/8; expiry
+  returns EXPIRED 31/7. Canonical MCEP v2 uses operation tag 159, operand tags
+  645–652, option tags 575–577, and output tags 698–699 while v1 remains
+  compatible with historical plans. Memory/SQLite replay and compiled reply
+  and timeout routes are covered.
 
 - Added typed CICS `POST` for row `0147`. A task-owned four-byte timer-event
   area starts at zero, is posted with bytes `40 00 80 00` on expiry or cross-task

@@ -87,12 +87,17 @@ pub(super) use document_control::{
 };
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use file_tokens::FileUpdateState;
+pub use operator_control::CICS_OPERATOR_WORK_GENERATION;
+pub use operator_control::CicsOperatorMessageView;
+pub(super) use operator_control::invoke as invoke_operator;
+pub(super) use time::invoke as invoke_time;
 pub(super) fn validate_owned_stores(
     store: &dyn mainframe_env_store_api::ProviderStateStore,
     limits: super::CicsLimits,
 ) -> Result<(), HostProblem> {
     task_enqueue::validate_store(store, limits)?;
     operator_control::load_operator_messages(store, limits)?;
+    operator_control::validate_active_operator_commands(store, limits)?;
     Ok(())
 }
 pub(super) use handle_state::{
@@ -150,7 +155,6 @@ pub(super) use task_enqueue::{load_enqueue_models, release_uow as release_uow_en
 pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
-pub(super) use time::invoke as invoke_time;
 pub(super) fn invoke_extended_control(
     service: &CicsService,
     run: &mut Run,

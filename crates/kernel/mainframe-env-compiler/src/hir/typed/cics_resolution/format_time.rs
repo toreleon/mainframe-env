@@ -119,6 +119,8 @@ pub(super) fn require_output_shape(
         }
         HirCicsOutputName::Field
         | HirCicsOutputName::DigestResult
+        | HirCicsOutputName::OperatorReply
+        | HirCicsOutputName::OperatorReplyLength
         | HirCicsOutputName::Commarea
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer

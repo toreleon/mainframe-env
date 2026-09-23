@@ -28,6 +28,8 @@ pub enum CicsOperation {
     Delay,
     /// Arm one task-owned timer-event control area.
     Post,
+    /// Write one system-console message and optionally await its reply.
+    WriteOperator,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -163,6 +165,7 @@ impl CicsOperation {
             Self::ChangeTask => "ChangeTask",
             Self::Delay => "Delay",
             Self::Post => "Post",
+            Self::WriteOperator => "WriteOperator",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -252,6 +255,7 @@ impl CicsOperation {
                 | Self::Cancel
                 | Self::Delay
                 | Self::Post
+                | Self::WriteOperator
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -323,6 +327,7 @@ impl CicsOperation {
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("DELAY", _) => Self::Delay,
             ("POST", _) => Self::Post,
+            ("WRITE", Some("OPERATOR")) => Self::WriteOperator,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,

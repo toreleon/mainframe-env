@@ -35,6 +35,12 @@ impl ProductServer {
                 }
                 Some(JesWorkOutcome::Completed)
             }
+            Some(CicsWorkOutcome::OperatorTimeout(wake)) => {
+                if wake {
+                    self.wake_delayed_online_task(work, now_tick)?;
+                }
+                Some(JesWorkOutcome::Completed)
+            }
             None => None,
         })
     }
@@ -199,6 +205,14 @@ impl ProductServer {
         {
             return Err(HostProblem::Malformed);
         }
+        self.wake_online_run_unit(run_unit, now_tick)
+    }
+
+    pub(super) fn wake_online_run_unit(
+        &self,
+        run_unit: &str,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
         let maximum = CicsLimits::default().max_sessions;
         let rows = self
             .store

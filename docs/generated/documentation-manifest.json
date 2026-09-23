@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 188,
+    "markdown_documents": 189,
     "navigation_groups": 5,
-    "normative_documents": 40,
+    "normative_documents": 41,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:ef9bba8dc180e2343bd863ef9ccb081c833657040859bf903c74b244a68f4db6",
+      "sha256": "sha256:7a5f230224ea6accb2cbf1f45840b3e48ef79bdc8cd9d7055a4f47dc573254c1",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 75,
-      "sha256": "sha256:2fd25cd3686033c0a331eaab3d0227e49d6f38f3e20ca786f7dd570db995bb76",
+      "relative_links": 76,
+      "sha256": "sha256:9f12b28d346df95a055d44b01d94ebef9977c740327877fe2e4f1339abb343c0",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -731,10 +731,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and console maintainers",
+      "path": "docs/decisions/0013-cics-operator-reply-boundary.md",
+      "relative_links": 0,
+      "scope": "WRITE OPERATOR, virtual console ingress, and suspended COBOL tasks",
+      "sha256": "sha256:4f6c69d3babd1f8d52e77698adc56b6c08338281ba877a4e9a0699b47352164c",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0013: Bind CICS operator replies to durable command positions",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 12,
-      "sha256": "sha256:8d8766c4416b933f6f57cdca53dcbafe9263e861bac18007fcbd0bcbcc536849",
+      "relative_links": 13,
+      "sha256": "sha256:9e3f5ae84265da6e810219becbd546846e523025ec7f18fd607434b1db964e01",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1074,7 +1086,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:dae12c86e3239693336db0a9b854ce0b71cf5540952e34f451a1c26edcd21b30",
+      "sha256": "sha256:20c6b44f19c0f09b989074956cf7ac39a4be326f1e941f0569c5532a2b8f1273",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1820,6 +1832,10 @@
           "path": "docs/decisions/0012-checked-amode64-storage-boundary.md"
         },
         {
+          "label": "ADR-0013: CICS operator reply boundary",
+          "path": "docs/decisions/0013-cics-operator-reply-boundary.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -1983,7 +1999,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:1294dcd9b00cba6f394d581182f15be7375ce80ee4c2b92f03c6b5901d7abf5e",
+  "registry_sha256": "sha256:d512c281a3f6c72ba7d83d46dd5bd8f462fb619460945f851cb658f27403a227",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

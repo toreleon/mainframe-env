@@ -5,6 +5,8 @@ pub enum HirCicsOutputName {
     Abstime,
     Field,
     DigestResult,
+    OperatorReply,
+    OperatorReplyLength,
     Commarea,
     Into,
     SetPointer,

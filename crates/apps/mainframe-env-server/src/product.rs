@@ -1,5 +1,4 @@
-use crate::cobol::artifact::admit_executable_artifact;
-use crate::cobol::bind_compatible_runtime_services;
+use crate::cobol::{artifact::admit_executable_artifact, bind_compatible_runtime_services};
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
 use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
@@ -163,6 +162,7 @@ pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 mod continuation;
 mod interval_wakeup;
+mod operator_console;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatchInstallReceipt {
@@ -5140,7 +5140,7 @@ impl ProductServer {
             "D IPLINFO" => b"IEE254I IPLINFO MAINFRAME-ENV 0.1".to_vec(),
             "D A,L" => b"IEE114I ACTIVE JOBS MAINFRAME-ENV".to_vec(),
             "D U,ALL" => b"IEE457I UNIT STATUS AVAILABLE".to_vec(),
-            _ => return Err(gateway_problem(HostProblem::Unsupported)),
+            _ => return self.cics_console_command(principal, name, command),
         };
         self.refresh_console_cache().map_err(gateway_problem)?;
         let mut messages = self
@@ -5220,7 +5220,7 @@ impl ProductServer {
             .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
         Ok(GatewayResponse::json(
             StatusCode::OK,
-            json!({"items":messages.iter().map(|message|json!({"key":message.key,"console":message.console,"text":String::from_utf8_lossy(&message.text)})).collect::<Vec<_>>() }),
+            self.operator_console_items(&messages)?,
         ))
     }
 }
@@ -6312,8 +6312,9 @@ mod tests {
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
     use mainframe_env_cics::{
-        CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION,
-        CicsApplicationEntryDefinition, CicsEventPostMode, CicsJavaStatus, CicsProgramDefinition,
+        CICS_DELAY_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
+        CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition, CicsEventPostMode,
+        CicsJavaStatus, CicsProgramDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -15832,6 +15833,264 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn online_write_operator_reply_resumes_selected_compiled_route() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. OPWRITE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TEXT-X PIC X(16) VALUE 'ASK OPERATOR'.\n01 REPLY-X PIC X(8).\n01 REPLY-LEN PIC S9(9) COMP.\n01 OP-FN PIC X(2).\n01 DONE-X PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE OPERATOR TEXT(TEXT-X) REPLY(REPLY-X) MAXLENGTH(8) REPLYLENGTH(REPLY-LEN) TIMEOUT(1) END-EXEC.\nMOVE EIBFN TO OP-FN.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let artifact = published_source_fixture("OPWRITE", std::str::from_utf8(source).unwrap());
+        let (server, _store, clock) = worker_test_server(100);
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "OPWRITE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("OP00".into(), "OPWRITE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "OPWRITE".into(),
+                    map: "OPWRITE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("typed-operator-reply", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "OP00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "OP00",
+                24,
+                80,
+                "typed-operator-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "OPWRITE", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "OPWRITE", 100)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+        let pending = server
+            .cics
+            .operator_messages()
+            .unwrap()
+            .into_iter()
+            .find(|message| message.reply_pending)
+            .unwrap();
+        assert!(pending.key.starts_with("cics-operator:"));
+        let logs = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::ConsoleLogs,
+            )
+            .unwrap();
+        let mainframe_env_zosmf::GatewayBody::Json(items) = logs.body else {
+            panic!("operator log must be JSON");
+        };
+        assert!(
+            items["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["key"].as_str() == Some(pending.key.as_str()))
+        );
+        let reply = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::ConsoleIssue {
+                    name: "OPER".into(),
+                    command: format!("R {},YES", pending.key).into_bytes(),
+                },
+            )
+            .unwrap();
+        assert_eq!(reply.status, StatusCode::OK);
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert!(
+            restored
+                .variable("REPLY-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"YES")
+        );
+        assert_eq!(
+            restored.variable("REPLY-LEN").unwrap().bytes(),
+            &[0, 0, 0, 3]
+        );
+        assert_eq!(restored.variable("OP-FN").unwrap().bytes(), &[0x6c, 0x02]);
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x12, 0x08]);
+    }
+
+    #[test]
+    fn online_write_operator_timeout_resumes_with_expired_condition() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. OPTIME.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 REPLY-X PIC X(8).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\n01 OP-FN PIC X(2).\n01 DONE-X PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE OPERATOR TEXT('WAIT FOR REPLY') REPLY(REPLY-X) MAXLENGTH(8) TIMEOUT(1) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO OP-FN.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let artifact = published_source_fixture("OPTIME", std::str::from_utf8(source).unwrap());
+        let (server, _store, clock) = worker_test_server(100);
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "OPTIME".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("OT00".into(), "OPTIME".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "OPTIME".into(),
+                    map: "OPTIME".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("typed-operator-timeout", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "OT00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "OT00",
+                24,
+                80,
+                "typed-operator-timeout-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "OPTIME", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "OPTIME", 100)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+        assert!(
+            server
+                .claim_jes_work("before-operator-timeout")
+                .unwrap()
+                .is_none()
+        );
+        clock.advance(1_000);
+        let work = server.claim_jes_work("operator-timeout").unwrap().unwrap();
+        assert_eq!(work.required_generation, CICS_OPERATOR_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 31]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 7]);
+        assert_eq!(restored.variable("OP-FN").unwrap().bytes(), &[0x6c, 0x02]);
     }
 
     #[test]

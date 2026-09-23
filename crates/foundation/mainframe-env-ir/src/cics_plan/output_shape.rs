@@ -22,6 +22,13 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WriteOperator => matches!(
+            output,
+            CicsOutputName::OperatorReply
+                | CicsOutputName::OperatorReplyLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

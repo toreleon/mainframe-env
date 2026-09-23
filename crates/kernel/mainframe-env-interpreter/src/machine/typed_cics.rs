@@ -174,6 +174,7 @@ pub(super) fn suspension(
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         CicsOperation::WriteJournalName => ("cics-journal", true),
         CicsOperation::WriteJournalNum => ("cics-journal", true),
+        CicsOperation::WriteOperator => ("cics-operator", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -473,6 +474,18 @@ pub(super) fn execute(
                 )?,
             );
         }
+        if output.name == CicsOutputName::OperatorReply {
+            arguments.insert(
+                "REPLY.MAXLENGTH".into(),
+                payload(
+                    "mainframe-env.cics.decimal@1",
+                    resolved_slot(machine, &output.target)?
+                        .length
+                        .to_string()
+                        .into_bytes(),
+                )?,
+            );
+        }
         match output.name {
             CicsOutputName::Abstime
             | CicsOutputName::Commarea
@@ -542,7 +555,11 @@ pub(super) fn execute(
                 )?);
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::DigestResult | CicsOutputName::Field | CicsOutputName::Ridfld => {
+            CicsOutputName::DigestResult
+            | CicsOutputName::Field
+            | CicsOutputName::Ridfld
+            | CicsOutputName::OperatorReply
+            | CicsOutputName::OperatorReplyLength => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Resp => response = Some(target),
@@ -576,6 +593,15 @@ pub(super) fn execute(
             "DELAY.ID".into(),
             payload(
                 "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if plan.operation == CicsPlanOperation::WriteOperator {
+        arguments.insert(
+            "OPERATOR.ID".into(),
+            payload(
+                "mainframe-env.cics.operator-id@1",
                 format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
             )?,
         );

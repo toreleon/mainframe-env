@@ -7,10 +7,11 @@ use crate::retention::{
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
     UowRetentionMetadata,
 };
+use handlers::invoke_terminal_control as terminal;
 pub use handlers::*;
-use handlers::{DurableFileStatus, argument_bytes, argument_optional, argument_text};
 use handlers::{
-    decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
+    DurableFileStatus, argument_bytes, argument_optional, argument_text, decode_terminal_address,
+    encode_terminal_address, terminal_field_address, validate_map,
 };
 pub(super) use handlers::{field, store_error};
 use mainframe_env_encoding::CodePage;
@@ -1722,19 +1723,18 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 80);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 81);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
                 handlers::invoke_task_control(self, run, &request, retention_tick)
             }
             CicsCommandFamily::Time => handlers::invoke_time(self, run, &request),
+            CicsCommandFamily::OperatorControl => handlers::invoke_operator(self, run, &request),
             CicsCommandFamily::ProgramControl => {
                 handlers::invoke_program_control(self, run, &request)
             }
-            CicsCommandFamily::TerminalControl => {
-                handlers::invoke_terminal_control(self, run, &request)
-            }
+            CicsCommandFamily::TerminalControl => terminal(self, run, &request),
             CicsCommandFamily::FileControl => handlers::invoke_file_control(self, run, &request),
             CicsCommandFamily::QueueControl => handlers::invoke_queue_control(self, run, &request),
             CicsCommandFamily::Recovery => {
@@ -11586,6 +11586,393 @@ mod tests {
             response.outputs["POST.EVENT"].bytes(),
             &[0, 0x10, 0, 4, 0x40, 0, 0x80, 0]
         );
+    }
+
+    #[test]
+    fn write_operator_persists_message_replays_and_delivers_reply() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (owner, _) = registered(&service);
+        let write = request(
+            CicsOperation::WriteOperator,
+            BTreeMap::from([
+                ("TEXT".into(), cics_literal(b"HELLO OPERATOR")),
+                ("OPTION.IMMEDIATE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(&effect(&owner.run_unit_id, write.clone(), 1), write.clone())
+            .unwrap();
+        assert_eq!(first.disposition, CicsDisposition::Complete);
+        assert_eq!(first.response, 0);
+        assert_eq!(
+            service
+                .invoke(&effect(&owner.run_unit_id, write.clone(), 1), write)
+                .unwrap(),
+            first
+        );
+        let messages = service.operator_messages().unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].text, b"HELLO OPERATOR");
+        assert_eq!(messages[0].routes, vec![2]);
+        assert_eq!(messages[0].action, Some(2));
+
+        let reply = request(
+            CicsOperation::WriteOperator,
+            BTreeMap::from([
+                ("TEXT".into(), cics_literal(b"CONTINUE?")),
+                ("REPLY".into(), argument(b"REPLY-AREA")),
+                ("REPLY.MAXLENGTH".into(), cics_decimal(8)),
+                ("MAXLENGTH".into(), cics_decimal(8)),
+                ("REPLYLENGTH".into(), argument(b"REPLY-LEN")),
+                ("TIMEOUT".into(), cics_decimal(1)),
+                (
+                    "OPERATOR.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.operator-id@1",
+                        b"run:17".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            2,
+        );
+        let pending = service
+            .invoke(&effect(&owner.run_unit_id, reply.clone(), 2), reply.clone())
+            .unwrap();
+        assert_eq!(pending.disposition, CicsDisposition::Suspended);
+        let message = service
+            .operator_messages()
+            .unwrap()
+            .into_iter()
+            .find(|message| message.reply_pending)
+            .unwrap();
+        let mut operator = invocation_for("operator-reply", BTreeMap::new());
+        operator.deadline_tick = 10_000;
+        assert_eq!(
+            service
+                .submit_operator_reply(&operator, "OPER", &message.key, b"YES", 1_500)
+                .unwrap(),
+            owner.run_unit_id.as_str()
+        );
+        let fallback = store
+            .claim(
+                "operator-reply-fallback",
+                Some(CICS_OPERATOR_WORK_GENERATION),
+                2_000,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(
+            service
+                .promote_operator_timeout_work(&fallback, 2_000)
+                .unwrap()
+        );
+        let resumed = request(CicsOperation::WriteOperator, reply.arguments.clone(), 3);
+        let complete = service
+            .invoke(&effect(&owner.run_unit_id, resumed.clone(), 3), resumed)
+            .unwrap();
+        assert_eq!(complete.disposition, CicsDisposition::Complete);
+        assert_eq!(complete.outputs["REPLY"].bytes(), b"YES");
+        assert_eq!(complete.outputs["REPLYLENGTH"].bytes(), b"3");
+
+        let mut short = request(
+            CicsOperation::WriteOperator,
+            BTreeMap::from([
+                ("TEXT".into(), cics_literal(b"SHORT REPLY")),
+                ("REPLY".into(), argument(b"REPLY-AREA")),
+                ("REPLY.MAXLENGTH".into(), cics_decimal(4)),
+                ("MAXLENGTH".into(), cics_decimal(4)),
+                ("REPLYLENGTH".into(), argument(b"REPLY-LEN")),
+                ("TIMEOUT".into(), cics_decimal(1)),
+                (
+                    "OPERATOR.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.operator-id@1",
+                        b"run:19".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            4,
+        );
+        short.condition_policy = CicsConditionPolicy::NoHandle;
+        assert_eq!(
+            service
+                .invoke(&effect(&owner.run_unit_id, short.clone(), 4), short.clone())
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let pending = service
+            .operator_messages()
+            .unwrap()
+            .into_iter()
+            .find(|message| message.reply_pending)
+            .unwrap();
+        let mut second_operator = invocation_for("operator-reply-2", BTreeMap::new());
+        second_operator.deadline_tick = 10_000;
+        service
+            .submit_operator_reply(&second_operator, "OPER", &pending.key, b"TOO LONG", 1_600)
+            .unwrap();
+        let mut resumed = request(CicsOperation::WriteOperator, short.arguments.clone(), 5);
+        resumed.condition_policy = CicsConditionPolicy::NoHandle;
+        let truncated = service
+            .invoke(&effect(&owner.run_unit_id, resumed.clone(), 5), resumed)
+            .unwrap();
+        assert_eq!(
+            (
+                truncated.condition.as_str(),
+                truncated.response,
+                truncated.response2
+            ),
+            ("LENGERR", 22, 8)
+        );
+        assert_eq!(truncated.outputs["REPLY"].bytes(), b"TOO ");
+        assert_eq!(truncated.outputs["REPLYLENGTH"].bytes(), b"8");
+        let mut looped = request(CicsOperation::WriteOperator, short.arguments.clone(), 6);
+        looped.condition_policy = CicsConditionPolicy::NoHandle;
+        assert_eq!(
+            service
+                .invoke(&effect(&owner.run_unit_id, looped.clone(), 6), looped)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let new_pending = service
+            .operator_messages()
+            .unwrap()
+            .into_iter()
+            .find(|message| message.reply_pending)
+            .unwrap();
+        assert_ne!(new_pending.key, pending.key);
+        let uncertain = request(
+            CicsOperation::WriteOperator,
+            BTreeMap::from([("TEXT".into(), cics_literal(b"UNKNOWN RECEIPT"))]),
+            7,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&owner.run_unit_id, uncertain.clone(), 7),
+                uncertain.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let retained = service.operator_messages().unwrap().len();
+        assert_eq!(
+            service
+                .invoke(&effect(&owner.run_unit_id, uncertain.clone(), 7), uncertain)
+                .unwrap()
+                .response,
+            0
+        );
+        assert_eq!(service.operator_messages().unwrap().len(), retained);
+    }
+
+    #[test]
+    fn write_operator_timeout_and_invalid_options_fail_without_message() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (owner, _) = registered(&service);
+        for (sequence, name, value, response2) in [
+            (1, "TEXTLENGTH", cics_decimal(700), 1),
+            (2, "CONSNAME", cics_literal(b"!"), 7),
+            (3, "ACTION", cics_decimal(9), 6),
+        ] {
+            let mut args = BTreeMap::from([("TEXT".into(), cics_literal(b"BAD"))]);
+            args.insert(name.into(), value);
+            let command = request(CicsOperation::WriteOperator, args, sequence);
+            let result = service.invoke(
+                &effect(&owner.run_unit_id, command.clone(), sequence),
+                command,
+            );
+            assert!(
+                matches!(result, Err(HostProblem::Condition { response: 16, response2: actual, .. }) if actual == response2)
+            );
+        }
+        assert!(service.operator_messages().unwrap().is_empty());
+        let timed = request(
+            CicsOperation::WriteOperator,
+            BTreeMap::from([
+                ("TEXT".into(), cics_literal(b"QUESTION")),
+                ("REPLY".into(), argument(b"REPLY")),
+                ("REPLY.MAXLENGTH".into(), cics_decimal(4)),
+                ("MAXLENGTH".into(), cics_decimal(4)),
+                ("TIMEOUT".into(), cics_decimal(1)),
+                (
+                    "OPERATOR.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.operator-id@1",
+                        b"run:18".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&owner.run_unit_id, timed.clone(), 5), timed.clone())
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let work = store
+            .claim("operator", Some(CICS_OPERATOR_WORK_GENERATION), 2_000, 100)
+            .unwrap()
+            .unwrap();
+        assert!(service.promote_operator_timeout_work(&work, 2_000).unwrap());
+        let resumed = request(CicsOperation::WriteOperator, timed.arguments.clone(), 6);
+        let expired = service
+            .invoke(&effect(&owner.run_unit_id, resumed.clone(), 6), resumed)
+            .unwrap();
+        assert_eq!(
+            (
+                expired.condition.as_str(),
+                expired.response,
+                expired.response2
+            ),
+            ("EXPIRED", 31, 7)
+        );
+    }
+
+    #[test]
+    fn write_operator_active_reply_survives_sqlite_reopen_and_rejects_corruption() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-operator-route-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("operator-sqlite", BTreeMap::new());
+        let session = SessionId::new("operator-sqlite", 64).unwrap();
+        let command = request(
+            CicsOperation::WriteOperator,
+            BTreeMap::from([
+                ("TEXT".into(), cics_literal(b"REOPEN REPLY")),
+                ("REPLY".into(), argument(b"REPLY")),
+                ("REPLY.MAXLENGTH".into(), cics_decimal(8)),
+                ("MAXLENGTH".into(), cics_decimal(8)),
+                ("TIMEOUT".into(), cics_decimal(1)),
+                (
+                    "OPERATOR.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.operator-id@1",
+                        b"operator-sqlite:42".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            1,
+        );
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store,
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command.clone()
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_500)),
+        )
+        .unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let pending = service
+            .operator_messages()
+            .unwrap()
+            .into_iter()
+            .find(|message| message.reply_pending)
+            .unwrap();
+        let mut operator = invocation_for("operator-sqlite-console", BTreeMap::new());
+        operator.deadline_tick = 10_000;
+        service
+            .submit_operator_reply(&operator, "OPER", &pending.key, b"REOPENED", 1_500)
+            .unwrap();
+        let resumed = request(CicsOperation::WriteOperator, command.arguments.clone(), 2);
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, resumed.clone(), 2),
+                resumed,
+            )
+            .unwrap();
+        assert_eq!(response.outputs["REPLY"].bytes(), b"REOPENED");
+        drop(service);
+        let row = store
+            .get_provider_state("cics-operator-active-v1", "operator-sqlite:42")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(&row.namespace, &row.key, row.version)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: 1,
+                    payload: b"{\"schema\":\"broken\"}".to_vec(),
+                    ..row
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(2_000)),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -2419,6 +2419,7 @@ mod tests {
             CicsOperation::Assign,
             CicsOperation::ChangeTask,
             CicsOperation::Post,
+            CicsOperation::WriteOperator,
             CicsOperation::Deq,
             CicsOperation::Delete,
             CicsOperation::DocumentCreate,

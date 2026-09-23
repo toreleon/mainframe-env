@@ -30,6 +30,7 @@ mod journal_control;
 mod legacy_compatibility;
 mod numeric_value;
 mod operation;
+mod operator_control;
 mod output_bindings;
 mod program_control;
 mod program_name;
@@ -211,6 +212,14 @@ fn validate_candidate(
     let mut condition_clause_count = 0usize;
     let mut aid_clause_count = 0usize;
     for name in present {
+        if descriptor.runtime_operation == Some("WriteOperator")
+            && matches!(*name, "IMMEDIATE" | "EVENTUAL" | "CRITICAL")
+        {
+            if clauses.contains_key(*name) {
+                return Err(format!("CICS WRITE OPERATOR {name} is a bare flag"));
+            }
+            continue;
+        }
         let Some(shape) = option_value_shape(descriptor, name) else {
             if let Some(condition_clauses) = descriptor.condition_clauses
                 && is_condition_name(name)
@@ -268,6 +277,9 @@ fn validate_candidate(
                     operation::command_label(descriptor)
                 ));
             }
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("WriteOperator")
+                    && matches!(*name, "ACTION" | "REPLY" | "REPLYLENGTH") => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
                 return Err(format!(
                     "CICS {} option {name} has a source-bounded operand shape",
@@ -685,6 +697,20 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Post => &[
             "INTERVAL", "TIME", "HOURS", "MINUTES", "SECONDS", "SET", "REQID", "RESP", "RESP2",
         ],
+        HirCicsOperation::WriteOperator => &[
+            "TEXT",
+            "TEXTLENGTH",
+            "ROUTECODES",
+            "NUMROUTES",
+            "CONSNAME",
+            "ACTION",
+            "REPLY",
+            "MAXLENGTH",
+            "REPLYLENGTH",
+            "TIMEOUT",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
@@ -766,6 +792,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Post => &["AFTER", "AT", "NOHANDLE"],
+        HirCicsOperation::WriteOperator => &["IMMEDIATE", "EVENTUAL", "CRITICAL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
         HirCicsOperation::ConvertTime => &["NOHANDLE"],
@@ -900,6 +927,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Post => &["SET"][..],
+        HirCicsOperation::WriteOperator => &["TEXT"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
@@ -1040,6 +1068,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
+    if operation == HirCicsOperation::WriteOperator {
+        operator_control::validate(&clauses, &raw_options)?;
+        operands.extend(operator_control::operands(&clauses, semantic)?);
+    }
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
@@ -1100,6 +1132,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         )?);
     }
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
+    if operation == HirCicsOperation::WriteOperator {
+        outputs.extend(operator_control::outputs(&clauses, semantic)?);
+    }
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {

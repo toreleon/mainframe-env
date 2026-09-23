@@ -382,6 +382,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0255"
     },
     {
+      "operation": "WriteOperator",
+      "interface": "api",
+      "family": "operator-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0256"
+    },
+    {
       "operation": "WriteTemporaryStorage",
       "interface": "api",
       "family": "queue-control",

@@ -5496,6 +5496,44 @@ mod tests {
     }
 
     #[test]
+    fn cics_write_operator_resolves_reply_action_and_rejects_conflicts() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OPWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(16) VALUE 'ASK OPERATOR'. 01 REPLY-X PIC X(8). 01 REPLY-LEN PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITE OPERATOR TEXT(TEXT-X) ACTION(DFHVALUE(IMMEDIATE)) REPLY(REPLY-X) MAXLENGTH(8) REPLYLENGTH(REPLY-LEN) TIMEOUT(1) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE OPERATOR: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WRITE OPERATOR");
+        assert_eq!(command.operation, HirCicsOperation::WriteOperator);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::OperatorAction
+                && operand.value == HirCicsValue::Integer(2)
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::OperatorReply
+                && output.target.qualified_name == "REPLY-X"
+        }));
+        for clauses in [
+            "TEXT(TEXT-X) REPLY(REPLY-X)",
+            "TEXT(TEXT-X) MAXLENGTH(8)",
+            "TEXT(TEXT-X) TIMEOUT(1)",
+            "TEXT(TEXT-X) ACTION(9) IMMEDIATE",
+            "TEXT(TEXT-X) IMMEDIATE EVENTUAL",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADOP. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(16). 01 REPLY-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE OPERATOR {clauses} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clauses}");
+        }
+    }
+
+    #[test]
     fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. 01 MS-X PIC S9(9) COMP VALUE 250. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. EXEC CICS DELAY FOR MILLISECS(MS-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

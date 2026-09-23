@@ -1,6 +1,6 @@
 use mainframe_env_cics::{
-    CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService,
-    CicsStartTask,
+    CICS_DELAY_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
+    CICS_START_WORK_GENERATION, CicsService, CicsStartTask,
 };
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{PlatformStore, StoreError, WorkRecord};
@@ -48,9 +48,18 @@ pub(crate) fn claim_durable_work(
     if delay.is_some() {
         return Ok(delay);
     }
-    store.claim(
+    let post = store.claim(
         worker,
         Some(CICS_POST_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )?;
+    if post.is_some() {
+        return Ok(post);
+    }
+    store.claim(
+        worker,
+        Some(CICS_OPERATOR_WORK_GENERATION),
         now_tick,
         JES_LEASE_TICKS,
     )
@@ -78,6 +87,7 @@ pub(crate) enum CicsWorkOutcome {
     Start(CicsStartTask),
     Delay,
     Post(bool),
+    OperatorTimeout(bool),
 }
 
 pub(crate) fn process_cics_work(
@@ -95,6 +105,9 @@ pub(crate) fn process_cics_work(
         }
         CICS_POST_WORK_GENERATION => Some(CicsWorkOutcome::Post(
             cics.promote_post_work(work, now_tick)?,
+        )),
+        CICS_OPERATOR_WORK_GENERATION => Some(CicsWorkOutcome::OperatorTimeout(
+            cics.promote_operator_timeout_work(work, now_tick)?,
         )),
         _ => None,
     })

@@ -13,6 +13,13 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::After | CicsPlanOption::At
         ),
+        CicsPlanOperation::WriteOperator => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::OperatorImmediate
+                | CicsPlanOption::OperatorEventual
+                | CicsPlanOption::OperatorCritical
+        ),
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

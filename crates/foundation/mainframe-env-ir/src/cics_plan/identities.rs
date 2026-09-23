@@ -17,6 +17,8 @@ pub enum CicsPlanOperation {
     FormatTime,
     /// Convert one architected date-time string into CICS absolute time.
     ConvertTime,
+    /// Write one operator console message and optionally await its reply.
+    WriteOperator,
     /// Remove editing characters from one EBCDIC numeric field in place.
     BifDeedit,
     /// Compute a source-bounded SHA-1 digest in one of three representations.
@@ -240,6 +242,22 @@ pub enum CicsOperandName {
     RecordLength,
     /// `DIGESTTYPE(...)` named CVDA selector for BIF DIGEST.
     DigestType,
+    /// `TEXT(...)` bytes sent to the system console.
+    OperatorText,
+    /// `TEXTLENGTH(...)` selected text byte count.
+    OperatorTextLength,
+    /// `ROUTECODES(...)` one-byte console route codes.
+    OperatorRouteCodes,
+    /// `NUMROUTES(...)` selected route count.
+    OperatorNumRoutes,
+    /// `CONSNAME(...)` specific system console name.
+    OperatorConsName,
+    /// `ACTION(...)` retained descriptor code.
+    OperatorAction,
+    /// `MAXLENGTH(...)` reply area capacity.
+    OperatorMaxLength,
+    /// `TIMEOUT(...)` reply deadline in seconds.
+    OperatorTimeout,
     /// Optional one-byte date separator.
     DateSep,
     /// Optional one-byte time separator.
@@ -412,6 +430,12 @@ pub enum CicsPlanOption {
     DigestBinary,
     /// Return a 28-byte base64 SHA-1 digest.
     DigestBase64,
+    /// Retain an operator message for immediate action (descriptor 2).
+    OperatorImmediate,
+    /// Retain an operator message for eventual action (descriptor 3).
+    OperatorEventual,
+    /// Retain an operator message for critical eventual action (descriptor 11).
+    OperatorCritical,
     /// Ignore and clear active abnormal-termination exits.
     Cancel,
     /// Suppress transaction-dump creation.
@@ -539,6 +563,10 @@ pub enum CicsOutputName {
     Field,
     /// `RESULT(...)` destination of BIF DIGEST.
     DigestResult,
+    /// Operator reply bytes received through `REPLY(...)`.
+    OperatorReply,
+    /// Actual operator reply byte count.
+    OperatorReplyLength,
     /// `MILLISECONDS(...)` fullword-binary destination.
     Milliseconds,
     /// `MMDDYY(...)` character destination.
