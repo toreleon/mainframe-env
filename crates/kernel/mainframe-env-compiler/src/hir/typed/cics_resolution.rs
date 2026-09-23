@@ -273,6 +273,9 @@ fn validate_candidate(
                 ));
             }
             (CicsApplicationOptionValueShape::Value, false) => {
+                if interval_control::bare_brexit_discriminator(descriptor.official_row, name) {
+                    continue;
+                }
                 return Err(format!(
                     "CICS {} option {name} requires a parenthesized operand",
                     operation::command_label(descriptor)

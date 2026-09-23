@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Recognize the source-defined bare `START BREXIT` discriminator when a
+  transaction supplies its default exit, while keeping row `0207` unready
+  until its BRXA execution path is connected.
+
 - Versioned the typed CICS effect-plan codec as `MCEP` v2 with big-endian `u16`
   operation, operand, option, and output tags. Existing tag numbers and
   canonical v1 plan decoding remain intact; new encodings are deterministic v2

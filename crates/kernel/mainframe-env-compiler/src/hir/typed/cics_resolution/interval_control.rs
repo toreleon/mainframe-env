@@ -5,6 +5,12 @@ use super::super::{
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{DataCategory, SemanticModel};
 
+pub(super) fn bare_brexit_discriminator(row: &str, name: &str) -> bool {
+    // The required command word has an optional operand when TRANSID names a
+    // transaction with a default exit (pinned api-commands:0207).
+    row == "ibm-cics-ts-6x-2026-08-31:api-commands:0207" && name == "BREXIT"
+}
+
 pub(super) fn validate_constraints(
     clauses: &Clauses,
     options: &[String],
