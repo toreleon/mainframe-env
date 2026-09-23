@@ -9,9 +9,11 @@ mod host_boundary;
 mod interval;
 mod interval_control;
 mod journal_control;
+mod limits;
 mod program_control;
 mod queue_control;
 mod recovery;
+mod spool_control;
 mod start_task;
 mod storage_control;
 mod task_context;
@@ -94,6 +96,10 @@ pub(super) use program_control::{
 };
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
+pub(super) use spool_control::{
+    SpoolRecord, SpoolRecordMode, SpoolReport, SpoolReportState, SpoolState, load_spool_state,
+    persist_spool_state,
+};
 pub use start_task::{CicsStartTask, CicsStartTerminal};
 pub(super) use task_context::{
     CurrentProgramFrame, allocate_terminal_input, synchronize_current_program,

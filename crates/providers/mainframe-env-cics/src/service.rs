@@ -58,32 +58,13 @@ pub struct CicsLimits {
     pub max_transform_resources: usize,
     pub max_transform_containers: usize,
     pub max_transform_bytes: usize,
+    pub max_spool_reports: usize,
+    pub max_spool_records: usize,
+    pub max_spool_replays: usize,
+    pub max_spool_bytes: usize,
+    pub max_spool_outdescr_bytes: usize,
 }
 
-impl Default for CicsLimits {
-    fn default() -> Self {
-        Self {
-            max_sessions: 4096,
-            max_runs: 4096,
-            max_maps: 1024,
-            max_programs: 4096,
-            max_file_aliases: 1024,
-            max_enqueue_models: 1024,
-            max_fields: 512,
-            max_screen_bytes: 4 * 1024 * 1024,
-            max_queue_records: 65536,
-            max_queue_bytes: 64 * 1024 * 1024,
-            max_documents: 4096,
-            max_document_templates: 1024,
-            max_document_bytes: 64 * 1024 * 1024,
-            max_document_symbols: 4096,
-            max_document_bookmarks: 4096,
-            max_transform_resources: 1024,
-            max_transform_containers: 4096,
-            max_transform_bytes: 64 * 1024 * 1024,
-        }
-    }
-}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsFileDefinition {
     pub dataset: DatasetName,
@@ -231,6 +212,22 @@ pub struct CicsTraceEntry {
     pub payload_bytes: usize,
 }
 
+/// Read-only view of a bounded CICS spool report.
+/// The token and ownership fields reflect the last durable state transition.
+/// Record bytes are copied so callers cannot mutate the provider's state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsSpoolReportSnapshot {
+    pub token: String,
+    pub state: String,
+    pub user_id: String,
+    pub node: String,
+    pub class: u8,
+    pub record_length: u32,
+    pub owner_run_unit: Option<String>,
+    pub records: Vec<Vec<u8>>,
+    pub next_record: usize,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsContinuation {
     pub transaction: String,
@@ -274,6 +271,7 @@ struct State {
     transform_containers: BTreeMap<(String, String), handlers::TransformContainer>,
     transform_bytes: usize,
     journals: BTreeMap<String, handlers::JournalRecord>,
+    spool: handlers::SpoolState,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
@@ -431,6 +429,8 @@ impl CicsService {
         let transform_resources = handlers::load_transform_resources(store.as_ref(), limits)?;
         let (transform_containers, transform_bytes) =
             handlers::load_transform_containers(store.as_ref(), limits)?;
+        let spool = handlers::load_spool_state(store.as_ref(), limits)?;
+        debug_assert!(spool.reports.len() <= limits.max_spool_reports);
         Ok(Arc::new(Self {
             host,
             store: Arc::clone(&store),
@@ -459,6 +459,7 @@ impl CicsService {
                 transform_containers,
                 transform_bytes,
                 journals: handlers::load_journals(store.as_ref(), limits)?,
+                spool,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -1387,7 +1388,6 @@ impl CicsService {
             })
             .unwrap_or_default())
     }
-
     pub fn register_transient_data_queues(
         &self,
         definitions: &[CicsTransientDataQueueDefinition],
@@ -14958,6 +14958,34 @@ mod tests {
                     .unwrap()
                     .is_none()
             );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bounded_spool_core_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-spool-core-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let token = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .stage_spool_input("MEAPUSER", b'B', &[b"ONE".to_vec(), b"TWO".to_vec()])
+                .unwrap()
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let report = service.spool_report_snapshot(&token).unwrap();
+            assert_eq!(report.state, "available-input");
+            assert_eq!(report.user_id, "MEAPUSER");
+            assert_eq!(report.class, b'B');
+            assert_eq!(report.records, [b"ONE".to_vec(), b"TWO".to_vec()]);
         }
         std::fs::remove_dir_all(root).unwrap();
     }
