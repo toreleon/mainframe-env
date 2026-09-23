@@ -115,6 +115,8 @@ pub enum CicsPlanOperation {
     DocumentRetrieve,
     /// Add or replace symbols in one transaction-owned document.
     DocumentSet,
+    /// Convert one BIT-mode application-data container to canonical JSON.
+    TransformDataToJson,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -229,7 +231,7 @@ pub enum CicsOperandName {
     MajorVersion,
     /// `MINORVERSION(...)` application minor version.
     MinorVersion,
-    /// `CHANNEL(...)` application invocation channel name.
+    /// `CHANNEL(...)` application invocation or transform channel name.
     Channel,
     /// `SET(...)` pointer target for LOAD.
     LoadSet,
@@ -271,6 +273,12 @@ pub enum CicsOperandName {
     CharacterSet,
     /// `VALUE(...)` supplies one document symbol value.
     SymbolValue,
+    /// Transform input-container name.
+    InContainer,
+    /// Transform output-container name.
+    OutContainer,
+    /// JSON transformer resource name.
+    Transformer,
 }
 
 /// Flag option accepted by the typed CICS pilot.

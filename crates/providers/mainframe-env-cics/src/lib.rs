@@ -25,8 +25,10 @@ pub use service::{
     CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
     CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsProgramDefinition,
     CicsReplayClock, CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution,
-    CicsTerminalSnapshot, CicsTraceEntry, CicsTransientDataQueueDefinition,
-    CicsTransientDataQueueKind, CicsTransientDataQueueOpen, cics_provider,
+    CicsTerminalSnapshot, CicsTraceEntry, CicsTransformContainerMode, CicsTransformDefinition,
+    CicsTransformFieldDefinition, CicsTransformFieldKind, CicsTransformFormat,
+    CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
+    cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

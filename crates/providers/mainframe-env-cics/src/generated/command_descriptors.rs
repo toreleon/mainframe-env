@@ -21,6 +21,7 @@ pub(crate) enum CicsCommandFamily {
     Recovery,
     IntervalControl,
     StorageControl,
+    TransformControl,
     DocumentControl,
 }
 
@@ -413,6 +414,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::TransformDataToJson,
+        syntax: "TRANSFORM DATATOJSON",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0221",
+        family: CicsCommandFamily::TransformControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Write,
         syntax: "WRITE FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
@@ -498,9 +506,10 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::WaitEvent => &CICS_COMMAND_DESCRIPTORS[51],
         CicsOperation::WaitExternal => &CICS_COMMAND_DESCRIPTORS[52],
         CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[53],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[54],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[55],
-        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[56],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[57],
+        CicsOperation::TransformDataToJson => &CICS_COMMAND_DESCRIPTORS[54],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[55],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[56],
+        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[57],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[58],
     }
 }

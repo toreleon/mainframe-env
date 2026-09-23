@@ -580,6 +580,28 @@ fn validate_operation_shape(
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::TransformDataToJson => {
+            let required = BTreeSet::from([
+                CicsOperandName::Channel,
+                CicsOperandName::InContainer,
+                CicsOperandName::Transformer,
+            ]);
+            let allowed = BTreeSet::from([
+                CicsOperandName::Channel,
+                CicsOperandName::InContainer,
+                CicsOperandName::OutContainer,
+                CicsOperandName::Transformer,
+            ]);
+            !required.is_subset(inputs)
+                || !inputs.is_subset(&allowed)
+                || plan.operands.iter().any(|operand| {
+                    !matches!(
+                        operand.value,
+                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                    )
+                })
+                || scheduling_options
+        }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -3383,6 +3405,63 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan(&invalid_user, limits),
             Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn transform_datatojson_tags_are_unique_reserved_and_round_trip() {
+        let operation_tag = operation_tag(CicsPlanOperation::TransformDataToJson);
+        assert!(codec_tags::TRANSFORM_OPERATION_TAGS.contains(&operation_tag));
+        assert_eq!(
+            operation_from_tag(operation_tag),
+            Ok(CicsPlanOperation::TransformDataToJson)
+        );
+        let operands = [
+            CicsOperandName::Channel,
+            CicsOperandName::InContainer,
+            CicsOperandName::OutContainer,
+            CicsOperandName::Transformer,
+        ];
+        let tags = operands.map(operand_tag);
+        assert!(
+            tags.iter()
+                .all(|tag| codec_tags::TRANSFORM_OPERAND_TAGS.contains(tag))
+        );
+        assert_eq!(tags.into_iter().collect::<BTreeSet<_>>().len(), tags.len());
+        for (name, tag) in operands.into_iter().zip(tags) {
+            assert_eq!(operand_from_tag(tag), Ok(name));
+        }
+        assert_eq!(codec_tags::TRANSFORM_OPTION_TAGS, 96..=107);
+        assert_eq!(codec_tags::TRANSFORM_OUTPUT_TAGS, 224..=231);
+
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::TransformDataToJson,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Channel,
+                    value: CicsOperandValue::Literal(b"WORK".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::InContainer,
+                    value: CicsOperandValue::Storage(slot(1, "INPUT-CONTAINER")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::OutContainer,
+                    value: CicsOperandValue::Literal(b"JSON".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Transformer,
+                    value: CicsOperandValue::Literal(b"CUSTOMER".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
         );
     }
 

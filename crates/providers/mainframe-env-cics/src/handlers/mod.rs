@@ -3,6 +3,7 @@ mod condition;
 mod document_control;
 mod file_control;
 mod handle_state;
+mod host_boundary;
 mod interval;
 mod interval_control;
 mod program_control;
@@ -18,6 +19,7 @@ mod task_wait;
 mod terminal_control;
 mod terminal_run;
 mod time;
+mod transform_control;
 pub(in crate::service) mod transient_data;
 
 use super::{CicsService, Run};
@@ -104,6 +106,17 @@ pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
+pub(super) use transform_control::invoke as invoke_transform_control;
+#[allow(unused_imports)]
+pub use transform_control::{
+    CicsTransformContainerMode, CicsTransformDefinition, CicsTransformFieldDefinition,
+    CicsTransformFieldKind, CicsTransformFormat,
+};
+pub(crate) use transform_control::{
+    TransformContainer, container as transform_container,
+    load_containers as load_transform_containers, load_resources as load_transform_resources,
+    put_container as put_transform_container, register_definition as register_transform_definition,
+};
 #[allow(unused_imports)]
 pub use transient_data::{
     CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,

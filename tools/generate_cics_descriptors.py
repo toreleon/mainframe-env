@@ -87,6 +87,7 @@ EXPECTED_FAMILIES = {
     "recovery": "Recovery",
     "interval-control": "IntervalControl",
     "storage-control": "StorageControl",
+    "transform-control": "TransformControl",
 }
 TYPED_EXECUTION_FAMILIES = {"document-control": "DocumentControl"}
 EXPECTED_RUNTIME_OPERATIONS = [
@@ -228,6 +229,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
+    (
+        "TransformDataToJson",
+        "api",
+        "transform-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0221",
+    ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
         "WriteTransientData",
@@ -504,6 +512,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Syncpoint",
         "Start",
         "Retrieve",
+        "TransformDataToJson",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -730,6 +739,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
     "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
+    "TransformDataToJson": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
 }
 
 
@@ -948,6 +960,7 @@ def _load_typed_execution_registrations(
         "SetAssociationUserCorrData",
         "Start",
         "Suspend",
+        "TransformDataToJson",
         "WaitEvent",
         "WaitExternal",
         "WriteTemporaryStorage",

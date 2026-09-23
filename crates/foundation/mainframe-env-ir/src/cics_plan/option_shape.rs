@@ -50,6 +50,7 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         CicsPlanOperation::DocumentSet => {
             !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Unescaped)
         }
+        CicsPlanOperation::TransformDataToJson => !matches!(option, CicsPlanOption::NoHandle),
         _ => !matches!(option, CicsPlanOption::NoHandle),
     })
 }

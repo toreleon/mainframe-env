@@ -64,6 +64,11 @@ All notable changes to mainframe-env are documented here.
   template sources produce deterministic 16-byte tokens and optional DOCSIZE;
   symbol lists, host code pages, template READ authorization, atomic replay,
   task cleanup, capacity failure, and SQLite reopen are covered.
+- Added typed CICS `TRANSFORM DATATOJSON` over a shared bounded transform
+  runtime. Digest-pinned JSON bindings map fixed application-data fields to
+  canonical JSON, named channel containers persist in BIT/CHAR modes, SAF
+  protects the transformer, exact source conditions are retained, and an
+  atomic transform ledger makes output replacement replay-safe across reopen.
 
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal

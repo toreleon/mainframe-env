@@ -1375,6 +1375,11 @@
         "id": "storage-control",
         "rust_variant": "StorageControl",
         "responsibility": "Bounded task-local virtual storage allocation and release semantics."
+      },
+      {
+        "id": "transform-control",
+        "rust_variant": "TransformControl",
+        "responsibility": "Bounded deterministic application-data, JSON, and XML transformation semantics."
       }
     ],
     "operations": [

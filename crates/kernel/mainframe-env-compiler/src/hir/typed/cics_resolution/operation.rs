@@ -61,6 +61,7 @@ pub(super) fn resolve(
         ["DOCUMENT", "INSERT"] => HirCicsOperation::DocumentInsert,
         ["DOCUMENT", "RETRIEVE"] => HirCicsOperation::DocumentRetrieve,
         ["DOCUMENT", "SET"] => HirCicsOperation::DocumentSet,
+        ["TRANSFORM", "DATATOJSON"] => HirCicsOperation::TransformDataToJson,
         _ => return Err(ResolutionFailure::Unsupported),
     })
 }

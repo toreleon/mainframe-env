@@ -7,6 +7,15 @@ const ASSIGN_OUTPUT_TAG_BASE: u8 = 13;
 const ASSIGN_OUTPUT_LEGACY_COUNT: u8 = 78;
 const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u8 = 96;
 
+#[cfg(test)]
+pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u8> = 68..=71;
+#[cfg(test)]
+pub(super) const TRANSFORM_OPERAND_TAGS: std::ops::RangeInclusive<u8> = 152..=171;
+#[cfg(test)]
+pub(super) const TRANSFORM_OPTION_TAGS: std::ops::RangeInclusive<u8> = 96..=107;
+#[cfg(test)]
+pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u8> = 224..=231;
+
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
     match value {
         CicsPlanOperation::Read => 0,
@@ -65,6 +74,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DocumentInsert => 65,
         CicsPlanOperation::DocumentRetrieve => 66,
         CicsPlanOperation::DocumentSet => 67,
+        CicsPlanOperation::TransformDataToJson => 68,
     }
 }
 
@@ -126,6 +136,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         65 => Ok(CicsPlanOperation::DocumentInsert),
         66 => Ok(CicsPlanOperation::DocumentRetrieve),
         67 => Ok(CicsPlanOperation::DocumentSet),
+        68 => Ok(CicsPlanOperation::TransformDataToJson),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -210,6 +221,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::MaximumLength => 145,
         CicsOperandName::CharacterSet => 146,
         CicsOperandName::SymbolValue => 147,
+        CicsOperandName::InContainer => 153,
+        CicsOperandName::OutContainer => 154,
+        CicsOperandName::Transformer => 155,
     }
 }
 
@@ -293,6 +307,9 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         145 => Ok(CicsOperandName::MaximumLength),
         146 => Ok(CicsOperandName::CharacterSet),
         147 => Ok(CicsOperandName::SymbolValue),
+        153 => Ok(CicsOperandName::InContainer),
+        154 => Ok(CicsOperandName::OutContainer),
+        155 => Ok(CicsOperandName::Transformer),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

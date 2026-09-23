@@ -55,6 +55,9 @@ pub struct CicsLimits {
     pub max_document_bytes: usize,
     pub max_document_symbols: usize,
     pub max_document_bookmarks: usize,
+    pub max_transform_resources: usize,
+    pub max_transform_containers: usize,
+    pub max_transform_bytes: usize,
 }
 
 impl Default for CicsLimits {
@@ -75,6 +78,9 @@ impl Default for CicsLimits {
             max_document_bytes: 64 * 1024 * 1024,
             max_document_symbols: 4096,
             max_document_bookmarks: 4096,
+            max_transform_resources: 1024,
+            max_transform_containers: 4096,
+            max_transform_bytes: 64 * 1024 * 1024,
         }
     }
 }
@@ -266,6 +272,9 @@ struct State {
     documents: BTreeMap<String, handlers::DocumentRecord>,
     document_templates: DocumentTemplates,
     document_bytes: usize,
+    transform_resources: BTreeMap<(CicsTransformFormat, String), handlers::CicsTransformDefinition>,
+    transform_containers: BTreeMap<(String, String), handlers::TransformContainer>,
+    transform_bytes: usize,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
@@ -420,6 +429,9 @@ impl CicsService {
         let (documents, document_templates, document_bytes) =
             handlers::load_document_authority(store.as_ref(), limits)?;
         let interval_records = handlers::load_interval_records(store.as_ref(), limits)?;
+        let transform_resources = handlers::load_transform_resources(store.as_ref(), limits)?;
+        let (transform_containers, transform_bytes) =
+            handlers::load_transform_containers(store.as_ref(), limits)?;
         Ok(Arc::new(Self {
             host,
             store,
@@ -444,6 +456,9 @@ impl CicsService {
                 documents,
                 document_templates,
                 document_bytes,
+                transform_resources,
+                transform_containers,
+                transform_bytes,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -1392,6 +1407,30 @@ impl CicsService {
         let counts = state.transient.counts();
         Ok(counts)
     }
+    pub fn register_transform_definition(
+        &self,
+        definition: CicsTransformDefinition,
+    ) -> Result<(), HostProblem> {
+        handlers::register_transform_definition(self, definition)
+    }
+
+    pub fn put_transform_container(
+        &self,
+        channel: &str,
+        name: &str,
+        mode: CicsTransformContainerMode,
+        bytes: Vec<u8>,
+    ) -> Result<(), HostProblem> {
+        handlers::put_transform_container(self, channel, name, mode, bytes)
+    }
+
+    pub fn transform_container(
+        &self,
+        channel: &str,
+        name: &str,
+    ) -> Result<(CicsTransformContainerMode, Vec<u8>), HostProblem> {
+        handlers::transform_container(self, channel, name)
+    }
 
     pub fn invoke(
         &self,
@@ -1683,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 58);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 59);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -1708,6 +1747,9 @@ impl CicsService {
             }
             CicsCommandFamily::DocumentControl => {
                 handlers::invoke_document_control(self, run, &request, retention_tick)
+            }
+            CicsCommandFamily::TransformControl => {
+                handlers::invoke_transform_control(self, run, &request)
             }
         }
         .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
@@ -1797,7 +1839,10 @@ impl CicsService {
             .map_err(|_| HostProblem::InfrastructureFailure)
     }
 
-    fn authorize(
+    /// Check a CICS resource using the active run's nested host request.
+    /// The same request path serves document, program, and transform handlers
+    /// so authorization shares the transaction's replay and deadline bounds.
+    pub(in crate::service) fn authorize(
         &self,
         run: &mut Run,
         class: &str,
@@ -1823,51 +1868,6 @@ impl CicsService {
             HostResult::Security(_) => Err(HostProblem::Unauthorized),
             _ => Err(HostProblem::ProviderFailure),
         }
-    }
-
-    fn nested(&self, run: &mut Run, request: HostRequest) -> Result<HostResult, HostProblem> {
-        run.host_sequence = run
-            .host_sequence
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        let key = request
-            .is_mutating()
-            .then(|| nested_key(run, run.host_sequence))
-            .transpose()?;
-        let nested_invocation = key
-            .as_ref()
-            .filter(|_| {
-                matches!(
-                    &request,
-                    HostRequest::Dataset(_)
-                        | HostRequest::Db2(_)
-                        | HostRequest::Ims(_)
-                        | HostRequest::Mq(_)
-                )
-            })
-            .map(|key| {
-                invocation_with_nested_origin(
-                    &run.invocation,
-                    key,
-                    run.outer_effect_key
-                        .as_deref()
-                        .ok_or(HostProblem::InfrastructureFailure)?,
-                )
-            })
-            .transpose()?;
-        let result = self.invoke_host(
-            nested_invocation.as_ref().unwrap_or(&run.invocation),
-            run.invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: run.invocation.run_unit_id.clone(),
-                sequence: run.host_sequence,
-                deadline_tick: run.invocation.deadline_tick,
-                idempotency_key: key,
-                request,
-            },
-        );
-        result.outcome
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3864,6 +3864,7 @@ mod tests {
     struct CommandSecurityAuthority {
         descriptor: CapabilityDescriptor,
         deny_command: bool,
+        deny_transform: bool,
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
         seen: CommandSecurityTrace,
@@ -3998,6 +3999,7 @@ mod tests {
                     ));
                     Ok(HostResult::Security(
                         if self.deny_command && class == "FACILITY"
+                            || self.deny_transform && class == "TRANSFORM"
                             || self.deny_surrogate && class == "SURROGAT"
                         {
                             SecurityDecision::Deny
@@ -4291,6 +4293,30 @@ mod tests {
         let provider = Arc::new(CommandSecurityAuthority {
             descriptor: descriptor("host.security.authorize"),
             deny_command,
+            deny_transform: false,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
+    }
+
+    fn transform_authorities(
+        deny_transform: bool,
+    ) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command: false,
+            deny_transform,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
@@ -4339,6 +4365,7 @@ mod tests {
             Arc::new(CommandSecurityAuthority {
                 descriptor: descriptor("host.security.authorize"),
                 deny_command: false,
+                deny_transform: false,
                 deny_surrogate,
                 principal_decision,
                 seen: seen.clone(),
@@ -4927,6 +4954,46 @@ mod tests {
         }
     }
 
+    fn transform_request(
+        sequence: u64,
+        channel: &[u8],
+        input: &[u8],
+        output: Option<&[u8]>,
+        transformer: &[u8],
+    ) -> CicsRequest {
+        let mut arguments = BTreeMap::from([
+            ("CHANNEL".into(), cics_literal(channel)),
+            ("INCONTAINER".into(), cics_literal(input)),
+            ("TRANSFORMER".into(), cics_literal(transformer)),
+        ]);
+        if let Some(output) = output {
+            arguments.insert("OUTCONTAINER".into(), cics_literal(output));
+        }
+        request(CicsOperation::TransformDataToJson, arguments, sequence)
+    }
+
+    fn json_transform_definition(name: &str, enabled: bool) -> CicsTransformDefinition {
+        CicsTransformDefinition {
+            name: name.into(),
+            enabled,
+            format: CicsTransformFormat::Json,
+            fields: vec![
+                CicsTransformFieldDefinition {
+                    name: "name".into(),
+                    offset: 0,
+                    length: 5,
+                    kind: CicsTransformFieldKind::Text,
+                },
+                CicsTransformFieldDefinition {
+                    name: "count".into(),
+                    offset: 5,
+                    length: 3,
+                    kind: CicsTransformFieldKind::SignedInteger,
+                },
+            ],
+        }
+    }
+
     fn effect(run: &RunUnitId, request: CicsRequest, sequence: u64) -> EffectRequest {
         EffectRequest {
             run_unit: run.clone(),
@@ -5040,6 +5107,7 @@ mod tests {
             ("STARTBR", CicsOperation::StartBrowse),
             ("SUSPEND", CicsOperation::Suspend),
             ("SYNCPOINT", CicsOperation::Syncpoint),
+            ("TRANSFORM DATATOJSON", CicsOperation::TransformDataToJson),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6271,7 +6339,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 58);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 59);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7314,6 +7382,243 @@ mod tests {
         drop(reopened);
         let _ = std::fs::remove_file(directory.join("state.db"));
         let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn transform_datatojson_is_deterministic_authorized_audited_and_restart_replay_safe() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-transform-json-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let (host, security) = transform_authorities(false);
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service =
+            CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, session) = registered(&service);
+        service
+            .register_transform_definition(json_transform_definition("CUSTOMER", true))
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".to_vec(),
+            )
+            .unwrap();
+        let request = transform_request(400, b"WORK", b"SOURCE", None, b"CUSTOMER");
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 400),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("NORMAL", 0, 0)
+        );
+        assert_eq!(
+            service.transform_container("WORK", "DFHJSON-JSON").unwrap(),
+            (
+                CicsTransformContainerMode::Char,
+                br#"{"count":7,"name":"ALICE"}"#.to_vec(),
+            )
+        );
+        assert_eq!(
+            *security.lock().unwrap(),
+            vec![
+                ("TCICSTRN".into(), "CICS.MENU".into(), AccessIntent::Execute,),
+                (
+                    "TRANSFORM".into(),
+                    "CICS.JSON.CUSTOMER".into(),
+                    AccessIntent::Update,
+                ),
+            ]
+        );
+        assert_eq!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .len(),
+            2
+        );
+
+        let replay = store
+            .get_provider_state("cics-effect-replay-v1", "outer-400")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-400", replay.version)
+            .unwrap();
+        let output_before = store
+            .get_provider_state("cics-transform-container-v1", "WORK/DFHJSON-JSON")
+            .unwrap()
+            .unwrap();
+        drop(service);
+        drop(store);
+
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let restarted = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        restarted
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let replayed = restarted
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 400),
+                request,
+            )
+            .unwrap();
+        assert_eq!(replayed, response);
+        let output_after = store
+            .get_provider_state("cics-transform-container-v1", "WORK/DFHJSON-JSON")
+            .unwrap()
+            .unwrap();
+        assert_eq!(output_after, output_before);
+        drop(restarted);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn transform_datatojson_conditions_and_bounds_are_exact() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&service);
+        for definition in [
+            json_transform_definition("CUSTOMER", true),
+            json_transform_definition("DISABLED", false),
+        ] {
+            service.register_transform_definition(definition).unwrap();
+        }
+        for (name, mode, bytes) in [
+            (
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".as_slice(),
+            ),
+            (
+                "CHAR",
+                CicsTransformContainerMode::Char,
+                b"ALICE007".as_slice(),
+            ),
+            (
+                "BAD",
+                CicsTransformContainerMode::Bit,
+                b"ALICEXXX".as_slice(),
+            ),
+        ] {
+            service
+                .put_transform_container("WORK", name, mode, bytes.to_vec())
+                .unwrap();
+        }
+
+        type TransformConditionCase<'a> = (u64, &'a [u8], &'a [u8], &'a [u8], &'a str, i32, i32);
+        let cases: &[TransformConditionCase<'_>] = &[
+            (410, b"!", b"SOURCE", b"CUSTOMER", "CHANNELERR", 122, 1),
+            (411, b"NONE", b"SOURCE", b"CUSTOMER", "CHANNELERR", 122, 2),
+            (
+                412,
+                b"WORK",
+                b"MISSING",
+                b"CUSTOMER",
+                "CONTAINERERR",
+                110,
+                3,
+            ),
+            (413, b"WORK", b"SOURCE", b"DISABLED", "INVREQ", 16, 1),
+            (414, b"WORK", b"BAD", b"CUSTOMER", "INVREQ", 16, 6),
+            (415, b"WORK", b"CHAR", b"CUSTOMER", "INVREQ", 16, 8),
+            (416, b"WORK", b"SOURCE", b"MISSING", "NOTFND", 13, 1),
+        ];
+        for (sequence, channel, input, transformer, name, response, response2) in cases {
+            let mut request = transform_request(*sequence, channel, input, None, transformer);
+            request.condition_policy = CicsConditionPolicy::NoHandle;
+            let actual = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), *sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (actual.condition.as_str(), actual.response, actual.response2),
+                (*name, *response, *response2),
+                "sequence {sequence}",
+            );
+        }
+
+        let (denied_host, denied_trace) = transform_authorities(true);
+        let denied = CicsService::open(
+            denied_host,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (denied_invocation, _) = registered(&denied);
+        denied
+            .register_transform_definition(json_transform_definition("CUSTOMER", true))
+            .unwrap();
+        denied
+            .put_transform_container(
+                "WORK",
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".to_vec(),
+            )
+            .unwrap();
+        let mut request = transform_request(417, b"WORK", b"SOURCE", None, b"CUSTOMER");
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        let unauthorized = denied
+            .invoke(
+                &effect(&denied_invocation.run_unit_id, request.clone(), 417),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                unauthorized.condition.as_str(),
+                unauthorized.response,
+                unauthorized.response2,
+            ),
+            ("INVREQ", 16, 101)
+        );
+        assert!(denied_trace.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "TRANSFORM".into(),
+                    "CICS.JSON.CUSTOMER".into(),
+                    AccessIntent::Update,
+                )
+        }));
+
+        let limited = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits {
+                max_transform_bytes: 7,
+                ..CicsLimits::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            limited.register_transform_definition(json_transform_definition("CUSTOMER", true)),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            limited.put_transform_container(
+                "WORK",
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".to_vec(),
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
     }
 
     #[test]

@@ -203,6 +203,7 @@ pub enum HirCicsOperation {
     DocumentInsert,
     DocumentRetrieve,
     DocumentSet,
+    TransformDataToJson,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -287,6 +288,9 @@ pub enum HirCicsOperandName {
     MaximumLength,
     CharacterSet,
     SymbolValue,
+    InContainer,
+    OutContainer,
+    Transformer,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1870,6 +1874,47 @@ mod tests {
         );
         assert_eq!(commands[2].operation, HirCicsOperation::Syncpoint);
         assert!(commands[2].options.contains(&HirCicsOption::Rollback));
+    }
+
+    #[test]
+    fn transform_datatojson_resolves_exact_typed_route_and_required_operands() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TRJSON. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHAN PIC X(16) VALUE 'WORK'. 01 INPUT-NAME PIC X(16) VALUE 'SOURCE'. 01 RESP-CODE PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS TRANSFORM DATATOJSON CHANNEL(CHAN) INCONTAINER(INPUT-NAME) OUTCONTAINER('RESULT') TRANSFORMER('CUSTOMER') RESP(RESP-CODE) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed transform HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved TRANSFORM DATATOJSON");
+        assert_eq!(command.operation, HirCicsOperation::TransformDataToJson);
+        assert_eq!(
+            command
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::Channel,
+                HirCicsOperandName::InContainer,
+                HirCicsOperandName::OutContainer,
+                HirCicsOperandName::Transformer,
+            ])
+        );
+        assert!(matches!(
+            command.condition_policy,
+            HirCicsConditionPolicy::Respond { .. }
+        ));
+
+        let missing = source.replace(" CHANNEL(CHAN)", "");
+        let analysis = analyze(&missing);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("TRANSFORM DATATOJSON requires CHANNEL")
+        }));
     }
 
     #[test]

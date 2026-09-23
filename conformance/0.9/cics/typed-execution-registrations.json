@@ -214,6 +214,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
     },
     {
+      "operation": "TransformDataToJson",
+      "interface": "api",
+      "family": "transform-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0221"
+    },
+    {
       "operation": "WaitEvent",
       "interface": "api",
       "family": "task-control",

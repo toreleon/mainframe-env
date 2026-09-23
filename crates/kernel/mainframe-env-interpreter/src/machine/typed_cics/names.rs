@@ -147,6 +147,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
         CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
         CicsPlanOperation::DocumentSet => CicsOperation::DocumentSet,
+        CicsPlanOperation::TransformDataToJson => CicsOperation::TransformDataToJson,
     }
 }
 
@@ -230,6 +231,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::MaximumLength => "MAXLENGTH",
         CicsOperandName::CharacterSet => "CHARACTERSET",
         CicsOperandName::SymbolValue => "VALUE",
+        CicsOperandName::InContainer => "INCONTAINER",
+        CicsOperandName::OutContainer => "OUTCONTAINER",
+        CicsOperandName::Transformer => "TRANSFORMER",
     }
 }
 

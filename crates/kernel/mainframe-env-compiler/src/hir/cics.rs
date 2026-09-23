@@ -258,6 +258,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::MaximumLength => CicsOperandName::MaximumLength,
                 HirCicsOperandName::CharacterSet => CicsOperandName::CharacterSet,
                 HirCicsOperandName::SymbolValue => CicsOperandName::SymbolValue,
+                HirCicsOperandName::InContainer => CicsOperandName::InContainer,
+                HirCicsOperandName::OutContainer => CicsOperandName::OutContainer,
+                HirCicsOperandName::Transformer => CicsOperandName::Transformer,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -401,6 +404,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DocumentInsert => CicsPlanOperation::DocumentInsert,
         HirCicsOperation::DocumentRetrieve => CicsPlanOperation::DocumentRetrieve,
         HirCicsOperation::DocumentSet => CicsPlanOperation::DocumentSet,
+        HirCicsOperation::TransformDataToJson => CicsPlanOperation::TransformDataToJson,
     }
 }
 
