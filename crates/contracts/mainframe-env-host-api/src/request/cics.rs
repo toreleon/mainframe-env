@@ -101,6 +101,8 @@ pub enum CicsOperation {
     TransformDataToJson,
     /// Convert one BIT-mode application-data container to deterministic XML.
     TransformDataToXml,
+    /// Convert JSON from a channel container to application data.
+    TransformJsonToData,
     Write,
     WriteTransientData,
     Xctl,
@@ -168,6 +170,7 @@ impl CicsOperation {
             Self::Syncpoint => "Syncpoint",
             Self::TransformDataToJson => "TransformDataToJson",
             Self::TransformDataToXml => "TransformDataToXml",
+            Self::TransformJsonToData => "TransformJsonToData",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -213,6 +216,7 @@ impl CicsOperation {
                 | Self::Syncpoint
                 | Self::TransformDataToJson
                 | Self::TransformDataToXml
+                | Self::TransformJsonToData
                 | Self::SetFileStatus
                 | Self::Start
                 | Self::Retrieve
@@ -292,6 +296,7 @@ impl CicsOperation {
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,
+            ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

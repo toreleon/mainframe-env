@@ -206,6 +206,7 @@ pub enum HirCicsOperation {
     DocumentSet,
     TransformDataToJson,
     TransformDataToXml,
+    TransformJsonToData,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -1897,6 +1898,30 @@ mod tests {
             diagnostic
                 .public_message()
                 .contains("TRANSFORM DATATOJSON requires CHANNEL")
+        }));
+    }
+
+    #[test]
+    fn transform_jsontodata_uses_the_reverse_json_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TRREVERSE. PROCEDURE DIVISION. EXEC CICS TRANSFORM JSONTODATA CHANNEL('WORK') INCONTAINER('JSON') TRANSFORMER('CUSTOMER') END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed reverse JSON HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved TRANSFORM JSONTODATA");
+        assert_eq!(command.operation, HirCicsOperation::TransformJsonToData);
+        assert_eq!(command.operands.len(), 3);
+        let missing = source.replace(" CHANNEL('WORK')", "");
+        let analysis = analyze(&missing);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("TRANSFORM JSONTODATA requires CHANNEL")
         }));
     }
 

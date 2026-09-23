@@ -423,6 +423,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DocumentSet => CicsPlanOperation::DocumentSet,
         HirCicsOperation::TransformDataToJson => CicsPlanOperation::TransformDataToJson,
         HirCicsOperation::TransformDataToXml => CicsPlanOperation::TransformDataToXml,
+        HirCicsOperation::TransformJsonToData => CicsPlanOperation::TransformJsonToData,
     }
 }
 

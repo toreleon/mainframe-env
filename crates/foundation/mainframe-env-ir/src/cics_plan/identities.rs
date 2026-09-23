@@ -119,6 +119,8 @@ pub enum CicsPlanOperation {
     TransformDataToJson,
     /// Convert one BIT-mode application-data container to deterministic XML.
     TransformDataToXml,
+    /// Convert one JSON container to BIT-mode application data.
+    TransformJsonToData,
 }
 
 /// Named input accepted by the typed CICS pilot.

@@ -10,6 +10,7 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, ProviderS
 use serde_json::{Map, Number, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod json_to_data;
 mod reader;
 use reader::Reader;
 
@@ -17,6 +18,7 @@ const RESOURCE_NAMESPACE: &str = "cics-transform-resource-v1";
 const CONTAINER_NAMESPACE: &str = "cics-transform-container-v1";
 const EFFECT_NAMESPACE: &str = "cics-transform-effect-v1";
 const DEFAULT_JSON_OUTPUT: &str = "DFHJSON-JSON";
+const DEFAULT_JSON_DATA_OUTPUT: &str = "DFHJSON-DATA";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum XmlTransformProblem {
@@ -93,6 +95,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::TransformDataToJson => data_to_json(service, run, request),
         CicsOperation::TransformDataToXml => data_to_xml(service, run, request),
+        CicsOperation::TransformJsonToData => json_to_data::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -452,6 +455,9 @@ fn validate_request(request: &CicsRequest, operation: CicsOperation) -> Result<(
     ];
     let (allowed, required) = match operation {
         CicsOperation::TransformDataToJson => {
+            (JSON_ALLOWED, &["CHANNEL", "INCONTAINER", "TRANSFORMER"][..])
+        }
+        CicsOperation::TransformJsonToData => {
             (JSON_ALLOWED, &["CHANNEL", "INCONTAINER", "TRANSFORMER"][..])
         }
         CicsOperation::TransformDataToXml => (
@@ -1095,6 +1101,7 @@ fn encode_effect(effect: &TransformEffect) -> Result<Vec<u8>, HostProblem> {
     out.push(match effect.operation {
         CicsOperation::TransformDataToJson => 1,
         CicsOperation::TransformDataToXml => 2,
+        CicsOperation::TransformJsonToData => 3,
         _ => return Err(HostProblem::InfrastructureFailure),
     });
     out.extend_from_slice(&effect.request_digest);
@@ -1115,6 +1122,7 @@ fn decode_effect(bytes: &[u8], limits: CicsLimits) -> Result<TransformEffect, Ho
     let operation = match reader.byte()? {
         1 => CicsOperation::TransformDataToJson,
         2 => CicsOperation::TransformDataToXml,
+        3 => CicsOperation::TransformJsonToData,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let request_digest = reader

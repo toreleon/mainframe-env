@@ -17,7 +17,9 @@ pub(super) fn invalid_shape(
         return true;
     }
     match plan.operation {
-        CicsPlanOperation::TransformDataToJson => invalid_data_to_json(plan, inputs),
+        CicsPlanOperation::TransformDataToJson | CicsPlanOperation::TransformJsonToData => {
+            invalid_data_to_json(plan, inputs)
+        }
         CicsPlanOperation::TransformDataToXml => invalid_data_to_xml(plan, inputs, outputs),
         _ => true,
     }

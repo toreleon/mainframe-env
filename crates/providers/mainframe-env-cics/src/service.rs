@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 60);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 61);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4973,6 +4973,18 @@ mod tests {
         request(CicsOperation::TransformDataToJson, arguments, sequence)
     }
 
+    fn json_to_data_request(
+        sequence: u64,
+        channel: &[u8],
+        input: &[u8],
+        output: Option<&[u8]>,
+        transformer: &[u8],
+    ) -> CicsRequest {
+        let mut request = transform_request(sequence, channel, input, output, transformer);
+        request.operation = CicsOperation::TransformJsonToData;
+        request
+    }
+
     fn json_transform_definition(name: &str, enabled: bool) -> CicsTransformDefinition {
         CicsTransformDefinition {
             name: name.into(),
@@ -5155,6 +5167,7 @@ mod tests {
             ("SYNCPOINT", CicsOperation::Syncpoint),
             ("TRANSFORM DATATOJSON", CicsOperation::TransformDataToJson),
             ("TRANSFORM DATATOXML", CicsOperation::TransformDataToXml),
+            ("TRANSFORM JSONTODATA", CicsOperation::TransformJsonToData),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6386,7 +6399,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 60);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 61);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7666,6 +7679,302 @@ mod tests {
             ),
             Err(HostProblem::ResourceExhausted)
         );
+    }
+
+    #[test]
+    fn transform_jsontodata_is_durable_authorized_and_replay_safe() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-transform-json-reverse-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let (host, security) = transform_authorities(false);
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service =
+            CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, session) = registered(&service);
+        service
+            .register_transform_definition(json_transform_definition("CUSTOMER", true))
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "JSON",
+                CicsTransformContainerMode::Char,
+                br#"{"name":"ALICE","count":7}"#.to_vec(),
+            )
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "DFHJSON-DATA",
+                CicsTransformContainerMode::Char,
+                b"OLD".to_vec(),
+            )
+            .unwrap();
+        let request = json_to_data_request(450, b"WORK", b"JSON", None, b"CUSTOMER");
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 450),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(
+            service.transform_container("WORK", "DFHJSON-DATA").unwrap(),
+            (CicsTransformContainerMode::Bit, b"ALICE007".to_vec())
+        );
+        assert!(security.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "TRANSFORM".into(),
+                    "CICS.JSON.CUSTOMER".into(),
+                    AccessIntent::Update,
+                )
+        }));
+        assert_eq!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .len(),
+            2
+        );
+        let output_before = store
+            .get_provider_state("cics-transform-container-v1", "WORK/DFHJSON-DATA")
+            .unwrap()
+            .unwrap();
+        assert_eq!(output_before.version, 2);
+        let outer = store
+            .get_provider_state("cics-effect-replay-v1", "outer-450")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-450", outer.version)
+            .unwrap();
+        drop(service);
+        drop(store);
+
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let restarted = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        restarted
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let replayed = restarted
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 450),
+                request,
+            )
+            .unwrap();
+        assert_eq!(replayed, response);
+        assert_eq!(
+            store
+                .get_provider_state("cics-transform-container-v1", "WORK/DFHJSON-DATA")
+                .unwrap()
+                .unwrap(),
+            output_before
+        );
+        drop(restarted);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn transform_jsontodata_conditions_and_utf8_bit_input_are_bounded() {
+        let service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        for definition in [
+            json_transform_definition("CUSTOMER", true),
+            json_transform_definition("DISABLED", false),
+        ] {
+            service.register_transform_definition(definition).unwrap();
+        }
+        for (name, mode, bytes) in [
+            (
+                "JSON",
+                CicsTransformContainerMode::Char,
+                br#"{"count":7,"name":"ALICE"}"#.as_slice(),
+            ),
+            (
+                "BITJSON",
+                CicsTransformContainerMode::Bit,
+                br#"{"count":7,"name":"ALICE"}"#.as_slice(),
+            ),
+            ("BAD", CicsTransformContainerMode::Char, b"{".as_slice()),
+            (
+                "BINARY",
+                CicsTransformContainerMode::Bit,
+                b"\xff".as_slice(),
+            ),
+            (
+                "OVERFLOW",
+                CicsTransformContainerMode::Char,
+                br#"{"count":7,"name":"ALICE TOO LONG"}"#.as_slice(),
+            ),
+        ] {
+            service
+                .put_transform_container("WORK", name, mode, bytes.to_vec())
+                .unwrap();
+        }
+        let request = json_to_data_request(451, b"WORK", b"BITJSON", Some(b"DATA"), b"CUSTOMER");
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 451),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            service.transform_container("WORK", "DATA").unwrap(),
+            (CicsTransformContainerMode::Bit, b"ALICE007".to_vec())
+        );
+        for (sequence, channel, input, transformer, condition, response, response2) in [
+            (
+                452,
+                b"!".as_slice(),
+                b"JSON".as_slice(),
+                b"CUSTOMER".as_slice(),
+                "CHANNELERR",
+                122,
+                1,
+            ),
+            (
+                453,
+                b"NONE".as_slice(),
+                b"JSON".as_slice(),
+                b"CUSTOMER".as_slice(),
+                "CHANNELERR",
+                122,
+                2,
+            ),
+            (
+                454,
+                b"WORK".as_slice(),
+                b"MISSING".as_slice(),
+                b"CUSTOMER".as_slice(),
+                "CONTAINERERR",
+                110,
+                1,
+            ),
+            (
+                455,
+                b"WORK".as_slice(),
+                b"JSON".as_slice(),
+                b"DISABLED".as_slice(),
+                "INVREQ",
+                16,
+                1,
+            ),
+            (
+                456,
+                b"WORK".as_slice(),
+                b"BAD".as_slice(),
+                b"CUSTOMER".as_slice(),
+                "INVREQ",
+                16,
+                4,
+            ),
+            (
+                457,
+                b"WORK".as_slice(),
+                b"BINARY".as_slice(),
+                b"CUSTOMER".as_slice(),
+                "INVREQ",
+                16,
+                7,
+            ),
+            (
+                458,
+                b"WORK".as_slice(),
+                b"JSON".as_slice(),
+                b"MISSING".as_slice(),
+                "NOTFND",
+                13,
+                1,
+            ),
+            (
+                459,
+                b"WORK".as_slice(),
+                b"OVERFLOW".as_slice(),
+                b"CUSTOMER".as_slice(),
+                "INVREQ",
+                16,
+                4,
+            ),
+        ] {
+            let mut request = json_to_data_request(sequence, channel, input, None, transformer);
+            request.condition_policy = CicsConditionPolicy::NoHandle;
+            let actual = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (actual.condition.as_str(), actual.response, actual.response2),
+                (condition, response, response2)
+            );
+        }
+        assert_eq!(
+            service.transform_container("WORK", "DATA").unwrap(),
+            (CicsTransformContainerMode::Bit, b"ALICE007".to_vec())
+        );
+        assert_eq!(
+            service.transform_container("WORK", "DFHJSON-DATA"),
+            Err(HostProblem::NotFound)
+        );
+
+        let (denied_host, denied_trace) = transform_authorities(true);
+        let denied = CicsService::open(
+            denied_host,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (denied_invocation, _) = registered(&denied);
+        denied
+            .register_transform_definition(json_transform_definition("CUSTOMER", true))
+            .unwrap();
+        denied
+            .put_transform_container(
+                "WORK",
+                "JSON",
+                CicsTransformContainerMode::Char,
+                br#"{"count":7,"name":"ALICE"}"#.to_vec(),
+            )
+            .unwrap();
+        let mut request = json_to_data_request(460, b"WORK", b"JSON", None, b"CUSTOMER");
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        let unauthorized = denied
+            .invoke(
+                &effect(&denied_invocation.run_unit_id, request.clone(), 460),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                unauthorized.condition.as_str(),
+                unauthorized.response,
+                unauthorized.response2
+            ),
+            ("INVREQ", 16, 101)
+        );
+        assert!(denied_trace.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "TRANSFORM".into(),
+                    "CICS.JSON.CUSTOMER".into(),
+                    AccessIntent::Update,
+                )
+        }));
     }
 
     #[test]

@@ -581,7 +581,9 @@ fn validate_operation_shape(
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
-        CicsPlanOperation::TransformDataToJson | CicsPlanOperation::TransformDataToXml => {
+        CicsPlanOperation::TransformDataToJson
+        | CicsPlanOperation::TransformDataToXml
+        | CicsPlanOperation::TransformJsonToData => {
             transform_control::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Syncpoint => {
@@ -3395,6 +3397,7 @@ mod tests {
         for operation in [
             CicsPlanOperation::TransformDataToJson,
             CicsPlanOperation::TransformDataToXml,
+            CicsPlanOperation::TransformJsonToData,
         ] {
             let tag = operation_tag(operation);
             assert!(codec_tags::TRANSFORM_OPERATION_TAGS.contains(&tag));
@@ -3466,6 +3469,14 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             plan
+        );
+
+        let mut reverse = plan.clone();
+        reverse.operation = CicsPlanOperation::TransformJsonToData;
+        let encoded = encode_cics_effect_plan(&reverse, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            reverse
         );
 
         let xml = CicsEffectPlan {

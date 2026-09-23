@@ -64,6 +64,11 @@ All notable changes to mainframe-env are documented here.
   template sources produce deterministic 16-byte tokens and optional DOCSIZE;
   symbol lists, host code pages, template READ authorization, atomic replay,
   task cleanup, capacity failure, and SQLite reopen are covered.
+- Added typed CICS `TRANSFORM JSONTODATA` over the shared durable transform
+  authority. Bounded JSON bindings reconstruct fixed BIT-mode application
+  records, accept CHAR or UTF-8-detectable BIT input, use `DFHJSON-DATA` by
+  default, enforce source conditions and SAF, and replay atomic replacements.
+
 - Added typed CICS `TRANSFORM DATATOXML` on the shared transform runtime.
   Bounded XML bindings emit deterministic namespace/type-qualified documents,
   return paired element/type metadata with exact fullword lengths, enforce the

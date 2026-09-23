@@ -161,6 +161,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DocumentSet => CicsOperation::DocumentSet,
         CicsPlanOperation::TransformDataToJson => CicsOperation::TransformDataToJson,
         CicsPlanOperation::TransformDataToXml => CicsOperation::TransformDataToXml,
+        CicsPlanOperation::TransformJsonToData => CicsOperation::TransformJsonToData,
     }
 }
 

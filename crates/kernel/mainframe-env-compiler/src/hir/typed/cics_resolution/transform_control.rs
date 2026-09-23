@@ -13,7 +13,7 @@ pub(super) struct TransformShape {
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<TransformShape> {
     let (clauses, required): (&'static [&'static str], &'static [&'static str]) = match operation {
-        HirCicsOperation::TransformDataToJson => (
+        HirCicsOperation::TransformDataToJson | HirCicsOperation::TransformJsonToData => (
             &[
                 "CHANNEL",
                 "INCONTAINER",
@@ -61,6 +61,7 @@ pub(super) fn validate_constraints(
     };
     let label = match operation {
         HirCicsOperation::TransformDataToJson => "DATATOJSON",
+        HirCicsOperation::TransformJsonToData => "JSONTODATA",
         HirCicsOperation::TransformDataToXml => "DATATOXML",
         _ => unreachable!("transform operation was checked above"),
     };
@@ -89,7 +90,7 @@ pub(super) fn operands(
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let text_operands = match operation {
-        HirCicsOperation::TransformDataToJson => &[
+        HirCicsOperation::TransformDataToJson | HirCicsOperation::TransformJsonToData => &[
             ("CHANNEL", HirCicsOperandName::Channel),
             ("INCONTAINER", HirCicsOperandName::InContainer),
             ("OUTCONTAINER", HirCicsOperandName::OutContainer),

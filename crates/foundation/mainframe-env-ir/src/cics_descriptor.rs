@@ -583,7 +583,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 58] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 59] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1048,6 +1048,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 58] = [
         effects: TRANSFORM_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::TransformJsonToData,
+        namespace: "cics.transform",
+        name: "json-to-data",
+        major: 1,
+        effects: TRANSFORM_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -1114,6 +1122,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::DocumentSet => &CICS_EXECUTABLE_DESCRIPTORS[55],
         CicsPlanOperation::TransformDataToJson => &CICS_EXECUTABLE_DESCRIPTORS[44],
         CicsPlanOperation::TransformDataToXml => &CICS_EXECUTABLE_DESCRIPTORS[45],
+        CicsPlanOperation::TransformJsonToData => &CICS_EXECUTABLE_DESCRIPTORS[46],
     }
 }
 
@@ -1175,7 +1184,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 58);
+        assert_eq!(typed.len(), 59);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1193,7 +1202,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 205);
+        assert_eq!(unready.len(), 204);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1444,6 +1453,7 @@ mod tests {
                 CicsPlanOperation::Delay,
                 CicsPlanOperation::TransformDataToJson,
                 CicsPlanOperation::TransformDataToXml,
+                CicsPlanOperation::TransformJsonToData,
             ])
         );
         assert_eq!(

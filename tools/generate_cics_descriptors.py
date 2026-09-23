@@ -243,6 +243,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0222",
     ),
+    (
+        "TransformJsonToData",
+        "api",
+        "transform-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0223",
+    ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
         "WriteTransientData",
@@ -521,6 +528,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Retrieve",
         "TransformDataToJson",
         "TransformDataToXml",
+        "TransformJsonToData",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -753,6 +761,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "TransformDataToXml": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "TransformJsonToData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
 }
 
 
@@ -973,6 +984,7 @@ def _load_typed_execution_registrations(
         "Suspend",
         "TransformDataToJson",
         "TransformDataToXml",
+        "TransformJsonToData",
         "WaitEvent",
         "WaitExternal",
         "WriteTemporaryStorage",

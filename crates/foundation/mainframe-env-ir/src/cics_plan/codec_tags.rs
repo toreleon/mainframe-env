@@ -76,6 +76,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DocumentSet => 67,
         CicsPlanOperation::TransformDataToJson => 68,
         CicsPlanOperation::TransformDataToXml => 69,
+        CicsPlanOperation::TransformJsonToData => 70,
     }
 }
 
@@ -139,6 +140,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         67 => Ok(CicsPlanOperation::DocumentSet),
         68 => Ok(CicsPlanOperation::TransformDataToJson),
         69 => Ok(CicsPlanOperation::TransformDataToXml),
+        70 => Ok(CicsPlanOperation::TransformJsonToData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
