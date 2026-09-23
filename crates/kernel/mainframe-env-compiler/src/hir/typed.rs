@@ -209,6 +209,7 @@ pub enum HirCicsOperation {
     TransformJsonToData,
     TransformXmlToData,
     WaitJournalName,
+    WaitJournalNum,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -309,6 +310,7 @@ pub enum HirCicsOperandName {
     TypeNamespace,
     TypeNamespaceLength,
     JournalName,
+    JournalNum,
     JournalReqId,
 }
 
@@ -6749,6 +6751,40 @@ mod tests {
                 "{command}: {:?}",
                 analysis.diagnostics
             );
+        }
+    }
+
+    #[test]
+    fn cics_wait_journalnum_accepts_numeric_identity_and_rejects_out_of_range() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQUEST-X PIC S9(9) COMP VALUE 7. 01 JOURNAL-X PIC 99 VALUE 7. PROCEDURE DIVISION. EXEC CICS WAIT JOURNALNUM(JOURNAL-X) REQID(REQUEST-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WAIT JOURNALNUM: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WAIT JOURNALNUM");
+        assert_eq!(command.operation, HirCicsOperation::WaitJournalNum);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::JournalNum
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        for number in [0, 100] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADNUM. PROCEDURE DIVISION. EXEC CICS WAIT JOURNALNUM({number}) END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{number}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("requires a journal number from 1 to 99")
+            }));
         }
     }
 }

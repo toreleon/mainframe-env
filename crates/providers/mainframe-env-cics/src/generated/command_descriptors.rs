@@ -450,6 +450,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::WaitJournalNum,
+        syntax: "WAIT JOURNALNUM",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0236",
+        family: CicsCommandFamily::JournalControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Write,
         syntax: "WRITE FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
@@ -540,9 +547,10 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::TransformJsonToData => &CICS_COMMAND_DESCRIPTORS[56],
         CicsOperation::TransformXmlToData => &CICS_COMMAND_DESCRIPTORS[57],
         CicsOperation::WaitJournalName => &CICS_COMMAND_DESCRIPTORS[58],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[59],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[60],
-        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[61],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[62],
+        CicsOperation::WaitJournalNum => &CICS_COMMAND_DESCRIPTORS[59],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[60],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[61],
+        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[62],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[63],
     }
 }

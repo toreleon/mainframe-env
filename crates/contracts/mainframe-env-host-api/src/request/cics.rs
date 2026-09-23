@@ -107,6 +107,8 @@ pub enum CicsOperation {
     TransformXmlToData,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
+    /// Synchronize this task with output for one numbered journal.
+    WaitJournalNum,
     Write,
     WriteTransientData,
     Xctl,
@@ -177,6 +179,7 @@ impl CicsOperation {
             Self::TransformJsonToData => "TransformJsonToData",
             Self::TransformXmlToData => "TransformXmlToData",
             Self::WaitJournalName => "WaitJournalName",
+            Self::WaitJournalNum => "WaitJournalNum",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -306,6 +309,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
             ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
+            ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

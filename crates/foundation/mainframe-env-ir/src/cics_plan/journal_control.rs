@@ -35,3 +35,31 @@ pub(super) fn invalid_wait_journal_name_shape(
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
 }
+
+pub(super) fn invalid_wait_journal_num_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed_inputs =
+        BTreeSet::from([CicsOperandName::JournalNum, CicsOperandName::JournalReqId]);
+    !inputs.contains(&CicsOperandName::JournalNum)
+        || !inputs.is_subset(&allowed_inputs)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::JournalNum => match &operand.value {
+                CicsOperandValue::Integer(value) => !(1..=99).contains(value),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::JournalReqId => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            _ => true,
+        })
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}

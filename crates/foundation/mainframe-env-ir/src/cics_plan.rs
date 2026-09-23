@@ -610,6 +610,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WaitJournalName => {
             journal_control::invalid_wait_journal_name_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::WaitJournalNum => {
+            journal_control::invalid_wait_journal_num_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Assign => {
             !inputs.is_empty()
                 || scheduling_options
@@ -1798,7 +1801,8 @@ mod tests {
             .collect::<BTreeSet<_>>();
         assert_eq!(tags.len(), operations.len());
         assert_eq!(operation_tag(CicsPlanOperation::WaitJournalName), 54);
-        for tag in 55..=57 {
+        assert_eq!(operation_tag(CicsPlanOperation::WaitJournalNum), 55);
+        for tag in 56..=57 {
             assert_eq!(
                 operation_from_tag(tag),
                 Err(CicsPlanCodecProblem::Malformed)
@@ -1806,7 +1810,8 @@ mod tests {
         }
         assert_eq!(operand_tag(CicsOperandName::JournalName), 96);
         assert_eq!(operand_tag(CicsOperandName::JournalReqId), 97);
-        for tag in 98..=111 {
+        assert_eq!(operand_tag(CicsOperandName::JournalNum), 98);
+        for tag in 99..=111 {
             assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }
         for tag in 60..=71 {
@@ -1864,6 +1869,46 @@ mod tests {
                 Err(CicsPlanCodecProblem::Malformed)
             );
         }
+    }
+
+    #[test]
+    fn wait_journal_num_plan_keeps_numeric_identity_distinct() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WaitJournalNum,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::JournalNum,
+                    value: CicsOperandValue::Integer(7),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::JournalReqId,
+                    value: CicsOperandValue::Storage(slot(55, "WAIT.NUM.REQID")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        for invalid_number in [0, 100] {
+            let mut invalid = plan.clone();
+            invalid.operands[0].value = CicsOperandValue::Integer(invalid_number);
+            assert_eq!(
+                encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+        let mut name_form = plan;
+        name_form.operands[0].name = CicsOperandName::JournalName;
+        name_form.operands[0].value = CicsOperandValue::Literal(b"DFHJ07".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&name_form, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]

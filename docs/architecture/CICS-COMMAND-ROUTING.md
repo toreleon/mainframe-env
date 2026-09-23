@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 45 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 46 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 218 `unready` rows that are recognized but fail explicitly as unsupported.
+- 217 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 45 API routes are the only advertised application commands.
+The current 46 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -295,6 +295,11 @@ deadline fence), and durable I/O, unknown-journal, and unavailable states map
 to IOERR 17, JIDERR 43, and NOTOPEN 19. Denial maps to NOTAUTH 70. The bounded
 authority and completion state survive SQLite reopen; WAIT itself is
 non-mutating and therefore creates no independent mutation replay ledger.
+Typed `WAIT JOURNALNUM` keeps the compatibility operation separate while mapping
+numeric values 1–99 to `DFHJ01`–`DFHJ99` before the same SAF check and durable
+wait. The explicit REQID remains task-owned; an omitted REQID uses the selected
+journal's current buffer. Other numeric values and mixed name/number operand
+shapes are rejected before the wait.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
@@ -444,7 +449,7 @@ differentials, or make 0.9.0 release-ready.
 | `storage-control` | bounded task-local virtual storage allocation and release |
 | `journal-control` | durable named-journal output state and task synchronization |
 
-This table describes the ten families present in the 47-operation runtime
+This table describes the ten families present in the 48-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

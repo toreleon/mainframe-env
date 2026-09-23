@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 63);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 64);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5234,6 +5234,7 @@ mod tests {
             ("TRANSFORM JSONTODATA", CicsOperation::TransformJsonToData),
             ("TRANSFORM XMLTODATA", CicsOperation::TransformXmlToData),
             ("WAIT JOURNALNAME('ACCTS')", CicsOperation::WaitJournalName),
+            ("WAIT JOURNALNUM(7)", CicsOperation::WaitJournalNum),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6465,7 +6466,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 63);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 64);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9138,6 +9139,95 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn wait_journalnum_maps_number_to_dfhj_and_preserves_token_scope() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = journal_authorities(false);
+        let service = CicsService::open(host, store, CicsLimits::default()).unwrap();
+        let (issuer, _) = registered(&service);
+        service
+            .register_journals(&BTreeSet::from(["DFHJ01".into(), "DFHJ07".into()]))
+            .unwrap();
+        service
+            .seed_journal_output("DFHJ07", &issuer.run_unit_id, 71, "hardened")
+            .unwrap();
+        let wait = |number: i64, request_id: Option<i64>| {
+            let mut arguments = BTreeMap::from([
+                ("JOURNALNUM".into(), cics_decimal(number)),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]);
+            if let Some(request_id) = request_id {
+                arguments.insert("REQID".into(), cics_decimal(request_id));
+            }
+            let mut request = request(CicsOperation::WaitJournalNum, arguments, 1);
+            request.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            request
+        };
+        let completed = wait(7, Some(71));
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&issuer.run_unit_id, completed.clone(), 1),
+                    completed
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        let empty = wait(1, None);
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, empty.clone(), 2), empty)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NOTOPEN", 19)
+        );
+        let unknown = wait(8, None);
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, unknown.clone(), 3), unknown)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("JIDERR", 43)
+        );
+
+        let other = RunUnitId::new("journalnum-other", InvocationLimits::default()).unwrap();
+        service
+            .seed_journal_output("DFHJ07", &other, 72, "pending")
+            .unwrap();
+        let current = wait(7, None);
+        assert_eq!(
+            service
+                .invoke(&effect(&issuer.run_unit_id, current.clone(), 4), current)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let wrong_owner = wait(7, Some(72));
+        let response = service
+            .invoke(
+                &effect(&issuer.run_unit_id, wrong_owner.clone(), 5),
+                wrong_owner,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("JIDERR", 43)
+        );
+        assert!(seen.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "JOURNAL".into(),
+                    "CICS.JOURNAL.DFHJ07".into(),
+                    AccessIntent::Read,
+                )
+        }));
     }
 
     #[test]

@@ -345,6 +345,7 @@ fn validate_candidate(
     if descriptor.runtime_operation == Some("Assign") {
         assign_validation::validate(clauses, present, semantic)?;
     }
+    journal_control::validate_candidate(descriptor, clauses)?;
 
     if let Some(name) = descriptor
         .required_options
@@ -450,20 +451,22 @@ fn option_value_shape(
     descriptor: &CicsApplicationRegistryDescriptor,
     name: &str,
 ) -> Option<CicsApplicationOptionValueShape> {
-    descriptor
-        .options
-        .iter()
-        .find(|option| option.name == name)
-        .map(|option| option.value_shape)
-        .or_else(|| {
-            compatibility_alias_target(descriptor, name).and_then(|canonical| {
-                descriptor
-                    .options
-                    .iter()
-                    .find(|option| option.name == canonical)
-                    .map(|option| option.value_shape)
+    journal_control::option_value_shape(descriptor, name).or_else(|| {
+        descriptor
+            .options
+            .iter()
+            .find(|option| option.name == name)
+            .map(|option| option.value_shape)
+            .or_else(|| {
+                compatibility_alias_target(descriptor, name).and_then(|canonical| {
+                    descriptor
+                        .options
+                        .iter()
+                        .find(|option| option.name == canonical)
+                        .map(|option| option.value_shape)
+                })
             })
-        })
+    })
 }
 
 fn compatibility_alias_target(
@@ -711,7 +714,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Retrieve => &[
             "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
         ],
-        HirCicsOperation::WaitJournalName => journal_control::allowed_clauses(operation),
+        HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum => {
+            journal_control::allowed_clauses(operation)
+        }
         _ => {
             transform_shape
                 .as_ref()
@@ -780,7 +785,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Read => &["EQUAL", "GENERIC", "GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
-        HirCicsOperation::WaitJournalName => journal_control::allowed_options(operation),
+        HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum => {
+            journal_control::allowed_options(operation)
+        }
         _ => {
             transform_shape
                 .as_ref()
@@ -885,7 +892,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
         HirCicsOperation::Syncpoint => &[][..],
-        HirCicsOperation::WaitJournalName => journal_control::required_clauses(operation),
+        HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum => {
+            journal_control::required_clauses(operation)
+        }
         _ => {
             transform_shape
                 .as_ref()

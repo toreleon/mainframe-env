@@ -267,6 +267,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         False,
         f"{OFFICIAL_BASELINE}:api-commands:0235",
     ),
+    (
+        "WaitJournalNum",
+        "api",
+        "journal-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0236",
+    ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
         "WriteTransientData",
@@ -548,6 +555,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "TransformJsonToData",
         "TransformXmlToData",
         "WaitJournalName",
+        "WaitJournalNum",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -687,6 +695,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "WaitJournalName": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WaitJournalNum": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "EndBrowse": frozenset(
@@ -1014,6 +1025,7 @@ def _load_typed_execution_registrations(
         "WaitEvent",
         "WaitExternal",
         "WaitJournalName",
+        "WaitJournalNum",
         "WriteTemporaryStorage",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -1339,6 +1351,7 @@ def load_catalog(
                 "WaitEvent",
                 "WaitExternal",
                 "WaitJournalName",
+                "WaitJournalNum",
             }
         ]
     )

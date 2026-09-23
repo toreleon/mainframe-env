@@ -79,6 +79,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::TransformJsonToData => 70,
         CicsPlanOperation::TransformXmlToData => 71,
         CicsPlanOperation::WaitJournalName => 54,
+        CicsPlanOperation::WaitJournalNum => 55,
     }
 }
 
@@ -145,6 +146,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         70 => Ok(CicsPlanOperation::TransformJsonToData),
         71 => Ok(CicsPlanOperation::TransformXmlToData),
         54 => Ok(CicsPlanOperation::WaitJournalName),
+        55 => Ok(CicsPlanOperation::WaitJournalNum),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -246,6 +248,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::TypeNamespaceLength => 167,
         CicsOperandName::JournalName => 96,
         CicsOperandName::JournalReqId => 97,
+        CicsOperandName::JournalNum => 98,
     }
 }
 
@@ -346,6 +349,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         167 => Ok(CicsOperandName::TypeNamespaceLength),
         96 => Ok(CicsOperandName::JournalName),
         97 => Ok(CicsOperandName::JournalReqId),
+        98 => Ok(CicsOperandName::JournalNum),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -87,6 +87,12 @@ All notable changes to mainframe-env are documented here.
   canonical JSON, named channel containers persist in BIT/CHAR modes, SAF
   protects the transformer, exact source conditions are retained, and an
   atomic transform ledger makes output replacement replay-safe across reopen.
+- Added typed CICS `WAIT JOURNALNUM` for compatibility with numbered journals.
+  Numeric values 1–99 select `DFHJnn` in the same durable authority as named
+  waits, while retaining a distinct source row, operation tag 55, and operand
+  tag 98. Explicit REQID and current-buffer waits share the existing task and
+  completion rules; invalid numbers are rejected before the provider route.
+
 - Added typed CICS `WAIT JOURNALNAME` through the new generated
   `journal-control` family and one durable authority shared with the remaining
   journal commands. Explicit fullword REQID tokens are task-owned; omission

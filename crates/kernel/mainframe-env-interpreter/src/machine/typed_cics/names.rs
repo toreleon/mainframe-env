@@ -165,6 +165,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::TransformJsonToData => CicsOperation::TransformJsonToData,
         CicsPlanOperation::TransformXmlToData => CicsOperation::TransformXmlToData,
         CicsPlanOperation::WaitJournalName => CicsOperation::WaitJournalName,
+        CicsPlanOperation::WaitJournalNum => CicsOperation::WaitJournalNum,
     }
 }
 
@@ -264,6 +265,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::TypeNamespace => "TYPENS",
         CicsOperandName::TypeNamespaceLength => "TYPENSLEN",
         CicsOperandName::JournalName => "JOURNALNAME",
+        CicsOperandName::JournalNum => "JOURNALNUM",
         CicsOperandName::JournalReqId => "REQID",
     }
 }

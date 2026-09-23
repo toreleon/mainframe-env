@@ -125,6 +125,8 @@ pub enum CicsPlanOperation {
     TransformXmlToData,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
+    /// Synchronize the issuing task with output for one numbered journal.
+    WaitJournalNum,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -313,6 +315,8 @@ pub enum CicsOperandName {
     TypeNamespaceLength,
     /// `JOURNALNAME(...)` named journal identity.
     JournalName,
+    /// `JOURNALNUM(...)` numeric journal identity from 1 to 99.
+    JournalNum,
     /// `REQID(...)` fullword token in the journal-control identity domain.
     JournalReqId,
 }

@@ -1652,6 +1652,7 @@ mod tests {
                     crate::HirCicsOperation::TransformXmlToData
                 }
                 CicsPlanOperation::WaitJournalName => crate::HirCicsOperation::WaitJournalName,
+                CicsPlanOperation::WaitJournalNum => crate::HirCicsOperation::WaitJournalNum,
             };
             assert_eq!(
                 operation.effects,
@@ -1727,6 +1728,7 @@ mod tests {
                 CicsPlanOperation::TransformJsonToData,
                 CicsPlanOperation::TransformXmlToData,
                 CicsPlanOperation::WaitJournalName,
+                CicsPlanOperation::WaitJournalNum,
             ])
         );
         let read = hir_plans

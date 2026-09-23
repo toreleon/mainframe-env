@@ -263,6 +263,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0235"
     },
     {
+      "operation": "WaitJournalNum",
+      "interface": "api",
+      "family": "journal-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0236"
+    },
+    {
       "operation": "WriteTemporaryStorage",
       "interface": "api",
       "family": "queue-control",

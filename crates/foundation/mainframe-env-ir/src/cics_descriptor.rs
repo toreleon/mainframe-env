@@ -592,7 +592,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 61] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 62] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1081,6 +1081,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 61] = [
         effects: JOURNAL_WAIT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitJournalNum,
+        namespace: "cics.journal",
+        name: "wait-journal-num",
+        major: 1,
+        effects: JOURNAL_WAIT_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -1150,6 +1158,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::TransformJsonToData => &CICS_EXECUTABLE_DESCRIPTORS[58],
         CicsPlanOperation::TransformXmlToData => &CICS_EXECUTABLE_DESCRIPTORS[59],
         CicsPlanOperation::WaitJournalName => &CICS_EXECUTABLE_DESCRIPTORS[60],
+        CicsPlanOperation::WaitJournalNum => &CICS_EXECUTABLE_DESCRIPTORS[61],
     }
 }
 
@@ -1211,7 +1220,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 61);
+        assert_eq!(typed.len(), 62);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1229,7 +1238,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 202);
+        assert_eq!(unready.len(), 201);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1478,6 +1487,7 @@ mod tests {
                 CicsPlanOperation::WaitEvent,
                 CicsPlanOperation::WaitExternal,
                 CicsPlanOperation::WaitJournalName,
+                CicsPlanOperation::WaitJournalNum,
                 CicsPlanOperation::DocumentCreate,
                 CicsPlanOperation::DocumentDelete,
                 CicsPlanOperation::DocumentInsert,

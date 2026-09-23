@@ -234,11 +234,18 @@ pub(in crate::service) fn invoke(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    if request.operation != CicsOperation::WaitJournalName {
+    if !matches!(
+        request.operation,
+        CicsOperation::WaitJournalName | CicsOperation::WaitJournalNum
+    ) {
         return Err(HostProblem::InfrastructureFailure);
     }
     validate_request(request)?;
-    let name = journal_name(request)?;
+    let name = match request.operation {
+        CicsOperation::WaitJournalName => journal_name(request)?,
+        CicsOperation::WaitJournalNum => journal_num_name(request)?,
+        _ => unreachable!(),
+    };
     service.authorize(
         run,
         "JOURNAL",
@@ -301,10 +308,16 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
-                "JOURNALNAME" => !matches!(
-                    value.schema(),
-                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
-                ),
+                "JOURNALNAME" => {
+                    !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                    ) || request.operation != CicsOperation::WaitJournalName
+                }
+                "JOURNALNUM" => {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                        || request.operation != CicsOperation::WaitJournalNum
+                }
                 "REQID" => value.schema() != "mainframe-env.cics.decimal@1",
                 "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
                 "OPTION.NOHANDLE" => {
@@ -329,6 +342,21 @@ fn journal_name(request: &CicsRequest) -> Result<String, HostProblem> {
         .trim()
         .to_ascii_uppercase();
     normalize_name(&name)
+}
+
+fn journal_num_name(request: &CicsRequest) -> Result<String, HostProblem> {
+    let value = request
+        .arguments
+        .get("JOURNALNUM")
+        .ok_or(HostProblem::Malformed)?;
+    let number = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .parse::<u8>()
+        .map_err(|_| HostProblem::Malformed)?;
+    if !(1..=99).contains(&number) {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(format!("DFHJ{number:02}"))
 }
 
 fn normalize_name(name: &str) -> Result<String, HostProblem> {

@@ -330,6 +330,9 @@ and reissues the same typed statement under the execution deadline and
 cancellation fence, and the durable provider authority maps IOERR, JIDERR,
 NOTOPEN, and SAF denial to exact EIB response codes. The authority survives a
 SQLite reopen without turning this non-mutating wait into a replayed mutation.
+Typed WAIT JOURNALNUM uses a distinct numeric 1–99 operand and resolves it to
+the corresponding `DFHJnn` journal before applying the same token ownership,
+current-buffer, authorization, and completion rules.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

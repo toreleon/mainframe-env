@@ -161,6 +161,7 @@ pub(super) fn suspension(
         CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
         CicsOperation::WaitJournalName => ("cics-journal", true),
+        CicsOperation::WaitJournalNum => ("cics-journal", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -371,6 +372,7 @@ pub(super) fn execute(
                         | CicsOperandName::TypeNameLength
                         | CicsOperandName::TypeNamespaceLength
                         | CicsOperandName::JournalReqId
+                        | CicsOperandName::JournalNum
                 ) =>
             {
                 (
