@@ -301,6 +301,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DumpTransaction => CicsOperation::DumpTransaction,
         CicsPlanOperation::Dump => CicsOperation::Dump,
         CicsPlanOperation::Trace => CicsOperation::Trace,
+        CicsPlanOperation::EnterTraceId => CicsOperation::EnterTraceId,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -556,6 +557,10 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::DumpSegmentList => "SEGMENTLIST",
         CicsOperandName::DumpLengthList => "LENGTHLIST",
         CicsOperandName::DumpNumSegments => "NUMSEGMENTS",
+        CicsOperandName::TraceId => "TRACEID",
+        CicsOperandName::TraceIdFrom => "FROM",
+        CicsOperandName::TraceIdResource => "RESOURCE",
+        CicsOperandName::TraceEntryName => "ENTRYNAME",
     }
 }
 
@@ -753,5 +758,8 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::TraceUser => "USER",
         CicsPlanOption::TraceEi => "EI",
         CicsPlanOption::TraceSingle => "SINGLE",
+        CicsPlanOption::TraceAccount => "ACCOUNT",
+        CicsPlanOption::TraceMonitor => "MONITOR",
+        CicsPlanOption::TracePerform => "PERFORM",
     }
 }

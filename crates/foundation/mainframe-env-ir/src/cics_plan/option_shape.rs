@@ -118,6 +118,13 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
                 | CicsPlanOption::TraceEi
                 | CicsPlanOption::TraceSingle
         ),
+        CicsPlanOperation::EnterTraceId => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::TraceAccount
+                | CicsPlanOption::TraceMonitor
+                | CicsPlanOption::TracePerform
+        ),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

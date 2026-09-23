@@ -56,6 +56,7 @@ pub enum HirCicsOperation {
     DumpTransaction,
     Dump,
     Trace,
+    EnterTraceId,
     Syncpoint,
     Unlock,
     Suspend,
@@ -344,6 +345,10 @@ pub enum HirCicsOperandName {
     DumpSegmentList,
     DumpLengthList,
     DumpNumSegments,
+    TraceId,
+    TraceIdFrom,
+    TraceIdResource,
+    TraceEntryName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -458,4 +463,7 @@ pub enum HirCicsOption {
     TraceUser,
     TraceEi,
     TraceSingle,
+    TraceAccount,
+    TraceMonitor,
+    TracePerform,
 }

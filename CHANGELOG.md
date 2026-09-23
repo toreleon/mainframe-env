@@ -140,6 +140,12 @@ All notable changes to mainframe-env are documented here.
   catalog identity is row 0220. Its CICS TX cross-product topic is unavailable
   locally, so this route is documented as local behavior.
 
+- Added a bounded local ENTER TRACEID route that retains named trace bytes and
+  records ACCOUNT, MONITOR, and PERFORM event data durably with SAF and replay.
+  Its CICS TS catalog identity is row 0065. The committed cross-product and
+  older-version compatibility topics are absent locally, so full IBM
+  monitoring equivalence is not claimed.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

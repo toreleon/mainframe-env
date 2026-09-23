@@ -228,6 +228,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
     },
     {
+      "operation": "EnterTraceId",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+    },
+    {
       "operation": "EnterTraceNum",
       "interface": "api",
       "family": "diagnostics",

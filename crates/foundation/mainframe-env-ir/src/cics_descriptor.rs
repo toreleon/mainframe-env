@@ -606,6 +606,7 @@ mod tests {
                 CicsPlanOperation::DumpTransaction,
                 CicsPlanOperation::Dump,
                 CicsPlanOperation::Trace,
+                CicsPlanOperation::EnterTraceId,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
                 CicsPlanOperation::StartBrowse,

@@ -30,6 +30,9 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         ],
         HirCicsOperation::Dump => &["DUMPCODE", "FROM", "LENGTH", "FLENGTH", "RESP", "RESP2"],
         HirCicsOperation::Trace => &["RESP", "RESP2"],
+        HirCicsOperation::EnterTraceId => {
+            &["TRACEID", "FROM", "RESOURCE", "ENTRYNAME", "RESP", "RESP2"]
+        }
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -47,6 +50,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
             "PPT", "SIT", "TCT", "NOHANDLE",
         ],
         HirCicsOperation::Trace => &["ON", "OFF", "SYSTEM", "USER", "EI", "SINGLE", "NOHANDLE"],
+        HirCicsOperation::EnterTraceId => &["ACCOUNT", "MONITOR", "PERFORM", "NOHANDLE"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -58,6 +62,7 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::DumpTransaction => &["DUMPCODE"],
         HirCicsOperation::Dump => &[],
         HirCicsOperation::Trace => &[],
+        HirCicsOperation::EnterTraceId => &["TRACEID"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -71,6 +76,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::Trace {
         validate_trace_options(options)?;
         return Ok(Vec::new());
+    }
+    if operation == HirCicsOperation::EnterTraceId {
+        return trace_id_operands(clauses, semantic);
     }
     if operation == HirCicsOperation::Monitor {
         return monitor_operands(clauses, semantic);
@@ -187,7 +195,72 @@ fn monitor_operands(
     Ok(result)
 }
 
+fn trace_id_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let identifier = cics_value(&clauses["TRACEID"], semantic)?;
+    let valid = match &identifier {
+        HirCicsValue::Literal(bytes) => (1..=8).contains(&bytes.len()),
+        HirCicsValue::Data(reference) => (1..=8).contains(&reference.length),
+        HirCicsValue::Integer(value) => value.to_string().len() <= 8,
+        HirCicsValue::LengthOf(_) => false,
+    };
+    if !valid {
+        return Err(ResolutionFailure::Invalid(
+            "CICS ENTER TRACEID requires a bounded one-to-eight-byte identifier".into(),
+        ));
+    }
+    let mut result = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::TraceId,
+        value: identifier,
+    }];
+    if let Some(tokens) = clauses.get("FROM") {
+        result.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::TraceIdFrom,
+            value: HirCicsValue::Data(complete_data_reference(tokens, semantic)?),
+        });
+    }
+    for (name, identity) in [
+        ("RESOURCE", HirCicsOperandName::TraceIdResource),
+        ("ENTRYNAME", HirCicsOperandName::TraceEntryName),
+    ] {
+        if let Some(tokens) = clauses.get(name) {
+            let value = cics_value(tokens, semantic)?;
+            let valid = match &value {
+                HirCicsValue::Literal(bytes) => bytes.len() == 8,
+                HirCicsValue::Data(reference) => {
+                    reference.length == 8
+                        && matches!(
+                            reference.category,
+                            DataCategory::Alphabetic | DataCategory::Alphanumeric
+                        )
+                }
+                _ => false,
+            };
+            if !valid {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS ENTER TRACEID {name} requires eight characters"
+                )));
+            }
+            result.push(HirCicsNamedOperand {
+                name: identity,
+                value,
+            });
+        }
+    }
+    Ok(result)
+}
+
 pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsOption> {
+    if operation == HirCicsOperation::EnterTraceId {
+        return Some(match name {
+            "ACCOUNT" => HirCicsOption::TraceAccount,
+            "MONITOR" => HirCicsOption::TraceMonitor,
+            "PERFORM" => HirCicsOption::TracePerform,
+            _ => return None,
+        });
+    }
     if operation == HirCicsOperation::Trace {
         return Some(match name {
             "ON" => HirCicsOption::TraceOn,

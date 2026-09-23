@@ -396,6 +396,10 @@ impl PlanContext<'_> {
                 HirCicsOperandName::DumpSegmentList => CicsOperandName::DumpSegmentList,
                 HirCicsOperandName::DumpLengthList => CicsOperandName::DumpLengthList,
                 HirCicsOperandName::DumpNumSegments => CicsOperandName::DumpNumSegments,
+                HirCicsOperandName::TraceId => CicsOperandName::TraceId,
+                HirCicsOperandName::TraceIdFrom => CicsOperandName::TraceIdFrom,
+                HirCicsOperandName::TraceIdResource => CicsOperandName::TraceIdResource,
+                HirCicsOperandName::TraceEntryName => CicsOperandName::TraceEntryName,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -546,6 +550,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DumpTransaction => CicsPlanOperation::DumpTransaction,
         HirCicsOperation::Dump => CicsPlanOperation::Dump,
         HirCicsOperation::Trace => CicsPlanOperation::Trace,
+        HirCicsOperation::EnterTraceId => CicsPlanOperation::EnterTraceId,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -751,5 +756,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::TraceUser => CicsPlanOption::TraceUser,
         HirCicsOption::TraceEi => CicsPlanOption::TraceEi,
         HirCicsOption::TraceSingle => CicsPlanOption::TraceSingle,
+        HirCicsOption::TraceAccount => CicsPlanOption::TraceAccount,
+        HirCicsOption::TraceMonitor => CicsPlanOption::TraceMonitor,
+        HirCicsOption::TracePerform => CicsPlanOption::TracePerform,
     }
 }

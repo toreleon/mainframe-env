@@ -4283,6 +4283,51 @@ mod tests {
     }
 
     #[test]
+    fn cics_enter_traceid_resolves_named_payload_and_local_flags() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TRACEID. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'ABCDEFGH'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ENTER TRACEID('EV01') FROM(DATA-X) RESOURCE('PROGRAM1') ENTRYNAME('ENTRY001') ACCOUNT MONITOR PERFORM RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("ENTER TRACEID: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed ENTER TRACEID");
+        assert_eq!(command.operation, HirCicsOperation::EnterTraceId);
+        assert!(command.options.contains(&HirCicsOption::TraceAccount));
+        assert!(command.options.contains(&HirCicsOption::TraceMonitor));
+        assert!(command.options.contains(&HirCicsOption::TracePerform));
+        for (command, expected) in [
+            (
+                "ENTER FROM(DATA-X) NOHANDLE",
+                "required command discriminator",
+            ),
+            ("ENTER TRACEID('ABCDEFGHI') NOHANDLE", "one-to-eight-byte"),
+            (
+                "ENTER TRACEID('EV01') RESOURCE('BAD') NOHANDLE",
+                "eight characters",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTID. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

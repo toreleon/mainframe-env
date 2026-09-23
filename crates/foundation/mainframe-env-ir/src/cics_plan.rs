@@ -684,6 +684,9 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::Dump => diagnostics::invalid_dump_shape(plan, inputs, outputs),
         CicsPlanOperation::Trace => diagnostics::invalid_trace_shape(plan, inputs, outputs),
+        CicsPlanOperation::EnterTraceId => {
+            diagnostics::invalid_trace_id_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2647,6 +2650,36 @@ mod tests {
         );
         let mut invalid = plan;
         invalid.options.insert(CicsPlanOption::TraceOff);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn enter_traceid_uses_reserved_v2_tags_and_requires_identifier() {
+        assert_eq!(operation_tag(CicsPlanOperation::EnterTraceId), 150);
+        assert_eq!(operand_tag(CicsOperandName::TraceId), 591);
+        assert_eq!(operand_tag(CicsOperandName::TraceEntryName), 594);
+        assert_eq!(option_tag(CicsPlanOption::TraceAccount), 528);
+        assert_eq!(option_tag(CicsPlanOption::TracePerform), 530);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::EnterTraceId,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::TraceId,
+                value: CicsOperandValue::Literal(b"EV01".to_vec()),
+            }],
+            options: BTreeSet::from([CicsPlanOption::TraceMonitor]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        let mut invalid = plan;
+        invalid.operands.clear();
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)

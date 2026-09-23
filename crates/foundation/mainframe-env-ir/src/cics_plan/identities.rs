@@ -198,6 +198,8 @@ pub enum CicsPlanOperation {
     Dump,
     /// Set bounded local trace-control switches.
     Trace,
+    /// Retain one named local diagnostic trace event.
+    EnterTraceId,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -659,6 +661,10 @@ pub enum CicsOperandName {
     DumpSegmentList,
     DumpLengthList,
     DumpNumSegments,
+    TraceId,
+    TraceIdFrom,
+    TraceIdResource,
+    TraceEntryName,
     /// Optional SPOOLWRITE transfer length.
     SpoolFlength,
 }
@@ -835,6 +841,9 @@ pub enum CicsPlanOption {
     TraceUser,
     TraceEi,
     TraceSingle,
+    TraceAccount,
+    TraceMonitor,
+    TracePerform,
 }
 
 /// Named result binding written after the host result arrives.

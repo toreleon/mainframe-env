@@ -1199,6 +1199,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "DUMP",
                 "DUMP TRANSACTION",
                 "ENQ",
+                "ENTER TRACEID",
                 "ENTER TRACENUM",
                 "FORMATTIME",
                 "HANDLE ABEND",

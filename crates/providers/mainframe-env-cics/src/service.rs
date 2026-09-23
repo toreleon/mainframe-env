@@ -15989,6 +15989,287 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    #[test]
+    fn enter_traceid_retains_named_payload_flags_and_replays_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        service
+            .configure_diagnostic_trace(CicsTraceConfiguration {
+                user_trace: true,
+                internal: true,
+                auxiliary: false,
+                system: false,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let trace = request(
+            CicsOperation::EnterTraceId,
+            BTreeMap::from([
+                ("TRACEID".into(), cics_literal(b"EV01")),
+                ("FROM".into(), enqueue_value(b"ABCDEFGH")),
+                ("RESOURCE".into(), cics_literal(b"PROGRAM1")),
+                ("ENTRYNAME".into(), cics_literal(b"ENTRY001")),
+                ("OPTION.ACCOUNT".into(), cics_option()),
+                ("OPTION.MONITOR".into(), cics_option()),
+                ("OPTION.PERFORM".into(), cics_option()),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, trace.clone(), 1),
+                trace.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.traces.len(), 1);
+        assert_eq!(snapshot.traces[0].identifier, "EV01");
+        assert_eq!(snapshot.traces[0].resource, "PROGRAM1");
+        assert_eq!(snapshot.traces[0].data, b"ABCDEFGH");
+        assert!(snapshot.traces[0].kind.contains("ACCOUNT+MONITOR+PERFORM"));
+        assert_eq!(snapshot.monitor_text["TRACEID:ENTRY001:EV01"], b"ABCDEFGH");
+        assert_eq!(snapshot.monitor_counters["TRACEID:ACCOUNT:ENTRY001"], 1);
+        assert_eq!(snapshot.monitor_counters["TRACEID:PERFORM:ENTRY001"], 1);
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+            .unwrap();
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, trace.clone(), 1), trace)
+                .unwrap(),
+            first
+        );
+        assert_eq!(service.diagnostic_snapshot().unwrap().traces.len(), 1);
+        assert_eq!(
+            service.diagnostic_snapshot().unwrap().monitor_counters["TRACEID:ACCOUNT:ENTRY001"],
+            1
+        );
+    }
+
+    #[test]
+    fn enter_traceid_denial_precedes_record_and_monitor_updates() {
+        let (authorities, seen) = diagnostic_authorities(true);
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(authorities, store.clone(), CicsLimits::default()).unwrap();
+        service
+            .configure_diagnostic_trace(CicsTraceConfiguration {
+                user_trace: true,
+                internal: true,
+                auxiliary: false,
+                system: false,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut denied = request(
+            CicsOperation::EnterTraceId,
+            BTreeMap::from([
+                ("TRACEID".into(), cics_literal(b"EV01")),
+                ("OPTION.MONITOR".into(), cics_option()),
+            ]),
+            1,
+        );
+        denied.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied)
+            .unwrap();
+        assert_eq!(result.condition, "NOTAUTH");
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert!(snapshot.traces.is_empty() && snapshot.monitor_text.is_empty());
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "CICSDIAG"
+                        && resource == "CICS.DIAG.TRACEID"
+                        && *intent == AccessIntent::Update
+                })
+        );
+    }
+
+    #[test]
+    fn enter_traceid_unknown_outcome_replays_without_duplicate_event() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        service
+            .configure_diagnostic_trace(CicsTraceConfiguration {
+                user_trace: true,
+                internal: true,
+                auxiliary: false,
+                system: false,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let trace = request(
+            CicsOperation::EnterTraceId,
+            BTreeMap::from([
+                ("TRACEID".into(), cics_literal(b"EV02")),
+                ("OPTION.ACCOUNT".into(), cics_option()),
+            ]),
+            1,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, trace.clone(), 1),
+                trace.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.traces.len(), 1);
+        assert_eq!(snapshot.monitor_counters["TRACEID:ACCOUNT:USER"], 1);
+        let replay = service
+            .invoke(&effect(&invocation.run_unit_id, trace.clone(), 1), trace)
+            .unwrap();
+        assert_eq!(replay.condition, "NORMAL");
+        assert_eq!(service.diagnostic_snapshot().unwrap().traces.len(), 1);
+        assert_eq!(
+            service.diagnostic_snapshot().unwrap().monitor_counters["TRACEID:ACCOUNT:USER"],
+            1
+        );
+    }
+
+    #[test]
+    fn enter_traceid_event_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-traceid-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .configure_diagnostic_trace(CicsTraceConfiguration {
+                    user_trace: true,
+                    internal: true,
+                    auxiliary: false,
+                    system: false,
+                })
+                .unwrap();
+            let (invocation, _) = registered(&service);
+            let trace = request(
+                CicsOperation::EnterTraceId,
+                BTreeMap::from([
+                    ("TRACEID".into(), cics_literal(b"EV03")),
+                    ("FROM".into(), enqueue_value(b"PERSIST!")),
+                    ("OPTION.MONITOR".into(), cics_option()),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, trace.clone(), 1), trace)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let snapshot = service.diagnostic_snapshot().unwrap();
+            assert_eq!(snapshot.traces.len(), 1);
+            assert_eq!(snapshot.traces[0].identifier, "EV03");
+            assert_eq!(snapshot.traces[0].data, b"PERSIST!");
+            assert_eq!(snapshot.monitor_text["TRACEID:USER:EV03"], b"PERSIST!");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn diagnostic_commands_cancel_or_expire_before_dispatch_with_audit() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, _) = registered(&service);
+        let operations = [
+            CicsOperation::Dump,
+            CicsOperation::DumpTransaction,
+            CicsOperation::EnterTraceId,
+            CicsOperation::EnterTraceNum,
+            CicsOperation::Monitor,
+            CicsOperation::Trace,
+        ];
+        let mut expected = BTreeMap::new();
+        for (index, operation) in operations.into_iter().enumerate() {
+            for (cancelled, now_tick) in [(true, 1), (false, 100)] {
+                let sequence = 10 + index as u64 * 2 + u64::from(!cancelled);
+                let request = request(operation, BTreeMap::new(), sequence);
+                let result = service.invoke_host(
+                    &invocation,
+                    now_tick,
+                    cancelled,
+                    effect(&invocation.run_unit_id, request, sequence),
+                );
+                let (problem, decision) = if cancelled {
+                    (HostProblem::Cancelled, AuditDecision::Cancelled)
+                } else {
+                    (HostProblem::TimedOut, AuditDecision::TimedOut)
+                };
+                assert_eq!(result.outcome, Err(problem));
+                expected.insert(sequence, decision);
+                assert!(
+                    store
+                        .get_provider_state("cics-effect-replay-v1", &format!("outer-{sequence}"))
+                        .unwrap()
+                        .is_none()
+                );
+            }
+        }
+        let observed = store
+            .audit_records(&invocation.execution_id, 10, 16)
+            .unwrap()
+            .into_iter()
+            .filter_map(|record| {
+                expected
+                    .contains_key(&record.effect_sequence)
+                    .then_some((record.effect_sequence, record.decision))
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(observed, expected);
+        let invalid = request(
+            CicsOperation::EnterTraceId,
+            BTreeMap::from([("TRACEID".into(), cics_literal(b"TOO-LONG!"))]),
+            30,
+        );
+        let outer = ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(
+                    1,
+                    vec![cics_provider(service.clone(), InvocationLimits::default())],
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            HostLimits::default(),
+        );
+        let result = outer
+            .invoke(
+                &invocation,
+                1,
+                false,
+                effect(&invocation.run_unit_id, invalid, 30),
+            )
+            .persist_with(|audit| store.record_audit(audit).map_err(store_error));
+        assert_eq!(result.outcome, Err(HostProblem::Malformed));
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 30, 1)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == AuditDecision::Rejected)
+        );
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert!(snapshot.traces.is_empty() && snapshot.dumps.is_empty());
+    }
+
     fn open_staged_spool_report(
         service: &CicsService,
         invocation: &Invocation,

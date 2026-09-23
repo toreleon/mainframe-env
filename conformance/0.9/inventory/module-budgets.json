@@ -299,6 +299,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/diagnostics/dump_transaction.rs",
       "crates/providers/mainframe-env-cics/src/handlers/diagnostics/trace_number.rs",
       "crates/providers/mainframe-env-cics/src/handlers/diagnostics/trace_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/diagnostics/trace_id.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/insert.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/retrieve.rs",

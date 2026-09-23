@@ -196,3 +196,43 @@ pub(super) fn invalid_trace_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_trace_id_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::TraceId)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::TraceId,
+            CicsOperandName::TraceIdFrom,
+            CicsOperandName::TraceIdResource,
+            CicsOperandName::TraceEntryName,
+        ]))
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::TraceId => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::Integer(_)
+            ),
+            CicsOperandName::TraceIdFrom => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::TraceIdResource | CicsOperandName::TraceEntryName => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            _ => true,
+        })
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::TraceAccount
+                    | CicsPlanOption::TraceMonitor
+                    | CicsPlanOption::TracePerform
+            )
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

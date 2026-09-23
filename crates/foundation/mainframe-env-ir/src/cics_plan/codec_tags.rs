@@ -144,6 +144,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::DumpTransaction => 149,
         CicsPlanOperation::Dump => 148,
         CicsPlanOperation::Trace => 153,
+        CicsPlanOperation::EnterTraceId => 150,
     }
 }
 
@@ -275,6 +276,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         149 => Ok(CicsPlanOperation::DumpTransaction),
         148 => Ok(CicsPlanOperation::Dump),
         153 => Ok(CicsPlanOperation::Trace),
+        150 => Ok(CicsPlanOperation::EnterTraceId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -500,6 +502,10 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::DumpSegmentList => 588,
         CicsOperandName::DumpLengthList => 589,
         CicsOperandName::DumpNumSegments => 590,
+        CicsOperandName::TraceId => 591,
+        CicsOperandName::TraceIdFrom => 592,
+        CicsOperandName::TraceIdResource => 593,
+        CicsOperandName::TraceEntryName => 594,
     }
 }
 
@@ -724,6 +730,10 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         588 => Ok(CicsOperandName::DumpSegmentList),
         589 => Ok(CicsOperandName::DumpLengthList),
         590 => Ok(CicsOperandName::DumpNumSegments),
+        591 => Ok(CicsOperandName::TraceId),
+        592 => Ok(CicsOperandName::TraceIdFrom),
+        593 => Ok(CicsOperandName::TraceIdResource),
+        594 => Ok(CicsOperandName::TraceEntryName),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -845,6 +855,9 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::TraceUser => 525,
         CicsPlanOption::TraceEi => 526,
         CicsPlanOption::TraceSingle => 527,
+        CicsPlanOption::TraceAccount => 528,
+        CicsPlanOption::TraceMonitor => 529,
+        CicsPlanOption::TracePerform => 530,
     }
 }
 
@@ -965,6 +978,9 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         525 => Ok(CicsPlanOption::TraceUser),
         526 => Ok(CicsPlanOption::TraceEi),
         527 => Ok(CicsPlanOption::TraceSingle),
+        528 => Ok(CicsPlanOption::TraceAccount),
+        529 => Ok(CicsPlanOption::TraceMonitor),
+        530 => Ok(CicsPlanOption::TracePerform),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

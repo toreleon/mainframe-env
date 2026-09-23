@@ -193,6 +193,8 @@ pub enum CicsOperation {
     Dump,
     /// Change the bounded local diagnostic trace switches.
     Trace,
+    /// Retain a bounded named user trace and local monitoring event.
+    EnterTraceId,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -349,6 +351,7 @@ impl CicsOperation {
             Self::DumpTransaction => "DumpTransaction",
             Self::Dump => "Dump",
             Self::Trace => "Trace",
+            Self::EnterTraceId => "EnterTraceId",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -501,6 +504,7 @@ impl CicsOperation {
                 | Self::DumpTransaction
                 | Self::Dump
                 | Self::Trace
+                | Self::EnterTraceId
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -627,6 +631,7 @@ impl CicsOperation {
             ("DUMP", Some("TRANSACTION")) => Self::DumpTransaction,
             ("DUMP", _) => Self::Dump,
             ("TRACE", _) => Self::Trace,
+            ("ENTER", Some("TRACEID")) => Self::EnterTraceId,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

@@ -380,6 +380,14 @@ switches are durable and share the diagnostic replay row; the configured
 `CICSDIAG` resource is checked before mutation. The exact CICS TS 6.x TRACE
 command page is absent from the pinned local corpus, so these are explicit
 local controls rather than a claim about every IBM trace facility.
+The local `ENTER TRACEID` form stores an exact bounded payload with its
+identifier, resource, entry name, issuing identity, selected destination, and
+ACCOUNT/MONITOR/PERFORM flags. MONITOR retains the event bytes in the local
+monitor text map; ACCOUNT and PERFORM increment their own durable event counts.
+It consumes a TRACE SINGLE arm when present. The CICS TS 6.x target command
+page and both committed compatibility bodies are absent locally, so these
+event counts are expressly local diagnostic behavior, not a claim about IBM
+MCT accounting or performance record layout.
 
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or

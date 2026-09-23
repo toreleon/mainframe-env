@@ -99,6 +99,7 @@ pub(super) fn resolve(
         ["SPOOLREAD"] => HirCicsOperation::SpoolRead,
         ["SPOOLWRITE"] => HirCicsOperation::SpoolWrite,
         ["ENTER", "TRACENUM"] => HirCicsOperation::EnterTraceNum,
+        ["ENTER", "TRACEID"] => HirCicsOperation::EnterTraceId,
         ["MONITOR"] => HirCicsOperation::Monitor,
         ["DUMP", "TRANSACTION"] => HirCicsOperation::DumpTransaction,
         ["DUMP"] => HirCicsOperation::Dump,

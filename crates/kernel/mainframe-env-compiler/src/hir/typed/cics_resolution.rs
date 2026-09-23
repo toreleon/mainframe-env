@@ -721,6 +721,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DumpTransaction => diagnostics::allowed_clauses(operation),
         HirCicsOperation::Dump => diagnostics::allowed_clauses(operation),
         HirCicsOperation::Trace => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::EnterTraceId => diagnostics::allowed_clauses(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -822,6 +823,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DumpTransaction => diagnostics::allowed_options(operation),
         HirCicsOperation::Dump => diagnostics::allowed_options(operation),
         HirCicsOperation::Trace => diagnostics::allowed_options(operation),
+        HirCicsOperation::EnterTraceId => diagnostics::allowed_options(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -970,6 +972,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DumpTransaction => diagnostics::required(operation),
         HirCicsOperation::Dump => diagnostics::required(operation),
         HirCicsOperation::Trace => diagnostics::required(operation),
+        HirCicsOperation::EnterTraceId => diagnostics::required(operation),
         _ => {
             command_shape
                 .as_ref()

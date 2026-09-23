@@ -295,6 +295,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("DumpTransaction", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0057"),
     ("Dump", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0056"),
     ("Trace", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0220"),
+    ("EnterTraceId", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0065"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -693,6 +694,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SpoolRead",
         "SpoolWrite",
         "EnterTraceNum",
+        "EnterTraceId",
         "Monitor",
         "DumpTransaction",
         "Dump",
@@ -1090,6 +1092,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "Dump": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Trace": frozenset({"memory-write", "condition", "transaction"}),
+    "EnterTraceId": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1333,6 +1338,7 @@ def _load_typed_execution_registrations(
         "Dump",
         "DumpTransaction",
         "Enq",
+        "EnterTraceId",
         "EnterTraceNum",
         "Freemain",
         "Freemain64",
