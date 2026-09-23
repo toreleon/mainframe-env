@@ -39,6 +39,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::Getmain64 => matches!(
+            output,
+            CicsOutputName::SetPointer64 | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::FormatTime => matches!(
             output,
             CicsOutputName::Milliseconds

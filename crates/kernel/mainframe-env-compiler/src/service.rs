@@ -1617,6 +1617,9 @@ mod tests {
                     crate::HirCicsOperation::WriteTemporaryStorage
                 }
                 CicsPlanOperation::Getmain => crate::HirCicsOperation::Getmain,
+                CicsPlanOperation::Getmain64 => {
+                    panic!("GETMAIN64 must not originate from COBOL source")
+                }
                 CicsPlanOperation::Freemain => crate::HirCicsOperation::Freemain,
                 CicsPlanOperation::ReceiveMap => crate::HirCicsOperation::ReceiveMap,
                 CicsPlanOperation::SendMap => crate::HirCicsOperation::SendMap,

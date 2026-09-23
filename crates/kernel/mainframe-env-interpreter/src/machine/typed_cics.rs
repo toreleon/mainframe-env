@@ -15,11 +15,13 @@ mod legacy;
 mod names;
 mod response;
 mod retrieve;
+mod runtime_validation;
 mod task_wait;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 pub(super) use response::drive_response;
+use runtime_validation::validate_runtime_plan;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
@@ -362,6 +364,7 @@ pub(super) fn execute(
                         | CicsOperandName::Seconds
                         | CicsOperandName::Milliseconds
                         | CicsOperandName::Flength
+                        | CicsOperandName::Flength64
                         | CicsOperandName::NumEvents
                         | CicsOperandName::Purgeability
                         | CicsOperandName::Item
@@ -489,6 +492,14 @@ pub(super) fn execute(
                     machine,
                     &target,
                     plan.operation,
+                )?);
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::SetPointer64 => {
+                arguments.extend(retrieve::allocation64_arguments(
+                    machine,
+                    &target,
+                    arguments.get("LOCATION"),
                 )?);
                 outputs.insert(key.into(), target);
             }
@@ -641,6 +652,9 @@ pub(super) fn write_output(
     }
     if name == "SET" {
         return retrieve::write_set_output(machine, operation, target, value);
+    }
+    if name == "SET64" {
+        return retrieve::write_set64_output(machine, target, value);
     }
     if matches!(
         name,
@@ -832,46 +846,6 @@ fn validate_declared_slots(
     Ok(())
 }
 
-fn validate_runtime_plan(
-    machine: &ReferenceMachine,
-    operation: &Operation,
-    plan: &CicsEffectPlan,
-) -> Result<(), MachineProblem> {
-    for operand in &plan.operands {
-        if let CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) = &operand.value {
-            let slot_use = if matches!(operand.value, CicsOperandValue::Storage(_))
-                && matches!(
-                    operand.name,
-                    CicsOperandName::Length | CicsOperandName::KeyLength | CicsOperandName::Item
-                ) {
-                if matches!(
-                    plan.operation,
-                    CicsPlanOperation::DocumentCreate
-                        | CicsPlanOperation::DocumentInsert
-                        | CicsPlanOperation::DocumentSet
-                ) {
-                    SlotUse::FullwordInput
-                } else {
-                    SlotUse::HalfwordInput
-                }
-            } else {
-                names::input_slot_use(operand.name)
-            };
-            validate_machine_slot(machine, operation, slot, slot_use)?;
-        }
-    }
-    validate_address_set_slots(machine, operation, plan)?;
-    for output in &plan.outputs {
-        validate_machine_slot(
-            machine,
-            operation,
-            &output.target,
-            names::output_slot_use(output.name),
-        )?;
-    }
-    Ok(())
-}
-
 fn validate_address_set_slots(
     machine: &ReferenceMachine,
     operation: &Operation,
@@ -937,6 +911,7 @@ fn validate_machine_slot(
             | SlotUse::HalfwordOutput
             | SlotUse::FullwordOutput
             | SlotUse::PointerOutput
+            | SlotUse::Pointer64Output
             | SlotUse::AddressOutput
             | SlotUse::AssignOutput(_)
     ) && matches!(
@@ -1046,6 +1021,13 @@ fn validate_machine_slot(
     {
         return Err(invalid_plan(
             "ADDRESS SET pointer operands must use POINTER or POINTER-32",
+        ));
+    }
+    if matches!(slot_use, SlotUse::Pointer64Output)
+        && (layout.category != LayoutCategory::Pointer || layout.length != 8)
+    {
+        return Err(invalid_plan(
+            "AMODE(64) SET requires an eight-byte pointer slot",
         ));
     }
     if matches!(slot_use, SlotUse::AddressInput | SlotUse::AddressOutput)

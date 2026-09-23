@@ -1857,7 +1857,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@10"
+            "mainframe-env.reference-machine-checkpoint@11"
         );
         let mut restored = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -1956,7 +1956,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@10"
+            "mainframe-env.reference-machine-checkpoint@11"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())

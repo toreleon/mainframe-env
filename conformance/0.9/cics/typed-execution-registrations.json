@@ -123,6 +123,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0094"
     },
     {
+      "operation": "Getmain64",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0095"
+    },
+    {
       "operation": "HandleAid",
       "interface": "api",
       "family": "task-control",

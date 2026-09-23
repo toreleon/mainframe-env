@@ -42,7 +42,9 @@ pub(super) fn allocation_capacity(
     let allocated = (machine.static_base_count..machine.bases.len())
         .filter(|base| !machine.freed_allocations.contains(base))
         .count();
-    if allocated >= machine.invocation.limits.max_frames as usize {
+    if allocated + machine.storage64.live_allocations()
+        >= machine.invocation.limits.max_frames as usize
+    {
         return Ok(0);
     }
     machine.address_bytes_for(machine.bases.len(), 0, pointer.length)?;
@@ -55,10 +57,194 @@ pub(super) fn allocation_capacity(
             total.checked_add(storage.len())
         })
         .ok_or(MachineProblem::ResourceExhausted)?;
+    let used = used
+        .checked_add(
+            usize::try_from(
+                machine
+                    .storage64
+                    .charged_bytes()
+                    .ok_or(MachineProblem::ResourceExhausted)?,
+            )
+            .map_err(|_| MachineProblem::ResourceExhausted)?,
+        )
+        .ok_or(MachineProblem::ResourceExhausted)?;
     usize::try_from(machine.invocation.limits.max_storage_bytes)
         .map_err(|_| MachineProblem::ResourceExhausted)?
         .checked_sub(used)
         .ok_or(MachineProblem::ResourceExhausted)
+}
+
+pub(super) fn allocation64_arguments(
+    machine: &ReferenceMachine,
+    target: &CicsTarget,
+    location: Option<&BoundedPayload>,
+) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
+    let CicsTarget::Resolved(slot) = target else {
+        return Err(MachineProblem::UnexpectedHostResult);
+    };
+    let pointer = resolved_slot(machine, slot)?;
+    if pointer.length != 8 {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let used_base = machine
+        .bases
+        .iter()
+        .enumerate()
+        .filter(|(base, _)| !machine.freed_allocations.contains(base))
+        .try_fold(0u64, |total, (_, storage)| {
+            total.checked_add(storage.len() as u64)
+        })
+        .ok_or(MachineProblem::ResourceExhausted)?;
+    let available = machine
+        .invocation
+        .limits
+        .max_storage_bytes
+        .saturating_sub(used_base)
+        .saturating_sub(
+            machine
+                .storage64
+                .charged_bytes()
+                .ok_or(MachineProblem::ResourceExhausted)?,
+        );
+    let live_bases = (machine.static_base_count..machine.bases.len())
+        .filter(|base| !machine.freed_allocations.contains(base))
+        .count();
+    let available = if live_bases + machine.storage64.live_allocations()
+        >= machine.invocation.limits.max_frames as usize
+    {
+        0
+    } else {
+        available
+    };
+    let mut arguments = BTreeMap::from([
+        (
+            "SET64.MAXLENGTH".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                available.to_string().into_bytes(),
+            )?,
+        ),
+        (
+            "SET64.LIMIT".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                machine
+                    .invocation
+                    .limits
+                    .max_storage_bytes
+                    .to_string()
+                    .into_bytes(),
+            )?,
+        ),
+    ]);
+    let location = match location.map(BoundedPayload::bytes) {
+        None => crate::storage64::Storage64Location::AboveBar,
+        Some(b"LOC24") => crate::storage64::Storage64Location::Loc24,
+        Some(b"LOC31") => crate::storage64::Storage64Location::Loc31,
+        Some(_) => return Err(MachineProblem::UnexpectedHostResult),
+    };
+    if let Some((limit, available)) = machine.storage64.location_capacity(location) {
+        arguments.insert(
+            "SET64.DSALIMIT".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                limit.to_string().into_bytes(),
+            )?,
+        );
+        arguments.insert(
+            "SET64.DSAAVAILABLE".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                available.to_string().into_bytes(),
+            )?,
+        );
+    }
+    Ok(arguments)
+}
+
+pub(super) fn write_set64_output(
+    machine: &mut ReferenceMachine,
+    target: &CicsTarget,
+    value: &BoundedPayload,
+) -> Result<(), MachineProblem> {
+    let CicsTarget::Resolved(slot) = target else {
+        return Err(MachineProblem::UnexpectedHostResult);
+    };
+    let pointer = resolved_slot(machine, slot)?;
+    if pointer.length != 8 {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    if value.schema() == "mainframe-env.cics.pointer64-null@1" && value.bytes().is_empty() {
+        return machine.write_reference(&pointer, &[0; 8]);
+    }
+    if value.schema() != "mainframe-env.cics.storage64-allocation@1" || value.bytes().len() != 8 {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let bytes = value.bytes();
+    let attributes = crate::storage64::Storage64Attributes {
+        location: match bytes[0] {
+            0 => crate::storage64::Storage64Location::AboveBar,
+            1 => crate::storage64::Storage64Location::Loc24,
+            2 => crate::storage64::Storage64Location::Loc31,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        },
+        key: match bytes[1] {
+            0 => crate::storage64::Storage64Key::User,
+            1 => crate::storage64::Storage64Key::Cics,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        },
+        shared: match bytes[2] {
+            0 => false,
+            1 => true,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        },
+        executable: match bytes[3] {
+            0 => false,
+            1 => true,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        },
+    };
+    let length = u32::from_be_bytes(
+        bytes[4..8]
+            .try_into()
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?,
+    );
+    let charged = ((u64::from(length) + 15) & !15) + 16;
+    let base_used = machine
+        .bases
+        .iter()
+        .enumerate()
+        .filter(|(base, _)| !machine.freed_allocations.contains(base))
+        .try_fold(0u64, |total, (_, storage)| {
+            total.checked_add(storage.len() as u64)
+        })
+        .ok_or(MachineProblem::UnexpectedHostResult)?;
+    if base_used
+        .checked_add(
+            machine
+                .storage64
+                .charged_bytes()
+                .ok_or(MachineProblem::UnexpectedHostResult)?,
+        )
+        .and_then(|used| used.checked_add(charged))
+        .is_none_or(|used| used > machine.invocation.limits.max_storage_bytes)
+        || (machine.static_base_count..machine.bases.len())
+            .filter(|base| !machine.freed_allocations.contains(base))
+            .count()
+            + machine.storage64.live_allocations()
+            >= machine.invocation.limits.max_frames as usize
+    {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let address = machine
+        .storage64
+        .allocate(
+            machine.invocation.run_unit_id.as_str(),
+            i64::from(length),
+            attributes,
+        )
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    machine.write_reference(&pointer, &address.to_be_bytes())
 }
 
 pub(super) fn freemain_argument(

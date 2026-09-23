@@ -576,11 +576,13 @@ pub fn cics_application_registry_for_tokens(
     best.and_then(|(descriptor, _)| (!ambiguous).then_some(descriptor))
 }
 
+mod executable_lookup;
+pub use executable_lookup::cics_executable_descriptor;
 mod registry_lookup;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 66] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 67] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1109,82 +1111,15 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 66] = [
         effects: READ_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Getmain64,
+        namespace: "cics.storage",
+        name: "getmain64",
+        major: 1,
+        effects: STORAGE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
-
-/// Resolves the executable descriptor for a decoded CICS plan operation.
-#[must_use]
-pub const fn cics_executable_descriptor(
-    operation: CicsPlanOperation,
-) -> &'static CicsExecutableDescriptor {
-    match operation {
-        CicsPlanOperation::Deq => &CICS_EXECUTABLE_DESCRIPTORS[0],
-        CicsPlanOperation::Enq => &CICS_EXECUTABLE_DESCRIPTORS[1],
-        CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[2],
-        CicsPlanOperation::Rewrite => &CICS_EXECUTABLE_DESCRIPTORS[3],
-        CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[4],
-        CicsPlanOperation::ChangeTask => &CICS_EXECUTABLE_DESCRIPTORS[5],
-        CicsPlanOperation::Suspend => &CICS_EXECUTABLE_DESCRIPTORS[6],
-        CicsPlanOperation::SetAssociationUserCorrData => &CICS_EXECUTABLE_DESCRIPTORS[7],
-        CicsPlanOperation::AddressSet => &CICS_EXECUTABLE_DESCRIPTORS[8],
-        CicsPlanOperation::PopHandle => &CICS_EXECUTABLE_DESCRIPTORS[9],
-        CicsPlanOperation::PushHandle => &CICS_EXECUTABLE_DESCRIPTORS[10],
-        CicsPlanOperation::IgnoreCondition => &CICS_EXECUTABLE_DESCRIPTORS[11],
-        CicsPlanOperation::HandleCondition => &CICS_EXECUTABLE_DESCRIPTORS[12],
-        CicsPlanOperation::HandleAid => &CICS_EXECUTABLE_DESCRIPTORS[13],
-        CicsPlanOperation::AsktimeEib => &CICS_EXECUTABLE_DESCRIPTORS[14],
-        CicsPlanOperation::Asktime => &CICS_EXECUTABLE_DESCRIPTORS[15],
-        CicsPlanOperation::FormatTime => &CICS_EXECUTABLE_DESCRIPTORS[16],
-        CicsPlanOperation::Abend => &CICS_EXECUTABLE_DESCRIPTORS[17],
-        CicsPlanOperation::HandleAbend => &CICS_EXECUTABLE_DESCRIPTORS[18],
-        CicsPlanOperation::Link => &CICS_EXECUTABLE_DESCRIPTORS[19],
-        CicsPlanOperation::Xctl => &CICS_EXECUTABLE_DESCRIPTORS[20],
-        CicsPlanOperation::Return => &CICS_EXECUTABLE_DESCRIPTORS[21],
-        CicsPlanOperation::StartBrowse => &CICS_EXECUTABLE_DESCRIPTORS[22],
-        CicsPlanOperation::ResetBrowse => &CICS_EXECUTABLE_DESCRIPTORS[64],
-        CicsPlanOperation::Unlock => &CICS_EXECUTABLE_DESCRIPTORS[65],
-        CicsPlanOperation::ReadNext => &CICS_EXECUTABLE_DESCRIPTORS[23],
-        CicsPlanOperation::ReadPrev => &CICS_EXECUTABLE_DESCRIPTORS[24],
-        CicsPlanOperation::EndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[25],
-        CicsPlanOperation::Delete => &CICS_EXECUTABLE_DESCRIPTORS[26],
-        CicsPlanOperation::Write => &CICS_EXECUTABLE_DESCRIPTORS[27],
-        CicsPlanOperation::WriteTransientData => &CICS_EXECUTABLE_DESCRIPTORS[28],
-        CicsPlanOperation::ReceiveMap => &CICS_EXECUTABLE_DESCRIPTORS[29],
-        CicsPlanOperation::SendMap => &CICS_EXECUTABLE_DESCRIPTORS[30],
-        CicsPlanOperation::SendText => &CICS_EXECUTABLE_DESCRIPTORS[31],
-        CicsPlanOperation::Assign => &CICS_EXECUTABLE_DESCRIPTORS[32],
-        CicsPlanOperation::PurgeMessage => &CICS_EXECUTABLE_DESCRIPTORS[33],
-        CicsPlanOperation::Start => &CICS_EXECUTABLE_DESCRIPTORS[34],
-        CicsPlanOperation::Retrieve => &CICS_EXECUTABLE_DESCRIPTORS[35],
-        CicsPlanOperation::Cancel => &CICS_EXECUTABLE_DESCRIPTORS[36],
-        CicsPlanOperation::Delay => &CICS_EXECUTABLE_DESCRIPTORS[37],
-        CicsPlanOperation::DeleteTransientData => &CICS_EXECUTABLE_DESCRIPTORS[38],
-        CicsPlanOperation::Getmain => &CICS_EXECUTABLE_DESCRIPTORS[39],
-        CicsPlanOperation::Freemain => &CICS_EXECUTABLE_DESCRIPTORS[40],
-        CicsPlanOperation::DeleteTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[41],
-        CicsPlanOperation::Address => &CICS_EXECUTABLE_DESCRIPTORS[42],
-        CicsPlanOperation::ReadTransientData => &CICS_EXECUTABLE_DESCRIPTORS[43],
-        CicsPlanOperation::ReadTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[44],
-        CicsPlanOperation::WaitEvent => &CICS_EXECUTABLE_DESCRIPTORS[45],
-        CicsPlanOperation::WaitExternal => &CICS_EXECUTABLE_DESCRIPTORS[46],
-        CicsPlanOperation::WriteTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[47],
-        CicsPlanOperation::InvokeApplication => &CICS_EXECUTABLE_DESCRIPTORS[48],
-        CicsPlanOperation::Load => &CICS_EXECUTABLE_DESCRIPTORS[49],
-        CicsPlanOperation::Release => &CICS_EXECUTABLE_DESCRIPTORS[50],
-        CicsPlanOperation::DocumentCreate => &CICS_EXECUTABLE_DESCRIPTORS[51],
-        CicsPlanOperation::DocumentDelete => &CICS_EXECUTABLE_DESCRIPTORS[52],
-        CicsPlanOperation::DocumentInsert => &CICS_EXECUTABLE_DESCRIPTORS[53],
-        CicsPlanOperation::DocumentRetrieve => &CICS_EXECUTABLE_DESCRIPTORS[54],
-        CicsPlanOperation::DocumentSet => &CICS_EXECUTABLE_DESCRIPTORS[55],
-        CicsPlanOperation::TransformDataToJson => &CICS_EXECUTABLE_DESCRIPTORS[56],
-        CicsPlanOperation::TransformDataToXml => &CICS_EXECUTABLE_DESCRIPTORS[57],
-        CicsPlanOperation::TransformJsonToData => &CICS_EXECUTABLE_DESCRIPTORS[58],
-        CicsPlanOperation::TransformXmlToData => &CICS_EXECUTABLE_DESCRIPTORS[59],
-        CicsPlanOperation::WaitJournalName => &CICS_EXECUTABLE_DESCRIPTORS[60],
-        CicsPlanOperation::WaitJournalNum => &CICS_EXECUTABLE_DESCRIPTORS[61],
-        CicsPlanOperation::WriteJournalName => &CICS_EXECUTABLE_DESCRIPTORS[62],
-        CicsPlanOperation::WriteJournalNum => &CICS_EXECUTABLE_DESCRIPTORS[63],
-    }
-}
 
 /// Resolves an executable descriptor without accepting adjacent legacy CICS
 /// operation identities.
@@ -1244,7 +1179,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 64);
+        assert_eq!(typed.len(), 67);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1262,7 +1197,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 199);
+        assert_eq!(unready.len(), 196);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));

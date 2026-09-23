@@ -6,6 +6,7 @@ mod coordinator;
 mod machine;
 mod recovery;
 mod runtime;
+pub mod storage64;
 mod value;
 
 pub use coordinator::{

@@ -44,6 +44,9 @@ pub(in crate::machine) fn drive_response(
             None
         }
         CicsDisposition::Returned => Some(MachineDrive::Completed(machine.complete()?)),
-        CicsDisposition::Abended => Some(MachineDrive::Abend(abend_outcome(operation, &response)?)),
+        CicsDisposition::Abended => {
+            machine.release_storage64_task();
+            Some(MachineDrive::Abend(abend_outcome(operation, &response)?))
+        }
     })
 }

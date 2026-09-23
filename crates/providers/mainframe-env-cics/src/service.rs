@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 68);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 69);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -3679,6 +3679,7 @@ mod tests {
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
+    use mainframe_env_store_api::AuditSink;
     use mainframe_env_store_api::{
         ArtifactRecord, ArtifactStore, AuditSink, EffectDigestFormat, EffectIntentMetadata,
         EffectRecord, EffectState, ExecutableArtifactMetadata, WorkState,
@@ -4616,6 +4617,38 @@ mod tests {
         (invocation, session)
     }
 
+    fn registered_amode64(service: &CicsService) -> (Invocation, SessionId) {
+        let invocation = invocation_for(
+            "run64",
+            BTreeMap::from([
+                (
+                    "cics.amode64.caller".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.amode64-caller@1",
+                        b"non-le-amode64".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.amode64.taskdatakey".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.taskdatakey@1",
+                        b"USER".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        let session = SessionId::new("session64", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        (invocation, session)
+    }
+
     fn argument(value: &[u8]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.argument@1",
@@ -5244,6 +5277,7 @@ mod tests {
             ("FORMATTIME", CicsOperation::FormatTime),
             ("FREEMAIN", CicsOperation::Freemain),
             ("GETMAIN", CicsOperation::Getmain),
+            ("GETMAIN64", CicsOperation::Getmain64),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE AID", CicsOperation::HandleAid),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
@@ -6519,7 +6553,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 68);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 69);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -16159,6 +16193,246 @@ mod tests {
                 oversized_length.response2
             ),
             ("LENGERR", 22, 1)
+        );
+    }
+
+    #[test]
+    fn getmain64_has_distinct_checked_abi_conditions_and_replay() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered_amode64(&service);
+        let base = BTreeMap::from([
+            (
+                "ABI64".into(),
+                cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+            ),
+            ("FLENGTH".into(), cics_decimal(17)),
+            ("SET64".into(), argument(b"PTR64-X")),
+            ("SET64.LIMIT".into(), cics_decimal(128)),
+            ("SET64.MAXLENGTH".into(), cics_decimal(128)),
+        ]);
+        let get = request(CicsOperation::Getmain64, base.clone(), 1);
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, get.clone(), 1),
+                get.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(
+            first.outputs["SET64"].schema(),
+            "mainframe-env.cics.storage64-allocation@1"
+        );
+        assert_eq!(first.outputs["SET64"].bytes(), &[0, 0, 0, 0, 0, 0, 0, 17]);
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, get.clone(), 1), get)
+                .unwrap(),
+            first
+        );
+
+        let mut zero = base.clone();
+        zero.insert("FLENGTH".into(), cics_decimal(0));
+        let mut zero = request(CicsOperation::Getmain64, zero, 2);
+        zero.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let zero = service
+            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 2), zero)
+            .unwrap();
+        assert_eq!(
+            (zero.condition.as_str(), zero.response, zero.response2),
+            ("LENGERR", 22, 1)
+        );
+        assert_eq!(
+            zero.outputs["SET64"].schema(),
+            "mainframe-env.cics.pointer64-null@1"
+        );
+
+        let mut exhausted = base.clone();
+        exhausted.insert("SET64.MAXLENGTH".into(), cics_decimal(47));
+        let exhausted = request(CicsOperation::Getmain64, exhausted, 3);
+        let exhausted = service
+            .invoke(
+                &effect(&invocation.run_unit_id, exhausted.clone(), 3),
+                exhausted,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                exhausted.condition.as_str(),
+                exhausted.response,
+                exhausted.response2
+            ),
+            ("NOSTG", 42, 2)
+        );
+
+        let mut executable = base.clone();
+        executable.insert("OPTION.EXECUTABLE".into(), cics_option());
+        let mut executable = request(CicsOperation::Getmain64, executable, 4);
+        executable.condition_policy = CicsConditionPolicy::NoHandle;
+        let executable = service
+            .invoke(
+                &effect(&invocation.run_unit_id, executable.clone(), 4),
+                executable,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                executable.condition.as_str(),
+                executable.response,
+                executable.response2
+            ),
+            ("INVREQ", 16, 2)
+        );
+
+        let mut location = base;
+        location.insert("LOCATION".into(), cics_literal(b"LOC31"));
+        location.insert("SET64.DSALIMIT".into(), cics_decimal(2_130_706_432));
+        location.insert("SET64.DSAAVAILABLE".into(), cics_decimal(2_130_706_432));
+        location.insert("OPTION.EXECUTABLE".into(), cics_option());
+        location.insert("OPTION.CICSDATAKEY".into(), cics_option());
+        let location = request(CicsOperation::Getmain64, location, 5);
+        let location = service
+            .invoke(
+                &effect(&invocation.run_unit_id, location.clone(), 5),
+                location,
+            )
+            .unwrap();
+        assert_eq!(
+            location.outputs["SET64"].bytes(),
+            &[2, 1, 0, 1, 0, 0, 0, 17]
+        );
+
+        let mut invalid_location = BTreeMap::from([
+            (
+                "ABI64".into(),
+                cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+            ),
+            ("FLENGTH".into(), cics_decimal(1)),
+            ("LOCATION".into(), cics_literal(b"LOC64")),
+            ("SET64".into(), argument(b"PTR64-X")),
+            ("SET64.LIMIT".into(), cics_decimal(128)),
+            ("SET64.MAXLENGTH".into(), cics_decimal(128)),
+        ]);
+        let mut invalid = request(CicsOperation::Getmain64, invalid_location.clone(), 6);
+        invalid.condition_policy = CicsConditionPolicy::NoHandle;
+        let invalid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 6),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                invalid.condition.as_str(),
+                invalid.response,
+                invalid.response2
+            ),
+            ("INVREQ", 16, 3)
+        );
+
+        invalid_location.remove("LOCATION");
+        invalid_location.insert("FLENGTH".into(), cics_decimal(2_146_435_057));
+        invalid_location.insert("SET64.LIMIT".into(), cics_decimal(2_146_435_057));
+        let mut over_source_limit = request(CicsOperation::Getmain64, invalid_location, 7);
+        over_source_limit.condition_policy = CicsConditionPolicy::NoHandle;
+        let over_source_limit = service
+            .invoke(
+                &effect(&invocation.run_unit_id, over_source_limit.clone(), 7),
+                over_source_limit,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                over_source_limit.condition.as_str(),
+                over_source_limit.response,
+                over_source_limit.response2
+            ),
+            ("LENGERR", 22, 1)
+        );
+    }
+
+    #[test]
+    fn getmain64_replay_survives_sqlite_reopen_without_a_second_allocation_intent() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-getmain64-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let arguments = BTreeMap::from([
+            (
+                "ABI64".into(),
+                cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+            ),
+            ("FLENGTH".into(), cics_decimal(17)),
+            ("SET64".into(), argument(b"PTR64-X")),
+            ("SET64.LIMIT".into(), cics_decimal(128)),
+            ("SET64.MAXLENGTH".into(), cics_decimal(128)),
+        ]);
+        let request = request(CicsOperation::Getmain64, arguments, 1);
+        let (invocation, session, first) = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let (invocation, session) = registered_amode64(&service);
+            let first = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 1),
+                    request.clone(),
+                )
+                .unwrap();
+            (invocation, session, first)
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let replay = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 1),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(replay, first);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn getmain64_requires_caller_abi_after_audited_transaction_authorization() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, _) = registered(&service);
+        let request = request(
+            CicsOperation::Getmain64,
+            BTreeMap::from([
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("FLENGTH".into(), cics_decimal(1)),
+                ("SET64".into(), argument(b"PTR64-X")),
+                ("SET64.LIMIT".into(), cics_decimal(128)),
+                ("SET64.MAXLENGTH".into(), cics_decimal(128)),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 1),
+                request
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            !store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .is_empty()
         );
     }
 

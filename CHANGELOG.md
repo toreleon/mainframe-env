@@ -129,6 +129,15 @@ All notable changes to mainframe-env are documented here.
   NOTAUTH 70 are preserved with SAF/audit and SQLite reopen coverage. Operation
   tag 54 and operand tags 96–97 are append-only; the remaining journal tag
   envelopes stay reserved and collision-tested.
+- Added a checked non-LE AMODE(64) GETMAIN64 virtual-storage route. Eight-byte
+  addresses use a separate allocation authority from COBOL GETMAIN; LOC24,
+  LOC31, and above-bar requests occupy bounded virtual ranges. Checkpoint v11
+  preserves allocation bytes, cursor generations, key and location attributes,
+  and stale-address rejection. Fullword FLENGTH, NOSUSPEND, the common response
+  policy, exact LENGERR/NOSTG/INVREQ paths, replay, and Memory/SQLite provider
+  operation are covered. SHARED remains fail-closed pending durable cross-task
+  storage, and no assembler source frontend or native executable storage is
+  claimed.
 
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal

@@ -336,6 +336,17 @@ owned by the current task, applies the replay-bound release intent, checkpoints
 the freed identity, and excludes released bytes and frames from current
 capacity accounting. Invalid, static, unassigned, or repeated release returns
 INVREQ 16/1; key/shared/load ownership remains deferred.
+GETMAIN64 is a separate typed Core-MIR operation for a checked non-LE
+AMODE(64) caller, never an alias of GETMAIN or a COBOL source form. The
+invocation binds the caller ABI and TASKDATAKEY, FLENGTH is fullword, and SET64
+requires an eight-byte pointer slot. The interpreter owns a monotonic virtual
+arena with distinct above-bar, LOC24, and LOC31 address ranges; allocation
+bytes, guard-zone charges, attributes, and cursors survive checkpoint v11.
+The provider returns a replay-bound allocation specification and exact
+conditions, while the interpreter creates the address. SHARED remains
+fail-closed until cross-task storage can be durable. The selected-route test
+uses a compiled layout scaffold translated to the distinct typed IR identity;
+it does not claim an assembler source frontend or native executable memory.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so

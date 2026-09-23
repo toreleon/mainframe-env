@@ -61,6 +61,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DeleteTransientData => 38,
         CicsPlanOperation::Getmain => 39,
         CicsPlanOperation::Freemain => 40,
+        CicsPlanOperation::Getmain64 => 72,
         CicsPlanOperation::DeleteTemporaryStorage => 41,
         CicsPlanOperation::Address => 42,
         CicsPlanOperation::ReadTransientData => 51,
@@ -132,6 +133,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         38 => Ok(CicsPlanOperation::DeleteTransientData),
         39 => Ok(CicsPlanOperation::Getmain),
         40 => Ok(CicsPlanOperation::Freemain),
+        72 => Ok(CicsPlanOperation::Getmain64),
         41 => Ok(CicsPlanOperation::DeleteTemporaryStorage),
         42 => Ok(CicsPlanOperation::Address),
         51 => Ok(CicsPlanOperation::ReadTransientData),
@@ -263,6 +265,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::JournalPrefix => 102,
         CicsOperandName::JournalPfxLeng => 103,
         CicsOperandName::Token => 182,
+        CicsOperandName::Flength64 => 172,
+        CicsOperandName::Location64 => 173,
+        CicsOperandName::Abi64 => 174,
     }
 }
 
@@ -370,6 +375,9 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         102 => Ok(CicsOperandName::JournalPrefix),
         103 => Ok(CicsOperandName::JournalPfxLeng),
         182 => Ok(CicsOperandName::Token),
+        172 => Ok(CicsOperandName::Flength64),
+        173 => Ok(CicsOperandName::Location64),
+        174 => Ok(CicsOperandName::Abi64),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -415,6 +423,10 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Hold => 38,
         CicsPlanOption::Unescaped => 84,
         CicsPlanOption::DocumentDataOnly => 85,
+        CicsPlanOption::CicsDataKey64 => 108,
+        CicsPlanOption::UserDataKey64 => 109,
+        CicsPlanOption::Shared64 => 110,
+        CicsPlanOption::Executable64 => 111,
     }
 }
 
@@ -459,6 +471,10 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         38 => Ok(CicsPlanOption::Hold),
         84 => Ok(CicsPlanOption::Unescaped),
         85 => Ok(CicsPlanOption::DocumentDataOnly),
+        108 => Ok(CicsPlanOption::CicsDataKey64),
+        109 => Ok(CicsPlanOption::UserDataKey64),
+        110 => Ok(CicsPlanOption::Shared64),
+        111 => Ok(CicsPlanOption::Executable64),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -504,6 +520,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::TypeNamespace => 230,
         CicsOutputName::TypeNamespaceLength => 231,
         CicsOutputName::JournalReqId => 201,
+        CicsOutputName::SetPointer64 => 232,
     }
 }
 
@@ -540,6 +557,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         230 => Ok(CicsOutputName::TypeNamespace),
         231 => Ok(CicsOutputName::TypeNamespaceLength),
         201 => Ok(CicsOutputName::JournalReqId),
+        232 => Ok(CicsOutputName::SetPointer64),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

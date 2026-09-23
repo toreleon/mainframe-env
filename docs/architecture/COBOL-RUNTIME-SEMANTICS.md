@@ -358,6 +358,9 @@ unavailable capacity returns NOSTG 42/2, which is ignored by default. LENGTH
 selects the source-defined below-line compatibility policy, but the virtual
 allocator exposes no native 24-bit address. Native addresses, storage keys,
 SHARED/EXECUTABLE policy and GETMAIN64 remain outside this subset.
+The separate GETMAIN64 typed IR route requires a non-LE AMODE(64) invocation
+binding and an eight-byte pointer target. COBOL source continues to reject
+GETMAIN64; a 64-bit COBOL pointer alone does not grant that caller ABI.
 Typed local FREEMAIN accepts exactly one of DATAPOINTER or DATA. DATAPOINTER
 requires a POINTER or POINTER-32 value that the current machine can prove names
 a live, offset-zero GETMAIN allocation. DATA accepts a declared COBOL area only

@@ -52,6 +52,8 @@ pub enum CicsOperation {
     Freemain,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
+    /// Admit a checked non-LE AMODE(64) virtual allocation request.
+    Getmain64,
     HandleAbend,
     /// Install or deactivate one bounded set of terminal AID handlers.
     HandleAid,
@@ -152,6 +154,7 @@ impl CicsOperation {
             Self::FormatTime => "FormatTime",
             Self::Freemain => "Freemain",
             Self::Getmain => "Getmain",
+            Self::Getmain64 => "Getmain64",
             Self::HandleAbend => "HandleAbend",
             Self::HandleAid => "HandleAid",
             Self::HandleCondition => "HandleCondition",
@@ -219,6 +222,7 @@ impl CicsOperation {
                 | Self::Enq
                 | Self::Freemain
                 | Self::Getmain
+                | Self::Getmain64
                 | Self::Rewrite
                 | Self::Write
                 | Self::WriteJournalName
@@ -291,6 +295,7 @@ impl CicsOperation {
             ("FORMATTIME", _) => Self::FormatTime,
             ("FREEMAIN", _) => Self::Freemain,
             ("GETMAIN", _) => Self::Getmain,
+            ("GETMAIN64", _) => Self::Getmain64,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", Some("AID")) => Self::HandleAid,
             ("HANDLE", Some("CONDITION")) => Self::HandleCondition,

@@ -19,6 +19,8 @@ pub enum CicsPlanOperation {
     Freemain,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
+    /// Allocate a checked AMODE(64) virtual allocation.
+    Getmain64,
     /// Change the issuing task's dispatch priority and optionally yield.
     ChangeTask,
     /// Cancel one unhonored local interval-control START request.
@@ -225,6 +227,12 @@ pub enum CicsOperandName {
     Milliseconds,
     /// `FLENGTH(...)` fullword allocation length.
     Flength,
+    /// AMODE(64) fullword allocation length.
+    Flength64,
+    /// AMODE(64) DSA location CVDA.
+    Location64,
+    /// Checked non-LE AMODE(64) caller ABI marker.
+    Abi64,
     /// `INITIMG(...)` one-byte initialization image.
     InitImage,
     /// `DATAPOINTER(...)` virtual storage pointer returned by GETMAIN.
@@ -418,6 +426,14 @@ pub enum CicsPlanOption {
     Unescaped,
     /// Omit bookmark and conversion tags from a document retrieval.
     DocumentDataOnly,
+    /// Request CICS-key 64-bit storage.
+    CicsDataKey64,
+    /// Request user-key 64-bit storage.
+    UserDataKey64,
+    /// Retain 64-bit storage beyond task end.
+    Shared64,
+    /// Request an executable DSA for a below-bar location.
+    Executable64,
 }
 
 /// Named result binding written after the host result arrives.
@@ -427,6 +443,8 @@ pub enum CicsOutputName {
     Into,
     /// Pointer receiving interpreter-owned retrieved storage.
     SetPointer,
+    /// Eight-byte opaque AMODE(64) virtual-address result.
+    SetPointer64,
     /// Returned browse record identifier.
     Ridfld,
     /// `TOKEN(...)` fullword update identifier returned by READ UPDATE.

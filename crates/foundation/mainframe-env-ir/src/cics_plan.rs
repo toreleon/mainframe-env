@@ -578,6 +578,9 @@ fn validate_operation_shape(
             queue_control::invalid_write_temporary_storage_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Getmain => storage_control::invalid_getmain_shape(plan, inputs, outputs),
+        CicsPlanOperation::Getmain64 => {
+            storage_control::invalid_getmain64_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Freemain => {
             storage_control::invalid_freemain_shape(plan, inputs, outputs)
         }
@@ -3351,6 +3354,90 @@ mod tests {
         literal_image.operands[1].value = CicsOperandValue::Literal(vec![b'Z']);
         assert_eq!(
             encode_cics_effect_plan(&literal_image, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn getmain64_uses_disjoint_append_only_tags_and_checked_plan_shape() {
+        for tag in 0..=u8::MAX {
+            if let Ok(value) = operation_from_tag(tag) {
+                assert_eq!(operation_tag(value), tag, "operation tag {tag}");
+            }
+            if let Ok(value) = operand_from_tag(tag) {
+                assert_eq!(operand_tag(value), tag, "operand tag {tag}");
+            }
+            if let Ok(value) = option_from_tag(tag) {
+                assert_eq!(option_tag(value), tag, "option tag {tag}");
+            }
+            if let Ok(value) = output_from_tag(tag) {
+                assert_eq!(output_tag(value), tag, "output tag {tag}");
+            }
+        }
+        assert_eq!(operation_tag(CicsPlanOperation::Getmain64), 72);
+        assert_eq!(operation_from_tag(73), Err(CicsPlanCodecProblem::Malformed));
+        assert_eq!(operand_tag(CicsOperandName::Flength64), 172);
+        assert_eq!(operand_tag(CicsOperandName::Location64), 173);
+        assert_eq!(operand_tag(CicsOperandName::Abi64), 174);
+        assert_eq!(option_tag(CicsPlanOption::CicsDataKey64), 108);
+        assert_eq!(option_tag(CicsPlanOption::UserDataKey64), 109);
+        assert_eq!(option_tag(CicsPlanOption::Shared64), 110);
+        assert_eq!(option_tag(CicsPlanOption::Executable64), 111);
+        assert_eq!(output_tag(CicsOutputName::SetPointer64), 232);
+        for tag in 233..=239 {
+            assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Getmain64,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Flength64,
+                    value: CicsOperandValue::Integer(32),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Location64,
+                    value: CicsOperandValue::Literal(b"LOC31".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Abi64,
+                    value: CicsOperandValue::Literal(
+                        b"mainframe-env.cics-amode64-nonle@1".to_vec(),
+                    ),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::NoSuspend, CicsPlanOption::Executable64]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SetPointer64,
+                target: slot(2, "PTR-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&encoded, limits).unwrap(), plan);
+        let mut missing_abi = plan.clone();
+        missing_abi
+            .operands
+            .retain(|value| value.name != CicsOperandName::Abi64);
+        assert_eq!(
+            encode_cics_effect_plan(&missing_abi, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut conflicting_keys = plan.clone();
+        conflicting_keys
+            .options
+            .insert(CicsPlanOption::CicsDataKey64);
+        conflicting_keys
+            .options
+            .insert(CicsPlanOption::UserDataKey64);
+        assert_eq!(
+            encode_cics_effect_plan(&conflicting_keys, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut wrong_pointer = plan;
+        wrong_pointer.outputs[0].name = CicsOutputName::SetPointer;
+        assert_eq!(
+            encode_cics_effect_plan(&wrong_pointer, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }
