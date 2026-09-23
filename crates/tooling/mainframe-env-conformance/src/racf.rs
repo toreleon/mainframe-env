@@ -708,7 +708,6 @@ fn descriptor_acee(
         .find(|descriptor| descriptor.request_type() == request_type)?;
     (!matches!(mode, RacrouteCase::Denied) && descriptor.requires_acee()).then_some(admin_acee)
 }
-
 fn racroute_result_identity(result: Option<&RacrouteResult>) -> &'static str {
     match result {
         Some(RacrouteResult::Audit { .. }) => "audit",
@@ -725,6 +724,7 @@ fn racroute_result_identity(result: Option<&RacrouteResult>) -> &'static str {
         Some(RacrouteResult::TokenMapped { .. }) => "token-mapped",
         Some(RacrouteResult::TokenExtracted(_)) => "token-extracted",
         Some(RacrouteResult::Verified { .. }) => "verified",
+        Some(RacrouteResult::CredentialVerified { .. }) => "credential-verified",
         None => "none",
     }
 }
