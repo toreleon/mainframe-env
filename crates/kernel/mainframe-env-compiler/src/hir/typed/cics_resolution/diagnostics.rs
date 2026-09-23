@@ -29,6 +29,7 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
             "RESP2",
         ],
         HirCicsOperation::Dump => &["DUMPCODE", "FROM", "LENGTH", "FLENGTH", "RESP", "RESP2"],
+        HirCicsOperation::Trace => &["RESP", "RESP2"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -45,6 +46,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
             "COMPLETE", "TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES", "DCT", "FCT", "PCT",
             "PPT", "SIT", "TCT", "NOHANDLE",
         ],
+        HirCicsOperation::Trace => &["ON", "OFF", "SYSTEM", "USER", "EI", "SINGLE", "NOHANDLE"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -55,15 +57,21 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::Monitor => &["POINT"],
         HirCicsOperation::DumpTransaction => &["DUMPCODE"],
         HirCicsOperation::Dump => &[],
+        HirCicsOperation::Trace => &[],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
 
 pub(super) fn operands(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::Trace {
+        validate_trace_options(options)?;
+        return Ok(Vec::new());
+    }
     if operation == HirCicsOperation::Monitor {
         return monitor_operands(clauses, semantic);
     }
@@ -180,6 +188,17 @@ fn monitor_operands(
 }
 
 pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsOption> {
+    if operation == HirCicsOperation::Trace {
+        return Some(match name {
+            "ON" => HirCicsOption::TraceOn,
+            "OFF" => HirCicsOption::TraceOff,
+            "SYSTEM" => HirCicsOption::TraceSystem,
+            "USER" => HirCicsOption::TraceUser,
+            "EI" => HirCicsOption::TraceEi,
+            "SINGLE" => HirCicsOption::TraceSingle,
+            _ => return None,
+        });
+    }
     if !matches!(
         operation,
         HirCicsOperation::Dump | HirCicsOperation::DumpTransaction
@@ -202,6 +221,21 @@ pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsO
         "DCT" => HirCicsOption::DumpDct,
         _ => return None,
     })
+}
+
+fn validate_trace_options(options: &[String]) -> Resolution<()> {
+    let on = options.iter().any(|option| option == "ON");
+    let off = options.iter().any(|option| option == "OFF");
+    let targets = ["USER", "SYSTEM", "EI", "SINGLE"]
+        .iter()
+        .filter(|name| options.iter().any(|option| option == **name))
+        .count();
+    if on == off || targets == 0 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS TRACE requires exactly one of ON or OFF and at least one trace switch".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn outputs(

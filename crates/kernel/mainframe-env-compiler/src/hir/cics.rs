@@ -545,6 +545,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Monitor => CicsPlanOperation::Monitor,
         HirCicsOperation::DumpTransaction => CicsPlanOperation::DumpTransaction,
         HirCicsOperation::Dump => CicsPlanOperation::Dump,
+        HirCicsOperation::Trace => CicsPlanOperation::Trace,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -744,5 +745,11 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::DumpTct => CicsPlanOption::DumpTct,
         HirCicsOption::DumpTrt => CicsPlanOption::DumpTrt,
         HirCicsOption::DumpDct => CicsPlanOption::DumpDct,
+        HirCicsOption::TraceOn => CicsPlanOption::TraceOn,
+        HirCicsOption::TraceOff => CicsPlanOption::TraceOff,
+        HirCicsOption::TraceSystem => CicsPlanOption::TraceSystem,
+        HirCicsOption::TraceUser => CicsPlanOption::TraceUser,
+        HirCicsOption::TraceEi => CicsPlanOption::TraceEi,
+        HirCicsOption::TraceSingle => CicsPlanOption::TraceSingle,
     }
 }

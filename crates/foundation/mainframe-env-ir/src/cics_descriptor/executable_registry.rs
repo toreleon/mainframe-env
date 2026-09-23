@@ -1,6 +1,13 @@
 use super::*;
 
 const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
+const TRACE_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 const MONITOR_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,
@@ -349,7 +356,7 @@ pub fn cics_application_registry_for_tokens(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 125] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 126] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1345,6 +1352,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 125] = [
         name: "dump",
         major: 1,
         effects: DIAGNOSTIC_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Trace,
+        namespace: "cics.diagnostics",
+        name: "trace",
+        major: 1,
+        effects: TRACE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];

@@ -4243,6 +4243,46 @@ mod tests {
     }
 
     #[test]
+    fn cics_trace_resolves_local_switches_and_rejects_conflicts() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TRACECTL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS TRACE ON USER EI RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("TRACE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed TRACE");
+        assert_eq!(command.operation, HirCicsOperation::Trace);
+        assert!(command.options.contains(&HirCicsOption::TraceOn));
+        assert!(command.options.contains(&HirCicsOption::TraceUser));
+        assert!(command.options.contains(&HirCicsOption::TraceEi));
+        for command in [
+            "TRACE ON OFF USER NOHANDLE",
+            "TRACE ON NOHANDLE",
+            "TRACE USER NOHANDLE",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTRC. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis.diagnostics.iter().any(|diagnostic| {
+                    diagnostic
+                        .public_message()
+                        .contains("exactly one of ON or OFF")
+                }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

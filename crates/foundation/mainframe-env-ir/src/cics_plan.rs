@@ -683,6 +683,7 @@ fn validate_operation_shape(
             diagnostics::invalid_dump_transaction_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Dump => diagnostics::invalid_dump_shape(plan, inputs, outputs),
+        CicsPlanOperation::Trace => diagnostics::invalid_trace_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2624,6 +2625,31 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
             Ok(plan)
+        );
+    }
+
+    #[test]
+    fn trace_uses_reserved_v2_tags_and_rejects_ambiguous_direction() {
+        assert_eq!(operation_tag(CicsPlanOperation::Trace), 153);
+        assert_eq!(option_tag(CicsPlanOption::TraceOn), 522);
+        assert_eq!(option_tag(CicsPlanOption::TraceSingle), 527);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Trace,
+            operands: Vec::new(),
+            options: BTreeSet::from([CicsPlanOption::TraceOn, CicsPlanOption::TraceUser]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        let mut invalid = plan;
+        invalid.options.insert(CicsPlanOption::TraceOff);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

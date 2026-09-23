@@ -72,14 +72,19 @@ pub(super) fn invoke(
         return response(service, run, reply);
     }
     let configuration = current.configuration;
-    if !exception && !configuration.user_trace {
+    if !exception && !configuration.user_trace && !current.single_trace {
         return Err(condition("INVREQ", 16, 3));
     }
-    if !exception && !(configuration.internal || configuration.auxiliary || configuration.system) {
+    if !exception
+        && !(configuration.internal
+            || configuration.auxiliary
+            || configuration.system
+            || current.single_trace)
+    {
         return Err(condition("INVREQ", 16, 2));
     }
     let mut destinations = Vec::new();
-    if exception || configuration.internal {
+    if exception || configuration.internal || current.single_trace {
         destinations.push("INTERNAL");
     }
     if configuration.auxiliary {
@@ -103,6 +108,9 @@ pub(super) fn invoke(
         run_unit: run.invocation.run_unit_id.as_str().into(),
         principal: run.invocation.principal.id().as_str().into(),
     });
+    if !exception && current.single_trace {
+        next.single_trace = false;
+    }
     let reply = state::DiagnosticReply::normal();
     next.record_replay(
         mutation.idempotency_key.as_str(),

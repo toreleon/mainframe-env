@@ -143,6 +143,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::Monitor => 152,
         CicsPlanOperation::DumpTransaction => 149,
         CicsPlanOperation::Dump => 148,
+        CicsPlanOperation::Trace => 153,
     }
 }
 
@@ -273,6 +274,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         152 => Ok(CicsPlanOperation::Monitor),
         149 => Ok(CicsPlanOperation::DumpTransaction),
         148 => Ok(CicsPlanOperation::Dump),
+        153 => Ok(CicsPlanOperation::Trace),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -837,6 +839,12 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::DumpTct => 519,
         CicsPlanOption::DumpTrt => 520,
         CicsPlanOption::DumpDct => 521,
+        CicsPlanOption::TraceOn => 522,
+        CicsPlanOption::TraceOff => 523,
+        CicsPlanOption::TraceSystem => 524,
+        CicsPlanOption::TraceUser => 525,
+        CicsPlanOption::TraceEi => 526,
+        CicsPlanOption::TraceSingle => 527,
     }
 }
 
@@ -951,6 +959,12 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         519 => Ok(CicsPlanOption::DumpTct),
         520 => Ok(CicsPlanOption::DumpTrt),
         521 => Ok(CicsPlanOption::DumpDct),
+        522 => Ok(CicsPlanOption::TraceOn),
+        523 => Ok(CicsPlanOption::TraceOff),
+        524 => Ok(CicsPlanOption::TraceSystem),
+        525 => Ok(CicsPlanOption::TraceUser),
+        526 => Ok(CicsPlanOption::TraceEi),
+        527 => Ok(CicsPlanOption::TraceSingle),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

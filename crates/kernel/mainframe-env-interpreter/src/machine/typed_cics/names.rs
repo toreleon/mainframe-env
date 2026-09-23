@@ -300,6 +300,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Monitor => CicsOperation::Monitor,
         CicsPlanOperation::DumpTransaction => CicsOperation::DumpTransaction,
         CicsPlanOperation::Dump => CicsOperation::Dump,
+        CicsPlanOperation::Trace => CicsOperation::Trace,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -746,5 +747,11 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::DumpTct => "TCT",
         CicsPlanOption::DumpTrt => "TRT",
         CicsPlanOption::DumpDct => "DCT",
+        CicsPlanOption::TraceOn => "ON",
+        CicsPlanOption::TraceOff => "OFF",
+        CicsPlanOption::TraceSystem => "SYSTEM",
+        CicsPlanOption::TraceUser => "USER",
+        CicsPlanOption::TraceEi => "EI",
+        CicsPlanOption::TraceSingle => "SINGLE",
     }
 }

@@ -15810,6 +15810,185 @@ mod tests {
         );
     }
 
+    #[test]
+    fn trace_switches_control_numeric_entries_and_single_is_consumed_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        let (invocation, _) = registered(&service);
+        let on = request(
+            CicsOperation::Trace,
+            BTreeMap::from([
+                ("OPTION.ON".into(), cics_option()),
+                ("OPTION.USER".into(), cics_option()),
+                ("OPTION.EI".into(), cics_option()),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(&effect(&invocation.run_unit_id, on.clone(), 1), on.clone())
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert!(snapshot.configuration.user_trace && snapshot.configuration.internal);
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+            .unwrap();
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, on.clone(), 1), on)
+                .unwrap(),
+            first
+        );
+        let trace = request(
+            CicsOperation::EnterTraceNum,
+            BTreeMap::from([
+                ("TRACENUM".into(), cics_decimal(12)),
+                ("FROM".into(), enqueue_value(b"ABCDEFGH")),
+            ]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, trace.clone(), 2), trace)
+            .unwrap();
+        assert_eq!(
+            service.diagnostic_snapshot().unwrap().traces[0].data,
+            b"ABCDEFGH"
+        );
+
+        let off = request(
+            CicsOperation::Trace,
+            BTreeMap::from([
+                ("OPTION.OFF".into(), cics_option()),
+                ("OPTION.USER".into(), cics_option()),
+                ("OPTION.EI".into(), cics_option()),
+            ]),
+            3,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, off.clone(), 3), off)
+            .unwrap();
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert!(!snapshot.configuration.user_trace && !snapshot.configuration.internal);
+        let single = request(
+            CicsOperation::Trace,
+            BTreeMap::from([
+                ("OPTION.ON".into(), cics_option()),
+                ("OPTION.SINGLE".into(), cics_option()),
+            ]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, single.clone(), 4), single)
+            .unwrap();
+        assert!(service.diagnostic_snapshot().unwrap().single_trace);
+        let once = request(
+            CicsOperation::EnterTraceNum,
+            BTreeMap::from([("TRACENUM".into(), cics_decimal(13))]),
+            5,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, once.clone(), 5), once)
+            .unwrap();
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.traces.len(), 2);
+        assert_eq!(snapshot.traces[1].kind, "TRACENUM:INTERNAL");
+        assert!(!snapshot.single_trace);
+    }
+
+    #[test]
+    fn trace_configuration_denial_precedes_mutation() {
+        let (authorities, seen) = diagnostic_authorities(true);
+        let service = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut denied = request(
+            CicsOperation::Trace,
+            BTreeMap::from([
+                ("OPTION.ON".into(), cics_option()),
+                ("OPTION.USER".into(), cics_option()),
+            ]),
+            1,
+        );
+        denied.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied)
+            .unwrap();
+        assert_eq!(result.condition, "NOTAUTH");
+        assert!(
+            !service
+                .diagnostic_snapshot()
+                .unwrap()
+                .configuration
+                .user_trace
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "CICSDIAG"
+                        && resource == "CICS.DIAG.TRACE.CONFIG"
+                        && *intent == AccessIntent::Update
+                })
+        );
+    }
+
+    #[test]
+    fn trace_single_switch_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-trace-control-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let (invocation, _) = registered(&service);
+            let single = request(
+                CicsOperation::Trace,
+                BTreeMap::from([
+                    ("OPTION.ON".into(), cics_option()),
+                    ("OPTION.SINGLE".into(), cics_option()),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, single.clone(), 1), single)
+                .unwrap();
+            assert!(service.diagnostic_snapshot().unwrap().single_trace);
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            assert!(service.diagnostic_snapshot().unwrap().single_trace);
+            let invocation = invocation_for("trace-control-reopen", BTreeMap::new());
+            let session = SessionId::new("trace-control-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let trace = request(
+                CicsOperation::EnterTraceNum,
+                BTreeMap::from([("TRACENUM".into(), cics_decimal(8))]),
+                2,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, trace.clone(), 2), trace)
+                .unwrap();
+            let snapshot = service.diagnostic_snapshot().unwrap();
+            assert!(!snapshot.single_trace);
+            assert_eq!(snapshot.traces[0].identifier, "8");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     fn open_staged_spool_report(
         service: &CicsService,
         invocation: &Invocation,

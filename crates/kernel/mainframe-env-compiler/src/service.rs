@@ -1890,6 +1890,7 @@ mod tests {
                 CicsPlanOperation::Monitor => crate::HirCicsOperation::Monitor,
                 CicsPlanOperation::DumpTransaction => crate::HirCicsOperation::DumpTransaction,
                 CicsPlanOperation::Dump => crate::HirCicsOperation::Dump,
+                CicsPlanOperation::Trace => crate::HirCicsOperation::Trace,
                 CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
                 CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
                 CicsPlanOperation::WaitEvent => crate::HirCicsOperation::WaitEvent,

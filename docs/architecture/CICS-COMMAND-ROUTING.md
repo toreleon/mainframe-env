@@ -372,6 +372,14 @@ It can include the local dump-code table (`DCT`) and accepts an omitted code,
 using the generic diagnostic resource in that case. Its exact CICS TS 6.x
 behavior is source-gapped; this route promises only the documented local
 capture and never claims a CICS dump dataset or system dump.
+The local `TRACE` form requires one ON/OFF direction and at least one of USER,
+SYSTEM, EI, or SINGLE. USER controls the user trace flag, SYSTEM the system
+destination, EI the internal destination, and SINGLE arms one internal user
+entry. The following `ENTER TRACENUM` consumes that one-shot flag. These
+switches are durable and share the diagnostic replay row; the configured
+`CICSDIAG` resource is checked before mutation. The exact CICS TS 6.x TRACE
+command page is absent from the pinned local corpus, so these are explicit
+local controls rather than a claim about every IBM trace facility.
 
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or

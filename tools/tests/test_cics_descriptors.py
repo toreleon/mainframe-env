@@ -1238,6 +1238,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "SPOOLREAD",
                 "SPOOLWRITE",
                 "SUSPEND",
+                "TRACE",
                 "WAIT EVENT",
                 "WAIT EXTERNAL",
                 "SYNCPOINT",

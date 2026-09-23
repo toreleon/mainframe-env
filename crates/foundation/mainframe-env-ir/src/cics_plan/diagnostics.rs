@@ -160,3 +160,39 @@ pub(super) fn invalid_dump_shape(
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
         || super::option_shape::has_unsupported(plan)
 }
+
+pub(super) fn invalid_trace_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let on = plan.options.contains(&CicsPlanOption::TraceOn);
+    let off = plan.options.contains(&CicsPlanOption::TraceOff);
+    let targets = [
+        CicsPlanOption::TraceSystem,
+        CicsPlanOption::TraceUser,
+        CicsPlanOption::TraceEi,
+        CicsPlanOption::TraceSingle,
+    ]
+    .iter()
+    .filter(|option| plan.options.contains(option))
+    .count();
+    !inputs.is_empty()
+        || on == off
+        || targets == 0
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::TraceOn
+                    | CicsPlanOption::TraceOff
+                    | CicsPlanOption::TraceSystem
+                    | CicsPlanOption::TraceUser
+                    | CicsPlanOption::TraceEi
+                    | CicsPlanOption::TraceSingle
+            )
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

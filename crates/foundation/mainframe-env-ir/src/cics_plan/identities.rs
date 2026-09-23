@@ -196,6 +196,8 @@ pub enum CicsPlanOperation {
     DumpTransaction,
     /// Capture selected local diagnostic state through the DUMP form.
     Dump,
+    /// Set bounded local trace-control switches.
+    Trace,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -827,6 +829,12 @@ pub enum CicsPlanOption {
     DumpTct,
     DumpTrt,
     DumpDct,
+    TraceOn,
+    TraceOff,
+    TraceSystem,
+    TraceUser,
+    TraceEi,
+    TraceSingle,
 }
 
 /// Named result binding written after the host result arrives.

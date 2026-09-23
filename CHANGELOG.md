@@ -135,6 +135,11 @@ All notable changes to mainframe-env are documented here.
   compatibility topic is unavailable locally, so the implementation does not
   claim target-product dump-dataset or system-dump behavior.
 
+- Added a bounded local TRACE switch route. USER, SYSTEM, and EI update the
+  durable local trace flags; SINGLE arms one numeric trace entry. The CICS TS
+  catalog identity is row 0220. Its CICS TX cross-product topic is unavailable
+  locally, so this route is documented as local behavior.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

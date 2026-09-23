@@ -102,6 +102,7 @@ pub(super) fn resolve(
         ["MONITOR"] => HirCicsOperation::Monitor,
         ["DUMP", "TRANSACTION"] => HirCicsOperation::DumpTransaction,
         ["DUMP"] => HirCicsOperation::Dump,
+        ["TRACE"] => HirCicsOperation::Trace,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,

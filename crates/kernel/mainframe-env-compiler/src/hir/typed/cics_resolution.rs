@@ -720,6 +720,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Monitor => diagnostics::allowed_clauses(operation),
         HirCicsOperation::DumpTransaction => diagnostics::allowed_clauses(operation),
         HirCicsOperation::Dump => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::Trace => diagnostics::allowed_clauses(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -820,6 +821,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Monitor => diagnostics::allowed_options(operation),
         HirCicsOperation::DumpTransaction => diagnostics::allowed_options(operation),
         HirCicsOperation::Dump => diagnostics::allowed_options(operation),
+        HirCicsOperation::Trace => diagnostics::allowed_options(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -967,6 +969,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Monitor => diagnostics::required(operation),
         HirCicsOperation::DumpTransaction => diagnostics::required(operation),
         HirCicsOperation::Dump => diagnostics::required(operation),
+        HirCicsOperation::Trace => diagnostics::required(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -986,7 +989,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation,
         semantic,
     )?);
-    operands.extend(diagnostics::operands(&clauses, operation, semantic)?);
+    operands.extend(diagnostics::operands(
+        &clauses,
+        &raw_options,
+        operation,
+        semantic,
+    )?);
     if operation == HirCicsOperation::Abend
         && let Some(operand) = abend::operand(&clauses, semantic)?
     {

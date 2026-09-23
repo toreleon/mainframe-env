@@ -99,6 +99,8 @@ pub struct CicsMonitorPointDefinition {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsDiagnosticSnapshot {
     pub configuration: CicsTraceConfiguration,
+    /// Whether one local user trace entry has been armed by TRACE SINGLE.
+    pub single_trace: bool,
     pub traces: Vec<CicsDiagnosticTraceRecord>,
     pub dumps: Vec<CicsDiagnosticDumpRecord>,
     pub dump_definitions: BTreeMap<String, CicsDumpCodeDefinition>,
@@ -181,6 +183,7 @@ impl DiagnosticState {
     pub fn snapshot(&self) -> CicsDiagnosticSnapshot {
         CicsDiagnosticSnapshot {
             configuration: self.configuration,
+            single_trace: self.single_trace,
             traces: self.traces.clone(),
             dumps: self.dumps.clone(),
             dump_definitions: self.dump_definitions.clone(),

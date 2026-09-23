@@ -3,6 +3,7 @@
 mod dump_transaction;
 mod monitor;
 mod state;
+mod trace_control;
 mod trace_number;
 
 pub use state::{
@@ -146,6 +147,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::Monitor => monitor::invoke(service, run, request),
         CicsOperation::DumpTransaction => dump_transaction::invoke(service, run, request),
         CicsOperation::Dump => dump_transaction::invoke(service, run, request),
+        CicsOperation::Trace => trace_control::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
