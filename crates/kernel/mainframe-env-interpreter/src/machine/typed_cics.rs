@@ -224,7 +224,9 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
                     ) {
                     if matches!(
                         plan.operation,
-                        CicsPlanOperation::DocumentCreate | CicsPlanOperation::DocumentInsert
+                        CicsPlanOperation::DocumentCreate
+                            | CicsPlanOperation::DocumentInsert
+                            | CicsPlanOperation::DocumentSet
                     ) {
                         SlotUse::FullwordInput
                     } else {
@@ -807,7 +809,9 @@ fn validate_runtime_plan(
                 ) {
                 if matches!(
                     plan.operation,
-                    CicsPlanOperation::DocumentCreate | CicsPlanOperation::DocumentInsert
+                    CicsPlanOperation::DocumentCreate
+                        | CicsPlanOperation::DocumentInsert
+                        | CicsPlanOperation::DocumentSet
                 ) {
                     SlotUse::FullwordInput
                 } else {

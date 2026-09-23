@@ -220,3 +220,47 @@ pub(super) fn invalid_retrieve_shape(
             )
         })
 }
+
+pub(super) fn invalid_set_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed = BTreeSet::from([
+        CicsOperandName::DocumentToken,
+        CicsOperandName::Symbol,
+        CicsOperandName::SymbolValue,
+        CicsOperandName::SymbolList,
+        CicsOperandName::Delimiter,
+        CicsOperandName::Length,
+    ]);
+    let single =
+        inputs.contains(&CicsOperandName::Symbol) && inputs.contains(&CicsOperandName::SymbolValue);
+    let list = inputs.contains(&CicsOperandName::SymbolList);
+    !inputs.is_subset(&allowed)
+        || !inputs.contains(&CicsOperandName::DocumentToken)
+        || !inputs.contains(&CicsOperandName::Length)
+        || single == list
+        || inputs.contains(&CicsOperandName::Symbol)
+            != inputs.contains(&CicsOperandName::SymbolValue)
+        || (inputs.contains(&CicsOperandName::Delimiter) && !list)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::DocumentToken
+            | CicsOperandName::SymbolValue
+            | CicsOperandName::SymbolList => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::Symbol | CicsOperandName::Delimiter => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::Length => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            ),
+            _ => true,
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

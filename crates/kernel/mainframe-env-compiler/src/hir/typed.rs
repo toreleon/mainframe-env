@@ -202,6 +202,7 @@ pub enum HirCicsOperation {
     DocumentDelete,
     DocumentInsert,
     DocumentRetrieve,
+    DocumentSet,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -6496,5 +6497,58 @@ mod tests {
                     .public_message()
                     .contains("requires option LENGTH")
         }));
+    }
+
+    #[test]
+    fn document_set_lowers_individual_and_list_symbol_modes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DOCSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 VALUE-X PIC X(4) VALUE 'A%2B'. 01 LIST-X PIC X(16) VALUE 'one=1&Two=2'. PROCEDURE DIVISION. EXEC CICS DOCUMENT SET DOCTOKEN(TOKEN-X) SYMBOL('Title') VALUE(VALUE-X) LENGTH(4) UNESCAPED END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DOCUMENT SET: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DOCUMENT SET");
+        assert_eq!(command.operation, HirCicsOperation::DocumentSet);
+        assert!(command.options.contains(&HirCicsOption::Unescaped));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SymbolValue
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "VALUE-X")
+        }));
+        let list_source = source.replace(
+            "SYMBOL('Title') VALUE(VALUE-X) LENGTH(4) UNESCAPED",
+            "SYMBOLLIST(LIST-X) LENGTH(11)",
+        );
+        let list = analyze(&list_source);
+        assert!(list.hir.is_some(), "{:?}", list.diagnostics);
+        for (command, expected) in [
+            (
+                "DOCUMENT SET DOCTOKEN(TOKEN-X) SYMBOL('Title') VALUE(VALUE-X)",
+                "requires LENGTH",
+            ),
+            (
+                "DOCUMENT SET DOCTOKEN(TOKEN-X) SYMBOL('Title') VALUE(VALUE-X) SYMBOLLIST(LIST-X) LENGTH(4)",
+                "SYMBOL with VALUE or SYMBOLLIST",
+            ),
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDOC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 VALUE-X PIC X(4). 01 LIST-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&invalid);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
     }
 }

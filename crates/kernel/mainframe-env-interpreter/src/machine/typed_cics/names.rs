@@ -146,6 +146,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DocumentDelete => CicsOperation::DocumentDelete,
         CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
         CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
+        CicsPlanOperation::DocumentSet => CicsOperation::DocumentSet,
     }
 }
 

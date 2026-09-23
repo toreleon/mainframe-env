@@ -1638,6 +1638,7 @@ mod tests {
                 CicsPlanOperation::DocumentDelete => crate::HirCicsOperation::DocumentDelete,
                 CicsPlanOperation::DocumentInsert => crate::HirCicsOperation::DocumentInsert,
                 CicsPlanOperation::DocumentRetrieve => crate::HirCicsOperation::DocumentRetrieve,
+                CicsPlanOperation::DocumentSet => crate::HirCicsOperation::DocumentSet,
             };
             assert_eq!(
                 operation.effects,

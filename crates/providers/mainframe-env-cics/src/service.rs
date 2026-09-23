@@ -1678,7 +1678,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 57);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 58);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4997,6 +4997,7 @@ mod tests {
             ("DOCUMENT DELETE", CicsOperation::DocumentDelete),
             ("DOCUMENT INSERT", CicsOperation::DocumentInsert),
             ("DOCUMENT RETRIEVE", CicsOperation::DocumentRetrieve),
+            ("DOCUMENT SET", CicsOperation::DocumentSet),
             ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
@@ -6265,7 +6266,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 57);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 58);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6313,6 +6314,161 @@ mod tests {
         assert_eq!(
             document_retrieve.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0054"
+        );
+        let document_set = command_descriptor(CicsOperation::DocumentSet);
+        assert_eq!(document_set.syntax, "DOCUMENT SET");
+        assert_eq!(
+            document_set.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0055"
+        );
+    }
+
+    #[test]
+    fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-set", BTreeMap::new());
+        let session = SessionId::new("document-set", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([("DOCTOKEN".into(), argument(b"TOKEN-X"))]),
+            1,
+        );
+        let created = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        let token = created.outputs["DOCTOKEN"].bytes().to_vec();
+        let set = request(
+            CicsOperation::DocumentSet,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("SYMBOL".into(), cics_literal(b"Name")),
+                ("VALUE".into(), task_value(b"A%2B")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, set.clone(), 2),
+                set.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, set.clone(), 2), set)
+                .unwrap(),
+            first
+        );
+        assert_eq!(
+            store.list_provider_state("cics-document-v1", 8).unwrap()[0].version,
+            2
+        );
+        let insert = |name: &'static [u8], sequence: u64| {
+            request(
+                CicsOperation::DocumentInsert,
+                BTreeMap::from([
+                    ("DOCTOKEN".into(), task_value(&token)),
+                    ("SYMBOL".into(), cics_literal(name)),
+                ]),
+                sequence,
+            )
+        };
+        let first_insert = insert(b"Name", 3);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, first_insert.clone(), 3),
+                first_insert,
+            )
+            .unwrap();
+        let replace = request(
+            CicsOperation::DocumentSet,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("SYMBOL".into(), cics_literal(b"Name")),
+                ("VALUE".into(), task_value(b"B")),
+                ("LENGTH".into(), cics_decimal(1)),
+            ]),
+            4,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, replace.clone(), 4),
+                replace,
+            )
+            .unwrap();
+        let second_insert = insert(b"Name", 5);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, second_insert.clone(), 5),
+                second_insert,
+            )
+            .unwrap();
+        let list = request(
+            CicsOperation::DocumentSet,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("SYMBOLLIST".into(), task_value(b"Name=C&name=d")),
+                ("LENGTH".into(), cics_decimal(13)),
+            ]),
+            6,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, list.clone(), 6), list)
+            .unwrap();
+        let lower_insert = insert(b"name", 7);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, lower_insert.clone(), 7),
+                lower_insert,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .documents
+                .values()
+                .next()
+                .unwrap()
+                .content_bytes(),
+            b"A+Bd"
+        );
+        let invalid = request(
+            CicsOperation::DocumentSet,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("SYMBOLLIST".into(), task_value(b"bad name=x")),
+                ("LENGTH".into(), cics_decimal(10)),
+            ]),
+            8,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 8),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "SYMBOLERR".into(),
+                response: 116,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .documents
+                .values()
+                .next()
+                .unwrap()
+                .content_bytes(),
+            b"A+Bd"
         );
     }
 

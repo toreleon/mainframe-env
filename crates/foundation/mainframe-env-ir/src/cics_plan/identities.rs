@@ -113,6 +113,8 @@ pub enum CicsPlanOperation {
     DocumentInsert,
     /// Copy one transaction-owned document into an application buffer.
     DocumentRetrieve,
+    /// Add or replace symbols in one transaction-owned document.
+    DocumentSet,
 }
 
 /// Named input accepted by the typed CICS pilot.

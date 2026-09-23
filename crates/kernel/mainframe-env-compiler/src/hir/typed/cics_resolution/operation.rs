@@ -60,6 +60,7 @@ pub(super) fn resolve(
         ["DOCUMENT", "DELETE"] => HirCicsOperation::DocumentDelete,
         ["DOCUMENT", "INSERT"] => HirCicsOperation::DocumentInsert,
         ["DOCUMENT", "RETRIEVE"] => HirCicsOperation::DocumentRetrieve,
+        ["DOCUMENT", "SET"] => HirCicsOperation::DocumentSet,
         _ => return Err(ResolutionFailure::Unsupported),
     })
 }

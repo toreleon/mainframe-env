@@ -634,6 +634,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DocumentRetrieve => {
             document_control::invalid_retrieve_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DocumentSet => {
+            document_control::invalid_set_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1722,6 +1725,49 @@ mod tests {
         missing
             .outputs
             .retain(|output| output.name != CicsOutputName::Length);
+        assert_eq!(
+            encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn document_set_tag_and_symbol_shape_round_trip() {
+        assert_eq!(operation_tag(CicsPlanOperation::DocumentSet), 67);
+        assert_eq!(operation_from_tag(67), Ok(CicsPlanOperation::DocumentSet));
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DocumentSet,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(4),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::DocumentToken,
+                    value: CicsOperandValue::Storage(slot(1, "DOCUMENT.TOKEN")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Symbol,
+                    value: CicsOperandValue::Literal(b"Name".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SymbolValue,
+                    value: CicsOperandValue::Storage(slot(2, "DOCUMENT.VALUE")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::Unescaped]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut missing = plan;
+        missing
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::SymbolValue);
         assert_eq!(
             encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)

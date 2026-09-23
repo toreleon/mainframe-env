@@ -21,6 +21,7 @@ const TEMPLATE_MAGIC: &[u8; 8] = b"MECTPL01";
 
 mod insert;
 mod retrieve;
+mod set;
 mod transport;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -59,6 +60,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::DocumentDelete => delete(service, run, request, retention_tick),
         CicsOperation::DocumentInsert => insert::invoke(service, run, request, retention_tick),
         CicsOperation::DocumentRetrieve => retrieve::invoke(service, run, request),
+        CicsOperation::DocumentSet => set::invoke(service, run, request, retention_tick),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

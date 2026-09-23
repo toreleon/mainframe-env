@@ -64,6 +64,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DocumentDelete => 64,
         CicsPlanOperation::DocumentInsert => 65,
         CicsPlanOperation::DocumentRetrieve => 66,
+        CicsPlanOperation::DocumentSet => 67,
     }
 }
 
@@ -124,6 +125,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         64 => Ok(CicsPlanOperation::DocumentDelete),
         65 => Ok(CicsPlanOperation::DocumentInsert),
         66 => Ok(CicsPlanOperation::DocumentRetrieve),
+        67 => Ok(CicsPlanOperation::DocumentSet),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -316,6 +316,13 @@ interpreter writes the available prefix and required LENGTH even on LENGERR
 supported CP037 client character sets on request, and leaves the source
 document unchanged.
 
+`DOCUMENT SET` lowers either SYMBOL/VALUE or SYMBOLLIST with a fullword
+LENGTH and the shared 16-byte DOCTOKEN. DELIMITER is confined to symbol-list
+mode and UNESCAPED keeps value bytes literal. The provider applies
+case-sensitive symbol updates to the transaction-owned document with a
+versioned document-plus-replay write. Existing inserted segments are not
+rewritten when a symbol definition changes.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

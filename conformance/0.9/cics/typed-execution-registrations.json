@@ -95,6 +95,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0054"
     },
     {
+      "operation": "DocumentSet",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0055"
+    },
+    {
       "operation": "Enq",
       "interface": "api",
       "family": "task-control",

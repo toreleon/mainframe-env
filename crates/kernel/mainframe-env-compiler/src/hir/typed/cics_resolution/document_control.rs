@@ -50,6 +50,16 @@ pub(super) const RETRIEVE_CLAUSES: &[&str] = &[
     "RESP2",
 ];
 pub(super) const RETRIEVE_OPTIONS: &[&str] = &["DATAONLY", "NOHANDLE"];
+pub(super) const SET_CLAUSES: &[&str] = &[
+    "DELIMITER",
+    "DOCTOKEN",
+    "LENGTH",
+    "RESP",
+    "RESP2",
+    "SYMBOL",
+    "SYMBOLLIST",
+    "VALUE",
+];
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
@@ -57,6 +67,9 @@ pub(super) fn validate_constraints(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::DocumentSet {
+        return validate_set(clauses, semantic);
+    }
     if operation == HirCicsOperation::DocumentRetrieve {
         return validate_retrieve(clauses, semantic);
     }
@@ -150,6 +163,9 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::DocumentSet {
+        return set_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::DocumentRetrieve {
         return retrieve_operands(clauses, semantic);
     }
@@ -442,6 +458,102 @@ fn retrieve_operands(
             value: cics_value(tokens, semantic)?,
         });
     }
+    Ok(operands)
+}
+
+fn validate_set(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    let tokens = clauses
+        .get("DOCTOKEN")
+        .ok_or_else(|| ResolutionFailure::Invalid("CICS DOCUMENT SET requires DOCTOKEN".into()))?;
+    let token = complete_data_reference(tokens, semantic)?;
+    if token.length != 16
+        || !matches!(
+            token.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric | DataCategory::Group
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DOCUMENT SET DOCTOKEN requires a 16-byte area".into(),
+        ));
+    }
+    let single = clauses.contains_key("SYMBOL") && clauses.contains_key("VALUE");
+    let list = clauses.contains_key("SYMBOLLIST");
+    if single == list || clauses.contains_key("SYMBOL") != clauses.contains_key("VALUE") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DOCUMENT SET requires SYMBOL with VALUE or SYMBOLLIST".into(),
+        ));
+    }
+    if clauses.contains_key("DELIMITER") && !list {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DOCUMENT SET DELIMITER requires SYMBOLLIST".into(),
+        ));
+    }
+    let length = clauses
+        .get("LENGTH")
+        .ok_or_else(|| ResolutionFailure::Invalid("CICS DOCUMENT SET requires LENGTH".into()))?;
+    length_value(length, semantic)?;
+    if let Some(tokens) = clauses.get("SYMBOL") {
+        let value = cics_value(tokens, semantic)?;
+        let width = match value {
+            HirCicsValue::Literal(value) => value.len(),
+            HirCicsValue::Data(reference) => reference.length,
+            _ => 0,
+        };
+        if !(1..=32).contains(&width) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS DOCUMENT SET SYMBOL requires 1-32 bytes".into(),
+            ));
+        }
+    }
+    if let Some(tokens) = clauses.get("DELIMITER") {
+        let value = cics_value(tokens, semantic)?;
+        let width = match value {
+            HirCicsValue::Literal(value) => value.len(),
+            HirCicsValue::Data(reference) => reference.length,
+            _ => 0,
+        };
+        if width != 1 {
+            return Err(ResolutionFailure::Invalid(
+                "CICS DOCUMENT SET DELIMITER requires one byte".into(),
+            ));
+        }
+    }
+    for name in ["VALUE", "SYMBOLLIST"] {
+        if let Some(tokens) = clauses.get(name) {
+            complete_data_reference(tokens, semantic)?;
+        }
+    }
+    Ok(())
+}
+
+fn set_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::DocumentToken,
+        value: HirCicsValue::Data(complete_data_reference(&clauses["DOCTOKEN"], semantic)?),
+    }];
+    for (source, name) in [
+        ("SYMBOL", HirCicsOperandName::Symbol),
+        ("VALUE", HirCicsOperandName::SymbolValue),
+        ("SYMBOLLIST", HirCicsOperandName::SymbolList),
+        ("DELIMITER", HirCicsOperandName::Delimiter),
+    ] {
+        if let Some(tokens) = clauses.get(source) {
+            let value = cics_value(tokens, semantic)?;
+            if matches!(source, "VALUE" | "SYMBOLLIST") && !matches!(value, HirCicsValue::Data(_)) {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS DOCUMENT SET {source} requires a data area"
+                )));
+            }
+            operands.push(HirCicsNamedOperand { name, value });
+        }
+    }
+    operands.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::Length,
+        value: length_value(&clauses["LENGTH"], semantic)?,
+    });
     Ok(operands)
 }
 

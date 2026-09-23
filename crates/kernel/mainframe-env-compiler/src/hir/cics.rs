@@ -400,6 +400,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DocumentDelete => CicsPlanOperation::DocumentDelete,
         HirCicsOperation::DocumentInsert => CicsPlanOperation::DocumentInsert,
         HirCicsOperation::DocumentRetrieve => CicsPlanOperation::DocumentRetrieve,
+        HirCicsOperation::DocumentSet => CicsPlanOperation::DocumentSet,
     }
 }
 

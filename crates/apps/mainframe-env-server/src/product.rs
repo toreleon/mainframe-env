@@ -11540,6 +11540,95 @@ mod tests {
     }
 
     #[test]
+    fn compiled_document_set_supplies_later_symbol_insert() {
+        let artifact = published_source_fixture(
+            "DOCSET",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DOCSET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(16).\n01 VALUE-X PIC X VALUE 'A'.\n01 INTO-X PIC X(2).\n01 LENGTH-X PIC S9(9) COMP.\n01 SET-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS DOCUMENT CREATE DOCTOKEN(TOKEN-X) END-EXEC.\nEXEC CICS DOCUMENT SET DOCTOKEN(TOKEN-X) SYMBOL('Name') VALUE(VALUE-X) LENGTH(1) END-EXEC.\nMOVE EIBFN TO SET-FN.\nEXEC CICS DOCUMENT INSERT DOCTOKEN(TOKEN-X) SYMBOL('Name') END-EXEC.\nEXEC CICS DOCUMENT RETRIEVE DOCTOKEN(TOKEN-X) INTO(INTO-X) LENGTH(LENGTH-X) DATAONLY END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DOCSET".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DOCS".into(), "DOCSET".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DOCSET".into(),
+                    map: "DOCSET".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("document-set-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DOCS", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DOCS",
+                24,
+                80,
+                "document-set-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DOCSET", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("SET-FN").unwrap().bytes(), &[0x3C, 0x08]);
+        assert!(
+            restored
+                .variable("INTO-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"A")
+        );
+        assert_eq!(
+            restored.variable("LENGTH-X").unwrap().bytes(),
+            &[0, 0, 0, 1]
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::DocumentSet)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_consumes_into_and_returns_original_length() {
         let artifact = published_source_fixture(
             "READQTD",

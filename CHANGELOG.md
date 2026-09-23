@@ -13,6 +13,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `DOCUMENT SET` for individual symbols and symbol lists,
+  including case-sensitive replacement, bounded lengths, delimiter and
+  UNESCAPED handling, atomic document and replay updates, and compiled EIBFN
+  `3C08` routing.
+
 - Added typed CICS `DOCUMENT RETRIEVE` with DATAONLY or bounded tagged output,
   optional CHARACTERSET conversion, MAXLENGTH probing and truncation, exact
   required LENGTH reporting, and compiled EIBFN `3C06` routing.

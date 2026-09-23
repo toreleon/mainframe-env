@@ -278,8 +278,11 @@ bounded before persistence. `DOCUMENT RETRIEVE` uses tag 66, input operand
 tags 132/145/146, and document DATAONLY option tag 85. It copies tagged or
 data-only content to a bounded application buffer, returns the exact required
 LENGTH on a short buffer, and performs the supported CP037 character-set
-conversions without changing document state. The rest of the reserved ranges
-remain available to row 0055.
+conversions without changing document state. `DOCUMENT SET` uses tag 67 and
+the shared token, symbol, value, list, delimiter and length operands. It
+replaces case-sensitive symbol definitions atomically with the effect replay;
+previously inserted bytes retain their materialized values. The unused
+operand, option and output tags in the reserved ranges remain unassigned.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
