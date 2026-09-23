@@ -140,6 +140,8 @@ fn respond(
             CicsCredentialFailure::Revoked => condition("NOTAUTH", 70, 19),
             CicsCredentialFailure::NewCredentialRequired => condition("NOTAUTH", 70, 3),
             CicsCredentialFailure::InvalidCredential => condition("NOTAUTH", 70, 2),
+            CicsCredentialFailure::UnacceptableNewCredential => condition("NOTAUTH", 70, 4),
+            CicsCredentialFailure::MismatchedCredentialKind => condition("INVREQ", 16, 2),
             CicsCredentialFailure::UnknownGroup | CicsCredentialFailure::GroupNotConnected => {
                 condition("NOTAUTH", 70, 23)
             }

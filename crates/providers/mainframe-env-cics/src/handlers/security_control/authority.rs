@@ -75,6 +75,10 @@ pub enum CicsCredentialFailure {
     NewCredentialRequired,
     /// The supplied credential did not verify.
     InvalidCredential,
+    /// The proposed new credential violates the SAF password or phrase policy.
+    UnacceptableNewCredential,
+    /// Old and new phrase lengths select different credential fields.
+    MismatchedCredentialKind,
     /// The requested group is unknown.
     UnknownGroup,
     /// The user is not connected to the requested group.

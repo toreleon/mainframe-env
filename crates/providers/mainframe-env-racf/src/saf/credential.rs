@@ -1,6 +1,7 @@
 //! Credential verification inside the durable SAF transaction authority.
 
 use super::*;
+use crate::authority::CredentialPolicyProblem;
 use crate::model::{CredentialVerifier, connection_key};
 
 /// Credential field selected for one SAF verification.
@@ -23,6 +24,10 @@ pub enum CredentialFailure {
     NewCredentialRequired,
     /// The supplied credential did not verify.
     InvalidCredential,
+    /// The new credential violates the active RACF policy or history.
+    UnacceptableNewCredential,
+    /// The old and new phrase lengths select different credential fields.
+    MismatchedCredentialKind,
     /// The requested group does not exist.
     UnknownGroup,
     /// The user is not connected to the requested group.
@@ -183,6 +188,197 @@ fn verify_secret(credential: &CredentialVerifier, secret: &[u8]) -> Result<bool,
     let parsed = PasswordHash::new(&credential.encoded_verifier)
         .map_err(|_| DecisionReason::PolicyUnavailable)?;
     Ok(Argon2::default().verify_password(secret, &parsed).is_ok())
+}
+
+pub(super) fn change_cics_request(
+    service: &RacfService,
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &SafRequestContext,
+    user: &PrincipalId,
+    packed: Option<&[u8]>,
+    kind: CredentialKind,
+    states: &mut Vec<RacrouteState>,
+) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
+    let packed = packed.ok_or(DecisionReason::CredentialInvalid)?;
+    let [old_hi, old_lo, new_hi, new_lo, ..] = packed else {
+        return Err(DecisionReason::MalformedRequest);
+    };
+    let old_len = usize::from(u16::from_be_bytes([*old_hi, *old_lo]));
+    let new_len = usize::from(u16::from_be_bytes([*new_hi, *new_lo]));
+    if old_len == 0
+        || new_len == 0
+        || old_len > 100
+        || new_len > 100
+        || packed.len() != 4 + old_len + new_len
+    {
+        return Err(DecisionReason::MalformedRequest);
+    }
+    let old = &packed[4..4 + old_len];
+    let new = &packed[4 + old_len..];
+    if kind == CredentialKind::Password && (old_len > 8 || new_len > 8) {
+        return Err(DecisionReason::MalformedRequest);
+    }
+    if kind == CredentialKind::Phrase && (old_len <= 8) != (new_len <= 8) {
+        return Ok(denied(
+            DecisionReason::CredentialInvalid,
+            CredentialFailure::MismatchedCredentialKind,
+        ));
+    }
+    let Some(principal) = snapshot.principals.get(user.as_str()) else {
+        return Ok(denied(
+            DecisionReason::PrincipalNotFound,
+            CredentialFailure::UnknownUser,
+        ));
+    };
+    if matches!(
+        principal.state,
+        PrincipalState::Revoked | PrincipalState::Suspended | PrincipalState::Locked
+    ) {
+        return Ok(denied(
+            DecisionReason::PrincipalInactive,
+            CredentialFailure::Revoked,
+        ));
+    }
+    let phrase_slot = kind == CredentialKind::Phrase && old_len > 8;
+    let existing = if phrase_slot {
+        principal.phrase_credential.as_ref().or_else(|| {
+            principal
+                .credential
+                .as_ref()
+                .filter(|value| value.is_phrase)
+        })
+    } else {
+        principal
+            .credential
+            .as_ref()
+            .filter(|value| !value.is_phrase)
+    };
+    let Some(existing) = existing else {
+        return Ok(denied(
+            DecisionReason::CredentialInvalid,
+            CredentialFailure::NewCredentialRequired,
+        ));
+    };
+    if !verify_secret(existing, old)? {
+        let principal = snapshot
+            .principals
+            .get_mut(user.as_str())
+            .ok_or(DecisionReason::RecoveryRequired)?;
+        principal.invalid_count = Some(principal.invalid_count.unwrap_or(0).saturating_add(1));
+        return Ok(denied(
+            DecisionReason::CredentialInvalid,
+            CredentialFailure::InvalidCredential,
+        ));
+    }
+    let next = match service.credential_from_bytes(
+        &snapshot.policy,
+        user.as_str(),
+        Some(existing),
+        new,
+        phrase_slot,
+        context.tick(),
+    ) {
+        Ok(next) => next,
+        Err(CredentialPolicyProblem::Invalid | CredentialPolicyProblem::Reused) => {
+            return Ok(denied(
+                DecisionReason::CredentialInvalid,
+                CredentialFailure::UnacceptableNewCredential,
+            ));
+        }
+        Err(CredentialPolicyProblem::Infrastructure) => {
+            return Err(DecisionReason::PolicyUnavailable);
+        }
+    };
+    let principal = snapshot
+        .principals
+        .get_mut(user.as_str())
+        .ok_or(DecisionReason::RecoveryRequired)?;
+    let details = CredentialDetails {
+        changed_tick: i64::try_from(context.tick())
+            .map_err(|_| DecisionReason::ResourceExhausted)?,
+        days_left: -1,
+        expiry_tick: -1,
+        invalid_count: principal.invalid_count.unwrap_or(255),
+        last_use_tick: i64::try_from(principal.last_use_tick.unwrap_or(0))
+            .map_err(|_| DecisionReason::ResourceExhausted)?,
+    };
+    if phrase_slot {
+        principal.phrase_credential = Some(next);
+    } else {
+        principal.credential = Some(next);
+    }
+    principal.state = PrincipalState::Active;
+    principal.invalid_count = Some(0);
+    principal.last_use_tick = Some(context.tick());
+    principal.version = principal
+        .version
+        .checked_add(1)
+        .ok_or(DecisionReason::ResourceExhausted)?;
+    states.push(RacrouteState::PolicyResolved);
+    let decision = decision(DecisionReason::Granted, AccessLevel::None, None, None);
+    Ok((
+        decision.status,
+        RacrouteResult::CredentialVerified {
+            decision,
+            failure: None,
+            details: Some(details),
+        },
+    ))
+}
+
+pub(super) fn is_authentication_request(request: &RacrouteRequest) -> bool {
+    matches!(
+        request,
+        RacrouteRequest::Signon { .. }
+            | RacrouteRequest::Verify { .. }
+            | RacrouteRequest::VerifyCredential { .. }
+            | RacrouteRequest::ChangeCredential { .. }
+            | RacrouteRequest::Verifyx { .. }
+    )
+}
+
+pub(super) fn digest_cics_request(digest: &mut Sha256, request: &RacrouteRequest) {
+    match request {
+        RacrouteRequest::VerifyCredential {
+            user,
+            credential_reference,
+            kind,
+            group,
+            binding_digest,
+        } => {
+            digest_saf_tag(digest, 0xc1);
+            digest_saf_field(digest, user.as_str().as_bytes());
+            digest_saf_field(digest, credential_reference.as_str().as_bytes());
+            digest_saf_tag(
+                digest,
+                match kind {
+                    CredentialKind::Password => 1,
+                    CredentialKind::Phrase => 2,
+                },
+            );
+            digest_saf_optional(digest, group.as_deref());
+            digest_saf_field(digest, binding_digest);
+        }
+        RacrouteRequest::ChangeCredential {
+            user,
+            credential_reference,
+            kind,
+            binding_digest,
+        } => {
+            digest_saf_tag(digest, 0xc2);
+            digest_saf_field(digest, user.as_str().as_bytes());
+            digest_saf_field(digest, credential_reference.as_str().as_bytes());
+            digest_saf_tag(
+                digest,
+                match kind {
+                    CredentialKind::Password => 1,
+                    CredentialKind::Phrase => 2,
+                },
+            );
+            digest_saf_field(digest, binding_digest);
+        }
+        _ => unreachable!("only CICS credential requests are delegated"),
+    }
 }
 
 pub(super) fn build_mfa_proof(

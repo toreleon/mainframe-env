@@ -129,6 +129,12 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
                     CicsCredentialFailure::NewCredentialRequired
                 }
                 CredentialFailure::InvalidCredential => CicsCredentialFailure::InvalidCredential,
+                CredentialFailure::UnacceptableNewCredential => {
+                    CicsCredentialFailure::UnacceptableNewCredential
+                }
+                CredentialFailure::MismatchedCredentialKind => {
+                    CicsCredentialFailure::MismatchedCredentialKind
+                }
                 CredentialFailure::UnknownGroup => CicsCredentialFailure::UnknownGroup,
                 CredentialFailure::GroupNotConnected => CicsCredentialFailure::GroupNotConnected,
                 CredentialFailure::GroupRevoked => CicsCredentialFailure::GroupRevoked,

@@ -131,6 +131,17 @@ pub enum RacrouteRequest {
         group: Option<String>,
         binding_digest: [u8; 32],
     },
+    /// Change one CICS password or phrase in the same audited SAF transition.
+    /// The scoped reference resolves to one length-framed old/new secret pair.
+    /// The binding digest ties both clear inputs to the outer CICS request.
+    /// A replay reads the durable terminal result without resolving the secret.
+    /// No clear credential appears in the transaction or audit record.
+    ChangeCredential {
+        user: PrincipalId,
+        credential_reference: SecretRef,
+        kind: CredentialKind,
+        binding_digest: [u8; 32],
+    },
     Audit {
         action: String,
         resource_digest: String,
@@ -224,7 +235,9 @@ impl RacrouteRequest {
             Self::Tokenmap { .. } => RacrouteRequestType::Tokenmap,
             Self::Tokenxtr { .. } => RacrouteRequestType::Tokenxtr,
             Self::Verify { .. } => RacrouteRequestType::Verify,
-            Self::VerifyCredential { .. } => RacrouteRequestType::Verify,
+            Self::VerifyCredential { .. } | Self::ChangeCredential { .. } => {
+                RacrouteRequestType::Verify
+            }
             Self::Verifyx { .. } => RacrouteRequestType::Verifyx,
         }
     }
@@ -383,7 +396,7 @@ pub(crate) fn execute(
     let initial = service.database.read()?;
     let mut preflight = validate_request_shape(&request).err();
     if preflight.is_none()
-        && is_authentication_request(&request)
+        && credential::is_authentication_request(&request)
         && (!initial.subsystem.running || !initial.database_status.active)
     {
         return reject_unavailable_authentication(
@@ -422,6 +435,10 @@ pub(crate) fn execute(
                 ..
             }
             | RacrouteRequest::VerifyCredential {
+                credential_reference,
+                ..
+            }
+            | RacrouteRequest::ChangeCredential {
                 credential_reference,
                 ..
             }
@@ -535,6 +552,7 @@ pub(crate) fn execute(
         }
         let mut staged = snapshot.clone();
         let applied = apply_request(
+            service,
             &mut staged,
             context,
             &request,
@@ -699,16 +717,6 @@ pub(crate) fn reconcile_legacy_replay(
             }
         })
         .map(|_| ())
-}
-
-fn is_authentication_request(request: &RacrouteRequest) -> bool {
-    matches!(
-        request,
-        RacrouteRequest::Signon { .. }
-            | RacrouteRequest::Verify { .. }
-            | RacrouteRequest::VerifyCredential { .. }
-            | RacrouteRequest::Verifyx { .. }
-    )
 }
 
 fn reject_unavailable_authentication(
@@ -948,6 +956,7 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
                 normalized_principal(group)?;
             }
         }
+        RacrouteRequest::ChangeCredential { .. } => {}
         RacrouteRequest::Verifyx {
             acee_id,
             parent_acee,
@@ -973,11 +982,15 @@ fn normalized_preflight_result(
         RacrouteRequest::Signon { .. }
             | RacrouteRequest::Verify { .. }
             | RacrouteRequest::VerifyCredential { .. }
+            | RacrouteRequest::ChangeCredential { .. }
             | RacrouteRequest::Verifyx { .. }
     ) {
         return None;
     }
-    if matches!(request, RacrouteRequest::VerifyCredential { .. }) {
+    if matches!(
+        request,
+        RacrouteRequest::VerifyCredential { .. } | RacrouteRequest::ChangeCredential { .. }
+    ) {
         Some(RacrouteResult::CredentialVerified {
             decision: decision(reason, AccessLevel::None, None, None),
             failure: Some(CredentialFailure::PolicyUnavailable),
@@ -1007,6 +1020,7 @@ fn validate_environment(environment: &AccessEnvironment) -> Result<(), DecisionR
 }
 
 fn apply_request(
+    service: &RacfService,
     snapshot: &mut SecurityDatabaseSnapshot,
     context: &SafRequestContext,
     request: &RacrouteRequest,
@@ -1382,6 +1396,9 @@ fn apply_request(
             group.as_deref(),
             states,
         ),
+        RacrouteRequest::ChangeCredential { user, kind, .. } => {
+            credential::change_cics_request(service, snapshot, context, user, secret, *kind, states)
+        }
         RacrouteRequest::Verifyx {
             user,
             action,
@@ -2207,25 +2224,8 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
             digest_saf_tag(&mut digest, verify_action_tag(*action));
             digest_saf_optional(&mut digest, acee_id.as_deref());
         }
-        RacrouteRequest::VerifyCredential {
-            user,
-            credential_reference,
-            kind,
-            group,
-            binding_digest,
-        } => {
-            digest_saf_tag(&mut digest, 0xc1);
-            digest_saf_field(&mut digest, user.as_str().as_bytes());
-            digest_saf_field(&mut digest, credential_reference.as_str().as_bytes());
-            digest_saf_tag(
-                &mut digest,
-                match kind {
-                    CredentialKind::Password => 1,
-                    CredentialKind::Phrase => 2,
-                },
-            );
-            digest_saf_optional(&mut digest, group.as_deref());
-            digest_saf_field(&mut digest, binding_digest);
+        RacrouteRequest::VerifyCredential { .. } | RacrouteRequest::ChangeCredential { .. } => {
+            credential::digest_cics_request(&mut digest, request);
         }
         RacrouteRequest::Verifyx {
             user,
@@ -2689,6 +2689,162 @@ mod tests {
                 .credential
                 .is_some()
         );
+    }
+
+    #[test]
+    fn cics_credential_change_checks_old_secret_and_replays_without_reapplying() {
+        let (service, resolver, admin) = setup();
+        resolver.insert("secret:change-old", b"PASSWORD".to_vec());
+        service
+            .add_user(
+                "CHANGE1",
+                &SecretRef::new("secret:change-old", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let user = PrincipalId::new("CHANGE1", InvocationLimits::default()).unwrap();
+        let packet = |old: &[u8], new: &[u8]| {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&(old.len() as u16).to_be_bytes());
+            bytes.extend_from_slice(&(new.len() as u16).to_be_bytes());
+            bytes.extend_from_slice(old);
+            bytes.extend_from_slice(new);
+            bytes
+        };
+        resolver.insert("secret:change-wrong", packet(b"WRONG123", b"NEWPASS1"));
+        resolver.insert("secret:change-valid", packet(b"PASSWORD", b"NEWPASS1"));
+        let request = |reference: &str, binding_digest| RacrouteRequest::ChangeCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new(reference, Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            binding_digest,
+        };
+        let wrong = service
+            .racroute(
+                &saf_context(&admin, None, "CICS-CHANGE-WRONG", 5),
+                request("secret:change-wrong", [1; 32]),
+            )
+            .unwrap();
+        assert!(matches!(
+            wrong.result,
+            Some(RacrouteResult::CredentialVerified {
+                failure: Some(CredentialFailure::InvalidCredential),
+                ..
+            })
+        ));
+        assert_eq!(
+            service.database.read().unwrap().principals["CHANGE1"].invalid_count,
+            Some(1)
+        );
+        let context = saf_context(&admin, None, "CICS-CHANGE-VALID", 6);
+        let valid = service
+            .racroute(&context, request("secret:change-valid", [2; 32]))
+            .unwrap();
+        assert_eq!(valid.status.reason, DecisionReason::Granted);
+        let before = service.database.read().unwrap();
+        assert_eq!(before.principals["CHANGE1"].invalid_count, Some(0));
+        assert_eq!(
+            service
+                .racroute(&context, request("secret:change-valid", [2; 32]))
+                .unwrap(),
+            valid
+        );
+        assert_eq!(
+            service.database.read().unwrap().audits.len(),
+            before.audits.len()
+        );
+        assert_eq!(
+            service.racroute(&context, request("secret:change-valid", [3; 32])),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        resolver.insert("secret:changed", b"NEWPASS1".to_vec());
+        let verified = service
+            .racroute(
+                &saf_context(&admin, None, "CICS-CHANGE-VERIFY", 7),
+                RacrouteRequest::VerifyCredential {
+                    user,
+                    credential_reference: SecretRef::new("secret:changed", Default::default())
+                        .unwrap(),
+                    kind: CredentialKind::Password,
+                    group: None,
+                    binding_digest: [4; 32],
+                },
+            )
+            .unwrap();
+        assert_eq!(verified.status.reason, DecisionReason::Granted);
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_cics_credential_change_and_replay() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-change-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("racf.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        resolver.insert("secret:old", b"PASSWORD".to_vec());
+        let mut packet = Vec::from([0, 8, 0, 8]);
+        packet.extend_from_slice(b"PASSWORD");
+        packet.extend_from_slice(b"NEWPASS1");
+        resolver.insert("secret:change", packet);
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let user = PrincipalId::new("CHANGE1", InvocationLimits::default()).unwrap();
+        let context = saf_context(&admin, None, "CICS-CHANGE-SQLITE", 9);
+        let request = RacrouteRequest::ChangeCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:change", Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            binding_digest: [7; 32],
+        };
+        let first = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            service
+                .bootstrap_administrator(
+                    "RACFADM",
+                    &SecretRef::new("secret:admin", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service
+                .add_user(
+                    "CHANGE1",
+                    &SecretRef::new("secret:old", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service.racroute(&context, request.clone()).unwrap()
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            let before = service.database.read().unwrap();
+            assert_eq!(service.racroute(&context, request.clone()).unwrap(), first);
+            assert_eq!(
+                service.database.read().unwrap().audits.len(),
+                before.audits.len()
+            );
+            resolver.insert("secret:new", b"NEWPASS1".to_vec());
+            let verified = service
+                .racroute(
+                    &saf_context(&admin, None, "CICS-CHANGE-SQLITE-VERIFY", 10),
+                    RacrouteRequest::VerifyCredential {
+                        user,
+                        credential_reference: SecretRef::new("secret:new", Default::default())
+                            .unwrap(),
+                        kind: CredentialKind::Password,
+                        group: None,
+                        binding_digest: [8; 32],
+                    },
+                )
+                .unwrap();
+            assert_eq!(verified.status.reason, DecisionReason::Granted);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]
