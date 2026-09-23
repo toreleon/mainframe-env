@@ -128,6 +128,44 @@ pub(super) fn invalid_get_shape(
         })
 }
 
+pub(super) fn invalid_query_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::CounterName)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::CounterName,
+            CicsOperandName::CounterPool,
+        ]))
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::CounterValue,
+            CicsOutputName::CounterMinimum,
+            CicsOutputName::CounterMaximum,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle | CicsPlanOption::CounterNoSuspend
+            )
+        })
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::CounterName => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_name(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterPool => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_pool(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            _ => true,
+        })
+}
+
 pub(super) fn invalid_delete_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,

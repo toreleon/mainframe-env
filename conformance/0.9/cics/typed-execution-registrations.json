@@ -88,6 +88,20 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0088"
     },
     {
+      "operation": "QueryCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0153"
+    },
+    {
+      "operation": "QueryDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0154"
+    },
+    {
       "operation": "DeleteTemporaryStorage",
       "interface": "api",
       "family": "queue-control",

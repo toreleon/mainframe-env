@@ -54,7 +54,9 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         CicsPlanOperation::DefineCounter
         | CicsPlanOperation::DefineDCounter
         | CicsPlanOperation::DeleteCounter
-        | CicsPlanOperation::DeleteDCounter => !matches!(
+        | CicsPlanOperation::DeleteDCounter
+        | CicsPlanOperation::QueryCounter
+        | CicsPlanOperation::QueryDCounter => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::CounterNoSuspend
         ),

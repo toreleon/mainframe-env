@@ -530,9 +530,11 @@ pub(super) fn execute(
             CicsOutputName::DocumentSize => {
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::CounterValue => {
+            CicsOutputName::CounterValue
+            | CicsOutputName::CounterMinimum
+            | CicsOutputName::CounterMaximum => {
                 arguments.insert(
-                    "VALUE".into(),
+                    key.into(),
                     payload("mainframe-env.cics.output@1", Vec::new())?,
                 );
                 outputs.insert(key.into(), target);

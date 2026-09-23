@@ -105,6 +105,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::DeleteDCounter => 121,
         CicsPlanOperation::GetCounter => 122,
         CicsPlanOperation::GetDCounter => 123,
+        CicsPlanOperation::QueryCounter => 124,
+        CicsPlanOperation::QueryDCounter => 125,
     }
 }
 
@@ -197,6 +199,8 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         121 => Ok(CicsPlanOperation::DeleteDCounter),
         122 => Ok(CicsPlanOperation::GetCounter),
         123 => Ok(CicsPlanOperation::GetDCounter),
+        124 => Ok(CicsPlanOperation::QueryCounter),
+        125 => Ok(CicsPlanOperation::QueryDCounter),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -663,6 +667,8 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
         CicsOutputName::Into => 0,
         CicsOutputName::CounterValue => 440,
+        CicsOutputName::CounterMinimum => 441,
+        CicsOutputName::CounterMaximum => 442,
         CicsOutputName::Resp => 1,
         CicsOutputName::Resp2 => 2,
         CicsOutputName::Abstime => 3,
@@ -718,6 +724,8 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
     match value {
         0 => Ok(CicsOutputName::Into),
         440 => Ok(CicsOutputName::CounterValue),
+        441 => Ok(CicsOutputName::CounterMinimum),
+        442 => Ok(CicsOutputName::CounterMaximum),
         1 => Ok(CicsOutputName::Resp),
         2 => Ok(CicsOutputName::Resp2),
         3 => Ok(CicsOutputName::Abstime),

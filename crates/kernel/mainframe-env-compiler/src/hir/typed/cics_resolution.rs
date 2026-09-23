@@ -696,12 +696,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
-        HirCicsOperation::DefineCounter
-        | HirCicsOperation::DefineDCounter
-        | HirCicsOperation::DeleteCounter
-        | HirCicsOperation::DeleteDCounter
-        | HirCicsOperation::GetCounter
-        | HirCicsOperation::GetDCounter => counter_control::allowed_clauses(operation),
+        operation if counter_control::is_counter(operation) => {
+            counter_control::allowed_clauses(operation)
+        }
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -789,12 +786,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
-        HirCicsOperation::DefineCounter
-        | HirCicsOperation::DefineDCounter
-        | HirCicsOperation::DeleteCounter
-        | HirCicsOperation::DeleteDCounter
-        | HirCicsOperation::GetCounter
-        | HirCicsOperation::GetDCounter => counter_control::allowed_options(operation),
+        operation if counter_control::is_counter(operation) => {
+            counter_control::allowed_options(operation)
+        }
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -919,12 +913,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
-        HirCicsOperation::DefineCounter
-        | HirCicsOperation::DefineDCounter
-        | HirCicsOperation::DeleteCounter
-        | HirCicsOperation::DeleteDCounter
-        | HirCicsOperation::GetCounter
-        | HirCicsOperation::GetDCounter => counter_control::required(operation),
+        operation if counter_control::is_counter(operation) => counter_control::required(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput

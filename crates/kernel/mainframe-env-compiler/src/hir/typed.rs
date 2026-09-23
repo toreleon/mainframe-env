@@ -166,6 +166,8 @@ pub enum HirCicsOperation {
     DeleteDCounter,
     GetCounter,
     GetDCounter,
+    QueryCounter,
+    QueryDCounter,
     ChangeTask,
     Deq,
     Enq,

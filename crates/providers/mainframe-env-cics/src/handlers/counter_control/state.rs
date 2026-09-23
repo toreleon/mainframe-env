@@ -26,6 +26,14 @@ pub(super) struct CounterRecord {
 }
 
 impl CounterRecord {
+    pub fn current_value(&self) -> u64 {
+        if self.at_limit {
+            self.maximum.wrapping_add(1)
+        } else {
+            self.current
+        }
+    }
+
     pub fn set_current(&mut self, value: u64) {
         self.current = value;
         self.at_limit = value == self.maximum.wrapping_add(1) && value != self.minimum;

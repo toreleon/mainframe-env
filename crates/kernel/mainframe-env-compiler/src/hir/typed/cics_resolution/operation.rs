@@ -25,6 +25,8 @@ pub(super) fn resolve(
         ["DELETE", "DCOUNTER"] => HirCicsOperation::DeleteDCounter,
         ["GET", "COUNTER"] => HirCicsOperation::GetCounter,
         ["GET", "DCOUNTER"] => HirCicsOperation::GetDCounter,
+        ["QUERY", "COUNTER"] => HirCicsOperation::QueryCounter,
+        ["QUERY", "DCOUNTER"] => HirCicsOperation::QueryDCounter,
         ["ENQ"] => HirCicsOperation::Enq,
         ["HANDLE", "ABEND"] => HirCicsOperation::HandleAbend,
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,

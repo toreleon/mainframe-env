@@ -14,6 +14,8 @@ pub(super) const fn is_counter(operation: HirCicsOperation) -> bool {
             | HirCicsOperation::DeleteDCounter
             | HirCicsOperation::GetCounter
             | HirCicsOperation::GetDCounter
+            | HirCicsOperation::QueryCounter
+            | HirCicsOperation::QueryDCounter
     )
 }
 
@@ -47,6 +49,12 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
             "RESP",
             "RESP2",
         ],
+        HirCicsOperation::QueryCounter => &[
+            "COUNTER", "POOL", "VALUE", "MINIMUM", "MAXIMUM", "RESP", "RESP2",
+        ],
+        HirCicsOperation::QueryDCounter => &[
+            "DCOUNTER", "POOL", "VALUE", "MINIMUM", "MAXIMUM", "RESP", "RESP2",
+        ],
         _ => unreachable!("counter clause contract requested for another operation"),
     }
 }
@@ -68,6 +76,8 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::DefineDCounter | HirCicsOperation::DeleteDCounter => &["DCOUNTER"],
         HirCicsOperation::GetCounter => &["COUNTER", "VALUE"],
         HirCicsOperation::GetDCounter => &["DCOUNTER", "VALUE"],
+        HirCicsOperation::QueryCounter => &["COUNTER"],
+        HirCicsOperation::QueryDCounter => &["DCOUNTER"],
         _ => unreachable!("counter required clause contract requested for another operation"),
     }
 }
@@ -137,12 +147,17 @@ pub(super) fn operands(
             ("COMPAREMIN", HirCicsOperandName::CounterCompareMin),
             ("COMPAREMAX", HirCicsOperandName::CounterCompareMax),
         ]
-    } else {
+    } else if matches!(
+        operation,
+        HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter
+    ) {
         &[
             ("VALUE", HirCicsOperandName::CounterValue),
             ("MINIMUM", HirCicsOperandName::CounterMinimum),
             ("MAXIMUM", HirCicsOperandName::CounterMaximum),
         ]
+    } else {
+        &[]
     };
     for &(label, name) in numeric {
         let Some(tokens) = clauses.get(label) else {
@@ -162,27 +177,48 @@ pub(super) fn outputs(
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
     if !matches!(
         operation,
-        HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+        HirCicsOperation::GetCounter
+            | HirCicsOperation::GetDCounter
+            | HirCicsOperation::QueryCounter
+            | HirCicsOperation::QueryDCounter
     ) {
         return Ok(Vec::new());
     }
-    let target = complete_data_reference(&clauses["VALUE"], semantic)?;
-    require_writable(&target)?;
-    let doubleword = operation == HirCicsOperation::GetDCounter;
-    if target.usage != CobolUsage::Binary
-        || target.length != if doubleword { 8 } else { 4 }
-        || target.scale != 0
-        || target.signed == doubleword
-    {
-        return Err(ResolutionFailure::Invalid(
-            "CICS GET counter VALUE requires matching signed fullword or unsigned doubleword storage"
-                .into(),
-        ));
+    let doubleword = matches!(
+        operation,
+        HirCicsOperation::GetDCounter | HirCicsOperation::QueryDCounter
+    );
+    let labels: &[(&str, HirCicsOutputName)] = if matches!(
+        operation,
+        HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+    ) {
+        &[("VALUE", HirCicsOutputName::CounterValue)]
+    } else {
+        &[
+            ("VALUE", HirCicsOutputName::CounterValue),
+            ("MINIMUM", HirCicsOutputName::CounterMinimum),
+            ("MAXIMUM", HirCicsOutputName::CounterMaximum),
+        ]
+    };
+    let mut outputs = Vec::new();
+    for &(label, name) in labels {
+        let Some(tokens) = clauses.get(label) else {
+            continue;
+        };
+        let target = complete_data_reference(tokens, semantic)?;
+        require_writable(&target)?;
+        if target.usage != CobolUsage::Binary
+            || target.length != if doubleword { 8 } else { 4 }
+            || target.scale != 0
+            || target.signed == doubleword
+        {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS counter {label} requires matching signed fullword or unsigned doubleword storage"
+            )));
+        }
+        outputs.push(HirCicsOutputBinding { name, target });
     }
-    Ok(vec![HirCicsOutputBinding {
-        name: HirCicsOutputName::CounterValue,
-        target,
-    }])
+    Ok(outputs)
 }
 
 fn validate_text(

@@ -3,6 +3,8 @@ use mainframe_env_ir::CicsAssignOutput;
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
     CounterValue,
+    CounterMinimum,
+    CounterMaximum,
     Abstime,
     Commarea,
     Into,

@@ -41,6 +41,10 @@ pub enum CicsPlanOperation {
     GetCounter,
     /// IBM GET named-counter command.
     GetDCounter,
+    /// IBM QUERY named-counter command.
+    QueryCounter,
+    /// IBM QUERY named-counter command.
+    QueryDCounter,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -621,6 +625,10 @@ pub enum CicsPlanOption {
 pub enum CicsOutputName {
     /// Current named-counter value returned by GET or QUERY.
     CounterValue,
+    /// Defined named-counter lower bound returned by QUERY.
+    CounterMinimum,
+    /// Defined named-counter upper bound returned by QUERY.
+    CounterMaximum,
     /// Record payload destination.
     Into,
     /// Pointer receiving interpreter-owned retrieved storage.

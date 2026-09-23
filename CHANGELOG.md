@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS QUERY COUNTER and QUERY DCOUNTER for current, minimum,
+  and maximum outputs, including normal one-past-maximum reporting and
+  source-defined signed fullword LENGERR warnings on wide counters. IBM CICS
+  TS 6.x application API `dfhp4_querycounter.html`, rows 0153/0154.
+
 - Added typed CICS GET COUNTER and GET DCOUNTER with atomic current-value
   allocation, increment ranges, inclusive comparisons, REDUCE and WRAP,
   at-limit SUPPRESSED conditions, fullword LENGERR warning, and replay.

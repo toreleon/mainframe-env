@@ -8,12 +8,14 @@ pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Optio
         Some(
             CicsPlanOperation::DefineCounter
             | CicsPlanOperation::DeleteCounter
-            | CicsPlanOperation::GetCounter,
+            | CicsPlanOperation::GetCounter
+            | CicsPlanOperation::QueryCounter,
         ) => Some((4, true)),
         Some(
             CicsPlanOperation::DefineDCounter
             | CicsPlanOperation::DeleteDCounter
-            | CicsPlanOperation::GetDCounter,
+            | CicsPlanOperation::GetDCounter
+            | CicsPlanOperation::QueryDCounter,
         ) => Some((8, false)),
         _ => None,
     }
@@ -133,7 +135,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
-        CicsOutputName::CounterValue => SlotUse::CounterNumber,
+        CicsOutputName::CounterValue
+        | CicsOutputName::CounterMinimum
+        | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
@@ -194,6 +198,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DeleteDCounter => CicsOperation::DeleteDCounter,
         CicsPlanOperation::GetCounter => CicsOperation::GetCounter,
         CicsPlanOperation::GetDCounter => CicsOperation::GetDCounter,
+        CicsPlanOperation::QueryCounter => CicsOperation::QueryCounter,
+        CicsPlanOperation::QueryDCounter => CicsOperation::QueryDCounter,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -447,6 +453,7 @@ pub(super) const fn operand_for(
         CicsPlanOperation::DefineDCounter
             | CicsPlanOperation::DeleteDCounter
             | CicsPlanOperation::GetDCounter
+            | CicsPlanOperation::QueryDCounter
     ) && matches!(name, CicsOperandName::CounterName)
     {
         "DCOUNTER"
@@ -458,6 +465,8 @@ pub(super) const fn operand_for(
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
         CicsOutputName::CounterValue => "VALUE",
+        CicsOutputName::CounterMinimum => "MINIMUM",
+        CicsOutputName::CounterMaximum => "MAXIMUM",
         CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",

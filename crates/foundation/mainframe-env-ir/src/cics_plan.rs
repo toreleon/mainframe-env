@@ -649,6 +649,9 @@ fn validate_operation_shape(
         CicsPlanOperation::GetCounter | CicsPlanOperation::GetDCounter => {
             counter_control::invalid_get_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::QueryCounter | CicsPlanOperation::QueryDCounter => {
+            counter_control::invalid_query_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }

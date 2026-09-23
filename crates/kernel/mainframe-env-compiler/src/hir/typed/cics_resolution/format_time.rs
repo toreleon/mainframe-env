@@ -148,6 +148,8 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebEprSet
         | HirCicsOutputName::WebEprLength
         | HirCicsOutputName::CounterValue
+        | HirCicsOutputName::CounterMinimum
+        | HirCicsOutputName::CounterMaximum
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

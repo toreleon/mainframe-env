@@ -34,6 +34,10 @@ pub enum CicsOperation {
     GetCounter,
     /// Execute IBM GET against an unsigned doubleword named counter.
     GetDCounter,
+    /// Execute IBM QUERY against a signed fullword named counter.
+    QueryCounter,
+    /// Execute IBM QUERY against an unsigned doubleword named counter.
+    QueryDCounter,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -184,6 +188,8 @@ impl CicsOperation {
             Self::DeleteDCounter => "DeleteDCounter",
             Self::GetCounter => "GetCounter",
             Self::GetDCounter => "GetDCounter",
+            Self::QueryCounter => "QueryCounter",
+            Self::QueryDCounter => "QueryDCounter",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -272,6 +278,8 @@ impl CicsOperation {
                 | Self::DeleteDCounter
                 | Self::GetCounter
                 | Self::GetDCounter
+                | Self::QueryCounter
+                | Self::QueryDCounter
         )
     }
 
@@ -379,6 +387,8 @@ impl CicsOperation {
             ("DELETE", Some("DCOUNTER")) => Self::DeleteDCounter,
             ("GET", Some("COUNTER")) => Self::GetCounter,
             ("GET", Some("DCOUNTER")) => Self::GetDCounter,
+            ("QUERY", Some("COUNTER")) => Self::QueryCounter,
+            ("QUERY", Some("DCOUNTER")) => Self::QueryDCounter,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,

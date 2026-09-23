@@ -26780,4 +26780,51 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn named_counter_query_reports_at_limit_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"READONLY")),
+                ("VALUE".into(), cics_decimal(3)),
+                ("MAXIMUM".into(), cics_decimal(2)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let query = CicsRequest {
+            operation: CicsOperation::QueryCounter,
+            arguments: BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"READONLY")),
+                ("VALUE".into(), argument(b"")),
+                ("MINIMUM".into(), argument(b"")),
+                ("MAXIMUM".into(), argument(b"")),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        };
+        let before = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let reply = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 2), query)
+            .unwrap();
+        assert_eq!(reply.condition, "NORMAL");
+        assert_eq!(reply.outputs["VALUE"].bytes(), b"3");
+        assert_eq!(reply.outputs["MINIMUM"].bytes(), b"0");
+        assert_eq!(reply.outputs["MAXIMUM"].bytes(), b"2");
+        assert_eq!(
+            store
+                .get_provider_state("cics-counter-control-v1", "state")
+                .unwrap()
+                .unwrap(),
+            before
+        );
+    }
 }
