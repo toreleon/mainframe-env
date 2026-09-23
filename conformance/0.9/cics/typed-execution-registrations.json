@@ -627,6 +627,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0240"
     },
     {
+      "operation": "WebExtract",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0243"
+    },
+    {
       "operation": "WebOpen",
       "interface": "api",
       "family": "web-control",

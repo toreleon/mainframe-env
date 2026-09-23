@@ -370,6 +370,9 @@ pub(super) fn execute(
                         | CicsOperandName::WebHostLength
                         | CicsOperandName::WebPathLength
                         | CicsOperandName::WebQueryStringLength
+                        | CicsOperandName::WebMethodLength
+                        | CicsOperandName::WebVersionLength
+                        | CicsOperandName::WebRealmLength
                         | CicsOperandName::WebPortNumber
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
@@ -503,6 +506,15 @@ pub(super) fn execute(
             | CicsOutputName::WebSessionToken
             | CicsOutputName::WebHttpVNum
             | CicsOutputName::WebHttpRNum
+            | CicsOutputName::WebScheme
+            | CicsOutputName::WebHttpMethod
+            | CicsOutputName::WebMethodLength
+            | CicsOutputName::WebHttpVersion
+            | CicsOutputName::WebVersionLength
+            | CicsOutputName::WebRequestType
+            | CicsOutputName::WebUriMap
+            | CicsOutputName::WebRealm
+            | CicsOutputName::WebRealmLength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

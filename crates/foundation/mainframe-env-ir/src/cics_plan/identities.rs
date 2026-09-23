@@ -254,6 +254,8 @@ pub enum CicsPlanOperation {
     WebOpen,
     /// Close one task-owned HTTP client session.
     WebClose,
+    /// Extract metadata from one inbound request or client session.
+    WebExtract,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -697,6 +699,12 @@ pub enum CicsOperandName {
     WebCodePage,
     /// Eight-byte client session token supplied to WEB CLOSE.
     WebSessionToken,
+    /// Fullword input capacity for the HTTP method result.
+    WebMethodLength,
+    /// Fullword input capacity for the HTTP version result.
+    WebVersionLength,
+    /// Fullword input capacity for the HTTP authentication realm result.
+    WebRealmLength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -1007,4 +1015,22 @@ pub enum CicsOutputName {
     WebHttpVNum,
     /// Server HTTP minor protocol number.
     WebHttpRNum,
+    /// HTTP or HTTPS scheme CVDA.
+    WebScheme,
+    /// HTTP request method.
+    WebHttpMethod,
+    /// Actual HTTP method length.
+    WebMethodLength,
+    /// HTTP protocol version string.
+    WebHttpVersion,
+    /// Actual HTTP version string length.
+    WebVersionLength,
+    /// HTTPYES or HTTPNO request-type CVDA.
+    WebRequestType,
+    /// Selected inbound or client URIMAP name.
+    WebUriMap,
+    /// Latest HTTP 401 authentication realm.
+    WebRealm,
+    /// Actual realm length.
+    WebRealmLength,
 }

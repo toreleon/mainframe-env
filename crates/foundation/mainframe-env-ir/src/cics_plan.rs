@@ -640,6 +640,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WebParseUrl => web_control::invalid_parse_url_shape(plan, inputs, outputs),
         CicsPlanOperation::WebOpen => web_control::invalid_open_shape(plan, inputs, outputs),
         CicsPlanOperation::WebClose => web_control::invalid_close_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebExtract => web_control::invalid_extract_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2028,6 +2029,70 @@ mod tests {
         );
         assert_eq!(
             encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_extract_uses_reserved_v2_tags_and_checked_length_pair() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebExtract), 94);
+        assert_eq!(operation_from_tag(94), Ok(CicsPlanOperation::WebExtract));
+        for (name, tag) in [
+            (CicsOperandName::WebMethodLength, 268),
+            (CicsOperandName::WebVersionLength, 269),
+            (CicsOperandName::WebRealmLength, 270),
+        ] {
+            assert!((256..=319).contains(&tag));
+            assert_eq!(operand_tag(name), tag);
+            assert_eq!(operand_from_tag(tag), Ok(name));
+        }
+        for (name, tag) in [
+            (CicsOutputName::WebScheme, 324),
+            (CicsOutputName::WebHttpMethod, 325),
+            (CicsOutputName::WebMethodLength, 326),
+            (CicsOutputName::WebHttpVersion, 327),
+            (CicsOutputName::WebVersionLength, 328),
+            (CicsOutputName::WebRequestType, 329),
+            (CicsOutputName::WebUriMap, 330),
+            (CicsOutputName::WebRealm, 331),
+            (CicsOutputName::WebRealmLength, 332),
+        ] {
+            assert!((312..=375).contains(&tag));
+            assert_eq!(output_tag(name), tag);
+            assert_eq!(output_from_tag(tag), Ok(name));
+        }
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebExtract,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::WebHostLength,
+                value: CicsOperandValue::Storage(slot(1, "HOST-LEN")),
+            }],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::WebHost,
+                    target: slot(2, "HOST-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebHostLength,
+                    target: slot(1, "HOST-LEN"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut invalid = plan;
+        invalid.outputs.remove(1);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

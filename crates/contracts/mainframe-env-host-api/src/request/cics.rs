@@ -235,6 +235,8 @@ pub enum CicsOperation {
     WebOpen,
     /// Release one task-owned client connection and invalidate its token.
     WebClose,
+    /// Extract metadata from the current inbound request or an open client session.
+    WebExtract,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -379,6 +381,7 @@ impl CicsOperation {
             Self::WebParseUrl => "WebParseUrl",
             Self::WebOpen => "WebOpen",
             Self::WebClose => "WebClose",
+            Self::WebExtract => "WebExtract",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -656,6 +659,7 @@ impl CicsOperation {
             ("WEB", Some("PARSE")) => Self::WebParseUrl,
             ("WEB", Some("OPEN")) => Self::WebOpen,
             ("WEB", Some("CLOSE")) => Self::WebClose,
+            ("WEB", Some("EXTRACT")) => Self::WebExtract,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

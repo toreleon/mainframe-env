@@ -9,6 +9,9 @@ pub(super) fn output_capacity(
         CicsOutputName::WebHost => "HOST.MAXLENGTH",
         CicsOutputName::WebPath => "PATH.MAXLENGTH",
         CicsOutputName::WebQueryString => "QUERYSTRING.MAXLENGTH",
+        CicsOutputName::WebHttpMethod => "HTTPMETHOD.MAXLENGTH",
+        CicsOutputName::WebHttpVersion => "HTTPVERSION.MAXLENGTH",
+        CicsOutputName::WebRealm => "REALM.MAXLENGTH",
         _ => return Ok(None),
     };
     let CicsTarget::Resolved(slot) = target else {

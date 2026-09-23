@@ -74,7 +74,7 @@ pub struct CicsLimits {
     pub max_web_headers: usize,
 }
 
-pub use handlers::CicsFileDefinition;
+pub use handlers::{CicsFileDefinition, CicsWebInboundRequest};
 
 /// Durable document-template definition used by `DOCUMENT CREATE` and `INSERT`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 132);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 133);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7831,6 +7831,220 @@ mod tests {
     }
 
     #[test]
+    fn web_extract_reads_bound_inbound_request_and_reports_short_buffers() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("web-extract", BTreeMap::new());
+        let session = SessionId::new("web-extract", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "WEBX", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTPS".into(),
+                    host: "example.com".into(),
+                    port: 443,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/orders".into(),
+                    query: "x=%2F".into(),
+                    urimap: Some("ORDERS".into()),
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let mut extract = request(
+            CicsOperation::WebExtract,
+            BTreeMap::from([
+                ("HOST".into(), argument(b"HOST-X")),
+                ("HOSTLENGTH".into(), cics_decimal(4)),
+                ("HTTPMETHOD".into(), argument(b"METHOD-X")),
+                ("METHODLENGTH".into(), cics_decimal(8)),
+                ("PATH".into(), argument(b"PATH-X")),
+                ("PATHLENGTH".into(), cics_decimal(16)),
+                ("QUERYSTRING".into(), argument(b"QUERY-X")),
+                ("QUERYSTRLEN".into(), cics_decimal(16)),
+                ("SCHEME".into(), argument(b"SCHEME-X")),
+                ("REQUESTTYPE".into(), argument(b"TYPE-X")),
+                ("URIMAP".into(), argument(b"URIMAP-X")),
+            ]),
+            1,
+        );
+        extract.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let short = service
+            .invoke(
+                &effect(&invocation.run_unit_id, extract.clone(), 1),
+                extract.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (short.condition.as_str(), short.response, short.response2),
+            ("LENGERR", 22, 29)
+        );
+        assert_eq!(short.outputs["HOST"].bytes(), b"exam");
+        assert_eq!(short.outputs["HOSTLENGTH"].bytes(), b"11");
+        assert_eq!(short.outputs["HTTPMETHOD"].bytes(), b"GET");
+        assert_eq!(short.outputs["PATH"].bytes(), b"/orders");
+        assert_eq!(short.outputs["QUERYSTRING"].bytes(), b"x=%2F");
+        assert_eq!(short.outputs["SCHEME"].bytes(), b"2");
+        assert_eq!(short.outputs["REQUESTTYPE"].bytes(), b"1");
+        assert_eq!(short.outputs["URIMAP"].bytes(), b"ORDERS");
+        extract
+            .arguments
+            .insert("HOSTLENGTH".into(), cics_decimal(32));
+        let complete = service
+            .invoke(
+                &effect(&invocation.run_unit_id, extract.clone(), 2),
+                extract,
+            )
+            .unwrap();
+        assert_eq!(complete.condition, "NORMAL");
+        assert_eq!(complete.outputs["HOST"].bytes(), b"example.com");
+        let mut bad_token = request(
+            CicsOperation::WebExtract,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(b"BADTOKEN")),
+                ("SCHEME".into(), argument(b"SCHEME-X")),
+            ]),
+            3,
+        );
+        bad_token.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let missing = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bad_token.clone(), 3),
+                bad_token,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                missing.condition.as_str(),
+                missing.response,
+                missing.response2
+            ),
+            ("NOTOPEN", 19, 27)
+        );
+        let malformed = request(
+            CicsOperation::WebExtract,
+            BTreeMap::from([("HOST".into(), argument(b"HOST-X"))]),
+            4,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 4),
+                malformed
+            ),
+            Err(HostProblem::Malformed)
+        );
+        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        assert!(service.lock().unwrap().web.inbound.is_empty());
+    }
+
+    #[test]
+    fn web_close_releases_session_once_and_replays_after_unknown_outcome() {
+        struct TransportProbe(AtomicUsize);
+        impl CicsWebTransport for TransportProbe {
+            fn open(
+                &self,
+                _: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let transport = Arc::new(TransportProbe(AtomicUsize::new(0)));
+        service.install_web_transport(transport.clone()).unwrap();
+        let invocation = invocation_for("web-close", BTreeMap::new());
+        let session = SessionId::new("web-close", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("HOST".into(), cics_literal(b"example.com")),
+                ("HOSTLENGTH".into(), cics_decimal(11)),
+                ("SCHEME".into(), cics_literal(b"HTTP")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            1,
+        );
+        let opened = service
+            .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+            .unwrap();
+        let token = opened.outputs["SESSTOKEN"].bytes();
+        let close = request(
+            CicsOperation::WebClose,
+            BTreeMap::from([("SESSTOKEN".into(), argument(token))]),
+            2,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, close.clone(), 2),
+                close.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(transport.0.load(Ordering::SeqCst), 1);
+        assert!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 2), close)
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        assert_eq!(transport.0.load(Ordering::SeqCst), 1);
+        let mut again = request(
+            CicsOperation::WebClose,
+            BTreeMap::from([("SESSTOKEN".into(), argument(token))]),
+            3,
+        );
+        again.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let invalid = service
+            .invoke(&effect(&invocation.run_unit_id, again.clone(), 3), again)
+            .unwrap();
+        assert_eq!(
+            (
+                invalid.condition.as_str(),
+                invalid.response,
+                invalid.response2
+            ),
+            ("NOTOPEN", 19, 27)
+        );
+    }
+
+    #[test]
     fn web_open_urimap_state_survives_sqlite_reopen() {
         struct StaticTransport;
         impl CicsWebTransport for StaticTransport {
@@ -7906,6 +8120,58 @@ mod tests {
         assert_eq!(state.web.urimaps["ORDERS"].path, "/orders");
         assert!(state.web.sessions.values().next().unwrap().pooled);
         drop(state);
+        reopened
+            .install_web_transport(Arc::new(StaticTransport))
+            .unwrap();
+        reopened
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let extract = request(
+            CicsOperation::WebExtract,
+            BTreeMap::from([
+                (
+                    "SESSTOKEN".into(),
+                    argument(response.outputs["SESSTOKEN"].bytes()),
+                ),
+                ("HOST".into(), argument(b"HOST-X")),
+                ("HOSTLENGTH".into(), cics_decimal(32)),
+                ("PATH".into(), argument(b"PATH-X")),
+                ("PATHLENGTH".into(), cics_decimal(32)),
+                ("HTTPVERSION".into(), argument(b"VERSION-X")),
+                ("VERSIONLEN".into(), cics_decimal(8)),
+                ("URIMAP".into(), argument(b"URIMAP-X")),
+            ]),
+            2,
+        );
+        let metadata = reopened
+            .invoke(
+                &effect(&invocation.run_unit_id, extract.clone(), 2),
+                extract,
+            )
+            .unwrap();
+        assert_eq!(metadata.outputs["HOST"].bytes(), b"example.com");
+        assert_eq!(metadata.outputs["PATH"].bytes(), b"/orders");
+        assert_eq!(metadata.outputs["HTTPVERSION"].bytes(), b"1.1");
+        assert_eq!(metadata.outputs["VERSIONLEN"].bytes(), b"3");
+        assert_eq!(metadata.outputs["URIMAP"].bytes(), b"ORDERS");
+        let close = request(
+            CicsOperation::WebClose,
+            BTreeMap::from([(
+                "SESSTOKEN".into(),
+                argument(response.outputs["SESSTOKEN"].bytes()),
+            )]),
+            2,
+        );
+        let closed = reopened
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 2), close)
+            .unwrap();
+        assert_eq!(closed.condition, "NORMAL");
+        assert!(
+            reopened_store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
         drop(reopened);
         std::fs::remove_dir_all(directory).unwrap();
     }

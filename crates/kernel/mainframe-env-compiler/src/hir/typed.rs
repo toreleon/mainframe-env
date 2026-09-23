@@ -6960,6 +6960,76 @@ mod tests {
     }
 
     #[test]
+    fn web_extract_lowers_server_outputs_and_client_token() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBEXTRACT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 HOST-X PIC X(32). 01 HOST-LEN PIC S9(9) COMP VALUE 32. 01 PATH-X PIC X(32). 01 PATH-LEN PIC S9(9) COMP VALUE 32. 01 METHOD-X PIC X(8). 01 METHOD-LEN PIC S9(9) COMP VALUE 8. 01 SCHEME-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
+        for command in [
+            "WEB EXTRACT HOST(HOST-X) HOSTLENGTH(HOST-LEN) PATH(PATH-X) PATHLENGTH(PATH-LEN) HTTPMETHOD(METHOD-X) METHODLENGTH(METHOD-LEN) SCHEME(SCHEME-X)",
+            "WEB EXTRACT SESSTOKEN(TOKEN-X) HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(SCHEME-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed WEB EXTRACT");
+            assert_eq!(command.operation, HirCicsOperation::WebExtract);
+            assert!(command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::WebScheme
+                    && output.target.qualified_name == "SCHEME-X"
+            }));
+        }
+        for command in [
+            "WEB EXTRACT HOST(HOST-X)",
+            "WEB EXTRACT SESSTOKEN(TOKEN-X) HTTPMETHOD(METHOD-X) METHODLENGTH(METHOD-LEN)",
+            "WEB EXTRACT SESSTOKEN(TOKEN-X) REALM(PATH-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn web_close_lowers_session_token_and_rejects_wrong_storage() {
+        let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBCLOSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
+        let analysis = analyze(&format!(
+            "{prefix}EXEC CICS WEB CLOSE SESSTOKEN(TOKEN-X) END-EXEC. STOP RUN."
+        ));
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WEB CLOSE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WEB CLOSE");
+        assert_eq!(command.operation, HirCicsOperation::WebClose);
+        assert_eq!(
+            command.operands[0].name,
+            HirCicsOperandName::WebSessionToken
+        );
+        for source in [
+            "EXEC CICS WEB CLOSE END-EXEC.",
+            "EXEC CICS WEB CLOSE SESSTOKEN(TOKEN-X) HOST(TOKEN-X) END-EXEC.",
+        ] {
+            let analysis = analyze(&format!("{prefix}{source} STOP RUN."));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn web_open_lowers_bounded_direct_endpoint_and_session_token() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBOPEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 HOST-X PIC X(11) VALUE 'example.com'. 01 HOST-LEN PIC S9(9) COMP VALUE 11. 01 TOKEN-X PIC X(8). 01 VNUM-X PIC S9(4) COMP. 01 RNUM-X PIC S9(4) COMP. PROCEDURE DIVISION. ";
         let source = format!(

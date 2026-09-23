@@ -65,4 +65,13 @@ pub enum HirCicsOutputName {
     WebSessionToken,
     WebHttpVNum,
     WebHttpRNum,
+    WebScheme,
+    WebHttpMethod,
+    WebMethodLength,
+    WebHttpVersion,
+    WebVersionLength,
+    WebRequestType,
+    WebUriMap,
+    WebRealm,
+    WebRealmLength,
 }

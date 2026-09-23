@@ -14,7 +14,24 @@ pub(super) fn reviewed_ambiguous_shape(
     has_value
         && matches!(
             (descriptor.label_tokens, name),
-            (["WEB", "OPEN"], "SCHEME") | (["WEB", "PARSE", "URL"], "HOSTTYPE")
+            (["WEB", "OPEN"], "SCHEME")
+                | (["WEB", "PARSE", "URL"], "HOSTTYPE")
+                | (["WEB", "EXTRACT"], "HOST")
+                | (["WEB", "EXTRACT"], "HOSTTYPE")
+                | (["WEB", "EXTRACT"], "HTTPMETHOD")
+                | (["WEB", "EXTRACT"], "HTTPVERSION")
+                | (["WEB", "EXTRACT"], "METHODLENGTH")
+                | (["WEB", "EXTRACT"], "PATH")
+                | (["WEB", "EXTRACT"], "PATHLENGTH")
+                | (["WEB", "EXTRACT"], "PORTNUMBER")
+                | (["WEB", "EXTRACT"], "QUERYSTRING")
+                | (["WEB", "EXTRACT"], "QUERYSTRLEN")
+                | (["WEB", "EXTRACT"], "REALM")
+                | (["WEB", "EXTRACT"], "REALMLEN")
+                | (["WEB", "EXTRACT"], "REQUESTTYPE")
+                | (["WEB", "EXTRACT"], "SCHEME")
+                | (["WEB", "EXTRACT"], "URIMAP")
+                | (["WEB", "EXTRACT"], "VERSIONLEN")
         )
 }
 
@@ -48,12 +65,37 @@ pub(super) const OPEN_CLAUSES: &[&str] = &[
     "RESP2",
 ];
 pub(super) const CLOSE_CLAUSES: &[&str] = &["SESSTOKEN", "RESP", "RESP2"];
+pub(super) const EXTRACT_CLAUSES: &[&str] = &[
+    "SESSTOKEN",
+    "SCHEME",
+    "HOST",
+    "HOSTLENGTH",
+    "HOSTTYPE",
+    "HTTPMETHOD",
+    "METHODLENGTH",
+    "HTTPVERSION",
+    "VERSIONLEN",
+    "PATH",
+    "PATHLENGTH",
+    "PORTNUMBER",
+    "QUERYSTRING",
+    "QUERYSTRLEN",
+    "REQUESTTYPE",
+    "URIMAP",
+    "REALM",
+    "REALMLEN",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate(
     clauses: &Clauses,
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::WebExtract {
+        return validate_extract(clauses, semantic);
+    }
     if operation == HirCicsOperation::WebClose {
         let tokens = clauses.get("SESSTOKEN").ok_or_else(|| {
             ResolutionFailure::Invalid("CICS WEB CLOSE requires SESSTOKEN".into())
@@ -290,6 +332,9 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::WebExtract {
+        return extract_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::WebClose {
         return Ok(vec![HirCicsNamedOperand {
             name: HirCicsOperandName::WebSessionToken,
@@ -370,6 +415,9 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation == HirCicsOperation::WebExtract {
+        return extract_outputs(clauses, semantic);
+    }
     if operation == HirCicsOperation::WebOpen {
         return open_outputs(clauses, semantic);
     }
@@ -407,6 +455,156 @@ fn open_outputs(
         ("SESSTOKEN", HirCicsOutputName::WebSessionToken),
         ("HTTPVNUM", HirCicsOutputName::WebHttpVNum),
         ("HTTPRNUM", HirCicsOutputName::WebHttpRNum),
+    ] {
+        if let Some(tokens) = clauses.get(source) {
+            outputs.push(HirCicsOutputBinding {
+                name,
+                target: complete_data_reference(tokens, semantic)?,
+            });
+        }
+    }
+    Ok(outputs)
+}
+
+fn validate_extract(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    let client = clauses.contains_key("SESSTOKEN");
+    if client {
+        let value = cics_value(&clauses["SESSTOKEN"], semantic)?;
+        if !matches!(
+            &value,
+            HirCicsValue::Data(reference) if reference.length == 8
+        ) && !matches!(&value, HirCicsValue::Literal(bytes) if bytes.len() == 8)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB EXTRACT SESSTOKEN requires eight bytes".into(),
+            ));
+        }
+        if [
+            "HTTPMETHOD",
+            "METHODLENGTH",
+            "QUERYSTRING",
+            "QUERYSTRLEN",
+            "REQUESTTYPE",
+        ]
+        .iter()
+        .any(|name| clauses.contains_key(*name))
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB EXTRACT client form forbids server-only results".into(),
+            ));
+        }
+    } else if ["REALM", "REALMLEN"]
+        .iter()
+        .any(|name| clauses.contains_key(*name))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB EXTRACT server form forbids client REALM".into(),
+        ));
+    }
+    for (area, length) in [
+        ("HOST", "HOSTLENGTH"),
+        ("HTTPMETHOD", "METHODLENGTH"),
+        ("HTTPVERSION", "VERSIONLEN"),
+        ("PATH", "PATHLENGTH"),
+        ("QUERYSTRING", "QUERYSTRLEN"),
+        ("REALM", "REALMLEN"),
+    ] {
+        if clauses.contains_key(area) != clauses.contains_key(length) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS WEB EXTRACT {area} and {length} must occur together"
+            )));
+        }
+        if let Some(tokens) = clauses.get(area) {
+            let target = complete_data_reference(tokens, semantic)?;
+            require_writable(&target)?;
+            if target.length == 0 {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS WEB EXTRACT {area} requires receiving storage"
+                )));
+            }
+        }
+        if let Some(tokens) = clauses.get(length) {
+            fullword_target(tokens, semantic, length)?;
+        }
+    }
+    for name in ["SCHEME", "HOSTTYPE", "PORTNUMBER", "REQUESTTYPE"] {
+        if let Some(tokens) = clauses.get(name) {
+            fullword_target(tokens, semantic, name)?;
+        }
+    }
+    if let Some(tokens) = clauses.get("URIMAP") {
+        let target = complete_data_reference(tokens, semantic)?;
+        require_writable(&target)?;
+        if target.length != 8 {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB EXTRACT URIMAP requires eight-byte storage".into(),
+            ));
+        }
+    }
+    if !EXTRACT_CLAUSES
+        .iter()
+        .filter(|name| !matches!(**name, "SESSTOKEN" | "RESP" | "RESP2"))
+        .any(|name| clauses.contains_key(*name))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB EXTRACT requires a result area".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn extract_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = Vec::new();
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::WebSessionToken,
+            value: cics_value(tokens, semantic)?,
+        });
+    }
+    for (source, name) in [
+        ("HOSTLENGTH", HirCicsOperandName::WebHostLength),
+        ("METHODLENGTH", HirCicsOperandName::WebMethodLength),
+        ("VERSIONLEN", HirCicsOperandName::WebVersionLength),
+        ("PATHLENGTH", HirCicsOperandName::WebPathLength),
+        ("QUERYSTRLEN", HirCicsOperandName::WebQueryStringLength),
+        ("REALMLEN", HirCicsOperandName::WebRealmLength),
+    ] {
+        if let Some(tokens) = clauses.get(source) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: HirCicsValue::Data(complete_data_reference(tokens, semantic)?),
+            });
+        }
+    }
+    Ok(operands)
+}
+
+fn extract_outputs(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    let mut outputs = Vec::new();
+    for (source, name) in [
+        ("SCHEME", HirCicsOutputName::WebScheme),
+        ("HOST", HirCicsOutputName::WebHost),
+        ("HOSTLENGTH", HirCicsOutputName::WebHostLength),
+        ("HOSTTYPE", HirCicsOutputName::WebHostType),
+        ("HTTPMETHOD", HirCicsOutputName::WebHttpMethod),
+        ("METHODLENGTH", HirCicsOutputName::WebMethodLength),
+        ("HTTPVERSION", HirCicsOutputName::WebHttpVersion),
+        ("VERSIONLEN", HirCicsOutputName::WebVersionLength),
+        ("PATH", HirCicsOutputName::WebPath),
+        ("PATHLENGTH", HirCicsOutputName::WebPathLength),
+        ("PORTNUMBER", HirCicsOutputName::WebPortNumber),
+        ("QUERYSTRING", HirCicsOutputName::WebQueryString),
+        ("QUERYSTRLEN", HirCicsOutputName::WebQueryStringLength),
+        ("REQUESTTYPE", HirCicsOutputName::WebRequestType),
+        ("URIMAP", HirCicsOutputName::WebUriMap),
+        ("REALM", HirCicsOutputName::WebRealm),
+        ("REALMLEN", HirCicsOutputName::WebRealmLength),
     ] {
         if let Some(tokens) = clauses.get(source) {
             outputs.push(HirCicsOutputBinding {

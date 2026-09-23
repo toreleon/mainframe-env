@@ -169,6 +169,15 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebSessionToken
         | HirCicsOutputName::WebHttpVNum
         | HirCicsOutputName::WebHttpRNum
+        | HirCicsOutputName::WebScheme
+        | HirCicsOutputName::WebHttpMethod
+        | HirCicsOutputName::WebMethodLength
+        | HirCicsOutputName::WebHttpVersion
+        | HirCicsOutputName::WebVersionLength
+        | HirCicsOutputName::WebRequestType
+        | HirCicsOutputName::WebUriMap
+        | HirCicsOutputName::WebRealm
+        | HirCicsOutputName::WebRealmLength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

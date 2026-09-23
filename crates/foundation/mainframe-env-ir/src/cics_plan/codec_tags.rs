@@ -106,6 +106,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::WebParseUrl => 91,
         CicsPlanOperation::WebOpen => 92,
         CicsPlanOperation::WebClose => 93,
+        CicsPlanOperation::WebExtract => 94,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -241,6 +242,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         91 => Ok(CicsPlanOperation::WebParseUrl),
         92 => Ok(CicsPlanOperation::WebOpen),
         93 => Ok(CicsPlanOperation::WebClose),
+        94 => Ok(CicsPlanOperation::WebExtract),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -524,6 +526,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebCertificate => 265,
         CicsOperandName::WebCodePage => 266,
         CicsOperandName::WebSessionToken => 267,
+        CicsOperandName::WebMethodLength => 268,
+        CicsOperandName::WebVersionLength => 269,
+        CicsOperandName::WebRealmLength => 270,
     }
 }
 
@@ -764,6 +769,9 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         265 => Ok(CicsOperandName::WebCertificate),
         266 => Ok(CicsOperandName::WebCodePage),
         267 => Ok(CicsOperandName::WebSessionToken),
+        268 => Ok(CicsOperandName::WebMethodLength),
+        269 => Ok(CicsOperandName::WebVersionLength),
+        270 => Ok(CicsOperandName::WebRealmLength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1088,6 +1096,15 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::WebSessionToken => 321,
         CicsOutputName::WebHttpVNum => 322,
         CicsOutputName::WebHttpRNum => 323,
+        CicsOutputName::WebScheme => 324,
+        CicsOutputName::WebHttpMethod => 325,
+        CicsOutputName::WebMethodLength => 326,
+        CicsOutputName::WebHttpVersion => 327,
+        CicsOutputName::WebVersionLength => 328,
+        CicsOutputName::WebRequestType => 329,
+        CicsOutputName::WebUriMap => 330,
+        CicsOutputName::WebRealm => 331,
+        CicsOutputName::WebRealmLength => 332,
     }
 }
 
@@ -1156,6 +1173,15 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         321 => Ok(CicsOutputName::WebSessionToken),
         322 => Ok(CicsOutputName::WebHttpVNum),
         323 => Ok(CicsOutputName::WebHttpRNum),
+        324 => Ok(CicsOutputName::WebScheme),
+        325 => Ok(CicsOutputName::WebHttpMethod),
+        326 => Ok(CicsOutputName::WebMethodLength),
+        327 => Ok(CicsOutputName::WebHttpVersion),
+        328 => Ok(CicsOutputName::WebVersionLength),
+        329 => Ok(CicsOutputName::WebRequestType),
+        330 => Ok(CicsOutputName::WebUriMap),
+        331 => Ok(CicsOutputName::WebRealm),
+        332 => Ok(CicsOutputName::WebRealmLength),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

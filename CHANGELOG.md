@@ -38,6 +38,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB EXTRACT` for task-bound inbound HTTP requests and
+  durable client sessions, with source length/condition handling and a compiled
+  COBOL route. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0243` binds
+  `dfhp4_webextract.html` at
+  `sha256:328947a78cac9afe1efa11df299067f286e2653de9ae29ec5abc1f2bd4df3427`.
+
 - Added typed CICS `WEB CLOSE` with task-owned token validation, selected
   transport release, durable session removal and replay, and source NOTOPEN
   conditions. IBM CICS TS 6.x baseline

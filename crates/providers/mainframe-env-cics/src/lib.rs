@@ -33,7 +33,7 @@ pub use service::{
     CicsTraceEntry, CicsTransformContainerMode, CicsTransformDefinition,
     CicsTransformFieldDefinition, CicsTransformFieldKind, CicsTransformFormat,
     CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
-    CicsWebEndpoint, CicsWebServiceDefinition, CicsWebTransport, CicsWebUriMapDefinition,
+    CicsWebEndpoint, CicsWebInboundRequest, CicsWebServiceDefinition, CicsWebTransport, CicsWebUriMapDefinition,
     CicsWebVersion, CicsXmlTransformMetadata, cics_provider,
 };
 

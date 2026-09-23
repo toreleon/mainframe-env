@@ -128,6 +128,7 @@ pub enum HirCicsOperation {
     SendControl,
     SendPage,
     SendPartnset,
+    WebExtract,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -364,6 +365,9 @@ pub enum HirCicsOperandName {
     TraceIdFrom,
     TraceIdResource,
     TraceEntryName,
+    WebMethodLength,
+    WebVersionLength,
+    WebRealmLength,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

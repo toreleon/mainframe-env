@@ -38,6 +38,34 @@ pub struct CicsWebVersion {
     pub minor: u16,
 }
 
+/// One HTTP request assigned to a CICS Web-support task by the host adapter.
+/// Values retain the wire spelling needed by WEB EXTRACT and header browsing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsWebInboundRequest {
+    /// Whether the listener classified this as an HTTP request.
+    pub http: bool,
+    /// HTTP or HTTPS listener scheme.
+    pub scheme: String,
+    /// Host from the absolute request URI or Host header, without a port.
+    pub host: String,
+    /// Effective listener port.
+    pub port: u16,
+    /// Original HTTP method token.
+    pub method: String,
+    /// Request protocol version.
+    pub version: CicsWebVersion,
+    /// Escaped request path, beginning with a slash.
+    pub path: String,
+    /// Escaped query bytes without the question mark.
+    pub query: String,
+    /// Matched inbound URIMAP, if any.
+    pub urimap: Option<String>,
+    /// Request entity bytes for WEB RECEIVE and WEB RETRIEVE.
+    pub body: Vec<u8>,
+    /// Ordered HTTP headers, retaining repeated fields.
+    pub headers: Vec<(String, String)>,
+}
+
 /// Transport operations needed by the CICS client session lifecycle.
 /// Implementations receive the live invocation to inspect deadline and cancellation.
 pub trait CicsWebTransport: Send + Sync {
@@ -94,6 +122,7 @@ pub(in crate::service) struct WebClientSession {
 
 pub(in crate::service) struct WebState {
     pub sessions: BTreeMap<String, WebClientSession>,
+    pub inbound: BTreeMap<String, CicsWebInboundRequest>,
     pub urimaps: BTreeMap<String, CicsWebUriMapDefinition>,
     pub transport: Option<Arc<dyn CicsWebTransport>>,
     pub bytes: usize,
@@ -105,6 +134,7 @@ pub(in crate::service) fn load(
 ) -> Result<WebState, HostProblem> {
     let mut state = WebState {
         sessions: BTreeMap::new(),
+        inbound: BTreeMap::new(),
         urimaps: BTreeMap::new(),
         transport: None,
         bytes: 0,

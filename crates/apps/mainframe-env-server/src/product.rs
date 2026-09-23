@@ -11402,6 +11402,119 @@ mod tests {
     }
 
     #[test]
+    fn compiled_web_extract_reads_bound_http_request() {
+        let artifact = published_source_fixture(
+            "WEBOPEN",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. WEBOPEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 HOST-X PIC X(11) VALUE 'example.com'.\n01 HOST-LEN PIC S9(9) COMP VALUE 11.\n01 TOKEN-X PIC X(8).\n01 METHOD-LEN PIC S9(9) COMP VALUE 8.\n01 SCHEME-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WEB EXTRACT HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(SCHEME-X) HTTPMETHOD(TOKEN-X) METHODLENGTH(METHOD-LEN) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "WEBOPEN".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("WEBO".into(), "WEBOPEN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "WEBOPEN".into(),
+                    map: "WEBOPEN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("web-open-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "WEBO", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "WEBO",
+                24,
+                80,
+                "web-open-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .cics
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                mainframe_env_cics::CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTPS".into(),
+                    host: "example.com".into(),
+                    port: 443,
+                    method: "GET".into(),
+                    version: mainframe_env_cics::CicsWebVersion { major: 1, minor: 1 },
+                    path: "/orders".into(),
+                    query: "x=1".into(),
+                    urimap: Some("ORDERS".into()),
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "WEBOPEN", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(&restored.variable("TOKEN-X").unwrap().bytes()[..3], b"GET");
+        assert_eq!(
+            restored.variable("SCHEME-X").unwrap().bytes(),
+            &[0, 0, 0, 2]
+        );
+        assert_eq!(
+            restored.variable("METHOD-LEN").unwrap().bytes(),
+            &[0, 0, 0, 3]
+        );
+        assert_eq!(
+            server
+                .store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::WebExtract)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_web_close_releases_the_selected_compiled_session() {
         struct LocalWebTransport;
         impl mainframe_env_cics::CicsWebTransport for LocalWebTransport {

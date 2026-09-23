@@ -5,13 +5,98 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 mod close;
+mod extract;
 mod model;
 mod open;
 mod parse_url;
-pub use model::{CicsWebEndpoint, CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion};
+pub use model::{
+    CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
+    CicsWebVersion,
+};
 pub(in crate::service) use model::{WebState, load as load_web_state};
 
 impl CicsService {
+    /// Bind one bounded inbound HTTP request to an already registered CICS task.
+    /// The host adapter supplies this context before compiled Web commands run.
+    pub fn bind_web_inbound_request(
+        &self,
+        run_unit: &mainframe_env_execution_api::RunUnitId,
+        request: CicsWebInboundRequest,
+    ) -> Result<(), HostProblem> {
+        if !matches!(request.scheme.as_str(), "HTTP" | "HTTPS")
+            || request.host.is_empty()
+            || request.host.len() > 255
+            || request
+                .host
+                .bytes()
+                .any(|byte| !(0x21..=0x7e).contains(&byte))
+            || request.port == 0
+            || request.http && request.method.is_empty()
+            || request.method.len() > 32
+            || !request.method.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric()
+                    || matches!(
+                        byte,
+                        b'!' | b'#'
+                            | b'$'
+                            | b'%'
+                            | b'&'
+                            | b'\''
+                            | b'*'
+                            | b'+'
+                            | b'-'
+                            | b'.'
+                            | b'^'
+                            | b'_'
+                            | b'`'
+                            | b'|'
+                            | b'~'
+                    )
+            })
+            || request.version.major == 0
+            || request.http && !request.path.starts_with('/')
+            || request.path.len() > 4096
+            || request.query.len() > 4096
+            || request
+                .path
+                .bytes()
+                .any(|byte| !(0x21..=0x7e).contains(&byte) || byte == b'#')
+            || request
+                .query
+                .bytes()
+                .any(|byte| !(0x21..=0x7e).contains(&byte) || byte == b'#')
+            || request.body.len() > self.limits.max_web_bytes
+            || request.headers.len() > 128
+            || request.headers.iter().any(|(name, value)| {
+                name.is_empty()
+                    || name.len() > 128
+                    || !name
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+                    || value.len() > 8192
+                    || value.bytes().any(|byte| matches!(byte, b'\r' | b'\n'))
+            })
+            || request
+                .urimap
+                .as_ref()
+                .is_some_and(|name| name.is_empty() || name.len() > 8)
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut state = self.lock()?;
+        if !state.runs.contains_key(run_unit) {
+            return Err(HostProblem::Unauthorized);
+        }
+        match state.web.inbound.get(run_unit.as_str()) {
+            Some(existing) if existing == &request => Ok(()),
+            Some(_) => Err(HostProblem::IdempotencyConflict),
+            None => {
+                state.web.inbound.insert(run_unit.as_str().into(), request);
+                Ok(())
+            }
+        }
+    }
+
     /// Install the reviewed outbound HTTP transport for CICS web sessions.
     pub fn install_web_transport(
         &self,
@@ -120,6 +205,10 @@ impl CicsService {
 
 pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     let mut state = service.lock()?;
+    state
+        .web
+        .inbound
+        .remove(run.invocation.run_unit_id.as_str());
     let owned = state
         .web
         .sessions
@@ -176,6 +265,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::WebClose => {
             close::invoke(service, run, request, run.invocation.deadline_tick)
         }
+        CicsOperation::WebExtract => extract::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

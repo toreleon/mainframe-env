@@ -132,3 +132,69 @@ pub(super) fn invalid_close_shape(
             .iter()
             .any(|name| !matches!(name, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_extract_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed = BTreeSet::from([
+        CicsOperandName::WebSessionToken,
+        CicsOperandName::WebHostLength,
+        CicsOperandName::WebPathLength,
+        CicsOperandName::WebQueryStringLength,
+        CicsOperandName::WebMethodLength,
+        CicsOperandName::WebVersionLength,
+        CicsOperandName::WebRealmLength,
+    ]);
+    !inputs.is_subset(&allowed)
+        || !outputs
+            .iter()
+            .any(|name| !matches!(name, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || inputs.contains(&CicsOperandName::WebSessionToken)
+            && !matches!(
+                operand_value(plan, CicsOperandName::WebSessionToken),
+                Some(CicsOperandValue::Storage(_) | CicsOperandValue::Literal(_))
+            )
+        || [
+            (
+                CicsOperandName::WebHostLength,
+                CicsOutputName::WebHostLength,
+                CicsOutputName::WebHost,
+            ),
+            (
+                CicsOperandName::WebPathLength,
+                CicsOutputName::WebPathLength,
+                CicsOutputName::WebPath,
+            ),
+            (
+                CicsOperandName::WebQueryStringLength,
+                CicsOutputName::WebQueryStringLength,
+                CicsOutputName::WebQueryString,
+            ),
+            (
+                CicsOperandName::WebMethodLength,
+                CicsOutputName::WebMethodLength,
+                CicsOutputName::WebHttpMethod,
+            ),
+            (
+                CicsOperandName::WebVersionLength,
+                CicsOutputName::WebVersionLength,
+                CicsOutputName::WebHttpVersion,
+            ),
+            (
+                CicsOperandName::WebRealmLength,
+                CicsOutputName::WebRealmLength,
+                CicsOutputName::WebRealm,
+            ),
+        ]
+        .into_iter()
+        .any(|(input, length, buffer)| {
+            let value = operand_value(plan, input);
+            let target = output_target(&plan.outputs, length);
+            value.is_some() != target.is_some()
+                || value.is_some() != outputs.contains(&buffer)
+                || !matches!(value, None | Some(CicsOperandValue::Storage(_)))
+                || matches!(value, Some(CicsOperandValue::Storage(slot)) if target != Some(slot))
+        })
+}
