@@ -8354,6 +8354,7 @@ impl ReferenceMachine {
     fn release_storage64_task(&mut self) {
         self.storage64
             .end_task(self.invocation.run_unit_id.as_str());
+        self.retain_storage64_task_bindings();
     }
 }
 
@@ -8529,8 +8530,7 @@ fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
 pub(super) fn encode_snapshot_prefix(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
     let mut bytes = b"MECP0012".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
-    let program_counter = u64::try_from(snapshot.program_counter).ok()?;
-    bytes.extend_from_slice(&program_counter.to_be_bytes());
+    bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
     bytes.extend_from_slice(&snapshot.executed_steps.to_be_bytes());
     push_bytes(&mut bytes, &snapshot.output)?;

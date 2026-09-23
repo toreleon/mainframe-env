@@ -100,9 +100,7 @@ impl ReferenceMachine {
         Ok(())
     }
 
-    pub(super) fn release_storage64_task(&mut self) {
-        self.storage64
-            .end_task(self.invocation.run_unit_id.as_str());
+    pub(super) fn retain_storage64_task_bindings(&mut self) {
         self.storage64_area_bindings
             .retain(|_, address| self.storage64.contains(*address));
     }

@@ -176,7 +176,7 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(len(observed_runtime), 68)
         self.assertEqual(
             sum(row["implementation_status"] == "unimplemented" for row in contract_rows),
-            196,
+            195,
         )
         rows_by_label = {row["label"]: row for row in contract_rows}
         self.assertEqual(rows_by_label["ABEND"]["registration_status"], "typed-runtime")
@@ -266,7 +266,7 @@ class CicsDescriptorTests(unittest.TestCase):
         )
         self.assertEqual(
             sum(row["contract"]["registry"]["advertised"] for row in contract_rows),
-            67,
+            68,
         )
         self.assertTrue(
             all(
@@ -1010,7 +1010,7 @@ class CicsDescriptorTests(unittest.TestCase):
         )
         self.assertEqual(
             sum("memory-write" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            67,
+            68,
         )
 
     def test_resource_selectors_are_family_scoped_and_input_only(self):

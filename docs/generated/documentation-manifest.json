@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 187,
+    "markdown_documents": 188,
     "navigation_groups": 5,
-    "normative_documents": 39,
+    "normative_documents": 40,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:1cf6707ba9a4c67f315a50a02bcdb5b83510464185d31636fa44d01bcc1edf7f",
+      "sha256": "sha256:c62a436f2c0cb678027f8ce3e7c144bd16cac0e62a792f25864fc8430858a14b",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 74,
-      "sha256": "sha256:4f1bb8b28dd72fdd56d36e8221f8e7ecde5c44214febd769a9c65e7a21068ad0",
+      "relative_links": 75,
+      "sha256": "sha256:2fd25cd3686033c0a331eaab3d0227e49d6f38f3e20ca786f7dd570db995bb76",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -343,9 +343,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 22,
+      "relative_links": 23,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:6bf624a9e8dc95a5bc8839a335f396b50a3f29fca7240d3cd0b9db564ea052f3",
+      "sha256": "sha256:fe5b6e8e18a4ac31df657fa302bdc6d72798f3a52951073aea9eba633e3d5542",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -719,10 +719,22 @@
       "xtask_commands": 1
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and execution maintainers",
+      "path": "docs/decisions/0012-checked-amode64-storage-boundary.md",
+      "relative_links": 0,
+      "scope": "GETMAIN64 and FREEMAIN64 typed IR, host effects, virtual addresses, and checkpoints",
+      "sha256": "sha256:4ad1c12cf41b05ab63873e2b680dbe984c8b86ef6fa05d7c4e3a225b953c4564",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0012: Keep AMODE(64) storage in a checked virtual task arena",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 11,
-      "sha256": "sha256:6fba710ae25b2fc16ab04d01c471d1d2d3b80a72a61aae5dccf31d11f1f9d352",
+      "relative_links": 12,
+      "sha256": "sha256:8d8766c4416b933f6f57cdca53dcbafe9263e861bac18007fcbd0bcbcc536849",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1062,7 +1074,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:1cd9797ccc7d84a99546c38df0eaecca1835d5cca712c4ba954ea1dadf75edc1",
+      "sha256": "sha256:0409d4357aa24e6cf06a08e249082db28608e8d8c79506f9c3f653ebe757b922",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1804,6 +1816,10 @@
           "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md"
         },
         {
+          "label": "ADR-0012: Checked AMODE64 storage boundary",
+          "path": "docs/decisions/0012-checked-amode64-storage-boundary.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -1967,7 +1983,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:1a60772cee4f6817504770dc5751fec131f8ab601ad8310ec389f4f2fe285d8d",
+  "registry_sha256": "sha256:1294dcd9b00cba6f394d581182f15be7375ce80ee4c2b92f03c6b5901d7abf5e",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

@@ -3679,7 +3679,6 @@ mod tests {
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
-    use mainframe_env_store_api::AuditSink;
     use mainframe_env_store_api::{
         ArtifactRecord, ArtifactStore, AuditSink, EffectDigestFormat, EffectIntentMetadata,
         EffectRecord, EffectState, ExecutableArtifactMetadata, WorkState,
