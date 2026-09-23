@@ -269,6 +269,8 @@ pub enum CicsOperation {
     WriteJournalNum,
     /// Invalidate one task-owned file update context.
     Unlock,
+    /// Verify one standard password with the installed SAF authority.
+    VerifyPassword,
     Write,
     WriteTransientData,
     Xctl,
@@ -420,6 +422,7 @@ impl CicsOperation {
             Self::WriteJournalName => "WriteJournalName",
             Self::WriteJournalNum => "WriteJournalNum",
             Self::Unlock => "Unlock",
+            Self::VerifyPassword => "VerifyPassword",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -547,6 +550,7 @@ impl CicsOperation {
                 | Self::TransformJsonToData
                 | Self::TransformXmlToData
                 | Self::Unlock
+                | Self::VerifyPassword
                 | Self::SetFileStatus
                 | Self::SpoolClose
                 | Self::SpoolOpenInput
@@ -730,6 +734,7 @@ impl CicsOperation {
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,
             ("WRITE", Some("JOURNALNUM")) => Self::WriteJournalNum,
             ("UNLOCK", _) => Self::Unlock,
+            ("VERIFY", Some("PASSWORD")) => Self::VerifyPassword,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

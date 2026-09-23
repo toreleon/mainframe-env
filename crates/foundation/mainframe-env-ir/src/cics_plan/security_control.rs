@@ -16,7 +16,7 @@ pub(super) fn invalid_query_shape(
             CicsOperandName::ResType,
             CicsOperandName::ResIdLength,
             CicsOperandName::LogMessage,
-            CicsOperandName::UserId,
+            CicsOperandName::SecurityUserId,
         ]))
         || !outputs.iter().any(|name| {
             matches!(
@@ -36,6 +36,47 @@ pub(super) fn invalid_query_shape(
                 operand.value,
                 CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
             ),
+            _ => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+        })
+}
+
+pub(super) fn invalid_verify_password_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::SecurityUserId)
+        || !inputs.contains(&CicsOperandName::SecurityPassword)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::SecurityUserId,
+            CicsOperandName::SecurityGroupId,
+            CicsOperandName::SecurityPassword,
+        ]))
+        || outputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOutputName::SecurityChangeTime
+                    | CicsOutputName::SecurityDaysLeft
+                    | CicsOutputName::SecurityEsmReason
+                    | CicsOutputName::SecurityEsmResp
+                    | CicsOutputName::SecurityExpiryTime
+                    | CicsOutputName::SecurityInvalidCount
+                    | CicsOutputName::SecurityLastUseTime
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::SecurityPassword => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
             _ => !matches!(
                 operand.value,
                 CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)

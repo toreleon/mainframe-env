@@ -33,6 +33,86 @@ pub enum CicsSecurityAccessReason {
     PolicyUnavailable,
 }
 
+/// Credential field selected by a CICS VERIFY command.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsCredentialKind {
+    /// Standard password verification.
+    Password,
+    /// Password or phrase verification according to the supplied length.
+    Phrase,
+}
+
+/// Borrowed, nonpersisted verification input passed to the installed SAF bridge.
+pub struct CicsCredentialRequest<'a> {
+    /// The immutable issuing task principal.
+    pub actor: &'a PrincipalId,
+    /// The user ID whose credential is verified.
+    pub user: &'a PrincipalId,
+    /// Borrowed clear credential; never serialized into a provider row.
+    pub credential: &'a [u8],
+    /// Standard password or length-selected phrase verification.
+    pub kind: CicsCredentialKind,
+    /// Optional RACF group connection to check in the same transition.
+    pub group: Option<&'a str>,
+    /// Canonical digest of the complete CICS request, including its secret bytes.
+    pub binding_digest: [u8; 32],
+    /// Stable bounded key for durable SAF replay.
+    pub idempotency_key: &'a str,
+    /// Redacted audit correlation identity.
+    pub correlation: &'a str,
+    /// Observed finite logical time for this attempt.
+    pub tick: u64,
+}
+
+/// Source-distinct SAF credential failures used for CICS condition translation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsCredentialFailure {
+    /// Unknown user ID.
+    UnknownUser,
+    /// Revoked, suspended, or locked user ID.
+    Revoked,
+    /// The required credential is expired or missing.
+    NewCredentialRequired,
+    /// The supplied credential did not verify.
+    InvalidCredential,
+    /// The requested group is unknown.
+    UnknownGroup,
+    /// The user is not connected to the requested group.
+    GroupNotConnected,
+    /// The requested group connection is revoked.
+    GroupRevoked,
+    /// The external security manager cannot evaluate the attempt.
+    PolicyUnavailable,
+}
+
+/// Nonsecret profile status returned by a successful verification.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsCredentialDetails {
+    /// Credential change time in CICS logical clock units.
+    pub changed_tick: i64,
+    /// Days to expiration, or negative one if no expiration applies.
+    pub days_left: i16,
+    /// Expiration time, or negative one if no expiration applies.
+    pub expiry_tick: i64,
+    /// Prior invalid credential count.
+    pub invalid_count: u16,
+    /// Prior successful-use time, or zero when none exists.
+    pub last_use_tick: i64,
+}
+
+/// Audited SAF result for a single password or phrase attempt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsCredentialVerification {
+    /// Source-distinct denial, absent after success.
+    pub failure: Option<CicsCredentialFailure>,
+    /// Nonsecret status, present only after success.
+    pub details: Option<CicsCredentialDetails>,
+    /// External security manager return code.
+    pub esm_response: i64,
+    /// External security manager reason code.
+    pub esm_reason: i64,
+}
+
 /// Installed RACF adapter for source-defined CICS security queries.
 pub trait CicsSecurityAuthority: Send + Sync {
     /// Evaluate one resource access level and record the SAF audit before returning.
@@ -45,6 +125,12 @@ pub trait CicsSecurityAuthority: Send + Sync {
         tick: u64,
         correlation: &str,
     ) -> Result<CicsSecurityAccess, HostProblem>;
+
+    /// Verify one borrowed credential through the replay-safe SAF authority.
+    fn verify_credential(
+        &self,
+        request: CicsCredentialRequest<'_>,
+    ) -> Result<CicsCredentialVerification, HostProblem>;
 }
 
 impl CicsService {

@@ -738,9 +738,9 @@ impl ProductServer {
             enterprise_replay_clock,
         )?;
         cics.bind_artifact_store(artifacts.clone())?;
-        cics.bind_security_authority(Arc::new(cics_security::RacfCicsSecurityAuthority::new(
-            racf.clone(),
-        )))?;
+        let racf_security = racf.clone();
+        let auth = cics_security::RacfCicsSecurityAuthority::new(racf_security, secrets.clone());
+        cics.bind_security_authority(Arc::new(auth))?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
@@ -23031,6 +23031,90 @@ mod tests {
                 .filter(|entry| entry.operation == CicsOperation::SendPage)
                 .count(),
             1
+        );
+    }
+
+    #[test]
+    fn compiled_verify_password_uses_saf_and_returns_7406() {
+        let artifact = published_source_fixture(
+            "VPASS",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. VPASS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PASS-X PIC X(8) VALUE 'TESTPASS'. 01 COUNT-X PIC S9(4) COMP. 01 ESM-X PIC S9(9) COMP. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. 01 VERIFY-FN PIC X(2). PROCEDURE DIVISION. EXEC CICS VERIFY PASSWORD(PASS-X) USERID('IBMUSER') INVALIDCOUNT(COUNT-X) ESMRESP(ESM-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. MOVE EIBFN TO VERIFY-FN. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "VPASS".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("VPAS".into(), "VPASS".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "VPASS".into(),
+                    map: "VPASS".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("verify-password-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "VPAS", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "VPAS",
+                24,
+                80,
+                "verify-password-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "VPASS", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("VERIFY-FN").unwrap().bytes(),
+            &[0x74, 0x06]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("ESM-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("COUNT-X").unwrap().bytes(), &[0, 255]);
+        assert!(
+            server
+                .racf
+                .audits()
+                .iter()
+                .any(|audit| audit.action == "VERIFY")
         );
     }
 }

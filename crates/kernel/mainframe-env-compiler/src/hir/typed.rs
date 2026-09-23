@@ -7837,4 +7837,35 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn cics_verify_password_requires_resolved_secret_and_checked_outputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. VSEC. DATA DIVISION. WORKING-STORAGE SECTION. 01 PASS-X PIC X(8) VALUE 'PASSWORD'. 01 ESM-X PIC S9(9) COMP. 01 DAYS-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS VERIFY PASSWORD(PASS-X) USERID('IBMUSER') ESMRESP(ESM-X) DAYSLEFT(DAYS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("VERIFY PASSWORD: {:?}", analysis.diagnostics));
+        let verify = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed VERIFY PASSWORD");
+        assert_eq!(verify.operation, HirCicsOperation::VerifyPassword);
+        assert!(verify.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SecurityPassword
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "PASS-X")
+        }));
+        assert!(verify.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SecurityDaysLeft
+                && output.target.qualified_name == "DAYS-X"
+        }));
+        assert!(
+            analyze(&source.replace("PASSWORD(PASS-X)", "PASSWORD('PASSWORD')"))
+                .hir
+                .is_none()
+        );
+    }
 }

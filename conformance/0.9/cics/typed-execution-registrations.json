@@ -599,6 +599,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0225"
     },
     {
+      "operation": "VerifyPassword",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0228"
+    },
+    {
       "operation": "WaitEvent",
       "interface": "api",
       "family": "task-control",

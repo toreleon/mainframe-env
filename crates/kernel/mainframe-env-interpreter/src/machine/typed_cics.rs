@@ -220,6 +220,11 @@ pub(super) fn execute(
             }
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
             CicsOperandValue::Storage(slot)
+                if operand.name == CicsOperandName::SecurityPassword =>
+            {
+                ("mainframe-env.cics.secret@1", read_slot(machine, slot)?)
+            }
+            CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
                     CicsOperandName::CommareaPointer

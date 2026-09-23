@@ -31440,6 +31440,13 @@ mod tests {
                 })
             );
         }
+
+        fn verify_credential(
+            &self,
+            _: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
     }
 
     #[test]

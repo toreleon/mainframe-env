@@ -4,7 +4,7 @@ use super::super::{
     require_writable,
 };
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
-use crate::{CobolUsage, SemanticModel};
+use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) const QUERY_CLAUSES: &[&str] = &[
     "RESCLASS",
@@ -20,12 +20,29 @@ pub(super) const QUERY_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const VERIFY_PASSWORD_CLAUSES: &[&str] = &[
+    "PASSWORD",
+    "USERID",
+    "GROUPID",
+    "CHANGETIME",
+    "DAYSLEFT",
+    "ESMREASON",
+    "ESMRESP",
+    "EXPIRYTIME",
+    "INVALIDCOUNT",
+    "LASTUSETIME",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate(
     clauses: &Clauses,
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::VerifyPassword {
+        return validate_verify_password(clauses, semantic);
+    }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(());
     }
@@ -75,6 +92,9 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::VerifyPassword {
+        return verify_password_operands(clauses, semantic);
+    }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(Vec::new());
     }
@@ -83,7 +103,7 @@ pub(super) fn operands(
         ("RESCLASS", HirCicsOperandName::ResClass),
         ("RESID", HirCicsOperandName::ResId),
         ("RESTYPE", HirCicsOperandName::ResType),
-        ("USERID", HirCicsOperandName::UserId),
+        ("USERID", HirCicsOperandName::SecurityUserId),
     ] {
         if let Some(value) = clauses.get(name) {
             out.push(HirCicsNamedOperand {
@@ -111,6 +131,9 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation == HirCicsOperation::VerifyPassword {
+        return verify_password_outputs(clauses, semantic);
+    }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(Vec::new());
     }
@@ -141,4 +164,105 @@ fn fullword(reference: &HirDataReference, name: &str) -> Resolution<()> {
         )));
     }
     Ok(())
+}
+
+fn validate_verify_password(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    if !clauses.contains_key("PASSWORD") || !clauses.contains_key("USERID") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY PASSWORD requires PASSWORD and USERID".into(),
+        ));
+    }
+    let password = complete_data_reference(&clauses["PASSWORD"], semantic).map_err(|_| {
+        ResolutionFailure::Invalid("CICS VERIFY PASSWORD requires resolved password storage".into())
+    })?;
+    if password.length != 8
+        || !matches!(
+            password.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY PASSWORD requires an 8-character password data area".into(),
+        ));
+    }
+    for name in ["USERID", "GROUPID"] {
+        if let Some(value) = clauses.get(name) {
+            let resolved = cics_value(value, semantic)?;
+            if matches!(resolved, HirCicsValue::Literal(ref literal) if literal.is_empty() || literal.len() > 8)
+                || matches!(resolved, HirCicsValue::Data(ref reference) if reference.length != 8)
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS VERIFY PASSWORD {name} requires up to eight characters"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_password_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut out = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::SecurityPassword,
+        value: HirCicsValue::Data(complete_data_reference(&clauses["PASSWORD"], semantic)?),
+    }];
+    for (name, identity) in [
+        ("USERID", HirCicsOperandName::SecurityUserId),
+        ("GROUPID", HirCicsOperandName::SecurityGroupId),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: cics_value(value, semantic)?,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn verify_password_outputs(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    let mut out = Vec::new();
+    for (name, identity, width) in [
+        ("CHANGETIME", HirCicsOutputName::SecurityChangeTime, 8),
+        ("DAYSLEFT", HirCicsOutputName::SecurityDaysLeft, 2),
+        ("ESMREASON", HirCicsOutputName::SecurityEsmReason, 4),
+        ("ESMRESP", HirCicsOutputName::SecurityEsmResp, 4),
+        ("EXPIRYTIME", HirCicsOutputName::SecurityExpiryTime, 8),
+        ("INVALIDCOUNT", HirCicsOutputName::SecurityInvalidCount, 2),
+        ("LASTUSETIME", HirCicsOutputName::SecurityLastUseTime, 8),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            let reference = complete_data_reference(value, semantic)?;
+            require_writable(&reference)?;
+            if width == 8 {
+                if reference.usage != CobolUsage::PackedDecimal
+                    || reference.length != 8
+                    || reference.digits != 15
+                    || reference.scale != 0
+                    || !reference.signed
+                {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS VERIFY PASSWORD {name} requires PIC S9(15) COMP-3 storage"
+                    )));
+                }
+            } else if reference.usage != CobolUsage::Binary
+                || reference.length != width
+                || reference.scale != 0
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS VERIFY PASSWORD {name} requires {width}-byte binary storage"
+                )));
+            }
+            out.push(HirCicsOutputBinding {
+                name: identity,
+                target: reference,
+            });
+        }
+    }
+    Ok(out)
 }

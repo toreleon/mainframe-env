@@ -150,6 +150,7 @@ impl Canonical for CicsOperation {
             Self::WriteJournalName => out.variant("CicsOperation", "WriteJournalName", 0),
             Self::WriteJournalNum => out.variant("CicsOperation", "WriteJournalNum", 0),
             Self::Unlock => out.variant("CicsOperation", "Unlock", 0),
+            Self::VerifyPassword => out.variant("CicsOperation", "VerifyPassword", 0),
             Self::Write => out.variant("CicsOperation", "Write", 0),
             Self::WriteTransientData => out.variant("CicsOperation", "WriteTransientData", 0),
             Self::Xctl => out.variant("CicsOperation", "Xctl", 0),

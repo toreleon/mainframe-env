@@ -205,6 +205,13 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::SecurityUpdate
         | CicsOutputName::SecurityControl
         | CicsOutputName::SecurityAlter
+        | CicsOutputName::SecurityChangeTime
+        | CicsOutputName::SecurityDaysLeft
+        | CicsOutputName::SecurityEsmReason
+        | CicsOutputName::SecurityEsmResp
+        | CicsOutputName::SecurityExpiryTime
+        | CicsOutputName::SecurityInvalidCount
+        | CicsOutputName::SecurityLastUseTime
         | CicsOutputName::Resp2
         | CicsOutputName::Length
         | CicsOutputName::NumItems
@@ -368,6 +375,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
         CicsPlanOperation::QuerySecurity => CicsOperation::QuerySecurity,
+        CicsPlanOperation::VerifyPassword => CicsOperation::VerifyPassword,
         CicsPlanOperation::Start => CicsOperation::Start,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
@@ -417,6 +425,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::ResIdLength => "RESIDLENGTH",
         CicsOperandName::ResType => "RESTYPE",
         CicsOperandName::LogMessage => "LOGMESSAGE",
+        CicsOperandName::SecurityUserId => "USERID",
+        CicsOperandName::SecurityGroupId => "GROUPID",
+        CicsOperandName::SecurityPassword => "PASSWORD",
         CicsOperandName::Abcode => "ABCODE",
         CicsOperandName::Event => "EVENT",
         CicsOperandName::SubEvent => "SUBEVENT",

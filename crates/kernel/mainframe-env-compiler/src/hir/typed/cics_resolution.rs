@@ -428,6 +428,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => interval_control::DELAY_CLAUSES,
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::QuerySecurity => security_control::QUERY_CLAUSES,
+        HirCicsOperation::VerifyPassword => security_control::VERIFY_PASSWORD_CLAUSES,
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
@@ -502,6 +503,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::QuerySecurity
+        | HirCicsOperation::VerifyPassword
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -718,6 +720,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
+        HirCicsOperation::VerifyPassword => &["PASSWORD", "USERID"][..],
         HirCicsOperation::Syncpoint => &[][..],
         HirCicsOperation::WaitJournalName
         | HirCicsOperation::WaitJournalNum

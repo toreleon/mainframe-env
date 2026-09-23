@@ -37,7 +37,11 @@ pub use service::{
     CicsWebServiceDefinition, CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
     CicsXmlTransformMetadata, cics_provider,
 };
-pub use service::{CicsSecurityAccess, CicsSecurityAccessReason, CicsSecurityAuthority};
+pub use service::{
+    CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind, CicsCredentialRequest,
+    CicsCredentialVerification, CicsSecurityAccess, CicsSecurityAccessReason,
+    CicsSecurityAuthority,
+};
 
 #[cfg(feature = "fault-injection")]
 pub use service::CicsFileFaultPoint;

@@ -89,6 +89,7 @@ pub(super) fn resolve(
         ["DELAY"] => HirCicsOperation::Delay,
         ["PURGE", "MESSAGE"] => HirCicsOperation::PurgeMessage,
         ["QUERY", "SECURITY"] => HirCicsOperation::QuerySecurity,
+        ["VERIFY", "PASSWORD"] => HirCicsOperation::VerifyPassword,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,

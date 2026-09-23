@@ -1,22 +1,29 @@
 //! Product binding from CICS security controls to the accepted RACF/SAF authority.
 
 use super::*;
-use mainframe_env_cics::{CicsSecurityAccess, CicsSecurityAccessReason, CicsSecurityAuthority};
+use mainframe_env_cics::{
+    CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind, CicsCredentialRequest,
+    CicsCredentialVerification, CicsSecurityAccess, CicsSecurityAccessReason,
+    CicsSecurityAuthority,
+};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_racf::{
-    AccessEnvironment, AccessLevel, DecisionReason, RacfService, RacrouteRequest, RacrouteResult,
-    SafRequestContext,
+    AccessEnvironment, AccessLevel, CredentialFailure, CredentialKind, DecisionReason, RacfService,
+    RacrouteRequest, RacrouteResult, SafRequestContext,
 };
 use std::sync::Arc;
 
 pub(super) const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 
-pub(super) struct RacfCicsSecurityAuthority(Arc<RacfService>);
+pub(super) struct RacfCicsSecurityAuthority {
+    racf: Arc<RacfService>,
+    secrets: Arc<MemorySecretResolver>,
+}
 
 impl RacfCicsSecurityAuthority {
-    pub(super) fn new(racf: Arc<RacfService>) -> Self {
-        Self(racf)
+    pub(super) fn new(racf: Arc<RacfService>, secrets: Arc<MemorySecretResolver>) -> Self {
+        Self { racf, secrets }
     }
 }
 
@@ -38,7 +45,7 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
             correlation,
             tick,
         )?;
-        let outcome = self.0.racroute(
+        let outcome = self.racf.racroute(
             &context,
             RacrouteRequest::Auth {
                 class: class.into(),
@@ -71,6 +78,73 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
             reason,
         })
     }
+
+    fn verify_credential(
+        &self,
+        request: CicsCredentialRequest<'_>,
+    ) -> Result<CicsCredentialVerification, HostProblem> {
+        let mut identity = Sha256::new();
+        identity.update(b"mainframe-env.cics-credential-ref@1\0");
+        identity.update(request.idempotency_key.as_bytes());
+        identity.update(request.actor.as_str().as_bytes());
+        let reference = SecretRef::new(
+            format!("cics:verify:{:x}", identity.finalize()),
+            HostLimits::default(),
+        )?;
+        let _scope = self
+            .secrets
+            .scoped(&reference, request.credential.to_vec())?;
+        let context = SafRequestContext::new(
+            request.actor.clone(),
+            None,
+            None,
+            request.idempotency_key,
+            request.correlation,
+            request.tick,
+        )?;
+        let outcome = self.racf.racroute(
+            &context,
+            RacrouteRequest::VerifyCredential {
+                user: request.user.clone(),
+                credential_reference: reference,
+                kind: match request.kind {
+                    CicsCredentialKind::Password => CredentialKind::Password,
+                    CicsCredentialKind::Phrase => CredentialKind::Phrase,
+                },
+                group: request.group.map(str::to_string),
+                binding_digest: request.binding_digest,
+            },
+        )?;
+        let (failure, details) = match outcome.result {
+            Some(RacrouteResult::CredentialVerified {
+                failure, details, ..
+            }) => (failure, details),
+            _ => return Err(HostProblem::ProviderFailure),
+        };
+        Ok(CicsCredentialVerification {
+            failure: failure.map(|failure| match failure {
+                CredentialFailure::UnknownUser => CicsCredentialFailure::UnknownUser,
+                CredentialFailure::Revoked => CicsCredentialFailure::Revoked,
+                CredentialFailure::NewCredentialRequired => {
+                    CicsCredentialFailure::NewCredentialRequired
+                }
+                CredentialFailure::InvalidCredential => CicsCredentialFailure::InvalidCredential,
+                CredentialFailure::UnknownGroup => CicsCredentialFailure::UnknownGroup,
+                CredentialFailure::GroupNotConnected => CicsCredentialFailure::GroupNotConnected,
+                CredentialFailure::GroupRevoked => CicsCredentialFailure::GroupRevoked,
+                CredentialFailure::PolicyUnavailable => CicsCredentialFailure::PolicyUnavailable,
+            }),
+            details: details.map(|value| CicsCredentialDetails {
+                changed_tick: value.changed_tick,
+                days_left: value.days_left,
+                expiry_tick: value.expiry_tick,
+                invalid_count: value.invalid_count,
+                last_use_tick: value.last_use_tick,
+            }),
+            esm_response: i64::from(outcome.status.racf_return_code),
+            esm_reason: i64::from(outcome.status.racf_reason_code),
+        })
+    }
 }
 
 pub(super) fn terminal_principal(value: &str) -> Result<PrincipalId, GatewayProblem> {
@@ -95,7 +169,7 @@ mod tests {
         racf.permit("FACILITY", "ITEM", "IBMUSER", AccessIntent::Update)
             .unwrap();
         let user = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
-        let adapter = RacfCicsSecurityAuthority::new(racf.clone());
+        let adapter = RacfCicsSecurityAuthority::new(racf.clone(), secrets);
         let before = racf.database().summary().unwrap().audits;
         let allowed = adapter
             .query_access(&user, &user, "FACILITY", "ITEM", 1, "query-allow")

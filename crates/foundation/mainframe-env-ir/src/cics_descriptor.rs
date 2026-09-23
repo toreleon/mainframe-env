@@ -1,6 +1,8 @@
 //! Executable descriptors for the bounded typed CICS dialect.
 
+mod effects;
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
+use effects::SPOOL_EFFECTS;
 
 mod effects;
 mod executable_entries;

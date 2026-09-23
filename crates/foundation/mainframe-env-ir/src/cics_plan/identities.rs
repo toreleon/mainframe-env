@@ -210,6 +210,8 @@ pub enum CicsPlanOperation {
     Assign,
     /// Query source-defined SAF access levels for a CICS or named resource.
     QuerySecurity,
+    /// Verify a standard password through the installed SAF authority.
+    VerifyPassword,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
     /// Schedule one local interval-control START data record.

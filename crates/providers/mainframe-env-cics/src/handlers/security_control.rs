@@ -2,7 +2,12 @@
 
 use super::super::{CicsService, Run, decimal_payload};
 mod authority;
-pub use authority::{CicsSecurityAccess, CicsSecurityAccessReason, CicsSecurityAuthority};
+mod verify;
+pub use authority::{
+    CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind, CicsCredentialRequest,
+    CicsCredentialVerification, CicsSecurityAccess, CicsSecurityAccessReason,
+    CicsSecurityAuthority,
+};
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
@@ -23,6 +28,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
+        CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
