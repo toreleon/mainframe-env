@@ -87,7 +87,9 @@ pub(super) fn invoke(
     if state.web.sessions.get(&key) != Some(&session) {
         return Err(HostProblem::UnknownOutcome);
     }
-    let mutations = vec![
+    let header_key = model::header_stage_key(run.invocation.run_unit_id.as_str(), Some(token));
+    let staged = state.web.pending_headers.get(&header_key).cloned();
+    let mut mutations = vec![
         ProviderStateMutation::Delete {
             namespace: model::SESSION_NAMESPACE.into(),
             key: key.clone(),
@@ -95,6 +97,13 @@ pub(super) fn invoke(
         },
         ProviderStateMutation::Put(open::replay_write(run, request, retention_tick, &response)?),
     ];
+    if let Some(headers) = &staged {
+        mutations.push(ProviderStateMutation::Delete {
+            namespace: model::HEADER_NAMESPACE.into(),
+            key: header_key.clone(),
+            expected_version: headers.version,
+        });
+    }
     if service
         .store
         .mutate_provider_states_atomic(mutations)
@@ -110,6 +119,14 @@ pub(super) fn invoke(
         .checked_sub(model::encode_session(&session)?.len())
         .ok_or(HostProblem::InfrastructureFailure)?;
     state.web.sessions.remove(&key);
+    if let Some(headers) = staged {
+        state.web.bytes = state
+            .web
+            .bytes
+            .checked_sub(model::encode_header_stage(&headers)?.len())
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.web.pending_headers.remove(&header_key);
+    }
     drop(state);
     if service
         .replay_unknown_after_persist

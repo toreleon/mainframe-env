@@ -375,6 +375,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebStartBrowse => CicsOperation::WebStartBrowse,
         CicsPlanOperation::WebReadNext => CicsOperation::WebReadNext,
         CicsPlanOperation::WebEndBrowse => CicsOperation::WebEndBrowse,
+        CicsPlanOperation::WebWrite => CicsOperation::WebWrite,
     }
 }
 
@@ -619,6 +620,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebNameLength => "NAMELENGTH",
         CicsOperandName::WebValueLength => "VALUELENGTH",
         CicsOperandName::WebBrowseStartName => "BROWSESTARTNAME",
+        CicsOperandName::WebHeaderValue => "VALUE",
         CicsOperandName::WebPortNumber => "PORTNUMBER",
         CicsOperandName::WebScheme => "SCHEME",
         CicsOperandName::WebUriMap => "URIMAP",

@@ -134,6 +134,7 @@ pub enum HirCicsOperation {
     WebStartBrowse,
     WebReadNext,
     WebEndBrowse,
+    WebWrite,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -379,6 +380,7 @@ pub enum HirCicsOperandName {
     WebNameLength,
     WebValueLength,
     WebBrowseStartName,
+    WebHeaderValue,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

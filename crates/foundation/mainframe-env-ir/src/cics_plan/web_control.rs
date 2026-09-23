@@ -390,3 +390,52 @@ pub(super) fn invalid_end_browse_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_write_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let required = [
+        CicsOperandName::WebHttpHeaderName,
+        CicsOperandName::WebNameLength,
+        CicsOperandName::WebHeaderValue,
+        CicsOperandName::WebValueLength,
+    ];
+    let allowed = BTreeSet::from([
+        required[0],
+        required[1],
+        required[2],
+        required[3],
+        CicsOperandName::WebSessionToken,
+    ]);
+    !required.iter().all(|name| inputs.contains(name))
+        || !inputs.is_subset(&allowed)
+        || !plan
+            .options
+            .iter()
+            .all(|option| *option == CicsPlanOption::NoHandle)
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || [required[0], required[2], CicsOperandName::WebSessionToken]
+            .into_iter()
+            .any(|name| {
+                operand_value(plan, name).is_some_and(|value| {
+                    !matches!(
+                        value,
+                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                    )
+                })
+            })
+        || [required[1], required[3]].into_iter().any(|name| {
+            !matches!(
+                operand_value(plan, name),
+                Some(
+                    CicsOperandValue::Integer(_)
+                        | CicsOperandValue::Storage(_)
+                        | CicsOperandValue::LengthOf(_)
+                )
+            )
+        })
+}

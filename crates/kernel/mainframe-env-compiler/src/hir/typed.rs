@@ -6960,6 +6960,46 @@ mod tests {
     }
 
     #[test]
+    fn web_write_lowers_header_bytes_and_fullword_lengths() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADER-X PIC X(6) VALUE 'X-Test'. 01 VALUE-X PIC X(5) VALUE 'alpha'. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
+        for source in [
+            "WEB WRITE HTTPHEADER(HEADER-X) NAMELENGTH(6) VALUE(VALUE-X) VALUELENGTH(5)",
+            "WEB WRITE HTTPHEADER(HEADER-X) NAMELENGTH(6) VALUE(VALUE-X) VALUELENGTH(5) SESSTOKEN(TOKEN-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed WEB WRITE");
+            assert_eq!(command.operation, HirCicsOperation::WebWrite);
+            assert!(
+                command
+                    .operands
+                    .iter()
+                    .any(|operand| { operand.name == HirCicsOperandName::WebHeaderValue })
+            );
+        }
+        for source in [
+            "WEB WRITE HTTPHEADER(HEADER-X) VALUE(VALUE-X) VALUELENGTH(5)",
+            "WEB WRITE HTTPHEADER(HEADER-X) NAMELENGTH(6) VALUE(VALUE-X) VALUELENGTH(0)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn web_endbrowse_selects_one_kind_and_optional_client_token() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
         for (source, kind) in [

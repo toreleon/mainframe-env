@@ -13,6 +13,7 @@ mod parse_url;
 mod read;
 mod read_next;
 mod start_browse;
+mod write;
 pub use model::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
     CicsWebVersion,
@@ -233,7 +234,17 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
         })
         .map(|(key, browse)| (key.clone(), browse.clone()))
         .collect::<Vec<_>>();
-    if owned.is_empty() && owned_browses.is_empty() {
+    let owned_headers = state
+        .web
+        .pending_headers
+        .iter()
+        .filter(|(_, headers)| {
+            headers.owner_execution == run.invocation.execution_id.as_str()
+                && headers.owner_run_unit == run.invocation.run_unit_id.as_str()
+        })
+        .map(|(key, headers)| (key.clone(), headers.clone()))
+        .collect::<Vec<_>>();
+    if owned.is_empty() && owned_browses.is_empty() && owned_headers.is_empty() {
         return Ok(());
     }
     let mut deletes: Vec<ProviderStateMutation> = owned
@@ -251,6 +262,15 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
                 namespace: model::BROWSE_NAMESPACE.into(),
                 key: key.clone(),
                 expected_version: browse.version,
+            }),
+    );
+    deletes.extend(
+        owned_headers
+            .iter()
+            .map(|(key, headers)| ProviderStateMutation::Delete {
+                namespace: model::HEADER_NAMESPACE.into(),
+                key: key.clone(),
+                expected_version: headers.version,
             }),
     );
     service
@@ -273,6 +293,14 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
             .checked_sub(model::encode_browse(browse)?.len())
             .ok_or(HostProblem::InfrastructureFailure)?;
         state.web.browses.remove(key);
+    }
+    for (key, headers) in &owned_headers {
+        state.web.bytes = state
+            .web
+            .bytes
+            .checked_sub(model::encode_header_stage(headers)?.len())
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.web.pending_headers.remove(key);
     }
     drop(state);
     if let Some(transport) = transport {
@@ -304,6 +332,9 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::WebEndBrowse => {
             end_browse::invoke(service, run, request, run.invocation.deadline_tick)
+        }
+        CicsOperation::WebWrite => {
+            write::invoke(service, run, request, run.invocation.deadline_tick)
         }
         CicsOperation::WebStartBrowse => {
             start_browse::invoke(service, run, request, run.invocation.deadline_tick)

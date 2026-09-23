@@ -266,6 +266,8 @@ pub enum CicsPlanOperation {
     WebReadNext,
     /// End one task-owned Web browse.
     WebEndBrowse,
+    /// Stage one HTTP header for the next Web message.
+    WebWrite,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -727,6 +729,8 @@ pub enum CicsOperandName {
     WebValueLength,
     /// Optional name at which a Web browse starts.
     WebBrowseStartName,
+    /// HTTP header value to stage for WEB WRITE.
+    WebHeaderValue,
 }
 
 /// Flag option accepted by the typed CICS pilot.

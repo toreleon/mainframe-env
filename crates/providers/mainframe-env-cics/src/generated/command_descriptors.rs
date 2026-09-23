@@ -967,6 +967,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::WebWrite,
+        syntax: "WEB WRITE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0252",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Write,
         syntax: "WRITE FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
@@ -1144,11 +1151,12 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::WebRead => &CICS_COMMAND_DESCRIPTORS[129],
         CicsOperation::WebReadNext => &CICS_COMMAND_DESCRIPTORS[130],
         CicsOperation::WebStartBrowse => &CICS_COMMAND_DESCRIPTORS[131],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[132],
-        CicsOperation::WriteJournalName => &CICS_COMMAND_DESCRIPTORS[133],
-        CicsOperation::WriteJournalNum => &CICS_COMMAND_DESCRIPTORS[134],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[135],
-        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[136],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[137],
+        CicsOperation::WebWrite => &CICS_COMMAND_DESCRIPTORS[132],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[133],
+        CicsOperation::WriteJournalName => &CICS_COMMAND_DESCRIPTORS[134],
+        CicsOperation::WriteJournalNum => &CICS_COMMAND_DESCRIPTORS[135],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[136],
+        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[137],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[138],
     }
 }

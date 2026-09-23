@@ -415,6 +415,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0251",
     ),
+    (
+        "WebWrite",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0252",
+    ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
         "WriteJournalName",
@@ -779,6 +786,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WebRead",
         "WebReadNext",
         "WebStartBrowse",
+        "WebWrite",
         "WriteJournalName",
         "WriteJournalNum",
         "WsaContextBuild",
@@ -1209,6 +1217,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WebEndBrowse": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "WebWrite": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "WebOpen": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
@@ -1497,6 +1508,7 @@ def _load_typed_execution_registrations(
         "WebRead",
         "WebReadNext",
         "WebStartBrowse",
+        "WebWrite",
         "WriteJournalName",
         "WriteJournalNum",
         "WriteTemporaryStorage",
@@ -1877,6 +1889,7 @@ def load_catalog(
                 "WebRead",
                 "WebReadNext",
                 "WebStartBrowse",
+                "WebWrite",
                 "WriteJournalName",
                 "WriteJournalNum",
             }

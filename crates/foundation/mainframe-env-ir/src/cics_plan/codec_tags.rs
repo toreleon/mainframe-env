@@ -112,6 +112,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::WebStartBrowse => 97,
         CicsPlanOperation::WebReadNext => 98,
         CicsPlanOperation::WebEndBrowse => 99,
+        CicsPlanOperation::WebWrite => 100,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -253,6 +254,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         97 => Ok(CicsPlanOperation::WebStartBrowse),
         98 => Ok(CicsPlanOperation::WebReadNext),
         99 => Ok(CicsPlanOperation::WebEndBrowse),
+        100 => Ok(CicsPlanOperation::WebWrite),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -545,6 +547,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebNameLength => 274,
         CicsOperandName::WebValueLength => 275,
         CicsOperandName::WebBrowseStartName => 276,
+        CicsOperandName::WebHeaderValue => 277,
     }
 }
 
@@ -794,6 +797,7 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         274 => Ok(CicsOperandName::WebNameLength),
         275 => Ok(CicsOperandName::WebValueLength),
         276 => Ok(CicsOperandName::WebBrowseStartName),
+        277 => Ok(CicsOperandName::WebHeaderValue),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 138);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 139);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7831,6 +7831,240 @@ mod tests {
     }
 
     #[test]
+    fn web_write_client_rejects_generated_header_and_close_clears_stage() {
+        struct StaticTransport;
+        impl CicsWebTransport for StaticTransport {
+            fn open(
+                &self,
+                _: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .install_web_transport(Arc::new(StaticTransport))
+            .unwrap();
+        let invocation = invocation_for("web-write-client", BTreeMap::new());
+        let session = SessionId::new("web-write-client", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("HOST".into(), cics_literal(b"example.com")),
+                ("HOSTLENGTH".into(), cics_decimal(11)),
+                ("SCHEME".into(), cics_literal(b"HTTP")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            1,
+        );
+        let opened = service
+            .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+            .unwrap();
+        let token = opened.outputs["SESSTOKEN"].bytes();
+        let mut forbidden = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"Host")),
+                ("NAMELENGTH".into(), cics_decimal(4)),
+                ("VALUE".into(), cics_literal(b"evil")),
+                ("VALUELENGTH".into(), cics_decimal(4)),
+                ("SESSTOKEN".into(), argument(token)),
+            ]),
+            2,
+        );
+        forbidden.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let denied = service
+            .invoke(
+                &effect(&invocation.run_unit_id, forbidden.clone(), 2),
+                forbidden,
+            )
+            .unwrap();
+        assert_eq!(
+            (denied.condition.as_str(), denied.response, denied.response2),
+            ("INVREQ", 16, 19)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-web-header-stage-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        let write = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-Trace")),
+                ("NAMELENGTH".into(), cics_decimal(7)),
+                ("VALUE".into(), cics_literal(b"ok")),
+                ("VALUELENGTH".into(), cics_decimal(2)),
+                ("SESSTOKEN".into(), argument(token)),
+            ]),
+            3,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 3), write)
+            .unwrap();
+        assert_eq!(
+            store
+                .list_provider_state("cics-web-header-stage-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+        let close = request(
+            CicsOperation::WebClose,
+            BTreeMap::from([("SESSTOKEN".into(), argument(token))]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 4), close)
+            .unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-web-header-stage-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .list_provider_state("cics-web-session-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn web_write_stages_duplicate_headers_and_replays_unknown_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("web-write", BTreeMap::new());
+        let session = SessionId::new("web-write", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: String::new(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let first = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-Test")),
+                ("NAMELENGTH".into(), cics_decimal(6)),
+                ("VALUE".into(), cics_literal(b"alpha")),
+                ("VALUELENGTH".into(), cics_decimal(5)),
+            ]),
+            1,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, first.clone(), 1),
+                first.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        let second = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-Test")),
+                ("NAMELENGTH".into(), cics_decimal(6)),
+                ("VALUE".into(), cics_literal(b"beta")),
+                ("VALUELENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, second.clone(), 2),
+                second.clone(),
+            )
+            .unwrap();
+        let reopened =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        let state = reopened.lock().unwrap();
+        let stage = state.web.pending_headers.values().next().unwrap();
+        assert_eq!(
+            stage.headers,
+            vec![
+                ("X-Test".into(), "alpha".into()),
+                ("X-Test".into(), "beta".into())
+            ]
+        );
+        assert_eq!(stage.version, 2);
+        drop(state);
+        let mut malformed = request(CicsOperation::WebWrite, second.arguments.clone(), 3);
+        malformed
+            .arguments
+            .insert("VALUE".into(), cics_literal(b"bad\r\n"));
+        malformed
+            .arguments
+            .insert("VALUELENGTH".into(), cics_decimal(5));
+        malformed.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let invalid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 3),
+                malformed,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                invalid.condition.as_str(),
+                invalid.response,
+                invalid.response2
+            ),
+            ("INVREQ", 16, 19)
+        );
+        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-web-header-stage-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn web_startbrowse_persists_query_cursor_and_replays_unknown_once() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());
@@ -8169,7 +8403,53 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        reopened
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: String::new(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let write = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-Test")),
+                ("NAMELENGTH".into(), cics_decimal(6)),
+                ("VALUE".into(), cics_literal(b"alpha")),
+                ("VALUELENGTH".into(), cics_decimal(5)),
+            ]),
+            4,
+        );
+        reopened
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 4), write)
+            .unwrap();
         drop(reopened);
+        let verify =
+            CicsService::open(authorities(), reopened_store.clone(), CicsLimits::default())
+                .unwrap();
+        let stage = verify
+            .lock()
+            .unwrap()
+            .web
+            .pending_headers
+            .values()
+            .next()
+            .unwrap()
+            .clone();
+        assert_eq!(stage.headers, vec![("X-Test".into(), "alpha".into())]);
+        drop(verify);
+        drop(reopened_store);
         std::fs::remove_dir_all(directory).unwrap();
     }
 

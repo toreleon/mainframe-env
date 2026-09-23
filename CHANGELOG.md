@@ -38,6 +38,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB WRITE HTTPHEADER` with bounded ordered staging for
+  server responses and client requests, forbidden generated client headers,
+  durable replay and a compiled route. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0252` binds
+  `dfhp4_webwritehttpheader.html` at
+  `sha256:369252b2fd5372d910ec699d0ad7ade37e8dfd2a77fcac8e6dd5f43ec8dd82c3`.
+
 - Added typed CICS `WEB ENDBROWSE` for header, query, and form cursor release,
   with atomic deletion/replay and a compiled route. IBM CICS TS 6.x baseline
   `ibm-cics-ts-6x-2026-08-31:api-commands` row `0242` binds

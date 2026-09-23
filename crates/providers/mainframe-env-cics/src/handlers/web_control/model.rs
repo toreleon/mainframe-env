@@ -8,9 +8,11 @@ use std::sync::Arc;
 pub(super) const SESSION_NAMESPACE: &str = "cics-web-session-v1";
 pub(super) const URIMAP_NAMESPACE: &str = "cics-web-urimap-v1";
 pub(super) const BROWSE_NAMESPACE: &str = "cics-web-browse-v1";
+pub(super) const HEADER_NAMESPACE: &str = "cics-web-header-stage-v1";
 const SESSION_MAGIC: &[u8; 8] = b"MECWEB01";
 const URIMAP_MAGIC: &[u8; 8] = b"MECWURI1";
 const BROWSE_MAGIC: &[u8; 8] = b"MECWBR01";
+const HEADER_MAGIC: &[u8; 8] = b"MECWHDR1";
 
 /// A bounded HTTP endpoint selected by WEB OPEN, independent of the transport.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -134,9 +136,20 @@ pub(in crate::service) struct WebBrowse {
     pub version: u64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::service) struct WebHeaderStage {
+    pub owner_execution: String,
+    pub owner_run_unit: String,
+    pub transaction: String,
+    pub client_token: Option<[u8; 8]>,
+    pub headers: Vec<(String, String)>,
+    pub version: u64,
+}
+
 pub(in crate::service) struct WebState {
     pub sessions: BTreeMap<String, WebClientSession>,
     pub browses: BTreeMap<String, WebBrowse>,
+    pub pending_headers: BTreeMap<String, WebHeaderStage>,
     pub inbound: BTreeMap<String, CicsWebInboundRequest>,
     pub urimaps: BTreeMap<String, CicsWebUriMapDefinition>,
     pub transport: Option<Arc<dyn CicsWebTransport>>,
@@ -150,6 +163,7 @@ pub(in crate::service) fn load(
     let mut state = WebState {
         sessions: BTreeMap::new(),
         browses: BTreeMap::new(),
+        pending_headers: BTreeMap::new(),
         inbound: BTreeMap::new(),
         urimaps: BTreeMap::new(),
         transport: None,
@@ -203,7 +217,92 @@ pub(in crate::service) fn load(
             .filter(|total| *total <= limits.max_web_bytes)
             .ok_or(HostProblem::ResourceExhausted)?;
     }
+    for row in store
+        .list_provider_state(HEADER_NAMESPACE, limits.max_web_sessions)
+        .map_err(store_error)?
+    {
+        let headers = decode_header_stage(&row.payload, row.version)?;
+        if row.key != header_stage_key(&headers.owner_run_unit, headers.client_token)
+            || state.pending_headers.insert(row.key, headers).is_some()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        state.bytes = state
+            .bytes
+            .checked_add(row.payload.len())
+            .filter(|total| *total <= limits.max_web_bytes)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
     Ok(state)
+}
+
+pub(super) fn header_stage_key(run_unit: &str, token: Option<[u8; 8]>) -> String {
+    format!(
+        "{run_unit}:{}",
+        token.map_or_else(|| "server".into(), token_key)
+    )
+}
+
+pub(super) fn encode_header_stage(stage: &WebHeaderStage) -> Result<Vec<u8>, HostProblem> {
+    let mut out = HEADER_MAGIC.to_vec();
+    for text in [
+        stage.owner_execution.as_str(),
+        stage.owner_run_unit.as_str(),
+        stage.transaction.as_str(),
+    ] {
+        field(&mut out, text.as_bytes())?;
+    }
+    out.extend_from_slice(&stage.client_token.unwrap_or([0; 8]));
+    out.extend_from_slice(
+        &u16::try_from(stage.headers.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, value) in &stage.headers {
+        field(&mut out, name.as_bytes())?;
+        field(&mut out, value.as_bytes())?;
+    }
+    Ok(out)
+}
+
+fn decode_header_stage(bytes: &[u8], version: u64) -> Result<WebHeaderStage, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    if reader.take(8)? != HEADER_MAGIC || version == 0 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let owner_execution = read_text(&mut reader, 128)?;
+    let owner_run_unit = read_text(&mut reader, 128)?;
+    let transaction = read_text(&mut reader, 8)?;
+    let token: [u8; 8] = reader
+        .take(8)?
+        .try_into()
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let count = usize::from(read_u16(&mut reader)?);
+    if count > 128 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut headers = Vec::with_capacity(count);
+    for _ in 0..count {
+        headers.push((read_text(&mut reader, 128)?, read_text(&mut reader, 32000)?));
+    }
+    if reader.at != bytes.len()
+        || owner_execution.is_empty()
+        || owner_run_unit.is_empty()
+        || transaction.is_empty()
+        || headers
+            .iter()
+            .any(|(name, value)| name.is_empty() || value.is_empty())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(WebHeaderStage {
+        owner_execution,
+        owner_run_unit,
+        transaction,
+        client_token: (token != [0; 8]).then_some(token),
+        headers,
+        version,
+    })
 }
 
 pub(super) fn browse_key(run_unit: &str, kind: &str) -> String {
