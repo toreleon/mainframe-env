@@ -5,13 +5,11 @@ use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
-mod cics_operand_names;
-mod cics_operation;
+mod cics_identities;
 mod cics_output_names;
 mod cics_resolution;
 mod corresponding_reference;
-pub use cics_operand_names::HirCicsOperandName;
-pub use cics_operation::HirCicsOperation;
+pub use cics_identities::{HirCicsOperandName, HirCicsOperation, HirCicsOption};
 pub use cics_output_names::HirCicsOutputName;
 use corresponding_reference::corresponding_group_reference_at;
 
@@ -162,100 +160,6 @@ pub enum HirCicsValue {
 pub struct HirCicsNamedOperand {
     pub name: HirCicsOperandName,
     pub value: HirCicsValue,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum HirCicsOption {
-    DefResp,
-    NoWait,
-    Rrn,
-    Console,
-    PrintMedium,
-    Card,
-    WpMedia1,
-    WpMedia2,
-    WpMedia3,
-    WpMedia4,
-    Nleom,
-    Accum,
-    Formfeed,
-    DefaultScreen,
-    AlternateScreen,
-    EraseAup,
-    Print,
-    Alarm,
-    Frset,
-    Paging,
-    Last,
-    Honeom,
-    L40,
-    L64,
-    L80,
-    ReleasePage,
-    RetainPage,
-    Autopage,
-    CurrentPage,
-    AllPages,
-    NoAutopage,
-    OperPurge,
-    AsIs,
-    Cancel,
-    NoDump,
-    Reset,
-    Update,
-    Rollback,
-    NoHandle,
-    Task,
-    Uow,
-    NoSuspend,
-    Erase,
-    Cursor,
-    DateSep,
-    TimeSep,
-    FreeKb,
-    Gteq,
-    Generic,
-    Fmh,
-    Protect,
-    Wait,
-    After,
-    At,
-    For,
-    Until,
-    NoCheck,
-    MapOnly,
-    DataOnly,
-    Equal,
-    Terminal,
-    Purgeable,
-    NotPurgeable,
-    Next,
-    RewriteTemporary,
-    Auxiliary,
-    Main,
-    ExactMatch,
-    Minimum,
-    Hold,
-    Unescaped,
-    CounterNoSuspend,
-    CounterReduce,
-    CounterWrap,
-    SpoolKeep,
-    SpoolDelete,
-    SpoolNoCc,
-    SpoolAsa,
-    SpoolMcc,
-    SpoolPrint,
-    SpoolPunch,
-    SpoolLine,
-    SpoolPage,
-    EventAnd,
-    EventOr,
-    TimerAfter,
-    TimerAt,
-    TimerOn,
-    AcqActivity,
-    AcqProcess,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
