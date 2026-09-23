@@ -34509,6 +34509,35 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 3);
     }
 
+    #[test]
+    fn encrypted_passticket_cancellation_after_saf_is_unknown_outcome() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let cancel = mainframe_env_execution_api::CancellationProbe::new();
+        service
+            .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                calls: Arc::new(AtomicUsize::new(0)),
+                failure: None,
+                cancel: Some(cancel.clone()),
+            }))
+            .unwrap();
+        let invocation = invocation().with_cancellation_probe(cancel);
+        let session = SessionId::new("encrypted-cancel", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let verify = verify_token_request(61);
+        let verified = service
+            .invoke(&effect(&invocation.run_unit_id, verify.clone(), 61), verify)
+            .unwrap();
+        let issue = encryptptkt_request(62, verified.outputs["ENCRYPTKEY"].bytes());
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, issue.clone(), 62), issue),
+            Err(HostProblem::UnknownOutcome)
+        );
+    }
+
     fn passticket_request(sequence: u64) -> CicsRequest {
         let mut request = request(
             CicsOperation::RequestPassTicket,
