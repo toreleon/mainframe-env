@@ -2,6 +2,8 @@
 //!
 //! GDS commands report through RETCODE, without raising EXEC CICS conditions.
 
+use super::ConversationIssue;
+
 /// Full six-byte GDS RETCODE, including zero trailing bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GdsReturnCode(pub [u8; 6]);
@@ -100,6 +102,39 @@ pub enum GdsFreeFailure {
     NotOwned,
 }
 
+/// Source-specific GDS ISSUE failures. Each GDS form writes the full RETCODE
+/// and never raises an EXEC CICS condition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GdsIssueFailure {
+    NotAppc,
+    NotBasic,
+    StateCheck,
+    WrongSyncLevel,
+    NotOwned,
+}
+
+impl GdsIssueFailure {
+    #[must_use]
+    pub const fn retcode(self, flow: ConversationIssue) -> GdsReturnCode {
+        GdsReturnCode(match self {
+            Self::NotAppc => [0x03, 0, 0, 0, 0, 0],
+            Self::NotBasic => [0x03, 0x04, 0, 0, 0, 0],
+            Self::StateCheck if matches!(flow, ConversationIssue::Prepare) => {
+                [0x03, 0x24, 0, 0, 0, 0]
+            }
+            Self::StateCheck => [0x03, 0x08, 0, 0, 0, 0],
+            Self::WrongSyncLevel if matches!(flow, ConversationIssue::Prepare) => {
+                [0x03, 0x0c, 0, 0, 0, 0]
+            }
+            Self::WrongSyncLevel if matches!(flow, ConversationIssue::Confirmation) => {
+                [0x03, 0x14, 0, 0, 0, 0]
+            }
+            Self::WrongSyncLevel => [0x03, 0x08, 0, 0, 0, 0],
+            Self::NotOwned => [0x04, 0, 0, 0, 0, 0],
+        })
+    }
+}
+
 impl GdsFreeFailure {
     #[must_use]
     pub const fn retcode(self) -> GdsReturnCode {
@@ -140,5 +175,23 @@ mod tests {
             [5, 0, 0, 0, 127, 255]
         );
         assert_eq!(GdsFreeFailure::StateCheck.retcode().0, [3, 8, 0, 0, 0, 0]);
+        assert_eq!(
+            GdsIssueFailure::StateCheck
+                .retcode(ConversationIssue::Prepare)
+                .0,
+            [3, 36, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            GdsIssueFailure::WrongSyncLevel
+                .retcode(ConversationIssue::Prepare)
+                .0,
+            [3, 12, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            GdsIssueFailure::WrongSyncLevel
+                .retcode(ConversationIssue::Confirmation)
+                .0,
+            [3, 20, 0, 0, 0, 0]
+        );
     }
 }

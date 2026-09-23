@@ -165,7 +165,8 @@ fn encode_cics_effect_plan_version(
     validate_plan(plan, limits)?;
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag(plan.operation))
-            || (130..=139).contains(&operation_tag(plan.operation)))
+            || (130..=139).contains(&operation_tag(plan.operation))
+            || (239..=258).contains(&operation_tag(plan.operation)))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -237,7 +238,9 @@ pub fn decode_cics_effect_plan(
     }
     let operation_tag = reader.tag(version)?;
     if version == LEGACY_VERSION
-        && ((91..=104).contains(&operation_tag) || (130..=139).contains(&operation_tag))
+        && ((91..=104).contains(&operation_tag)
+            || (130..=139).contains(&operation_tag)
+            || (239..=258).contains(&operation_tag))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -1333,6 +1336,23 @@ mod tests {
             decode_cics_effect_plan(&outputs[..21], limits),
             Err(CicsPlanCodecProblem::Truncated)
         );
+    }
+
+    #[test]
+    fn issue_reserved_tags_cross_the_v1_byte_boundary_without_truncation() {
+        let mut legacy = Writer::new(8);
+        legacy.tag(255, LEGACY_VERSION).unwrap();
+        assert_eq!(
+            legacy.tag(256, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        assert_eq!(legacy.finish(), [255]);
+
+        let mut canonical = Writer::new(8);
+        for tag in 256..=258 {
+            canonical.tag(tag, VERSION).unwrap();
+        }
+        assert_eq!(canonical.finish(), [1, 0, 1, 1, 1, 2]);
     }
 
     #[test]

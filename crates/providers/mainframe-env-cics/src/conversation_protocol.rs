@@ -42,6 +42,7 @@ pub enum ConversationState {
     Receive,
     Free,
     PendFree,
+    PendReceive,
     ConfFree,
     ConfReceive,
     ConfSend,
@@ -49,6 +50,17 @@ pub enum ConversationState {
     SyncReceive,
     SyncSend,
     Rollback,
+}
+
+/// One ISSUE protocol flow. The source command's mapped or GDS form selects
+/// the wire encoding, while this record remains the only state authority.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConversationIssue {
+    Abend,
+    Confirmation,
+    Error,
+    Prepare,
+    Signal,
 }
 
 /// The invocation that owns a conversation. Its lease epoch fences resumed
@@ -109,11 +121,70 @@ pub enum ConversationProblem {
     DplPrincipal,
     WrongKind,
     WrongState,
+    WrongSyncLevel,
     Length,
     Exhausted,
 }
 
 impl ConversationRecord {
+    /// Apply an APPC ISSUE flow after ownership and protocol checks. The
+    /// caller persists the resulting record and the effect/audit together;
+    /// transport acknowledgement alone never advances this state.
+    pub fn issue(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        basic: bool,
+        flow: ConversationIssue,
+    ) -> Result<ConversationState, ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if self.kind
+            != if basic {
+                ConversationKind::AppcBasic
+            } else {
+                ConversationKind::AppcMapped
+            }
+        {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if matches!(flow, ConversationIssue::Prepare) && self.sync_level != Some(2)
+            || matches!(flow, ConversationIssue::Confirmation) && self.sync_level == Some(0)
+        {
+            return Err(ConversationProblem::WrongSyncLevel);
+        }
+        let next = match flow {
+            ConversationIssue::Abend if self.state != ConversationState::Allocated => {
+                ConversationState::Free
+            }
+            ConversationIssue::Confirmation if self.state == ConversationState::ConfReceive => {
+                ConversationState::Receive
+            }
+            ConversationIssue::Error if self.state == ConversationState::ConfReceive => {
+                ConversationState::Receive
+            }
+            ConversationIssue::Error
+                if matches!(
+                    self.state,
+                    ConversationState::Send | ConversationState::Receive
+                ) =>
+            {
+                self.state
+            }
+            ConversationIssue::Prepare if self.state == ConversationState::Send => {
+                ConversationState::SyncReceive
+            }
+            ConversationIssue::Signal if self.state == ConversationState::Receive => {
+                ConversationState::Receive
+            }
+            _ => return Err(ConversationProblem::WrongState),
+        };
+        self.next_sequence()?;
+        self.state = next;
+        if flow == ConversationIssue::Abend {
+            self.released = true;
+        }
+        Ok(next)
+    }
     pub fn allocate(
         token: [u8; 4],
         system: &str,
@@ -363,6 +434,154 @@ mod tests {
             run_unit: "run".into(),
             lease_epoch: epoch,
         }
+    }
+
+    #[test]
+    fn issue_flows_use_the_shared_owned_protocol_record() {
+        let mut mapped = ConversationRecord::allocate(
+            *b"I001",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        mapped
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                b"TRAN".to_vec(),
+                vec![],
+                2,
+            )
+            .unwrap();
+        assert_eq!(
+            mapped.issue(
+                &owner(2),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Prepare,
+            ),
+            Err(ConversationProblem::StaleOwner)
+        );
+        assert_eq!(mapped.state, ConversationState::Send);
+        assert_eq!(
+            mapped.issue(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Prepare,
+            ),
+            Ok(ConversationState::SyncReceive)
+        );
+        let reopened = ConversationRecord::decode(&mapped.encode().unwrap()).unwrap();
+        assert_eq!(reopened.state, ConversationState::SyncReceive);
+        assert_eq!(reopened.sequence, 2);
+        assert_eq!(
+            mapped.issue(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Signal,
+            ),
+            Err(ConversationProblem::WrongState)
+        );
+        assert_eq!(mapped.sequence, 2);
+        assert_eq!(
+            mapped.issue(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Abend,
+            ),
+            Ok(ConversationState::Free)
+        );
+        assert!(mapped.released);
+    }
+
+    #[test]
+    fn issue_rejects_wrong_protocol_and_dpl_principal_without_mutation() {
+        let mut record = ConversationRecord::allocate(
+            *b"I002",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner(3),
+            true,
+        )
+        .unwrap();
+        let before = record.clone();
+        assert_eq!(
+            record.issue(
+                &owner(3),
+                ConversationContext::DplServer,
+                true,
+                ConversationIssue::Abend,
+            ),
+            Err(ConversationProblem::DplPrincipal)
+        );
+        assert_eq!(
+            record.issue(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Abend,
+            ),
+            Err(ConversationProblem::WrongKind)
+        );
+        assert_eq!(record, before);
+    }
+
+    #[test]
+    fn basic_issue_distinguishes_sync_level_from_state_failure() {
+        let mut basic = ConversationRecord::allocate(
+            *b"I003",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        basic
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                b"TRAN".to_vec(),
+                vec![],
+                0,
+            )
+            .unwrap();
+        let before = basic.clone();
+        assert_eq!(
+            basic.issue(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                ConversationIssue::Prepare,
+            ),
+            Err(ConversationProblem::WrongSyncLevel)
+        );
+        assert_eq!(basic, before);
+        basic.sync_level = Some(2);
+        assert_eq!(
+            basic.issue(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                ConversationIssue::Prepare,
+            ),
+            Ok(ConversationState::SyncReceive)
+        );
+        assert_eq!(
+            basic.issue(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                ConversationIssue::Prepare,
+            ),
+            Err(ConversationProblem::WrongState)
+        );
     }
 
     #[test]
