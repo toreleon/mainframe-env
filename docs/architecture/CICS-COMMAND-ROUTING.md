@@ -338,6 +338,8 @@ capacity accounting. Invalid, static, unassigned, or repeated release returns
 INVREQ 16/1; key/shared/load ownership remains deferred.
 GETMAIN64 is a separate typed Core-MIR operation for a checked non-LE
 AMODE(64) caller, never an alias of GETMAIN or a COBOL source form. The
+ownership and checkpoint boundary is recorded in
+[ADR-0012](../decisions/0012-checked-amode64-storage-boundary.md). The
 invocation binds the caller ABI and TASKDATAKEY, FLENGTH is fullword, and SET64
 requires an eight-byte pointer slot. The interpreter owns a monotonic virtual
 arena with distinct above-bar, LOC24, and LOC31 address ranges; allocation

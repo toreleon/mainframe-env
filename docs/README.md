@@ -73,6 +73,7 @@ explicitly names that authority as superseded.
 - [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
 - [ADR-0010: Rust module review budgets](decisions/0010-rust-module-review-budgets.md)
 - [ADR-0011: Typed language HIR and semantic IR](decisions/0011-typed-language-hir-and-semantic-ir.md)
+- [ADR-0012: Checked AMODE64 storage boundary](decisions/0012-checked-amode64-storage-boundary.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

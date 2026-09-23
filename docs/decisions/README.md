@@ -15,6 +15,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0009](0009-current-package-topology.md) | current 26-package topology and change governance | Accepted |
 | [0010](0010-rust-module-review-budgets.md) | hard Rust module budgets, facade ratchet, and CICS family layout | Accepted |
 | [0011](0011-typed-language-hir-and-semantic-ir.md) | language-specific HIR, semantic IR dialects, and typed host effects | Accepted |
+| [0012](0012-checked-amode64-storage-boundary.md) | checked AMODE(64) virtual storage and checkpoint boundary | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.
