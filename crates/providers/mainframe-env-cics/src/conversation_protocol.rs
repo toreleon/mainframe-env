@@ -6,7 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
+mod gds;
 mod ledger;
+pub use gds::{
+    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
+};
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
     ConversationSystemDefinition,
