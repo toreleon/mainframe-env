@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 191,
+    "markdown_documents": 192,
     "navigation_groups": 5,
-    "normative_documents": 43,
+    "normative_documents": 44,
     "xtask_commands": 168
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:14a00e3f048cd40f411a5759a1085f158ae5ff7e74717e46816a530f3ed08182",
+      "sha256": "sha256:5a24e51106495e718e0f6ea8ca45f0b45a09be6615e24dce9ad31d42acbc9d85",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 78,
-      "sha256": "sha256:89257d074f62db70a5fcdeda28565fa48eef85b0957c13b6d63e7ce76031f4df",
+      "relative_links": 79,
+      "sha256": "sha256:1b9140f89f7a138181db89d0e4b43814d0de9ac9107bcb6c4238d8126f1ee57f",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -767,10 +767,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0015-bts-lifecycle-authority.md",
+      "relative_links": 0,
+      "scope": "shared BTS process/activity state for 23 lifecycle application rows",
+      "sha256": "sha256:1f66b17f0f765c1c7724a52ffdd7dfd56f7481ba1461d61b28c09a635abd3377",
+      "status": "Proposed for the incremental CIC-904.bts-lifecycle slice",
+      "title": "ADR-0015: Shared BTS lifecycle authority",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 14,
-      "sha256": "sha256:b10f4a91e91ff530fcf7fa95f643bbe2327a80f43920d8713c6ea0191f383778",
+      "relative_links": 15,
+      "sha256": "sha256:9be28219b755621eebb4eca3e04cd79374605428f36650ef01cf25bac7736cef",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1109,8 +1121,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 84,
-      "sha256": "sha256:87ab049be9b8a46b93df00fe0a220184eb0d19d5b9ce016b99840b9de5a4cdc7",
+      "relative_links": 85,
+      "sha256": "sha256:ed7819187508df5d476dddb596b95ecf32a9c63e3b646501b51d6b8841b3daf6",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 1
     },
@@ -1868,6 +1880,10 @@
           "path": "docs/decisions/0014-named-counter-authority.md"
         },
         {
+          "label": "ADR-0015: BTS lifecycle authority",
+          "path": "docs/decisions/0015-bts-lifecycle-authority.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2031,7 +2047,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:3c0763d98da8b80a1d29982fa7f66f2eb22a0929d05bc1f963d549dc07606eec",
+  "registry_sha256": "sha256:047451f0582478712986b285c0aec2d5458dd29be932397a6f644a83c54f3be9",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,
