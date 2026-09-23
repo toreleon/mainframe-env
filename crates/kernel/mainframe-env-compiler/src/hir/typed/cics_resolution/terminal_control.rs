@@ -2,11 +2,12 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
     ResolutionFailure,
 };
-use super::{Clauses, cics_value, complete_data_reference};
-use crate::{DataCategory, SemanticModel};
+use super::{Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value};
+use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     let required: &[&str] = match operation {
@@ -20,6 +21,54 @@ pub(super) fn validate_constraints(
                 "CICS {operation:?} requires {name}"
             )));
         }
+    }
+    if operation == HirCicsOperation::SendMap
+        && clauses.contains_key("LENGTH")
+        && !clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP LENGTH requires an explicit FROM data area".into(),
+        ));
+    }
+    if operation == HirCicsOperation::ReceiveMap
+        && clauses.contains_key("LENGTH")
+        && !clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS RECEIVE MAP LENGTH requires an explicit FROM data area".into(),
+        ));
+    }
+    if operation == HirCicsOperation::ReceiveMap
+        && options.iter().any(|option| option == "TERMINAL")
+        && clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS RECEIVE MAP TERMINAL does not accept FROM".into(),
+        ));
+    }
+    if operation == HirCicsOperation::SendMap
+        && options.iter().any(|option| option == "DATAONLY")
+        && options.iter().any(|option| option == "MAPONLY")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP DATAONLY and MAPONLY are mutually exclusive".into(),
+        ));
+    }
+    if operation == HirCicsOperation::SendMap
+        && options.iter().any(|option| option == "MAPONLY")
+        && (clauses.contains_key("FROM") || clauses.contains_key("LENGTH"))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP MAPONLY does not accept FROM or LENGTH".into(),
+        ));
+    }
+    if operation == HirCicsOperation::SendMap
+        && options.iter().any(|option| option == "DATAONLY")
+        && !clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP DATAONLY requires an explicit FROM data area".into(),
+        ));
     }
     Ok(())
 }
@@ -79,23 +128,55 @@ pub(super) fn operands(
             value: HirCicsValue::Data(reference),
         });
     }
-    if operation == HirCicsOperation::SendText
-        && let Some(tokens) = clauses.get("LENGTH")
-    {
-        if !tokens
+    if let Some(tokens) = clauses.get("LENGTH") {
+        let value = if tokens
             .first()
             .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
-            || !tokens
+            && tokens
                 .get(1)
                 .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
         {
+            HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
+        } else if matches!(
+            operation,
+            HirCicsOperation::ReceiveMap | HirCicsOperation::SendMap | HirCicsOperation::SendText
+        ) {
+            let value = cics_integer_value(tokens, semantic)?;
+            match &value {
+                HirCicsValue::Data(reference)
+                    if reference.usage != CobolUsage::Binary
+                        || reference.length != 2
+                        || reference.scale != 0 =>
+                {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS {operation:?} LENGTH requires halfword binary storage"
+                    )));
+                }
+                HirCicsValue::Integer(value) if !(0..=32_767).contains(value) => {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS {operation:?} LENGTH literal must be between 0 and 32767"
+                    )));
+                }
+                _ => {}
+            }
+            value
+        } else {
+            unreachable!("LENGTH is admitted only for RECEIVE MAP, SEND MAP, or SEND TEXT")
+        };
+        if operation == HirCicsOperation::ReceiveMap
+            && let HirCicsValue::LengthOf(length) = &value
+            && !operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::From
+                    && matches!(&operand.value, HirCicsValue::Data(from) if from == length)
+            })
+        {
             return Err(ResolutionFailure::Invalid(
-                "CICS SEND TEXT LENGTH requires LENGTH OF a data area".into(),
+                "CICS ReceiveMap LENGTH OF must name the FROM data area".into(),
             ));
         }
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,
-            value: HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?),
+            value,
         });
     }
     Ok(operands)

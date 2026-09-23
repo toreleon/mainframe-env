@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:abda2d51b1b1b5b0adace4d5fb213f7f58132b21cd5bee192e7eefaf79750fca",
+      "sha256": "sha256:932b2633f560eee31ef23894723f53937a11774b52de1219f6bff67d93a7a7c4",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:80c3be9232ad1bf8092c182e71f0d264858db81d01fdb03276d2992ff803ea68",
+      "sha256": "sha256:673ebb93f8db7c9e059be129d17ba21d27b8163afcdf1fdd1fccd44660db3cc0",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:ae8b6611e60c972c965c57eecd51867044907ac9b8cc45e48a726bdd2fd5c201",
+      "sha256": "sha256:a5fb31fd477d3da90bb7036056b4be91f87dee6072cd00ffb85be8d09e43129e",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:fc16550a6dd317c96c68e81ca2a8dbde697ca8f91b528b63d60e962a7733ea50",
+      "sha256": "sha256:1bcf1e23e6f0f7e35ae8caf6a15d851b2e908df56b5c34b2d44b1cd186485f94",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

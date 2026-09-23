@@ -291,7 +291,7 @@ def check_dedicated_authorities(root: Path) -> None:
             "observation_bytes: u64",
             "logical_tick: u64",
             "impl RetentionStore for MemoryStore",
-            "let mut staged = state.clone()",
+            "let mut staged = self.snapshot(&state)",
             "insert_memory_archive(&mut staged",
             "*state = staged",
             "if next > max && !result.is_empty()",

@@ -32,6 +32,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
         CicsOperandName::Flength => SlotUse::FullwordInput,
+        CicsOperandName::DataPointer => SlotUse::PointerInput,
+        CicsOperandName::DataArea => SlotUse::Input,
         _ => SlotUse::Input,
     }
 }
@@ -62,6 +64,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
         CicsPlanOperation::Abend => CicsOperation::Abend,
+        CicsPlanOperation::Address => CicsOperation::Address,
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
         CicsPlanOperation::Asktime => CicsOperation::Asktime,
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
@@ -81,12 +84,15 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::StartBrowse => CicsOperation::StartBrowse,
         CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
         CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
+        CicsPlanOperation::ReadTransientData => CicsOperation::ReadTransientData,
         CicsPlanOperation::EndBrowse => CicsOperation::EndBrowse,
         CicsPlanOperation::Delete => CicsOperation::Delete,
         CicsPlanOperation::Write => CicsOperation::Write,
         CicsPlanOperation::WriteTransientData => CicsOperation::WriteTransientData,
         CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
+        CicsPlanOperation::DeleteTemporaryStorage => CicsOperation::DeleteTemporaryStorage,
         CicsPlanOperation::Getmain => CicsOperation::Getmain,
+        CicsPlanOperation::Freemain => CicsOperation::Freemain,
         CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,
         CicsPlanOperation::SendMap => CicsOperation::SendMap,
         CicsPlanOperation::SendText => CicsOperation::SendText,
@@ -120,6 +126,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::From => "FROM",
         CicsOperandName::Ridfld => "RIDFLD",
         CicsOperandName::Queue => "QUEUE",
+        CicsOperandName::Qname => "QNAME",
+        CicsOperandName::SysId => "SYSID",
+        CicsOperandName::CommareaPointer => "COMMAREA",
         CicsOperandName::Map => "MAP",
         CicsOperandName::Mapset => "MAPSET",
         CicsOperandName::Resource => "RESOURCE",
@@ -147,6 +156,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Milliseconds => "MILLISECS",
         CicsOperandName::Flength => "FLENGTH",
         CicsOperandName::InitImage => "INITIMG",
+        CicsOperandName::DataPointer => "DATAPOINTER",
+        CicsOperandName::DataArea => "DATA",
     }
 }
 
@@ -199,5 +210,10 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::For => "FOR",
         CicsPlanOption::Until => "UNTIL",
         CicsPlanOption::NoCheck => "NOCHECK",
+        CicsPlanOption::MapOnly => "MAPONLY",
+        CicsPlanOption::DataOnly => "DATAONLY",
+        CicsPlanOption::Generic => "GENERIC",
+        CicsPlanOption::Equal => "EQUAL",
+        CicsPlanOption::Terminal => "TERMINAL",
     }
 }

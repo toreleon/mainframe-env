@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
+    /// Return checked virtual addresses for task storage areas.
+    Address,
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
@@ -24,10 +26,14 @@ pub enum CicsOperation {
     Delete,
     /// Delete every record from one local transient-data queue.
     DeleteTransientData,
+    /// Delete every item from one local temporary-storage queue.
+    DeleteTemporaryStorage,
     /// Acquire or wait for one task enqueue resource.
     Enq,
     EndBrowse,
     FormatTime,
+    /// Release one task-local virtual storage area acquired by GETMAIN.
+    Freemain,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
     HandleAbend,
@@ -48,6 +54,8 @@ pub enum CicsOperation {
     Read,
     ReadNext,
     ReadPrev,
+    /// Read and consume one record from a local transient-data queue.
+    ReadTransientData,
     ReceiveMap,
     Retrieve,
     Return,
@@ -74,6 +82,7 @@ impl CicsOperation {
     pub const fn runtime_name(self) -> &'static str {
         match self {
             Self::Abend => "Abend",
+            Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
             Self::AsktimeEib => "AsktimeEib",
@@ -84,9 +93,11 @@ impl CicsOperation {
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DeleteTransientData => "DeleteTransientData",
+            Self::DeleteTemporaryStorage => "DeleteTemporaryStorage",
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::Freemain => "Freemain",
             Self::Getmain => "Getmain",
             Self::HandleAbend => "HandleAbend",
             Self::HandleAid => "HandleAid",
@@ -100,6 +111,7 @@ impl CicsOperation {
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
+            Self::ReadTransientData => "ReadTransientData",
             Self::ReceiveMap => "ReceiveMap",
             Self::Retrieve => "Retrieve",
             Self::Return => "Return",
@@ -124,16 +136,19 @@ impl CicsOperation {
             self,
             Self::Delete
                 | Self::DeleteTransientData
+                | Self::DeleteTemporaryStorage
                 | Self::Cancel
                 | Self::Delay
                 | Self::Deq
                 | Self::Enq
+                | Self::Freemain
                 | Self::Getmain
                 | Self::Rewrite
                 | Self::Write
                 | Self::WriteTransientData
                 | Self::Link
                 | Self::ReceiveMap
+                | Self::ReadTransientData
                 | Self::PurgeMessage
                 | Self::SendMap
                 | Self::SendText
@@ -159,6 +174,7 @@ impl CicsOperation {
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ABEND", _) => Self::Abend,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
+            ("ADDRESS", _) => Self::Address,
             ("ASKTIME", _)
                 if words
                     .iter()
@@ -174,9 +190,11 @@ impl CicsOperation {
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
             ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
+            ("DELETEQ", Some("TS")) => Self::DeleteTemporaryStorage,
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("FREEMAIN", _) => Self::Freemain,
             ("GETMAIN", _) => Self::Getmain,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", Some("AID")) => Self::HandleAid,
@@ -188,6 +206,7 @@ impl CicsOperation {
             ("PUSH", Some("HANDLE")) => Self::PushHandle,
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("READ", _) => Self::Read,
+            ("READQ", Some("TD")) => Self::ReadTransientData,
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,

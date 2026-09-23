@@ -69,14 +69,21 @@ contract explicitly permits it.
 - Typed CICS BMS plans admit a bounded local subset of `RECEIVE MAP`, `SEND MAP`,
   and `SEND TEXT`. MAP is a required 1–7 character literal or alpha/alphanumeric
   field for the two map commands; MAPSET is optional and defaults to MAP.
-  `SEND MAP` optionally captures FROM bytes, `RECEIVE MAP` optionally binds a
-  writable INTO area, and `SEND TEXT` requires captured FROM bytes. The provider
-  checks the requested durable map definition, makes a successfully sent map
-  current, and normalizes received named fields against that exact definition.
-  The selected typed route reports EIBFN `1802`, `1804`, or `1806` respectively.
-  SET pointers, omitted-MAP/AID-only receive, implicit symbolic map storage,
-  explicit length, paging, device and remaining terminal-control options are
-  rejected before executable publication.
+  `SEND MAP` optionally captures FROM bytes and admits LENGTH only with that
+  explicit area; `SEND TEXT` requires captured FROM bytes and admits the same
+  length forms. A literal, halfword-binary value, or matching `LENGTH OF`
+  selects the formatted or text prefix, and an out-of-range SEND TEXT value
+  returns LENGERR 22/0 before mutation. `SEND MAP MAPONLY` excludes FROM and
+  LENGTH and writes only initialized defaults from the selected map. `SEND MAP
+  DATAONLY` requires explicit symbolic FROM data, ignores map defaults, and
+  applies each supplied field attribute while preserving the current attribute
+  for `X'00'`. `RECEIVE MAP` optionally binds a writable INTO area. The provider
+  validates the exact SEND request shape, checks the requested durable map definition, makes
+  a successfully sent map current, and normalizes received named fields against
+  that exact definition. The selected typed route reports EIBFN `1802`, `1804`,
+  or `1806` respectively. SET pointers, omitted-MAP/AID-only receive, implicit
+  symbolic map storage, RECEIVE length, paging, device and remaining
+  terminal-control options are rejected before executable publication.
 - Typed `PURGE MESSAGE` has no operands beyond the common condition controls.
   The runtime exposes no full-BMS ACCUM/page-building path, so local execution
   purges the exact reachable empty logical-message state without clearing the
@@ -217,8 +224,9 @@ continuation; malformed schemas, unsupported DPL context, and unowned options
 fail before continuation mutation.
 
 The typed default file-browse loop gives RIDFLD explicit storage identity.
-STARTBR reads its initial key but has no record output. READNEXT and READPREV
-send the current key, write the returned payload to INTO, and require a
+STARTBR reads its initial key but has no record output; explicit EQUAL requires
+an exact starting key while GTEQ retains equal-or-next positioning. READNEXT
+and READPREV send the current key, write the returned payload to INTO, and require a
 `mainframe-env.cics.payload@1` RIDFLD output before updating that same key
 slot. ENDBR carries only the resolved FILE/DATASET identity. The sequence
 updates EIBFN to `060C`, `060E`, `0610`, and `0612`; forms needing named cursor,
@@ -226,13 +234,29 @@ remote routing, alternate record identities, SET storage, or RLS update-token
 state do not enter this typed route.
 
 Typed keyed file mutation resolves all data-bearing operands before dispatch.
-DELETE reads one explicit RIDFLD storage slot; WRITE FILE reads FROM and
-RIDFLD storage slots, preserving record and key bytes in the typed request.
-Both operations require exactly one FILE/DATASET alias, carry a mutation
-identity, and update EIBFN to `0608` or `0604`. Forms whose key or record is a
-literal, whose DELETE key comes from prior update context, or whose semantics
-depend on TOKEN, remote routing, lengths, alternate identities, mass insert, or
-RLS suspension do not publish the typed executable.
+DELETE reads an explicit RIDFLD storage slot or, after `READ UPDATE`, consumes
+the latest held key for the same file; WRITE FILE reads FROM and RIDFLD storage
+slots, while REWRITE reads FROM and consumes the same-file update hold. Optional
+WRITE or REWRITE LENGTH is a bounded literal, halfword-binary value, or matching
+`LENGTH OF` and selects the exact FROM prefix before the durable mutation.
+READ LENGTH supplies a writable halfword capacity and receives the actual
+record length after transfer. Optional READ, WRITE, or explicit-key DELETE
+KEYLENGTH accepts a positive literal, halfword-binary value, or `LENGTH OF` the
+RIDFLD area and must match the durable key definition. These operations require
+exactly one FILE/DATASET alias, carry a mutation identity, and update the
+operation-specific EIBFN. A current-record DELETE or REWRITE without a hold
+returns its source-defined `INVREQ`; DELETE cannot carry KEYLENGTH without
+RIDFLD. READ GTEQ selects the equal or first greater keyed record through a
+request-local cursor that is closed before the command completes. READ GENERIC
+selects only a record sharing the positive KEYLENGTH prefix of RIDFLD; combining
+GENERIC with GTEQ retains first-greater fallback. Explicit EQUAL preserves the
+default exact complete- or generic-key relation and cannot be combined with
+GTEQ. READ GTEQ with runtime KEYLENGTH zero selects the first keyed record,
+whether or not GENERIC is also present; zero fails closed for default EQUAL and
+GENERIC without GTEQ.
+Forms whose key or record is a literal, or whose semantics depend on TOKEN,
+remote routing, alternate identities, mass insert, or RLS suspension do not
+publish the typed executable.
 
 Typed local WRITEQ TD captures a 1–4 character QUEUE name and one FROM storage
 area. An omitted LENGTH selects the complete area; a present integer LENGTH
@@ -245,16 +269,36 @@ authorization for that queue resource, and atomically removes its durable
 records and retained-byte accounting. A missing queue returns QIDERR 44/0;
 remote SYSID and definition-driven extrapartition, disabled, or locked states
 remain outside this typed subset.
+Typed local READQ TD accepts exactly one INTO or SET destination and an optional
+writable halfword LENGTH. INTO uses either the supplied positive maximum or the
+compiler-derived area extent. SET returns a checked POINTER/POINTER-32 address
+to interpreter-owned storage containing the complete record and survives a
+checkpoint restore. Zero length and INTO truncation consume the record and
+return LENGERR 22/0; a negative length or insufficient SET allocation capacity
+does not consume. Missing and empty queues remain distinct as QIDERR 44/0 and
+QZERO 23/0. All three typed TDQ commands accept an explicit local-system SYSID;
+any other name returns SYSIDERR 53/0 before authorization or mutation. Remote
+routing, NOSUSPEND, and definition-driven modes remain fail-closed.
 
-Typed local GETMAIN requires SET plus a literal or fullword-binary FLENGTH and
-optionally accepts one character INITIMG and NOSUSPEND. The interpreter reports
-its bounded frame/byte capacity, receives initialized bytes through the typed
-host result, allocates one checkpointed virtual base, and writes only the
-checked virtual address to POINTER or POINTER-32 storage. Nonpositive or
-over-limit FLENGTH returns LENGERR 22/1 and clears SET; unavailable capacity
-returns NOSTG 42/2, which is ignored by default. Native addresses, legacy LENGTH, storage keys,
-SHARED/EXECUTABLE policy, GETMAIN64, and release semantics remain outside this
-subset.
+Typed local GETMAIN requires SET plus exactly one length selector: a literal or
+fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
+LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and
+NOSUSPEND. The interpreter reports its bounded frame/byte capacity, receives
+initialized bytes through the typed host result, allocates one checkpointed
+virtual base, and writes only the checked virtual address to POINTER or
+POINTER-32 storage. Zero or over-limit values return LENGERR 22/1 and clear SET;
+unavailable capacity returns NOSTG 42/2, which is ignored by default. LENGTH
+selects the source-defined below-line compatibility policy, but the virtual
+allocator exposes no native 24-bit address. Native addresses, storage keys,
+SHARED/EXECUTABLE policy and GETMAIN64 remain outside this subset.
+Typed local FREEMAIN accepts exactly one of DATAPOINTER or DATA. DATAPOINTER
+requires a POINTER or POINTER-32 value that the current machine can prove names
+a live, offset-zero GETMAIN allocation. DATA accepts a declared COBOL area only
+when its current virtual-storage view begins at such an allocation. Normal
+completion records the released base in the checkpoint, makes existing linkage
+views inaccessible, and restores its frame/byte capacity. A null, static,
+malformed, foreign, unassigned, or already-freed identity returns INVREQ 16/1.
+Key/shared/load ownership and FREEMAIN64 remain outside this subset.
 
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a

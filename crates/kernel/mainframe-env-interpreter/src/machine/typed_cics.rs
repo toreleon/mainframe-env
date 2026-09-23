@@ -9,10 +9,12 @@ use mainframe_env_ir::{
     decode_cics_effect_plan, verify_semantic_contracts,
 };
 
+mod address;
 mod assign;
 mod legacy;
 mod names;
 mod retrieve;
+pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 
@@ -22,18 +24,6 @@ const PLAN_ATTRIBUTE: &str = "cics_plan";
 pub(super) enum CicsTarget {
     Legacy(String),
     Resolved(CicsStorageSlot),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum CicsAddressSet {
-    PointerFromData {
-        target: CicsStorageSlot,
-        source: CicsStorageSlot,
-    },
-    DataFromPointer {
-        target: CicsStorageSlot,
-        source: CicsStorageSlot,
-    },
 }
 
 pub(super) fn operation_identities() -> Vec<OperationIdentity> {
@@ -73,16 +63,29 @@ pub(super) fn write_response_state(
         && response.response == 0
         && let Some(action) = address_set
     {
-        apply_address_set(machine, action)?;
+        address::apply(machine, action)?;
     }
     Ok(())
 }
 
+pub(super) fn into_payload_schema<'a>(
+    operation: CicsOperation,
+    response: &'a CicsResponse,
+) -> Option<&'a str> {
+    (operation != CicsOperation::ReadTransientData
+        || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
+    .then(|| response.payload.schema())
+}
+
 pub(super) fn write_runtime_output(
     machine: &mut ReferenceMachine,
+    operation: CicsOperation,
     name: &str,
     value: &BoundedPayload,
 ) -> Result<bool, MachineProblem> {
+    if retrieve::release_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
     if name != "TASK.PRIORITY" {
         return Ok(false);
     }
@@ -231,7 +234,7 @@ pub(super) fn execute(
     validate_runtime_plan(machine, operation, &plan)?;
 
     let host_operation = names::host_operation(plan.operation);
-    let address_set = address_set_action(&plan)?;
+    let address_set = address::action(&plan)?;
     let mut arguments = BTreeMap::new();
     for operand in &plan.operands {
         let (schema, bytes) = match &operand.value {
@@ -250,7 +253,9 @@ pub(super) fn execute(
             CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
-                    CicsOperandName::SetAddress | CicsOperandName::SetPointer
+                    CicsOperandName::CommareaPointer
+                        | CicsOperandName::SetAddress
+                        | CicsOperandName::SetPointer
                 ) =>
             {
                 (
@@ -263,6 +268,12 @@ pub(super) fn execute(
                     )
                     .into_bytes(),
                 )
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataPointer => {
+                retrieve::freemain_argument(machine, slot)?
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea => {
+                retrieve::freemain_data_argument(machine, slot)?
             }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
                 "mainframe-env.cics.storage-identity@1",
@@ -363,7 +374,24 @@ pub(super) fn execute(
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::Into => into = Some(target),
+            CicsOutputName::Into => {
+                if plan.operation == CicsPlanOperation::ReadTransientData {
+                    let CicsTarget::Resolved(slot) = &target else {
+                        return Err(MachineProblem::UnexpectedHostResult);
+                    };
+                    arguments.insert(
+                        "INTO.MAXLENGTH".into(),
+                        payload(
+                            "mainframe-env.cics.decimal@1",
+                            resolved_slot(machine, slot)?
+                                .length
+                                .to_string()
+                                .into_bytes(),
+                        )?,
+                    );
+                }
+                into = Some(target);
+            }
             CicsOutputName::SetPointer => {
                 arguments.extend(retrieve::allocation_arguments(
                     machine,
@@ -547,62 +575,6 @@ fn write_resolved_prefix(
     machine.write_reference(&reference, value)
 }
 
-fn address_set_action(plan: &CicsEffectPlan) -> Result<Option<CicsAddressSet>, MachineProblem> {
-    if plan.operation != CicsPlanOperation::AddressSet {
-        return Ok(None);
-    }
-    let slot = |name| {
-        plan.operands
-            .iter()
-            .find(|operand| operand.name == name)
-            .and_then(|operand| match &operand.value {
-                CicsOperandValue::Storage(slot) => Some(slot.clone()),
-                _ => None,
-            })
-            .ok_or_else(|| invalid_plan("ADDRESS SET storage role is missing"))
-    };
-    if plan
-        .operands
-        .iter()
-        .any(|operand| operand.name == CicsOperandName::SetPointer)
-    {
-        Ok(Some(CicsAddressSet::PointerFromData {
-            target: slot(CicsOperandName::SetPointer)?,
-            source: slot(CicsOperandName::UsingAddress)?,
-        }))
-    } else {
-        Ok(Some(CicsAddressSet::DataFromPointer {
-            target: slot(CicsOperandName::SetAddress)?,
-            source: slot(CicsOperandName::UsingPointer)?,
-        }))
-    }
-}
-
-pub(super) fn apply_address_set(
-    machine: &mut ReferenceMachine,
-    action: &CicsAddressSet,
-) -> Result<(), MachineProblem> {
-    match action {
-        CicsAddressSet::PointerFromData { target, source } => {
-            let target = resolved_slot(machine, target)?;
-            let source = resolved_slot(machine, source)?;
-            let address = machine.address_bytes(&source, target.length)?;
-            machine.write_reference(&target, &address)
-        }
-        CicsAddressSet::DataFromPointer { target, source } => {
-            let target = resolved_slot(machine, target)?;
-            let source = resolved_slot(machine, source)?;
-            let pointer = machine.read_reference(&source)?;
-            let address = if pointer.as_slice() == [0xff, 0, 0, 0] {
-                None
-            } else {
-                machine.decode_address(&pointer)?
-            };
-            machine.assign_linkage_address(&target.layout.name, address)
-        }
-    }
-}
-
 fn resolved_slot(
     machine: &ReferenceMachine,
     slot: &CicsStorageSlot,
@@ -773,6 +745,7 @@ fn validate_address_set_slots(
             continue;
         };
         let slot_use = match operand.name {
+            CicsOperandName::CommareaPointer => SlotUse::PointerOutput,
             CicsOperandName::SetAddress => SlotUse::AddressOutput,
             CicsOperandName::SetPointer => SlotUse::PointerOutput,
             CicsOperandName::UsingAddress => SlotUse::AddressInput,
@@ -780,6 +753,13 @@ fn validate_address_set_slots(
             _ => continue,
         };
         validate_machine_slot(machine, operation, slot, slot_use)?;
+        if operand.name == CicsOperandName::CommareaPointer
+            && resolved_slot(machine, slot)?.length != 4
+        {
+            return Err(invalid_plan(
+                "ADDRESS COMMAREA output must be a four-byte pointer",
+            ));
+        }
     }
     Ok(())
 }

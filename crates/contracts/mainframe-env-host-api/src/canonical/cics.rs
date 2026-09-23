@@ -6,6 +6,7 @@ impl Canonical for CicsOperation {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
+            Self::Address => out.variant("CicsOperation", "Address", 0),
             Self::AddressSet => out.variant("CicsOperation", "AddressSet", 0),
             Self::Asktime => out.variant("CicsOperation", "Asktime", 0),
             Self::AsktimeEib => out.variant("CicsOperation", "AsktimeEib", 0),
@@ -16,9 +17,13 @@ impl Canonical for CicsOperation {
             Self::Deq => out.variant("CicsOperation", "Deq", 0),
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DeleteTransientData => out.variant("CicsOperation", "DeleteTransientData", 0),
+            Self::DeleteTemporaryStorage => {
+                out.variant("CicsOperation", "DeleteTemporaryStorage", 0)
+            }
             Self::Enq => out.variant("CicsOperation", "Enq", 0),
             Self::EndBrowse => out.variant("CicsOperation", "EndBrowse", 0),
             Self::FormatTime => out.variant("CicsOperation", "FormatTime", 0),
+            Self::Freemain => out.variant("CicsOperation", "Freemain", 0),
             Self::Getmain => out.variant("CicsOperation", "Getmain", 0),
             Self::HandleAbend => out.variant("CicsOperation", "HandleAbend", 0),
             Self::HandleAid => out.variant("CicsOperation", "HandleAid", 0),
@@ -32,6 +37,7 @@ impl Canonical for CicsOperation {
             Self::Read => out.variant("CicsOperation", "Read", 0),
             Self::ReadNext => out.variant("CicsOperation", "ReadNext", 0),
             Self::ReadPrev => out.variant("CicsOperation", "ReadPrev", 0),
+            Self::ReadTransientData => out.variant("CicsOperation", "ReadTransientData", 0),
             Self::ReceiveMap => out.variant("CicsOperation", "ReceiveMap", 0),
             Self::Retrieve => out.variant("CicsOperation", "Retrieve", 0),
             Self::Return => out.variant("CicsOperation", "Return", 0),

@@ -10,6 +10,7 @@ pub(super) fn invalid_write_transient_data_shape(
         CicsOperandName::Queue,
         CicsOperandName::From,
         CicsOperandName::Length,
+        CicsOperandName::SysId,
     ]);
     !inputs.contains(&CicsOperandName::Queue)
         || !inputs.contains(&CicsOperandName::From)
@@ -21,6 +22,7 @@ pub(super) fn invalid_write_transient_data_shape(
             ),
             CicsOperandName::From => !matches!(operand.value, CicsOperandValue::Storage(_)),
             CicsOperandName::Length => matches!(operand.value, CicsOperandValue::Literal(_)),
+            CicsOperandName::SysId => invalid_system_value(&operand.value),
             _ => true,
         })
         || !outputs.is_subset(&BTreeSet::from([
@@ -33,16 +35,110 @@ pub(super) fn invalid_write_transient_data_shape(
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
 }
 
+pub(super) fn invalid_read_transient_data_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed_inputs = BTreeSet::from([
+        CicsOperandName::Queue,
+        CicsOperandName::Length,
+        CicsOperandName::SysId,
+    ]);
+    let data_outputs = usize::from(outputs.contains(&CicsOutputName::Into))
+        + usize::from(outputs.contains(&CicsOutputName::SetPointer));
+    !inputs.contains(&CicsOperandName::Queue)
+        || !inputs.is_subset(&allowed_inputs)
+        || data_outputs != 1
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::Queue => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::Length => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::SysId => invalid_system_value(&operand.value),
+            _ => true,
+        })
+        || outputs.contains(&CicsOutputName::Length) != inputs.contains(&CicsOperandName::Length)
+        || match plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::Length)
+            .map(|operand| &operand.value)
+        {
+            Some(CicsOperandValue::Storage(slot)) => plan
+                .outputs
+                .iter()
+                .find(|output| output.name == CicsOutputName::Length)
+                .is_none_or(|output| output.target != *slot),
+            Some(_) => true,
+            None => false,
+        }
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::Into
+                    | CicsOutputName::SetPointer
+                    | CicsOutputName::Length
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}
+
 pub(super) fn invalid_delete_transient_data_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
-    *inputs != BTreeSet::from([CicsOperandName::Queue])
-        || !matches!(
-            plan.operands.first().map(|operand| &operand.value),
-            Some(CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_))
-        )
+    let temporary = plan.operation == super::CicsPlanOperation::DeleteTemporaryStorage;
+    let identity = if temporary && inputs.contains(&CicsOperandName::Qname) {
+        CicsOperandName::Qname
+    } else {
+        CicsOperandName::Queue
+    };
+    let maximum = if identity == CicsOperandName::Qname {
+        16
+    } else if temporary {
+        8
+    } else {
+        4
+    };
+    let mut expected = BTreeSet::from([identity]);
+    if inputs.contains(&CicsOperandName::SysId) {
+        expected.insert(CicsOperandName::SysId);
+    }
+    *inputs != expected
+        || match plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == identity)
+            .map(|operand| &operand.value)
+        {
+            Some(CicsOperandValue::Literal(value)) => {
+                !(1..=maximum).contains(&value.len())
+                    || !value
+                        .iter()
+                        .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+            }
+            Some(CicsOperandValue::Storage(_)) => false,
+            _ => true,
+        }
+        || plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::SysId)
+            .is_some_and(|operand| match &operand.value {
+                CicsOperandValue::Literal(value) => {
+                    !matches!(value.len(), 1..=4) || !value.iter().all(u8::is_ascii_alphanumeric)
+                }
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            })
         || !outputs.is_subset(&BTreeSet::from([
             CicsOutputName::Resp,
             CicsOutputName::Resp2,
@@ -51,4 +147,14 @@ pub(super) fn invalid_delete_transient_data_shape(
             .options
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}
+
+fn invalid_system_value(value: &CicsOperandValue) -> bool {
+    match value {
+        CicsOperandValue::Literal(value) => {
+            !matches!(value.len(), 1..=4) || !value.iter().all(u8::is_ascii_alphanumeric)
+        }
+        CicsOperandValue::Storage(_) => false,
+        _ => true,
+    }
 }

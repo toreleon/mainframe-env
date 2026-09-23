@@ -5,6 +5,8 @@ use super::CicsAssignOutput;
 pub enum CicsPlanOperation {
     /// Terminate the issuing task abnormally or transfer to its active exit.
     Abend,
+    /// Return checked virtual addresses for task storage areas.
+    Address,
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     /// Refresh the EIB clock fields and return one absolute-time value.
@@ -13,6 +15,8 @@ pub enum CicsPlanOperation {
     AsktimeEib,
     /// Transform one absolute-time value into selected display/binary fields.
     FormatTime,
+    /// Release one task-local virtual storage area acquired by GETMAIN.
+    Freemain,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
     /// Change the issuing task's dispatch priority and optionally yield.
@@ -61,6 +65,10 @@ pub enum CicsPlanOperation {
     WriteTransientData,
     /// Delete every record from one local transient-data queue.
     DeleteTransientData,
+    /// Delete every item from one local temporary-storage queue.
+    DeleteTemporaryStorage,
+    /// Read and consume one record from a local transient-data queue.
+    ReadTransientData,
     /// Receive one mapped terminal input message.
     ReceiveMap,
     /// Send one mapped terminal output message.
@@ -112,8 +120,14 @@ pub enum CicsOperandName {
     From,
     /// `RIDFLD(...)` record identifier.
     Ridfld,
-    /// `QUEUE(...)` transient-data destination.
+    /// `QUEUE(...)` transient-data or temporary-storage resource.
     Queue,
+    /// `QNAME(...)` long temporary-storage resource.
+    Qname,
+    /// `SYSID(...)` target CICS system identity.
+    SysId,
+    /// `ADDRESS COMMAREA(pointer-reference)` output target.
+    CommareaPointer,
     /// `MAP(...)` BMS map name.
     Map,
     /// `MAPSET(...)` BMS mapset name.
@@ -165,6 +179,10 @@ pub enum CicsOperandName {
     Flength,
     /// `INITIMG(...)` one-byte initialization image.
     InitImage,
+    /// `DATAPOINTER(...)` virtual storage pointer returned by GETMAIN.
+    DataPointer,
+    /// `DATA(...)` area whose virtual address identifies GETMAIN storage.
+    DataArea,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -200,6 +218,8 @@ pub enum CicsPlanOption {
     FreeKb,
     /// Start a file browse at the first key greater than or equal to RIDFLD.
     Gteq,
+    /// Match a keyed READ by the KEYLENGTH prefix of RIDFLD.
+    Generic,
     /// Mark START data as containing function management headers.
     Fmh,
     /// Defer START work admission until a successful syncpoint.
@@ -212,6 +232,14 @@ pub enum CicsPlanOption {
     Until,
     /// Suppress the generated START request identifier in EIBREQID.
     NoCheck,
+    /// Send only the initialized default data defined by a BMS map.
+    MapOnly,
+    /// Send only application data and its supplied BMS field attributes.
+    DataOnly,
+    /// Require a keyed READ to match the complete or generic RIDFLD key.
+    Equal,
+    /// Receive mapped input from the terminal that originated the transaction.
+    Terminal,
 }
 
 /// Named result binding written after the host result arrives.

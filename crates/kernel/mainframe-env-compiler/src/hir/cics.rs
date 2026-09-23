@@ -181,6 +181,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::From => CicsOperandName::From,
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
                 HirCicsOperandName::Queue => CicsOperandName::Queue,
+                HirCicsOperandName::Qname => CicsOperandName::Qname,
+                HirCicsOperandName::SysId => CicsOperandName::SysId,
+                HirCicsOperandName::CommareaPointer => CicsOperandName::CommareaPointer,
                 HirCicsOperandName::Map => CicsOperandName::Map,
                 HirCicsOperandName::Mapset => CicsOperandName::Mapset,
                 HirCicsOperandName::Resource => CicsOperandName::Resource,
@@ -208,6 +211,8 @@ impl PlanContext<'_> {
                 HirCicsOperandName::DataLength => CicsOperandName::DataLength,
                 HirCicsOperandName::Flength => CicsOperandName::Flength,
                 HirCicsOperandName::InitImage => CicsOperandName::InitImage,
+                HirCicsOperandName::DataPointer => CicsOperandName::DataPointer,
+                HirCicsOperandName::DataArea => CicsOperandName::DataArea,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -291,6 +296,7 @@ impl PlanContext<'_> {
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
         HirCicsOperation::Abend => CicsPlanOperation::Abend,
+        HirCicsOperation::Address => CicsPlanOperation::Address,
         HirCicsOperation::AddressSet => CicsPlanOperation::AddressSet,
         HirCicsOperation::Asktime => CicsPlanOperation::Asktime,
         HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
@@ -317,12 +323,15 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::StartBrowse => CicsPlanOperation::StartBrowse,
         HirCicsOperation::ReadNext => CicsPlanOperation::ReadNext,
         HirCicsOperation::ReadPrev => CicsPlanOperation::ReadPrev,
+        HirCicsOperation::ReadTransientData => CicsPlanOperation::ReadTransientData,
         HirCicsOperation::EndBrowse => CicsPlanOperation::EndBrowse,
         HirCicsOperation::Delete => CicsPlanOperation::Delete,
         HirCicsOperation::Write => CicsPlanOperation::Write,
         HirCicsOperation::WriteTransientData => CicsPlanOperation::WriteTransientData,
         HirCicsOperation::DeleteTransientData => CicsPlanOperation::DeleteTransientData,
+        HirCicsOperation::DeleteTemporaryStorage => CicsPlanOperation::DeleteTemporaryStorage,
         HirCicsOperation::Getmain => CicsPlanOperation::Getmain,
+        HirCicsOperation::Freemain => CicsPlanOperation::Freemain,
         HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,
         HirCicsOperation::SendMap => CicsPlanOperation::SendMap,
         HirCicsOperation::SendText => CicsPlanOperation::SendText,
@@ -352,6 +361,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::TimeSep => CicsPlanOption::TimeSep,
         HirCicsOption::FreeKb => CicsPlanOption::FreeKb,
         HirCicsOption::Gteq => CicsPlanOption::Gteq,
+        HirCicsOption::Generic => CicsPlanOption::Generic,
+        HirCicsOption::Equal => CicsPlanOption::Equal,
         HirCicsOption::Fmh => CicsPlanOption::Fmh,
         HirCicsOption::Protect => CicsPlanOption::Protect,
         HirCicsOption::Wait => CicsPlanOption::Wait,
@@ -360,5 +371,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::For => CicsPlanOption::For,
         HirCicsOption::Until => CicsPlanOption::Until,
         HirCicsOption::NoCheck => CicsPlanOption::NoCheck,
+        HirCicsOption::MapOnly => CicsPlanOption::MapOnly,
+        HirCicsOption::DataOnly => CicsPlanOption::DataOnly,
+        HirCicsOption::Terminal => CicsPlanOption::Terminal,
     }
 }

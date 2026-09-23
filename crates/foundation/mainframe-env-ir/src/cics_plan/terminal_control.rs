@@ -24,7 +24,15 @@ pub(super) fn invalid_shape(
     !inputs.is_subset(&allowed_inputs)
         || !required.is_subset(inputs)
         || (plan.operation == CicsPlanOperation::ReceiveMap
-            && inputs.contains(&CicsOperandName::From))
+            && inputs.iter().any(|name| {
+                !matches!(
+                    name,
+                    CicsOperandName::Map
+                        | CicsOperandName::Mapset
+                        | CicsOperandName::From
+                        | CicsOperandName::Length
+                )
+            }))
         || (plan.operation == CicsPlanOperation::SendText
             && inputs
                 .iter()
@@ -35,7 +43,12 @@ pub(super) fn invalid_shape(
                 CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
             ),
             CicsOperandName::From => !matches!(operand.value, CicsOperandValue::Storage(_)),
-            CicsOperandName::Length => !matches!(operand.value, CicsOperandValue::LengthOf(_)),
+            CicsOperandName::Length => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            ),
             _ => true,
         })
         || match (
@@ -46,6 +59,7 @@ pub(super) fn invalid_shape(
                 .iter()
                 .find(|operand| operand.name == CicsOperandName::Length),
         ) {
+            (None, Some(_)) => true,
             (
                 Some(super::CicsNamedOperand {
                     value: CicsOperandValue::Storage(from),
@@ -56,8 +70,8 @@ pub(super) fn invalid_shape(
                     ..
                 }),
             ) => from != length,
+            (Some(_), Some(_)) => false,
             (_, None) => false,
-            _ => true,
         }
         || (plan.operation != CicsPlanOperation::ReceiveMap
             && outputs.contains(&CicsOutputName::Into))
@@ -72,6 +86,21 @@ pub(super) fn invalid_shape(
                 plan.operation,
                 CicsPlanOperation::SendMap | CicsPlanOperation::SendText
             ),
+            CicsPlanOption::MapOnly => {
+                plan.operation != CicsPlanOperation::SendMap
+                    || inputs.contains(&CicsOperandName::From)
+                    || inputs.contains(&CicsOperandName::Length)
+                    || plan.options.contains(&CicsPlanOption::DataOnly)
+            }
+            CicsPlanOption::DataOnly => {
+                plan.operation != CicsPlanOperation::SendMap
+                    || !inputs.contains(&CicsOperandName::From)
+                    || plan.options.contains(&CicsPlanOption::MapOnly)
+            }
+            CicsPlanOption::Terminal => {
+                plan.operation != CicsPlanOperation::ReceiveMap
+                    || inputs.contains(&CicsOperandName::From)
+            }
             _ => true,
         })
 }

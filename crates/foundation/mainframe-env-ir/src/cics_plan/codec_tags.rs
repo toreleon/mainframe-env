@@ -49,6 +49,10 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Delay => 37,
         CicsPlanOperation::DeleteTransientData => 38,
         CicsPlanOperation::Getmain => 39,
+        CicsPlanOperation::Freemain => 40,
+        CicsPlanOperation::DeleteTemporaryStorage => 41,
+        CicsPlanOperation::Address => 42,
+        CicsPlanOperation::ReadTransientData => 51,
     }
 }
 
@@ -94,6 +98,10 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         37 => Ok(CicsPlanOperation::Delay),
         38 => Ok(CicsPlanOperation::DeleteTransientData),
         39 => Ok(CicsPlanOperation::Getmain),
+        40 => Ok(CicsPlanOperation::Freemain),
+        41 => Ok(CicsPlanOperation::DeleteTemporaryStorage),
+        42 => Ok(CicsPlanOperation::Address),
+        51 => Ok(CicsPlanOperation::ReadTransientData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -141,6 +149,11 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::TermId => 38,
         CicsOperandName::Flength => 39,
         CicsOperandName::InitImage => 40,
+        CicsOperandName::DataPointer => 41,
+        CicsOperandName::DataArea => 42,
+        CicsOperandName::Qname => 43,
+        CicsOperandName::SysId => 44,
+        CicsOperandName::CommareaPointer => 45,
     }
 }
 
@@ -187,6 +200,11 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         38 => Ok(CicsOperandName::TermId),
         39 => Ok(CicsOperandName::Flength),
         40 => Ok(CicsOperandName::InitImage),
+        41 => Ok(CicsOperandName::DataPointer),
+        42 => Ok(CicsOperandName::DataArea),
+        43 => Ok(CicsOperandName::Qname),
+        44 => Ok(CicsOperandName::SysId),
+        45 => Ok(CicsOperandName::CommareaPointer),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -216,6 +234,11 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::For => 20,
         CicsPlanOption::Until => 21,
         CicsPlanOption::NoCheck => 22,
+        CicsPlanOption::MapOnly => 23,
+        CicsPlanOption::DataOnly => 24,
+        CicsPlanOption::Generic => 25,
+        CicsPlanOption::Equal => 26,
+        CicsPlanOption::Terminal => 27,
     }
 }
 
@@ -244,6 +267,11 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         20 => Ok(CicsPlanOption::For),
         21 => Ok(CicsPlanOption::Until),
         22 => Ok(CicsPlanOption::NoCheck),
+        23 => Ok(CicsPlanOption::MapOnly),
+        24 => Ok(CicsPlanOption::DataOnly),
+        25 => Ok(CicsPlanOption::Generic),
+        26 => Ok(CicsPlanOption::Equal),
+        27 => Ok(CicsPlanOption::Terminal),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

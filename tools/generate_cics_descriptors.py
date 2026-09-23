@@ -90,6 +90,7 @@ EXPECTED_FAMILIES = {
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
+    ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
@@ -105,10 +106,18 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0048",
     ),
+    (
+        "DeleteTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0049",
+    ),
     ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
+    ("Freemain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0084"),
     ("Getmain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0094"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
     ("HandleAid", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0098"),
@@ -134,6 +143,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Read", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0156"),
     ("ReadNext", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0157"),
     ("ReadPrev", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0158"),
+    (
+        "ReadTransientData",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0159",
+    ),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
@@ -372,6 +388,7 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "Abend",
+        "Address",
         "Cancel",
         "ChangeTask",
         "Delay",
@@ -381,6 +398,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Deq",
         "Enq",
         "FormatTime",
+        "Freemain",
         "Getmain",
         "HandleAbend",
         "HandleAid",
@@ -392,11 +410,13 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "StartBrowse",
         "ReadNext",
         "ReadPrev",
+        "ReadTransientData",
         "EndBrowse",
         "Delete",
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
+        "DeleteTemporaryStorage",
         "ReceiveMap",
         "SendMap",
         "SendText",
@@ -465,6 +485,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "Address": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
     "ChangeTask": frozenset(
@@ -515,6 +536,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "ReadPrev": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
+    "ReadTransientData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "EndBrowse": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
@@ -530,7 +554,13 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "DeleteTransientData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "DeleteTemporaryStorage": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Getmain": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Freemain": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReceiveMap": frozenset(
@@ -758,20 +788,24 @@ def _load_typed_execution_registrations(
             }
         )
     if [row["operation"] for row in normalized] != [
+        "Address",
         "AddressSet",
         "AsktimeEib",
         "Cancel",
         "ChangeTask",
         "Delay",
         "DeleteTransientData",
+        "DeleteTemporaryStorage",
         "Deq",
         "Enq",
+        "Freemain",
         "Getmain",
         "HandleAid",
         "IgnoreCondition",
         "PopHandle",
         "PurgeMessage",
         "PushHandle",
+        "ReadTransientData",
         "SetAssociationUserCorrData",
         "Start",
         "Suspend",
@@ -1065,17 +1099,23 @@ def load_catalog(
             if row[0]
             not in {
                 "ChangeTask",
+                "Address",
                 "AddressSet",
                 "AsktimeEib",
                 "Cancel",
                 "Delay",
                 "Deq",
+                "DeleteTransientData",
+                "DeleteTemporaryStorage",
                 "Enq",
+                "Freemain",
+                "Getmain",
                 "HandleAid",
                 "IgnoreCondition",
                 "PopHandle",
                 "PurgeMessage",
                 "PushHandle",
+                "ReadTransientData",
                 "SetAssociationUserCorrData",
                 "Start",
                 "Suspend",
@@ -3382,8 +3422,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 40:
-        raise DescriptorError("CICS application runtime set must remain exactly 40 rows")
+    if len(existing_runtime) != 44:
+        raise DescriptorError("CICS application runtime set must remain exactly 44 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3637,12 +3677,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 40
+        or len(typed_rows) != 44
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 40
-        or len(unready_rows) != 223
+        or len(advertised_rows) != 44
+        or len(unready_rows) != 219
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

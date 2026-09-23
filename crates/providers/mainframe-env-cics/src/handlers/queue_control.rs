@@ -1,6 +1,6 @@
 use super::super::{
-    CicsService, Run, TransientQueue, argument_bytes, argument_text, encode_transient,
-    mutation_problem, store_error,
+    CicsService, Run, TransientQueue, argument_bytes, argument_text, bounded, decimal_payload,
+    decode_transient, encode_transient, mutation_problem, store_error,
 };
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
@@ -14,9 +14,248 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::WriteTransientData => write(service, run, request),
+        CicsOperation::ReadTransientData => read(service, run, request),
         CicsOperation::DeleteTransientData => delete(service, run, request),
+        CicsOperation::DeleteTemporaryStorage => delete_temporary(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn signed_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, HostProblem> {
+    let Some(value) = request.arguments.get(name) else {
+        return Ok(None);
+    };
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(HostProblem::Malformed);
+    }
+    std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .parse::<i64>()
+        .map(Some)
+        .map_err(|_| HostProblem::Malformed)
+}
+
+fn read(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "QUEUE" | "SYSID" => !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                ),
+                "INTO" | "SET" | "RESP" | "RESP2" => {
+                    value.schema() != "mainframe-env.cics.argument@1"
+                }
+                "INTO.MAXLENGTH" | "SET.MAXLENGTH" | "LENGTH" => {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                }
+                "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+        || request.arguments.contains_key("INTO") == request.arguments.contains_key("SET")
+        || request.arguments.contains_key("INTO")
+            != request.arguments.contains_key("INTO.MAXLENGTH")
+        || request.arguments.contains_key("SET") != request.arguments.contains_key("SET.MAXLENGTH")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let queue = queue_name(request)?;
+    validate_local_system(run, request)?;
+    service.authorize(
+        run,
+        "QUEUE",
+        &format!("CICS.TD.{queue}"),
+        AccessIntent::Read,
+    )?;
+    let set = request.arguments.contains_key("SET");
+    let destination_maximum = signed_decimal(
+        request,
+        if set {
+            "SET.MAXLENGTH"
+        } else {
+            "INTO.MAXLENGTH"
+        },
+    )?
+    .and_then(|value| usize::try_from(value).ok())
+    .filter(|value| *value != 0)
+    .ok_or(HostProblem::Malformed)?;
+    let requested = signed_decimal(request, "LENGTH")?;
+    if requested.is_some_and(|value| value < 0) {
+        return Err(HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: 0,
+        });
+    }
+    let mut state = service.lock()?;
+    let current = state
+        .transient
+        .get(&queue)
+        .cloned()
+        .ok_or_else(|| HostProblem::Condition {
+            name: "QIDERR".into(),
+            response: 44,
+            response2: 0,
+        })?;
+    let (_, original) = current
+        .records
+        .first()
+        .cloned()
+        .ok_or_else(|| HostProblem::Condition {
+            name: "QZERO".into(),
+            response: 23,
+            response2: 0,
+        })?;
+    let maximum = if set {
+        destination_maximum
+    } else {
+        requested
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(destination_maximum)
+            .min(destination_maximum)
+    };
+    if set && original.len() > maximum {
+        return Err(HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: 0,
+        });
+    }
+    let truncated = !set && maximum < original.len();
+    let zero_length = requested == Some(0);
+    let mut value = original.clone();
+    value.truncate(maximum);
+    let mut next = current;
+    next.records.remove(0);
+    next.version = next
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    service
+        .store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: "cics-tdq".into(),
+                key: queue.clone(),
+                version: next.version,
+                payload: encode_transient(&next)?,
+            },
+            Some(next.version - 1),
+        )
+        .map_err(store_error)
+        .map_err(mutation_problem)?;
+    state.transient_bytes = state
+        .transient_bytes
+        .checked_sub(original.len())
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    state.transient.insert(queue, next);
+    let mut response = service.response(
+        run,
+        CicsDisposition::Complete,
+        if truncated || zero_length {
+            "LENGERR"
+        } else {
+            "NORMAL"
+        },
+        if truncated || zero_length { 22 } else { 0 },
+        0,
+        None,
+        None,
+        value,
+    )?;
+    if request.arguments.contains_key("LENGTH") {
+        response.outputs.insert(
+            "LENGTH".into(),
+            decimal_payload(
+                i64::try_from(original.len()).map_err(|_| HostProblem::ResourceExhausted)?,
+            )?,
+        );
+    }
+    if set {
+        response.outputs.insert("SET".into(), bounded(original)?);
+        response.payload = bounded(Vec::new())?;
+    }
+    Ok(response)
+}
+
+fn temporary_queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
+    if request.arguments.contains_key("QUEUE") == request.arguments.contains_key("QNAME") {
+        return Err(HostProblem::Malformed);
+    }
+    let (name, maximum) = if request.arguments.contains_key("QNAME") {
+        ("QNAME", 16)
+    } else {
+        ("QUEUE", 8)
+    };
+    let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
+    if !matches!(
+        value.schema(),
+        "mainframe-env.cics.argument@1"
+            | "mainframe-env.cics.literal@1"
+            | "mainframe-env.cics.storage-value@1"
+    ) {
+        return Err(HostProblem::Malformed);
+    }
+    if !value.bytes().is_empty() && value.bytes().iter().all(|byte| *byte == 0) {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 0,
+        });
+    }
+    let queue = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .trim()
+        .to_ascii_uppercase();
+    if queue.is_empty()
+        || queue.len() > maximum
+        || !queue
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(queue)
+}
+
+fn validate_local_system(run: &Run, request: &CicsRequest) -> Result<(), HostProblem> {
+    let Some(value) = request.arguments.get("SYSID") else {
+        return Ok(());
+    };
+    if !matches!(
+        value.schema(),
+        "mainframe-env.cics.argument@1"
+            | "mainframe-env.cics.literal@1"
+            | "mainframe-env.cics.storage-value@1"
+    ) {
+        return Err(HostProblem::Malformed);
+    }
+    let system = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .trim()
+        .to_ascii_uppercase();
+    if system.is_empty()
+        || system.len() > 4
+        || !system.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return Err(HostProblem::Malformed);
+    }
+    if !system.eq_ignore_ascii_case(&run.sysid) {
+        return Err(HostProblem::Condition {
+            name: "SYSIDERR".into(),
+            response: 53,
+            response2: 0,
+        });
+    }
+    Ok(())
 }
 
 fn queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
@@ -41,6 +280,7 @@ fn write(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let queue = queue_name(request)?;
+    validate_local_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",
@@ -143,12 +383,13 @@ fn delete(
     if request.arguments.keys().any(|name| {
         !matches!(
             name.as_str(),
-            "QUEUE" | "TDQUEUE" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
+            "QUEUE" | "TDQUEUE" | "SYSID" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
         )
     }) {
         return Err(HostProblem::Malformed);
     }
     let queue = queue_name(request)?;
+    validate_local_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",
@@ -180,6 +421,61 @@ fn delete(
         .transient_bytes
         .checked_sub(released)
         .ok_or(HostProblem::InfrastructureFailure)?;
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn delete_temporary(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "QNAME" | "QUEUE" | "SYSID" => false,
+                "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let queue = temporary_queue_name(request)?;
+    validate_local_system(run, request)?;
+    service.authorize(
+        run,
+        "QUEUE",
+        &format!("CICS.TS.{queue}"),
+        AccessIntent::Update,
+    )?;
+    let current = service
+        .store
+        .get_provider_state("cics-tsq", &queue)
+        .map_err(store_error)?
+        .ok_or_else(|| HostProblem::Condition {
+            name: "QIDERR".into(),
+            response: 44,
+            response2: 0,
+        })?;
+    decode_transient(&current.payload, current.version, service.limits)?;
+    service
+        .store
+        .delete_provider_state("cics-tsq", &queue, current.version)
+        .map_err(store_error)
+        .map_err(mutation_problem)?;
     service.response(
         run,
         CicsDisposition::Complete,

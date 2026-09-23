@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 42);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 46);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4035,6 +4035,19 @@ mod tests {
                 HostRequest::Dataset(request) => {
                     self.trace.requests.lock().unwrap().push(request.clone());
                     match request {
+                        DatasetRequest::Attributes { .. } => {
+                            Ok(HostResult::Dataset(DatasetResult::Attributes {
+                                attributes: DatasetAttributes {
+                                    organization: DatasetOrganization::KeySequenced,
+                                    record_format: RecordFormat::Fixed,
+                                    logical_record_length: 4,
+                                    key_offset: Some(0),
+                                    key_length: Some(3),
+                                    ccsid: None,
+                                },
+                                version: 1,
+                            }))
+                        }
                         DatasetRequest::Read { key, .. } => {
                             let identity = key.unwrap_or_else(|| b"AA".to_vec());
                             Ok(HostResult::Dataset(DatasetResult::Records {
@@ -4106,6 +4119,10 @@ mod tests {
                         *self.record.lock().unwrap() = records.first().cloned();
                         Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
                     }
+                }
+                HostRequest::Dataset(DatasetRequest::RewriteRecord { record, .. }) => {
+                    *self.record.lock().unwrap() = Some(record);
+                    Ok(HostResult::Dataset(DatasetResult::Mutated { version: 3 }))
                 }
                 HostRequest::Dataset(DatasetRequest::Read { key, .. }) => {
                     let Some(record) = self.record.lock().unwrap().clone() else {
@@ -4654,6 +4671,7 @@ mod tests {
     fn shared_catalog_recognizes_all_frozen_forms() {
         let cases = [
             ("ABEND", CicsOperation::Abend),
+            ("ADDRESS", CicsOperation::Address),
             ("ADDRESS SET", CicsOperation::AddressSet),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
@@ -4664,9 +4682,11 @@ mod tests {
             ("DEQ", CicsOperation::Deq),
             ("DELAY", CicsOperation::Delay),
             ("DELETE", CicsOperation::Delete),
+            ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
+            ("FREEMAIN", CicsOperation::Freemain),
             ("GETMAIN", CicsOperation::Getmain),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE AID", CicsOperation::HandleAid),
@@ -4677,6 +4697,7 @@ mod tests {
             ("POP HANDLE", CicsOperation::PopHandle),
             ("PUSH HANDLE", CicsOperation::PushHandle),
             ("READ", CicsOperation::Read),
+            ("READQ TD", CicsOperation::ReadTransientData),
             ("READNEXT", CicsOperation::ReadNext),
             ("READPREV", CicsOperation::ReadPrev),
             ("RECEIVE MAP", CicsOperation::ReceiveMap),
@@ -4708,7 +4729,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 42);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 46);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9099,6 +9120,302 @@ mod tests {
     }
 
     #[test]
+    fn readq_td_consumes_fifo_records_and_reports_lengths_and_empty_state() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, value) in [(1, b"ABCDE".as_slice()), (2, b"XYZ".as_slice())] {
+            let write = request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"IN01")),
+                    ("FROM".into(), argument(value)),
+                ]),
+                sequence,
+            );
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, write.clone(), sequence),
+                    write,
+                )
+                .unwrap();
+        }
+
+        let truncated = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"IN01")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("LENGTH".into(), cics_decimal(3)),
+            ]),
+            3,
+        );
+        let truncated = service
+            .invoke(
+                &effect(&invocation.run_unit_id, truncated.clone(), 3),
+                truncated,
+            )
+            .unwrap();
+        assert_eq!(truncated.payload.bytes(), b"ABC");
+        assert_eq!(truncated.outputs["LENGTH"].bytes(), b"5");
+        assert_eq!(
+            (
+                truncated.condition.as_str(),
+                truncated.response,
+                truncated.response2
+            ),
+            ("LENGERR", 22, 0)
+        );
+        assert_eq!(
+            service.transient_records("IN01").unwrap(),
+            [b"XYZ".to_vec()]
+        );
+
+        let zero = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"IN01")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("LENGTH".into(), cics_decimal(0)),
+            ]),
+            4,
+        );
+        let zero = service
+            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 4), zero)
+            .unwrap();
+        assert!(zero.payload.bytes().is_empty());
+        assert_eq!(zero.outputs["LENGTH"].bytes(), b"3");
+        assert_eq!((zero.condition.as_str(), zero.response), ("LENGERR", 22));
+        assert!(service.transient_records("IN01").unwrap().is_empty());
+
+        let empty = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"IN01")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, empty.clone(), 5), empty),
+            Err(HostProblem::Condition {
+                name: "QZERO".into(),
+                response: 23,
+                response2: 0,
+            })
+        );
+
+        let missing = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"NONE")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+            ]),
+            6,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 6),
+                missing,
+            ),
+            Err(HostProblem::Condition {
+                name: "QIDERR".into(),
+                response: 44,
+                response2: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn readq_td_set_returns_owned_record_storage_and_fences_capacity() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let write = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"SETQ")),
+                ("FROM".into(), argument(b"SET-DATA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+            .unwrap();
+
+        let too_small = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"SETQ")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, too_small.clone(), 2),
+                too_small,
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("SETQ").unwrap(),
+            [b"SET-DATA".to_vec()]
+        );
+
+        let set = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"SETQ")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(1024)),
+                ("LENGTH".into(), cics_decimal(0)),
+            ]),
+            3,
+        );
+        let set = service
+            .invoke(&effect(&invocation.run_unit_id, set.clone(), 3), set)
+            .unwrap();
+        assert!(set.payload.bytes().is_empty());
+        assert_eq!(set.outputs["SET"].bytes(), b"SET-DATA");
+        assert_eq!(set.outputs["LENGTH"].bytes(), b"8");
+        assert_eq!((set.condition.as_str(), set.response), ("LENGERR", 22));
+        assert!(service.transient_records("SETQ").unwrap().is_empty());
+    }
+
+    #[test]
+    fn transient_data_sysid_accepts_only_local_system_before_mutation() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let invocation = invocation_for("tdq-sysid", BTreeMap::new());
+        let session = SessionId::new("tdq-sysid", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "AP01", "S001")
+            .unwrap();
+        let routed = |operation, extra: BTreeMap<String, BoundedPayload>, sequence| {
+            let mut arguments = BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"SYSQ")),
+                ("SYSID".into(), cics_literal(b"S001")),
+            ]);
+            arguments.extend(extra);
+            request(operation, arguments, sequence)
+        };
+
+        let mut unknown_write = routed(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([("FROM".into(), argument(b"ONE"))]),
+            1,
+        );
+        unknown_write
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown_write.clone(), 1),
+                unknown_write,
+            ),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 0,
+            })
+        );
+        assert!(service.transient_records("SYSQ").unwrap().is_empty());
+
+        let write = routed(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([("FROM".into(), argument(b"ONE"))]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 2), write)
+            .unwrap();
+
+        let mut unknown_read = routed(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+            ]),
+            3,
+        );
+        unknown_read
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown_read.clone(), 3),
+                unknown_read,
+            ),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("SYSQ").unwrap(),
+            [b"ONE".to_vec()]
+        );
+
+        let read = routed(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+            ]),
+            4,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 4), read)
+                .unwrap()
+                .payload
+                .bytes(),
+            b"ONE"
+        );
+
+        let write = routed(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([("FROM".into(), argument(b"TWO"))]),
+            5,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 5), write)
+            .unwrap();
+        let mut unknown_delete = routed(CicsOperation::DeleteTransientData, BTreeMap::new(), 6);
+        unknown_delete
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown_delete.clone(), 6),
+                unknown_delete,
+            ),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("SYSQ").unwrap(),
+            [b"TWO".to_vec()]
+        );
+        let delete = routed(CicsOperation::DeleteTransientData, BTreeMap::new(), 7);
+        service
+            .invoke(&effect(&invocation.run_unit_id, delete.clone(), 7), delete)
+            .unwrap();
+    }
+
+    #[test]
     fn deleteq_td_deallocation_survives_sqlite_reopen() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-deleteq-td-{}-{:?}",
@@ -9161,6 +9478,242 @@ mod tests {
     }
 
     #[test]
+    fn deleteq_ts_names_are_authorized_replay_safe_and_durable() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-deleteq-ts-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: "TEMPQ".into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![("seed-item".into(), b"DURABLE".to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: "LONG-QUEUE".into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![("seed-long-item".into(), b"LONG".to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+            let service = service(store.clone());
+            let (invocation, _) = registered(&service);
+            let delete = request(
+                CicsOperation::DeleteTemporaryStorage,
+                BTreeMap::from([("QUEUE".into(), argument(b"TEMPQ"))]),
+                1,
+            );
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, delete.clone(), 1),
+                    delete.clone(),
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "TEMPQ")
+                    .unwrap()
+                    .is_none()
+            );
+
+            let replay = service
+                .invoke(&effect(&invocation.run_unit_id, delete.clone(), 1), delete)
+                .unwrap();
+            assert_eq!(replay.condition, "NORMAL");
+
+            for (sequence, queue, condition, response) in [
+                (2, b"MISSING".as_slice(), "QIDERR", 44),
+                (3, [0_u8; 8].as_slice(), "INVREQ", 16),
+            ] {
+                let mut absent = request(
+                    CicsOperation::DeleteTemporaryStorage,
+                    BTreeMap::from([
+                        ("QUEUE".into(), argument(queue)),
+                        ("RESP".into(), argument(b"RESP-X")),
+                        ("RESP2".into(), argument(b"RESP2-X")),
+                    ]),
+                    sequence,
+                );
+                absent.condition_policy = CicsConditionPolicy::Respond {
+                    response_field: "RESP-X".into(),
+                    response2_field: Some("RESP2-X".into()),
+                };
+                let result = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, absent.clone(), sequence),
+                        absent,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    (result.condition.as_str(), result.response),
+                    (condition, response)
+                );
+                assert_eq!(result.response2, 0);
+            }
+
+            let conflicting = request(
+                CicsOperation::DeleteTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"TEMPQ")),
+                    ("QNAME".into(), argument(b"LONG-QUEUE")),
+                ]),
+                4,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, conflicting.clone(), 4),
+                    conflicting,
+                ),
+                Err(HostProblem::Malformed)
+            );
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "LONG-QUEUE")
+                    .unwrap()
+                    .is_some()
+            );
+
+            let delete_long = request(
+                CicsOperation::DeleteTemporaryStorage,
+                BTreeMap::from([("QNAME".into(), argument(b"LONG-QUEUE"))]),
+                5,
+            );
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, delete_long.clone(), 5),
+                    delete_long,
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "LONG-QUEUE")
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let _service = service(store.clone());
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "TEMPQ")
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "LONG-QUEUE")
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn deleteq_ts_sysid_accepts_only_the_local_system() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        for key in ["LOCALQ", "REMOTEQ"] {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![(format!("seed-{key}"), key.as_bytes().to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        let service = service(store.clone());
+        let invocation = invocation_for("deleteq-ts-sysid", BTreeMap::new());
+        let session = SessionId::new("deleteq-ts-sysid", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+            .unwrap();
+
+        let local = request(
+            CicsOperation::DeleteTemporaryStorage,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"LOCALQ")),
+                ("SYSID".into(), argument(b"S001")),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, local.clone(), 1), local)
+            .unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        assert!(
+            store
+                .get_provider_state("cics-tsq", "LOCALQ")
+                .unwrap()
+                .is_none()
+        );
+
+        let mut remote = request(
+            CicsOperation::DeleteTemporaryStorage,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"REMOTEQ")),
+                ("SYSID".into(), argument(b"R001")),
+                ("RESP".into(), argument(b"RESP-X")),
+            ]),
+            2,
+        );
+        remote.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: None,
+        };
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, remote.clone(), 2), remote)
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("SYSIDERR", 53, 0)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-tsq", "REMOTEQ")
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
     fn getmain_returns_initialized_storage_and_exact_capacity_conditions() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
@@ -9194,6 +9747,22 @@ mod tests {
             .unwrap();
         assert_eq!(replay, response);
 
+        let length = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("LENGTH".into(), cics_decimal(4)),
+                ("INITIMG".into(), task_value(b"Q")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+                ("SET.LIMIT".into(), cics_decimal(65_535)),
+            ]),
+            2,
+        );
+        let length = service
+            .invoke(&effect(&invocation.run_unit_id, length.clone(), 2), length)
+            .unwrap();
+        assert_eq!(length.outputs["SET"].bytes(), b"QQQQ");
+
         let mut zero = request(
             CicsOperation::Getmain,
             BTreeMap::from([
@@ -9204,14 +9773,14 @@ mod tests {
                 ("RESP".into(), argument(b"RESP-X")),
                 ("RESP2".into(), argument(b"RESP2-X")),
             ]),
-            2,
+            3,
         );
         zero.condition_policy = CicsConditionPolicy::Respond {
             response_field: "RESP-X".into(),
             response2_field: Some("RESP2-X".into()),
         };
         let zero = service
-            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 2), zero)
+            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 3), zero)
             .unwrap();
         assert_eq!(
             (zero.condition.as_str(), zero.response, zero.response2),
@@ -9231,11 +9800,11 @@ mod tests {
                 ("SET.MAXLENGTH".into(), cics_decimal(16)),
                 ("SET.LIMIT".into(), cics_decimal(64)),
             ]),
-            3,
+            4,
         );
         let exhausted = service
             .invoke(
-                &effect(&invocation.run_unit_id, exhausted.clone(), 3),
+                &effect(&invocation.run_unit_id, exhausted.clone(), 4),
                 exhausted,
             )
             .unwrap();
@@ -9258,7 +9827,7 @@ mod tests {
                 ("SET.LIMIT".into(), cics_decimal(64)),
                 ("RESP".into(), argument(b"RESP-X")),
             ]),
-            4,
+            5,
         );
         over_limit.condition_policy = CicsConditionPolicy::Respond {
             response_field: "RESP-X".into(),
@@ -9266,7 +9835,7 @@ mod tests {
         };
         let over_limit = service
             .invoke(
-                &effect(&invocation.run_unit_id, over_limit.clone(), 4),
+                &effect(&invocation.run_unit_id, over_limit.clone(), 5),
                 over_limit,
             )
             .unwrap();
@@ -9282,6 +9851,148 @@ mod tests {
             over_limit.outputs["SET"].schema(),
             "mainframe-env.cics.pointer-null@1"
         );
+
+        let mut oversized_length = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("LENGTH".into(), cics_decimal(65_521)),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(65_535)),
+                ("SET.LIMIT".into(), cics_decimal(65_535)),
+                ("RESP".into(), argument(b"RESP-X")),
+            ]),
+            6,
+        );
+        oversized_length.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: None,
+        };
+        let oversized_length = service
+            .invoke(
+                &effect(&invocation.run_unit_id, oversized_length.clone(), 6),
+                oversized_length,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                oversized_length.condition.as_str(),
+                oversized_length.response,
+                oversized_length.response2
+            ),
+            ("LENGERR", 22, 1)
+        );
+    }
+
+    #[test]
+    fn freemain_returns_release_intent_and_exact_invalid_pointer_condition() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let pointer = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let valid = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([(
+                "DATAPOINTER".into(),
+                pointer(
+                    "mainframe-env.cics.allocated-pointer@1",
+                    &[0, 0, 0, 2, 0, 0, 0, 0],
+                ),
+            )]),
+            1,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, valid.clone(), 1),
+                valid.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(
+            response.outputs["FREEMAIN.POINTER"],
+            valid.arguments["DATAPOINTER"]
+        );
+        let replay = service
+            .invoke(&effect(&invocation.run_unit_id, valid.clone(), 1), valid)
+            .unwrap();
+        assert_eq!(replay, response);
+
+        let data = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([(
+                "DATA".into(),
+                pointer(
+                    "mainframe-env.cics.allocated-pointer@1",
+                    &[0, 0, 0, 3, 0, 0, 0, 0],
+                ),
+            )]),
+            2,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, data.clone(), 2),
+                data.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(response.outputs["FREEMAIN.POINTER"], data.arguments["DATA"]);
+
+        let both = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([
+                (
+                    "DATA".into(),
+                    pointer("mainframe-env.cics.allocated-pointer@1", &[0; 8]),
+                ),
+                (
+                    "DATAPOINTER".into(),
+                    pointer("mainframe-env.cics.allocated-pointer@1", &[0; 8]),
+                ),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, both.clone(), 3), both),
+            Err(HostProblem::Malformed)
+        );
+
+        let mut invalid = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([
+                (
+                    "DATAPOINTER".into(),
+                    pointer("mainframe-env.cics.invalid-pointer@1", &[0; 8]),
+                ),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            4,
+        );
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let invalid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 4),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                invalid.condition.as_str(),
+                invalid.response,
+                invalid.response2
+            ),
+            ("INVREQ", 16, 1)
+        );
+        assert!(!invalid.outputs.contains_key("FREEMAIN.POINTER"));
     }
 
     /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.
@@ -11571,6 +12282,56 @@ mod tests {
     }
 
     #[test]
+    fn address_commarea_validates_virtual_pointer_metadata() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, arguments) in [
+            (
+                325,
+                BTreeMap::from([
+                    ("COMMAREA".into(), storage_target(b"artifact:1:PTR-X")),
+                    (
+                        "USING.ADDRESS".into(),
+                        enqueue_identity(b"artifact:2:DFHCOMMAREA"),
+                    ),
+                ]),
+            ),
+            (
+                326,
+                BTreeMap::from([("COMMAREA".into(), storage_target(b"artifact:1:PTR-X"))]),
+            ),
+        ] {
+            let request = request(CicsOperation::Address, arguments, sequence);
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, request.clone(), sequence),
+                        request,
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+        }
+        for (sequence, arguments) in [
+            (327, BTreeMap::new()),
+            (
+                328,
+                BTreeMap::from([("COMMAREA".into(), argument(b"WRONG-SCHEMA"))]),
+            ),
+        ] {
+            let request = request(CicsOperation::Address, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
     fn address_set_accepts_only_two_checked_virtual_pointer_directions() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
@@ -13748,6 +14509,138 @@ mod tests {
     }
 
     #[test]
+    fn receive_map_from_length_maps_only_the_selected_supplied_area() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "INPUTS".into(),
+                map: "FORM".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "VALUE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        service
+            .submit_input(
+                &session,
+                0x7d,
+                &BTreeMap::from([("VALUE".into(), b"TERM".to_vec())]),
+            )
+            .unwrap();
+
+        let mut supplied = Vec::new();
+        field(&mut supplied, b"VALUE").unwrap();
+        field(&mut supplied, b"DATA").unwrap();
+        let selected = supplied.len();
+        field(&mut supplied, b"IGNORED").unwrap();
+        field(&mut supplied, b"TAIL").unwrap();
+        let before = service.lock().unwrap().sessions[session.as_str()].clone();
+        let receive = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"INPUTS")),
+                ("MAP".into(), argument(b"FORM")),
+                ("FROM".into(), argument(&supplied)),
+                ("LENGTH".into(), cics_decimal(selected as i64)),
+                ("INTO".into(), argument(b"INPUT-X")),
+            ]),
+            1,
+        );
+        let mapped = service
+            .invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 1),
+                receive,
+            )
+            .unwrap();
+        assert_eq!(mapped.disposition, CicsDisposition::Complete);
+        assert_eq!(mapped.payload.bytes(), &supplied[..selected]);
+        assert_eq!(mapped.outputs["BMS.VALUE"].bytes(), b"DATA");
+        assert_eq!(mapped.outputs["BMS.VALUE.LENGTH"].bytes(), b"4");
+        let after = service.lock().unwrap().sessions[session.as_str()].clone();
+        assert_eq!(after.version, before.version);
+        assert_eq!(after.input.payload, before.input.payload);
+
+        for (sequence, arguments) in [
+            (
+                2,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"INPUTS")),
+                    ("MAP".into(), argument(b"FORM")),
+                    ("LENGTH".into(), cics_decimal(1)),
+                ]),
+            ),
+            (
+                3,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"INPUTS")),
+                    ("MAP".into(), argument(b"FORM")),
+                    ("FROM".into(), argument(&supplied)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(supplied.len()).unwrap() + 1),
+                    ),
+                ]),
+            ),
+            (
+                4,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"INPUTS")),
+                    ("MAP".into(), argument(b"FORM")),
+                    ("FROM".into(), argument(&supplied)),
+                    ("OPTION.TERMINAL".into(), cics_option()),
+                ]),
+            ),
+        ] {
+            let invalid = request(CicsOperation::ReceiveMap, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        let after_invalid = service.lock().unwrap().sessions[session.as_str()].clone();
+        assert_eq!(after_invalid.version, before.version);
+        assert_eq!(after_invalid.input.payload, before.input.payload);
+
+        let terminal = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"INPUTS")),
+                ("MAP".into(), argument(b"FORM")),
+                ("OPTION.TERMINAL".into(), cics_option()),
+            ]),
+            5,
+        );
+        let terminal = service
+            .invoke(
+                &effect(&invocation.run_unit_id, terminal.clone(), 5),
+                terminal,
+            )
+            .unwrap();
+        assert_eq!(terminal.outputs["BMS.VALUE"].bytes(), b"TERM");
+    }
+
+    #[test]
     fn bms_send_file_read_and_program_transfer_are_typed() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
@@ -13921,6 +14814,313 @@ mod tests {
             service.lock().unwrap().sessions[session.as_str()].screen,
             b"HELLO"
         );
+
+        let mut oversized = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), argument(b"DATA")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            2,
+        );
+        oversized.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let oversized = service
+            .invoke(
+                &effect(&invocation.run_unit_id, oversized.clone(), 2),
+                oversized,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                oversized.condition.as_str(),
+                oversized.response,
+                oversized.response2
+            ),
+            ("LENGERR", 22, 0)
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].screen,
+            b"HELLO"
+        );
+    }
+
+    #[test]
+    fn send_map_length_selects_the_explicit_from_prefix() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "LENGTHS".into(),
+                map: "SHORT".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "VALUE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: Some(0),
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        let send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"LENGTHS")),
+                ("MAP".into(), argument(b"SHORT")),
+                ("FROM".into(), argument(b"ABCDEFGH")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert!(
+            response
+                .payload
+                .bytes()
+                .windows(4)
+                .any(|bytes| bytes == b"ABCD")
+        );
+        let state = service.lock().unwrap();
+        assert_eq!(
+            state.sessions[session.as_str()].field_values["VALUE"],
+            b"ABCD"
+        );
+        drop(state);
+
+        let missing_from = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"LENGTHS")),
+                ("MAP".into(), argument(b"SHORT")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing_from.clone(), 2),
+                missing_from,
+            ),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn send_map_maponly_selects_defaults_and_rejects_application_data() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "DEFMAPS".into(),
+                map: "WELCOME".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "TITLE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 7,
+                    initial: b"WELCOME".to_vec(),
+                    color: None,
+                    highlight: None,
+                    protected: true,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        let send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"DEFMAPS")),
+                ("MAP".into(), argument(b"WELCOME")),
+                ("OPTION.MAPONLY".into(), cics_option()),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert!(
+            response
+                .payload
+                .bytes()
+                .windows(7)
+                .any(|bytes| bytes == b"WELCOME")
+        );
+        let state = service.lock().unwrap();
+        assert_eq!(
+            state.sessions[session.as_str()].field_values["TITLE"],
+            b"WELCOME"
+        );
+        drop(state);
+
+        for (sequence, extra) in [
+            (2, ("FROM", argument(b"OVERRIDE"))),
+            (3, ("LENGTH", cics_decimal(4))),
+        ] {
+            let invalid = request(
+                CicsOperation::SendMap,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DEFMAPS")),
+                    ("MAP".into(), argument(b"WELCOME")),
+                    ("OPTION.MAPONLY".into(), cics_option()),
+                    (extra.0.into(), extra.1),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].field_values["TITLE"],
+            b"WELCOME"
+        );
+    }
+
+    #[test]
+    fn send_map_dataonly_uses_supplied_attributes_and_preserves_zero_attribute() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "DATAMAP".into(),
+                map: "UPDATE".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "VALUE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 1,
+                    initial: b"Z".to_vec(),
+                    color: None,
+                    highlight: None,
+                    protected: true,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: Some(0),
+                    attribute_offset: Some(1),
+                }],
+            })
+            .unwrap();
+        let send = |sequence, symbolic: &[u8]| {
+            request(
+                CicsOperation::SendMap,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DATAMAP")),
+                    ("MAP".into(), argument(b"UPDATE")),
+                    ("FROM".into(), argument(symbolic)),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let first = send(1, &[b'A', 0xc1]);
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        assert!(response.payload.bytes().contains(&b'A'));
+        {
+            let state = service.lock().unwrap();
+            let current = &state.sessions[session.as_str()];
+            assert_eq!(current.field_values["VALUE"], b"A");
+            assert!(!current.field_protection["VALUE"]);
+            assert!(current.field_modified["VALUE"]);
+            assert!(!current.screen.contains(&b'Z'));
+        }
+
+        let preserve = send(2, &[b'B', 0]);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, preserve.clone(), 2),
+                preserve,
+            )
+            .unwrap();
+        {
+            let state = service.lock().unwrap();
+            let current = &state.sessions[session.as_str()];
+            assert_eq!(current.field_values["VALUE"], b"B");
+            assert!(!current.field_protection["VALUE"]);
+            assert!(current.field_modified["VALUE"]);
+        }
+
+        let invalid_attribute = send(3, &[b'C', 0x02]);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid_attribute.clone(), 3),
+                invalid_attribute,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].field_values["VALUE"],
+            b"B"
+        );
+
+        for (sequence, arguments) in [
+            (
+                4,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DATAMAP")),
+                    ("MAP".into(), argument(b"UPDATE")),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                ]),
+            ),
+            (
+                5,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DATAMAP")),
+                    ("MAP".into(), argument(b"UPDATE")),
+                    ("FROM".into(), argument(&[b'D', 0xc0])),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                    ("OPTION.MAPONLY".into(), cics_option()),
+                ]),
+            ),
+        ] {
+            let invalid = request(CicsOperation::SendMap, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
     }
 
     #[test]
@@ -13963,6 +15163,7 @@ mod tests {
                 ("RIDFLD".into(), argument(b"ABC")),
                 ("LENGTH".into(), cics_decimal(8)),
                 ("KEYLENGTH".into(), cics_decimal(3)),
+                ("OPTION.UPDATE".into(), cics_option()),
             ]),
             2,
         );
@@ -13970,6 +15171,45 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, read.clone(), 2), read)
             .unwrap();
         assert_eq!(response.payload.bytes(), b"ABC12");
+        assert_eq!(response.outputs["LENGTH"].bytes(), b"5");
+
+        let mismatched_delete = request(
+            CicsOperation::Delete,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"TESTFILE")),
+                ("RIDFLD".into(), argument(b"ABC")),
+                ("KEYLENGTH".into(), cics_decimal(2)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, mismatched_delete.clone(), 3),
+                mismatched_delete,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 26,
+            })
+        );
+
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"TESTFILE")),
+                ("FROM".into(), argument(b"ABC67890")),
+                ("LENGTH".into(), cics_decimal(5)),
+            ]),
+            4,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 4),
+                rewrite,
+            )
+            .unwrap();
+        assert_eq!(*persisted.lock().unwrap(), Some(b"ABC67".to_vec()));
     }
 
     #[test]
@@ -14190,6 +15430,32 @@ mod tests {
         service
             .invoke(&effect(&invocation.run_unit_id, end.clone(), 5), end)
             .unwrap();
+        let equal_start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("OPTION.EQUAL".into(), argument(b"")),
+            ]),
+            6,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, equal_start.clone(), 6),
+                equal_start,
+            )
+            .unwrap();
+        let equal_end = request(
+            CicsOperation::EndBrowse,
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
+            7,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, equal_end.clone(), 7),
+                equal_end,
+            )
+            .unwrap();
 
         let requests = trace.requests.lock().unwrap();
         assert!(matches!(
@@ -14200,21 +15466,34 @@ mod tests {
                 ..
             } if dataset.as_str() == "CARDDEMO.CARDDAT"
         ));
+        assert!(matches!(&requests[1], DatasetRequest::Attributes { .. }));
         assert!(matches!(
-            &requests[1],
+            &requests[2],
             DatasetRequest::ReadNext { cursor, .. } if cursor == "CURSOR-1"
         ));
         assert!(matches!(
-            &requests[2],
+            &requests[3],
             DatasetRequest::RewriteRecord { key, record, .. }
                 if key == b"AA" && record == b"AA22"
         ));
         assert!(matches!(
-            &requests[3],
+            &requests[4],
             DatasetRequest::DeleteRecord { key, .. } if key == b"AA"
         ));
         assert!(matches!(
-            &requests[4],
+            &requests[5],
+            DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
+        ));
+        assert!(matches!(
+            &requests[6],
+            DatasetRequest::StartBrowse {
+                dataset,
+                relation: mainframe_env_host_api::KeyRelation::Equal,
+                ..
+            } if dataset.as_str() == "CARDDEMO.CARDDAT"
+        ));
+        assert!(matches!(
+            &requests[7],
             DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
         ));
         drop(requests);
@@ -14222,6 +15501,212 @@ mod tests {
         assert_eq!(origins.len(), 2);
         assert_eq!(origins[0].1, "outer-3");
         assert_eq!(origins[1].1, "outer-4");
+    }
+
+    #[test]
+    fn start_browse_generic_key_length_selects_prefix_and_first_record() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+
+        let generic_equal = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AAZ")),
+                ("KEYLENGTH".into(), cics_decimal(2)),
+                ("OPTION.GENERIC".into(), cics_option()),
+                ("OPTION.EQUAL".into(), cics_option()),
+            ]),
+            1,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, generic_equal.clone(), 1),
+                generic_equal,
+            )
+            .unwrap();
+        let end = request(
+            CicsOperation::EndBrowse,
+            BTreeMap::from([("FILE".into(), argument(b"CARDDAT"))]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, end.clone(), 2), end)
+            .unwrap();
+
+        let missing_prefix = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"BBZ")),
+                ("KEYLENGTH".into(), cics_decimal(2)),
+                ("OPTION.GENERIC".into(), cics_option()),
+                ("OPTION.EQUAL".into(), cics_option()),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing_prefix.clone(), 3),
+                missing_prefix,
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 80,
+            })
+        );
+
+        let first = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"ZZ")),
+                ("KEYLENGTH".into(), cics_decimal(0)),
+                ("OPTION.GENERIC".into(), cics_option()),
+                ("OPTION.GTEQ".into(), cics_option()),
+            ]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 4), first)
+            .unwrap();
+
+        for (sequence, key_length, generic, response2) in
+            [(5, 1, false, 26), (6, 3, true, 25), (7, -1, true, 42)]
+        {
+            let mut arguments = BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AAZ")),
+                ("KEYLENGTH".into(), cics_decimal(key_length)),
+            ]);
+            if generic {
+                arguments.insert("OPTION.GENERIC".into(), cics_option());
+                arguments.insert("OPTION.EQUAL".into(), cics_option());
+            }
+            let invalid = request(CicsOperation::StartBrowse, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2,
+                })
+            );
+        }
+
+        let requests = trace.requests.lock().unwrap();
+        assert!(matches!(requests[0], DatasetRequest::Attributes { .. }));
+        assert!(matches!(
+            &requests[1],
+            DatasetRequest::StartBrowse { key, relation, .. }
+                if key == b"AA" && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
+        assert!(matches!(requests[2], DatasetRequest::ReadNext { .. }));
+        assert!(matches!(requests[3], DatasetRequest::EndBrowse { .. }));
+        assert!(matches!(
+            &requests[4],
+            DatasetRequest::StartBrowse { key, relation, .. }
+                if key == b"AA" && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
+        assert!(matches!(
+            &requests[11],
+            DatasetRequest::StartBrowse { key, relation, .. }
+                if key.is_empty()
+                    && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
+    }
+
+    #[test]
+    fn browse_length_truncates_and_returns_actual_record_length() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+
+        let start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+
+        let next = request(
+            CicsOperation::ReadNext,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("LENGTH".into(), cics_decimal(2)),
+            ]),
+            2,
+        );
+        let truncated = service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+            .unwrap();
+        assert_eq!(truncated.condition, "LENGERR");
+        assert_eq!((truncated.response, truncated.response2), (22, 11));
+        assert_eq!(truncated.payload.bytes(), b"AA");
+        assert_eq!(truncated.outputs["LENGTH"].bytes(), b"4");
+
+        let previous = request(
+            CicsOperation::ReadPrev,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("LENGTH".into(), cics_decimal(6)),
+            ]),
+            3,
+        );
+        let fixed_mismatch = service
+            .invoke(
+                &effect(&invocation.run_unit_id, previous.clone(), 3),
+                previous,
+            )
+            .unwrap();
+        assert_eq!(fixed_mismatch.condition, "LENGERR");
+        assert_eq!(
+            (fixed_mismatch.response, fixed_mismatch.response2),
+            (22, 13)
+        );
+        assert_eq!(fixed_mismatch.payload.bytes(), b"AA11");
+        assert_eq!(fixed_mismatch.outputs["LENGTH"].bytes(), b"4");
+
+        let requests = trace.requests.lock().unwrap();
+        assert!(matches!(requests[0], DatasetRequest::StartBrowse { .. }));
+        assert!(matches!(requests[1], DatasetRequest::Attributes { .. }));
+        assert!(matches!(
+            requests[2],
+            DatasetRequest::ReadNext { reverse: false, .. }
+        ));
+        assert!(matches!(requests[3], DatasetRequest::Attributes { .. }));
+        assert!(matches!(
+            requests[4],
+            DatasetRequest::ReadNext { reverse: true, .. }
+        ));
     }
 
     /// Issue #205: current-record DELETE consumes exactly one READ UPDATE hold.

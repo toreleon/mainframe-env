@@ -241,11 +241,22 @@ fn file(
             other => other,
         })?;
     let length = decimal_argument(request, "LENGTH")?;
-    let key_length = decimal_argument(request, "KEYLENGTH")?;
-    let attributes = if (length.is_some() || key_length.is_some())
+    let key_length = signed_decimal_argument(request, "KEYLENGTH")?;
+    let attributes = if (length.is_some()
+        || key_length.is_some()
+        || matches!(
+            request.operation,
+            CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ))
         && matches!(
             request.operation,
-            CicsOperation::Read | CicsOperation::Write | CicsOperation::Rewrite
+            CicsOperation::Read
+                | CicsOperation::Write
+                | CicsOperation::Rewrite
+                | CicsOperation::Delete
+                | CicsOperation::StartBrowse
+                | CicsOperation::ReadNext
+                | CicsOperation::ReadPrev
         ) {
         match service.nested(
             run,
@@ -259,9 +270,29 @@ fn file(
     } else {
         None
     };
-    validate_key_length(request.operation, key_length, attributes.as_ref())?;
-    let mut length_condition =
-        validate_record_length(request.operation, length, attributes.as_ref())?;
+    let generic = request.arguments.contains_key("OPTION.GENERIC");
+    let gteq = request.arguments.contains_key("OPTION.GTEQ");
+    let equal = request.arguments.contains_key("OPTION.EQUAL");
+    validate_search_relation(request.operation, equal, gteq)?;
+    validate_key_length(
+        request.operation,
+        key_length,
+        attributes.as_ref(),
+        generic,
+        gteq,
+    )?;
+    let mut length_condition = if matches!(
+        request.operation,
+        CicsOperation::Read
+            | CicsOperation::ReadNext
+            | CicsOperation::ReadPrev
+            | CicsOperation::Write
+            | CicsOperation::Rewrite
+    ) {
+        validate_record_length(request.operation, length, attributes.as_ref())?
+    } else {
+        None
+    };
     let transfer_length = if matches!(
         request.operation,
         CicsOperation::Write | CicsOperation::Rewrite
@@ -323,12 +354,9 @@ fn file(
             dataset: dataset.clone(),
             member,
             key: argument_bytes(request, "RIDFLD")
-                .map(|mut value| {
-                    if let Some(key_length) = key_length {
-                        value.truncate(key_length as usize);
-                    }
-                    encode_dataset_bytes(ccsid, &value)
-                })
+                .map(|value| truncate_key(value, key_length))
+                .transpose()?
+                .map(|value| encode_dataset_bytes(ccsid, &value))
                 .transpose()?,
             max_records: 1,
             control: Default::default(),
@@ -402,9 +430,16 @@ fn file(
             dataset: dataset.clone(),
             key: encode_dataset_bytes(
                 ccsid,
-                &argument_bytes(request, "RIDFLD").unwrap_or_default(),
+                &truncate_key(
+                    argument_bytes(request, "RIDFLD").unwrap_or_default(),
+                    key_length,
+                )?,
             )?,
-            relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
+            relation: if equal && !generic {
+                mainframe_env_host_api::KeyRelation::Equal
+            } else {
+                mainframe_env_host_api::KeyRelation::GreaterOrEqual
+            },
         },
         CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
             dataset: dataset.clone(),
@@ -442,26 +477,28 @@ fn file(
     if service.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterIntent)? {
         return Err(HostProblem::InfrastructureFailure);
     }
-    let result = service
-        .nested(run, HostRequest::Dataset(host_request))
-        .map_err(|problem| match (operation, problem) {
-            (CicsOperation::Read, HostProblem::NotFound) => HostProblem::Condition {
-                name: "NOTFND".into(),
-                response: 13,
-                response2: 80,
-            },
-            (
-                CicsOperation::Read,
-                HostProblem::Condition {
-                    name, response: 13, ..
-                },
-            ) if name == "NOTFND" => HostProblem::Condition {
-                name,
-                response: 13,
-                response2: 80,
-            },
-            (_, other) => other,
-        })?;
+    if operation == CicsOperation::StartBrowse && generic && equal {
+        let key = argument_bytes(request, "RIDFLD")
+            .map(|value| truncate_key(value, key_length))
+            .transpose()?
+            .map(|value| encode_dataset_bytes(ccsid, &value))
+            .transpose()?
+            .ok_or(HostProblem::Malformed)?;
+        read_relational(service, run, dataset.clone(), key, true)
+            .map_err(|problem| normalize_file_not_found(CicsOperation::StartBrowse, problem))?;
+    }
+    let result = if operation == CicsOperation::Read && (gteq || generic) {
+        let key = argument_bytes(request, "RIDFLD")
+            .map(|value| truncate_key(value, key_length))
+            .transpose()?
+            .map(|value| encode_dataset_bytes(ccsid, &value))
+            .transpose()?
+            .ok_or(HostProblem::Malformed)?;
+        read_relational(service, run, dataset.clone(), key, generic && !gteq)
+    } else {
+        service.nested(run, HostRequest::Dataset(host_request))
+    }
+    .map_err(|problem| normalize_file_not_found(operation, problem))?;
     let mut browse_key = None;
     let mut payload = match result {
         HostResult::Dataset(DatasetResult::Records {
@@ -550,13 +587,65 @@ fn file(
     if let Some(key) = browse_key {
         response.outputs.insert("RIDFLD".into(), bounded(key)?);
     }
-    if operation == CicsOperation::Read && length.is_some() {
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+    ) && length.is_some()
+    {
         response.outputs.insert(
             "LENGTH".into(),
             super::super::decimal_payload(i64::from(actual_length))?,
         );
     }
     Ok(response)
+}
+
+fn read_relational(
+    service: &CicsService,
+    run: &mut Run,
+    dataset: DatasetName,
+    key: Vec<u8>,
+    require_prefix: bool,
+) -> Result<HostResult, HostProblem> {
+    let start = service.nested(
+        run,
+        HostRequest::Dataset(DatasetRequest::StartBrowse {
+            dataset: dataset.clone(),
+            key: key.clone(),
+            relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
+        }),
+    )?;
+    let HostResult::Dataset(DatasetResult::Browse { cursor, .. }) = start else {
+        return Err(HostProblem::ProviderFailure);
+    };
+    let read = service.nested(
+        run,
+        HostRequest::Dataset(DatasetRequest::ReadNext {
+            dataset: dataset.clone(),
+            cursor: cursor.clone(),
+            reverse: false,
+            control: Default::default(),
+        }),
+    );
+    let close = service.nested(
+        run,
+        HostRequest::Dataset(DatasetRequest::EndBrowse { dataset, cursor }),
+    );
+    close?;
+    let result = read?;
+    let matched = matches!(
+        &result,
+        HostResult::Dataset(DatasetResult::Browse {
+            record: Some(_),
+            key: Some(found),
+            ..
+        }) if !require_prefix || found.starts_with(&key)
+    );
+    if !matched {
+        Err(HostProblem::NotFound)
+    } else {
+        Ok(result)
+    }
 }
 
 fn decimal_argument(request: &CicsRequest, name: &str) -> Result<Option<u32>, HostProblem> {
@@ -573,14 +662,105 @@ fn decimal_argument(request: &CicsRequest, name: &str) -> Result<Option<u32>, Ho
     Ok(Some(value))
 }
 
+fn signed_decimal_argument(request: &CicsRequest, name: &str) -> Result<Option<i32>, HostProblem> {
+    let Some(value) = request.arguments.get(name) else {
+        return Ok(None);
+    };
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(HostProblem::Malformed);
+    }
+    let value = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .parse::<i32>()
+        .map_err(|_| HostProblem::Malformed)?;
+    Ok(Some(value))
+}
+
+fn truncate_key(mut value: Vec<u8>, key_length: Option<i32>) -> Result<Vec<u8>, HostProblem> {
+    if let Some(key_length) = key_length {
+        value.truncate(usize::try_from(key_length).map_err(|_| HostProblem::Malformed)?);
+    }
+    Ok(value)
+}
+
+fn normalize_file_not_found(operation: CicsOperation, problem: HostProblem) -> HostProblem {
+    match (operation, problem) {
+        (CicsOperation::Read | CicsOperation::StartBrowse, HostProblem::NotFound) => {
+            HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 80,
+            }
+        }
+        (
+            CicsOperation::Read | CicsOperation::StartBrowse,
+            HostProblem::Condition {
+                name, response: 13, ..
+            },
+        ) if name == "NOTFND" => HostProblem::Condition {
+            name,
+            response: 13,
+            response2: 80,
+        },
+        (_, other) => other,
+    }
+}
+
 fn validate_key_length(
     operation: CicsOperation,
-    key_length: Option<u32>,
+    key_length: Option<i32>,
     attributes: Option<&mainframe_env_host_api::DatasetAttributes>,
+    generic: bool,
+    gteq: bool,
 ) -> Result<(), HostProblem> {
-    if matches!(operation, CicsOperation::Read | CicsOperation::Write)
-        && let Some(key_length) = key_length
-        && attributes.and_then(|attributes| attributes.key_length) != Some(key_length)
+    if generic {
+        if !matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) {
+            return Err(HostProblem::Malformed);
+        }
+        let key_length = key_length.ok_or(HostProblem::Malformed)?;
+        if key_length < 0 {
+            return Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 42,
+            });
+        }
+        if key_length == 0 {
+            return if gteq {
+                Ok(())
+            } else {
+                Err(HostProblem::Malformed)
+            };
+        }
+        if attributes
+            .and_then(|attributes| attributes.key_length)
+            .is_none_or(|defined| i64::from(key_length) >= i64::from(defined))
+        {
+            return Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 25,
+            });
+        }
+        return Ok(());
+    }
+    if matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse)
+        && gteq
+        && key_length == Some(0)
+    {
+        return Ok(());
+    }
+    if matches!(
+        operation,
+        CicsOperation::Read
+            | CicsOperation::Write
+            | CicsOperation::Delete
+            | CicsOperation::StartBrowse
+    ) && let Some(key_length) = key_length
+        && attributes
+            .and_then(|attributes| attributes.key_length)
+            .map(i64::from)
+            != Some(i64::from(key_length))
     {
         return Err(HostProblem::Condition {
             name: "INVREQ".into(),
@@ -589,6 +769,18 @@ fn validate_key_length(
         });
     }
     Ok(())
+}
+
+fn validate_search_relation(
+    operation: CicsOperation,
+    equal: bool,
+    gteq: bool,
+) -> Result<(), HostProblem> {
+    if equal && (!matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) || gteq) {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_record_length(
@@ -618,7 +810,10 @@ fn validate_record_length(
         };
     }
     if !variable && length != attributes.logical_record_length {
-        let response2 = if operation == CicsOperation::Read {
+        let response2 = if matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ) {
             13
         } else {
             14
@@ -654,8 +849,10 @@ fn apply_read_length(
     condition: &mut Option<(&'static str, i32, i32)>,
 ) -> Result<u32, HostProblem> {
     let actual = u32::try_from(payload.len()).map_err(|_| HostProblem::ResourceExhausted)?;
-    if operation == CicsOperation::Read
-        && let Some(maximum) = length
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+    ) && let Some(maximum) = length
         && actual > maximum
     {
         payload.truncate(maximum as usize);
@@ -702,9 +899,36 @@ mod tests {
         assert_eq!(payload, b"ABCD");
         assert_eq!(condition, Some(("LENGERR", 22, 11)));
 
+        assert!(matches!(
+            validate_record_length(CicsOperation::ReadNext, None, Some(&variable)),
+            Err(HostProblem::Condition {
+                response: 22,
+                response2: 10,
+                ..
+            })
+        ));
+        let mut browse_payload = b"ABCDEFGH".to_vec();
+        let mut browse_condition =
+            validate_record_length(CicsOperation::ReadNext, Some(4), Some(&variable)).unwrap();
+        assert_eq!(
+            apply_read_length(
+                CicsOperation::ReadNext,
+                Some(4),
+                &mut browse_payload,
+                &mut browse_condition,
+            ),
+            Ok(8)
+        );
+        assert_eq!(browse_payload, b"ABCD");
+        assert_eq!(browse_condition, Some(("LENGERR", 22, 11)));
+
         let fixed = attributes(RecordFormat::Fixed, 8);
         assert_eq!(
             validate_record_length(CicsOperation::Read, Some(10), Some(&fixed)),
+            Ok(Some(("LENGERR", 22, 13)))
+        );
+        assert_eq!(
+            validate_record_length(CicsOperation::ReadPrev, Some(10), Some(&fixed)),
             Ok(Some(("LENGERR", 22, 13)))
         );
     }
@@ -729,6 +953,26 @@ mod tests {
             Ok(Some(("LENGERR", 22, 12)))
         );
         let fixed = attributes(RecordFormat::Fixed, 8);
+        assert_eq!(
+            validate_search_relation(CicsOperation::Read, true, false),
+            Ok(())
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::Read, true, true),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::Write, true, false),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::StartBrowse, true, false),
+            Ok(())
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::StartBrowse, true, true),
+            Err(HostProblem::Malformed)
+        );
         assert!(matches!(
             validate_record_length(CicsOperation::Rewrite, Some(7), Some(&fixed)),
             Err(HostProblem::Condition {
@@ -738,7 +982,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed)),
+            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed), false, false),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 26,
@@ -746,17 +990,109 @@ mod tests {
             })
         ));
         assert_eq!(
-            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed)),
+            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed), false, false),
             Ok(())
         );
         assert!(matches!(
-            validate_key_length(CicsOperation::Write, Some(2), Some(&fixed)),
+            validate_key_length(CicsOperation::Write, Some(2), Some(&fixed), false, false),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 26,
                 ..
             })
         ));
+        assert!(matches!(
+            validate_key_length(CicsOperation::Delete, Some(2), Some(&fixed), false, false),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 26,
+                ..
+            })
+        ));
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed), true, false),
+            Ok(())
+        );
+        assert!(matches!(
+            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed), true, false),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 25,
+                ..
+            })
+        ));
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, None, Some(&fixed), true, false),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), false, true),
+            Ok(())
+        );
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), true, true),
+            Ok(())
+        );
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), true, false),
+            Err(HostProblem::Malformed)
+        );
+        assert!(matches!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), false, false),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 26,
+                ..
+            })
+        ));
+        assert_eq!(
+            validate_key_length(
+                CicsOperation::StartBrowse,
+                Some(2),
+                Some(&fixed),
+                true,
+                false,
+            ),
+            Ok(())
+        );
+        assert!(matches!(
+            validate_key_length(
+                CicsOperation::StartBrowse,
+                Some(3),
+                Some(&fixed),
+                true,
+                false,
+            ),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 25,
+                ..
+            })
+        ));
+        assert!(matches!(
+            validate_key_length(
+                CicsOperation::StartBrowse,
+                Some(-1),
+                Some(&fixed),
+                true,
+                false,
+            ),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 42,
+                ..
+            })
+        ));
+        assert_eq!(
+            validate_key_length(
+                CicsOperation::StartBrowse,
+                Some(0),
+                Some(&fixed),
+                true,
+                true,
+            ),
+            Ok(())
+        );
         assert_eq!(
             validate_record_length(CicsOperation::Write, Some(5), Some(&fixed)),
             Ok(Some(("LENGERR", 22, 14)))

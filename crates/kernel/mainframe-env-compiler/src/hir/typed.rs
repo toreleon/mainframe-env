@@ -148,10 +148,12 @@ pub struct HirComputeStatement {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
     Abend,
+    Address,
     AddressSet,
     Asktime,
     AsktimeEib,
     FormatTime,
+    Freemain,
     Getmain,
     Cancel,
     Delay,
@@ -168,11 +170,13 @@ pub enum HirCicsOperation {
     StartBrowse,
     ReadNext,
     ReadPrev,
+    ReadTransientData,
     EndBrowse,
     Delete,
     Write,
     WriteTransientData,
     DeleteTransientData,
+    DeleteTemporaryStorage,
     ReceiveMap,
     SendMap,
     SendText,
@@ -204,6 +208,9 @@ pub enum HirCicsOperandName {
     From,
     Ridfld,
     Queue,
+    Qname,
+    SysId,
+    CommareaPointer,
     Map,
     Mapset,
     Resource,
@@ -234,6 +241,8 @@ pub enum HirCicsOperandName {
     DataLength,
     Flength,
     InitImage,
+    DataPointer,
+    DataArea,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -267,6 +276,7 @@ pub enum HirCicsOption {
     TimeSep,
     FreeKb,
     Gteq,
+    Generic,
     Fmh,
     Protect,
     Wait,
@@ -275,6 +285,10 @@ pub enum HirCicsOption {
     For,
     Until,
     NoCheck,
+    MapOnly,
+    DataOnly,
+    Equal,
+    Terminal,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -1764,7 +1778,7 @@ mod tests {
 
     #[test]
     fn cics_pilot_commands_resolve_named_inputs_outputs_options_and_policy() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICST. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(4). 01 RESP-X PIC 999. 01 RESP2-X PIC 999. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS SYNCPOINT ROLLBACK RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICST. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(4). 01 REWRITE-X PIC X(4) VALUE 'AA22'. 01 RESP-X PIC 999. 01 RESP2-X PIC 999. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(REWRITE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS SYNCPOINT ROLLBACK RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed CICS HIR");
         let commands = hir
             .statements
@@ -1890,6 +1904,71 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn cics_address_commarea_resolves_pointer_and_optional_area() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(8). PROCEDURE DIVISION USING DFHCOMMAREA. EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed ADDRESS COMMAREA HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed ADDRESS command");
+        assert_eq!(command.operation, HirCicsOperation::Address);
+        assert_eq!(
+            command
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::CommareaPointer,
+                HirCicsOperandName::UsingAddress,
+            ])
+        );
+
+        let absent = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NOAREA. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. PROCEDURE DIVISION. EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. STOP RUN.",
+        );
+        let absent = absent.hir.expect("ADDRESS without COMMAREA");
+        let command = absent
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed absent ADDRESS command");
+        assert_eq!(command.operands.len(), 1);
+        assert_eq!(
+            command.operands[0].name,
+            HirCicsOperandName::CommareaPointer
+        );
+
+        for (command, expected) in [
+            (
+                "ADDRESS COMMAREA(TEXT-X)",
+                "requires a four-byte POINTER or POINTER-32 reference",
+            ),
+            ("ADDRESS EIB(PTR-X)", "typed lowering is unready for EIB"),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. 01 TEXT-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
     }
 
     #[test]
@@ -2602,7 +2681,47 @@ mod tests {
         }
     }
 
-    /// Issue #204: GTEQ is scoped to typed STARTBR and preserves its typed route.
+    #[test]
+    fn cics_browse_length_is_one_halfword_input_output_binding() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BROWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). 01 LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS READPREV FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("browse LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        for command in &commands[1..] {
+            let length = command
+                .operands
+                .iter()
+                .find(|operand| operand.name == HirCicsOperandName::Length)
+                .expect("browse LENGTH input");
+            assert!(matches!(
+                length.value,
+                HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+            ));
+            assert!(command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Length
+                    && output.target.qualified_name == "LENGTH-X"
+            }));
+        }
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) LENGTH(KEY-X) END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(2) END-EXEC.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    /// Issue #204: GTEQ is scoped to typed keyed selection routes.
     #[test]
     fn cics_startbr_gteq_is_typed_and_operation_scoped() {
         let valid = analyze(
@@ -2622,10 +2741,85 @@ mod tests {
         assert_eq!(command.operation, HirCicsOperation::StartBrowse);
         assert_eq!(command.options, BTreeSet::from([HirCicsOption::Gteq]));
 
-        let invalid = analyze(
+        let equal = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BREQUAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) EQUAL END-EXEC.",
+        );
+        let hir = equal
+            .hir
+            .unwrap_or_else(|| panic!("STARTBR EQUAL: {:?}", equal.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed STARTBR EQUAL");
+        assert_eq!(command.operation, HirCicsOperation::StartBrowse);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Equal]));
+
+        let generic = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BRGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE 'AAZ'. 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC EQUAL END-EXEC.",
+        );
+        let hir = generic
+            .hir
+            .unwrap_or_else(|| panic!("STARTBR GENERIC: {:?}", generic.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed STARTBR GENERIC");
+        assert_eq!(command.operation, HirCicsOperation::StartBrowse);
+        assert_eq!(
+            command.options,
+            BTreeSet::from([HirCicsOption::Equal, HirCicsOption::Generic])
+        );
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "KEY-LENGTH-X"
+                )
+        }));
+
+        let read = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. RDGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
         );
+        let hir = read
+            .hir
+            .unwrap_or_else(|| panic!("READ GTEQ: {:?}", read.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ");
+        assert_eq!(command.operation, HirCicsOperation::Read);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Gteq]));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WRGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
+        );
         assert!(invalid.hir.is_none());
+        let conflicting = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADREL. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) EQUAL GTEQ END-EXEC.",
+        );
+        assert!(conflicting.hir.is_none());
+        for command in [
+            "STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) GENERIC",
+            "STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(0) GENERIC EQUAL",
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+        }
     }
 
     /// Issue #205: DELETE may select the record held by READ UPDATE.
@@ -2703,10 +2897,6 @@ mod tests {
                 "DELETE FILE('ACCTDAT') RIDFLD(KEY-X) TOKEN(KEY-X)",
                 "unready for TOKEN",
             ),
-            (
-                "WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(4)",
-                "unready for LENGTH",
-            ),
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
@@ -2733,10 +2923,360 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cics_write_file_resolves_bounded_record_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WRITELEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(8) VALUE '003ABCDE'. 01 LENGTH-X PIC S9(4) COMP VALUE 5. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(5) END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH OF RECORD-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE FILE LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Write =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(5)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "RECORD-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(32768) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 OTHER-X PIC X(4). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_rewrite_file_resolves_bounded_record_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. REWRITELEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(8) VALUE '003ABCDE'. 01 LENGTH-X PIC S9(4) COMP VALUE 5. PROCEDURE DIVISION. EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(5) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(LENGTH OF RECORD-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("REWRITE FILE LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Rewrite =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(5)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "RECORD-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(8). PROCEDURE DIVISION. EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(32768) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(8). 01 LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(8). 01 OTHER-X PIC X(4). PROCEDURE DIVISION. EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_write_file_resolves_bounded_key_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(8) VALUE '003ABCDE'. 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 3. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(3) END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE FILE KEYLENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Write =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "KEY-LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "KEY-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 KEY-LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 OTHER-X PIC X(2). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_delete_file_resolves_bounded_key_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. DELETEKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 3. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(3) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELETE FILE KEYLENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Delete =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "KEY-LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "KEY-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(0) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 KEY-LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 OTHER-X PIC X(2). PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') KEYLENGTH(KEY-LENGTH-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_read_file_resolves_bounded_key_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(8). 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 3. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(3) EQUAL END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READ FILE KEYLENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Read =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[0].options.contains(&HirCicsOption::Equal));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "KEY-LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "KEY-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 KEY-LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 OTHER-X PIC X(2). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_read_gteq_is_typed_and_operation_scoped() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '004'. 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READ GTEQ: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ GTEQ");
+        assert_eq!(command.operation, HirCicsOperation::Read);
+        assert!(command.options.contains(&HirCicsOption::Gteq));
+
+        let wrong_operation = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC. STOP RUN.",
+        );
+        assert!(wrong_operation.hir.is_none());
+        let conflicting_relation = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADREL. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) EQUAL GTEQ END-EXEC. STOP RUN.",
+        );
+        assert!(conflicting_relation.hir.is_none());
+    }
+
+    #[test]
+    fn cics_read_generic_requires_bounded_key_length() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '00Z'. 01 RECORD-X PIC X(7). 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC EQUAL END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READ GENERIC: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ GENERIC");
+        assert_eq!(command.operation, HirCicsOperation::Read);
+        assert!(command.options.contains(&HirCicsOption::Generic));
+        assert!(command.options.contains(&HirCicsOption::Equal));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) GENERIC END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_read_zero_key_length_requires_gteq() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). 01 ZERO-X PIC S9(4) COMP VALUE 0. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GTEQ END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(ZERO-X) GTEQ END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GENERIC GTEQ END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READ KEYLENGTH(0) GTEQ: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Read =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && operand.value == HirCicsValue::Integer(0)
+        }));
+        assert!(commands[..2].iter().all(|command| {
+            command.options.contains(&HirCicsOption::Gteq)
+                && !command.options.contains(&HirCicsOption::Generic)
+        }));
+        assert!(commands[2].options.contains(&HirCicsOption::Gteq));
+        assert!(commands[2].options.contains(&HirCicsOption::Generic));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GENERIC END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
     /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.
     #[test]
     fn cics_transient_data_write_resolves_queue_record_and_optional_length() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) SYSID('S001') END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -2763,6 +3303,10 @@ mod tests {
         }));
         assert!(command.operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("S001".into())
         }));
 
         let deleted = analyze(
@@ -2816,8 +3360,8 @@ mod tests {
                 "FROM requires a data area",
             ),
             (
-                "WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) SYSID('R1')",
-                "unready for SYSID",
+                "WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) SYSID('TOOLONG')",
+                "SYSID requires a 1-4 character name",
             ),
         ] {
             let analysis = analyze(&format!(
@@ -2833,19 +3377,217 @@ mod tests {
                 analysis.diagnostics
             );
         }
-        let remote = analyze(
+        let routed = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQR. PROCEDURE DIVISION. EXEC CICS DELETEQ TD QUEUE('OUTQ') SYSID('R001') END-EXEC. STOP RUN.",
         );
-        assert!(remote.hir.is_none());
-        assert!(remote.diagnostics.iter().any(|diagnostic| {
-            diagnostic
-                .public_message()
-                .contains("typed lowering is unready for SYSID")
+        let routed = routed
+            .hir
+            .unwrap_or_else(|| panic!("DELETEQ TD SYSID: {:?}", routed.diagnostics));
+        let routed = routed
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DELETEQ TD SYSID");
+        assert!(routed.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("R001".into())
         }));
     }
 
     #[test]
-    fn cics_getmain_resolves_bounded_task_local_storage() {
+    fn cics_readq_td_resolves_into_and_inout_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(4) VALUE 'IN01'. 01 DATA-X PIC X(6). 01 LENGTH-X PIC S9(4) COMP VALUE 3. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE(QUEUE-X) INTO(DATA-X) LENGTH(LENGTH-X) SYSID('S001') RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READQ TD: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READQ TD");
+        assert_eq!(command.operation, HirCicsOperation::ReadTransientData);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Queue
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "QUEUE-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("S001".into())
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Into && output.target.qualified_name == "DATA-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Length && output.target.qualified_name == "LENGTH-X"
+        }));
+
+        let set = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE('IN01') SET(PTR-X) END-EXEC. STOP RUN.",
+        );
+        let set = set
+            .hir
+            .unwrap_or_else(|| panic!("READQ TD SET: {:?}", set.diagnostics));
+        let set = set
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READQ TD SET");
+        assert!(set.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SetPointer && output.target.qualified_name == "PTR-X"
+        }));
+
+        for (command, expected) in [
+            ("READQ TD INTO(DATA-X)", "requires QUEUE"),
+            (
+                "READQ TD QUEUE('IN01')",
+                "requires exactly one of INTO or SET",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) SET(PTR-X)",
+                "requires exactly one of INTO or SET",
+            ),
+            (
+                "READQ TD QUEUE('IN01') SET(DATA-X)",
+                "SET requires a POINTER or POINTER-32 reference",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) LENGTH(3)",
+                "LENGTH requires writable halfword binary storage",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) LENGTH(BAD-LENGTH-X)",
+                "LENGTH requires writable halfword binary storage",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) SYSID('TOOLONG')",
+                "SYSID requires a 1-4 character name",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRTD. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). 01 BAD-LENGTH-X PIC S9(9) COMP. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_deleteq_ts_resolves_local_queue_names() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELETEQ TS: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 4);
+        assert!(
+            commands
+                .iter()
+                .all(|command| command.operation == HirCicsOperation::DeleteTemporaryStorage)
+        );
+        assert_eq!(
+            commands[0].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Queue,
+                value: HirCicsValue::Literal("TEMPQ".into()),
+            }
+        );
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("S001".into())
+        }));
+        assert!(matches!(
+            &commands[1].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Queue,
+                value: HirCicsValue::Data(reference),
+            } if reference.qualified_name == "QUEUE-X"
+        ));
+        assert_eq!(
+            commands[2].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Qname,
+                value: HirCicsValue::Literal("LONG-QUEUE".into()),
+            }
+        );
+        assert!(matches!(
+            &commands[3].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Qname,
+                value: HirCicsValue::Data(reference),
+            } if reference.qualified_name == "QNAME-X"
+        ));
+
+        for (command, expected) in [
+            ("DELETEQ TS", "requires exactly one of QUEUE or QNAME"),
+            (
+                "DELETEQ TS QUEUE('TOOLONG09')",
+                "QUEUE requires a 1-8 character name",
+            ),
+            (
+                "DELETEQ TS QNAME('TOO-LONG-QUEUE-NAME')",
+                "QNAME requires a 1-16 character name",
+            ),
+            (
+                "DELETEQ TS QUEUE('TEMPQ') QNAME('LONG-QUEUE')",
+                "requires exactly one of QUEUE or QNAME",
+            ),
+            (
+                "DELETEQ TS QUEUE('TEMPQ') SYSID('TOOLONG')",
+                "SYSID requires a 1-4 character name",
+            ),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTS. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_getmain_resolves_bounded_flength_and_length_storage() {
         let analysis = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(9) COMP VALUE 4. 01 INIT-X PIC X VALUE 'Z'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) INITIMG(INIT-X) NOSUSPEND RESP(RESP-X) END-EXEC. STOP RUN.",
         );
@@ -2880,11 +3622,95 @@ mod tests {
         }));
         assert!(command.options.contains(&HirCicsOption::NoSuspend));
 
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC 9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(LEN-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("GETMAIN LENGTH: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed GETMAIN LENGTH");
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "LEN-X"
+                )
+        }));
+
         for source in [
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(4) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(4). PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(2147483648) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(LEN-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC 9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(LEN-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(-1) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(65521) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) LENGTH(4) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_freemain_resolves_exactly_one_pointer_or_data_input() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("FREEMAIN: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed FREEMAIN");
+        assert_eq!(command.operation, HirCicsOperation::Freemain);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DataPointer
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "PTR-X"
+                )
+        }));
+
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. LINKAGE SECTION. 01 LINK-X PIC X(4). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA(LINK-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("FREEMAIN DATA: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed FREEMAIN DATA");
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DataArea
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "LINK-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS FREEMAIN END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 DATA-X PIC X(4). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA(DATA-X) DATAPOINTER(PTR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA('ABCD') END-EXEC. STOP RUN.",
         ] {
             let analysis = analyze(source);
             assert!(analysis.hir.is_none(), "{source}");
@@ -2982,11 +3808,97 @@ mod tests {
         }
     }
 
-    /// Issues #203 and #206: CardDemo SEND display controls and LENGTH OF stay typed.
+    #[test]
+    fn cics_receive_map_from_resolves_bounded_input_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RCVFROM. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(16). 01 IN-X PIC X(16). 01 LENGTH-X PIC S9(4) COMP VALUE 8. PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(LENGTH-X) INTO(IN-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(LENGTH OF FROM-X) INTO(IN-X) END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RECEIVE MAP FROM: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands.iter().all(|command| {
+            command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::From
+                    && matches!(
+                        operand.value,
+                        HirCicsValue::Data(ref reference)
+                            if reference.qualified_name == "FROM-X"
+                    )
+            }) && command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Into && output.target.qualified_name == "IN-X"
+            })
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "FROM-X"
+                )
+        }));
+
+        for command in [
+            "RECEIVE MAP('MENU') LENGTH(4) INTO(IN-X)",
+            "RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(32768) INTO(IN-X)",
+            "RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(LENGTH OF IN-X) INTO(IN-X)",
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRCV. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(16). 01 IN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn cics_receive_map_terminal_selects_originating_terminal_without_from() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RCVTERM. DATA DIVISION. WORKING-STORAGE SECTION. 01 IN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') INTO(IN-X) TERMINAL END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RECEIVE MAP TERMINAL: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RECEIVE MAP TERMINAL");
+        assert_eq!(command.operation, HirCicsOperation::ReceiveMap);
+        assert!(command.options.contains(&HirCicsOption::Terminal));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADTERM. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(16). 01 IN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') FROM(FROM-X) INTO(IN-X) TERMINAL END-EXEC.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("TERMINAL does not accept FROM")
+        }));
+    }
+
+    /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.
     #[test]
     fn cics_send_map_admits_erase_cursor_and_freekb() {
         let analysis = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') ERASE CURSOR FREEKB END-EXEC. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH OF DATA-X) ERASE FREEKB END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(LENGTH-X) ERASE CURSOR FREEKB END-EXEC. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH OF DATA-X) ERASE FREEKB END-EXEC. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH-X) END-EXEC.",
         );
         let hir = analysis
             .hir
@@ -3011,10 +3923,111 @@ mod tests {
             commands[1].options,
             BTreeSet::from([HirCicsOption::Erase, HirCicsOption::FreeKb])
         );
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X")
+        }));
         assert!(commands[1].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length
                 && matches!(operand.value, HirCicsValue::LengthOf(ref reference) if reference.qualified_name == "DATA-X")
         }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X")
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') LENGTH(4) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(32768) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(32768) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_send_map_maponly_rejects_application_data() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDDEF. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') MAPONLY END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND MAP MAPONLY: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND MAP MAPONLY");
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::MapOnly]));
+        assert!(command.operands.iter().all(|operand| !matches!(
+            operand.name,
+            HirCicsOperandName::From | HirCicsOperandName::Length
+        )));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADMAPO. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) MAPONLY END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADMAPO. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(4) MAPONLY END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("MAPONLY does not accept FROM or LENGTH")
+            }));
+        }
+    }
+
+    #[test]
+    fn cics_send_map_dataonly_requires_application_data() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDDATA. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(2). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(DATA-X) LENGTH(LENGTH OF DATA-X) DATAONLY END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND MAP DATAONLY: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND MAP DATAONLY");
+        assert!(command.options.contains(&HirCicsOption::DataOnly));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::From
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "DATA-X"
+                )
+        }));
+
+        for (source, expected) in [
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDATA. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') DATAONLY END-EXEC. STOP RUN.",
+                "DATAONLY requires an explicit FROM data area",
+            ),
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDATA. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') DATAONLY MAPONLY END-EXEC. STOP RUN.",
+                "DATAONLY and MAPONLY are mutually exclusive",
+            ),
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) })
+            );
+        }
     }
 
     /// Issue #208: an eight-byte MAPSET data area is resolved at run time.
@@ -3746,14 +4759,13 @@ mod tests {
 
     #[test]
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. \
-            WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. \
-            EXEC CICS ADDRESS ACEE(PTR-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. PROCEDURE DIVISION. \
+            EXEC CICS RESETBR END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         assert!(analysis.hir.is_none());
         assert!(analysis.diagnostics.iter().any(|diagnostic| {
             let message = diagnostic.public_message();
-            message.contains("ADDRESS") && message.contains("handler is unready")
+            message.contains("RESETBR") && message.contains("handler is unready")
         }));
     }
 
@@ -4447,6 +5459,13 @@ mod tests {
                 .iter()
                 .any(|output| output.name == HirCicsOutputName::Length)
         );
+
+        for invalid in ["LENGTH(8)", "LENGTH(LENGTH OF REC-X)"] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
     }
 
     #[test]

@@ -39,24 +39,105 @@ pub(super) fn allocation_capacity(
         return Err(MachineProblem::UnexpectedHostResult);
     };
     let pointer = resolved_slot(machine, slot)?;
-    if machine
-        .bases
-        .len()
-        .saturating_sub(machine.static_base_count)
-        >= machine.invocation.limits.max_frames as usize
-    {
+    let allocated = (machine.static_base_count..machine.bases.len())
+        .filter(|base| !machine.freed_allocations.contains(base))
+        .count();
+    if allocated >= machine.invocation.limits.max_frames as usize {
         return Ok(0);
     }
     machine.address_bytes_for(machine.bases.len(), 0, pointer.length)?;
     let used = machine
         .bases
         .iter()
-        .try_fold(0usize, |total, storage| total.checked_add(storage.len()))
+        .enumerate()
+        .filter(|(base, _)| !machine.freed_allocations.contains(base))
+        .try_fold(0usize, |total, (_, storage)| {
+            total.checked_add(storage.len())
+        })
         .ok_or(MachineProblem::ResourceExhausted)?;
     usize::try_from(machine.invocation.limits.max_storage_bytes)
         .map_err(|_| MachineProblem::ResourceExhausted)?
         .checked_sub(used)
         .ok_or(MachineProblem::ResourceExhausted)
+}
+
+pub(super) fn freemain_argument(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<(&'static str, Vec<u8>), MachineProblem> {
+    let pointer = resolved_slot(machine, slot)?;
+    let bytes = machine.read_reference(&pointer)?;
+    let valid = machine
+        .decode_address(&bytes)
+        .ok()
+        .flatten()
+        .is_some_and(|(base, offset)| {
+            base >= machine.static_base_count
+                && offset == 0
+                && !machine.freed_allocations.contains(&base)
+        });
+    Ok((
+        if valid {
+            "mainframe-env.cics.allocated-pointer@1"
+        } else {
+            "mainframe-env.cics.invalid-pointer@1"
+        },
+        bytes,
+    ))
+}
+
+pub(super) fn freemain_data_argument(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<(&'static str, Vec<u8>), MachineProblem> {
+    let reference = resolved_slot(machine, slot)?;
+    let Some(view) = machine.storage_view(&reference.layout.name).ok() else {
+        return Ok(("mainframe-env.cics.invalid-pointer@1", vec![0; 8]));
+    };
+    if view.base < machine.static_base_count
+        || view.offset != 0
+        || machine.freed_allocations.contains(&view.base)
+    {
+        return Ok(("mainframe-env.cics.invalid-pointer@1", vec![0; 8]));
+    }
+    Ok((
+        "mainframe-env.cics.allocated-pointer@1",
+        machine.address_bytes_for(view.base, view.offset, 8)?,
+    ))
+}
+
+pub(super) fn release_pointer(
+    machine: &mut ReferenceMachine,
+    value: &BoundedPayload,
+) -> Result<(), MachineProblem> {
+    if value.schema() != "mainframe-env.cics.allocated-pointer@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let Some((base, offset)) = machine.decode_address(value.bytes())? else {
+        return Err(MachineProblem::UnexpectedHostResult);
+    };
+    if base < machine.static_base_count || offset != 0 || machine.freed_allocations.contains(&base)
+    {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    machine.freed_allocations.insert(base);
+    Ok(())
+}
+
+pub(super) fn release_output(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    name: &str,
+    value: &BoundedPayload,
+) -> Result<bool, MachineProblem> {
+    if name != "FREEMAIN.POINTER" {
+        return Ok(false);
+    }
+    if operation != CicsOperation::Freemain {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    release_pointer(machine, value)?;
+    Ok(true)
 }
 
 pub(super) fn write_set_output(

@@ -9,7 +9,7 @@
   "differential_credit": 0,
   "catalog": {
     "descriptor_path": "conformance/0.9/cics/command-descriptors.json",
-    "descriptor_sha256": "sha256:ecc0a5bf94c28c0f1b135f88a263db2d3c5ad812cf3cea6c313476c6497c35f9",
+    "descriptor_sha256": "sha256:af06985dba30c6fd7f8dab88886340b3b4fa88ad5b770ef287201b7e172ea948",
     "official_catalog_sha256": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba",
     "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
   },
@@ -41,7 +41,7 @@
     }
   },
   "mapping_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-command-source-map@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of catalog, toc_projection, row_range, and ordered rows",
-  "mapping_sha256": "sha256:e3e453846334aa92235f21f0028e9c77f084fc4e872d9f592b7af227decac863",
+  "mapping_sha256": "sha256:c535f2cac1072e16a0f3e252045cac975934c5e24d405a560a4e0ad14e0de726",
   "rows": [
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001",

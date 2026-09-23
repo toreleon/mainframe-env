@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
+mod address;
 mod assign_validation;
 mod file_operands;
 mod format_time;
@@ -663,6 +664,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let operation = operation::resolve(descriptor)?;
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
+        HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
         HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
@@ -719,7 +721,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
-        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "KEYLENGTH", "RESP", "RESP2"],
         HirCicsOperation::Write => &[
             "FILE",
             "DATASET",
@@ -730,11 +732,20 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP",
             "RESP2",
         ],
-        HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::DeleteTransientData => &["QUEUE", "RESP", "RESP2"],
-        HirCicsOperation::Getmain => &["FLENGTH", "INITIMG", "SET", "RESP", "RESP2"],
-        HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
-        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::WriteTransientData => {
+            &["QUEUE", "FROM", "LENGTH", "SYSID", "RESP", "RESP2"]
+        }
+        HirCicsOperation::ReadTransientData => {
+            &["QUEUE", "INTO", "SET", "LENGTH", "SYSID", "RESP", "RESP2"]
+        }
+        HirCicsOperation::DeleteTransientData => &["QUEUE", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::DeleteTemporaryStorage => &["QNAME", "QUEUE", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
+        HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
+        HirCicsOperation::ReceiveMap => {
+            &["MAP", "MAPSET", "FROM", "INTO", "LENGTH", "RESP", "RESP2"]
+        }
+        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
@@ -775,7 +786,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
-        HirCicsOperation::AddressSet
+        HirCicsOperation::Address
+        | HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -791,8 +803,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Delete
         | HirCicsOperation::Write
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
-        | HirCicsOperation::ReceiveMap
+        | HirCicsOperation::DeleteTemporaryStorage
+        | HirCicsOperation::Freemain
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::PopHandle
@@ -804,13 +818,16 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
-        HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
+        HirCicsOperation::SendMap => &[
+            "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
+        ],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
-        HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
+        HirCicsOperation::StartBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],
-        HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
+        HirCicsOperation::Read => &["EQUAL", "GENERIC", "GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
     };
@@ -849,12 +866,13 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         )));
     }
     program_control::validate_constraints(operation, &clauses)?;
-    file_operands::validate_constraints(&clauses, operation)?;
+    file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
-    terminal_control::validate_constraints(&clauses, operation)?;
+    terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     for required in match operation {
+        HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
@@ -877,7 +895,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Read
         | HirCicsOperation::Rewrite
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
+        | HirCicsOperation::DeleteTemporaryStorage
+        | HirCicsOperation::Freemain
         | HirCicsOperation::Getmain
         | HirCicsOperation::ReceiveMap
         | HirCicsOperation::SendMap
@@ -910,6 +931,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
     }
     operands.extend(program_control::operands(operation, &clauses, semantic)?);
+    if operation == HirCicsOperation::Address {
+        operands.extend(address::operands(&clauses, semantic)?);
+    }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
         let (using_is_address, using) = cics_address_value(&clauses["USING"], semantic)?;
@@ -1049,14 +1073,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             name: HirCicsOutputName::Length,
             target,
         });
-    } else if operation == HirCicsOperation::Read
-        && let Some(HirCicsNamedOperand {
-            value: HirCicsValue::Data(target),
-            ..
-        }) = operands
-            .iter()
-            .find(|operand| operand.name == HirCicsOperandName::Length)
-    {
+    } else if let Some(target) = output_bindings::inout_length(&operands, operation) {
         require_writable(target)?;
         outputs.push(HirCicsOutputBinding {
             name: HirCicsOutputName::Length,
@@ -1088,6 +1105,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "TIMESEP" => HirCicsOption::TimeSep,
             "FREEKB" => HirCicsOption::FreeKb,
             "GTEQ" => HirCicsOption::Gteq,
+            "GENERIC" => HirCicsOption::Generic,
+            "EQUAL" => HirCicsOption::Equal,
+            "TERMINAL" => HirCicsOption::Terminal,
             "FMH" => HirCicsOption::Fmh,
             "PROTECT" => HirCicsOption::Protect,
             "WAIT" => HirCicsOption::Wait,
@@ -1096,6 +1116,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "FOR" => HirCicsOption::For,
             "UNTIL" => HirCicsOption::Until,
             "NOCHECK" => HirCicsOption::NoCheck,
+            "MAPONLY" => HirCicsOption::MapOnly,
+            "DATAONLY" => HirCicsOption::DataOnly,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

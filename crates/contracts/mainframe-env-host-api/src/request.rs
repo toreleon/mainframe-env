@@ -2415,6 +2415,7 @@ mod tests {
     fn all_cics_runtime_operation_names_are_unique() {
         let forms = [
             CicsOperation::Abend,
+            CicsOperation::Address,
             CicsOperation::AddressSet,
             CicsOperation::Asktime,
             CicsOperation::AsktimeEib,
@@ -2423,9 +2424,11 @@ mod tests {
             CicsOperation::Deq,
             CicsOperation::Delete,
             CicsOperation::DeleteTransientData,
+            CicsOperation::DeleteTemporaryStorage,
             CicsOperation::Enq,
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
+            CicsOperation::Freemain,
             CicsOperation::Getmain,
             CicsOperation::HandleAbend,
             CicsOperation::HandleAid,
@@ -2439,6 +2442,7 @@ mod tests {
             CicsOperation::Read,
             CicsOperation::ReadNext,
             CicsOperation::ReadPrev,
+            CicsOperation::ReadTransientData,
             CicsOperation::ReceiveMap,
             CicsOperation::Retrieve,
             CicsOperation::Return,
@@ -2454,7 +2458,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 39);
+        assert_eq!(forms.len(), 43);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

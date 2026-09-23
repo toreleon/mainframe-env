@@ -6,6 +6,24 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
+  TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal
+  the current CICS system before authorization or mutation; unknown and
+  unsupported remote systems return exact SYSIDERR 53/0 with queue state
+  unchanged.
+
+- Added typed CICS `READQ TD SET` over interpreter-owned virtual storage. SET
+  is exactly alternative to INTO, returns a checked POINTER/POINTER-32 address
+  to the complete consumed record, participates in checkpoint restore, and
+  rejects insufficient allocation capacity without consuming the queue.
+
+- Added typed local CICS `READQ TD QUEUE/INTO/LENGTH`. The FIFO read consumes
+  exactly one durable record, uses compiler-derived INTO capacity when LENGTH
+  is omitted, returns the original record length through writable halfword
+  storage, and preserves IBM's consume-and-LENGERR rules for zero or truncated
+  reads. Missing and empty queues return exact QIDERR 44/0 and QZERO 23/0;
+  SET, SYSID, NOSUSPEND, and TDQUEUE definition modes remain fail-closed.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,
@@ -360,18 +378,85 @@ All notable changes to mainframe-env are documented here.
   higher-level, and DPL ownership remain deferred.
 - Migrated the default-cursor `STARTBR`/`READNEXT`/`READPREV`/`ENDBR` file
   browse subset to typed plans. The compiler binds exactly one FILE/DATASET
-  resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`,
-  models RIDFLD as the same input/output slot on reads, and writes the returned
-  record into a pre-resolved INTO area.
-  REQID/SYSID, alternate key modes and lengths, SET, and UPDATE/TOKEN/RLS
-  semantics remain fail-closed.
+  resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`
+  and exact-key `EQUAL` relations as an exclusive choice, models RIDFLD as the
+  same input/output slot on reads, and writes the returned record into a
+  pre-resolved INTO area. STARTBR now also accepts bounded KEYLENGTH forms,
+  requires KEYLENGTH for GENERIC, preserves prefix-only EQUAL positioning,
+  supports GENERIC GTEQ and KEYLENGTH zero first-record positioning, and maps
+  definition/full-key violations to exact INVREQ 16/25, 16/26, or 16/42.
+  READNEXT and READPREV LENGTH now use one writable halfword as input capacity
+  and actual-length output, truncate oversized records with LENGERR 22/11,
+  reject omitted variable-record lengths with 22/10, and preserve fixed-record
+  mismatch 22/13.
+  REQID/SYSID, alternate key modes, SET, and UPDATE/TOKEN/RLS semantics remain
+  fail-closed.
 - Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to
   typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
   inputs, FILE/DATASET remains one exact resource alias, and both operations
   carry typed mutation identity. DELETE may instead consume the latest record
-  held by `READ UPDATE`; TOKEN deletes, remote and length forms, generic and
-  alternate record identifiers, mass insert, and RLS wait controls remain
-  deferred.
+  held by `READ UPDATE`. READ LENGTH is a writable halfword capacity that
+  returns the actual record length. WRITE and REWRITE LENGTH accept a bounded
+  literal, halfword-binary value, or matching `LENGTH OF` and persist only that
+  prefix;
+  READ, WRITE, and explicit-key DELETE KEYLENGTH accept the same positive
+  halfword forms against RIDFLD and preserve exact `INVREQ` 16/26 for a
+  definition mismatch. TOKEN deletes, remote forms, generic and alternate
+  record identifiers, mass insert, and RLS wait controls remain deferred. READ
+  GTEQ uses the existing bounded dataset cursor primitive to return the equal
+  key or first greater keyed record without retaining browse state; READ
+  GENERIC uses a positive partial KEYLENGTH and returns only a matching prefix.
+  Explicit READ EQUAL now selects the same source-defined exact complete- or
+  generic-key behavior as the default relation and conflicts with GTEQ.
+  READ GTEQ also accepts source-defined KEYLENGTH zero to select the first keyed
+  record, including with GENERIC, while zero remains rejected for default EQUAL
+  and GENERIC without GTEQ.
+- Repaired the CICS file/UOW conformance pilot after typed REWRITE began
+  requiring a storage-backed FROM area. Mutation fixtures now move their exact
+  bytes into the declared record area before REWRITE, and the WRITE LENGTH
+  source is test-only so the pilot module again meets its reviewed production
+  line ceiling and warnings-denied build.
+- Restored the CICS semantic-family module policy after interval, task-start,
+  and storage handlers were added. Deterministic interval normalization now
+  lives under the reviewed handler tree with stable public re-exports, and the
+  frozen module inventory enumerates every current semantic handler module.
+- Repaired the typed-semantic architecture guard after legacy CICS execution
+  moved behind a module re-export. The guard now bounds typed execution at the
+  first legacy helper and distinguishes a forbidden bare grammar `arguments`
+  call from the typed SET allocation helper.
+- Removed an application-specific profile name from the production dataset
+  replay-index documentation; the optimization and replay behavior remain
+  generic and unchanged.
+- Updated the durable-retention architecture guard for the memory store's
+  instrumented `snapshot` staging API. It continues to require staged archive
+  insertion and one final atomic state replacement without depending on the
+  retired direct-clone spelling.
+- Updated the CICS command-descriptor schema from seven to the exact nine
+  reviewed runtime families after interval-control and storage-control were
+  frozen into the generator authority.
+- Updated the generated CICS application-contract schema to the current
+  readiness split: 41 typed, 0 legacy, 41 advertised, and 222 unready rows,
+  with an exact 24-family summary bound.
+- Reconciled the frozen CICS source-map view with newer typed runtime
+  admissions. DELETEQ TD, FREEMAIN, and GETMAIN are excluded from the
+  no-admission compatibility projection, and all three maps now bind the
+  current descriptor digest.
+- Propagated the regenerated CICS map identities into the three zero-credit
+  source corpora and their independently recomputed corpus digests. No topic,
+  retained HTML, source fact, or browser receipt changed.
+- Propagated the refreshed map/corpus identities through all three CICS
+  extraction plans and recomputed their canonical plan digests without
+  changing selectors, bounds, resolutions, or expected projection shapes.
+- Propagated the refreshed map, corpus, and extraction-plan identities through
+  all three zero-credit CICS candidate projections and recomputed their
+  canonical projection digests without changing any of the 18,070 candidate
+  facts or their review states.
+- Rebound the three accepted CICS source-review envelopes and generated
+  application-command contract to those refreshed candidate files. The prior
+  independent-verification report identities, all dispositions, readiness
+  states, and command facts remain unchanged; no source replay or credit was
+  claimed. Descriptor test ratchets now reflect the already sealed 41 API
+  operations, including DELETEQ TD, FREEMAIN, and GETMAIN.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
@@ -384,20 +469,53 @@ All notable changes to mainframe-env are documented here.
   and selected compiled-route regressions cover deletion and repeated-delete
   behavior. Remote SYSID and TDQUEUE definition, extrapartition, disabled, and
   locked states remain fail-closed.
-- Added a typed task-local `GETMAIN SET/FLENGTH` subset over interpreter-owned
-  virtual storage. Literal or fullword-binary lengths, one-byte `INITIMG`,
-  `NOSUSPEND`, checkpoint restoration, replay, LENGERR 22/1 pointer clearing,
-  and default-ignored NOSTG 42/2 are covered without exposing native addresses.
-  Legacy LENGTH, key/share/executable policy, FREEMAIN/64, and DPL proof remain
-  fail-closed or pending.
+- Added typed local `DELETEQ TS` QUEUE and QNAME forms through append-only
+  operation tag 41 and long-name operand tag 43. QUEUE accepts 1–8 characters;
+  QNAME accepts 1–16 and preserves the source-required 16-byte field. The
+  runtime authorizes the selected resource, validates the durable `cics-tsq`
+  row before versioned deletion, frees all stored items, and returns exact
+  `QIDERR` 44/0 or all-zero-name `INVREQ` 16/0 through ordinary condition
+  handling. An explicit SYSID matching the local system uses the same path;
+  an unknown system returns `SYSIDERR` 53/0 without mutation. Replay and SQLite
+  reopen preserve a single deletion; remote/shared dispatch, TSMODEL state,
+  locking, and WRITEQ/READQ TS remain pending.
+- Added typed task-local `GETMAIN SET` with exactly one FLENGTH or compatibility
+  LENGTH over interpreter-owned virtual storage. FLENGTH accepts signed
+  fullword input; LENGTH accepts unsigned halfword input and enforces its 65,520
+  byte ceiling. One-byte `INITIMG`, `NOSUSPEND`, checkpoint restoration, replay,
+  LENGERR 22/1 pointer clearing, and default-ignored NOSTG 42/2 are covered
+  without exposing native addresses. Key/share/executable policy, 64-bit forms,
+  and DPL proof remain fail-closed or pending.
+- Added typed task-local `FREEMAIN DATAPOINTER` and `FREEMAIN DATA`. The
+  interpreter validates either the pointer value or the DATA area's current
+  virtual-storage view against a live, offset-zero GETMAIN allocation, applies
+  a replay-bound release, checkpoints stale identity, rejects repeat, static,
+  or foreign releases with exact `INVREQ` 16/1, and restores released
+  frame/byte capacity. Key/shared/load ownership, FREEMAIN64, and DPL proof
+  remain pending.
 - Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
   selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name
   plus trailing blank. MAPSET defaults to MAP, and FROM/INTO storage is
-  resolved before dispatch. RECEIVE uses the requested durable definition for
-  terminal-fit and field normalization. SET pointers, omitted-map AID-only
-  receive, implicit symbolic map storage, lengths, paging, device and other
-  terminal controls remain fail-closed.
+  resolved before dispatch. `SEND MAP LENGTH` and `SEND TEXT LENGTH` accept a
+  literal, halfword binary value, or matching `LENGTH OF` form and select only
+  that prefix of an explicit FROM area; out-of-range SEND TEXT values return
+  exact `LENGERR` 22/0 before screen mutation. `SEND MAP MAPONLY` rejects
+  application FROM/LENGTH data and writes only the initialized defaults from
+  the selected map. `SEND MAP DATAONLY` requires explicit symbolic FROM data,
+  ignores map defaults, applies supplied field attributes, and preserves the
+  prior field attribute when the supplied byte is `X'00'`. RECEIVE uses the
+  requested durable definition for terminal-fit and field normalization.
+  `RECEIVE MAP FROM` accepts an optional literal, halfword-binary, or matching
+  `LENGTH OF` value, maps only that supplied prefix, and leaves queued terminal
+  input untouched. Explicit `RECEIVE MAP TERMINAL` selects the originating
+  terminal path, rejects combination with FROM before state mutation, and
+  carries a typed empty option through the compiled selected route. SET
+  pointers, TIOAPFX handling, omitted-map AID-only receive, implicit symbolic
+  map storage, paging, translation, partition, and other device controls remain
+  fail-closed.
+- Updated the locked `rustls` dependency from 0.23.43 to 0.23.45 so the
+  release dependency gate is not exposed to `RUSTSEC-2026-0285`.
 - Added a typed `PURGE MESSAGE` route for the runtime's reachable empty
   full-BMS logical-message state. Local execution is an idempotent audited
   mutation that preserves the displayed terminal image; DPL execution returns
@@ -464,6 +582,12 @@ All notable changes to mainframe-env are documented here.
   compiler distinguishes pointer references from `ADDRESS OF` data areas, the
   provider validates only opaque storage identities, and the interpreter
   applies checked virtual aliases after successful audited dispatch.
+- Added typed CICS `ADDRESS COMMAREA` through append-only operation tag 42 and
+  pointer-target operand tag 45. A four-byte POINTER/POINTER-32 receives a
+  checked virtual address for the current program's DFHCOMMAREA; an absent or
+  unassigned COMMAREA receives exact `X'FF000000'`. The address can be consumed
+  by the existing ADDRESS SET route without exposing a native process address;
+  ACEE, CWA, EIB, TCTUA, and TWA remain pending.
 - Added source-backed CICS `ABEND NODUMP` admission and explicit terminal dump
   disposition. Valid nonreserved ABCODE values request a dump, omitted or
   invalid codes and NODUMP suppress it, and retained older outcomes remain

@@ -4,12 +4,10 @@
 
 mod abi;
 mod generated;
-mod interval;
 mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
-pub use interval::{CicsIntervalError, CicsIntervalMode, CicsIntervalTime};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -21,9 +19,10 @@ pub use retention::{
 };
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsContinuation, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsLimits,
-    CicsReplayClock, CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution,
-    CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
+    CicsContinuation, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus,
+    CicsIntervalError, CicsIntervalMode, CicsIntervalTime, CicsLimits, CicsReplayClock,
+    CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot,
+    CicsTraceEntry, cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

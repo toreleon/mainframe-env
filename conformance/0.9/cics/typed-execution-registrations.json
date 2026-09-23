@@ -4,6 +4,13 @@
   "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
   "registrations": [
     {
+      "operation": "Address",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0005"
+    },
+    {
       "operation": "AddressSet",
       "interface": "api",
       "family": "task-control",
@@ -46,6 +53,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0048"
     },
     {
+      "operation": "DeleteTemporaryStorage",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0049"
+    },
+    {
       "operation": "Deq",
       "interface": "api",
       "family": "task-control",
@@ -58,6 +72,13 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
+    },
+    {
+      "operation": "Freemain",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0084"
     },
     {
       "operation": "Getmain",
@@ -100,6 +121,13 @@
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0149"
+    },
+    {
+      "operation": "ReadTransientData",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0159"
     },
     {
       "operation": "SetAssociationUserCorrData",

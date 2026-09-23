@@ -1945,8 +1945,8 @@ impl ReferenceMachine {
                 )?;
                 if let Some(target) = into
                     && matches!(
-                        response.payload.schema(),
-                        "mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1"
+                        typed_cics::into_payload_schema(operation, &response),
+                        Some("mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1")
                     )
                 {
                     typed_cics::write_target(
@@ -1956,7 +1956,7 @@ impl ReferenceMachine {
                     )?;
                 }
                 for (name, value) in &response.outputs {
-                    if typed_cics::write_runtime_output(self, name, value)? {
+                    if typed_cics::write_runtime_output(self, operation, name, value)? {
                         continue;
                     }
                     if let Some(field) = name.strip_prefix("BMS.") {

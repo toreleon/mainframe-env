@@ -204,18 +204,31 @@ automatic wake, process-restart WAIT resume, terminal association, and automatic
 task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
-RIDFLD without returning a record and admits the default-equivalent `GTEQ`
-relation; READNEXT and READPREV require INTO and
+RIDFLD without returning a record and admits the default-equivalent `GTEQ` or
+exact-key `EQUAL` relation as an exclusive choice; READNEXT and READPREV require INTO and
 model RIDFLD as the same input/output storage identity so the host-updated key
 feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
-KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and other generic key modes, and
+KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and generic key modes, and
 UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
 The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
 the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
-requires explicit FROM and RIDFLD data areas. Both use the same single
+requires explicit FROM and RIDFLD data areas; REWRITE consumes the held record
+identity and an explicit FROM area. Optional WRITE or REWRITE LENGTH is a
+bounded literal, halfword-binary value, or matching `LENGTH OF` and selects the
+exact record prefix before mutation. READ LENGTH is the same writable halfword
+capacity on input and actual-record-length output. Optional READ, WRITE, or
+explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
+RIDFLD and is validated against the durable definition. All use the same single
 FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
-SYSID/length handling, generic and alternate record identities, WRITE
-MASSINSERT, and RLS NOSUSPEND remain fail-closed.
+SYSID, generic and alternate record identities, WRITE MASSINSERT, and RLS
+NOSUSPEND remain fail-closed. READ GTEQ uses a bounded transient dataset cursor
+to select the equal key or first greater keyed record, and closes that cursor
+before returning the record. READ GENERIC uses the same transient route with a
+required positive partial KEYLENGTH and rejects a first-greater record whose key
+does not share the requested prefix. Explicit EQUAL selects the same exact
+complete- or generic-key route as the default relation and is mutually
+exclusive with GTEQ. GTEQ may carry source-defined KEYLENGTH zero to select the
+first keyed record, including when GENERIC is also present.
 The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
 storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
 provider writes exactly the selected prefix under the request's mutation
@@ -223,24 +236,52 @@ identity, so retries compare the semantic record rather than ignored trailing
 bytes. Typed local DELETEQ TD accepts only the bounded QUEUE selector, requires
 update access to the same queue resource, and atomically removes the durable
 queue plus its retained-byte accounting. A missing queue returns QIDERR 44/0.
-Remote SYSID routing and TDQUEUE definition-state conditions remain deferred.
-Typed local GETMAIN routes SET plus FLENGTH and optional INITIMG through the
-storage-control family. The interpreter contributes its remaining virtual
+Typed local READQ TD consumes the oldest durable record into exactly one
+writable INTO area or SET pointer. INTO uses the optional halfword LENGTH as a
+maximum and returns the original record length; omitted LENGTH uses the
+compiler-resolved INTO extent. SET returns a checked virtual address to an
+interpreter-owned copy of the complete record and participates in checkpoint
+restore. Zero or truncated INTO reads consume and return LENGERR 22/0, while
+negative length or insufficient SET capacity preserves the queue. Missing and
+empty queues return QIDERR 44/0 and QZERO 23/0. SYSID, NOSUSPEND, remote
+routing, and TDQUEUE definition-state conditions remain deferred. WRITEQ TD,
+READQ TD, and DELETEQ TD accept SYSID only when it identifies the current
+system; an unknown or unsupported remote name returns SYSIDERR 53/0 before
+authorization or queue mutation.
+Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
+and optional INITIMG through the storage-control family. FLENGTH uses signed
+fullword input; LENGTH uses unsigned halfword input and the source-defined
+65,520-byte ceiling. The interpreter contributes its remaining virtual
 frame/byte capacity, applies the returned initialized bytes to a checkpointed
-virtual base, and writes a checked POINTER or POINTER-32 address. Nonpositive
-or over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
-default-ignored NOSTG 42/2. Native addresses, legacy LENGTH, key/share/executable attributes,
-FREEMAIN, and 64-bit forms remain deferred.
+virtual base, and writes a checked POINTER or POINTER-32 address. Zero or
+over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
+default-ignored NOSTG 42/2. LENGTH selects below-line compatibility without
+exposing or claiming a native address. Native addresses, key/share/executable
+attributes, and 64-bit forms remain deferred. Typed FREEMAIN accepts exactly one
+DATAPOINTER or DATA slot. The interpreter proves that the pointer value or
+DATA area's current virtual-storage view names the start of a live allocation
+owned by the current task, applies the replay-bound release intent, checkpoints
+the freed identity, and excludes released bytes and frames from current
+capacity accounting. Invalid, static, unassigned, or repeated release returns
+INVREQ 16/1; key/shared/load ownership remains deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
 its runtime value can contain a valid name plus a trailing blank. `SEND MAP`
-requires MAP, defaults MAPSET to MAP, and optionally captures FROM; `RECEIVE
-MAP` requires MAP, applies the same MAPSET default, and optionally writes INTO;
-`SEND TEXT` requires FROM. The provider uses the requested durable map
-definition for terminal-fit validation and input-field normalization. SET
-pointers, omitted-map AID-only receive, implicit symbolic map storage, explicit
-length, paging, device and other terminal controls remain explicit compiler
+requires MAP, defaults MAPSET to MAP, and optionally captures FROM. With an
+explicit FROM, LENGTH accepts a bounded literal, halfword-binary value, or
+matching `LENGTH OF` and selects that exact prefix before symbolic-map
+formatting. MAPONLY rejects FROM/LENGTH and selects only the initialized map
+defaults. DATAONLY requires explicit symbolic FROM bytes, ignores map defaults,
+applies supplied field attributes, and preserves an existing attribute for
+`X'00'`. `SEND TEXT` requires FROM and accepts the same three LENGTH forms; an
+out-of-range runtime value returns LENGERR 22/0 without changing the screen.
+`RECEIVE MAP` requires MAP, applies the same MAPSET default, and optionally
+writes INTO. The provider validates the canonical request shape and uses the
+requested durable map definition for
+terminal-fit validation and input-field normalization. SET pointers,
+omitted-map AID-only receive, implicit symbolic map storage, RECEIVE length,
+paging, device and other terminal controls remain explicit compiler
 rejections.
 `CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
 terminal provider (`#210`). `ERASE` coincides with the provider's existing
@@ -353,9 +394,9 @@ differentials, or make 0.9.0 release-ready.
 | `queue-control` | transient-data queue writes and local queue deletion |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 | `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
-| `storage-control` | bounded task-local virtual storage allocation |
+| `storage-control` | bounded task-local virtual storage allocation and release |
 
-This table describes the nine families already present in the 42-operation runtime
+This table describes the nine families already present in the 43-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

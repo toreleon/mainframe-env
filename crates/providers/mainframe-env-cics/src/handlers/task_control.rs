@@ -240,12 +240,14 @@ pub(in crate::service) fn invoke(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::Address => address(service, run, request),
         CicsOperation::AddressSet => address_set(service, run, request),
         CicsOperation::ChangeTask => change_task(service, run, request),
         CicsOperation::Deq | CicsOperation::Enq => {
             super::task_enqueue::invoke(service, run, request, retention_tick)
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
+        CicsOperation::Freemain => super::storage_control::invoke(service, run, request),
         CicsOperation::Getmain => super::storage_control::invoke(service, run, request),
         CicsOperation::HandleAid => handle_aid(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
@@ -262,6 +264,40 @@ pub(in crate::service) fn invoke(
         CicsOperation::Abend => abend(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn address(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "COMMAREA" => value.schema() != "mainframe-env.cics.storage-target@1",
+                "USING.ADDRESS" => value.schema() != "mainframe-env.cics.storage-identity@1",
+                "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+        || !request.arguments.contains_key("COMMAREA")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
 }
 
 fn address_set(

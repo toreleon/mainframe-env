@@ -724,10 +724,10 @@
   "execution_authority": false,
   "independent_verification_sha256": "sha256:74af58e09d33140b81cf1d4ba63c30ffd333dafded84cb722ccc8700a6b47597",
   "inputs": {
-    "candidate_projection_sha256": "sha256:e83ee1054f46aa872473729e2a10937c2d60ce4429cf606fe9fec4d939f3156b",
-    "extraction_plan_sha256": "sha256:6eedebc4500f0ca7575fb871faac453075292e7317e3271dcf2ba48507b2ddbb",
-    "source_corpus_sha256": "sha256:f15adcf273b97b8f452e4831845cee251e78afdeb9920343a052c541f73b18f5",
-    "source_map_sha256": "sha256:338566f77c3683dd11eabdd79a0ad6172dedae1409e6074fa21cfe7baa208b01",
+    "candidate_projection_sha256": "sha256:bd1a4501b759fb5dfc73614f9df962145adf00871141485f1661208f99403bdb",
+    "extraction_plan_sha256": "sha256:e214324ff1606bc7df5315ca0f382c7d836b9c166cc098f479574c969baf3575",
+    "source_corpus_sha256": "sha256:8354c5e2731c4b6664ce884493a96bb5f570254a642ddafafa83b9cb299ebeb8",
+    "source_map_sha256": "sha256:331036fa6eec143d12b0f1931a58043e2f74ee89eb74a073a879cbf5921d2dd9",
     "topic_manifest_sha256": "sha256:8acb506c0e5d6084235d94f5bb015d66c37b7f792a85713bcb3c7d0fb6b563ba"
   },
   "issue_dispositions": {
@@ -770,7 +770,7 @@
       "path": "conformance/0.9/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:5ccbf511b13e8af2cba83b95e13a147104cc4bca42095b748a77decc24e7f8fd",
+  "review_sha256": "sha256:eb0680fa0df254845a9dcacb66f6c5016affe2115fb10044a9ec2db3ddf5811c",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,
