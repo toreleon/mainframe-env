@@ -1635,6 +1635,7 @@ mod tests {
                 CicsPlanOperation::Start => crate::HirCicsOperation::Start,
                 CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
                 CicsPlanOperation::DocumentCreate => crate::HirCicsOperation::DocumentCreate,
+                CicsPlanOperation::DocumentDelete => crate::HirCicsOperation::DocumentDelete,
             };
             assert_eq!(
                 operation.effects,

@@ -107,6 +107,8 @@ pub enum CicsPlanOperation {
     Retrieve,
     /// Create one bounded transaction-owned document.
     DocumentCreate,
+    /// Delete one transaction-owned document and release its storage.
+    DocumentDelete,
 }
 
 /// Named input accepted by the typed CICS pilot.

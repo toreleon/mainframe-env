@@ -199,6 +199,7 @@ pub enum HirCicsOperation {
     Start,
     Retrieve,
     DocumentCreate,
+    DocumentDelete,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -6347,6 +6348,53 @@ mod tests {
                     .iter()
                     .any(|diagnostic| diagnostic.public_message().contains(expected)),
                 "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn document_delete_requires_one_sixteen_byte_token_input() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DOCDELET. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS DOCUMENT DELETE DOCTOKEN(TOKEN-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DOCUMENT DELETE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DOCUMENT DELETE");
+        assert_eq!(command.operation, HirCicsOperation::DocumentDelete);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DocumentToken
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "TOKEN-X"
+                )
+        }));
+        assert!(command.outputs.is_empty());
+        for (source, expected) in [
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDOC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS DOCUMENT DELETE END-EXEC. STOP RUN.",
+                "requires option DOCTOKEN",
+            ),
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDOC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(15). PROCEDURE DIVISION. EXEC CICS DOCUMENT DELETE DOCTOKEN(TOKEN-X) END-EXEC. STOP RUN.",
+                "requires a 16-byte area",
+            ),
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none());
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{source}: {:?}",
                 analysis.diagnostics
             );
         }

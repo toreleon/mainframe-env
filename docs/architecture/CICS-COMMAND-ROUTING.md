@@ -265,8 +265,11 @@ The document row and canonical outer replay are one atomic store mutation, so
 an unknown result replays the same token without duplicating content; rows
 reload from SQLite and are deleted when their owning task ends. Operation tag
 63, operand tags 132–147, option tag 84, and non-ASSIGN output tags 216–217 are
-append-only; the rest of the reserved ranges remain available to rows
-0052–0055.
+append-only. `DOCUMENT DELETE` uses tag 64 and a storage-backed 16-byte
+DOCTOKEN input. It verifies task/transaction ownership and atomically deletes
+the durable row with its replay record, freeing aggregate capacity immediately;
+a missing token returns NOTFND 13/1. The rest of the reserved ranges remain
+available to rows 0053–0055.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

@@ -82,3 +82,18 @@ pub(super) fn invalid_create_shape(
         || operand_value(plan, CicsOperandName::ListLength)
             .is_some_and(|value| matches!(value, CicsOperandValue::Integer(value) if *value < 1))
 }
+
+pub(super) fn invalid_delete_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    inputs != &BTreeSet::from([CicsOperandName::DocumentToken])
+        || plan.operands.iter().any(|operand| {
+            operand.name != CicsOperandName::DocumentToken
+                || !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

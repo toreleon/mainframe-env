@@ -625,6 +625,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DocumentCreate => {
             document_control::invalid_create_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DocumentDelete => {
+            document_control::invalid_delete_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1592,6 +1595,36 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             plan
+        );
+    }
+
+    #[test]
+    fn document_delete_tag_and_shape_round_trip() {
+        assert_eq!(operation_tag(CicsPlanOperation::DocumentDelete), 64);
+        assert_eq!(
+            operation_from_tag(64),
+            Ok(CicsPlanOperation::DocumentDelete)
+        );
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DocumentDelete,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::DocumentToken,
+                value: CicsOperandValue::Storage(slot(1, "DOCUMENT.TOKEN")),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut missing = plan;
+        missing.operands.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

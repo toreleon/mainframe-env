@@ -295,6 +295,11 @@ provider owns the bounded durable document/template state, source conditions,
 template SAF decision, transaction ownership, atomic replay, SQLite reload and
 task-end reclamation.
 
+`DOCUMENT DELETE` lowers a 16-byte DOCTOKEN data area as an input and accepts
+only common condition options. The interpreter captures its token bytes before
+dispatch; the provider checks document ownership, releases the durable record
+and aggregate capacity, and records the replay result in the same mutation.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

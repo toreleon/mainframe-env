@@ -384,6 +384,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
         HirCicsOperation::DocumentCreate => CicsPlanOperation::DocumentCreate,
+        HirCicsOperation::DocumentDelete => CicsPlanOperation::DocumentDelete,
     }
 }
 

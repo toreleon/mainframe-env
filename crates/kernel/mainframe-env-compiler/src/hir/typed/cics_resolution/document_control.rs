@@ -22,6 +22,7 @@ pub(super) const ALLOWED_CLAUSES: &[&str] = &[
     "TEXT",
 ];
 pub(super) const ALLOWED_OPTIONS: &[&str] = &["NOHANDLE", "UNESCAPED"];
+pub(super) const DELETE_CLAUSES: &[&str] = &["DOCTOKEN", "RESP", "RESP2"];
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
@@ -29,6 +30,23 @@ pub(super) fn validate_constraints(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::DocumentDelete {
+        let tokens = clauses.get("DOCTOKEN").ok_or_else(|| {
+            ResolutionFailure::Invalid("CICS DOCUMENT DELETE requires DOCTOKEN".into())
+        })?;
+        let token = complete_data_reference(tokens, semantic)?;
+        if token.length != 16
+            || !matches!(
+                token.category,
+                DataCategory::Alphabetic | DataCategory::Alphanumeric | DataCategory::Group
+            )
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS DOCUMENT DELETE DOCTOKEN requires a 16-byte area".into(),
+            ));
+        }
+        return Ok(());
+    }
     if operation != HirCicsOperation::DocumentCreate {
         return Ok(());
     }
@@ -99,6 +117,12 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::DocumentDelete {
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::DocumentToken,
+            value: HirCicsValue::Data(complete_data_reference(&clauses["DOCTOKEN"], semantic)?),
+        }]);
+    }
     if operation != HirCicsOperation::DocumentCreate {
         return Ok(Vec::new());
     }

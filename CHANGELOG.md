@@ -13,6 +13,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `DOCUMENT DELETE` for transaction-owned 16-byte tokens.
+  Deletion frees durable document storage immediately, records the delete and
+  effect replay atomically, and returns the documented NOTFND 13/1 on a new
+  request for an absent document.
+
 - Made first-time CICS TDQUEUE-definition registration migration-safe. Existing
   compatibility-profile queues must all be declared and satisfy the proposed
   direction, record-size, record-count, and byte limits before any definition

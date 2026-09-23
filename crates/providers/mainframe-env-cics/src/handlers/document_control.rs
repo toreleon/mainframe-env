@@ -52,6 +52,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::DocumentCreate => create(service, run, request, retention_tick),
+        CicsOperation::DocumentDelete => delete(service, run, request, retention_tick),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -349,6 +350,70 @@ fn create(
     state.document_bytes += usage;
     state.documents.insert(key, document);
     Ok(response)
+}
+
+fn delete(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+) -> Result<CicsResponse, HostProblem> {
+    validate_delete_request(request)?;
+    let token = request.arguments["DOCTOKEN"].bytes();
+    let mut state = service.lock()?;
+    let document = document_for_token(&state.documents, run, token, 1)?;
+    let key = token_key(&document.token);
+    let version = document.version;
+    let remaining_bytes = state
+        .document_bytes
+        .checked_sub(document.usage_bytes())
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let response = service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    service
+        .store
+        .mutate_provider_states_atomic(vec![
+            ProviderStateMutation::Delete {
+                namespace: DOCUMENT_NAMESPACE.into(),
+                key: key.clone(),
+                expected_version: version,
+            },
+            ProviderStateMutation::Put(replay_write(run, request, retention_tick, &response)?),
+        ])
+        .map_err(store_error)?;
+    state.documents.remove(&key);
+    state.document_bytes = remaining_bytes;
+    Ok(response)
+}
+
+fn validate_delete_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    if !request.arguments.contains_key("DOCTOKEN")
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    for (name, value) in &request.arguments {
+        let valid = match name.as_str() {
+            "DOCTOKEN" => value.schema() == "mainframe-env.cics.storage-value@1",
+            "RESP" | "RESP2" => value.schema() == "mainframe-env.cics.argument@1",
+            "OPTION.NOHANDLE" => {
+                value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    Ok(())
 }
 
 fn validate_create_request(request: &CicsRequest) -> Result<(), HostProblem> {

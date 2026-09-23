@@ -1678,7 +1678,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 54);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 55);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4994,6 +4994,7 @@ mod tests {
             ("DELAY", CicsOperation::Delay),
             ("DELETE", CicsOperation::Delete),
             ("DOCUMENT CREATE", CicsOperation::DocumentCreate),
+            ("DOCUMENT DELETE", CicsOperation::DocumentDelete),
             ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
@@ -6262,7 +6263,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 54);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 55);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6292,6 +6293,87 @@ mod tests {
         assert_eq!(
             document.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0051"
+        );
+        let document_delete = command_descriptor(CicsOperation::DocumentDelete);
+        assert_eq!(document_delete.syntax, "DOCUMENT DELETE");
+        assert_eq!(
+            document_delete.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0052"
+        );
+    }
+
+    #[test]
+    fn document_delete_releases_storage_and_replays_without_redeleting() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-delete", BTreeMap::new());
+        let session = SessionId::new("document-delete", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(b"DOCUMENT")),
+                ("LENGTH".into(), cics_decimal(8)),
+            ]),
+            1,
+        );
+        let created = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        let token = created.outputs["DOCTOKEN"].bytes().to_vec();
+        assert_eq!(service.lock().unwrap().document_bytes, 8);
+        let delete = request(
+            CicsOperation::DocumentDelete,
+            BTreeMap::from([("DOCTOKEN".into(), task_value(&token))]),
+            2,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, delete.clone(), 2),
+                delete.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(service.lock().unwrap().document_bytes, 0);
+        assert!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-2")
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, delete.clone(), 2),
+                    delete.clone(),
+                )
+                .unwrap(),
+            first
+        );
+        let mut missing = delete;
+        missing.mutation.as_mut().unwrap().sequence = 3;
+        missing.mutation.as_mut().unwrap().idempotency_key =
+            IdempotencyKey::new("outer-3", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 3),
+                missing
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 1,
+            })
         );
     }
 
