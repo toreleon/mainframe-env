@@ -13,6 +13,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Aligned the frozen CICS command-contract readiness schema with the integrated
+  73 typed, 0 legacy, and 190 unready application routes.
+
 - Moved the typed CICS TSQ NUMITEMS plan output from tag 110, which overlaps
   the ASSIGN extension mapping, to the lane-reserved non-ASSIGN tag 200. An
   exhaustive codec regression now proves that every `CicsOutputName` tag is
