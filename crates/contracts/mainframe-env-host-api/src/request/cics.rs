@@ -135,6 +135,8 @@ pub enum CicsOperation {
     /// Remove one atomic child without deleting or resetting it.
     RemoveSubevent,
     ReceiveMap,
+    /// Receive one 8775 partition input message and identify its partition.
+    ReceivePartn,
     Retrieve,
     Return,
     Rewrite,
@@ -279,6 +281,7 @@ impl CicsOperation {
             Self::ReadTransientData => "ReadTransientData",
             Self::RemoveSubevent => "RemoveSubevent",
             Self::ReceiveMap => "ReceiveMap",
+            Self::ReceivePartn => "ReceivePartn",
             Self::Retrieve => "Retrieve",
             Self::Return => "Return",
             Self::Rewrite => "Rewrite",
@@ -403,6 +406,7 @@ impl CicsOperation {
                 | Self::Load
                 | Self::Release
                 | Self::ReceiveMap
+                | Self::ReceivePartn
                 | Self::ReadTransientData
                 | Self::RemoveSubevent
                 | Self::PurgeMessage
@@ -515,6 +519,7 @@ impl CicsOperation {
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
+            ("RECEIVE", Some("PARTN")) => Self::ReceivePartn,
             ("RETRIEVE", Some("REATTACH")) => Self::RetrieveReattachEvent,
             ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
             ("RETRIEVE", _) => Self::Retrieve,

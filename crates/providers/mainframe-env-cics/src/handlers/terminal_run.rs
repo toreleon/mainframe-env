@@ -109,10 +109,12 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        if let Some(run) = state.runs.get(&run_id).cloned() {
+        let run = state.runs.get(&run_id).cloned();
+        drop(state);
+        if let Some(run) = run {
             handlers::release_task_state(self, &run)?;
         }
-        state.runs.remove(&run_id);
+        self.lock()?.runs.remove(&run_id);
         Ok(trace)
     }
 
@@ -170,8 +172,9 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
+        drop(state);
         handlers::release_task_state(self, &run)?;
-        state.runs.remove(&run_id);
+        self.lock()?.runs.remove(&run_id);
         Ok(())
     }
 }

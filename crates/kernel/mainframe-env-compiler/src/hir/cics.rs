@@ -386,6 +386,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
+                HirCicsOutputName::Partn => CicsOutputName::Partn,
                 HirCicsOutputName::SetPointer => CicsOutputName::SetPointer,
                 HirCicsOutputName::Ridfld => CicsOutputName::Ridfld,
                 HirCicsOutputName::Token => CicsOutputName::Token,
@@ -542,6 +543,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SendMap => CicsPlanOperation::SendMap,
         HirCicsOperation::SendText => CicsPlanOperation::SendText,
         HirCicsOperation::SendPartnset => CicsPlanOperation::SendPartnset,
+        HirCicsOperation::ReceivePartn => CicsPlanOperation::ReceivePartn,
         HirCicsOperation::Assign => CicsPlanOperation::Assign,
         HirCicsOperation::PurgeMessage => CicsPlanOperation::PurgeMessage,
         HirCicsOperation::Start => CicsPlanOperation::Start,
@@ -588,6 +590,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
 const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
         HirCicsOption::Cancel => CicsPlanOption::Cancel,
+        HirCicsOption::AsIs => CicsPlanOption::AsIs,
         HirCicsOption::NoDump => CicsPlanOption::NoDump,
         HirCicsOption::Reset => CicsPlanOption::Reset,
         HirCicsOption::Update => CicsPlanOption::Update,

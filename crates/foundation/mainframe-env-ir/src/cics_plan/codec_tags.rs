@@ -113,6 +113,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::SpoolRead => 61,
         CicsPlanOperation::SpoolWrite => 62,
         CicsPlanOperation::SendPartnset => 90,
+        CicsPlanOperation::ReceivePartn => 86,
         CicsPlanOperation::DefineCounter => 118,
         CicsPlanOperation::DefineDCounter => 119,
         CicsPlanOperation::DeleteCounter => 120,
@@ -225,6 +226,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         61 => Ok(CicsPlanOperation::SpoolRead),
         62 => Ok(CicsPlanOperation::SpoolWrite),
         90 => Ok(CicsPlanOperation::SendPartnset),
+        86 => Ok(CicsPlanOperation::ReceivePartn),
         118 => Ok(CicsPlanOperation::DefineCounter),
         119 => Ok(CicsPlanOperation::DefineDCounter),
         120 => Ok(CicsPlanOperation::DeleteCounter),
@@ -678,6 +680,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::SpoolPunch => 78,
         CicsPlanOption::SpoolLine => 79,
         CicsPlanOption::SpoolPage => 80,
+        CicsPlanOption::AsIs => 124,
         CicsPlanOption::EventAnd => 252,
         CicsPlanOption::EventOr => 253,
         CicsPlanOption::TimerAfter => 254,
@@ -745,6 +748,7 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         78 => Ok(CicsPlanOption::SpoolPunch),
         79 => Ok(CicsPlanOption::SpoolLine),
         80 => Ok(CicsPlanOption::SpoolPage),
+        124 => Ok(CicsPlanOption::AsIs),
         252 => Ok(CicsPlanOption::EventAnd),
         253 => Ok(CicsPlanOption::EventOr),
         254 => Ok(CicsPlanOption::TimerAfter),
@@ -818,6 +822,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::SetPointer64 => 232,
         CicsOutputName::SpoolToken => 208,
         CicsOutputName::SpoolToFlength => 209,
+        CicsOutputName::Partn => 248,
     }
 }
 
@@ -872,6 +877,7 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         232 => Ok(CicsOutputName::SetPointer64),
         208 => Ok(CicsOutputName::SpoolToken),
         209 => Ok(CicsOutputName::SpoolToFlength),
+        248 => Ok(CicsOutputName::Partn),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

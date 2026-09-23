@@ -79,6 +79,15 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Into | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::ReceivePartn => matches!(
+            output,
+            CicsOutputName::Partn
+                | CicsOutputName::Into
+                | CicsOutputName::SetPointer
+                | CicsOutputName::Length
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Assign => matches!(
             output,
             CicsOutputName::Assign(_) | CicsOutputName::Resp | CicsOutputName::Resp2

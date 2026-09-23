@@ -9,6 +9,32 @@ pub(super) fn invalid_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
+    if plan.operation == CicsPlanOperation::ReceivePartn {
+        return !inputs.is_subset(&BTreeSet::from([CicsOperandName::Length]))
+            || !outputs.is_subset(&BTreeSet::from([
+                CicsOutputName::Partn,
+                CicsOutputName::Into,
+                CicsOutputName::SetPointer,
+                CicsOutputName::Length,
+                CicsOutputName::Resp,
+                CicsOutputName::Resp2,
+            ]))
+            || !outputs.contains(&CicsOutputName::Partn)
+            || outputs.contains(&CicsOutputName::Into)
+                && outputs.contains(&CicsOutputName::SetPointer)
+            || outputs.contains(&CicsOutputName::Into)
+                != inputs.contains(&CicsOperandName::Length)
+            || outputs.contains(&CicsOutputName::Into)
+                != outputs.contains(&CicsOutputName::Length)
+            || plan.operands.iter().any(|operand| {
+                operand.name != CicsOperandName::Length
+                    || !matches!(operand.value, CicsOperandValue::Storage(_))
+            })
+            || plan
+                .options
+                .iter()
+                .any(|option| !matches!(option, CicsPlanOption::AsIs | CicsPlanOption::NoHandle));
+    }
     if plan.operation == CicsPlanOperation::SendPartnset {
         return !inputs.is_subset(&BTreeSet::from([CicsOperandName::Partnset]))
             || plan.operands.iter().any(|operand| {

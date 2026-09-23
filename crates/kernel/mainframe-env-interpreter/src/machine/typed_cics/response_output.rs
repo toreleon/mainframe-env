@@ -40,7 +40,7 @@ pub(in crate::machine) fn write_output(
             && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
-            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
+            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE" | "PARTN"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && matches!(

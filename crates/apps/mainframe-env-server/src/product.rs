@@ -20428,4 +20428,198 @@ mod tests {
         );
     }
 
+    #[test]
+    fn compiled_receive_partn_consumes_selected_partition_input_and_sets_eib() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "RECPART",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECPART.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PARTN-X PIC X(2).\n01 DATA-X PIC X(5).\n01 LEN-X PIC S9(4) COMP VALUE 5.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\n01 PARTN-FN PIC X(2).\n01 AID-X PIC X.\n01 CPOS-X PIC S9(4) COMP.\nPROCEDURE DIVISION.\nEXEC CICS RECEIVE PARTN(PARTN-X) INTO(DATA-X) LENGTH(LEN-X) ASIS RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO PARTN-FN.\nMOVE EIBAID TO AID-X.\nMOVE EIBCPOSN TO CPOS-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "partition-receive-class",
+                    "partition-receive-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(FACILITY)",
+            )
+            .unwrap();
+        for (resource, intent) in [
+            ("CICS.TERMINAL.PARTNSET.PSET1", AccessIntent::Update),
+            ("CICS.TERMINAL.PARTN.P", AccessIntent::Read),
+        ] {
+            server
+                .racf
+                .define_profile("FACILITY", resource, "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit("FACILITY", resource, "IBMUSER", intent)
+                .unwrap();
+        }
+        server
+            .cics
+            .register_partition_sets(&[CicsPartitionSetDefinition {
+                name: "PSET1".into(),
+                partitions: vec![CicsPartitionDefinition {
+                    name: "P".into(),
+                    top: 0,
+                    left: 0,
+                    rows: 24,
+                    columns: 80,
+                }],
+            }])
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "RECPART".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("RP00".into(), "RECPART".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "RECPART".into(),
+                    map: "RECPART".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("partition-receive-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "RP00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "RP00",
+                24,
+                80,
+                "partition-receive-selected-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let argument = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        for (operation, arguments, sequence) in [
+            (
+                CicsOperation::SendPartnset,
+                BTreeMap::from([(
+                    "PARTNSET".into(),
+                    argument("mainframe-env.cics.literal@1", b"PSET1"),
+                )]),
+                1,
+            ),
+            (
+                CicsOperation::SendText,
+                BTreeMap::from([(
+                    "FROM".into(),
+                    argument("mainframe-env.cics.storage-value@1", b"READY"),
+                )]),
+                2,
+            ),
+        ] {
+            let request = CicsRequest {
+                operation,
+                arguments,
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: Some(Mutation {
+                    sequence,
+                    idempotency_key: IdempotencyKey::new(
+                        format!("partition-receive-setup-{sequence}"),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                    transaction: Some("RP00".into()),
+                }),
+            };
+            server
+                .cics
+                .invoke(
+                    &EffectRequest {
+                        run_unit: invocation.run_unit_id.clone(),
+                        sequence,
+                        deadline_tick: invocation.deadline_tick,
+                        idempotency_key: request
+                            .mutation
+                            .as_ref()
+                            .map(|mutation| mutation.idempotency_key.clone()),
+                        request: HostRequest::Cics(request.clone()),
+                    },
+                    request,
+                )
+                .unwrap();
+        }
+        server
+            .cics
+            .submit_partition_input(
+                &session,
+                &principal,
+                "partition-receive-selected-csrf",
+                0x7d,
+                "P",
+                b"lower",
+                17,
+                3,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "RECPART", 4)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DATA-X").unwrap().bytes(), b"LOWER");
+        assert_eq!(restored.variable("PARTN-X").unwrap().bytes(), b"P ");
+        assert_eq!(
+            restored.variable("PARTN-FN").unwrap().bytes(),
+            &[0x18, 0x0e]
+        );
+        assert_eq!(restored.variable("AID-X").unwrap().bytes(), &[0x7d]);
+        assert_eq!(restored.variable("CPOS-X").unwrap().bytes(), &[0, 17]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 4)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::ReceivePartn)
+                .count(),
+            1
+        );
+    }
+
 }

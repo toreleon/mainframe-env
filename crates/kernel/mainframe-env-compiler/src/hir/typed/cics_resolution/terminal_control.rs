@@ -10,6 +10,17 @@ pub(super) fn validate_constraints(
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::ReceivePartn {
+        if !clauses.contains_key("PARTN")
+            || clauses.contains_key("INTO") && clauses.contains_key("SET")
+            || clauses.contains_key("INTO") != clauses.contains_key("LENGTH")
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS RECEIVE PARTN requires PARTN and pairs INTO with LENGTH; INTO and SET are exclusive"
+                    .into(),
+            ));
+        }
+    }
     let required: &[&str] = match operation {
         HirCicsOperation::ReceiveMap | HirCicsOperation::SendMap => &["MAP"],
         HirCicsOperation::SendText => &["FROM"],
@@ -78,6 +89,25 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::ReceivePartn {
+        let Some(tokens) = clauses.get("LENGTH") else {
+            return Ok(Vec::new());
+        };
+        let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {
+            return Err(ResolutionFailure::Invalid(
+                "CICS RECEIVE PARTN LENGTH requires a halfword binary data area".into(),
+            ));
+        };
+        if reference.usage != CobolUsage::Binary || reference.length != 2 || reference.scale != 0 {
+            return Err(ResolutionFailure::Invalid(
+                "CICS RECEIVE PARTN LENGTH requires a halfword binary data area".into(),
+            ));
+        }
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::Length,
+            value: HirCicsValue::Data(reference),
+        }]);
+    }
     if operation == HirCicsOperation::SendPartnset {
         let Some(tokens) = clauses.get("PARTNSET") else {
             return Ok(Vec::new());

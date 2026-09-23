@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `RECEIVE PARTN` with authenticated 8775 partition input,
+  AID/partition/cursor and length outputs, first-receive and ASIS handling,
+  truncation conditions, durable consumption, and atomic replay. Source:
+  IBM CICS TS 6.x application API sources-b, `dfhp4_receivepartn.html`, row 0164.
+
 - Added typed CICS `SEND PARTNSET` with durable task selection, base reset,
   registered partition geometry, SAF checks, immediate receive sequencing,
   and atomic replay receipts. Source: IBM CICS TS 6.x application API

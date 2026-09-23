@@ -30,7 +30,7 @@ The committed topic SHA was checked against
 the matching HTML was parsed locally with `ibm_docs.py` `PlainText`.
 The pinned source says an immediately following RECEIVE is invalid until a
 SEND MAP, SEND TEXT, or SEND CONTROL intervenes. This route records the
-selection and leaves that sequencing to the relevant receive path. The local
+selection and the RECEIVE paths enforce that sequencing. The local
 definition API bounds names to eight alphanumeric characters and geometry
 to the configured terminal size; those bounds are implementation contracts.
 
@@ -38,3 +38,27 @@ During offline review, `ibm_docs.py read` succeeded for the exact topic.
 `search` returned the requested row but reported other uncached topics in its
 catalog scope. Those topics were not candidates for this command. No network
 or browser refresh was used.
+
+## RECEIVE PARTN
+
+`CicsService::submit_partition_input` accepts an AID, partition name, raw
+data, and cursor position from an authenticated terminal session. The active
+partition set must contain that name. `RECEIVE PARTN` is rejected until a SEND
+MAP or SEND TEXT has followed `SEND PARTNSET`; submitted input alone does not
+satisfy that sequencing rule. The receive route consumes one pending input,
+returns its partition name, actual LENGTH, AID and cursor position, applies
+first-receive uppercase translation and later ASIS, and truncates INTO with
+LENGERR 22 while reporting the original length. SET returns a 12-byte prefix
+followed by data through the interpreter's pointer output contract. Session,
+partition receive state, and replay receipt update atomically in the provider
+store after FACILITY authorization. The MCEP v2 tags are operation 86, option
+ASIS 124, and output PARTN 248.
+
+Source: IBM CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0164`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivepartn.html`,
+raw HTML SHA-256
+`55f42adddc8b4aba65cd474531ffaca3a51d76716927a5432f9d49505d4a30f3`.
+The committed hash matched its exact raw archive file, and the repository's
+`ibm_docs.py` `PlainText` parser read the local HTML. No refresh was used.

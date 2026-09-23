@@ -2477,6 +2477,7 @@ mod tests {
             CicsOperation::UpdateCounter,
             CicsOperation::UpdateDCounter,
             CicsOperation::ReceiveMap,
+            CicsOperation::ReceivePartn,
             CicsOperation::Retrieve,
             CicsOperation::Return,
             CicsOperation::Rewrite,
@@ -2512,7 +2513,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 102);
+        assert_eq!(forms.len(), 103);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

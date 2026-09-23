@@ -239,6 +239,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0160",
     ),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
+    ("ReceivePartn", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0164"),
     ("Release", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0165"),
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("ResetBrowse", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0171"),
@@ -640,6 +641,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DocumentRetrieve",
         "DocumentSet",
         "ReceiveMap",
+        "ReceivePartn",
         "SendMap",
         "SendPartnset",
         "SendText",
@@ -689,6 +691,13 @@ WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
     {f"{OFFICIAL_BASELINE}:api-commands:0234"}
 )
 SEND_PARTNSET_ROW = f"{OFFICIAL_BASELINE}:api-commands:0191"
+RECEIVE_PARTN_ROW = f"{OFFICIAL_BASELINE}:api-commands:0164"
+RECEIVE_PARTN_HEAD_STRUCTURE_SHA256 = (
+    "sha256:e0c7180753c5ec1c2076218faca36b07464078527efbfe6508358935a6459cff"
+)
+RECEIVE_PARTN_CONTINUATION_STRUCTURE_SHA256 = (
+    "sha256:168098de33942ef816b8bcff47871cf8dc5037bdc52841894d08e4161fd2e829"
+)
 SEND_PARTNSET_STRUCTURE_SHA256 = (
     "sha256:2830db8cb3ee405ffbac97f1b5b5d6572ab46b52c5b89b9f004c676b0f0689e9"
 )
@@ -972,6 +981,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
             "condition",
             "transaction",
         }
+    ),
+    "ReceivePartn": frozenset(
+        {"memory-read", "memory-write", "terminal-read", "suspension", "condition", "transaction"}
     ),
     "SendMap": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
@@ -1268,6 +1280,7 @@ def _load_typed_execution_registrations(
         "PushHandle",
         "ReadTemporaryStorage",
         "ReadTransientData",
+        "ReceivePartn",
         "Release",
         "RemoveSubevent",
         "ResetBrowse",
@@ -2214,6 +2227,25 @@ def _send_partnset_heading_operand(
     )
 
 
+def _receive_partn_reviewed_grammar(
+    command: dict[str, Any], grammar: dict[str, Any]
+) -> bool:
+    if command["official_row"] != RECEIVE_PARTN_ROW:
+        return False
+    variants = grammar["variants"]
+    return (
+        len(variants) == 2
+        and {
+            (variant.get("panel", {}).get("role"), variant.get("structure_sha256"))
+            for variant in variants
+        }
+        == {
+            ("command-head", RECEIVE_PARTN_HEAD_STRUCTURE_SHA256),
+            ("continuation", RECEIVE_PARTN_CONTINUATION_STRUCTURE_SHA256),
+        }
+    )
+
+
 def _host_option_value_limit(markers: set[str]) -> int:
     valued = markers - {"none"}
     if not valued:
@@ -2745,6 +2777,15 @@ def _option_contract(
         # resource name is omitted to restore the base partition state.
         constraints["required"] = [
             name for name in constraints["required"] if name != "PARTNSET"
+        ]
+    if _receive_partn_reviewed_grammar(command, grammar):
+        constraints["dependencies"] = [
+            *constraints["dependencies"],
+            {"option": "INTO", "requires": ["LENGTH"]},
+        ]
+        constraints["mutual_exclusions"] = [
+            *constraints["mutual_exclusions"],
+            ["INTO", "SET"],
         ]
     if _spoolwrite_page_choice(command, dimensions):
         choice = {"members": ["LINE", "PAGE"], "required": False}
@@ -3952,6 +3993,10 @@ def _recognition_contract(
         heads = {("SEND", "PARTNSET")}
         discriminators.clear()
         required_discriminators.clear()
+    if _receive_partn_reviewed_grammar(command, grammar):
+        heads = {("RECEIVE", "PARTN")}
+        discriminators.clear()
+        required_discriminators.clear()
     if grammar["status"] == "pending":
         status = "pending"
     elif grammar["status"] == "not-applicable":
@@ -3959,6 +4004,8 @@ def _recognition_contract(
     elif grammar["status"] == "bounded-ambiguity" or not source_heads:
         status = "bounded-ambiguity"
     else:
+        status = "resolved"
+    if _receive_partn_reviewed_grammar(command, grammar):
         status = "resolved"
     return {
         "recognition_status": status,

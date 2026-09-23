@@ -5,13 +5,27 @@ pub(super) fn allocation_arguments(
     target: &CicsTarget,
     operation: CicsPlanOperation,
 ) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
+    let mut capacity = allocation_capacity(machine, target)?;
+    if operation == CicsPlanOperation::ReceivePartn {
+        let live = machine
+            .bases
+            .iter()
+            .enumerate()
+            .filter(|(base, _)| !machine.freed_allocations.contains(base))
+            .count();
+        capacity = if live + machine.storage64.live_allocations() + 3
+            > machine.invocation.limits.max_frames as usize
+        {
+            0
+        } else {
+            capacity.saturating_sub(PARTITION_RECEIVE_MARKER.len())
+        };
+    }
     let mut arguments = BTreeMap::from([(
         "SET.MAXLENGTH".into(),
         payload(
             "mainframe-env.cics.decimal@1",
-            allocation_capacity(machine, target)?
-                .to_string()
-                .into_bytes(),
+            capacity.to_string().into_bytes(),
         )?,
     )]);
     if operation == CicsPlanOperation::Getmain {
@@ -340,6 +354,23 @@ pub(super) fn release_temporary_storage_set(machine: &mut ReferenceMachine) {
     machine.freed_allocations.extend(releases);
 }
 
+const PARTITION_RECEIVE_MARKER: &[u8] = b"MEC-RECEIVE-PARTN";
+
+pub(super) fn release_partition_receive_set(machine: &mut ReferenceMachine) {
+    let mut releases = Vec::new();
+    for marker in machine.static_base_count..machine.bases.len().saturating_sub(2) {
+        if machine.bases[marker] == PARTITION_RECEIVE_MARKER
+            && machine.bases[marker + 1].is_empty()
+            && machine.freed_allocations.contains(&marker)
+            && machine.freed_allocations.contains(&(marker + 1))
+            && !machine.freed_allocations.contains(&(marker + 2))
+        {
+            releases.push(marker + 2);
+        }
+    }
+    machine.freed_allocations.extend(releases);
+}
+
 pub(super) fn write_set_output(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
@@ -360,7 +391,23 @@ pub(super) fn write_set_output(
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let capacity = allocation_capacity(machine, target)?;
-    if value.bytes().len() > capacity {
+    if value.bytes().len() > capacity
+        || operation == CicsOperation::ReceivePartn
+            && (value
+                .bytes()
+                .len()
+                .saturating_add(PARTITION_RECEIVE_MARKER.len())
+                > capacity
+                || machine
+                    .bases
+                    .iter()
+                    .enumerate()
+                    .filter(|(base, _)| !machine.freed_allocations.contains(base))
+                    .count()
+                    + machine.storage64.live_allocations()
+                    + 3
+                    > machine.invocation.limits.max_frames as usize)
+    {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let CicsTarget::Resolved(slot) = target else {
@@ -370,6 +417,13 @@ pub(super) fn write_set_output(
     let base = if operation == CicsOperation::ReadTemporaryStorage {
         let marker = machine.bases.len();
         machine.bases.extend([Vec::new(), Vec::new()]);
+        machine.freed_allocations.extend([marker, marker + 1]);
+        marker + 2
+    } else if operation == CicsOperation::ReceivePartn {
+        let marker = machine.bases.len();
+        machine
+            .bases
+            .extend([PARTITION_RECEIVE_MARKER.to_vec(), Vec::new()]);
         machine.freed_allocations.extend([marker, marker + 1]);
         marker + 2
     } else {

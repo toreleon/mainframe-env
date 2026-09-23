@@ -62,6 +62,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::SendPartnset => partition_set::invoke(service, run, request),
+        CicsOperation::ReceivePartn => partition_set::invoke_receive(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
         CicsOperation::PurgeMessage => purge_message(service, run, request),
@@ -229,7 +230,7 @@ fn send(
         next.field_modified = field_modified.unwrap_or_default();
         next.field_values = field_values.unwrap_or_default();
     }
-    service.persist_session(&run.session, &next, Some(current.version))?;
+    partition_set::persist_send(service, run, &current, &next)?;
     state.sessions.insert(run.session.clone(), next);
     service.response(
         run,
@@ -383,7 +384,7 @@ fn receive(
         .get(&run.session)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
-    partition_set::require_intervening_send(service, run, current.version)?;
+    partition_set::require_intervening_send(service, run)?;
     let requested_names = if request.arguments.contains_key("MAP") {
         Some(map_names(request)?)
     } else {

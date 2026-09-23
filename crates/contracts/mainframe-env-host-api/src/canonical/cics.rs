@@ -83,6 +83,7 @@ impl Canonical for CicsOperation {
             Self::SendText => out.variant("CicsOperation", "SendText", 0),
             Self::SendMap => out.variant("CicsOperation", "SendMap", 0),
             Self::SendPartnset => out.variant("CicsOperation", "SendPartnset", 0),
+            Self::ReceivePartn => out.variant("CicsOperation", "ReceivePartn", 0),
             Self::SetAssociationUserCorrData => {
                 out.variant("CicsOperation", "SetAssociationUserCorrData", 0)
             }

@@ -17,6 +17,7 @@ pub(super) fn inout_length(
             | HirCicsOperation::ReadPrev
             | HirCicsOperation::ReadTransientData
             | HirCicsOperation::ReadTemporaryStorage
+            | HirCicsOperation::ReceivePartn
     )
     .then(|| {
         operands.iter().find_map(|operand| match &operand.value {
@@ -90,6 +91,7 @@ pub(super) fn resolve(
     for (name, identity) in [
         ("ABSTIME", HirCicsOutputName::Abstime),
         ("INTO", HirCicsOutputName::Into),
+        ("PARTN", HirCicsOutputName::Partn),
         ("SET", HirCicsOutputName::SetPointer),
         ("MILLISECONDS", HirCicsOutputName::Milliseconds),
         ("MMDDYY", HirCicsOutputName::Mmddyy),
@@ -109,6 +111,9 @@ pub(super) fn resolve(
         ("YYYYMMDD", HirCicsOutputName::Yyyymmdd),
     ] {
         if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
+            continue;
+        }
+        if name == "PARTN" && operation != HirCicsOperation::ReceivePartn {
             continue;
         }
         if name == "TIME" && operation != HirCicsOperation::FormatTime {
@@ -132,6 +137,7 @@ pub(super) fn resolve(
                     | HirCicsOperation::Getmain
                     | HirCicsOperation::ReadTransientData
                     | HirCicsOperation::ReadTemporaryStorage
+                    | HirCicsOperation::ReceivePartn
             )
         {
             continue;
@@ -176,6 +182,16 @@ pub(super) fn resolve(
                 return Err(super::super::ResolutionFailure::Invalid(format!(
                     "CICS {operation:?} SET requires a POINTER or POINTER-32 reference"
                 )));
+            }
+            if name == "PARTN"
+                && (!matches!(
+                    target.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                ) || !matches!(target.length, 1..=2))
+            {
+                return Err(super::super::ResolutionFailure::Invalid(
+                    "CICS RECEIVE PARTN PARTN requires a 1-2 character writable area".into(),
+                ));
             }
             format_time::require_output_shape(identity, &target, clauses, options)?;
             outputs.push(HirCicsOutputBinding {

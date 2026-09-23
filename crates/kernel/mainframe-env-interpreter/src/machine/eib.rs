@@ -38,6 +38,13 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
+        (
+            "EIBCPOSN".into(),
+            CobolValue::Decimal(Decimal {
+                coefficient: 0,
+                scale: 0,
+            }),
+        ),
         ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
         ("EIBREQID".into(), CobolValue::Bytes(vec![0x00; 8])),
         (
@@ -78,8 +85,29 @@ pub(super) fn write_context(
     {
         machine.write("EIBFN", &descriptor.eibfn)?;
     }
-    if operation == CicsOperation::ReceiveMap {
+    if matches!(
+        operation,
+        CicsOperation::ReceiveMap | CicsOperation::ReceivePartn
+    ) {
         machine.write("EIBAID", &[response.aid])?;
+    }
+    if operation == CicsOperation::ReceivePartn
+        && let Some(value) = response.outputs.get("EIBCPOSN")
+    {
+        if value.schema() != "mainframe-env.cics.decimal@1" {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let cursor = std::str::from_utf8(value.bytes())
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?
+            .parse::<u16>()
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+        machine.write_decimal(
+            "EIBCPOSN",
+            Decimal {
+                coefficient: i128::from(cursor),
+                scale: 0,
+            },
+        )?;
     }
     if operation == CicsOperation::Retrieve
         && let Some(value) = response.outputs.get("EIBFMH")

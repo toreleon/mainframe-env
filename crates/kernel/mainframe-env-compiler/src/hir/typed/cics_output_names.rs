@@ -13,6 +13,7 @@ pub enum HirCicsOutputName {
     Abstime,
     Commarea,
     Into,
+    Partn,
     SetPointer,
     Ridfld,
     Token,

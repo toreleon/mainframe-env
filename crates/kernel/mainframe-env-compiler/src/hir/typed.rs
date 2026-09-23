@@ -166,6 +166,7 @@ pub struct HirCicsNamedOperand {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOption {
+    AsIs,
     Cancel,
     NoDump,
     Reset,

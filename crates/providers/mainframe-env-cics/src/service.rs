@@ -6640,7 +6640,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 109);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 110);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -28921,6 +28921,274 @@ mod tests {
         let reopened = service(store);
         assert_eq!(
             reopened.partition_set_for_run(&run_unit).unwrap(),
+            Some("PSET1".into())
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn receive_partn_requires_intervening_send_then_consumes_partition_input_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        cics.register_partition_sets(&[CicsPartitionSetDefinition {
+            name: "PSET1".into(),
+            partitions: vec![CicsPartitionDefinition {
+                name: "P".into(),
+                top: 0,
+                left: 0,
+                rows: 24,
+                columns: 80,
+            }],
+        }])
+        .unwrap();
+        let invocation = invocation_for("partition-receive", BTreeMap::new());
+        let session = SessionId::new("partition-receive-session", 64).unwrap();
+        cics.launch_terminal(
+            invocation.clone(),
+            &session,
+            "MENU",
+            24,
+            80,
+            "partition-receive-csrf",
+            1,
+            100,
+        )
+        .unwrap();
+        let set = request(
+            CicsOperation::SendPartnset,
+            BTreeMap::from([("PARTNSET".into(), cics_literal(b"PSET1"))]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, set.clone(), 1), set)
+            .unwrap();
+        assert_eq!(
+            cics.submit_partition_input(
+                &session,
+                invocation.principal.id(),
+                "partition-receive-csrf",
+                0x7d,
+                "P",
+                b"mixed",
+                17,
+                2,
+            )
+            .unwrap()
+            .aid,
+            0x7d
+        );
+        let first = request(
+            CicsOperation::ReceivePartn,
+            BTreeMap::from([
+                ("PARTN".into(), argument(b"PARTN-X")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(3)),
+                ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+                ("OPTION.ASIS".into(), cics_option()),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, first.clone(), 2),
+                first.clone()
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
+        let send = request(
+            CicsOperation::SendText,
+            BTreeMap::from([("FROM".into(), argument(b"READY"))]),
+            3,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 3), send)
+            .unwrap();
+        let truncated_request = request(CicsOperation::ReceivePartn, first.arguments.clone(), 4);
+        let truncated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, truncated_request.clone(), 4),
+                truncated_request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (truncated.condition.as_str(), truncated.response),
+            ("LENGERR", 22)
+        );
+        assert_eq!(truncated.payload.bytes(), b"MIX");
+        assert_eq!(truncated.outputs["PARTN"].bytes(), b"P");
+        assert_eq!(truncated.outputs["LENGTH"].bytes(), b"5");
+        assert_eq!(truncated.outputs["EIBCPOSN"].bytes(), b"17");
+        assert_eq!(truncated.aid, 0x7d);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, truncated_request.clone(), 4),
+                truncated_request,
+            )
+            .unwrap(),
+            truncated
+        );
+        assert_eq!(
+            cics.submit_partition_input(
+                &session,
+                invocation.principal.id(),
+                "partition-receive-csrf",
+                0x7d,
+                "UNKNOWN",
+                b"abc",
+                0,
+                3,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        cics.submit_partition_input(
+            &session,
+            invocation.principal.id(),
+            "partition-receive-csrf",
+            0x7d,
+            "P",
+            b"lower",
+            0,
+            3,
+        )
+        .unwrap();
+        let second = request(
+            CicsOperation::ReceivePartn,
+            BTreeMap::from([
+                ("PARTN".into(), argument(b"PARTN-X")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("INTO.MAXLENGTH".into(), cics_decimal(5)),
+                ("OPTION.ASIS".into(), cics_option()),
+            ]),
+            5,
+        );
+        let received = cics
+            .invoke(&effect(&invocation.run_unit_id, second.clone(), 5), second)
+            .unwrap();
+        assert_eq!(received.payload.bytes(), b"lower");
+        assert_eq!(received.condition, "NORMAL");
+        cics.submit_partition_input(
+            &session,
+            invocation.principal.id(),
+            "partition-receive-csrf",
+            0x7d,
+            "P",
+            b"data",
+            0,
+            4,
+        )
+        .unwrap();
+        let set = request(
+            CicsOperation::ReceivePartn,
+            BTreeMap::from([
+                ("PARTN".into(), argument(b"PARTN-X")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+            ]),
+            6,
+        );
+        let set_response = cics
+            .invoke(&effect(&invocation.run_unit_id, set.clone(), 6), set)
+            .unwrap();
+        let mut expected = vec![0; 12];
+        expected.extend_from_slice(b"DATA");
+        assert_eq!(set_response.outputs["SET"].bytes(), expected);
+        assert!(set_response.payload.bytes().is_empty());
+    }
+
+    #[test]
+    fn receive_partn_sqlite_reopen_replays_consumed_input() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-receive-partn-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("receive-partn-sqlite", BTreeMap::new());
+        let session = SessionId::new("receive-partn-sqlite-session", 64).unwrap();
+        let receive = request(
+            CicsOperation::ReceivePartn,
+            BTreeMap::from([
+                ("PARTN".into(), argument(b"PARTN-X")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("INTO.MAXLENGTH".into(), cics_decimal(5)),
+            ]),
+            3,
+        );
+        let original = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            cics.register_partition_sets(&[CicsPartitionSetDefinition {
+                name: "PSET1".into(),
+                partitions: vec![CicsPartitionDefinition {
+                    name: "P".into(),
+                    top: 0,
+                    left: 0,
+                    rows: 24,
+                    columns: 80,
+                }],
+            }])
+            .unwrap();
+            cics.launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "receive-partn-sqlite-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+            let set = request(
+                CicsOperation::SendPartnset,
+                BTreeMap::from([("PARTNSET".into(), cics_literal(b"PSET1"))]),
+                1,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, set.clone(), 1), set)
+                .unwrap();
+            let send = request(
+                CicsOperation::SendText,
+                BTreeMap::from([("FROM".into(), argument(b"READY"))]),
+                2,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 2), send)
+                .unwrap();
+            cics.submit_partition_input(
+                &session,
+                invocation.principal.id(),
+                "receive-partn-sqlite-csrf",
+                0x7d,
+                "P",
+                b"lower",
+                12,
+                2,
+            )
+            .unwrap();
+            cics.invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 3),
+                receive.clone(),
+            )
+            .unwrap()
+        };
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = service(store);
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 3),
+                receive
+            )
+            .unwrap(),
+            original
+        );
+        assert_eq!(
+            cics.partition_set_for_run(&invocation.run_unit_id).unwrap(),
             Some("PSET1".into())
         );
         std::fs::remove_dir_all(root).unwrap();

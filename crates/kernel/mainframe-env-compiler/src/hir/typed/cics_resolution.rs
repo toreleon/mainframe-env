@@ -672,6 +672,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendPartnset => &["PARTNSET", "RESP", "RESP2"],
+        HirCicsOperation::ReceivePartn => &["PARTN", "INTO", "SET", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
         HirCicsOperation::Delay => &[
@@ -780,6 +781,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
         HirCicsOperation::SendPartnset => &["NOHANDLE"],
+        HirCicsOperation::ReceivePartn => &["ASIS", "NOHANDLE"],
         HirCicsOperation::StartBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::ResetBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
@@ -889,6 +891,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SendMap
         | HirCicsOperation::SendText
         | HirCicsOperation::SendPartnset
+        | HirCicsOperation::ReceivePartn
         | HirCicsOperation::Assign
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage

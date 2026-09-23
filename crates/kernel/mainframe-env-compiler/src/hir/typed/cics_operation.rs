@@ -50,6 +50,7 @@ pub enum HirCicsOperation {
     WriteTemporaryStorage,
     ReceiveMap,
     SendMap,
+    ReceivePartn,
     SendPartnset,
     SendText,
     Assign,

@@ -137,6 +137,8 @@ pub enum CicsPlanOperation {
     WriteTemporaryStorage,
     /// Receive one mapped terminal input message.
     ReceiveMap,
+    /// Receive data and a partition name from the active 8775 set.
+    ReceivePartn,
     /// Send one mapped terminal output message.
     SendMap,
     /// Send one unmapped terminal text message.
@@ -578,6 +580,8 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    /// Retain lowercase bytes on a subsequent 8775 partition receive.
+    AsIs,
     /// The composite predicate requires all child events.
     EventAnd,
     /// The composite predicate requires any child event.
@@ -698,6 +702,8 @@ pub enum CicsPlanOption {
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    /// Name of the 8775 partition that supplied terminal input.
+    Partn,
     /// Status returned by CHECK TIMER.
     TimerStatus,
     /// Event name returned by RETRIEVE REATTACH EVENT.

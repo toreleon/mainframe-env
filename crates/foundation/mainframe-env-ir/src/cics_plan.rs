@@ -602,6 +602,7 @@ fn validate_operation_shape(
             storage_control::invalid_freemain64_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::ReceiveMap
+        | CicsPlanOperation::ReceivePartn
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText
         | CicsPlanOperation::SendPartnset => terminal_control::invalid_shape(plan, inputs, outputs),
@@ -4476,6 +4477,8 @@ mod tests {
         assert_eq!(operation_from_tag(75), Ok(CicsPlanOperation::Unlock));
         assert_eq!(operation_tag(CicsPlanOperation::SendPartnset), 90);
         assert_eq!(operation_from_tag(90), Ok(CicsPlanOperation::SendPartnset));
+        assert_eq!(operation_tag(CicsPlanOperation::ReceivePartn), 86);
+        assert_eq!(operation_from_tag(86), Ok(CicsPlanOperation::ReceivePartn));
         assert_eq!(operand_tag(CicsOperandName::Token), 182);
         assert_eq!(operand_from_tag(182), Ok(CicsOperandName::Token));
         assert_eq!(operand_tag(CicsOperandName::Partnset), 192);
@@ -4522,7 +4525,11 @@ mod tests {
         for tag in 183..=191 {
             assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }
-        for tag in 76..=89 {
+        assert_eq!(option_tag(CicsPlanOption::AsIs), 124);
+        assert_eq!(option_from_tag(124), Ok(CicsPlanOption::AsIs));
+        assert_eq!(output_tag(CicsOutputName::Partn), 248);
+        assert_eq!(output_from_tag(248), Ok(CicsOutputName::Partn));
+        for tag in (76..=89).filter(|tag| *tag != 86) {
             assert_eq!(
                 operation_from_tag(tag),
                 Err(CicsPlanCodecProblem::Malformed)

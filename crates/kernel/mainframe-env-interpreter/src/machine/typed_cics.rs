@@ -30,7 +30,7 @@ use names::SlotUse;
 use registry::operation_schema;
 use registry::{expected_effects, expected_operation};
 pub(super) use registry::{operation_identities, validate_module_operations};
-pub(super) use response::drive_response;
+pub(super) use response::{drive_response, write_response_state, write_runtime_output};
 use runtime_validation::validate_runtime_plan;
 pub(super) use storage64::Storage64Intent;
 
@@ -46,70 +46,7 @@ pub(super) fn is_typed(operation: &Operation) -> bool {
     expected_operation(&operation.identity).is_some()
 }
 
-pub(super) fn write_response_state(
-    machine: &mut ReferenceMachine,
-    operation: CicsOperation,
-    storage64_intent: Option<Storage64Intent>,
-    response_target: Option<&CicsTarget>,
-    response2_target: Option<&CicsTarget>,
-    address_set: Option<&CicsAddressSet>,
-    outputs: &BTreeMap<String, CicsTarget>,
-    response: &CicsResponse,
-) -> Result<Option<usize>, MachineProblem> {
-    storage64::validate_response(operation, storage64_intent, response)?;
-    web_service_control::validate_response(operation, outputs, response)?;
-    for (target, value) in [
-        (response_target, response.response),
-        (response2_target, response.response2),
-    ] {
-        if let Some(target) = target {
-            write_target(
-                machine,
-                target,
-                &CobolValue::Decimal(Decimal {
-                    coefficient: i128::from(value),
-                    scale: 0,
-                }),
-            )?;
-        }
-    }
-    if response.disposition == CicsDisposition::Complete
-        && response.response == 0
-        && let Some(action) = address_set
-    {
-        address::apply(machine, action)?;
-    }
-    retrieve::prepare_load_allocation(machine, operation, response, outputs)
-}
-
 pub(super) use runtime_validation::into_payload_schema;
-
-pub(super) fn write_runtime_output(
-    machine: &mut ReferenceMachine,
-    operation: CicsOperation,
-    name: &str,
-    value: &BoundedPayload,
-) -> Result<bool, MachineProblem> {
-    if retrieve::release_output(machine, operation, name, value)? {
-        return Ok(true);
-    }
-    if storage64::release_output(machine, operation, name, value)? {
-        return Ok(true);
-    }
-    if task_wait::apply_posted_output(machine, operation, name, value)? {
-        return Ok(true);
-    }
-    if name != "TASK.PRIORITY" {
-        return Ok(false);
-    }
-    if value.schema() != "mainframe-env.cics.decimal@1" {
-        return Err(MachineProblem::UnexpectedHostResult);
-    }
-    machine.invocation.priority = String::from_utf8_lossy(value.bytes())
-        .parse::<u8>()
-        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-    Ok(true)
-}
 
 pub(super) fn abend_dump_disposition(
     operation: CicsOperation,
@@ -243,6 +180,12 @@ pub(super) fn execute(
     }
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
+    }
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::ReceivePartn | CicsPlanOperation::ReceiveMap
+    ) {
+        retrieve::release_partition_receive_set(machine);
     }
     let host_operation = names::host_operation(plan.operation);
     let address_set = address::action(&plan)?;
@@ -491,6 +434,7 @@ pub(super) fn execute(
             | CicsOutputName::WebEprInto
             | CicsOutputName::WebEprSet
             | CicsOutputName::WebEprLength
+            | CicsOutputName::Partn
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -498,6 +442,7 @@ pub(super) fn execute(
                 if matches!(
                     plan.operation,
                     CicsPlanOperation::ReadTransientData
+                        | CicsPlanOperation::ReceivePartn
                         | CicsPlanOperation::DocumentRetrieve
                         | CicsPlanOperation::SpoolRead
                 ) {

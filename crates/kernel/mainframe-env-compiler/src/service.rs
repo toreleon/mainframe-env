@@ -1527,6 +1527,44 @@ mod tests {
     }
 
     #[test]
+    fn receive_partn_compiles_partition_length_and_asis_through_v2_plan() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RPARTN. DATA DIVISION. WORKING-STORAGE SECTION. 01 PARTN-X PIC X(2). 01 DATA-X PIC X(5). 01 LEN-X PIC S9(4) COMP VALUE 5. 01 RC PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RECEIVE PARTN(PARTN-X) INTO(DATA-X) LENGTH(LEN-X) ASIS RESP(RC) END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let hir = analysis.hir.expect("typed RECEIVE PARTN HIR");
+        let plan = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .expect("RECEIVE PARTN plan");
+        assert_eq!(plan.operation, CicsPlanOperation::ReceivePartn);
+        assert_eq!(plan.operands[0].name, CicsOperandName::Length);
+        assert!(
+            plan.options
+                .contains(&mainframe_env_ir::CicsPlanOption::AsIs)
+        );
+        assert!(
+            plan.outputs
+                .iter()
+                .any(|output| output.name == CicsOutputName::Partn)
+        );
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(&encoded[..8], b"MCEP\0\x02\0V");
+    }
+
+    #[test]
     fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 LOCK-X PIC X(4) VALUE 'LOCK'. 01 PTR-X POINTER-32. 01 CORR-X PIC X(80) VALUE ALL 'A'. 01 PRIORITY-X PIC S9(4) COMP VALUE 200. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. 01 EVENT-NAME PIC X(16). 01 SUBEVENT-NAME PIC X(16). 01 TOKEN-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(RECORD-X) END-EXEC. EXEC CICS XCTL PROGRAM('NEXT') COMMAREA(RECORD-X) END-EXEC. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS RESETBR FILE('ACCTDAT') RIDFLD(KEY-X) GTEQ END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') UPDATE TOKEN(TOKEN-X) INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS UNLOCK FILE('ACCTDAT') TOKEN(TOKEN-X) END-EXEC. EXEC CICS ENQ RESOURCE(LOCK-X) LENGTH(4) UOW NOSUSPEND END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-X) LENGTH(4) UOW END-EXEC. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF RECORD-X) END-EXEC. EXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS HANDLE AID ANYKEY(AID-HANDLER) ENTER END-EXEC. EXEC CICS HANDLE ABEND PROGRAM('ABEXIT') END-EXEC. EXEC CICS HANDLE CONDITION ERROR(ERROR-HANDLER) LENGERR END-EXEC. EXEC CICS IGNORE CONDITION PGMIDERR END-EXEC. EXEC CICS PUSH HANDLE END-EXEC. EXEC CICS POP HANDLE RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. EXEC CICS ABEND ABCODE(AB-CODE) NODUMP END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(RECORD-X) END-EXEC.";
         let source = format!(
@@ -1680,6 +1718,7 @@ mod tests {
                 CicsPlanOperation::SendMap => crate::HirCicsOperation::SendMap,
                 CicsPlanOperation::SendText => crate::HirCicsOperation::SendText,
                 CicsPlanOperation::SendPartnset => crate::HirCicsOperation::SendPartnset,
+                CicsPlanOperation::ReceivePartn => crate::HirCicsOperation::ReceivePartn,
                 CicsPlanOperation::Assign => crate::HirCicsOperation::Assign,
                 CicsPlanOperation::PurgeMessage => crate::HirCicsOperation::PurgeMessage,
                 CicsPlanOperation::PopHandle => crate::HirCicsOperation::PopHandle,

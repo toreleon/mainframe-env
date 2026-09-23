@@ -312,6 +312,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0159"
     },
     {
+      "operation": "ReceivePartn",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0164"
+    },
+    {
       "operation": "Release",
       "interface": "api",
       "family": "program-control",
