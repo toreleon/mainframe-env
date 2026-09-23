@@ -193,6 +193,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0146"
     },
     {
+      "operation": "Post",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0147"
+    },
+    {
       "operation": "PurgeMessage",
       "interface": "api",
       "family": "terminal-control",

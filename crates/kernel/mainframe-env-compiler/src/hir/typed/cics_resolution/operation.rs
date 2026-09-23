@@ -53,6 +53,7 @@ pub(super) fn resolve(
         ["ASSIGN"] => HirCicsOperation::Assign,
         ["CANCEL"] => HirCicsOperation::Cancel,
         ["DELAY"] => HirCicsOperation::Delay,
+        ["POST"] => HirCicsOperation::Post,
         ["PURGE", "MESSAGE"] => HirCicsOperation::PurgeMessage,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,

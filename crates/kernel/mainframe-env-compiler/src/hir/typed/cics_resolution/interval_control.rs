@@ -45,6 +45,22 @@ pub(super) fn validate_constraints(
                 ));
             }
         }
+        HirCicsOperation::Post => {
+            let after = options.iter().any(|option| option == "AFTER");
+            let at = options.iter().any(|option| option == "AT");
+            let units = ["HOURS", "MINUTES", "SECONDS"]
+                .into_iter()
+                .any(|name| clauses.contains_key(name));
+            let schedules = usize::from(clauses.contains_key("INTERVAL"))
+                + usize::from(clauses.contains_key("TIME"))
+                + usize::from(after)
+                + usize::from(at);
+            if schedules > 1 || (after || at) != units {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS POST accepts one INTERVAL, TIME, AFTER, or AT schedule".into(),
+                ));
+            }
+        }
         HirCicsOperation::Start => {
             let after = options.iter().any(|option| option == "AFTER");
             let at = options.iter().any(|option| option == "AT");
@@ -96,7 +112,8 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
         HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
-        HirCicsOperation::Delay => delay_operands(clauses, semantic),
+        HirCicsOperation::Delay => delay_operands(clauses, semantic, "DELAY"),
+        HirCicsOperation::Post => delay_operands(clauses, semantic, "POST"),
         HirCicsOperation::Start => start_operands(clauses, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
@@ -106,6 +123,7 @@ pub(super) fn operands(
 fn delay_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
+    operation: &str,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let mut operands = clauses
         .get("INTERVAL")
@@ -125,7 +143,7 @@ fn delay_operands(
     if let Some(request_id) = clauses.get("REQID") {
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::ReqId,
-            value: bounded_name(request_id, semantic, 8, "DELAY", "REQID")?,
+            value: bounded_name(request_id, semantic, 8, operation, "REQID")?,
         });
     }
     for (clause, name) in [

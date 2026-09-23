@@ -6,10 +6,13 @@
 
 mod cancel;
 mod delay;
+mod post;
 mod protect;
 mod retrieve;
 
 pub use delay::CICS_DELAY_WORK_GENERATION;
+pub use post::CICS_POST_WORK_GENERATION;
+pub(super) use post::ready_event as post_ready_event;
 pub(super) use protect::discard_records as discard_protected_start_records;
 pub(super) use protect::discard_run as discard_protected_starts;
 pub(super) use protect::finish_syncpoint as finish_protected_starts;
@@ -48,6 +51,7 @@ impl CicsService {
         replay_clock: Arc<dyn CicsReplayClock>,
     ) -> Result<Arc<Self>, HostProblem> {
         delay::validate_store(store.as_ref(), limits)?;
+        post::validate_store(store.as_ref(), limits)?;
         Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))
     }
 
@@ -187,6 +191,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::Cancel => cancel::invoke(service, run, request),
         CicsOperation::Delay => delay::invoke(service, run, request),
+        CicsOperation::Post => post::invoke(service, run, request),
         CicsOperation::Start => start(service, run, request),
         CicsOperation::Retrieve => retrieve::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
@@ -194,7 +199,8 @@ pub(in crate::service) fn invoke(
 }
 
 pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
-    delay::release_task(service, run)
+    delay::release_task(service, run)?;
+    post::release_task(service, run)
 }
 
 fn start(
@@ -363,6 +369,7 @@ fn start(
     if record.state == IntervalStartState::Pending {
         service.enqueue_interval_work(&record, run.invocation.priority)?;
     }
+    post::supersede_for_run(service, run)?;
     let mut response = service.response(
         run,
         CicsDisposition::Complete,

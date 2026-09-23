@@ -35,6 +35,8 @@ pub enum CicsPlanOperation {
     Cancel,
     /// Complete a source-defined zero-delay request without suspension.
     Delay,
+    /// Arm one task-owned timer-event control area for later posting.
+    Post,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.

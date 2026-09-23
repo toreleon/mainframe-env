@@ -18,6 +18,7 @@ pub enum HirCicsOperation {
     Getmain,
     Cancel,
     Delay,
+    Post,
     ChangeTask,
     Deq,
     Enq,

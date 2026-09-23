@@ -155,6 +155,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::BifDigest => CicsOperation::BifDigest,
         CicsPlanOperation::Cancel => CicsOperation::Cancel,
         CicsPlanOperation::Delay => CicsOperation::Delay,
+        CicsPlanOperation::Post => CicsOperation::Post,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,

@@ -1,5 +1,6 @@
 use mainframe_env_cics::{
-    CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService, CicsStartTask,
+    CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService,
+    CicsStartTask,
 };
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{PlatformStore, StoreError, WorkRecord};
@@ -38,9 +39,18 @@ pub(crate) fn claim_durable_work(
     if start.is_some() {
         return Ok(start);
     }
-    store.claim(
+    let delay = store.claim(
         worker,
         Some(CICS_DELAY_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )?;
+    if delay.is_some() {
+        return Ok(delay);
+    }
+    store.claim(
+        worker,
+        Some(CICS_POST_WORK_GENERATION),
         now_tick,
         JES_LEASE_TICKS,
     )
@@ -67,6 +77,7 @@ pub(crate) fn heartbeat_durable_work(
 pub(crate) enum CicsWorkOutcome {
     Start(CicsStartTask),
     Delay,
+    Post(bool),
 }
 
 pub(crate) fn process_cics_work(
@@ -82,6 +93,9 @@ pub(crate) fn process_cics_work(
             cics.promote_delay_work(work, now_tick)?;
             Some(CicsWorkOutcome::Delay)
         }
+        CICS_POST_WORK_GENERATION => Some(CicsWorkOutcome::Post(
+            cics.promote_post_work(work, now_tick)?,
+        )),
         _ => None,
     })
 }

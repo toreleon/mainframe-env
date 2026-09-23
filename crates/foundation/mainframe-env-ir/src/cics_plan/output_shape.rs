@@ -18,6 +18,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::DigestResult | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::Post => matches!(
+            output,
+            CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

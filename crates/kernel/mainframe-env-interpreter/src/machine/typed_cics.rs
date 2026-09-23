@@ -15,6 +15,7 @@ mod convert_time;
 mod legacy;
 mod names;
 mod output_write;
+mod post;
 mod response;
 mod retrieve;
 mod runtime_validation;
@@ -91,6 +92,9 @@ pub(super) fn write_runtime_output(
     name: &str,
     value: &BoundedPayload,
 ) -> Result<bool, MachineProblem> {
+    if post::apply_event(machine, name, value)? {
+        return Ok(true);
+    }
     if retrieve::release_output(machine, operation, name, value)? {
         return Ok(true);
     }

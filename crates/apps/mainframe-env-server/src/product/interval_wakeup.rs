@@ -29,6 +29,12 @@ impl ProductServer {
                 self.wake_delayed_online_task(work, now_tick)?;
                 Some(JesWorkOutcome::Completed)
             }
+            Some(CicsWorkOutcome::Post(wake)) => {
+                if wake {
+                    self.wake_delayed_online_task(work, now_tick)?;
+                }
+                Some(JesWorkOutcome::Completed)
+            }
             None => None,
         })
     }

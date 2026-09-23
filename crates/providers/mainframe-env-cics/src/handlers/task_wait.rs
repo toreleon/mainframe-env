@@ -62,7 +62,15 @@ pub(super) fn invoke(
     if let Some(response2) = invalid_response2(request)? {
         return Err(invreq(response2));
     }
-    let (kind, events, selected_index) = request_events(request)?;
+    let (kind, events, mut selected_index) = request_events(request)?;
+    if selected_index.is_none()
+        && let Some(event) = super::interval_control::post_ready_event(service, run)?
+        && let Some(matched) = events
+            .iter()
+            .find(|candidate| candidate.address == event[..4])
+    {
+        selected_index = Some(matched.index);
+    }
     let name = request
         .arguments
         .get("NAME")
@@ -316,6 +324,64 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
         Ok(()) | Err(StoreError::NotFound) => Ok(()),
         Err(error) => Err(store_error(error)),
     }
+}
+
+/// Mark a suspended wait ready when its ECB is owned by a due POST timer.
+pub(super) fn post_timer_event(
+    service: &CicsService,
+    run_unit: &str,
+    address: [u8; 4],
+) -> Result<bool, HostProblem> {
+    let key = wait_key(run_unit);
+    for _ in 0..MAX_CAS_ATTEMPTS {
+        let Some(row) = service
+            .store
+            .get_provider_state(WAIT_NAMESPACE, &key)
+            .map_err(store_error)?
+        else {
+            return Ok(false);
+        };
+        let mut record = decode(&row.payload, row.version)?;
+        if record.run_unit != run_unit {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let Some(index) = record
+            .events
+            .iter()
+            .find(|event| event.address == address)
+            .map(|event| event.index)
+        else {
+            return Ok(false);
+        };
+        match record.state {
+            WaitState::Posted | WaitState::Consumed => {
+                return Ok(record.selected_index == Some(index));
+            }
+            WaitState::Purged => return Ok(false),
+            WaitState::Pending => {
+                record.state = WaitState::Posted;
+                record.selected_index = Some(index);
+                record.version = record
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                match service.store.put_provider_state(
+                    ProviderStateRecord {
+                        namespace: WAIT_NAMESPACE.into(),
+                        key: key.clone(),
+                        version: record.version,
+                        payload: encode(&record)?,
+                    },
+                    Some(row.version),
+                ) {
+                    Ok(()) => return Ok(true),
+                    Err(StoreError::Conflict | StoreError::NotFound) => continue,
+                    Err(error) => return Err(store_error(error)),
+                }
+            }
+        }
+    }
+    Err(HostProblem::IdempotencyConflict)
 }
 
 fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {

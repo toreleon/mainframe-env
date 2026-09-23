@@ -23,6 +23,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `POST` for row `0147`. A task-owned four-byte timer-event
+  area starts at zero, is posted with bytes `40 00 80 00` on expiry or cross-task
+  CANCEL, and can wake WAIT EVENT, WAIT EXTERNAL, or WAITCICS. The durable timer
+  uses the shared interval clock and worker; later POST, DELAY, or local START
+  supersedes it. MCEP v2 operation tag 158 reuses reviewed schedule and SET
+  identities while v1 rejects the new operation.
+
 - Added typed CICS `WAITCICS` for row `0239`. It waits on one or more checked
   MVS-format ECBs, admits standard or hand posting, honors purgeability, and
   persists the wait through SQLite reopen. MCEP v2 uses operation tag 157 and

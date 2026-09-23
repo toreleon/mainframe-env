@@ -93,7 +93,26 @@ pub use interval::{CicsIntervalError, CicsIntervalMode, CicsIntervalTime};
 #[cfg(test)]
 pub(super) use interval_control::IntervalStartState;
 pub(super) use interval_control::load as load_interval_records;
-pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
+pub use interval_control::{
+    CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION,
+};
+pub(super) fn post_event_outputs(
+    service: &CicsService,
+    run: &Run,
+) -> Result<BTreeMap<String, mainframe_env_execution_api::BoundedPayload>, HostProblem> {
+    let Some(event) = interval_control::post_ready_event(service, run)? else {
+        return Ok(BTreeMap::new());
+    };
+    Ok(BTreeMap::from([(
+        "POST.EVENT".into(),
+        mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.post-event@1",
+            event,
+            mainframe_env_execution_api::InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    )]))
+}
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use journal_control::{JournalRecord, load as load_journals};
 pub(super) use program_control::invoke as invoke_program_control;

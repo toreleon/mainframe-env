@@ -16,6 +16,7 @@ mod interval_control;
 mod journal_control;
 mod option_shape;
 mod output_shape;
+mod post;
 mod program_control;
 mod queue_control;
 mod spool_control;
@@ -501,6 +502,7 @@ fn validate_operation_shape(
                 || !outputs.contains(&CicsOutputName::DigestResult)
                 || scheduling_options
         }
+        CicsPlanOperation::Post => post::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -3577,6 +3579,38 @@ mod tests {
         forged_v1[6] = 157;
         assert_eq!(
             decode_cics_effect_plan(&forged_v1, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn post_uses_v2_operation_and_requires_set_pointer() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Post,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Interval,
+                value: CicsOperandValue::Integer(1),
+            }],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SetPointer,
+                target: slot(1, "POST.POINTER"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[6..8], &158u16.to_be_bytes());
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits).unwrap(), encoded);
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut no_set = plan;
+        no_set.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&no_set, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

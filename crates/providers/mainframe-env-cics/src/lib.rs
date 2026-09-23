@@ -20,15 +20,16 @@ pub use retention::{
     describe_cics_undo_row, describe_cics_uow_row,
 };
 pub use service::{
-    BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsApplicationEntryDefinition, CicsContinuation, CicsDocumentTemplateDefinition,
-    CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
-    CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsProgramDefinition,
-    CicsReplayClock, CicsService, CicsSpoolReportSnapshot, CicsStartTask, CicsStartTerminal,
-    CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry, CicsTransformContainerMode,
-    CicsTransformDefinition, CicsTransformFieldDefinition, CicsTransformFieldKind,
-    CicsTransformFormat, CicsTransientDataQueueDefinition, CicsTransientDataQueueKind,
-    CicsTransientDataQueueOpen, CicsXmlTransformMetadata, cics_provider,
+    BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION,
+    CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition, CicsContinuation,
+    CicsDocumentTemplateDefinition, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus,
+    CicsIntervalError, CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits,
+    CicsProgramDefinition, CicsReplayClock, CicsService, CicsSpoolReportSnapshot, CicsStartTask,
+    CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
+    CicsTransformContainerMode, CicsTransformDefinition, CicsTransformFieldDefinition,
+    CicsTransformFieldKind, CicsTransformFormat, CicsTransientDataQueueDefinition,
+    CicsTransientDataQueueKind, CicsTransientDataQueueOpen, CicsXmlTransformMetadata,
+    cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

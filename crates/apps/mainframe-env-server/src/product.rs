@@ -6312,8 +6312,8 @@ mod tests {
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
     use mainframe_env_cics::{
-        CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
-        CicsEventPostMode, CicsJavaStatus, CicsProgramDefinition,
+        CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION,
+        CicsApplicationEntryDefinition, CicsEventPostMode, CicsJavaStatus, CicsProgramDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -15689,6 +15689,146 @@ mod tests {
             server
                 .store
                 .list_provider_state("cics-task-wait-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn online_post_timer_wakes_waitcics_selected_route() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. POSTWAIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 POST-PTR POINTER-32.\n01 ECB-LIST-PTR POINTER-32.\n01 POST-FN PIC X(2).\n01 WAIT-FN PIC X(2).\n01 DONE-X PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS POST INTERVAL(1) SET(POST-PTR) END-EXEC.\nMOVE EIBFN TO POST-FN.\nSET ECB-LIST-PTR TO ADDRESS OF POST-PTR.\nEXEC CICS WAITCICS ECBLIST(ECB-LIST-PTR) NUMEVENTS(1) NAME('POSTWAIT') END-EXEC.\nMOVE EIBFN TO WAIT-FN.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let artifact = published_source_fixture("POSTWAIT", std::str::from_utf8(source).unwrap());
+        let (server, _store, clock) = worker_test_server(100);
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "POSTWAIT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("PW00".into(), "POSTWAIT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "POSTWAIT".into(),
+                    map: "POSTWAIT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("typed-post-wait", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "PW00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "PW00",
+                24,
+                80,
+                "typed-post-wait-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "POSTWAIT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "POSTWAIT", 100)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+        assert!(server.claim_jes_work("before-post").unwrap().is_none());
+        clock.advance(1_000);
+        let work = server.claim_jes_work("post-worker").unwrap().unwrap();
+        assert_eq!(work.required_generation, CICS_POST_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("POST-FN").unwrap().bytes(), &[0x10, 0x06]);
+        assert_eq!(restored.variable("WAIT-FN").unwrap().bytes(), &[0x5e, 0x32]);
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_ne!(restored.variable("POST-PTR").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x12, 0x08]);
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 8)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .count(),
+            3
+        );
+        server
+            .run_online_exchange(&session, &principal, "POSTWAIT", 1_100)
+            .unwrap();
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-task-wait-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-post-v1", 2)
                 .unwrap()
                 .is_empty()
         );

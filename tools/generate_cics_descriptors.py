@@ -189,6 +189,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Link", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0138"),
     ("Load", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0142"),
     ("PopHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0146"),
+    ("Post", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0147"),
     (
         "PurgeMessage",
         "api",
@@ -589,6 +590,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Assign",
         "PurgeMessage",
         "PopHandle",
+        "Post",
         "PushHandle",
         "Read",
         "Rewrite",
@@ -845,6 +847,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
+    "Post": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -1112,6 +1115,7 @@ def _load_typed_execution_registrations(
         "InvokeApplication",
         "Load",
         "PopHandle",
+        "Post",
         "PurgeMessage",
         "PushHandle",
         "ReadTransientData",
@@ -1459,6 +1463,7 @@ def load_catalog(
                 "Load",
                 "Release",
                 "PopHandle",
+                "Post",
                 "PurgeMessage",
                 "PushHandle",
                 "ReadTransientData",

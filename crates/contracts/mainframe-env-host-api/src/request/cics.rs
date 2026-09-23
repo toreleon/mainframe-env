@@ -26,6 +26,8 @@ pub enum CicsOperation {
     ChangeTask,
     /// Complete the source-defined zero-delay interval-control boundary.
     Delay,
+    /// Arm one task-owned timer-event control area.
+    Post,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -160,6 +162,7 @@ impl CicsOperation {
             Self::Cancel => "Cancel",
             Self::ChangeTask => "ChangeTask",
             Self::Delay => "Delay",
+            Self::Post => "Post",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -248,6 +251,7 @@ impl CicsOperation {
                 | Self::WriteTemporaryStorage
                 | Self::Cancel
                 | Self::Delay
+                | Self::Post
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -318,6 +322,7 @@ impl CicsOperation {
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("DELAY", _) => Self::Delay,
+            ("POST", _) => Self::Post,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,

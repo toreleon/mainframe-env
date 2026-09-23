@@ -408,6 +408,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::BifDigest => CicsPlanOperation::BifDigest,
         HirCicsOperation::Cancel => CicsPlanOperation::Cancel,
         HirCicsOperation::Delay => CicsPlanOperation::Delay,
+        HirCicsOperation::Post => CicsPlanOperation::Post,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,

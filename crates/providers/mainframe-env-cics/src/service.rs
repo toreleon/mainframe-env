@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 79);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 80);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -1894,7 +1894,7 @@ impl CicsService {
             target,
             next_transaction,
             payload: bounded(payload)?,
-            outputs: BTreeMap::new(),
+            outputs: handlers::post_event_outputs(self, run)?,
             unit_of_work: None,
         })
     }
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 79);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 80);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -11516,6 +11516,334 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_ne!(next.work_id, work.work_id);
+    }
+
+    #[test]
+    fn post_arms_zero_area_promotes_and_exposes_exact_event_bytes() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let address = [0, 0x10, 0, 4];
+        let post = request(
+            CicsOperation::Post,
+            BTreeMap::from([
+                ("SET".into(), argument(b"POST-PTR")),
+                ("SET.MAXLENGTH".into(), cics_decimal(4)),
+                (
+                    "POST.SET.ADDRESS".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.virtual-address@1",
+                        address.to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("INTERVAL".into(), cics_decimal(1)),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, post.clone(), 1),
+                post.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.outputs["SET"].bytes(), &[0; 4]);
+        assert_eq!(first.outputs["EIBREQID"].bytes().len(), 8);
+        assert!(!first.outputs.contains_key("POST.EVENT"));
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, post.clone(), 1), post)
+                .unwrap(),
+            first
+        );
+        assert!(
+            store
+                .claim("post-worker", Some(CICS_POST_WORK_GENERATION), 1_999, 100)
+                .unwrap()
+                .is_none()
+        );
+        let work = store
+            .claim("post-worker", Some(CICS_POST_WORK_GENERATION), 2_000, 100)
+            .unwrap()
+            .unwrap();
+        assert!(!service.promote_post_work(&work, 2_000).unwrap());
+        let inspect = request(CicsOperation::AsktimeEib, BTreeMap::new(), 2);
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, inspect.clone(), 2),
+                inspect,
+            )
+            .unwrap();
+        assert_eq!(
+            response.outputs["POST.EVENT"].bytes(),
+            &[0, 0x10, 0, 4, 0x40, 0, 0x80, 0]
+        );
+    }
+
+    #[test]
+    fn post_cancel_from_other_task_posts_and_delay_supersedes() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (owner, _) = registered(&service);
+        let other = invocation_for("post-canceler", BTreeMap::new());
+        let other_session = SessionId::new("post-canceler", 64).unwrap();
+        service.create_session(&other_session, 24, 80).unwrap();
+        service
+            .register_run(other.clone(), &other_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let post_args = |id: &[u8]| {
+            BTreeMap::from([
+                ("SET".into(), argument(b"POST-PTR")),
+                ("SET.MAXLENGTH".into(), cics_decimal(4)),
+                (
+                    "POST.SET.ADDRESS".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.virtual-address@1",
+                        vec![0, 0x10, 0, 4],
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("INTERVAL".into(), cics_decimal(10)),
+                ("REQID".into(), cics_literal(id)),
+            ])
+        };
+        let post = request(CicsOperation::Post, post_args(b"POSTONE"), 1);
+        service
+            .invoke(&effect(&owner.run_unit_id, post.clone(), 1), post)
+            .unwrap();
+        let cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([("REQID".into(), cics_literal(b"POSTONE"))]),
+            10,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&other.run_unit_id, cancel.clone(), 10), cancel)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let inspect = request(CicsOperation::AsktimeEib, BTreeMap::new(), 2);
+        assert_eq!(
+            service
+                .invoke(&effect(&owner.run_unit_id, inspect.clone(), 2), inspect)
+                .unwrap()
+                .outputs["POST.EVENT"]
+                .bytes(),
+            &[0, 0x10, 0, 4, 0x40, 0, 0x80, 0]
+        );
+
+        let next = request(CicsOperation::Post, post_args(b"POSTTWO"), 3);
+        service
+            .invoke(&effect(&owner.run_unit_id, next.clone(), 3), next)
+            .unwrap();
+        let delay = request(CicsOperation::Delay, BTreeMap::new(), 4);
+        service
+            .invoke(&effect(&owner.run_unit_id, delay.clone(), 4), delay)
+            .unwrap();
+        let inspect = request(CicsOperation::AsktimeEib, BTreeMap::new(), 5);
+        assert!(
+            !service
+                .invoke(&effect(&owner.run_unit_id, inspect.clone(), 5), inspect)
+                .unwrap()
+                .outputs
+                .contains_key("POST.EVENT")
+        );
+    }
+
+    #[test]
+    fn post_timer_survives_sqlite_reopen_and_rejects_corrupt_record() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-post-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("post-sqlite-reopen", BTreeMap::new());
+        let session = SessionId::new("post-sqlite-reopen", 64).unwrap();
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let post = request(
+                CicsOperation::Post,
+                BTreeMap::from([
+                    ("SET".into(), argument(b"POST-PTR")),
+                    ("SET.MAXLENGTH".into(), cics_decimal(4)),
+                    (
+                        "POST.SET.ADDRESS".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.virtual-address@1",
+                            vec![0, 0x10, 0, 4],
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                    ("INTERVAL".into(), cics_decimal(1)),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, post.clone(), 1), post)
+                .unwrap();
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(2_000)),
+        )
+        .unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let work = store
+            .claim(
+                "post-reopen-worker",
+                Some(CICS_POST_WORK_GENERATION),
+                2_000,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(!service.promote_post_work(&work, 2_000).unwrap());
+        let inspect = request(CicsOperation::AsktimeEib, BTreeMap::new(), 2);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, inspect.clone(), 2),
+                    inspect
+                )
+                .unwrap()
+                .outputs["POST.EVENT"]
+                .bytes(),
+            &[0, 0x10, 0, 4, 0x40, 0, 0x80, 0]
+        );
+        drop(service);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-post-v1".into(),
+                    key: invocation.run_unit_id.as_str().into(),
+                    version: 3,
+                    payload: b"malformed".to_vec(),
+                },
+                Some(2),
+            )
+            .unwrap();
+        assert!(matches!(
+            CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(2_000)),
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn post_rejects_invalid_time_and_short_area_without_creating_timer() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        for (sequence, interval, response2) in [(20, 1_000_000, 4), (21, 6_000, 5), (22, 60, 6)] {
+            let post = request(
+                CicsOperation::Post,
+                BTreeMap::from([
+                    ("SET".into(), argument(b"POST-PTR")),
+                    ("SET.MAXLENGTH".into(), cics_decimal(4)),
+                    (
+                        "POST.SET.ADDRESS".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.virtual-address@1",
+                            vec![0, 0x10, 0, 4],
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                    ("INTERVAL".into(), cics_decimal(interval)),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, post.clone(), sequence),
+                    post
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2
+                })
+            );
+        }
+        let short = request(
+            CicsOperation::Post,
+            BTreeMap::from([
+                ("SET".into(), argument(b"POST-PTR")),
+                ("SET.MAXLENGTH".into(), cics_decimal(3)),
+                (
+                    "POST.SET.ADDRESS".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.virtual-address@1",
+                        vec![0, 0x10, 0, 4],
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            23,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, short.clone(), 23), short),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-post-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
