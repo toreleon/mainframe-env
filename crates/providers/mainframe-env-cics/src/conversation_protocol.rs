@@ -6,6 +6,12 @@
 
 use serde::{Deserialize, Serialize};
 
+mod ledger;
+pub use ledger::{
+    CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
+    ConversationSystemDefinition,
+};
+
 /// Durable encoding version for one allocated conversation.
 pub const CONVERSATION_RECORD_VERSION: u16 = 1;
 /// Maximum length of a partner process name defined by APPC.
@@ -55,8 +61,10 @@ impl ConversationOwner {
     fn valid(&self) -> bool {
         !self.execution.is_empty()
             && self.execution.len() <= 128
+            && !self.execution.contains('\0')
             && !self.run_unit.is_empty()
             && self.run_unit.len() <= 128
+            && !self.run_unit.contains('\0')
             && self.lease_epoch != 0
     }
 }
@@ -153,10 +161,9 @@ impl ConversationRecord {
             || self.token == [0; 4]
             || self.system.is_empty()
             || self.system.len() > 4
-            || !self
-                .system
-                .bytes()
-                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+            || !self.system.bytes().all(|byte| {
+                byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+            })
             || !self.owner.valid()
             || self
                 .process

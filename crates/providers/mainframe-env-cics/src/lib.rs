@@ -11,8 +11,10 @@ mod service;
 
 pub use abi::cics_abi_library;
 pub use conversation_protocol::{
-    CONVERSATION_RECORD_VERSION, ConversationContext, ConversationKind, ConversationOwner,
-    ConversationProblem, ConversationRecord, ConversationState, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+    CONVERSATION_RECORD_VERSION, CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader,
+    ConversationContext, ConversationKind, ConversationLedger, ConversationOwner,
+    ConversationProblem, ConversationRecord, ConversationState, ConversationSystemDefinition,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES,
 };
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 
