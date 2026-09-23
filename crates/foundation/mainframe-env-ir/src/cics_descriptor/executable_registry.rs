@@ -349,7 +349,7 @@ pub fn cics_application_registry_for_tokens(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 123] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 124] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1329,6 +1329,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 123] = [
         name: "monitor",
         major: 1,
         effects: MONITOR_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::DumpTransaction,
+        namespace: "cics.diagnostics",
+        name: "dump-transaction",
+        major: 1,
+        effects: DIAGNOSTIC_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];

@@ -192,6 +192,8 @@ pub enum CicsPlanOperation {
     EnterTraceNum,
     /// Apply one installed local user event monitoring definition.
     Monitor,
+    /// Capture selected local transaction data and diagnostic table content.
+    DumpTransaction,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -646,6 +648,13 @@ pub enum CicsOperandName {
     MonitorEntryName,
     MonitorData1,
     MonitorData2,
+    DumpCode,
+    DumpFrom,
+    DumpLength,
+    DumpFlength,
+    DumpSegmentList,
+    DumpLengthList,
+    DumpNumSegments,
     /// Optional SPOOLWRITE transfer length.
     SpoolFlength,
 }
@@ -803,6 +812,18 @@ pub enum CicsPlanOption {
     /// Write a page-mode spool record.
     SpoolPage,
     TraceException,
+    DumpComplete,
+    DumpTask,
+    DumpStorage,
+    DumpProgram,
+    DumpTerminal,
+    DumpTables,
+    DumpFct,
+    DumpPct,
+    DumpPpt,
+    DumpSit,
+    DumpTct,
+    DumpTrt,
 }
 
 /// Named result binding written after the host result arrives.
@@ -910,4 +931,6 @@ pub enum CicsOutputName {
     SpoolToken,
     /// Actual length of the SPOOLREAD record.
     SpoolToFlength,
+    /// Generated identifier of a retained local transaction dump.
+    DumpId,
 }

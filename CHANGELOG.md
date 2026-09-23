@@ -123,6 +123,12 @@ All notable changes to mainframe-env are documented here.
   applies an authorized point definition. Source: CICS TS 6.x application API
   sources-b, `dfhp4_monitor.html`, catalog row 0143.
 
+- Added typed CICS DUMP TRANSACTION with a durable bounded local section
+  snapshot, selected FROM and segment bytes, source dump-code suppression,
+  run/count DUMPID, checked SAF, and replay after a result gap. Source: CICS TS
+  6.x application API sources-a, `dfhp4_dumptransaction.html`, catalog row
+  0057.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

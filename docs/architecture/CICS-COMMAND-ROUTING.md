@@ -359,6 +359,14 @@ Clock actions read the host clock; MOVE uses the four-byte DATA2 length or the
 registered default. Missing DATA2 returns INVREQ/6 after the move, matching
 the source's successful-operation condition. Point, data, and definition
 errors retain their distinct INVREQ secondary codes.
+`DUMP TRANSACTION` stores a bounded `MECDMP01` section stream in the durable
+diagnostics row. FROM and SEGMENTLIST sections retain exact task storage bytes;
+other sections record only the local task and catalog state the provider owns.
+Registered dump-code maximum and suppression rules are applied before
+capture, and `CICSDIAG` authorization precedes every write. DUMPID uses a
+durable run/count counter; a fresh provider instance advances the run number
+on its first successful dump. System dump requests fail explicitly because
+this provider has no SDUMP backend.
 
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or

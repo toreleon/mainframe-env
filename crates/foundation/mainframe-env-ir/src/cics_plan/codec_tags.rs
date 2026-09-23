@@ -141,6 +141,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::UpdateDCounter => 129,
         CicsPlanOperation::EnterTraceNum => 151,
         CicsPlanOperation::Monitor => 152,
+        CicsPlanOperation::DumpTransaction => 149,
     }
 }
 
@@ -269,6 +270,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         129 => Ok(CicsPlanOperation::UpdateDCounter),
         151 => Ok(CicsPlanOperation::EnterTraceNum),
         152 => Ok(CicsPlanOperation::Monitor),
+        149 => Ok(CicsPlanOperation::DumpTransaction),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -487,6 +489,13 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::MonitorEntryName => 581,
         CicsOperandName::MonitorData1 => 582,
         CicsOperandName::MonitorData2 => 583,
+        CicsOperandName::DumpCode => 584,
+        CicsOperandName::DumpFrom => 585,
+        CicsOperandName::DumpLength => 586,
+        CicsOperandName::DumpFlength => 587,
+        CicsOperandName::DumpSegmentList => 588,
+        CicsOperandName::DumpLengthList => 589,
+        CicsOperandName::DumpNumSegments => 590,
     }
 }
 
@@ -704,6 +713,13 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         581 => Ok(CicsOperandName::MonitorEntryName),
         582 => Ok(CicsOperandName::MonitorData1),
         583 => Ok(CicsOperandName::MonitorData2),
+        584 => Ok(CicsOperandName::DumpCode),
+        585 => Ok(CicsOperandName::DumpFrom),
+        586 => Ok(CicsOperandName::DumpLength),
+        587 => Ok(CicsOperandName::DumpFlength),
+        588 => Ok(CicsOperandName::DumpSegmentList),
+        589 => Ok(CicsOperandName::DumpLengthList),
+        590 => Ok(CicsOperandName::DumpNumSegments),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -806,6 +822,18 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::CounterReduce => 317,
         CicsPlanOption::CounterWrap => 318,
         CicsPlanOption::TraceException => 508,
+        CicsPlanOption::DumpComplete => 509,
+        CicsPlanOption::DumpTask => 510,
+        CicsPlanOption::DumpStorage => 511,
+        CicsPlanOption::DumpProgram => 512,
+        CicsPlanOption::DumpTerminal => 513,
+        CicsPlanOption::DumpTables => 514,
+        CicsPlanOption::DumpFct => 515,
+        CicsPlanOption::DumpPct => 516,
+        CicsPlanOption::DumpPpt => 517,
+        CicsPlanOption::DumpSit => 518,
+        CicsPlanOption::DumpTct => 519,
+        CicsPlanOption::DumpTrt => 520,
     }
 }
 
@@ -907,6 +935,18 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         317 => Ok(CicsPlanOption::CounterReduce),
         318 => Ok(CicsPlanOption::CounterWrap),
         508 => Ok(CicsPlanOption::TraceException),
+        509 => Ok(CicsPlanOption::DumpComplete),
+        510 => Ok(CicsPlanOption::DumpTask),
+        511 => Ok(CicsPlanOption::DumpStorage),
+        512 => Ok(CicsPlanOption::DumpProgram),
+        513 => Ok(CicsPlanOption::DumpTerminal),
+        514 => Ok(CicsPlanOption::DumpTables),
+        515 => Ok(CicsPlanOption::DumpFct),
+        516 => Ok(CicsPlanOption::DumpPct),
+        517 => Ok(CicsPlanOption::DumpPpt),
+        518 => Ok(CicsPlanOption::DumpSit),
+        519 => Ok(CicsPlanOption::DumpTct),
+        520 => Ok(CicsPlanOption::DumpTrt),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -971,6 +1011,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::SpoolToken => 208,
         CicsOutputName::SpoolToFlength => 209,
         CicsOutputName::Partn => 248,
+        CicsOutputName::DumpId => 632,
     }
 }
 
@@ -1026,6 +1067,7 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         208 => Ok(CicsOutputName::SpoolToken),
         209 => Ok(CicsOutputName::SpoolToFlength),
         248 => Ok(CicsOutputName::Partn),
+        632 => Ok(CicsOutputName::DumpId),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

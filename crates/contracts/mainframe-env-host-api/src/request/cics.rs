@@ -187,6 +187,8 @@ pub enum CicsOperation {
     EnterTraceNum,
     /// Record a configured user event monitoring point.
     Monitor,
+    /// Capture a bounded local transaction diagnostic dump.
+    DumpTransaction,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -340,6 +342,7 @@ impl CicsOperation {
             Self::SpoolWrite => "SpoolWrite",
             Self::EnterTraceNum => "EnterTraceNum",
             Self::Monitor => "Monitor",
+            Self::DumpTransaction => "DumpTransaction",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -489,6 +492,7 @@ impl CicsOperation {
                 | Self::SpoolWrite
                 | Self::EnterTraceNum
                 | Self::Monitor
+                | Self::DumpTransaction
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -612,6 +616,7 @@ impl CicsOperation {
             ("SPOOLWRITE", _) => Self::SpoolWrite,
             ("ENTER", Some("TRACENUM")) => Self::EnterTraceNum,
             ("MONITOR", _) => Self::Monitor,
+            ("DUMP", Some("TRANSACTION")) => Self::DumpTransaction,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

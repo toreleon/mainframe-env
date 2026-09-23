@@ -156,6 +156,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SubEventName
         | HirCicsOutputName::EventType
         | HirCicsOutputName::FireStatus
+        | HirCicsOutputName::DumpId
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

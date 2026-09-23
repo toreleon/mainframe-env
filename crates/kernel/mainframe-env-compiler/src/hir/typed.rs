@@ -4147,6 +4147,56 @@ mod tests {
     }
 
     #[test]
+    fn cics_dump_transaction_resolves_data_selection_and_dumpid() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DUMPTRN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'ABCDEFGH'. 01 LENGTH-X PIC S9(9) COMP VALUE 3. 01 DUMP-ID-X PIC X(9). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DUMP TRANSACTION DUMPCODE('ABCD') FROM(DATA-X) FLENGTH(LENGTH-X) TASK DUMPID(DUMP-ID-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DUMP TRANSACTION: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DUMP TRANSACTION");
+        assert_eq!(command.operation, HirCicsOperation::DumpTransaction);
+        assert!(command.options.contains(&HirCicsOption::DumpTask));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::DumpId && output.target.qualified_name == "DUMP-ID-X"
+        }));
+        for (command, expected) in [
+            ("DUMP TRANSACTION TASK NOHANDLE", "requires DUMPCODE"),
+            (
+                "DUMP TRANSACTION DUMPCODE('ABCD') FROM(DATA-X) LENGTH(SHORT-X) FLENGTH(LENGTH-X) NOHANDLE",
+                "mutually exclusive",
+            ),
+            (
+                "DUMP TRANSACTION DUMPCODE('ABCD') FROM(DATA-X) FLENGTH(SHORT-X) NOHANDLE",
+                "4-byte binary storage",
+            ),
+            (
+                "DUMP TRANSACTION DUMPCODE('ABCD') DUMPID(BAD-ID-X) NOHANDLE",
+                "nine-character",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDMP. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 SHORT-X PIC S9(4) COMP. 01 LENGTH-X PIC S9(9) COMP. 01 BAD-ID-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

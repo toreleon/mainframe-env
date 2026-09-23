@@ -359,6 +359,9 @@ pub(super) fn execute(
                         | CicsOperandName::TraceNum
                         | CicsOperandName::TraceFromLength
                 | CicsOperandName::MonitorPoint
+                        | CicsOperandName::DumpLength
+                        | CicsOperandName::DumpFlength
+                        | CicsOperandName::DumpNumSegments
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -403,6 +406,20 @@ pub(super) fn execute(
         );
     }
 
+    if plan.operation == CicsPlanOperation::DumpTransaction
+        && plan
+            .operands
+            .iter()
+            .any(|operand| operand.name == CicsOperandName::DumpSegmentList)
+    {
+        arguments.insert(
+            "SEGMENTS".into(),
+            payload(
+                "mainframe-env.cics.dump-segments@1",
+                diagnostics::dump_segments(machine, &plan)?,
+            )?,
+        );
+    }
     let mut into = None;
     let mut outputs = operand_outputs;
     let mut response = None;
@@ -460,6 +477,7 @@ pub(super) fn execute(
             | CicsOutputName::WebEprSet
             | CicsOutputName::WebEprLength
             | CicsOutputName::Partn
+            | CicsOutputName::DumpId
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

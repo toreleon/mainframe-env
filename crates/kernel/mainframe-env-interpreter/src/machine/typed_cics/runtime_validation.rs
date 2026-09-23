@@ -128,6 +128,7 @@ pub(super) fn validate_machine_slot(
             | SlotUse::AssignOutput(_)
             | SlotUse::SpoolTokenOutput
             | SlotUse::SpoolToFlengthOutput
+            | SlotUse::DumpIdOutput
     ) && matches!(
         layout.category,
         LayoutCategory::Condition | LayoutCategory::Rename
@@ -174,6 +175,17 @@ pub(super) fn validate_machine_slot(
     if matches!(slot_use, SlotUse::MonitorDataInput) && layout.length != 4 {
         return Err(invalid_plan(
             "MONITOR DATA1 and DATA2 must occupy four bytes",
+        ));
+    }
+    if matches!(slot_use, SlotUse::DumpIdOutput)
+        && (layout.length != 9
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "DUMPID must be writable nine-character storage",
         ));
     }
     if matches!(slot_use, SlotUse::FullwordOutput)

@@ -218,6 +218,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::FireStatus | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::DumpTransaction => matches!(
+            output,
+            CicsOutputName::DumpId | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

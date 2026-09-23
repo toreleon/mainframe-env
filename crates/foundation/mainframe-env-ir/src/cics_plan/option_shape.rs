@@ -76,6 +76,22 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             CicsPlanOption::NoHandle | CicsPlanOption::TraceException
         ),
         CicsPlanOperation::Monitor => !matches!(option, CicsPlanOption::NoHandle),
+        CicsPlanOperation::DumpTransaction => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::DumpComplete
+                | CicsPlanOption::DumpTask
+                | CicsPlanOption::DumpStorage
+                | CicsPlanOption::DumpProgram
+                | CicsPlanOption::DumpTerminal
+                | CicsPlanOption::DumpTables
+                | CicsPlanOption::DumpFct
+                | CicsPlanOption::DumpPct
+                | CicsPlanOption::DumpPpt
+                | CicsPlanOption::DumpSit
+                | CicsPlanOption::DumpTct
+                | CicsPlanOption::DumpTrt
+        ),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

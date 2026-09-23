@@ -12795,6 +12795,105 @@ mod tests {
     }
 
     #[test]
+    fn compiled_dump_transaction_captures_from_bytes_and_7e02() {
+        let artifact = published_source_fixture(
+            "DUMPTRN",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DUMPTRN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'ABCDEFGH'.\n01 LENGTH-X PIC S9(9) COMP VALUE 3.\n01 DUMP-ID-X PIC X(9).\n01 RESP-X PIC S9(9) COMP.\n01 DUMP-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS DUMP TRANSACTION DUMPCODE('ABCD') FROM(DATA-X) FLENGTH(LENGTH-X) TASK DUMPID(DUMP-ID-X) RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO DUMP-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CICSDIAG", "CICS.DIAG.DUMP.ABCD", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CICSDIAG",
+                "CICS.DIAG.DUMP.ABCD",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DUMPTRN".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DMP1".into(), "DUMPTRN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DUMPTRN".into(),
+                    map: "DUMPTRN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("dump-transaction-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DMP1", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DMP1",
+                24,
+                80,
+                "dump-transaction-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DUMPTRN", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DUMP-FN").unwrap().bytes(), &[0x7e, 0x02]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert!(
+            restored
+                .variable("DUMP-ID-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"1/0001")
+        );
+        let snapshot = server.cics.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.dumps.len(), 1);
+        assert!(
+            snapshot.dumps[0]
+                .data
+                .windows(3)
+                .any(|bytes| bytes == b"ABC")
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_set_allocates_checkpointed_record_storage() {
         let artifact = published_source_fixture(
             "READQSET",

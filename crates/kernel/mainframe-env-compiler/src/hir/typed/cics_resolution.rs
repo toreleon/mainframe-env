@@ -260,6 +260,9 @@ fn validate_candidate(
             ));
         };
         let has_value = clauses.contains_key(*name);
+        if descriptor.label_tokens == ["DUMP", "TRANSACTION"] && *name == "DUMPID" && has_value {
+            continue;
+        }
         match (shape, has_value) {
             (CicsApplicationOptionValueShape::Flag, true) => {
                 return Err(format!(
@@ -715,6 +718,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolWrite => spool_control::allowed_clauses(operation),
         HirCicsOperation::EnterTraceNum => diagnostics::allowed_clauses(operation),
         HirCicsOperation::Monitor => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::DumpTransaction => diagnostics::allowed_clauses(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -813,6 +817,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolWrite => spool_control::allowed_options(operation),
         HirCicsOperation::EnterTraceNum => diagnostics::allowed_options(operation),
         HirCicsOperation::Monitor => diagnostics::allowed_options(operation),
+        HirCicsOperation::DumpTransaction => diagnostics::allowed_options(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -958,6 +963,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolWrite => spool_control::required(operation),
         HirCicsOperation::EnterTraceNum => diagnostics::required(operation),
         HirCicsOperation::Monitor => diagnostics::required(operation),
+        HirCicsOperation::DumpTransaction => diagnostics::required(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -1137,6 +1143,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;
@@ -1163,6 +1170,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         .map(|option| {
             counter_control::option(operation, option)
                 .or_else(|| event_control::option(operation, option))
+                .or_else(|| diagnostics::option(operation, option))
                 .or_else(|| {
                     matches!(
                         operation,

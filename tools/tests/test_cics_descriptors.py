@@ -1196,6 +1196,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "DOCUMENT INSERT",
                 "DOCUMENT RETRIEVE",
                 "DOCUMENT SET",
+                "DUMP TRANSACTION",
                 "ENQ",
                 "ENTER TRACENUM",
                 "FORMATTIME",

@@ -278,8 +278,7 @@ struct State {
     transform_bytes: usize,
     journals: BTreeMap<String, handlers::JournalRecord>,
     spool: handlers::SpoolState,
-    // Internal authority for the declared records-core slice. Command handlers
-    // remain deliberately disconnected until the producer/consumer slices seal.
+    // Internal interval-control records authority.
     #[allow(dead_code)]
     interval_records: BTreeMap<String, handlers::IntervalStartRecord>,
     #[cfg(feature = "fault-injection")]
@@ -307,6 +306,7 @@ pub struct CicsService {
     work_store: Option<Arc<dyn WorkStore>>,
     artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     replay_unknown_after_persist: AtomicBool,
+    diagnostic_run_opened: AtomicBool,
 }
 
 /// Trusted durable logical-time source used after CICS work is durably resolved.
@@ -436,7 +436,6 @@ impl CicsService {
         let (transform_containers, transform_bytes) =
             handlers::load_transform_containers(store.as_ref(), limits)?;
         let spool = handlers::load_spool_state(store.as_ref(), limits)?;
-        debug_assert!(spool.reports.len() <= limits.max_spool_reports);
         Ok(Arc::new(Self {
             host,
             store: Arc::clone(&store),
@@ -445,6 +444,7 @@ impl CicsService {
             work_store,
             artifacts: OnceLock::new(),
             replay_unknown_after_persist: AtomicBool::new(false),
+            diagnostic_run_opened: AtomicBool::new(false),
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
@@ -15472,6 +15472,258 @@ mod tests {
             )
             .unwrap();
         assert_eq!((result.response, result.response2), (16, 1));
+    }
+
+    #[test]
+    fn dump_transaction_retains_selected_bytes_and_suppresses_after_maximum() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        service
+            .register_diagnostic_resources(
+                &[CicsDumpCodeDefinition {
+                    code: "ABCD".into(),
+                    suppress: false,
+                    maximum: 1,
+                    system_dump: false,
+                }],
+                &[],
+            )
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let arguments = BTreeMap::from([
+            ("DUMPCODE".into(), cics_literal(b"ABCD")),
+            ("FROM".into(), enqueue_value(b"ABCDEFG")),
+            ("FLENGTH".into(), cics_decimal(3)),
+            ("OPTION.TASK".into(), cics_option()),
+            (
+                "DUMPID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.argument@1",
+                    b"DUMP-ID-X".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+        ]);
+        let dump = request(CicsOperation::DumpTransaction, arguments.clone(), 1);
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, dump.clone(), 1),
+                dump.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(first.outputs["DUMPID"].bytes(), b"1/0001");
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.dumps.len(), 1);
+        assert_eq!(snapshot.dumps[0].dump_id, "1/0001");
+        assert_eq!(snapshot.dumps[0].sections, ["DUMPCODE", "TASK", "FROM"]);
+        assert!(
+            snapshot.dumps[0]
+                .data
+                .windows(3)
+                .any(|bytes| bytes == b"ABC")
+        );
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+            .unwrap();
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, dump.clone(), 1), dump)
+            .unwrap();
+        assert_eq!(replayed, first);
+        assert_eq!(service.diagnostic_snapshot().unwrap().dumps.len(), 1);
+
+        let mut suppressed = request(CicsOperation::DumpTransaction, arguments, 2);
+        suppressed.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, suppressed.clone(), 2),
+                suppressed,
+            )
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response, result.response2),
+            ("SUPPRESSED", 72, 1)
+        );
+        assert_eq!(service.diagnostic_snapshot().unwrap().dumps.len(), 1);
+
+        let mut invalid = request(
+            CicsOperation::DumpTransaction,
+            BTreeMap::from([("DUMPCODE".into(), cics_literal(b"A B"))]),
+            3,
+        );
+        invalid.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response, result.response2),
+            ("INVREQ", 16, 13)
+        );
+        assert_eq!(service.diagnostic_snapshot().unwrap().dumps.len(), 2);
+    }
+
+    #[test]
+    fn dump_transaction_segments_and_counter_survive_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-dump-transaction-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let (invocation, _) = registered(&service);
+            let dump = request(
+                CicsOperation::DumpTransaction,
+                BTreeMap::from([("DUMPCODE".into(), cics_literal(b"ABCD"))]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, dump.clone(), 1), dump)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let invocation = invocation_for("dump-reopen", BTreeMap::new());
+            let session = SessionId::new("dump-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let dump = request(
+                CicsOperation::DumpTransaction,
+                BTreeMap::from([
+                    ("DUMPCODE".into(), cics_literal(b"EFGH")),
+                    ("SEGMENTLIST".into(), enqueue_value(&[0, 0, 0, 1])),
+                    ("LENGTHLIST".into(), enqueue_value(&[0, 0, 0, 3])),
+                    ("NUMSEGMENTS".into(), cics_decimal(1)),
+                    (
+                        "SEGMENTS".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.dump-segments@1",
+                            b"\0\0\0\x03XYZ".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                ]),
+                2,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, dump.clone(), 2), dump)
+                .unwrap();
+            let snapshot = service.diagnostic_snapshot().unwrap();
+            assert_eq!(snapshot.dumps.len(), 2);
+            assert_eq!(snapshot.dumps[1].dump_id, "2/0001");
+            assert!(snapshot.dumps[1].sections.contains(&"SEGMENT0001".into()));
+            assert!(
+                snapshot.dumps[1]
+                    .data
+                    .windows(3)
+                    .any(|bytes| bytes == b"XYZ")
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn dump_transaction_denial_precedes_capture() {
+        let (authorities, seen) = diagnostic_authorities(true);
+        let service = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut denied = request(
+            CicsOperation::DumpTransaction,
+            BTreeMap::from([("DUMPCODE".into(), cics_literal(b"ABCD"))]),
+            1,
+        );
+        denied.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied)
+            .unwrap();
+        assert_eq!(result.condition, "NOTAUTH");
+        assert!(service.diagnostic_snapshot().unwrap().dumps.is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "CICSDIAG"
+                        && resource == "CICS.DIAG.DUMP.ABCD"
+                        && *intent == AccessIntent::Update
+                })
+        );
+    }
+
+    #[test]
+    fn dump_transaction_rejects_malformed_segments_and_space_exhaustion() {
+        let mut limits = CicsLimits::default();
+        limits.max_diagnostic_payload_bytes = 64;
+        let service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            limits,
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let malformed = request(
+            CicsOperation::DumpTransaction,
+            BTreeMap::from([
+                ("DUMPCODE".into(), cics_literal(b"ABCD")),
+                ("SEGMENTLIST".into(), enqueue_value(&[0, 0, 0, 1])),
+                ("LENGTHLIST".into(), enqueue_value(&[0, 0, 0, 3])),
+                ("NUMSEGMENTS".into(), cics_decimal(1)),
+                (
+                    "SEGMENTS".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.dump-segments@1",
+                        b"\0\0\0\x02XY".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 1),
+                malformed
+            ),
+            Err(HostProblem::Malformed)
+        );
+        let mut oversized = request(
+            CicsOperation::DumpTransaction,
+            BTreeMap::from([
+                ("DUMPCODE".into(), cics_literal(b"ABCD")),
+                ("FROM".into(), enqueue_value(&[b'X'; 80])),
+            ]),
+            2,
+        );
+        oversized.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, oversized.clone(), 2),
+                oversized,
+            )
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response, result.response2),
+            ("NOSPACE", 18, 4)
+        );
+        assert!(service.diagnostic_snapshot().unwrap().dumps.is_empty());
     }
 
     fn open_staged_spool_report(

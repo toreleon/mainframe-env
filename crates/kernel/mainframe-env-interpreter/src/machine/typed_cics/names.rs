@@ -60,6 +60,7 @@ pub(super) enum SlotUse {
     SpoolMaxFlengthInput,
     SpoolToFlengthOutput,
     MonitorDataInput,
+    DumpIdOutput,
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -143,6 +144,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::TraceNum | CicsOperandName::TraceFromLength => SlotUse::HalfwordInput,
         CicsOperandName::MonitorPoint => SlotUse::HalfwordInput,
         CicsOperandName::MonitorData1 | CicsOperandName::MonitorData2 => SlotUse::MonitorDataInput,
+        CicsOperandName::DumpLength => SlotUse::HalfwordInput,
+        CicsOperandName::DumpFlength | CicsOperandName::DumpNumSegments => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -197,6 +200,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::DocumentSize => SlotUse::NumericOutput,
         CicsOutputName::SpoolToken => SlotUse::SpoolTokenOutput,
         CicsOutputName::SpoolToFlength => SlotUse::SpoolToFlengthOutput,
+        CicsOutputName::DumpId => SlotUse::DumpIdOutput,
     }
 }
 
@@ -294,6 +298,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SpoolWrite => CicsOperation::SpoolWrite,
         CicsPlanOperation::EnterTraceNum => CicsOperation::EnterTraceNum,
         CicsPlanOperation::Monitor => CicsOperation::Monitor,
+        CicsPlanOperation::DumpTransaction => CicsOperation::DumpTransaction,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -542,6 +547,13 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::MonitorEntryName => "ENTRYNAME",
         CicsOperandName::MonitorData1 => "DATA1",
         CicsOperandName::MonitorData2 => "DATA2",
+        CicsOperandName::DumpCode => "DUMPCODE",
+        CicsOperandName::DumpFrom => "FROM",
+        CicsOperandName::DumpLength => "LENGTH",
+        CicsOperandName::DumpFlength => "FLENGTH",
+        CicsOperandName::DumpSegmentList => "SEGMENTLIST",
+        CicsOperandName::DumpLengthList => "LENGTHLIST",
+        CicsOperandName::DumpNumSegments => "NUMSEGMENTS",
     }
 }
 
@@ -618,6 +630,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::JournalReqId => "REQID",
         CicsOutputName::SpoolToken => "TOKEN",
         CicsOutputName::SpoolToFlength => "TOFLENGTH",
+        CicsOutputName::DumpId => "DUMPID",
     }
 }
 
@@ -719,5 +732,17 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::AcqActivity => "ACQACTIVITY",
         CicsPlanOption::AcqProcess => "ACQPROCESS",
         CicsPlanOption::TraceException => "EXCEPTION",
+        CicsPlanOption::DumpComplete => "COMPLETE",
+        CicsPlanOption::DumpTask => "TASK",
+        CicsPlanOption::DumpStorage => "STORAGE",
+        CicsPlanOption::DumpProgram => "PROGRAM",
+        CicsPlanOption::DumpTerminal => "TERMINAL",
+        CicsPlanOption::DumpTables => "TABLES",
+        CicsPlanOption::DumpFct => "FCT",
+        CicsPlanOption::DumpPct => "PCT",
+        CicsPlanOption::DumpPpt => "PPT",
+        CicsPlanOption::DumpSit => "SIT",
+        CicsPlanOption::DumpTct => "TCT",
+        CicsPlanOption::DumpTrt => "TRT",
     }
 }

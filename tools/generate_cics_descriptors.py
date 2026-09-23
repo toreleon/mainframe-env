@@ -292,6 +292,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("RemoveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0166"),
     ("EnterTraceNum", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0066"),
     ("Monitor", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0143"),
+    ("DumpTransaction", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0057"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -691,6 +692,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SpoolWrite",
         "EnterTraceNum",
         "Monitor",
+        "DumpTransaction",
         "Suspend",
         "WaitEvent",
         "WaitExternal",
@@ -1079,6 +1081,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Monitor": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
+    "DumpTransaction": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1319,6 +1324,7 @@ def _load_typed_execution_registrations(
         "DocumentInsert",
         "DocumentRetrieve",
         "DocumentSet",
+        "DumpTransaction",
         "Enq",
         "EnterTraceNum",
         "Freemain",

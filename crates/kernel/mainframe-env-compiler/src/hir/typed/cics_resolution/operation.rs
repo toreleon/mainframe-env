@@ -100,6 +100,7 @@ pub(super) fn resolve(
         ["SPOOLWRITE"] => HirCicsOperation::SpoolWrite,
         ["ENTER", "TRACENUM"] => HirCicsOperation::EnterTraceNum,
         ["MONITOR"] => HirCicsOperation::Monitor,
+        ["DUMP", "TRANSACTION"] => HirCicsOperation::DumpTransaction,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,

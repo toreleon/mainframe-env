@@ -207,6 +207,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0055"
     },
     {
+      "operation": "DumpTransaction",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0057"
+    },
+    {
       "operation": "Enq",
       "interface": "api",
       "family": "task-control",

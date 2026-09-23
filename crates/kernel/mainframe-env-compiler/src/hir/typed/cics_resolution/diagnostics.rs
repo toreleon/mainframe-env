@@ -1,6 +1,6 @@
 use super::super::{
-    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
-    ResolutionFailure,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
 };
 use super::{Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value};
 use crate::{CobolUsage, DataCategory, SemanticModel};
@@ -16,6 +16,18 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
             "RESP2",
         ],
         HirCicsOperation::Monitor => &["POINT", "DATA1", "DATA2", "ENTRYNAME", "RESP", "RESP2"],
+        HirCicsOperation::DumpTransaction => &[
+            "DUMPCODE",
+            "FROM",
+            "LENGTH",
+            "FLENGTH",
+            "SEGMENTLIST",
+            "LENGTHLIST",
+            "NUMSEGMENTS",
+            "DUMPID",
+            "RESP",
+            "RESP2",
+        ],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -24,6 +36,10 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
     match operation {
         HirCicsOperation::EnterTraceNum => &["EXCEPTION", "NOHANDLE"],
         HirCicsOperation::Monitor => &["NOHANDLE"],
+        HirCicsOperation::DumpTransaction => &[
+            "COMPLETE", "TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES", "FCT", "PCT", "PPT",
+            "SIT", "TCT", "TRT", "NOHANDLE",
+        ],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -32,6 +48,7 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::EnterTraceNum => &["TRACENUM"],
         HirCicsOperation::Monitor => &["POINT"],
+        HirCicsOperation::DumpTransaction => &["DUMPCODE"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -43,6 +60,9 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     if operation == HirCicsOperation::Monitor {
         return monitor_operands(clauses, semantic);
+    }
+    if operation == HirCicsOperation::DumpTransaction {
+        return dump_transaction_operands(clauses, semantic);
     }
     if operation != HirCicsOperation::EnterTraceNum {
         return Ok(Vec::new());
@@ -148,6 +168,171 @@ fn monitor_operands(
         }
     }
     Ok(result)
+}
+
+pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsOption> {
+    if operation != HirCicsOperation::DumpTransaction {
+        return None;
+    }
+    Some(match name {
+        "COMPLETE" => HirCicsOption::DumpComplete,
+        "TASK" => HirCicsOption::DumpTask,
+        "STORAGE" => HirCicsOption::DumpStorage,
+        "PROGRAM" => HirCicsOption::DumpProgram,
+        "TERMINAL" => HirCicsOption::DumpTerminal,
+        "TABLES" => HirCicsOption::DumpTables,
+        "FCT" => HirCicsOption::DumpFct,
+        "PCT" => HirCicsOption::DumpPct,
+        "PPT" => HirCicsOption::DumpPpt,
+        "SIT" => HirCicsOption::DumpSit,
+        "TCT" => HirCicsOption::DumpTct,
+        "TRT" => HirCicsOption::DumpTrt,
+        _ => return None,
+    })
+}
+
+pub(super) fn outputs(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation != HirCicsOperation::DumpTransaction {
+        return Ok(Vec::new());
+    }
+    let Some(tokens) = clauses.get("DUMPID") else {
+        return Ok(Vec::new());
+    };
+    let target = complete_data_reference(tokens, semantic)?;
+    require_writable(&target)?;
+    if target.length != 9
+        || !matches!(
+            target.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DUMP TRANSACTION DUMPID requires nine-character writable storage".into(),
+        ));
+    }
+    Ok(vec![HirCicsOutputBinding {
+        name: HirCicsOutputName::DumpId,
+        target,
+    }])
+}
+
+fn dump_transaction_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let code = cics_value(&clauses["DUMPCODE"], semantic)?;
+    let valid_code = match &code {
+        HirCicsValue::Literal(text) => (1..=4).contains(&text.len()),
+        HirCicsValue::Data(reference) => {
+            (1..=4).contains(&reference.length)
+                && matches!(
+                    reference.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                )
+        }
+        _ => false,
+    };
+    if !valid_code {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DUMP TRANSACTION DUMPCODE requires one to four characters".into(),
+        ));
+    }
+    if clauses.contains_key("LENGTH") && clauses.contains_key("FLENGTH") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DUMP TRANSACTION LENGTH and FLENGTH are mutually exclusive".into(),
+        ));
+    }
+    if (clauses.contains_key("LENGTH") || clauses.contains_key("FLENGTH"))
+        && !clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DUMP TRANSACTION LENGTH or FLENGTH requires FROM".into(),
+        ));
+    }
+    let segment_count = ["SEGMENTLIST", "LENGTHLIST", "NUMSEGMENTS"]
+        .iter()
+        .filter(|name| clauses.contains_key(**name))
+        .count();
+    if segment_count != 0 && segment_count != 3 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DUMP TRANSACTION SEGMENTLIST, LENGTHLIST, and NUMSEGMENTS must occur together"
+                .into(),
+        ));
+    }
+    let mut result = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::DumpCode,
+        value: code,
+    }];
+    if let Some(tokens) = clauses.get("FROM") {
+        result.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::DumpFrom,
+            value: HirCicsValue::Data(complete_data_reference(tokens, semantic)?),
+        });
+    }
+    for (name, identity, width) in [
+        ("LENGTH", HirCicsOperandName::DumpLength, 2),
+        ("FLENGTH", HirCicsOperandName::DumpFlength, 4),
+    ] {
+        if let Some(tokens) = clauses.get(name) {
+            let value = cics_integer_value(tokens, semantic)?;
+            if let HirCicsValue::Data(reference) = &value {
+                require_binary_width("DUMP TRANSACTION", name, reference, width)?;
+            }
+            result.push(HirCicsNamedOperand {
+                name: identity,
+                value,
+            });
+        }
+    }
+    if segment_count == 3 {
+        for (name, identity) in [
+            ("SEGMENTLIST", HirCicsOperandName::DumpSegmentList),
+            ("LENGTHLIST", HirCicsOperandName::DumpLengthList),
+        ] {
+            let reference = complete_data_reference(&clauses[name], semantic)?;
+            if reference.length == 0 || reference.length % 4 != 0 {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS DUMP TRANSACTION {name} requires a four-byte aligned list"
+                )));
+            }
+            result.push(HirCicsNamedOperand {
+                name: identity,
+                value: HirCicsValue::Data(reference),
+            });
+        }
+        let count = complete_data_reference(&clauses["NUMSEGMENTS"], semantic)?;
+        require_binary_width("DUMP TRANSACTION", "NUMSEGMENTS", &count, 4)?;
+        result.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::DumpNumSegments,
+            value: HirCicsValue::Data(count),
+        });
+    }
+    Ok(result)
+}
+
+fn require_binary_width(
+    command: &str,
+    name: &str,
+    reference: &super::super::HirDataReference,
+    width: usize,
+) -> Resolution<()> {
+    if reference.length == width
+        && reference.scale == 0
+        && matches!(
+            reference.usage,
+            CobolUsage::Binary | CobolUsage::NativeBinary
+        )
+    {
+        Ok(())
+    } else {
+        Err(ResolutionFailure::Invalid(format!(
+            "CICS {command} {name} requires {width}-byte binary storage"
+        )))
+    }
 }
 
 fn require_halfword(

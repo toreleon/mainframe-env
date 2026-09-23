@@ -53,6 +53,7 @@ pub enum HirCicsOperation {
     SpoolWrite,
     EnterTraceNum,
     Monitor,
+    DumpTransaction,
     Syncpoint,
     Unlock,
     Suspend,
@@ -334,6 +335,13 @@ pub enum HirCicsOperandName {
     MonitorEntryName,
     MonitorData1,
     MonitorData2,
+    DumpCode,
+    DumpFrom,
+    DumpLength,
+    DumpFlength,
+    DumpSegmentList,
+    DumpLengthList,
+    DumpNumSegments,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -429,4 +437,16 @@ pub enum HirCicsOption {
     NoAutopage,
     OperPurge,
     AsIs,
+    DumpComplete,
+    DumpTask,
+    DumpStorage,
+    DumpProgram,
+    DumpTerminal,
+    DumpTables,
+    DumpFct,
+    DumpPct,
+    DumpPpt,
+    DumpSit,
+    DumpTct,
+    DumpTrt,
 }

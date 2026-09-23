@@ -389,6 +389,13 @@ impl PlanContext<'_> {
                 HirCicsOperandName::MonitorEntryName => CicsOperandName::MonitorEntryName,
                 HirCicsOperandName::MonitorData1 => CicsOperandName::MonitorData1,
                 HirCicsOperandName::MonitorData2 => CicsOperandName::MonitorData2,
+                HirCicsOperandName::DumpCode => CicsOperandName::DumpCode,
+                HirCicsOperandName::DumpFrom => CicsOperandName::DumpFrom,
+                HirCicsOperandName::DumpLength => CicsOperandName::DumpLength,
+                HirCicsOperandName::DumpFlength => CicsOperandName::DumpFlength,
+                HirCicsOperandName::DumpSegmentList => CicsOperandName::DumpSegmentList,
+                HirCicsOperandName::DumpLengthList => CicsOperandName::DumpLengthList,
+                HirCicsOperandName::DumpNumSegments => CicsOperandName::DumpNumSegments,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -459,6 +466,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::CounterMaximum => CicsOutputName::CounterMaximum,
                 HirCicsOutputName::SpoolToken => CicsOutputName::SpoolToken,
                 HirCicsOutputName::SpoolToFlength => CicsOutputName::SpoolToFlength,
+                HirCicsOutputName::DumpId => CicsOutputName::DumpId,
             },
             target: self.slot(&output.target)?,
         })
@@ -535,6 +543,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SpoolWrite => CicsPlanOperation::SpoolWrite,
         HirCicsOperation::EnterTraceNum => CicsPlanOperation::EnterTraceNum,
         HirCicsOperation::Monitor => CicsPlanOperation::Monitor,
+        HirCicsOperation::DumpTransaction => CicsPlanOperation::DumpTransaction,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -721,5 +730,17 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::AcqActivity => CicsPlanOption::AcqActivity,
         HirCicsOption::AcqProcess => CicsPlanOption::AcqProcess,
         HirCicsOption::TraceException => CicsPlanOption::TraceException,
+        HirCicsOption::DumpComplete => CicsPlanOption::DumpComplete,
+        HirCicsOption::DumpTask => CicsPlanOption::DumpTask,
+        HirCicsOption::DumpStorage => CicsPlanOption::DumpStorage,
+        HirCicsOption::DumpProgram => CicsPlanOption::DumpProgram,
+        HirCicsOption::DumpTerminal => CicsPlanOption::DumpTerminal,
+        HirCicsOption::DumpTables => CicsPlanOption::DumpTables,
+        HirCicsOption::DumpFct => CicsPlanOption::DumpFct,
+        HirCicsOption::DumpPct => CicsPlanOption::DumpPct,
+        HirCicsOption::DumpPpt => CicsPlanOption::DumpPpt,
+        HirCicsOption::DumpSit => CicsPlanOption::DumpSit,
+        HirCicsOption::DumpTct => CicsPlanOption::DumpTct,
+        HirCicsOption::DumpTrt => CicsPlanOption::DumpTrt,
     }
 }

@@ -47,13 +47,21 @@ pub struct CicsDiagnosticTraceRecord {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CicsDiagnosticDumpRecord {
+    /// Strictly increasing sequence within the durable diagnostic row.
     pub sequence: u64,
+    /// Local run/count identifier, formatted as `xxxx/yyyy`.
     pub dump_id: String,
+    /// `TRANSACTION` for an application transaction dump.
     pub scope: String,
+    /// Requested dump code, including invalid source text when INVREQ/13 followed capture.
     pub code: String,
+    /// Ordered section names present in `data`.
     pub sections: Vec<String>,
+    /// `MECDMP01`, a big-endian section count, then length-prefixed names and bytes.
     pub data: Vec<u8>,
+    /// Issuing run unit identity at capture time.
     pub run_unit: String,
+    /// Issuing principal identity at capture time.
     pub principal: String,
 }
 

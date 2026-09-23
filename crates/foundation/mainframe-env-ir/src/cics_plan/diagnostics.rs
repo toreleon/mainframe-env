@@ -72,3 +72,58 @@ pub(super) fn invalid_monitor_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_dump_transaction_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let segments = [
+        CicsOperandName::DumpSegmentList,
+        CicsOperandName::DumpLengthList,
+        CicsOperandName::DumpNumSegments,
+    ]
+    .iter()
+    .filter(|name| inputs.contains(name))
+    .count();
+    !inputs.contains(&CicsOperandName::DumpCode)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::DumpCode,
+            CicsOperandName::DumpFrom,
+            CicsOperandName::DumpLength,
+            CicsOperandName::DumpFlength,
+            CicsOperandName::DumpSegmentList,
+            CicsOperandName::DumpLengthList,
+            CicsOperandName::DumpNumSegments,
+        ]))
+        || inputs.contains(&CicsOperandName::DumpLength)
+            && inputs.contains(&CicsOperandName::DumpFlength)
+        || (inputs.contains(&CicsOperandName::DumpLength)
+            || inputs.contains(&CicsOperandName::DumpFlength))
+            && !inputs.contains(&CicsOperandName::DumpFrom)
+        || segments != 0 && segments != 3
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::DumpCode => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::DumpFrom
+            | CicsOperandName::DumpSegmentList
+            | CicsOperandName::DumpLengthList
+            | CicsOperandName::DumpNumSegments => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::DumpLength | CicsOperandName::DumpFlength => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+            ),
+            _ => true,
+        })
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::DumpId | CicsOutputName::Resp | CicsOutputName::Resp2
+            )
+        })
+        || super::option_shape::has_unsupported(plan)
+}

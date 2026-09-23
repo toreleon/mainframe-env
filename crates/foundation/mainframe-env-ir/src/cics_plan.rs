@@ -679,6 +679,9 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::EnterTraceNum => diagnostics::invalid_trace_num_shape(plan, inputs, outputs),
         CicsPlanOperation::Monitor => diagnostics::invalid_monitor_shape(plan, inputs, outputs),
+        CicsPlanOperation::DumpTransaction => {
+            diagnostics::invalid_dump_transaction_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2561,6 +2564,44 @@ mod tests {
         );
         let mut invalid = plan;
         invalid.operands.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn dump_transaction_uses_reserved_v2_tags_and_checked_dependencies() {
+        assert_eq!(operation_tag(CicsPlanOperation::DumpTransaction), 149);
+        assert_eq!(operand_tag(CicsOperandName::DumpCode), 584);
+        assert_eq!(operand_tag(CicsOperandName::DumpFrom), 585);
+        assert_eq!(operand_tag(CicsOperandName::DumpNumSegments), 590);
+        assert_eq!(option_tag(CicsPlanOption::DumpComplete), 509);
+        assert_eq!(option_tag(CicsPlanOption::DumpTrt), 520);
+        assert_eq!(output_tag(CicsOutputName::DumpId), 632);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DumpTransaction,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::DumpCode,
+                value: CicsOperandValue::Literal(b"ABCD".to_vec()),
+            }],
+            options: BTreeSet::from([CicsPlanOption::DumpTask]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::DumpId,
+                target: slot(1, "DUMP-ID-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        let mut invalid = plan;
+        invalid.operands.push(CicsNamedOperand {
+            name: CicsOperandName::DumpLength,
+            value: CicsOperandValue::Integer(4),
+        });
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
