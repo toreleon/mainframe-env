@@ -515,6 +515,8 @@ impl PlanContext<'_> {
                 HirCicsOutputName::WebRealmLength => CicsOutputName::WebRealmLength,
                 HirCicsOutputName::WebValue => CicsOutputName::WebValue,
                 HirCicsOutputName::WebValueLength => CicsOutputName::WebValueLength,
+                HirCicsOutputName::WebBrowseName => CicsOutputName::WebBrowseName,
+                HirCicsOutputName::WebBrowseNameLength => CicsOutputName::WebBrowseNameLength,
             },
             target: self.slot(&output.target)?,
         })
@@ -688,6 +690,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::ExtractWeb => CicsPlanOperation::ExtractWeb,
         HirCicsOperation::WebRead => CicsPlanOperation::WebRead,
         HirCicsOperation::WebStartBrowse => CicsPlanOperation::WebStartBrowse,
+        HirCicsOperation::WebReadNext => CicsPlanOperation::WebReadNext,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,

@@ -644,6 +644,7 @@ fn validate_operation_shape(
         CicsPlanOperation::ExtractWeb => web_control::invalid_extract_shape(plan, inputs, outputs),
         CicsPlanOperation::WebRead => web_control::invalid_read_shape(plan, inputs, outputs),
         CicsPlanOperation::WebStartBrowse => web_control::invalid_start_browse_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebReadNext => web_control::invalid_read_next_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2228,6 +2229,62 @@ mod tests {
         conflict.options.insert(CicsPlanOption::WebBrowseFormField);
         assert_eq!(
             encode_cics_effect_plan(&conflict, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_readnext_codec_checks_cursor_result_bindings() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebReadNext), 98);
+        assert_eq!(operation_from_tag(98), Ok(CicsPlanOperation::WebReadNext));
+        assert_eq!(output_tag(CicsOutputName::WebBrowseName), 335);
+        assert_eq!(output_tag(CicsOutputName::WebBrowseNameLength), 336);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebReadNext,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::WebNameLength,
+                    value: CicsOperandValue::Storage(slot(1, "NAME-LEN")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebValueLength,
+                    value: CicsOperandValue::Storage(slot(2, "VALUE-LEN")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::WebBrowseQueryParm]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::WebValue,
+                    target: slot(3, "VALUE-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebValueLength,
+                    target: slot(2, "VALUE-LEN"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebBrowseName,
+                    target: slot(4, "NAME-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebBrowseNameLength,
+                    target: slot(1, "NAME-LEN"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut invalid = plan;
+        invalid.outputs.remove(3);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

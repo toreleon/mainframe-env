@@ -17,6 +17,12 @@ pub(super) fn reviewed_ambiguous_shape(
         return true;
     }
     if has_value
+        && descriptor.label_tokens == ["WEB", "READNEXT"]
+        && READ_NEXT_CLAUSES.contains(&name)
+    {
+        return true;
+    }
+    if has_value
         && matches!(
             descriptor.label_tokens,
             ["WEB", "EXTRACT"] | ["EXTRACT", "WEB"]
@@ -108,6 +114,17 @@ pub(super) const START_BROWSE_CLAUSES: &[&str] = &[
 ];
 pub(super) const START_BROWSE_OPTIONS: &[&str] =
     &["HTTPHEADER", "FORMFIELD", "QUERYPARM", "NOHANDLE"];
+pub(super) const READ_NEXT_CLAUSES: &[&str] = &[
+    "HTTPHEADER",
+    "QUERYPARM",
+    "FORMFIELD",
+    "NAMELENGTH",
+    "SESSTOKEN",
+    "VALUE",
+    "VALUELENGTH",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -117,6 +134,9 @@ pub(super) fn validate(
 ) -> Resolution<()> {
     if operation == HirCicsOperation::WebStartBrowse {
         return validate_start_browse(clauses, options, semantic);
+    }
+    if operation == HirCicsOperation::WebReadNext {
+        return validate_read_next(clauses, semantic);
     }
     if matches!(
         operation,
@@ -366,6 +386,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::WebStartBrowse {
         return start_browse_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::WebReadNext {
+        return read_next_operands(clauses, semantic);
+    }
     if matches!(
         operation,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
@@ -463,6 +486,9 @@ pub(super) fn outputs(
     }
     if operation == HirCicsOperation::WebRead {
         return read_outputs(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebReadNext {
+        return read_next_outputs(clauses, semantic);
     }
     if operation == HirCicsOperation::WebOpen {
         return open_outputs(clauses, semantic);
@@ -872,4 +898,103 @@ fn start_browse_operands(
         });
     }
     Ok(operands)
+}
+
+fn validate_read_next(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    let selectors = ["HTTPHEADER", "QUERYPARM", "FORMFIELD"];
+    if selectors
+        .iter()
+        .filter(|name| clauses.contains_key(**name))
+        .count()
+        != 1
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READNEXT requires exactly one browse kind".into(),
+        ));
+    }
+    if clauses.contains_key("SESSTOKEN") && !clauses.contains_key("HTTPHEADER") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB READNEXT SESSTOKEN applies only to HTTPHEADER".into(),
+        ));
+    }
+    for name in ["NAMELENGTH", "VALUE", "VALUELENGTH"] {
+        if !clauses.contains_key(name) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS WEB READNEXT requires {name}"
+            )));
+        }
+    }
+    let name = selectors
+        .into_iter()
+        .find(|name| clauses.contains_key(*name))
+        .ok_or(ResolutionFailure::Unsupported)?;
+    for area in [name, "VALUE"] {
+        let target = complete_data_reference(&clauses[area], semantic)?;
+        require_writable(&target)?;
+        if target.length == 0 {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS WEB READNEXT {area} requires receiving storage"
+            )));
+        }
+    }
+    for length in ["NAMELENGTH", "VALUELENGTH"] {
+        fullword_target(&clauses[length], semantic, length)?;
+    }
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        let token = cics_value(tokens, semantic)?;
+        if !matches!(&token, HirCicsValue::Data(reference) if reference.length == 8)
+            && !matches!(&token, HirCicsValue::Literal(bytes) if bytes.len() == 8)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB READNEXT SESSTOKEN requires eight bytes".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn read_next_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::WebNameLength,
+            value: HirCicsValue::Data(complete_data_reference(&clauses["NAMELENGTH"], semantic)?),
+        },
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::WebValueLength,
+            value: HirCicsValue::Data(complete_data_reference(&clauses["VALUELENGTH"], semantic)?),
+        },
+    ];
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::WebSessionToken,
+            value: cics_value(tokens, semantic)?,
+        });
+    }
+    Ok(operands)
+}
+
+fn read_next_outputs(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    let name = ["HTTPHEADER", "QUERYPARM", "FORMFIELD"]
+        .into_iter()
+        .find(|name| clauses.contains_key(*name))
+        .ok_or(ResolutionFailure::Unsupported)?;
+    let mut outputs = Vec::new();
+    for (source, target) in [
+        (name, HirCicsOutputName::WebBrowseName),
+        ("NAMELENGTH", HirCicsOutputName::WebBrowseNameLength),
+        ("VALUE", HirCicsOutputName::WebValue),
+        ("VALUELENGTH", HirCicsOutputName::WebValueLength),
+    ] {
+        outputs.push(HirCicsOutputBinding {
+            name: target,
+            target: complete_data_reference(&clauses[source], semantic)?,
+        });
+    }
+    Ok(outputs)
 }

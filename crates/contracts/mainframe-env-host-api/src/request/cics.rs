@@ -243,6 +243,8 @@ pub enum CicsOperation {
     WebRead,
     /// Start one task-owned Web header, query, or form browse.
     WebStartBrowse,
+    /// Read the next name and value from a task-owned Web browse.
+    WebReadNext,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -391,6 +393,7 @@ impl CicsOperation {
             Self::ExtractWeb => "ExtractWeb",
             Self::WebRead => "WebRead",
             Self::WebStartBrowse => "WebStartBrowse",
+            Self::WebReadNext => "WebReadNext",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -447,6 +450,7 @@ impl CicsOperation {
                 | Self::WebOpen
                 | Self::WebClose
                 | Self::WebStartBrowse
+                | Self::WebReadNext
                 | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
@@ -673,6 +677,7 @@ impl CicsOperation {
             ("EXTRACT", Some("WEB")) => Self::ExtractWeb,
             ("WEB", Some("READ")) => Self::WebRead,
             ("WEB", Some("STARTBROWSE")) => Self::WebStartBrowse,
+            ("WEB", Some("READNEXT")) => Self::WebReadNext,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

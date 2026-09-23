@@ -180,6 +180,8 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebRealmLength
         | HirCicsOutputName::WebValue
         | HirCicsOutputName::WebValueLength
+        | HirCicsOutputName::WebBrowseName
+        | HirCicsOutputName::WebBrowseNameLength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

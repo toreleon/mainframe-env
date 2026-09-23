@@ -6960,6 +6960,51 @@ mod tests {
     }
 
     #[test]
+    fn web_readnext_lowers_browse_buffers_and_rejects_selector_conflicts() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBNEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAME-X PIC X(8). 01 NAME-LEN PIC S9(9) COMP VALUE 8. 01 VALUE-X PIC X(16). 01 VALUE-LEN PIC S9(9) COMP VALUE 16. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
+        for (source, option) in [
+            (
+                "WEB READNEXT QUERYPARM(NAME-X) NAMELENGTH(NAME-LEN) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+                HirCicsOption::WebBrowseQueryParm,
+            ),
+            (
+                "WEB READNEXT HTTPHEADER(NAME-X) NAMELENGTH(NAME-LEN) SESSTOKEN(TOKEN-X) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+                HirCicsOption::WebBrowseHttpHeader,
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed WEB READNEXT");
+            assert_eq!(command.operation, HirCicsOperation::WebReadNext);
+            assert!(command.options.contains(&option));
+            assert!(command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::WebBrowseNameLength
+                    && output.target.qualified_name == "NAME-LEN"
+            }));
+        }
+        for source in [
+            "WEB READNEXT QUERYPARM(NAME-X) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+            "WEB READNEXT QUERYPARM(NAME-X) FORMFIELD(NAME-X) NAMELENGTH(NAME-LEN) VALUE(VALUE-X) VALUELENGTH(VALUE-LEN)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn web_startbrowse_selects_header_or_named_query_cursor() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBBROWSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAME-X PIC X(8) VALUE 'q'. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
         for (source, kind) in [

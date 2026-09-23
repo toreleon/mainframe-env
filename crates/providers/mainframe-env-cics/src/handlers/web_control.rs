@@ -10,6 +10,7 @@ mod model;
 mod open;
 mod parse_url;
 mod read;
+mod read_next;
 mod start_browse;
 pub use model::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
@@ -297,6 +298,9 @@ pub(in crate::service) fn invoke(
         CicsOperation::WebExtract => extract::invoke(service, run, request),
         CicsOperation::ExtractWeb => extract::invoke(service, run, request),
         CicsOperation::WebRead => read::invoke(service, run, request),
+        CicsOperation::WebReadNext => {
+            read_next::invoke(service, run, request, run.invocation.deadline_tick)
+        }
         CicsOperation::WebStartBrowse => {
             start_browse::invoke(service, run, request, run.invocation.deadline_tick)
         }

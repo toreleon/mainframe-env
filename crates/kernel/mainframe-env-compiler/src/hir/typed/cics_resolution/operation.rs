@@ -137,6 +137,7 @@ pub(super) fn resolve(
         ["EXTRACT", "WEB"] => HirCicsOperation::ExtractWeb,
         ["WEB", "READ"] => HirCicsOperation::WebRead,
         ["WEB", "STARTBROWSE"] => HirCicsOperation::WebStartBrowse,
+        ["WEB", "READNEXT"] => HirCicsOperation::WebReadNext,
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
         ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,

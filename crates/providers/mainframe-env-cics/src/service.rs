@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 136);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 137);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7921,6 +7921,99 @@ mod tests {
             ),
             ("ILLOGIC", 21, 5)
         );
+        let mut short_next = request(
+            CicsOperation::WebReadNext,
+            BTreeMap::from([
+                ("OPTION.QUERYPARM".into(), argument(b"")),
+                ("BROWSENAME".into(), argument(b"NAME-X")),
+                ("NAMELENGTH".into(), cics_decimal(8)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(2)),
+            ]),
+            3,
+        );
+        short_next.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let short = service
+            .invoke(
+                &effect(&invocation.run_unit_id, short_next.clone(), 3),
+                short_next,
+            )
+            .unwrap();
+        assert_eq!(
+            (short.condition.as_str(), short.response, short.response2),
+            ("LENGERR", 22, 5)
+        );
+        assert_eq!(short.outputs["VALUE"].bytes(), b"tw");
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .web
+                .browses
+                .values()
+                .next()
+                .unwrap()
+                .cursor,
+            1
+        );
+        let next = request(
+            CicsOperation::WebReadNext,
+            BTreeMap::from([
+                ("OPTION.QUERYPARM".into(), argument(b"")),
+                ("BROWSENAME".into(), argument(b"NAME-X")),
+                ("NAMELENGTH".into(), cics_decimal(8)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(8)),
+            ]),
+            4,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, next.clone(), 4),
+                next.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let complete = service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 4), next)
+            .unwrap();
+        assert_eq!(complete.outputs["BROWSENAME"].bytes(), b"b");
+        assert_eq!(complete.outputs["VALUE"].bytes(), b"two");
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .web
+                .browses
+                .values()
+                .next()
+                .unwrap()
+                .cursor,
+            2
+        );
+        let mut end = request(
+            CicsOperation::WebReadNext,
+            BTreeMap::from([
+                ("OPTION.QUERYPARM".into(), argument(b"")),
+                ("BROWSENAME".into(), argument(b"NAME-X")),
+                ("NAMELENGTH".into(), cics_decimal(8)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(8)),
+            ]),
+            5,
+        );
+        end.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let end = service
+            .invoke(&effect(&invocation.run_unit_id, end.clone(), 5), end)
+            .unwrap();
+        assert_eq!((end.condition.as_str(), end.response), ("ENDFILE", 20));
         let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         handlers::release_task_state(&service, &run).unwrap();
         assert!(
@@ -7979,7 +8072,8 @@ mod tests {
         drop(store);
         let reopened_store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
         let reopened =
-            CicsService::open(authorities(), reopened_store, CicsLimits::default()).unwrap();
+            CicsService::open(authorities(), reopened_store.clone(), CicsLimits::default())
+                .unwrap();
         let state = reopened.lock().unwrap();
         let browse = state.web.browses.values().next().unwrap();
         assert_eq!(browse.kind, "QUERYPARM");
@@ -7992,6 +8086,32 @@ mod tests {
         );
         assert_eq!(browse.cursor, 0);
         drop(state);
+        reopened
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let next = request(
+            CicsOperation::WebReadNext,
+            BTreeMap::from([
+                ("OPTION.QUERYPARM".into(), argument(b"")),
+                ("BROWSENAME".into(), argument(b"NAME-X")),
+                ("NAMELENGTH".into(), cics_decimal(8)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(8)),
+            ]),
+            2,
+        );
+        let result = reopened
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+            .unwrap();
+        assert_eq!(result.outputs["BROWSENAME"].bytes(), b"a");
+        assert_eq!(result.outputs["VALUE"].bytes(), b"one");
+        assert_eq!(
+            reopened_store
+                .list_provider_state("cics-web-browse-v1", 8)
+                .unwrap()[0]
+                .version,
+            2
+        );
         drop(reopened);
         std::fs::remove_dir_all(directory).unwrap();
     }

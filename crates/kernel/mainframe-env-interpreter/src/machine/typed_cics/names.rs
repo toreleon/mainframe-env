@@ -219,6 +219,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::WebUriMap
         | CicsOutputName::WebRealm
         | CicsOutputName::WebValue => SlotUse::Output,
+        CicsOutputName::WebBrowseName => SlotUse::Output,
         CicsOutputName::WebHostLength
         | CicsOutputName::WebHostType
         | CicsOutputName::WebPortNumber
@@ -230,6 +231,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::WebRequestType
         | CicsOutputName::WebRealmLength
         | CicsOutputName::WebValueLength => SlotUse::FullwordOutput,
+        CicsOutputName::WebBrowseNameLength => SlotUse::FullwordOutput,
         CicsOutputName::WebSessionToken => SlotUse::Output,
         CicsOutputName::WebHttpVNum | CicsOutputName::WebHttpRNum => SlotUse::HalfwordOutput,
     }
@@ -371,6 +373,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::ExtractWeb => CicsOperation::ExtractWeb,
         CicsPlanOperation::WebRead => CicsOperation::WebRead,
         CicsPlanOperation::WebStartBrowse => CicsOperation::WebStartBrowse,
+        CicsPlanOperation::WebReadNext => CicsOperation::WebReadNext,
     }
 }
 
@@ -720,6 +723,8 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::WebRealmLength => "REALMLEN",
         CicsOutputName::WebValue => "VALUE",
         CicsOutputName::WebValueLength => "VALUELENGTH",
+        CicsOutputName::WebBrowseName => "BROWSENAME",
+        CicsOutputName::WebBrowseNameLength => "NAMELENGTH",
     }
 }
 

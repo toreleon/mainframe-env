@@ -76,4 +76,6 @@ pub enum HirCicsOutputName {
     WebRealmLength,
     WebValue,
     WebValueLength,
+    WebBrowseName,
+    WebBrowseNameLength,
 }

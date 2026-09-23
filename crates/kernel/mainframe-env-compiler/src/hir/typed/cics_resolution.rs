@@ -657,6 +657,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => web_control::EXTRACT_CLAUSES,
         HirCicsOperation::WebRead => web_control::READ_CLAUSES,
         HirCicsOperation::WebStartBrowse => web_control::START_BROWSE_CLAUSES,
+        HirCicsOperation::WebReadNext => web_control::READ_NEXT_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -766,6 +767,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &["NOHANDLE"],
         HirCicsOperation::WebRead => &["NOHANDLE"],
         HirCicsOperation::WebStartBrowse => web_control::START_BROWSE_OPTIONS,
+        HirCicsOperation::WebReadNext => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -940,6 +942,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &[][..],
         HirCicsOperation::WebRead => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
         HirCicsOperation::WebStartBrowse => &[][..],
+        HirCicsOperation::WebReadNext => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1192,7 +1195,13 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 .unwrap_or_else(|| operation::resolve_option(option, operation))
         })
         .collect::<BTreeSet<_>>();
-    if operation == HirCicsOperation::WebStartBrowse {
+    if matches!(
+        operation,
+        HirCicsOperation::WebStartBrowse | HirCicsOperation::WebReadNext
+    ) {
+        if operation == HirCicsOperation::WebReadNext && clauses.contains_key("HTTPHEADER") {
+            options.insert(HirCicsOption::WebBrowseHttpHeader);
+        }
         if clauses.contains_key("FORMFIELD") {
             options.insert(HirCicsOption::WebBrowseFormField);
         }

@@ -110,6 +110,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::ExtractWeb => 95,
         CicsPlanOperation::WebRead => 96,
         CicsPlanOperation::WebStartBrowse => 97,
+        CicsPlanOperation::WebReadNext => 98,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -249,6 +250,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         95 => Ok(CicsPlanOperation::ExtractWeb),
         96 => Ok(CicsPlanOperation::WebRead),
         97 => Ok(CicsPlanOperation::WebStartBrowse),
+        98 => Ok(CicsPlanOperation::WebReadNext),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -1131,6 +1133,8 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::WebRealmLength => 332,
         CicsOutputName::WebValue => 333,
         CicsOutputName::WebValueLength => 334,
+        CicsOutputName::WebBrowseName => 335,
+        CicsOutputName::WebBrowseNameLength => 336,
     }
 }
 
@@ -1210,6 +1214,8 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         332 => Ok(CicsOutputName::WebRealmLength),
         333 => Ok(CicsOutputName::WebValue),
         334 => Ok(CicsOutputName::WebValueLength),
+        335 => Ok(CicsOutputName::WebBrowseName),
+        336 => Ok(CicsOutputName::WebBrowseNameLength),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

@@ -140,5 +140,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::ExtractWeb => &CICS_EXECUTABLE_DESCRIPTORS[131],
         CicsPlanOperation::WebRead => &CICS_EXECUTABLE_DESCRIPTORS[132],
         CicsPlanOperation::WebStartBrowse => &CICS_EXECUTABLE_DESCRIPTORS[133],
+        CicsPlanOperation::WebReadNext => &CICS_EXECUTABLE_DESCRIPTORS[134],
     }
 }

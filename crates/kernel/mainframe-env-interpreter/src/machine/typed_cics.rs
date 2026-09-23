@@ -519,6 +519,8 @@ pub(super) fn execute(
             | CicsOutputName::WebRealmLength
             | CicsOutputName::WebValue
             | CicsOutputName::WebValueLength
+            | CicsOutputName::WebBrowseName
+            | CicsOutputName::WebBrowseNameLength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

@@ -307,3 +307,53 @@ pub(super) fn invalid_start_browse_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_read_next_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let kinds = [
+        CicsPlanOption::WebBrowseHttpHeader,
+        CicsPlanOption::WebBrowseQueryParm,
+        CicsPlanOption::WebBrowseFormField,
+    ];
+    kinds
+        .iter()
+        .filter(|kind| plan.options.contains(kind))
+        .count()
+        != 1
+        || !plan
+            .options
+            .iter()
+            .all(|option| kinds.contains(option) || *option == CicsPlanOption::NoHandle)
+        || !inputs.contains(&CicsOperandName::WebNameLength)
+        || !inputs.contains(&CicsOperandName::WebValueLength)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::WebNameLength,
+            CicsOperandName::WebValueLength,
+            CicsOperandName::WebSessionToken,
+        ]))
+        || inputs.contains(&CicsOperandName::WebSessionToken)
+            && !plan.options.contains(&CicsPlanOption::WebBrowseHttpHeader)
+        || !outputs.contains(&CicsOutputName::WebBrowseName)
+        || !outputs.contains(&CicsOutputName::WebBrowseNameLength)
+        || !outputs.contains(&CicsOutputName::WebValue)
+        || !outputs.contains(&CicsOutputName::WebValueLength)
+        || !matches!(
+            operand_value(plan, CicsOperandName::WebNameLength),
+            Some(CicsOperandValue::Storage(slot))
+                if output_target(&plan.outputs, CicsOutputName::WebBrowseNameLength) == Some(slot)
+        )
+        || !matches!(
+            operand_value(plan, CicsOperandName::WebValueLength),
+            Some(CicsOperandValue::Storage(slot))
+                if output_target(&plan.outputs, CicsOutputName::WebValueLength) == Some(slot)
+        )
+        || operand_value(plan, CicsOperandName::WebSessionToken).is_some_and(|value| {
+            !matches!(
+                value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            )
+        })
+}

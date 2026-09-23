@@ -132,6 +132,7 @@ pub enum HirCicsOperation {
     ExtractWeb,
     WebRead,
     WebStartBrowse,
+    WebReadNext,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

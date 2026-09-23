@@ -38,6 +38,17 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB READNEXT` over durable header, query, and form browse
+  snapshots, preserving the cursor on short buffers and reconciling an
+  uncertain persisted advance. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0247` binds
+  `dfhp4_webreadnextformfield.html` at
+  `sha256:138c7bc282b407692750df5c2902c6a5a9b17133cb1065e2a765762872a688fd`,
+  `dfhp4_webreadnexthttpheader.html` at
+  `sha256:9aebf7346383316e927a8c5857618808e7409e299c349182a46daa5c5fb80bc8`,
+  and `dfhp4_webreadnextqueryparm.html` at
+  `sha256:1503686c2b0a4ae0e9f333f148f0bee8aeddf1c6607e5115b5b914a8d614c0b3`.
+
 - Added typed CICS `WEB STARTBROWSE` for header, query, and URL-encoded form
   snapshots, with named starts, durable cursor state and a compiled route.
   IBM CICS TS 6.x baseline `ibm-cics-ts-6x-2026-08-31:api-commands` row

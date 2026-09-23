@@ -262,6 +262,8 @@ pub enum CicsPlanOperation {
     WebRead,
     /// Start one task-owned Web header, query, or form browse.
     WebStartBrowse,
+    /// Read and advance one task-owned Web browse cursor.
+    WebReadNext,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -1061,4 +1063,8 @@ pub enum CicsOutputName {
     WebValue,
     /// Actual WEB READ value length.
     WebValueLength,
+    /// Name returned by WEB READNEXT.
+    WebBrowseName,
+    /// Actual WEB READNEXT name length.
+    WebBrowseNameLength,
 }
