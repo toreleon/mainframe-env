@@ -1400,6 +1400,7 @@ name = "mainframe-env-execution-api"
 version = "0.8.3"
 dependencies = [
  "mainframe-env-diagnostics",
+ "zeroize",
 ]
 
 [[package]]

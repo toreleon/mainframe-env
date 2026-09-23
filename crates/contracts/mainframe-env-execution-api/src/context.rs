@@ -67,11 +67,32 @@ impl Default for ResourceLimits {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct BoundedPayload {
     schema: String,
-    bytes: Vec<u8>,
+    bytes: std::sync::Arc<zeroize::Zeroizing<Vec<u8>>>,
 }
+
+impl std::fmt::Debug for BoundedPayload {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut result = formatter.debug_struct("BoundedPayload");
+        result.field("schema", &self.schema);
+        if self.schema == "mainframe-env.cics.secret@1" {
+            result.field("bytes", &"<redacted>");
+        } else {
+            result.field("bytes", &self.bytes);
+        }
+        result.finish()
+    }
+}
+
+impl PartialEq for BoundedPayload {
+    fn eq(&self, other: &Self) -> bool {
+        self.schema == other.schema && self.bytes() == other.bytes()
+    }
+}
+
+impl Eq for BoundedPayload {}
 
 impl BoundedPayload {
     pub fn new(
@@ -80,13 +101,17 @@ impl BoundedPayload {
         limits: InvocationLimits,
     ) -> Result<Self, InvocationProblem> {
         let schema = schema.into();
+        let bytes = zeroize::Zeroizing::new(bytes);
         if schema.is_empty() || schema.len() > limits.max_identity_bytes {
             return Err(InvocationProblem::InvalidPayloadSchema);
         }
         if bytes.len() > limits.max_payload_bytes {
             return Err(InvocationProblem::PayloadLimitExceeded);
         }
-        Ok(Self { schema, bytes })
+        Ok(Self {
+            schema,
+            bytes: std::sync::Arc::new(bytes),
+        })
     }
 
     #[must_use]
@@ -377,5 +402,21 @@ mod tests {
         assert!(principal.has_grant(&read));
         let other = CapabilityId::new("host.dataset.write", limits).unwrap();
         assert!(!principal.has_grant(&other));
+    }
+
+    #[test]
+    fn secret_payload_clone_shares_zeroizing_bytes_and_debug_is_redacted() {
+        let secret = BoundedPayload::new(
+            "mainframe-env.cics.secret@1",
+            b"ONLY-IN-MEMORY".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let clone = secret.clone();
+        assert_eq!(secret.bytes().as_ptr(), clone.bytes().as_ptr());
+        assert_eq!(secret, clone);
+        let shown = format!("{secret:?}");
+        assert!(shown.contains("<redacted>"));
+        assert!(!shown.contains("ONLY-IN-MEMORY"));
     }
 }

@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Secret CICS payloads now share one zeroizing byte allocation across clones and
+  render as redacted values in debug output. This keeps typed credential
+  requests transient without changing their canonical bytes.
+
 - Versioned the typed CICS effect-plan codec as `MCEP` v2 with big-endian `u16`
   operation, operand, option, and output tags. Existing tag numbers and
   canonical v1 plan decoding remain intact; new encodings are deterministic v2
