@@ -93,6 +93,7 @@ EXPECTED_FAMILIES = {
     "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "builtin-function-control": "BuiltinFunctionControl",
     "document-control": "DocumentControl",
     "journal-control": "JournalControl",
 }
@@ -102,6 +103,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
+    ("BifDeedit", "api", "builtin-function-control", False, f"{OFFICIAL_BASELINE}:api-commands:0013"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
@@ -542,6 +544,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "AddressSet",
         "Asktime",
         "AsktimeEib",
+        "BifDeedit",
         "Deq",
         "Enq",
         "FormatTime",
@@ -667,6 +670,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Address": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
+    "BifDeedit": frozenset({"memory-read", "memory-write", "condition"}),
     "ChangeTask": frozenset(
         {"memory-read", "memory-write", "suspension", "condition"}
     ),
@@ -1076,6 +1080,7 @@ def _load_typed_execution_registrations(
         "Address",
         "AddressSet",
         "AsktimeEib",
+        "BifDeedit",
         "Cancel",
         "ChangeTask",
         "ConvertTime",
@@ -1419,6 +1424,7 @@ def load_catalog(
                 "Address",
                 "AddressSet",
                 "AsktimeEib",
+                "BifDeedit",
                 "Cancel",
                 "Delay",
                 "Deq",

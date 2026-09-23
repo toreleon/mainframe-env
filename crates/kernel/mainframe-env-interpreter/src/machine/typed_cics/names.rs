@@ -45,6 +45,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::DateString => SlotUse::DateStringInput,
+        CicsOperandName::Field => SlotUse::Input,
         CicsOperandName::MajorVersion | CicsOperandName::MinorVersion => SlotUse::FullwordInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
@@ -101,6 +102,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
+        CicsOutputName::Field => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::SetPointer => SlotUse::PointerOutput,
         CicsOutputName::SetPointer64 => SlotUse::Pointer64Output,
@@ -145,6 +147,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
         CicsPlanOperation::FormatTime => CicsOperation::FormatTime,
         CicsPlanOperation::ConvertTime => CicsOperation::ConvertTime,
+        CicsPlanOperation::BifDeedit => CicsOperation::BifDeedit,
         CicsPlanOperation::Cancel => CicsOperation::Cancel,
         CicsPlanOperation::Delay => CicsOperation::Delay,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
@@ -251,6 +254,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Aids => "AIDS",
         CicsOperandName::Abstime => "ABSTIME",
         CicsOperandName::DateString => "DATESTRING",
+        CicsOperandName::Field => "FIELD",
         CicsOperandName::DateSep => "DATESEP",
         CicsOperandName::TimeSep => "TIMESEP",
         CicsOperandName::KeyLength => "KEYLENGTH",
@@ -340,6 +344,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
         CicsOutputName::Abstime => "ABSTIME",
+        CicsOutputName::Field => "FIELD",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
         CicsOutputName::SetPointer => "SET",

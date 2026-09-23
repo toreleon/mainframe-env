@@ -25,6 +25,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
     },
     {
+      "operation": "BifDeedit",
+      "interface": "api",
+      "family": "builtin-function-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0013"
+    },
+    {
       "operation": "Cancel",
       "interface": "api",
       "family": "interval-control",

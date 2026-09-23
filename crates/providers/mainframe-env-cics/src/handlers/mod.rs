@@ -1,4 +1,5 @@
 mod bms_map;
+mod builtin_function;
 mod condition;
 mod document_control;
 mod file_control;
@@ -28,10 +29,16 @@ mod transform_control;
 pub(in crate::service) mod transient_data;
 
 use super::{CicsService, Run};
-use crate::generated::CicsCommandFamily;
+use crate::generated::{CicsCommandDescriptor, CicsCommandFamily};
 use mainframe_env_host_api::{CicsRequest, CicsResponse, HostProblem};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
+
+pub(super) fn verify_descriptor(request: &CicsRequest, descriptor: &CicsCommandDescriptor) {
+    debug_assert_eq!(descriptor.operation, request.operation);
+    debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
+    debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
+}
 
 pub(super) fn argument_bytes(request: &CicsRequest, name: &str) -> Option<Vec<u8>> {
     request
@@ -131,6 +138,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::JournalControl => {
             journal_control::invoke(service, run, request)
+        }
+        crate::generated::CicsCommandFamily::BuiltinFunctionControl => {
+            builtin_function::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

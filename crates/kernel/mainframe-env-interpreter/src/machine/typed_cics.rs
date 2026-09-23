@@ -521,7 +521,7 @@ pub(super) fn execute(
                 )?);
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::Ridfld => {
+            CicsOutputName::Field | CicsOutputName::Ridfld => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Resp => response = Some(target),
@@ -694,7 +694,7 @@ pub(super) fn write_output(
             && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
-            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
+            "COMMAREA" | "FIELD" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && matches!(

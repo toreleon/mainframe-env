@@ -2334,6 +2334,37 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cics_bif_deedit_resolves_writable_in_place_field() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BIFDEEDIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 EDITED-X PIC X(9). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS BIF DEEDIT FIELD(EDITED-X) LENGTH(9) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("BIF DEEDIT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed BIF DEEDIT");
+        assert_eq!(command.operation, HirCicsOperation::BifDeedit);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Field
+                && matches!(&operand.value, HirCicsValue::Data(reference) if reference.qualified_name == "EDITED-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Field && output.target.qualified_name == "EDITED-X"
+        }));
+        for clause in ["FIELD(EDITED-X) LENGTH('NINE')", "FIELD(RESP-X)"] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADBIF. DATA DIVISION. WORKING-STORAGE SECTION. 01 EDITED-X PIC X(9). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS BIF DEEDIT {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
     /// Issue #207: bare DATESEP and TIMESEP select the documented defaults.
     #[test]
     fn cics_formattime_bare_separators_lower_as_default_options() {

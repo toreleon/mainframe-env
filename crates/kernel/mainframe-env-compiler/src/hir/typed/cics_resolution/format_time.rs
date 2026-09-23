@@ -117,7 +117,8 @@ pub(super) fn require_output_shape(
                 )))
             }
         }
-        HirCicsOutputName::Commarea
+        HirCicsOutputName::Field
+        | HirCicsOutputName::Commarea
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer
         | HirCicsOutputName::Ridfld

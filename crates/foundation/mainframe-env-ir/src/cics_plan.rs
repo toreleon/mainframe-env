@@ -447,6 +447,20 @@ fn validate_operation_shape(
                 || !outputs.contains(&CicsOutputName::Abstime)
                 || scheduling_options
         }
+        CicsPlanOperation::BifDeedit => {
+            let field = plan.operands.iter().find(|operand| operand.name == CicsOperandName::Field);
+            let result = plan.outputs.iter().find(|output| output.name == CicsOutputName::Field);
+            !inputs.contains(&CicsOperandName::Field)
+                || !inputs.is_subset(&BTreeSet::from([
+                    CicsOperandName::Field,
+                    CicsOperandName::Length,
+                ]))
+                || !matches!(
+                    (field.map(|operand| &operand.value), result),
+                    (Some(CicsOperandValue::Storage(slot)), Some(binding)) if slot == &binding.target
+                )
+                || scheduling_options
+        }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -1305,6 +1319,48 @@ mod tests {
             encode_cics_effect_plan(&missing_output, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn bif_deedit_v2_requires_in_place_field_and_rejects_bad_tags() {
+        let limits = CicsPlanLimits::default();
+        let field = slot(1, "WORK.FIELD");
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::BifDeedit,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Field,
+                value: CicsOperandValue::Storage(field.clone()),
+            }],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Field,
+                target: field,
+            }],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[4..8], &[0, 2, 0, 155]);
+        assert_eq!(&encoded[12..14], &641u16.to_be_bytes());
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits).unwrap(), encoded);
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut other_slot = plan.clone();
+        other_slot.outputs[0].target = slot(2, "WORK.OTHER");
+        assert_eq!(
+            encode_cics_effect_plan(&other_slot, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        for replacement in [700u16, 0xffff] {
+            let mut unknown = encoded.clone();
+            unknown[12..14].copy_from_slice(&replacement.to_be_bytes());
+            assert_eq!(
+                decode_cics_effect_plan(&unknown, limits),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
     }
 
     /// Issue #212: unrelated file and UOW plans reject extension flags.

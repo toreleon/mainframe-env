@@ -17,6 +17,8 @@ pub enum CicsPlanOperation {
     FormatTime,
     /// Convert one architected date-time string into CICS absolute time.
     ConvertTime,
+    /// Remove editing characters from one EBCDIC numeric field in place.
+    BifDeedit,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -224,6 +226,8 @@ pub enum CicsOperandName {
     Abstime,
     /// `DATESTRING(...)` architected date-time input.
     DateString,
+    /// `FIELD(...)` in-place built-in DEEDIT source.
+    Field,
     /// Optional one-byte date separator.
     DateSep,
     /// Optional one-byte time separator.
@@ -513,6 +517,8 @@ pub enum CicsOutputName {
     Resp2,
     /// `ABSTIME(...)` packed-decimal destination.
     Abstime,
+    /// In-place `FIELD(...)` result of BIF DEEDIT.
+    Field,
     /// `MILLISECONDS(...)` fullword-binary destination.
     Milliseconds,
     /// `MMDDYY(...)` character destination.

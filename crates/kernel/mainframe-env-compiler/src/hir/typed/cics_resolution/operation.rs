@@ -16,6 +16,7 @@ pub(super) fn resolve(
         ["ASKTIME"] => HirCicsOperation::AsktimeEib,
         ["FORMATTIME"] => HirCicsOperation::FormatTime,
         ["CONVERTTIME"] => HirCicsOperation::ConvertTime,
+        ["BIF", "DEEDIT"] => HirCicsOperation::BifDeedit,
         ["FREEMAIN"] => HirCicsOperation::Freemain,
         ["GETMAIN"] => HirCicsOperation::Getmain,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,

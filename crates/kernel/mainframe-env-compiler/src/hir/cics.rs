@@ -214,6 +214,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Aids => CicsOperandName::Aids,
                 HirCicsOperandName::Abstime => CicsOperandName::Abstime,
                 HirCicsOperandName::DateString => CicsOperandName::DateString,
+                HirCicsOperandName::Field => CicsOperandName::Field,
                 HirCicsOperandName::DateSep => CicsOperandName::DateSep,
                 HirCicsOperandName::TimeSep => CicsOperandName::TimeSep,
                 HirCicsOperandName::KeyLength => CicsOperandName::KeyLength,
@@ -315,6 +316,7 @@ impl PlanContext<'_> {
         Ok(CicsOutputBinding {
             name: match output.name {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
+                HirCicsOutputName::Field => CicsOutputName::Field,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::SetPointer => CicsOutputName::SetPointer,
@@ -398,6 +400,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
         HirCicsOperation::FormatTime => CicsPlanOperation::FormatTime,
         HirCicsOperation::ConvertTime => CicsPlanOperation::ConvertTime,
+        HirCicsOperation::BifDeedit => CicsPlanOperation::BifDeedit,
         HirCicsOperation::Cancel => CicsPlanOperation::Cancel,
         HirCicsOperation::Delay => CicsPlanOperation::Delay,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,

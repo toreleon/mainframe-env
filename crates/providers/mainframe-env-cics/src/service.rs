@@ -1722,10 +1722,8 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 76);
-        debug_assert_eq!(descriptor.operation, request.operation);
-        debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
-        debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 77);
+        handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
                 handlers::invoke_task_control(self, run, &request, retention_tick)
@@ -1748,7 +1746,9 @@ impl CicsService {
             CicsCommandFamily::DocumentControl => {
                 handlers::invoke_document_control(self, run, &request, retention_tick)
             }
-            CicsCommandFamily::TransformControl | CicsCommandFamily::JournalControl => {
+            CicsCommandFamily::TransformControl
+            | CicsCommandFamily::JournalControl
+            | CicsCommandFamily::BuiltinFunctionControl => {
                 handlers::invoke_extended_control(self, run, &request, descriptor.family)
             }
         }
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 76);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 77);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -12576,6 +12576,59 @@ mod tests {
                 ("INVREQ", 16, 3)
             );
             assert_eq!(result.outputs["ABSTIME"].bytes(), b"0");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bif_deedit_updates_caller_field_and_rejects_bad_length_on_memory_and_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bif-deedit-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let stores: [Arc<dyn ProviderStateStore>; 2] = [
+            Arc::new(MemoryStore::new(Default::default())),
+            Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap()),
+        ];
+        for store in stores {
+            let cics = service(store);
+            let (invocation, _) = registered(&cics);
+            let valid = request(
+                CicsOperation::BifDeedit,
+                BTreeMap::from([
+                    ("FIELD".into(), enqueue_value(b"14-6704/B")),
+                    ("LENGTH".into(), cics_decimal(9)),
+                ]),
+                1,
+            );
+            let result = cics
+                .invoke(&effect(&invocation.run_unit_id, valid.clone(), 1), valid)
+                .unwrap();
+            assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+            assert_eq!(result.outputs["FIELD"].bytes(), b"00146704B");
+
+            let invalid = request(
+                CicsOperation::BifDeedit,
+                BTreeMap::from([
+                    ("FIELD".into(), enqueue_value(b"$25.68")),
+                    ("LENGTH".into(), cics_decimal(7)),
+                ]),
+                2,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), 2),
+                    invalid
+                ),
+                Err(HostProblem::Condition {
+                    name: "LENGERR".into(),
+                    response: 22,
+                    response2: 0,
+                })
+            );
         }
         std::fs::remove_dir_all(root).unwrap();
     }

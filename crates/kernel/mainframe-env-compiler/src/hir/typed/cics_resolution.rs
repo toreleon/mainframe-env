@@ -17,6 +17,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
 mod assign_validation;
+mod builtin_function;
 mod clause_parser;
 mod command_recognition;
 mod convert_time;
@@ -598,6 +599,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "YYYYMMDD",
         ],
         HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME", "RESP", "RESP2"],
+        HirCicsOperation::BifDeedit => &["FIELD", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -748,6 +750,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
         HirCicsOperation::ConvertTime => &["NOHANDLE"],
+        HirCicsOperation::BifDeedit => &["NOHANDLE"],
         HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
         HirCicsOperation::SendMap => &[
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
@@ -826,6 +829,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
         HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME"][..],
+        HirCicsOperation::BifDeedit => &["FIELD"][..],
         HirCicsOperation::Abend
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -1054,7 +1058,13 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::ConvertTime {
         operands.extend(convert_time::operands(&clauses, semantic)?);
     }
+    if operation == HirCicsOperation::BifDeedit {
+        operands.extend(builtin_function::deedit_operands(&clauses, semantic)?);
+    }
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
+    if operation == HirCicsOperation::BifDeedit {
+        outputs.push(builtin_function::deedit_output(&clauses, semantic)?);
+    }
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);

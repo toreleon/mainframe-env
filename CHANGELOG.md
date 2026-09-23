@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `BIF DEEDIT` for row `0013`. The command edits caller-owned
+  character storage in place, removes editing bytes, right-aligns digits,
+  preserves terminal zoned overpunch, and returns `LENGERR` for an invalid
+  length. MCEP v2 uses operation tag 155, FIELD input tag 641, and FIELD output
+  tag 696; the compiled selected route and memory/SQLite provider agree.
+
 - Added typed CICS `CONVERTTIME` for row `0031`. A 64-character DATESTRING
   accepts the four pinned architected formats, converts fractional seconds
   without rounding, and returns packed ABSTIME through the compiled selected

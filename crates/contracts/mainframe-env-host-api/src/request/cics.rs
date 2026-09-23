@@ -13,6 +13,8 @@ pub enum CicsOperation {
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
+    /// Remove editing characters from one numeric field in place.
+    BifDeedit,
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
@@ -147,6 +149,7 @@ impl CicsOperation {
             Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
+            Self::BifDeedit => "BifDeedit",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
@@ -302,6 +305,7 @@ impl CicsOperation {
                 Self::Asktime
             }
             ("ASKTIME", _) => Self::AsktimeEib,
+            ("BIF", Some("DEEDIT")) => Self::BifDeedit,
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,

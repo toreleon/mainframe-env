@@ -80,5 +80,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::SpoolRead => &CICS_EXECUTABLE_DESCRIPTORS[71],
         CicsPlanOperation::SpoolWrite => &CICS_EXECUTABLE_DESCRIPTORS[72],
         CicsPlanOperation::ConvertTime => &CICS_EXECUTABLE_DESCRIPTORS[73],
+        CicsPlanOperation::BifDeedit => &CICS_EXECUTABLE_DESCRIPTORS[74],
     }
 }

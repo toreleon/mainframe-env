@@ -107,6 +107,7 @@ const FORMAT_TIME_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
+const BUILTIN_EFFECTS: &[Effect] = FORMAT_TIME_EFFECTS;
 const ABEND_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,
@@ -651,7 +652,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 74);
+        assert_eq!(typed.len(), 75);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -669,7 +670,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 189);
+        assert_eq!(unready.len(), 188);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -877,6 +878,7 @@ mod tests {
                 CicsPlanOperation::AsktimeEib,
                 CicsPlanOperation::FormatTime,
                 CicsPlanOperation::ConvertTime,
+                CicsPlanOperation::BifDeedit,
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,

@@ -1578,6 +1578,7 @@ mod tests {
                 CicsPlanOperation::AsktimeEib => crate::HirCicsOperation::AsktimeEib,
                 CicsPlanOperation::FormatTime => crate::HirCicsOperation::FormatTime,
                 CicsPlanOperation::ConvertTime => crate::HirCicsOperation::ConvertTime,
+                CicsPlanOperation::BifDeedit => crate::HirCicsOperation::BifDeedit,
                 CicsPlanOperation::Cancel => crate::HirCicsOperation::Cancel,
                 CicsPlanOperation::Delay => crate::HirCicsOperation::Delay,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
