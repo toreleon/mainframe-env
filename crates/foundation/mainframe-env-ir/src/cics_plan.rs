@@ -742,6 +742,7 @@ fn validate_operation_shape(
             security_control::invalid_request_passticket_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Signon => security_control::invalid_signon_shape(plan, inputs, outputs),
+        CicsPlanOperation::Signoff => security_control::invalid_signoff_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -5281,6 +5282,7 @@ mod tests {
         assert_eq!(operation_tag(CicsPlanOperation::ChangePhrase), 131);
         assert_eq!(operation_tag(CicsPlanOperation::RequestPassTicket), 134);
         assert_eq!(operation_tag(CicsPlanOperation::Signon), 136);
+        assert_eq!(operation_tag(CicsPlanOperation::Signoff), 135);
         assert_eq!(operation_tag(CicsPlanOperation::VerifyPhrase), 138);
         assert_eq!(operand_tag(CicsOperandName::ResClass), 448);
         assert_eq!(operand_tag(CicsOperandName::LogMessage), 452);
@@ -5579,6 +5581,38 @@ mod tests {
             .find(|operand| operand.name == CicsOperandName::SecurityPassword)
             .unwrap()
             .value = CicsOperandValue::Literal(b"PASSWORD".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn signoff_plan_has_no_data_operands_and_requires_v2() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Signoff,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Resp,
+                target: slot(48, "RESP-X"),
+            }],
+            condition: CicsCondition::Respond {
+                response: slot(48, "RESP-X"),
+                response2: None,
+            },
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.operands.push(CicsNamedOperand {
+            name: CicsOperandName::SecurityUserId,
+            value: CicsOperandValue::Literal(b"IBMUSER".to_vec()),
+        });
         assert_eq!(
             encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)

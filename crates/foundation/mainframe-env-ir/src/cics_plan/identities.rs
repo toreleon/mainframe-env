@@ -214,6 +214,8 @@ pub enum CicsPlanOperation {
     RequestPassTicket,
     /// Authenticate a user and bind that identity to the terminal.
     Signon,
+    /// Clear the terminal's signed-on identity for future tasks.
+    Signoff,
     /// Verify a standard password through the installed SAF authority.
     VerifyPassword,
     /// Verify a password or phrase selected by its explicit length.

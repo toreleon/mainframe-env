@@ -94,6 +94,7 @@ pub(super) fn resolve(
         ["CHANGE", "PHRASE"] => HirCicsOperation::ChangePhrase,
         ["REQUEST", "PASSTICKET"] => HirCicsOperation::RequestPassTicket,
         ["SIGNON"] => HirCicsOperation::Signon,
+        ["SIGNOFF"] => HirCicsOperation::Signoff,
         ["VERIFY", "PHRASE"] => HirCicsOperation::VerifyPhrase,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,

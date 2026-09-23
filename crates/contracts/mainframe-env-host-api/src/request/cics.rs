@@ -135,6 +135,8 @@ pub enum CicsOperation {
     RequestPassTicket,
     /// Associate a verified user with the current terminal for subsequent tasks.
     Signon,
+    /// Restore the terminal default identity without changing this task principal.
+    Signoff,
     Read,
     ReadNext,
     ReadPrev,
@@ -359,6 +361,7 @@ impl CicsOperation {
             Self::QuerySecurity => "QuerySecurity",
             Self::RequestPassTicket => "RequestPassTicket",
             Self::Signon => "Signon",
+            Self::Signoff => "Signoff",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
@@ -682,6 +685,7 @@ impl CicsOperation {
             ("QUERY", Some("SECURITY")) => Self::QuerySecurity,
             ("REQUEST", Some("PASSTICKET")) => Self::RequestPassTicket,
             ("SIGNON", _) => Self::Signon,
+            ("SIGNOFF", _) => Self::Signoff,
             ("READ", _) => Self::Read,
             ("READQ", Some("TD")) => Self::ReadTransientData,
             ("REMOVE", Some("SUBEVENT")) => Self::RemoveSubevent,

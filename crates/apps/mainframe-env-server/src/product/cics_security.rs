@@ -10,8 +10,8 @@ use mainframe_env_cics::{
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_racf::{
-    AccessEnvironment, AccessLevel, CredentialFailure, CredentialKind, DecisionReason, RacfService,
-    RacrouteRequest, RacrouteResult, SafRequestContext,
+    AccessEnvironment, AccessLevel, CredentialFailure, CredentialKind, DecisionOutcome,
+    DecisionReason, RacfService, RacrouteRequest, RacrouteResult, SafRequestContext,
 };
 use std::sync::Arc;
 
@@ -224,6 +224,49 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
             esm_response: i64::from(outcome.status.racf_return_code),
             esm_reason: i64::from(outcome.status.racf_reason_code),
         })
+    }
+
+    fn audit_signoff(
+        &self,
+        actor: &PrincipalId,
+        session: &str,
+        binding_digest: [u8; 32],
+        idempotency_key: &str,
+        tick: u64,
+        allowed: bool,
+    ) -> Result<(), HostProblem> {
+        let mut digest = Sha256::new();
+        digest.update(b"mainframe-env.cics-signon-terminal@1\0");
+        digest.update(session.as_bytes());
+        digest.update(binding_digest);
+        let context = SafRequestContext::new(
+            actor.clone(),
+            None,
+            None,
+            idempotency_key,
+            idempotency_key,
+            tick,
+        )?;
+        let outcome = self.racf.racroute(
+            &context,
+            RacrouteRequest::Audit {
+                action: "CICS-SIGNOFF".into(),
+                resource_digest: format!("sha256:{:x}", digest.finalize()),
+                decision: if allowed {
+                    DecisionOutcome::Allow
+                } else {
+                    DecisionOutcome::Deny
+                },
+                fields: Default::default(),
+            },
+        )?;
+        if outcome.status.reason == DecisionReason::Granted
+            && matches!(outcome.result, Some(RacrouteResult::Audit { .. }))
+        {
+            Ok(())
+        } else {
+            Err(HostProblem::ProviderFailure)
+        }
     }
 }
 

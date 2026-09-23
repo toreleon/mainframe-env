@@ -337,6 +337,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/security_control/change.rs",
       "crates/providers/mainframe-env-cics/src/handlers/security_control/passticket.rs",
       "crates/providers/mainframe-env-cics/src/handlers/security_control/signon.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/security_control/signoff.rs",
       "crates/providers/mainframe-env-cics/src/handlers/security_control/terminal_state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/security_control/verify.rs",
       "crates/providers/mainframe-env-cics/src/handlers/spool_control.rs",

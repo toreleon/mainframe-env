@@ -380,6 +380,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::ChangePhrase => CicsOperation::ChangePhrase,
         CicsPlanOperation::RequestPassTicket => CicsOperation::RequestPassTicket,
         CicsPlanOperation::Signon => CicsOperation::Signon,
+        CicsPlanOperation::Signoff => CicsOperation::Signoff,
         CicsPlanOperation::VerifyPhrase => CicsOperation::VerifyPhrase,
         CicsPlanOperation::Start => CicsOperation::Start,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,

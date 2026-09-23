@@ -321,3 +321,18 @@ pub(super) fn invalid_signon_shape(
             ),
         })
 }
+
+pub(super) fn invalid_signoff_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.is_empty()
+        || outputs
+            .iter()
+            .any(|name| !matches!(name, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+}

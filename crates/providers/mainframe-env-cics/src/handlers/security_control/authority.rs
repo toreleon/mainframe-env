@@ -214,6 +214,17 @@ pub trait CicsSecurityAuthority: Send + Sync {
         &self,
         request: CicsPassTicketRequest<'_>,
     ) -> Result<CicsPassTicketOutcome, HostProblem>;
+
+    /// Record a source-shaped terminal sign-off allowance or denial before mutation.
+    fn audit_signoff(
+        &self,
+        actor: &PrincipalId,
+        session: &str,
+        binding_digest: [u8; 32],
+        idempotency_key: &str,
+        tick: u64,
+        allowed: bool,
+    ) -> Result<(), HostProblem>;
 }
 
 impl CicsService {

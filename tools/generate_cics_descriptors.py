@@ -806,6 +806,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "VerifyPhrase",
         "RequestPassTicket",
         "Signon",
+        "Signoff",
         "Start",
         "Retrieve",
         "TransformDataToJson",
@@ -1183,6 +1184,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
     "Signon": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "Signoff": frozenset(
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
     "VerifyPhrase": frozenset(

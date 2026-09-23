@@ -1281,6 +1281,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "PURGE MESSAGE",
                 "QUERY SECURITY",
                 "REQUEST PASSTICKET",
+                "SIGNOFF",
                 "SIGNON",
                 "CHANGE PASSWORD",
                 "CHANGE PHRASE",

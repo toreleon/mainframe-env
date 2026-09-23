@@ -876,6 +876,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::Signoff,
+        syntax: "SIGNOFF",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0195",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::WaitEvent,
         syntax: "WAIT EVENT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0233",

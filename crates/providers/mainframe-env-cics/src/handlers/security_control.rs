@@ -4,6 +4,7 @@ use super::super::{CicsService, Run, decimal_payload};
 mod authority;
 mod change;
 mod passticket;
+mod signoff;
 mod signon;
 mod terminal_state;
 mod verify;
@@ -40,6 +41,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::ChangePhrase => change::phrase(service, run, request, tick),
         CicsOperation::RequestPassTicket => passticket::issue(service, run, request, tick),
         CicsOperation::Signon => signon::invoke(service, run, request, tick),
+        CicsOperation::Signoff => signoff::invoke(service, run, request, tick),
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
         CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
         CicsOperation::VerifyPhrase => verify::phrase(service, run, request, tick),

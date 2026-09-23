@@ -31528,6 +31528,17 @@ mod tests {
         ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
             Err(HostProblem::Unsupported)
         }
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            _: bool,
+        ) -> Result<(), HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
     }
 
     #[test]
@@ -34060,6 +34071,17 @@ mod tests {
         ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
             Err(HostProblem::Unsupported)
         }
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            _: bool,
+        ) -> Result<(), HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
     }
 
     fn change_phrase_request(sequence: u64) -> CicsRequest {
@@ -34210,6 +34232,17 @@ mod tests {
                 esm_response: if self.failure.is_some() { 8 } else { 0 },
                 esm_reason: 0,
             })
+        }
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            _: bool,
+        ) -> Result<(), HostProblem> {
+            Err(HostProblem::Unsupported)
         }
     }
 

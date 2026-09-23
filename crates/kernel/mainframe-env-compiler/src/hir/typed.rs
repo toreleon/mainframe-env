@@ -7998,6 +7998,30 @@ mod tests {
     }
 
     #[test]
+    fn cics_signoff_has_no_data_operands_and_accepts_common_response() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TSOFF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SIGNOFF RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SIGNOFF: {:?}", analysis.diagnostics));
+        let signoff = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SIGNOFF");
+        assert_eq!(signoff.operation, HirCicsOperation::Signoff);
+        assert!(signoff.operands.is_empty());
+        assert!(
+            analyze(&source.replace("SIGNOFF RESP", "SIGNOFF USERID('IBMUSER') RESP"))
+                .hir
+                .is_none()
+        );
+    }
+
+    #[test]
     fn cics_verify_phrase_requires_explicit_bounded_length_and_storage_secret() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. VPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PHRASE-X PIC X(20) VALUE 'LONG-PHRASE-1234'. 01 DAYS-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS VERIFY PHRASE(PHRASE-X) PHRASELEN(16) USERID('IBMUSER') DAYSLEFT(DAYS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
