@@ -21,6 +21,7 @@ pub enum HirCicsOperation {
     Post,
     WriteOperator,
     ExtractCertificate,
+    ExtractTcpip,
     ChangeTask,
     Deq,
     Enq,

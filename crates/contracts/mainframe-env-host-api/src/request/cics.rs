@@ -32,6 +32,8 @@ pub enum CicsOperation {
     WriteOperator,
     /// Return fields from the accepted client certificate of this TCP/IP task.
     ExtractCertificate,
+    /// Return selected fields of the accepted TCP/IP connection.
+    ExtractTcpip,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -169,6 +171,7 @@ impl CicsOperation {
             Self::Post => "Post",
             Self::WriteOperator => "WriteOperator",
             Self::ExtractCertificate => "ExtractCertificate",
+            Self::ExtractTcpip => "ExtractTcpip",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -332,6 +335,7 @@ impl CicsOperation {
             ("POST", _) => Self::Post,
             ("WRITE", Some("OPERATOR")) => Self::WriteOperator,
             ("EXTRACT", Some("CERTIFICATE")) => Self::ExtractCertificate,
+            ("EXTRACT", Some("TCPIP")) => Self::ExtractTcpip,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,

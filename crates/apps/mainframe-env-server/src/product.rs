@@ -17801,6 +17801,129 @@ mod tests {
     }
 
     #[test]
+    fn online_extract_tcpip_reads_task_owned_ipv4_ipv6_fields() {
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. TCPEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ADDR-X PIC X(16).\n01 ADDR-LEN PIC S9(9) COMP VALUE 16.\n01 ADDR-NU PIC S9(9) COMP.\n01 SERVER6-X PIC X(16).\n01 SERVICE-X PIC X(8).\n01 PORT-X PIC X(5).\n01 PORT-NU PIC S9(9) COMP.\n01 MAXDATA-X PIC S9(9) COMP.\n01 TCP-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) CLIENTADDRNU(ADDR-NU) SRVRADDR6NU(SERVER6-X) TCPIPSERVICE(SERVICE-X) PORTNUMBER(PORT-X) PORTNUMNU(PORT-NU) MAXDATALEN(MAXDATA-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO TCP-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let artifact = published_source_fixture("TCPEXTR", source);
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "TCPEXTR".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("TP00".into(), "TCPEXTR".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "TCPEXTR".into(),
+                    map: "TCPEXTR".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("tcpip-extract", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "TP00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "TP00",
+                24,
+                80,
+                "tcpip-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .cics
+            .bind_tcpip_context(
+                &invocation,
+                CicsTcpipContext {
+                    client_address: Some("192.0.2.10".parse().unwrap()),
+                    server_address: Some("2001:db8::1".parse().unwrap()),
+                    client_name: None,
+                    server_name: None,
+                    tcpip_service: "HTTP0001".into(),
+                    port: 443,
+                    authenticate: CicsTcpipAuthenticate::Noauthentic,
+                    privacy: CicsTcpipPrivacy::Required,
+                    ssl_type: CicsTcpipSslType::Ssl,
+                    max_data_length: 65_536,
+                    certificate: None,
+                },
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "TCPEXTR", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "TCPEXTR", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("ADDR-X").unwrap().bytes(),
+            b"192.0.2.10      "
+        );
+        assert_eq!(
+            restored.variable("ADDR-LEN").unwrap().bytes(),
+            &10u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("ADDR-NU").unwrap().bytes(),
+            &[192, 0, 2, 10]
+        );
+        assert_eq!(
+            restored.variable("SERVER6-X").unwrap().bytes(),
+            &"2001:db8::1"
+                .parse::<std::net::Ipv6Addr>()
+                .unwrap()
+                .octets()
+        );
+        assert_eq!(restored.variable("SERVICE-X").unwrap().bytes(), b"HTTP0001");
+        assert_eq!(restored.variable("PORT-X").unwrap().bytes(), b"00443");
+        assert_eq!(
+            restored.variable("PORT-NU").unwrap().bytes(),
+            &443u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("MAXDATA-X").unwrap().bytes(),
+            &65_536u32.to_be_bytes()
+        );
+        assert_eq!(restored.variable("TCP-FN").unwrap().bytes(), &[0x3e, 0x0e]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
+    }
+
+    #[test]
     fn online_address_set_uses_checked_virtual_pointers_on_selected_route() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ADDRSET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SOURCE-X PIC X(4) VALUE 'ABCD'.\n01 OBSERVED-X PIC X(4).\n01 PTR-X POINTER.\n01 SET-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF SOURCE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ADDRESS SET(ADDRESS OF LINK-X) USING(PTR-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE 'WXYZ' TO LINK-X.\nMOVE SOURCE-X TO OBSERVED-X.\nMOVE EIBFN TO SET-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";

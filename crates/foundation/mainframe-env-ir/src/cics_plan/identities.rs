@@ -1,4 +1,4 @@
-use super::{CicsAssignOutput, CicsCertificateOutput};
+use super::{CicsAssignOutput, CicsCertificateOutput, CicsTcpipOutput};
 
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -21,6 +21,8 @@ pub enum CicsPlanOperation {
     WriteOperator,
     /// Extract selected fields of the accepted TCP/IP client certificate.
     ExtractCertificate,
+    /// Extract source-bounded accepted TCP/IP connection fields.
+    ExtractTcpip,
     /// Remove editing characters from one EBCDIC numeric field in place.
     BifDeedit,
     /// Compute a source-bounded SHA-1 digest in one of three representations.
@@ -575,6 +577,8 @@ pub enum CicsOutputName {
     OperatorReplyLength,
     /// One source-reviewed EXTRACT CERTIFICATE result.
     Certificate(CicsCertificateOutput),
+    /// One source-reviewed EXTRACT TCPIP result.
+    Tcpip(CicsTcpipOutput),
     /// `MILLISECONDS(...)` fullword-binary destination.
     Milliseconds,
     /// `MMDDYY(...)` character destination.

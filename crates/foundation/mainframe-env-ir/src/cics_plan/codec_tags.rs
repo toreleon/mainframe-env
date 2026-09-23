@@ -1,6 +1,6 @@
 use super::{
     CicsAssignOutput, CicsCertificateOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem,
-    CicsPlanOperation, CicsPlanOption,
+    CicsPlanOperation, CicsPlanOption, CicsTcpipOutput,
 };
 
 const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
@@ -38,6 +38,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::ConvertTime => 154,
         CicsPlanOperation::WriteOperator => 159,
         CicsPlanOperation::ExtractCertificate => 160,
+        CicsPlanOperation::ExtractTcpip => 161,
         CicsPlanOperation::BifDeedit => 155,
         CicsPlanOperation::BifDigest => 156,
         CicsPlanOperation::Post => 158,
@@ -123,6 +124,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         154 => Ok(CicsPlanOperation::ConvertTime),
         159 => Ok(CicsPlanOperation::WriteOperator),
         160 => Ok(CicsPlanOperation::ExtractCertificate),
+        161 => Ok(CicsPlanOperation::ExtractTcpip),
         155 => Ok(CicsPlanOperation::BifDeedit),
         156 => Ok(CicsPlanOperation::BifDigest),
         158 => Ok(CicsPlanOperation::Post),
@@ -598,6 +600,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::OperatorReply => 698,
         CicsOutputName::OperatorReplyLength => 699,
         CicsOutputName::Certificate(output) => output.tag(),
+        CicsOutputName::Tcpip(output) => output.tag(),
         CicsOutputName::Milliseconds => 4,
         CicsOutputName::Mmddyy => 5,
         CicsOutputName::Mmddyyyy => 6,
@@ -651,6 +654,9 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         699 => Ok(CicsOutputName::OperatorReplyLength),
         700..=716 => CicsCertificateOutput::from_tag(value)
             .map(CicsOutputName::Certificate)
+            .ok_or(CicsPlanCodecProblem::Malformed),
+        717..=732 => CicsTcpipOutput::from_tag(value)
+            .map(CicsOutputName::Tcpip)
             .ok_or(CicsPlanCodecProblem::Malformed),
         4 => Ok(CicsOutputName::Milliseconds),
         5 => Ok(CicsOutputName::Mmddyy),

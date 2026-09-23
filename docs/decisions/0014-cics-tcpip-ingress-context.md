@@ -1,6 +1,6 @@
 # ADR-0014: Keep CICS TCP/IP and certificate facts in trusted ingress context
 
-Status: **Accepted for v0.9 development; EXTRACT CERTIFICATE executable**
+Status: **Accepted for v0.9 development; bounded EXTRACT routes executable**
 Owner: **CICS and network maintainers**
 Scope: **EXTRACT TCPIP and EXTRACT CERTIFICATE task context**
 Applies from: **mainframe-env 0.9.0 development**
@@ -44,8 +44,9 @@ would allow a program to forge client certificate identity.
 4. The context stores CVDA names, not invented numeric values. `EXTRACT
    CERTIFICATE` returns source-selected DER and name fields through checked
    virtual pointers that expire on the next CICS command. `EXTRACT TCPIP`
-   remains unready pending a reviewed numeric CVDA mapping and selected
-   compiled route.
+   returns source-backed non-CVDA connection fields from the same authority;
+   its five numeric CVDA outputs remain closed pending a reviewed numeric
+   mapping from `dfha80c.html`.
 
 ## Consequences
 
@@ -60,5 +61,7 @@ readiness by itself.
 Focused memory/SQLite registration, idempotency, conflict, malformed-envelope,
 and corrupt-row reopen tests cover this authority. The compiled COBOL
 `EXTRACT CERTIFICATE` route checks pointer values, lifetime, EIBFN, and
-RESP/RESP2. Module, public API docs, typed-semantic, documentation,
+RESP/RESP2. A selected `EXTRACT TCPIP` route checks IPv4/IPv6 binary
+representation and EIB/RESP fields; provider regressions check LENGERR and
+non-TCP/IP INVREQ. Module, public API docs, typed-semantic, documentation,
 formatting, dependency, and diff gates apply.

@@ -23,6 +23,7 @@ mod queue_control;
 mod spool_control;
 mod storage_control;
 mod task_wait;
+mod tcpip;
 mod terminal_control;
 mod transform_control;
 mod write_operator;
@@ -30,6 +31,7 @@ mod write_operator;
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
 pub use certificate::{CICS_CERTIFICATE_OUTPUT_NAMES, CicsCertificateOutput};
 pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
+pub use tcpip::{CICS_TCPIP_OUTPUT_NAMES, CicsTcpipOutput};
 
 use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
@@ -514,6 +516,11 @@ fn validate_operation_shape(
                 ))
                 || plan.options.contains(&CicsPlanOption::CertificateOwner)
                     && plan.options.contains(&CicsPlanOption::CertificateIssuer)
+                || scheduling_options
+        }
+        CicsPlanOperation::ExtractTcpip => {
+            !inputs.is_empty()
+                || !outputs.iter().any(|output| matches!(output, CicsOutputName::Tcpip(_)))
                 || scheduling_options
         }
         CicsPlanOperation::ChangeTask => {
@@ -3744,6 +3751,47 @@ mod tests {
         malformed.outputs.remove(0);
         assert_eq!(
             encode_cics_effect_plan(&malformed, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut unknown = bytes;
+        unknown[6..8].copy_from_slice(&165u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&unknown, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn extract_tcpip_non_cvda_outputs_use_reserved_v2_tags() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::ExtractTcpip,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Tcpip(CicsTcpipOutput::ClientAddress),
+                    target: slot(1, "ADDR-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Tcpip(CicsTcpipOutput::ClientAddressLength),
+                    target: slot(2, "ADDR-LEN"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&bytes[4..8], &[0, 2, 0, 161]);
+        assert_eq!(CicsTcpipOutput::ClientAddress.tag(), 721);
+        assert_eq!(
+            output_from_tag(732),
+            Ok(CicsOutputName::Tcpip(CicsTcpipOutput::MaxDataLength))
+        );
+        assert_eq!(output_from_tag(733), Err(CicsPlanCodecProblem::Malformed));
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits), Ok(bytes.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut unknown = bytes;

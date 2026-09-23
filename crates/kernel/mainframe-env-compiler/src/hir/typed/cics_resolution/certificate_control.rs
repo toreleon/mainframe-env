@@ -7,6 +7,8 @@ use super::{
 use crate::{CobolUsage, DataCategory, SemanticModel};
 use mainframe_env_ir::CICS_CERTIFICATE_OUTPUT_NAMES;
 
+pub(super) mod tcpip_control;
+
 pub(super) const ALLOWED_CLAUSES: &[&str] = &[
     "CERTIFICATE",
     "LENGTH",
@@ -49,6 +51,9 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation == HirCicsOperation::ExtractTcpip {
+        return tcpip_control::outputs(clauses, semantic);
+    }
     if operation != HirCicsOperation::ExtractCertificate {
         return Ok(Vec::new());
     }

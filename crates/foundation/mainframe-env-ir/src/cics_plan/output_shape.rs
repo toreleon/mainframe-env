@@ -33,6 +33,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Certificate(_) | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::ExtractTcpip => matches!(
+            output,
+            CicsOutputName::Tcpip(_) | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

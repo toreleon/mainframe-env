@@ -19,6 +19,7 @@ impl Canonical for CicsOperation {
             Self::Post => out.variant("CicsOperation", "Post", 0),
             Self::WriteOperator => out.variant("CicsOperation", "WriteOperator", 0),
             Self::ExtractCertificate => out.variant("CicsOperation", "ExtractCertificate", 0),
+            Self::ExtractTcpip => out.variant("CicsOperation", "ExtractTcpip", 0),
             Self::Deq => out.variant("CicsOperation", "Deq", 0),
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DocumentCreate => out.variant("CicsOperation", "DocumentCreate", 0),

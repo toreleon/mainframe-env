@@ -5570,6 +5570,38 @@ mod tests {
     }
 
     #[test]
+    fn cics_extract_tcpip_requires_paired_buffers_and_rejects_unreviewed_cvda_outputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TCPEXTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP VALUE 16. 01 PORT-NU PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) PORTNUMNU(PORT-NU) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("EXTRACT TCPIP: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed EXTRACT TCPIP");
+        assert_eq!(command.operation, HirCicsOperation::ExtractTcpip);
+        assert!(command.outputs.iter().any(|output| output.name
+            == HirCicsOutputName::Tcpip(mainframe_env_ir::CicsTcpipOutput::ClientAddress)));
+        for clause in [
+            "CLIENTADDR(ADDR-X)",
+            "CADDRLENGTH(ADDR-LEN)",
+            "CLIENTADDR(ADDR-LEN) CADDRLENGTH(ADDR-LEN)",
+            "PORTNUMNU(ADDR-X)",
+            "AUTHENTICATE(PORT-NU)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP. 01 PORT-NU PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
+    #[test]
     fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. 01 MS-X PIC S9(9) COMP VALUE 250. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. EXEC CICS DELAY FOR MILLISECS(MS-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

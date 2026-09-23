@@ -1724,7 +1724,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 82);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 83);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 80);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 81);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -12029,6 +12029,15 @@ mod tests {
             .unwrap()
             .clone();
         assert_eq!(cics.current_tcpip_context(&run).unwrap(), Some(context));
+        let query = request(
+            CicsOperation::ExtractTcpip,
+            BTreeMap::from([("PORTNUMNU".into(), argument(b"PORT-NU"))]),
+            1,
+        );
+        let response = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 1), query)
+            .unwrap();
+        assert_eq!(response.outputs["PORTNUMNU"].bytes(), b"443");
         drop(cics);
         let row = store
             .get_provider_state("cics-tcpip-context-v1", invocation.run_unit_id.as_str())
@@ -12157,6 +12166,113 @@ mod tests {
                 conflict
             ),
             Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn extract_tcpip_returns_task_owned_addresses_and_source_length_conditions() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let args = BTreeMap::from([
+            ("CLIENTADDR".into(), argument(b"ADDR-X")),
+            ("CADDRLENGTH".into(), cics_decimal(16)),
+            ("CLIENTADDR.MAXLENGTH".into(), cics_decimal(16)),
+            ("CLIENTADDRNU".into(), argument(b"ADDR-NU")),
+            ("SERVERADDRNU".into(), argument(b"SERVER-NU")),
+            ("SRVRADDR6NU".into(), argument(b"SERVER6-NU")),
+            ("TCPIPSERVICE".into(), argument(b"SERVICE-X")),
+            ("PORTNUMNU".into(), argument(b"PORT-NU")),
+            ("MAXDATALEN".into(), argument(b"DATA-LEN")),
+        ]);
+        let missing = request(CicsOperation::ExtractTcpip, args.clone(), 1);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 1),
+                missing
+            ),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 5,
+                ..
+            })
+        ));
+        cics.bind_tcpip_context(
+            &invocation,
+            CicsTcpipContext {
+                client_address: Some("192.0.2.10".parse().unwrap()),
+                server_address: Some("2001:db8::1".parse().unwrap()),
+                client_name: Some("client.example".into()),
+                server_name: Some("server.example".into()),
+                tcpip_service: "HTTP0001".into(),
+                port: 443,
+                authenticate: CicsTcpipAuthenticate::Noauthentic,
+                privacy: CicsTcpipPrivacy::Required,
+                ssl_type: CicsTcpipSslType::Ssl,
+                max_data_length: 65_536,
+                certificate: None,
+            },
+        )
+        .unwrap();
+        let normal = request(CicsOperation::ExtractTcpip, args.clone(), 2);
+        let first = cics
+            .invoke(&effect(&invocation.run_unit_id, normal.clone(), 2), normal)
+            .unwrap();
+        assert_eq!(first.outputs["CLIENTADDR"].bytes(), b"192.0.2.10");
+        assert_eq!(first.outputs["CADDRLENGTH"].bytes(), b"10");
+        assert_eq!(first.outputs["CLIENTADDRNU"].bytes(), &[192, 0, 2, 10]);
+        assert_eq!(first.outputs["SERVERADDRNU"].bytes(), &[0; 4]);
+        assert_eq!(
+            first.outputs["SRVRADDR6NU"].bytes(),
+            &"2001:db8::1"
+                .parse::<std::net::Ipv6Addr>()
+                .unwrap()
+                .octets()
+        );
+        assert_eq!(first.outputs["TCPIPSERVICE"].bytes(), b"HTTP0001");
+        assert_eq!(first.outputs["PORTNUMNU"].bytes(), b"443");
+        assert_eq!(first.outputs["MAXDATALEN"].bytes(), b"65536");
+        let mut short = args;
+        short.insert("CADDRLENGTH".into(), cics_decimal(4));
+        let mut short_request = request(CicsOperation::ExtractTcpip, short, 3);
+        short_request.condition_policy = CicsConditionPolicy::NoHandle;
+        let second = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, short_request.clone(), 3),
+                short_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (second.condition.as_str(), second.response, second.response2),
+            ("LENGERR", 22, 3)
+        );
+        assert_eq!(second.outputs["CLIENTADDR"].bytes(), b"192.");
+        assert_eq!(second.outputs["CADDRLENGTH"].bytes(), b"4");
+        let mut ipv6 = BTreeMap::from([
+            ("SERVERADDR".into(), argument(b"SERVER-X")),
+            ("SADDRLENGTH".into(), cics_decimal(16)),
+            ("SERVERADDR.MAXLENGTH".into(), cics_decimal(16)),
+        ]);
+        let mut ipv6_request = request(CicsOperation::ExtractTcpip, ipv6.clone(), 4);
+        ipv6_request.condition_policy = CicsConditionPolicy::NoHandle;
+        let short_ipv6 = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, ipv6_request.clone(), 4),
+                ipv6_request,
+            )
+            .unwrap();
+        assert_eq!((short_ipv6.response, short_ipv6.response2), (22, 4));
+        ipv6.insert("SADDRLENGTH".into(), cics_decimal(39));
+        ipv6.insert("SERVERADDR.MAXLENGTH".into(), cics_decimal(39));
+        let full_ipv6 = request(CicsOperation::ExtractTcpip, ipv6, 5);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, full_ipv6.clone(), 5),
+                full_ipv6
+            )
+            .unwrap()
+            .response,
+            0
         );
     }
 

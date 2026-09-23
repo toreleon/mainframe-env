@@ -3,7 +3,7 @@
 use super::*;
 
 /// Complete registry of executable typed CICS operations.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 80] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 81] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -640,6 +640,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 80] = [
         operation: CicsPlanOperation::ExtractCertificate,
         namespace: "cics.network",
         name: "extract-certificate",
+        major: 1,
+        effects: ASSIGN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ExtractTcpip,
+        namespace: "cics.network",
+        name: "extract-tcpip",
         major: 1,
         effects: ASSIGN_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

@@ -7,6 +7,21 @@ use super::{
 };
 use crate::{DataCategory, SemanticModel};
 
+pub(super) const ALLOWED_CLAUSES: &[&str] = &[
+    "TEXT",
+    "TEXTLENGTH",
+    "ROUTECODES",
+    "NUMROUTES",
+    "CONSNAME",
+    "ACTION",
+    "REPLY",
+    "MAXLENGTH",
+    "REPLYLENGTH",
+    "TIMEOUT",
+    "RESP",
+    "RESP2",
+];
+
 pub(super) fn validate(clauses: &Clauses, options: &[String]) -> Resolution<()> {
     let action_flags = ["IMMEDIATE", "EVENTUAL", "CRITICAL"]
         .into_iter()

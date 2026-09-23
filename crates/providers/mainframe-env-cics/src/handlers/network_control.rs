@@ -6,6 +6,7 @@ use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
+use std::net::IpAddr;
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
@@ -14,8 +15,241 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::ExtractCertificate => extract_certificate(service, run, request),
+        CicsOperation::ExtractTcpip => extract_tcpip(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn extract_tcpip(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_tcpip_request(request)?;
+    let context = service
+        .current_tcpip_context(run)?
+        .ok_or_else(|| HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 5,
+        })?;
+    let client_address = context
+        .client_address
+        .map_or_else(|| "0.0.0.0".into(), |ip| ip.to_string());
+    let server_address = context
+        .server_address
+        .map_or_else(|| "0.0.0.0".into(), |ip| ip.to_string());
+    let mut result = service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    let mut length_error = None;
+    for (buffer, length, text, response2) in [
+        ("CLIENTADDR", "CADDRLENGTH", client_address.as_str(), 3),
+        ("SERVERADDR", "SADDRLENGTH", server_address.as_str(), 4),
+        (
+            "CLIENTNAME",
+            "CNAMELENGTH",
+            context.client_name.as_deref().unwrap_or(""),
+            6,
+        ),
+        (
+            "SERVERNAME",
+            "SNAMELENGTH",
+            context.server_name.as_deref().unwrap_or(""),
+            7,
+        ),
+    ] {
+        if !request.arguments.contains_key(buffer) {
+            continue;
+        }
+        let capacity = tcpip_capacity(request, length, buffer)?;
+        if capacity == 0 {
+            length_error.get_or_insert(1);
+            result.outputs.insert(length.into(), decimal_payload(0)?);
+            continue;
+        }
+        let bytes = text.as_bytes();
+        let copied = capacity.min(bytes.len());
+        result
+            .outputs
+            .insert(buffer.into(), bounded(bytes[..copied].to_vec())?);
+        result
+            .outputs
+            .insert(length.into(), decimal_payload(copied as i64)?);
+        let ipv6_needs_39 = match buffer {
+            "CLIENTADDR" => matches!(context.client_address, Some(IpAddr::V6(_))) && capacity < 39,
+            "SERVERADDR" => matches!(context.server_address, Some(IpAddr::V6(_))) && capacity < 39,
+            _ => false,
+        };
+        if copied < bytes.len() || ipv6_needs_39 {
+            length_error.get_or_insert(response2);
+        }
+    }
+    for name in request.arguments.keys() {
+        let bytes = match name.as_str() {
+            "CLIENTADDRNU" => Some(ipv4_bytes(context.client_address).to_vec()),
+            "SERVERADDRNU" => Some(ipv4_bytes(context.server_address).to_vec()),
+            "CLNTADDR6NU" => Some(ipv6_bytes(context.client_address).to_vec()),
+            "SRVRADDR6NU" => Some(ipv6_bytes(context.server_address).to_vec()),
+            "TCPIPSERVICE" => {
+                let mut bytes = context.tcpip_service.as_bytes().to_vec();
+                bytes.resize(8, b' ');
+                Some(bytes)
+            }
+            "PORTNUMBER" => Some(format!("{:05}", context.port).into_bytes()),
+            "PORTNUMNU" => {
+                result
+                    .outputs
+                    .insert(name.clone(), decimal_payload(i64::from(context.port))?);
+                None
+            }
+            "MAXDATALEN" => {
+                result.outputs.insert(
+                    name.clone(),
+                    decimal_payload(i64::from(context.max_data_length))?,
+                );
+                None
+            }
+            _ => None,
+        };
+        if let Some(bytes) = bytes {
+            result.outputs.insert(name.clone(), bounded(bytes)?);
+        }
+    }
+    if let Some(response2) = length_error {
+        let mut condition = super::condition(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2,
+            },
+        )?;
+        condition.outputs = result.outputs;
+        Ok(condition)
+    } else {
+        Ok(result)
+    }
+}
+
+fn tcpip_capacity(request: &CicsRequest, length: &str, buffer: &str) -> Result<usize, HostProblem> {
+    let declared = request
+        .arguments
+        .get(length)
+        .ok_or(HostProblem::Malformed)?;
+    let declared = std::str::from_utf8(declared.bytes()).map_err(|_| HostProblem::Malformed)?;
+    let declared = declared
+        .parse::<i64>()
+        .map_err(|_| HostProblem::Malformed)?;
+    let maximum = request
+        .arguments
+        .get(&format!("{buffer}.MAXLENGTH"))
+        .ok_or(HostProblem::Malformed)?;
+    let maximum = std::str::from_utf8(maximum.bytes()).map_err(|_| HostProblem::Malformed)?;
+    let maximum = maximum
+        .parse::<usize>()
+        .map_err(|_| HostProblem::Malformed)?;
+    if declared <= 0 {
+        return Ok(0);
+    }
+    Ok(usize::try_from(declared)
+        .map_err(|_| HostProblem::Malformed)?
+        .min(maximum))
+}
+
+fn ipv4_bytes(ip: Option<IpAddr>) -> [u8; 4] {
+    match ip {
+        Some(IpAddr::V4(address)) => address.octets(),
+        _ => [0; 4],
+    }
+}
+
+fn ipv6_bytes(ip: Option<IpAddr>) -> [u8; 16] {
+    match ip {
+        Some(IpAddr::V6(address)) => address.octets(),
+        _ => [0; 16],
+    }
+}
+
+fn validate_tcpip_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const OUTPUTS: &[&str] = &[
+        "CLIENTNAME",
+        "CNAMELENGTH",
+        "SERVERNAME",
+        "SNAMELENGTH",
+        "CLIENTADDR",
+        "CADDRLENGTH",
+        "CLIENTADDRNU",
+        "CLNTADDR6NU",
+        "SERVERADDR",
+        "SADDRLENGTH",
+        "SERVERADDRNU",
+        "SRVRADDR6NU",
+        "TCPIPSERVICE",
+        "PORTNUMBER",
+        "PORTNUMNU",
+        "MAXDATALEN",
+    ];
+    const BUFFERS: &[&str] = &["CLIENTNAME", "SERVERNAME", "CLIENTADDR", "SERVERADDR"];
+    let pairs = [
+        ("CLIENTNAME", "CNAMELENGTH"),
+        ("SERVERNAME", "SNAMELENGTH"),
+        ("CLIENTADDR", "CADDRLENGTH"),
+        ("SERVERADDR", "SADDRLENGTH"),
+    ];
+    let present = request
+        .arguments
+        .keys()
+        .any(|name| OUTPUTS.contains(&name.as_str()));
+    if request.operation != CicsOperation::ExtractTcpip
+        || !present
+        || pairs.iter().any(|(buffer, length)| {
+            let selected = request.arguments.contains_key(*buffer);
+            selected != request.arguments.contains_key(*length)
+                || selected
+                    != request
+                        .arguments
+                        .contains_key(&format!("{buffer}.MAXLENGTH"))
+        })
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request.arguments.iter().any(|(name, value)| {
+            if OUTPUTS.contains(&name.as_str()) {
+                value.schema()
+                    != if matches!(
+                        name.as_str(),
+                        "CNAMELENGTH" | "SNAMELENGTH" | "CADDRLENGTH" | "SADDRLENGTH"
+                    ) {
+                        "mainframe-env.cics.decimal@1"
+                    } else {
+                        "mainframe-env.cics.argument@1"
+                    }
+            } else if name.ends_with(".MAXLENGTH")
+                && BUFFERS
+                    .iter()
+                    .any(|buffer| name == &format!("{buffer}.MAXLENGTH"))
+            {
+                value.schema() != "mainframe-env.cics.decimal@1"
+            } else if matches!(name.as_str(), "RESP" | "RESP2") {
+                value.schema() != "mainframe-env.cics.argument@1"
+            } else if name == "OPTION.NOHANDLE" {
+                value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+            } else {
+                true
+            }
+        })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(())
 }
 
 fn extract_certificate(

@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a bounded typed `EXTRACT TCPIP` route for row `0074`. It returns the
+  task's trusted IPv4/IPv6 addresses, DNS names supplied by ingress, service,
+  port, and maximum data length with source-defined buffer lengths and
+  LENGERR responses. Numeric CVDA outputs remain explicitly rejected because
+  their IBM numeric table is absent from the committed source manifest.
+
 - Added typed CICS `EXTRACT CERTIFICATE` for row `0070`. It reads the
   immutable, task-owned TLS client certificate, returns checked virtual
   pointers and source-defined lengths/USERID, selects owner or issuer fields,
@@ -34,8 +40,8 @@ All notable changes to mainframe-env are documented here.
   the `EXTRACT TCPIP` and `EXTRACT CERTIFICATE` routes. Trusted host
   registration is immutable, survives SQLite reopen, rejects malformed
   connection/certificate envelopes, and releases with the CICS task. Both
-  `EXTRACT TCPIP` remains unready while typed outputs and their source numeric
-  CVDA representations are completed.
+  Numeric `EXTRACT TCPIP` CVDA outputs remain closed pending reviewed source
+  identities.
 
 - Added typed CICS `WRITE OPERATOR` for row `0256`. It persists a bounded
   console message with reviewed routing and action codes, displays long text

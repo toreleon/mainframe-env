@@ -4,8 +4,8 @@ use mainframe_env_ir::{
     CICS_ASSIGN_OUTPUT_NAMES, CICS_CERTIFICATE_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS,
     CicsCertificateOutput, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
     CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
-    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect, Module, OperationCatalog,
-    OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, CicsTcpipOutput, Effect, Module,
+    OperationCatalog, OperationSchema, OperationSemanticContract, cics_executable_descriptor,
     cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
     decode_cics_effect_plan, verify_semantic_contracts,
 };
@@ -24,6 +24,7 @@ mod runtime_validation;
 mod spool_control;
 mod storage64;
 mod task_wait;
+mod tcpip;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
@@ -496,6 +497,9 @@ pub(super) fn execute(
                 )?,
             );
         }
+        if let CicsOutputName::Tcpip(identity) = output.name {
+            tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
+        }
         match output.name {
             CicsOutputName::Abstime
             | CicsOutputName::Commarea
@@ -527,6 +531,9 @@ pub(super) fn execute(
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Certificate(_) => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::Tcpip(_) => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => {

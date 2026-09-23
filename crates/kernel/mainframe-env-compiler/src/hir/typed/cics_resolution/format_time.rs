@@ -122,6 +122,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::OperatorReply
         | HirCicsOutputName::OperatorReplyLength
         | HirCicsOutputName::Certificate(_)
+        | HirCicsOutputName::Tcpip(_)
         | HirCicsOutputName::Commarea
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer

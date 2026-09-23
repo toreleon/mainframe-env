@@ -2421,6 +2421,7 @@ mod tests {
             CicsOperation::Post,
             CicsOperation::WriteOperator,
             CicsOperation::ExtractCertificate,
+            CicsOperation::ExtractTcpip,
             CicsOperation::Deq,
             CicsOperation::Delete,
             CicsOperation::DocumentCreate,

@@ -1587,6 +1587,7 @@ mod tests {
                 CicsPlanOperation::ExtractCertificate => {
                     crate::HirCicsOperation::ExtractCertificate
                 }
+                CicsPlanOperation::ExtractTcpip => crate::HirCicsOperation::ExtractTcpip,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
                 CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
                 CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,

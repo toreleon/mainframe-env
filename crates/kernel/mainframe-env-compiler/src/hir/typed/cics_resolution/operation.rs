@@ -56,6 +56,7 @@ pub(super) fn resolve(
         ["POST"] => HirCicsOperation::Post,
         ["WRITE", "OPERATOR"] => HirCicsOperation::WriteOperator,
         ["EXTRACT", "CERTIFICATE"] => HirCicsOperation::ExtractCertificate,
+        ["EXTRACT", "TCPIP"] => HirCicsOperation::ExtractTcpip,
         ["PURGE", "MESSAGE"] => HirCicsOperation::PurgeMessage,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,

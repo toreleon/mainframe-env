@@ -40,6 +40,14 @@ pub(in crate::machine) fn write_output(
         || operation == CicsOperation::ExtractCertificate
             && name == "USERID"
             && value.schema() != "mainframe-env.cics.payload@1"
+        || operation == CicsOperation::ExtractTcpip
+            && CicsTcpipOutput::from_name(name)
+                .is_some_and(|output| output.fullword() || output.buffer_length())
+            && value.schema() != "mainframe-env.cics.decimal@1"
+        || operation == CicsOperation::ExtractTcpip
+            && CicsTcpipOutput::from_name(name)
+                .is_some_and(|output| !output.fullword() && !output.buffer_length())
+            && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && operation == CicsOperation::Read
             && value.schema() != "mainframe-env.cics.decimal@1"
