@@ -6,6 +6,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::ConvertTime => matches!(
+            output,
+            CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 75);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 76);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 75);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 76);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -12513,6 +12513,71 @@ mod tests {
                 "CardDemo CICS form is unsupported: {source}"
             );
         }
+    }
+
+    #[test]
+    fn converttime_returns_exact_abstime_and_conditions_on_memory_and_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-converttime-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let stores: [Arc<dyn ProviderStateStore>; 2] = [
+            Arc::new(MemoryStore::new(Default::default())),
+            Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap()),
+        ];
+        let mut date = [b' '; 64];
+        date[..24].copy_from_slice(b"2003-04-01T10:01:02.498Z");
+        for store in stores {
+            let cics = service(store);
+            let (invocation, _) = registered(&cics);
+            let valid_request = request(
+                CicsOperation::ConvertTime,
+                BTreeMap::from([
+                    ("DATESTRING".into(), enqueue_value(&date)),
+                    ("ABSTIME".into(), argument(b"ABS-X")),
+                ]),
+                1,
+            );
+            let result = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, valid_request.clone(), 1),
+                    valid_request,
+                )
+                .unwrap();
+            assert_eq!(result.condition, "NORMAL");
+            assert_eq!(result.outputs["ABSTIME"].bytes(), b"3258180062498");
+
+            let mut invalid = date;
+            invalid[5..7].copy_from_slice(b"13");
+            let mut request = request(
+                CicsOperation::ConvertTime,
+                BTreeMap::from([
+                    ("DATESTRING".into(), enqueue_value(&invalid)),
+                    ("ABSTIME".into(), argument(b"ABS-X")),
+                    ("RESP".into(), argument(b"RESP-X")),
+                ]),
+                2,
+            );
+            request.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: None,
+            };
+            let result = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 2),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (result.condition.as_str(), result.response, result.response2),
+                ("INVREQ", 16, 3)
+            );
+            assert_eq!(result.outputs["ABSTIME"].bytes(), b"0");
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

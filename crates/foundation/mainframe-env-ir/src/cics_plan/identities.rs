@@ -15,6 +15,8 @@ pub enum CicsPlanOperation {
     AsktimeEib,
     /// Transform one absolute-time value into selected display/binary fields.
     FormatTime,
+    /// Convert one architected date-time string into CICS absolute time.
+    ConvertTime,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -220,6 +222,8 @@ pub enum CicsOperandName {
     Aids,
     /// `ABSTIME(...)` packed-decimal input.
     Abstime,
+    /// `DATESTRING(...)` architected date-time input.
+    DateString,
     /// Optional one-byte date separator.
     DateSep,
     /// Optional one-byte time separator.

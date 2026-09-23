@@ -23,6 +23,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `CONVERTTIME` for row `0031`. A 64-character DATESTRING
+  accepts the four pinned architected formats, converts fractional seconds
+  without rounding, and returns packed ABSTIME through the compiled selected
+  route. Invalid calendar, clock, weekday, fraction, and offset values return
+  their reviewed INVREQ/RESP2 codes with zero ABSTIME under RESP handling;
+  memory and SQLite provider routes agree.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

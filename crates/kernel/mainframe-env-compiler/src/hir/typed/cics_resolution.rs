@@ -19,6 +19,7 @@ mod address;
 mod assign_validation;
 mod clause_parser;
 mod command_recognition;
+mod convert_time;
 mod document_control;
 mod file_operands;
 mod format_time;
@@ -596,6 +597,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "YYMMDD",
             "YYYYMMDD",
         ],
+        HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -745,6 +747,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
+        HirCicsOperation::ConvertTime => &["NOHANDLE"],
         HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
         HirCicsOperation::SendMap => &[
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
@@ -822,6 +825,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
+        HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME"][..],
         HirCicsOperation::Abend
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -1046,6 +1050,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     if operation == HirCicsOperation::FormatTime {
         operands.extend(format_time::operands(&clauses, semantic)?);
+    }
+    if operation == HirCicsOperation::ConvertTime {
+        operands.extend(convert_time::operands(&clauses, semantic)?);
     }
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);

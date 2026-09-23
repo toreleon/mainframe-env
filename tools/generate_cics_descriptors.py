@@ -105,6 +105,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
+    ("ConvertTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0031"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
     (
@@ -536,6 +537,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Address",
         "Cancel",
         "ChangeTask",
+        "ConvertTime",
         "Delay",
         "AddressSet",
         "Asktime",
@@ -668,6 +670,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "ChangeTask": frozenset(
         {"memory-read", "memory-write", "suspension", "condition"}
     ),
+    "ConvertTime": frozenset({"memory-read", "memory-write", "condition"}),
     "Deq": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Enq": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1075,6 +1078,7 @@ def _load_typed_execution_registrations(
         "AsktimeEib",
         "Cancel",
         "ChangeTask",
+        "ConvertTime",
         "Delay",
         "DeleteTransientData",
         "DeleteTemporaryStorage",
@@ -1411,6 +1415,7 @@ def load_catalog(
             if row[0]
             not in {
                 "ChangeTask",
+                "ConvertTime",
                 "Address",
                 "AddressSet",
                 "AsktimeEib",

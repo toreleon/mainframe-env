@@ -438,6 +438,15 @@ fn validate_operation_shape(
                 })
                 || scheduling_options
         }
+        CicsPlanOperation::ConvertTime => {
+            inputs != &BTreeSet::from([CicsOperandName::DateString])
+                || !plan
+                    .operands
+                    .iter()
+                    .all(|operand| matches!(operand.value, CicsOperandValue::Storage(_)))
+                || !outputs.contains(&CicsOutputName::Abstime)
+                || scheduling_options
+        }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -1263,6 +1272,38 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&outputs[..21], limits),
             Err(CicsPlanCodecProblem::Truncated)
+        );
+    }
+
+    #[test]
+    fn convert_time_uses_v2_only_operand_tag_and_exact_output_shape() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::ConvertTime,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::DateString,
+                value: CicsOperandValue::Storage(slot(1, "SOURCE.DATESTRING")),
+            }],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Abstime,
+                target: slot(2, "RESULT.ABSTIME"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&bytes[4..8], &[0, 2, 0, 154]);
+        assert_eq!(&bytes[12..14], &640u16.to_be_bytes());
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut missing_output = plan;
+        missing_output.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing_output, limits),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

@@ -99,8 +99,16 @@ def check(root: Path) -> None:
         "typed CICS compiler ownership",
     )
 
-    cics_descriptors = production(
+    cics_descriptor_facade = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
+    )
+    require(
+        "pub use executable_descriptors::CICS_EXECUTABLE_DESCRIPTORS"
+        in cics_descriptor_facade,
+        "typed CICS descriptor facade omits its reviewed table re-export",
+    )
+    cics_descriptors = cics_descriptor_facade + production(
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_descriptors.rs")
     )
     for required in [
         "pub const CICS_EXECUTABLE_DESCRIPTORS",

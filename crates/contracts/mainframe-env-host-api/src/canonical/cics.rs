@@ -30,6 +30,7 @@ impl Canonical for CicsOperation {
             Self::Enq => out.variant("CicsOperation", "Enq", 0),
             Self::EndBrowse => out.variant("CicsOperation", "EndBrowse", 0),
             Self::FormatTime => out.variant("CicsOperation", "FormatTime", 0),
+            Self::ConvertTime => out.variant("CicsOperation", "ConvertTime", 0),
             Self::Freemain => out.variant("CicsOperation", "Freemain", 0),
             Self::Freemain64 => out.variant("CicsOperation", "Freemain64", 0),
             Self::Getmain => out.variant("CicsOperation", "Getmain", 0),

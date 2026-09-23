@@ -48,6 +48,8 @@ pub enum CicsOperation {
     Enq,
     EndBrowse,
     FormatTime,
+    /// Convert a 64-byte architected date-time string to packed absolute time.
+    ConvertTime,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -164,6 +166,7 @@ impl CicsOperation {
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::ConvertTime => "ConvertTime",
             Self::Freemain => "Freemain",
             Self::Freemain64 => "Freemain64",
             Self::Getmain => "Getmain",
@@ -317,6 +320,7 @@ impl CicsOperation {
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("CONVERTTIME", _) => Self::ConvertTime,
             ("FREEMAIN", _) => Self::Freemain,
             ("FREEMAIN64", _) => Self::Freemain64,
             ("GETMAIN", _) => Self::Getmain,

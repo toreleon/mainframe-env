@@ -11,6 +11,7 @@ use mainframe_env_ir::{
 
 mod address;
 mod assign;
+mod convert_time;
 mod legacy;
 mod names;
 mod response;
@@ -1026,6 +1027,7 @@ fn validate_machine_slot(
             "FORMATTIME separator input must be one character",
         ));
     }
+    convert_time::validate_date_string_slot(layout, slot_use)?;
     if let SlotUse::FormatTextOutput(expected) = slot_use
         && (layout.length != expected
             || !matches!(

@@ -2,11 +2,12 @@ use super::{HirProblem, HirStatement, StatementKind, StatementOption, StatementO
 use crate::{CobolLayout, CobolUsage, DataCategory, LosslessSyntax, SemanticModel, SourceSpan};
 use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
 use mainframe_env_source::SourceBundle;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::ops::Range;
 
 mod cics_output_names;
 mod cics_resolution;
+mod cics_types;
 mod corresponding_reference;
 pub use cics_output_names::HirCicsOutputName;
 use corresponding_reference::corresponding_group_reference_at;
@@ -146,287 +147,7 @@ pub struct HirComputeStatement {
     pub size_error: HirSizeErrorPolicy,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum HirCicsOperation {
-    Abend,
-    Address,
-    AddressSet,
-    Asktime,
-    AsktimeEib,
-    FormatTime,
-    Freemain,
-    Getmain,
-    Cancel,
-    Delay,
-    ChangeTask,
-    Deq,
-    Enq,
-    HandleAid,
-    HandleAbend,
-    HandleCondition,
-    IgnoreCondition,
-    InvokeApplication,
-    Load,
-    Release,
-    Link,
-    Xctl,
-    Return,
-    StartBrowse,
-    ResetBrowse,
-    ReadNext,
-    ReadPrev,
-    ReadTransientData,
-    EndBrowse,
-    Delete,
-    Write,
-    WriteTransientData,
-    DeleteTransientData,
-    DeleteTemporaryStorage,
-    ReadTemporaryStorage,
-    WriteTemporaryStorage,
-    ReceiveMap,
-    SendMap,
-    SendText,
-    Assign,
-    PurgeMessage,
-    PopHandle,
-    PushHandle,
-    Read,
-    Rewrite,
-    SetAssociationUserCorrData,
-    SpoolClose,
-    SpoolOpenInput,
-    SpoolOpenOutput,
-    SpoolRead,
-    SpoolWrite,
-    Syncpoint,
-    Unlock,
-    Suspend,
-    WaitEvent,
-    WaitExternal,
-    Start,
-    Retrieve,
-    DocumentCreate,
-    DocumentDelete,
-    DocumentInsert,
-    DocumentRetrieve,
-    DocumentSet,
-    TransformDataToJson,
-    TransformDataToXml,
-    TransformJsonToData,
-    TransformXmlToData,
-    WaitJournalName,
-    WaitJournalNum,
-    WriteJournalName,
-    WriteJournalNum,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum HirCicsOperandName {
-    Abcode,
-    Label,
-    Program,
-    Commarea,
-    TransId,
-    TermId,
-    ReturnTransId,
-    ReturnTermId,
-    File,
-    Dataset,
-    From,
-    Ridfld,
-    Token,
-    Queue,
-    Qname,
-    SysId,
-    Item,
-    CommareaPointer,
-    Map,
-    Mapset,
-    Resource,
-    Length,
-    MaxLifetime,
-    Priority,
-    UserCorrData,
-    SetAddress,
-    SetPointer,
-    UsingAddress,
-    UsingPointer,
-    /// Canonical condition specifications for HANDLE or IGNORE.
-    Conditions,
-    /// Canonical terminal AID handler specifications.
-    Aids,
-    Abstime,
-    DateSep,
-    TimeSep,
-    KeyLength,
-    ReqId,
-    Interval,
-    StartTime,
-    UserId,
-    Hours,
-    Minutes,
-    Seconds,
-    Milliseconds,
-    DataLength,
-    Flength,
-    InitImage,
-    DataPointer,
-    DataArea,
-    EventControlAddress,
-    WaitName,
-    EcbList,
-    NumEvents,
-    Purgeability,
-    Application,
-    Platform,
-    ApplicationOperation,
-    MajorVersion,
-    MinorVersion,
-    Channel,
-    LoadSet,
-    Entry,
-    LoadLength,
-    LoadFlength,
-    DocumentToken,
-    Text,
-    Binary,
-    FromDocument,
-    Template,
-    SymbolList,
-    ListLength,
-    Delimiter,
-    HostCodePage,
-    Bookmark,
-    Symbol,
-    AtBookmark,
-    ToBookmark,
-    MaximumLength,
-    CharacterSet,
-    SymbolValue,
-    InContainer,
-    OutContainer,
-    Transformer,
-    DataContainer,
-    XmlContainer,
-    XmlTransform,
-    NsContainer,
-    ElementName,
-    ElementNameLength,
-    ElementNamespace,
-    ElementNamespaceLength,
-    TypeName,
-    TypeNameLength,
-    TypeNamespace,
-    TypeNamespaceLength,
-    JournalName,
-    JournalNum,
-    JournalReqId,
-    JournalTypeId,
-    JournalFrom,
-    JournalFlength,
-    JournalPrefix,
-    JournalPfxLeng,
-    SpoolToken,
-    SpoolUserId,
-    SpoolClass,
-    SpoolNode,
-    SpoolRecordLength,
-    SpoolOutDescr,
-    SpoolMaxFlength,
-    SpoolFrom,
-    SpoolFlength,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum HirCicsValue {
-    Literal(String),
-    Data(HirDataReference),
-    Integer(i64),
-    LengthOf(HirDataReference),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct HirCicsNamedOperand {
-    pub name: HirCicsOperandName,
-    pub value: HirCicsValue,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum HirCicsOption {
-    Cancel,
-    NoDump,
-    Reset,
-    Update,
-    Rollback,
-    NoHandle,
-    Task,
-    Uow,
-    NoSuspend,
-    Erase,
-    Cursor,
-    DateSep,
-    TimeSep,
-    FreeKb,
-    Gteq,
-    Generic,
-    Fmh,
-    Protect,
-    Wait,
-    After,
-    At,
-    For,
-    Until,
-    NoCheck,
-    MapOnly,
-    DataOnly,
-    Equal,
-    Terminal,
-    Purgeable,
-    NotPurgeable,
-    Next,
-    RewriteTemporary,
-    Auxiliary,
-    Main,
-    ExactMatch,
-    Minimum,
-    Hold,
-    Unescaped,
-    SpoolKeep,
-    SpoolDelete,
-    SpoolNoCc,
-    SpoolAsa,
-    SpoolMcc,
-    SpoolPrint,
-    SpoolPunch,
-    SpoolLine,
-    SpoolPage,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct HirCicsOutputBinding {
-    pub name: HirCicsOutputName,
-    pub target: HirDataReference,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum HirCicsConditionPolicy {
-    Default,
-    NoHandle,
-    Respond {
-        response: HirDataReference,
-        response2: Option<HirDataReference>,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct HirCicsStatement {
-    pub operation: HirCicsOperation,
-    pub operands: Vec<HirCicsNamedOperand>,
-    pub options: BTreeSet<HirCicsOption>,
-    pub outputs: Vec<HirCicsOutputBinding>,
-    pub condition_policy: HirCicsConditionPolicy,
-}
+pub use cics_types::*;
 
 enum ResolutionFailure {
     Unsupported,
@@ -1204,6 +925,7 @@ mod tests {
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
+    use std::collections::BTreeSet;
 
     fn analyze(source: &str) -> crate::CobolAnalysis {
         let limits = SourceLimits::default();
@@ -2574,6 +2296,42 @@ mod tests {
             let message = diagnostic.public_message();
             message.contains("FORMATTIME") && message.contains("DAYCOUNT")
         }));
+    }
+
+    /// Row 0031: CONVERTTIME accepts the pinned DATESTRING/ABSTIME storage shape.
+    #[test]
+    fn cics_converttime_requires_one_64_character_source_and_packed_destination() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CVTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATE-X PIC X(64). 01 ABS-X PIC S9(15) COMP-3. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CONVERTTIME DATESTRING(DATE-X) ABSTIME(ABS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("CONVERTTIME: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed CONVERTTIME");
+        assert_eq!(command.operation, HirCicsOperation::ConvertTime);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DateString
+                && matches!(&operand.value, HirCicsValue::Data(reference) if reference.qualified_name == "DATE-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Abstime && output.target.qualified_name == "ABS-X"
+        }));
+
+        for (date_picture, abs_picture) in [("X(63)", "S9(15) COMP-3"), ("X(64)", "X(8)")] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCV. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATE-X PIC {date_picture}. 01 ABS-X PIC {abs_picture}. PROCEDURE DIVISION. EXEC CICS CONVERTTIME DATESTRING(DATE-X) ABSTIME(ABS-X) END-EXEC. STOP RUN."
+            );
+            assert!(
+                analyze(&source).hir.is_none(),
+                "accepted {date_picture}, {abs_picture}"
+            );
+        }
     }
 
     /// Issue #207: bare DATESEP and TIMESEP select the documented defaults.

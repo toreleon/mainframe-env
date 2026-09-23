@@ -4,6 +4,8 @@ use mainframe_env_host_api::{
     HostRequest, HostResult,
 };
 
+mod convert_time;
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,
@@ -12,6 +14,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::Asktime | CicsOperation::AsktimeEib => asktime(service, run, request),
         CicsOperation::FormatTime => format_time(service, run, request),
+        CicsOperation::ConvertTime => convert_time::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
