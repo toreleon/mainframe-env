@@ -4,6 +4,13 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Versioned the typed CICS effect-plan codec as `MCEP` v2 with big-endian `u16`
+  operation, operand, option, and output tags. Existing tag numbers and
+  canonical v1 plan decoding remain intact; new encodings are deterministic v2
+  bytes, and malformed or unknown tags fail closed.
+
 ### Fixed
 
 - Moved the typed CICS TSQ NUMITEMS plan output from tag 110, which overlaps

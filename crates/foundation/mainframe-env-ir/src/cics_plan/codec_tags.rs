@@ -3,20 +3,20 @@ use super::{
     CicsPlanOption,
 };
 
-const ASSIGN_OUTPUT_TAG_BASE: u8 = 13;
-const ASSIGN_OUTPUT_LEGACY_COUNT: u8 = 78;
-const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u8 = 96;
+const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
+const ASSIGN_OUTPUT_LEGACY_COUNT: u16 = 78;
+const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u16 = 96;
 
 #[cfg(test)]
-pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u8> = 68..=71;
+pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u16> = 68..=71;
 #[cfg(test)]
-pub(super) const TRANSFORM_OPERAND_TAGS: std::ops::RangeInclusive<u8> = 153..=171;
+pub(super) const TRANSFORM_OPERAND_TAGS: std::ops::RangeInclusive<u16> = 153..=171;
 #[cfg(test)]
-pub(super) const TRANSFORM_OPTION_TAGS: std::ops::RangeInclusive<u8> = 96..=107;
+pub(super) const TRANSFORM_OPTION_TAGS: std::ops::RangeInclusive<u16> = 96..=107;
 #[cfg(test)]
-pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u8> = 224..=231;
+pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=231;
 
-pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
+pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
         CicsPlanOperation::Read => 0,
         CicsPlanOperation::Rewrite => 1,
@@ -94,7 +94,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
     }
 }
 
-pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
+pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
         0 => Ok(CicsPlanOperation::Read),
         1 => Ok(CicsPlanOperation::Rewrite),
@@ -173,7 +173,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
     }
 }
 
-pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
+pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
         CicsOperandName::File => 0,
         CicsOperandName::Dataset => 1,
@@ -294,7 +294,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
     }
 }
 
-pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> {
+pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
         0 => Ok(CicsOperandName::File),
         1 => Ok(CicsOperandName::Dataset),
@@ -416,7 +416,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
     }
 }
 
-pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
+pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
     match value {
         CicsPlanOption::Update => 0,
         CicsPlanOption::Rollback => 1,
@@ -473,7 +473,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
     }
 }
 
-pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
+pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
         0 => Ok(CicsPlanOption::Update),
         1 => Ok(CicsPlanOption::Rollback),
@@ -531,7 +531,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
     }
 }
 
-pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
+pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
         CicsOutputName::Into => 0,
         CicsOutputName::Resp => 1,
@@ -548,7 +548,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Ridfld => 12,
         CicsOutputName::Token => 240,
         CicsOutputName::Assign(output) => {
-            let tag = output.tag();
+            let tag = output.tag() as u16;
             if tag < ASSIGN_OUTPUT_LEGACY_COUNT {
                 ASSIGN_OUTPUT_TAG_BASE + tag
             } else {
@@ -578,7 +578,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
     }
 }
 
-pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
+pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
         0 => Ok(CicsOutputName::Into),
         1 => Ok(CicsOutputName::Resp),
@@ -614,15 +614,16 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         232 => Ok(CicsOutputName::SetPointer64),
         208 => Ok(CicsOutputName::SpoolToken),
         209 => Ok(CicsOutputName::SpoolToFlength),
-        13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
+        13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),
         // Reserved non-ASSIGN journal outputs must remain ahead of the
         // open-ended ASSIGN extension decoder.
         202..=207 => Err(CicsPlanCodecProblem::Malformed),
-        96..=200 | 208..=u8::MAX => value
+        96..=u16::MAX => value
             .checked_sub(ASSIGN_OUTPUT_EXTENSION_TAG_BASE)
             .and_then(|tag| tag.checked_add(ASSIGN_OUTPUT_LEGACY_COUNT))
+            .and_then(|tag| u8::try_from(tag).ok())
             .and_then(CicsAssignOutput::from_tag)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

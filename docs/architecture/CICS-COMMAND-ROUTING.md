@@ -596,6 +596,19 @@ the eventual public DPL transport.
 
 ## Change contract
 
+The typed CICS effect-plan wire contract is
+`mainframe-env.cics-effect-plan@2` (`MCEP`, big-endian version 2). Operation,
+operand, option, and output identity tags each occupy a big-endian `u16` in v2.
+All previously assigned numeric tags retain their values, including reserved
+gaps and the ASSIGN output ranges. Counts, operand value-kind bytes, storage
+slots, and condition bytes retain their v1 layout. The encoder emits only
+canonical v2 plans, sorting named operands and outputs and rejecting duplicate
+identities. The decoder accepts canonical v1 bytes for retained artifacts and
+canonical v2 bytes; it rejects unsupported versions, unknown tags, truncation,
+trailing bytes, and noncanonical ordering. Re-encoding a decoded v1 plan
+migrates it to v2. This wire migration does not change command semantics or
+the reviewed registry readiness split.
+
 Adding an identity to the application projection requires a reviewed change to
 the pinned official denominator and regeneration. It never updates
 `CicsOperation`, dispatch or coverage by itself.

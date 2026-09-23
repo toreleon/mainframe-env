@@ -33,10 +33,11 @@ use codec_tags::{
 };
 
 /// Stable wire identity for a typed CICS effect plan.
-pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@1";
+pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@2";
 
 const MAGIC: &[u8; 4] = b"MCEP";
-const VERSION: u16 = 1;
+const LEGACY_VERSION: u16 = 1;
+const VERSION: u16 = 2;
 
 /// Resource limits for CICS effect-plan encoding and decoding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,17 +144,25 @@ pub fn encode_cics_effect_plan(
     plan: &CicsEffectPlan,
     limits: CicsPlanLimits,
 ) -> Result<Vec<u8>, CicsPlanCodecProblem> {
+    encode_cics_effect_plan_version(plan, limits, VERSION)
+}
+
+fn encode_cics_effect_plan_version(
+    plan: &CicsEffectPlan,
+    limits: CicsPlanLimits,
+    version: u16,
+) -> Result<Vec<u8>, CicsPlanCodecProblem> {
     validate_plan(plan, limits)?;
     let mut writer = Writer::new(limits.max_encoded_bytes);
     writer.extend(MAGIC)?;
-    writer.u16(VERSION)?;
-    writer.byte(operation_tag(plan.operation))?;
+    writer.u16(version)?;
+    writer.tag(operation_tag(plan.operation), version)?;
 
     let mut operands = plan.operands.iter().collect::<Vec<_>>();
     operands.sort_by_key(|operand| operand.name);
     writer.count(operands.len())?;
     for operand in operands {
-        writer.byte(operand_tag(operand.name))?;
+        writer.tag(operand_tag(operand.name), version)?;
         match &operand.value {
             CicsOperandValue::Literal(bytes) => {
                 writer.byte(0)?;
@@ -176,14 +185,14 @@ pub fn encode_cics_effect_plan(
 
     writer.count(plan.options.len())?;
     for option in &plan.options {
-        writer.byte(option_tag(*option))?;
+        writer.tag(option_tag(*option), version)?;
     }
 
     let mut outputs = plan.outputs.iter().collect::<Vec<_>>();
     outputs.sort_by_key(|output| output.name);
     writer.count(outputs.len())?;
     for output in outputs {
-        writer.byte(output_tag(output.name))?;
+        writer.tag(output_tag(output.name), version)?;
         encode_slot(&mut writer, &output.target, limits)?;
     }
     encode_condition(&mut writer, &plan.condition, limits)?;
@@ -202,17 +211,18 @@ pub fn decode_cics_effect_plan(
     if reader.take(MAGIC.len())? != MAGIC {
         return Err(CicsPlanCodecProblem::BadMagic);
     }
-    if reader.u16()? != VERSION {
+    let version = reader.u16()?;
+    if !matches!(version, LEGACY_VERSION | VERSION) {
         return Err(CicsPlanCodecProblem::UnsupportedVersion);
     }
-    let operation = operation_from_tag(reader.byte()?)?;
+    let operation = operation_from_tag(reader.tag(version)?)?;
 
     let operand_count = reader.count(limits.max_operands)?;
     let mut operands = Vec::with_capacity(operand_count);
     let mut last_operand = None;
     let mut literal_bytes = 0usize;
     for _ in 0..operand_count {
-        let name = operand_from_tag(reader.byte()?)?;
+        let name = operand_from_tag(reader.tag(version)?)?;
         require_order(last_operand, name)?;
         last_operand = Some(name);
         let value = match reader.byte()? {
@@ -238,7 +248,7 @@ pub fn decode_cics_effect_plan(
     let mut options = BTreeSet::new();
     let mut last_option = None;
     for _ in 0..option_count {
-        let option = option_from_tag(reader.byte()?)?;
+        let option = option_from_tag(reader.tag(version)?)?;
         require_order(last_option, option)?;
         last_option = Some(option);
         if !options.insert(option) {
@@ -250,7 +260,7 @@ pub fn decode_cics_effect_plan(
     let mut outputs = Vec::with_capacity(output_count);
     let mut last_output = None;
     for _ in 0..output_count {
-        let name = output_from_tag(reader.byte()?)?;
+        let name = output_from_tag(reader.tag(version)?)?;
         require_order(last_output, name)?;
         last_output = Some(name);
         outputs.push(CicsOutputBinding {
@@ -270,7 +280,7 @@ pub fn decode_cics_effect_plan(
         condition,
     };
     validate_plan(&plan, limits)?;
-    if encode_cics_effect_plan(&plan, limits)? != bytes {
+    if encode_cics_effect_plan_version(&plan, limits, version)? != bytes {
         return Err(CicsPlanCodecProblem::NonCanonical);
     }
     Ok(plan)
@@ -936,6 +946,15 @@ impl Writer {
     fn byte(&mut self, value: u8) -> Result<(), CicsPlanCodecProblem> {
         self.extend(&[value])
     }
+    fn tag(&mut self, value: u16, version: u16) -> Result<(), CicsPlanCodecProblem> {
+        match version {
+            LEGACY_VERSION => {
+                self.byte(u8::try_from(value).map_err(|_| CicsPlanCodecProblem::Malformed)?)
+            }
+            VERSION => self.u16(value),
+            _ => Err(CicsPlanCodecProblem::UnsupportedVersion),
+        }
+    }
     fn u16(&mut self, value: u16) -> Result<(), CicsPlanCodecProblem> {
         self.extend(&value.to_be_bytes())
     }
@@ -1002,6 +1021,13 @@ impl<'a> Reader<'a> {
     }
     fn byte(&mut self) -> Result<u8, CicsPlanCodecProblem> {
         Ok(self.take(1)?[0])
+    }
+    fn tag(&mut self, version: u16) -> Result<u16, CicsPlanCodecProblem> {
+        match version {
+            LEGACY_VERSION => Ok(u16::from(self.byte()?)),
+            VERSION => self.u16(),
+            _ => Err(CicsPlanCodecProblem::UnsupportedVersion),
+        }
     }
     fn u16(&mut self) -> Result<u16, CicsPlanCodecProblem> {
         Ok(u16::from_be_bytes(
@@ -1138,6 +1164,106 @@ mod tests {
                 response2: Some(response2),
             },
         }
+    }
+
+    #[test]
+    fn legacy_plan_golden_decodes_and_migrates_to_canonical_v2() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Syncpoint,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let v1_golden = b"MCEP\0\x01\x02\0\0\0\0\0\0\0\0\0\0\0\0\0";
+        assert_eq!(decode_cics_effect_plan(v1_golden, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION).unwrap(),
+            v1_golden
+        );
+        let v2 = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&v2[..8], b"MCEP\0\x02\0\x02");
+        assert_eq!(v2.len(), v1_golden.len() + 1);
+        assert_eq!(decode_cics_effect_plan(&v2, limits), Ok(plan));
+
+        let legacy_read =
+            encode_cics_effect_plan_version(&read_plan(), limits, LEGACY_VERSION).unwrap();
+        let decoded = decode_cics_effect_plan(&legacy_read, limits).unwrap();
+        assert_eq!(
+            encode_cics_effect_plan_version(&decoded, limits, LEGACY_VERSION).unwrap(),
+            legacy_read
+        );
+        assert_eq!(
+            decode_cics_effect_plan(&encode_cics_effect_plan(&decoded, limits).unwrap(), limits),
+            Ok(decoded)
+        );
+    }
+
+    #[test]
+    fn wide_identity_tags_are_big_endian_and_unknown_tags_fail_closed() {
+        let limits = CicsPlanLimits::default();
+        let mut writer = Writer::new(2);
+        writer.tag(0x1234, VERSION).unwrap();
+        assert_eq!(writer.finish(), [0x12, 0x34]);
+        let mut reader = Reader::new(&[0x12, 0x34]);
+        assert_eq!(reader.tag(VERSION), Ok(0x1234));
+        assert_eq!(reader.tag(VERSION), Err(CicsPlanCodecProblem::Truncated));
+
+        let mut read = encode_cics_effect_plan(&read_plan(), limits).unwrap();
+        for offset in [6, 12] {
+            let saved = [read[offset], read[offset + 1]];
+            read[offset..offset + 2].copy_from_slice(&256u16.to_be_bytes());
+            assert_eq!(
+                decode_cics_effect_plan(&read, limits),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+            read[offset..offset + 2].copy_from_slice(&saved);
+        }
+        let options_plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Syncpoint,
+            operands: Vec::new(),
+            options: BTreeSet::from([CicsPlanOption::Rollback]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let mut options = encode_cics_effect_plan(&options_plan, limits).unwrap();
+        options[16..18].copy_from_slice(&256u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&options, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut unordered = options_plan;
+        unordered.options.insert(CicsPlanOption::NoHandle);
+        unordered.condition = CicsCondition::NoHandle;
+        let mut unordered = encode_cics_effect_plan(&unordered, limits).unwrap();
+        unordered[16..18].copy_from_slice(&2u16.to_be_bytes());
+        unordered[18..20].copy_from_slice(&1u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&unordered, limits),
+            Err(CicsPlanCodecProblem::NonCanonical)
+        );
+
+        let output_plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Asktime,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Abstime,
+                target: slot(1, "RESULT.ABSTIME"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let mut outputs = encode_cics_effect_plan(&output_plan, limits).unwrap();
+        outputs[20..22].copy_from_slice(&256u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&outputs, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        assert_eq!(
+            decode_cics_effect_plan(&outputs[..21], limits),
+            Err(CicsPlanCodecProblem::Truncated)
+        );
     }
 
     /// Issue #212: unrelated file and UOW plans reject extension flags.
@@ -1352,23 +1478,23 @@ mod tests {
         );
 
         assert_eq!(
-            operation_from_tag(u8::MAX),
+            operation_from_tag(u16::MAX),
             Err(CicsPlanCodecProblem::Malformed)
         );
         assert_eq!(
-            operand_from_tag(u8::MAX),
+            operand_from_tag(u16::MAX),
             Err(CicsPlanCodecProblem::Malformed)
         );
         assert_eq!(
-            option_from_tag(u8::MAX),
+            option_from_tag(u16::MAX),
             Err(CicsPlanCodecProblem::Malformed)
         );
         assert_eq!(
-            output_from_tag(u8::MAX),
+            output_from_tag(u16::MAX),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut unknown_value_tag = bytes;
-        unknown_value_tag[12] = u8::MAX;
+        unknown_value_tag[14] = u8::MAX;
         assert_eq!(
             decode_cics_effect_plan(&unknown_value_tag, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
@@ -2414,7 +2540,7 @@ mod tests {
         };
         let reset_bytes =
             encode_cics_effect_plan(&reset_browse, CicsPlanLimits::default()).unwrap();
-        assert_eq!(reset_bytes[6], 74);
+        assert_eq!(&reset_bytes[6..8], &74u16.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&reset_bytes, CicsPlanLimits::default()),
             Ok(reset_browse)
@@ -3179,7 +3305,7 @@ mod tests {
         assert_eq!(operand_tag(CicsOperandName::EventControlAddress), 46);
         assert_eq!(operand_tag(CicsOperandName::WaitName), 47);
         let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
-        assert_eq!(encoded[6], 43);
+        assert_eq!(&encoded[6..8], &43u16.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             plan
@@ -3221,7 +3347,7 @@ mod tests {
         assert_eq!(option_tag(CicsPlanOption::Purgeable), 28);
         assert_eq!(option_tag(CicsPlanOption::NotPurgeable), 29);
         let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
-        assert_eq!(encoded[6], 44);
+        assert_eq!(&encoded[6..8], &44u16.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             plan
@@ -3525,7 +3651,7 @@ mod tests {
 
     #[test]
     fn getmain64_uses_disjoint_append_only_tags_and_checked_plan_shape() {
-        for tag in 0..=u8::MAX {
+        for tag in 0..=u16::from(u8::MAX) {
             if let Ok(value) = operation_from_tag(tag) {
                 assert_eq!(operation_tag(value), tag, "operation tag {tag}");
             }
@@ -3725,7 +3851,7 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut bytes = encode_cics_effect_plan(&read_plan(), limits).unwrap();
-        bytes[4..6].copy_from_slice(&2u16.to_be_bytes());
+        bytes[4..6].copy_from_slice(&3u16.to_be_bytes());
         assert_eq!(
             decode_cics_effect_plan(&bytes, limits),
             Err(CicsPlanCodecProblem::UnsupportedVersion)
@@ -4144,7 +4270,7 @@ mod tests {
         let mut operands = BTreeSet::new();
         let mut options = BTreeSet::new();
         let mut outputs = BTreeSet::new();
-        for tag in u8::MIN..=u8::MAX {
+        for tag in u16::from(u8::MIN)..=u16::from(u8::MAX) {
             if let Ok(value) = operation_from_tag(tag) {
                 assert!(operations.insert(value), "duplicate operation tag {tag}");
                 assert_eq!(operation_tag(value), tag);
