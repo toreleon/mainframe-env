@@ -3670,8 +3670,8 @@ mod tests {
     use super::*;
     use crate::{CicsEventPostMode, CicsEventPurgeMode};
     use mainframe_env_execution_api::{
-        ArtifactRef, ExecutionId, Principal, RequestId, ResourceLimits, Selector, ServiceClass,
-        TraceId,
+        ArtifactRef, AuditDecision, ExecutionId, Principal, RequestId, ResourceLimits, Selector,
+        ServiceClass, TraceId,
     };
     use mainframe_env_host_api::{
         DatasetAttributes, DatasetOrganization, HostLimits, RecordFormat, RegistrySnapshot,
@@ -16757,6 +16757,79 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn storage64_effects_cancel_or_expire_before_dispatch_with_audit() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, _) = registered_amode64(&service);
+        let cases = [
+            (
+                CicsOperation::Getmain64,
+                BTreeMap::from([
+                    (
+                        "ABI64".into(),
+                        cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                    ),
+                    ("FLENGTH".into(), cics_decimal(17)),
+                    ("SET64".into(), argument(b"PTR64-X")),
+                    ("SET64.LIMIT".into(), cics_decimal(128)),
+                    ("SET64.MAXLENGTH".into(), cics_decimal(128)),
+                ]),
+            ),
+            (
+                CicsOperation::Freemain64,
+                BTreeMap::from([
+                    (
+                        "ABI64".into(),
+                        cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                    ),
+                    (
+                        "DATAPOINTER".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.allocated-pointer64@1",
+                            vec![0xA0, 0, 0, 1, 0, 0, 0, 8],
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                ]),
+            ),
+        ];
+        let mut expected_audit = BTreeMap::new();
+        for (index, (operation, arguments)) in cases.into_iter().enumerate() {
+            for (cancelled, now_tick) in [(true, 1), (false, 100)] {
+                let sequence = 10 + index as u64 * 2 + u64::from(!cancelled);
+                let request = request(operation, arguments.clone(), sequence);
+                let result = service.invoke_host(
+                    &invocation,
+                    now_tick,
+                    cancelled,
+                    effect(&invocation.run_unit_id, request, sequence),
+                );
+                let (problem, decision) = if cancelled {
+                    (HostProblem::Cancelled, AuditDecision::Cancelled)
+                } else {
+                    (HostProblem::TimedOut, AuditDecision::TimedOut)
+                };
+                assert_eq!(result.outcome, Err(problem));
+                expected_audit.insert(sequence, decision);
+                assert!(
+                    store
+                        .get_provider_state("cics-effect-replay-v1", &format!("outer-{sequence}"))
+                        .unwrap()
+                        .is_none()
+                );
+            }
+        }
+        let observed = store
+            .audit_records(&invocation.execution_id, 10, 16)
+            .unwrap()
+            .into_iter()
+            .map(|record| (record.effect_sequence, record.decision))
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(observed, expected_audit);
     }
 
     /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.
