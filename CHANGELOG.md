@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Made first-time CICS TDQUEUE-definition registration migration-safe. Existing
+  compatibility-profile queues must all be declared and satisfy the proposed
+  direction, record-size, record-count, and byte limits before any definition
+  row is written; partial or incompatible migrations leave durable and
+  in-memory state unchanged.
+
 - Added durable local CICS TDQUEUE definitions for typed WRITEQ TD, READQ TD,
   and DELETEQ TD. Installed intrapartition and extrapartition definitions now
   drive enabled/open direction, record-size and per-queue capacity checks with

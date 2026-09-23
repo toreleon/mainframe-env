@@ -140,6 +140,15 @@ pub(in crate::service) fn register(
         }
         normalized.push(definition);
     }
+    let mut proposed = state.definitions.clone();
+    for definition in &normalized {
+        proposed
+            .entry(definition.name.clone())
+            .or_insert_with(|| definition.clone());
+    }
+    if proposed.len() > limits.max_queue_records {
+        return Err(HostProblem::ResourceExhausted);
+    }
     let writes = normalized
         .iter()
         .filter(|definition| !state.definitions.contains_key(&definition.name))
@@ -156,6 +165,7 @@ pub(in crate::service) fn register(
         })
         .collect::<Result<Vec<_>, HostProblem>>()?;
     if !writes.is_empty() {
+        validate_materialized_queues(&state.queues, &proposed)?;
         store
             .put_provider_states_atomic(writes)
             .map_err(store_error)?;
@@ -165,6 +175,47 @@ pub(in crate::service) fn register(
             .definitions
             .entry(definition.name.clone())
             .or_insert(definition);
+    }
+    Ok(())
+}
+
+fn validate_materialized_queues(
+    queues: &BTreeMap<String, TransientQueue>,
+    definitions: &BTreeMap<String, CicsTransientDataQueueDefinition>,
+) -> Result<(), HostProblem> {
+    for (name, queue) in queues {
+        let Some(definition) = definitions.get(name) else {
+            return Err(HostProblem::IdempotencyConflict);
+        };
+        if queue.records.len() > definition.max_records {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let mut retained_bytes = 0usize;
+        for (_, record) in &queue.records {
+            retained_bytes = retained_bytes
+                .checked_add(record.len())
+                .ok_or(HostProblem::IdempotencyConflict)?;
+            let compatible = match (definition.kind, definition.open) {
+                (CicsTransientDataQueueKind::Intrapartition, None) => definition
+                    .record_size
+                    .is_none_or(|maximum| record.len() <= maximum),
+                (
+                    CicsTransientDataQueueKind::Extrapartition,
+                    Some(CicsTransientDataQueueOpen::Output),
+                ) => definition.record_size == Some(record.len()),
+                (
+                    CicsTransientDataQueueKind::Extrapartition,
+                    Some(CicsTransientDataQueueOpen::Input | CicsTransientDataQueueOpen::Closed),
+                ) => false,
+                _ => false,
+            };
+            if !compatible {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+        }
+        if retained_bytes > definition.max_bytes {
+            return Err(HostProblem::IdempotencyConflict);
+        }
     }
     Ok(())
 }

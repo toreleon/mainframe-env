@@ -278,7 +278,10 @@ QZERO 23/0. Durable installed TDQUEUE definitions select intrapartition or
 local extrapartition behavior, enabled/open direction, record-size rules, and
 per-queue record/byte bounds. Definition state survives provider reopen and
 produces exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR, QIDERR, and
-QZERO conditions. All three typed TDQ commands accept an explicit local-system
+QZERO conditions. On first registration, all compatibility-profile queues must
+be declared by the complete proposed set, and retained records must satisfy the
+new direction, record-size, record-count, and byte limits before any definition
+is persisted. All three typed TDQ commands accept an explicit local-system
 SYSID; any other name returns SYSIDERR 53/0 before authorization or mutation.
 Remote routing, NOSUSPEND/QBUSY, indoubt locking, and external data set
 integration remain fail-closed.

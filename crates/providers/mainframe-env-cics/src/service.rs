@@ -4687,6 +4687,51 @@ mod tests {
         }
     }
 
+    fn seed_compatibility_tdq(store: &dyn ProviderStateStore, name: &str, records: &[Vec<u8>]) {
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-tdq".into(),
+                    key: name.into(),
+                    version: 1,
+                    payload: encode_transient(&TransientQueue {
+                        records: records
+                            .iter()
+                            .enumerate()
+                            .map(|(index, record)| (format!("seed-{name}-{index}"), record.clone()))
+                            .collect(),
+                        version: 1,
+                    })
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+    }
+
+    fn compatibility_migration_definitions() -> Vec<CicsTransientDataQueueDefinition> {
+        vec![
+            tdq_definition(
+                "KEEP",
+                CicsTransientDataQueueKind::Intrapartition,
+                true,
+                None,
+                Some(3),
+                2,
+                5,
+            ),
+            tdq_definition(
+                "NEXT",
+                CicsTransientDataQueueKind::Extrapartition,
+                true,
+                Some(CicsTransientDataQueueOpen::Output),
+                Some(4),
+                1,
+                4,
+            ),
+        ]
+    }
+
     fn request(
         operation: CicsOperation,
         arguments: BTreeMap<String, BoundedPayload>,
@@ -9782,6 +9827,163 @@ mod tests {
             let service = service(store);
             assert_eq!(service.transient_data_counts().unwrap(), (1, 1, 0));
             assert!(service.transient_records("PERS").unwrap().is_empty());
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn transient_data_definition_migration_is_atomic_in_memory() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        seed_compatibility_tdq(store.as_ref(), "KEEP", &[b"AA".to_vec(), b"BBB".to_vec()]);
+        seed_compatibility_tdq(store.as_ref(), "NEXT", &[b"DATA".to_vec()]);
+        let queue_rows = store.list_provider_state("cics-tdq", 8).unwrap();
+        let active = service(store.clone());
+        assert_eq!(active.transient_data_counts().unwrap(), (0, 2, 9));
+
+        let valid = compatibility_migration_definitions();
+        let partial = vec![valid[0].clone()];
+        let mut excessive_records = valid.clone();
+        excessive_records[0].max_records = 1;
+        let mut excessive_bytes = valid.clone();
+        excessive_bytes[0].max_bytes = 4;
+        let mut oversized_record = valid.clone();
+        oversized_record[0].record_size = Some(2);
+        let mut wrong_direction = valid.clone();
+        wrong_direction[1].open = Some(CicsTransientDataQueueOpen::Input);
+        let mut wrong_fixed_size = valid.clone();
+        wrong_fixed_size[1].record_size = Some(3);
+
+        for definitions in [
+            partial,
+            excessive_records,
+            excessive_bytes,
+            oversized_record,
+            wrong_direction,
+            wrong_fixed_size,
+        ] {
+            assert_eq!(
+                active.register_transient_data_queues(&definitions),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(active.transient_data_counts().unwrap(), (0, 2, 9));
+            assert_eq!(
+                active.transient_records("KEEP").unwrap(),
+                [b"AA".to_vec(), b"BBB".to_vec()]
+            );
+            assert_eq!(
+                store.list_provider_state("cics-tdq", 8).unwrap(),
+                queue_rows
+            );
+            assert!(
+                store
+                    .list_provider_state("cics-tdq-definition", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+
+        active.register_transient_data_queues(&valid).unwrap();
+        assert_eq!(active.transient_data_counts().unwrap(), (2, 2, 9));
+        assert_eq!(
+            store.list_provider_state("cics-tdq", 8).unwrap(),
+            queue_rows
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-tdq-definition", 8)
+                .unwrap()
+                .len(),
+            2
+        );
+
+        let reopened = service(store);
+        assert_eq!(reopened.transient_data_counts().unwrap(), (2, 2, 9));
+        assert_eq!(
+            reopened.transient_records("KEEP").unwrap(),
+            [b"AA".to_vec(), b"BBB".to_vec()]
+        );
+        assert_eq!(
+            reopened.transient_records("NEXT").unwrap(),
+            [b"DATA".to_vec()]
+        );
+    }
+
+    #[test]
+    fn transient_data_definition_migration_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-tdq-definition-migration-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let valid = compatibility_migration_definitions();
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            seed_compatibility_tdq(store.as_ref(), "KEEP", &[b"AA".to_vec(), b"BBB".to_vec()]);
+            seed_compatibility_tdq(store.as_ref(), "NEXT", &[b"DATA".to_vec()]);
+            let queue_rows = store.list_provider_state("cics-tdq", 8).unwrap();
+            let service = service(store.clone());
+
+            assert_eq!(
+                service.register_transient_data_queues(&valid[..1]),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            let mut incompatible = valid.clone();
+            incompatible[1].record_size = Some(3);
+            assert_eq!(
+                service.register_transient_data_queues(&incompatible),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(service.transient_data_counts().unwrap(), (0, 2, 9));
+            assert_eq!(
+                store.list_provider_state("cics-tdq", 8).unwrap(),
+                queue_rows
+            );
+            assert!(
+                store
+                    .list_provider_state("cics-tdq-definition", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            assert_eq!(service.transient_data_counts().unwrap(), (0, 2, 9));
+            assert_eq!(
+                service.transient_records("KEEP").unwrap(),
+                [b"AA".to_vec(), b"BBB".to_vec()]
+            );
+            assert!(
+                store
+                    .list_provider_state("cics-tdq-definition", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+
+            service.register_transient_data_queues(&valid).unwrap();
+            assert_eq!(service.transient_data_counts().unwrap(), (2, 2, 9));
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            assert_eq!(service.transient_data_counts().unwrap(), (2, 2, 9));
+            assert_eq!(
+                service.transient_records("KEEP").unwrap(),
+                [b"AA".to_vec(), b"BBB".to_vec()]
+            );
+            assert_eq!(
+                service.transient_records("NEXT").unwrap(),
+                [b"DATA".to_vec()]
+            );
+            assert_eq!(
+                store
+                    .list_provider_state("cics-tdq-definition", 8)
+                    .unwrap()
+                    .len(),
+                2
+            );
         }
         std::fs::remove_dir_all(root).unwrap();
     }

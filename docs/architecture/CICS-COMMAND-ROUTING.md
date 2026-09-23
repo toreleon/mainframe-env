@@ -247,11 +247,14 @@ empty queues return QIDERR 44/0 and QZERO 23/0. Durable installed TDQUEUE
 definitions select intrapartition or local extrapartition direction, enabled
 and open state, record-size policy, and bounded per-queue capacity. Those
 definitions drive exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR,
-QIDERR, and QZERO outcomes across reopen. WRITEQ TD, READQ TD, and DELETEQ TD
-accept SYSID only when it identifies the current system; an unknown or
-unsupported remote name returns SYSIDERR 53/0 before authorization or queue
-mutation. NOSUSPEND/QBUSY, indoubt locking, remote routing, and external data
-set integration remain deferred.
+QIDERR, and QZERO outcomes across reopen. First registration preflights every
+materialized compatibility-profile queue against the complete proposed
+definition set and atomically rejects undeclared queues or retained data that
+violates direction, fixed/maximum record size, record count, or byte limits.
+WRITEQ TD, READQ TD, and DELETEQ TD accept SYSID only when it identifies the
+current system; an unknown or unsupported remote name returns SYSIDERR 53/0
+before authorization or queue mutation. NOSUSPEND/QBUSY, indoubt locking,
+remote routing, and external data set integration remain deferred.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
