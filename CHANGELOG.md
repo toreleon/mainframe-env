@@ -38,6 +38,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB ENDBROWSE` for header, query, and form cursor release,
+  with atomic deletion/replay and a compiled route. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0242` binds
+  `dfhp4_webendbrowseformfield.html` at
+  `sha256:4999d8ef5cb0a9388c43e45eccd79fc7b29e9f465f9457f263fdccea67def1e3`,
+  `dfhp4_webendbrowsehttpheader.html` at
+  `sha256:28beba13ed2772907ce3144606eade62a2c82de0d2c4202c2853e1409a529f77`,
+  and `dfhp4_webendbrowsequeryparm.html` at
+  `sha256:4e4734be485e27491c4c1e0e343c391c9a54df3319cb2bddfceafcc6d044080e`.
+
 - Added typed CICS `WEB READNEXT` over durable header, query, and form browse
   snapshots, preserving the cursor on short buffers and reconciling an
   uncertain persisted advance. IBM CICS TS 6.x baseline

@@ -6960,6 +6960,46 @@ mod tests {
     }
 
     #[test]
+    fn web_endbrowse_selects_one_kind_and_optional_client_token() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
+        for (source, kind) in [
+            ("WEB ENDBROWSE QUERYPARM", HirCicsOption::WebBrowseQueryParm),
+            ("WEB ENDBROWSE FORMFIELD", HirCicsOption::WebBrowseFormField),
+            (
+                "WEB ENDBROWSE HTTPHEADER SESSTOKEN(TOKEN-X)",
+                HirCicsOption::WebBrowseHttpHeader,
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed WEB ENDBROWSE");
+            assert_eq!(command.operation, HirCicsOperation::WebEndBrowse);
+            assert!(command.options.contains(&kind));
+        }
+        for source in [
+            "WEB ENDBROWSE",
+            "WEB ENDBROWSE QUERYPARM SESSTOKEN(TOKEN-X)",
+            "WEB ENDBROWSE HTTPHEADER FORMFIELD",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn web_readnext_lowers_browse_buffers_and_rejects_selector_conflicts() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBNEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAME-X PIC X(8). 01 NAME-LEN PIC S9(9) COMP VALUE 8. 01 VALUE-X PIC X(16). 01 VALUE-LEN PIC S9(9) COMP VALUE 16. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
         for (source, option) in [

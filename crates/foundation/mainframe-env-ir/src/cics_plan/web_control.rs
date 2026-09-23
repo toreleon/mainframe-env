@@ -357,3 +357,36 @@ pub(super) fn invalid_read_next_shape(
             )
         })
 }
+
+pub(super) fn invalid_end_browse_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let kinds = [
+        CicsPlanOption::WebBrowseHttpHeader,
+        CicsPlanOption::WebBrowseQueryParm,
+        CicsPlanOption::WebBrowseFormField,
+    ];
+    kinds
+        .iter()
+        .filter(|kind| plan.options.contains(kind))
+        .count()
+        != 1
+        || !plan
+            .options
+            .iter()
+            .all(|option| kinds.contains(option) || *option == CicsPlanOption::NoHandle)
+        || !inputs.is_subset(&BTreeSet::from([CicsOperandName::WebSessionToken]))
+        || inputs.contains(&CicsOperandName::WebSessionToken)
+            && !plan.options.contains(&CicsPlanOption::WebBrowseHttpHeader)
+        || operand_value(plan, CicsOperandName::WebSessionToken).is_some_and(|value| {
+            !matches!(
+                value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            )
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

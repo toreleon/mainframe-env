@@ -374,6 +374,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebRead => CicsOperation::WebRead,
         CicsPlanOperation::WebStartBrowse => CicsOperation::WebStartBrowse,
         CicsPlanOperation::WebReadNext => CicsOperation::WebReadNext,
+        CicsPlanOperation::WebEndBrowse => CicsOperation::WebEndBrowse,
     }
 }
 

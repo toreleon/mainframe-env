@@ -125,6 +125,9 @@ pub(super) const READ_NEXT_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const END_BROWSE_CLAUSES: &[&str] = &["SESSTOKEN", "RESP", "RESP2"];
+pub(super) const END_BROWSE_OPTIONS: &[&str] =
+    &["HTTPHEADER", "FORMFIELD", "QUERYPARM", "NOHANDLE"];
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -137,6 +140,9 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::WebReadNext {
         return validate_read_next(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebEndBrowse {
+        return validate_end_browse(clauses, options, semantic);
     }
     if matches!(
         operation,
@@ -388,6 +394,9 @@ pub(super) fn operands(
     }
     if operation == HirCicsOperation::WebReadNext {
         return read_next_operands(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebEndBrowse {
+        return end_browse_operands(clauses, semantic);
     }
     if matches!(
         operation,
@@ -997,4 +1006,51 @@ fn read_next_outputs(
         });
     }
     Ok(outputs)
+}
+
+fn validate_end_browse(
+    clauses: &Clauses,
+    options: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<()> {
+    let kinds = ["HTTPHEADER", "FORMFIELD", "QUERYPARM"];
+    if kinds
+        .iter()
+        .filter(|kind| options.iter().any(|option| option == **kind))
+        .count()
+        != 1
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB ENDBROWSE requires exactly one browse kind".into(),
+        ));
+    }
+    if clauses.contains_key("SESSTOKEN") && !options.iter().any(|option| option == "HTTPHEADER") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB ENDBROWSE SESSTOKEN applies only to HTTPHEADER".into(),
+        ));
+    }
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        let token = cics_value(tokens, semantic)?;
+        if !matches!(&token, HirCicsValue::Data(reference) if reference.length == 8)
+            && !matches!(&token, HirCicsValue::Literal(bytes) if bytes.len() == 8)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB ENDBROWSE SESSTOKEN requires eight bytes".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn end_browse_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    match clauses.get("SESSTOKEN") {
+        Some(tokens) => Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::WebSessionToken,
+            value: cics_value(tokens, semantic)?,
+        }]),
+        None => Ok(Vec::new()),
+    }
 }

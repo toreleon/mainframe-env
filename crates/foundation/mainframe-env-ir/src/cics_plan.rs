@@ -160,6 +160,9 @@ fn encode_cics_effect_plan_version(
     version: u16,
 ) -> Result<Vec<u8>, CicsPlanCodecProblem> {
     validate_plan(plan, limits)?;
+    if version == LEGACY_VERSION && (91..=104).contains(&operation_tag(plan.operation)) {
+        return Err(CicsPlanCodecProblem::Malformed);
+    }
     let mut writer = Writer::new(limits.max_encoded_bytes);
     writer.extend(MAGIC)?;
     writer.u16(version)?;
@@ -192,7 +195,11 @@ fn encode_cics_effect_plan_version(
 
     writer.count(plan.options.len())?;
     for option in &plan.options {
-        writer.tag(option_tag(*option), version)?;
+        let tag = option_tag(*option);
+        if version == LEGACY_VERSION && (188..=251).contains(&tag) {
+            return Err(CicsPlanCodecProblem::Malformed);
+        }
+        writer.tag(tag, version)?;
     }
 
     let mut outputs = plan.outputs.iter().collect::<Vec<_>>();
@@ -222,7 +229,11 @@ pub fn decode_cics_effect_plan(
     if !matches!(version, LEGACY_VERSION | VERSION) {
         return Err(CicsPlanCodecProblem::UnsupportedVersion);
     }
-    let operation = operation_from_tag(reader.tag(version)?)?;
+    let operation_tag = reader.tag(version)?;
+    if version == LEGACY_VERSION && (91..=104).contains(&operation_tag) {
+        return Err(CicsPlanCodecProblem::Malformed);
+    }
+    let operation = operation_from_tag(operation_tag)?;
 
     let operand_count = reader.count(limits.max_operands)?;
     let mut operands = Vec::with_capacity(operand_count);
@@ -255,7 +266,11 @@ pub fn decode_cics_effect_plan(
     let mut options = BTreeSet::new();
     let mut last_option = None;
     for _ in 0..option_count {
-        let option = option_from_tag(reader.tag(version)?)?;
+        let tag = reader.tag(version)?;
+        if version == LEGACY_VERSION && (188..=251).contains(&tag) {
+            return Err(CicsPlanCodecProblem::Malformed);
+        }
+        let option = option_from_tag(tag)?;
         require_order(last_option, option)?;
         last_option = Some(option);
         if !options.insert(option) {
@@ -645,6 +660,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WebRead => web_control::invalid_read_shape(plan, inputs, outputs),
         CicsPlanOperation::WebStartBrowse => web_control::invalid_start_browse_shape(plan, inputs, outputs),
         CicsPlanOperation::WebReadNext => web_control::invalid_read_next_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebEndBrowse => web_control::invalid_end_browse_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2283,6 +2299,48 @@ mod tests {
         );
         let mut invalid = plan;
         invalid.outputs.remove(3);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_endbrowse_codec_keeps_kind_and_rejects_client_token_on_query() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebEndBrowse), 99);
+        assert_eq!(operation_from_tag(99), Ok(CicsPlanOperation::WebEndBrowse));
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebEndBrowse,
+            operands: Vec::new(),
+            options: BTreeSet::from([CicsPlanOption::WebBrowseQueryParm]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut legacy = encode_cics_effect_plan_version(
+            &read_plan(),
+            CicsPlanLimits::default(),
+            LEGACY_VERSION,
+        )
+        .unwrap();
+        legacy[6] = 99;
+        assert_eq!(
+            decode_cics_effect_plan(&legacy, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut invalid = plan;
+        invalid.operands.push(CicsNamedOperand {
+            name: CicsOperandName::WebSessionToken,
+            value: CicsOperandValue::Storage(slot(1, "TOKEN-X")),
+        });
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)

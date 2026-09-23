@@ -367,6 +367,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0240",
     ),
     (
+        "WebEndBrowse",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0242",
+    ),
+    (
         "WebExtract",
         "api",
         "web-control",
@@ -765,6 +772,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WaitJournalName",
         "WaitJournalNum",
         "WebClose",
+        "WebEndBrowse",
         "WebExtract",
         "WebOpen",
         "WebParseUrl",
@@ -1198,6 +1206,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WebStartBrowse": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "WebEndBrowse": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "WebOpen": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
@@ -1479,6 +1490,7 @@ def _load_typed_execution_registrations(
         "WaitJournalName",
         "WaitJournalNum",
         "WebClose",
+        "WebEndBrowse",
         "WebExtract",
         "WebOpen",
         "WebParseUrl",
@@ -1858,6 +1870,7 @@ def load_catalog(
                 "WaitJournalName",
                 "WaitJournalNum",
                 "WebClose",
+                "WebEndBrowse",
                 "WebExtract",
                 "WebOpen",
                 "WebParseUrl",

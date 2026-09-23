@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 137);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 138);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8014,6 +8014,48 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, end.clone(), 5), end)
             .unwrap();
         assert_eq!((end.condition.as_str(), end.response), ("ENDFILE", 20));
+        let close_browse = request(
+            CicsOperation::WebEndBrowse,
+            BTreeMap::from([("OPTION.QUERYPARM".into(), argument(b""))]),
+            6,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, close_browse.clone(), 6),
+                close_browse.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let replayed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, close_browse.clone(), 6),
+                close_browse,
+            )
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        assert!(
+            store
+                .list_provider_state("cics-web-browse-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        let mut again = request(
+            CicsOperation::WebEndBrowse,
+            BTreeMap::from([("OPTION.QUERYPARM".into(), argument(b""))]),
+            7,
+        );
+        again.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let absent = service
+            .invoke(&effect(&invocation.run_unit_id, again.clone(), 7), again)
+            .unwrap();
+        assert_eq!(
+            (absent.condition.as_str(), absent.response, absent.response2),
+            ("INVREQ", 16, 4)
+        );
         let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         handlers::release_task_state(&service, &run).unwrap();
         assert!(
@@ -8111,6 +8153,21 @@ mod tests {
                 .unwrap()[0]
                 .version,
             2
+        );
+        let end = request(
+            CicsOperation::WebEndBrowse,
+            BTreeMap::from([("OPTION.QUERYPARM".into(), argument(b""))]),
+            3,
+        );
+        let closed = reopened
+            .invoke(&effect(&invocation.run_unit_id, end.clone(), 3), end)
+            .unwrap();
+        assert_eq!(closed.condition, "NORMAL");
+        assert!(
+            reopened_store
+                .list_provider_state("cics-web-browse-v1", 8)
+                .unwrap()
+                .is_empty()
         );
         drop(reopened);
         std::fs::remove_dir_all(directory).unwrap();

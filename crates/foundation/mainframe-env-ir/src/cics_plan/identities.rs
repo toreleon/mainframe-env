@@ -264,6 +264,8 @@ pub enum CicsPlanOperation {
     WebStartBrowse,
     /// Read and advance one task-owned Web browse cursor.
     WebReadNext,
+    /// End one task-owned Web browse.
+    WebEndBrowse,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
