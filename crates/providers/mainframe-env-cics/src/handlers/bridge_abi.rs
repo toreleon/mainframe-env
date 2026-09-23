@@ -39,6 +39,22 @@ pub(in crate::service) struct BrxaInitReply {
     pub user_abend_code: [u8; 4],
 }
 
+/// Bind follows a validated Init image and retains its BRDATA pointer.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::service) struct BrxaBindFrame {
+    bytes: Vec<u8>,
+}
+
+/// Source-defined Bind fields the bridge exit may return.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::service) struct BrxaBindReply {
+    pub start_code: [u8; 2],
+    pub load_ads_descriptor: bool,
+    pub facility_keep_time: u32,
+    pub identifier: [u8; 48],
+    pub user_abend_code: [u8; 4],
+}
+
 impl BrxaInitFrame {
     /// Build only the documented Init call; the value of `version` is not
     /// inferred from the BRARC topic.
@@ -123,13 +139,8 @@ impl BrxaInitFrame {
         }
         let transaction = &returned[TRANSACTION_AT..COMMAND_AT];
         let command = &returned[COMMAND_AT..DATA_AT];
-        let start_code = match &transaction[0x30..0x32] {
-            b"S " => *b"S ",
-            b"SD" => *b"SD",
-            _ => *b"TD",
-        };
         Ok(BrxaInitReply {
-            start_code,
+            start_code: normalized_start_code(transaction),
             load_ads_descriptor: transaction[0x32] == b'Y',
             facility_like: transaction[0x34..0x38]
                 .try_into()
@@ -141,6 +152,70 @@ impl BrxaInitFrame {
                 .try_into()
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             formatter: transaction[0x7c..0x84]
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            user_abend_code: command[0x0c..0x10]
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        })
+    }
+
+    /// Preserve a validated Init result when advancing to Bind. The committed
+    /// BRARC topic does not supply the Bind command code, so the caller must
+    /// provide one from separately reviewed authority.
+    pub(in crate::service) fn bind(
+        &self,
+        init_reply: &[u8],
+        bind_code: [u8; 2],
+    ) -> Result<BrxaBindFrame, HostProblem> {
+        self.validate_reply(init_reply)?;
+        if bind_code.contains(&0)
+            || bind_code == *b"IN"
+            || bind_code == *b"TM"
+            || bind_code == *b"AB"
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut bytes = init_reply.to_vec();
+        bytes[COMMAND_AT + 0x0a..COMMAND_AT + 0x0c].copy_from_slice(&bind_code);
+        Ok(BrxaBindFrame { bytes })
+    }
+}
+
+impl BrxaBindFrame {
+    pub(in crate::service) fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Accept only the fields BRARC identifies as writable on Bind. Values
+    /// above one week are capped to the source-defined facility keep limit.
+    pub(in crate::service) fn validate_reply(
+        &self,
+        returned: &[u8],
+    ) -> Result<BrxaBindReply, HostProblem> {
+        if returned.len() != self.bytes.len()
+            || self
+                .bytes
+                .iter()
+                .zip(returned)
+                .enumerate()
+                .any(|(index, (expected, actual))| expected != actual && !bind_writable(index))
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let transaction = &returned[TRANSACTION_AT..COMMAND_AT];
+        let command = &returned[COMMAND_AT..DATA_AT];
+        let start_code = normalized_start_code(transaction);
+        Ok(BrxaBindReply {
+            start_code,
+            load_ads_descriptor: transaction[0x32] == b'Y',
+            facility_keep_time: u32::from_be_bytes(
+                transaction[0x38..0x3c]
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            )
+            .min(604_800),
+            identifier: transaction[0x4c..0x7c]
                 .try_into()
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             user_abend_code: command[0x0c..0x10]
@@ -163,6 +238,26 @@ fn init_writable(index: usize) -> bool {
     index
         .checked_sub(COMMAND_AT)
         .is_some_and(|offset| (0x0c..0x10).contains(&offset))
+}
+
+fn bind_writable(index: usize) -> bool {
+    if index
+        .checked_sub(TRANSACTION_AT)
+        .is_some_and(|offset| matches!(offset, 0x30..=0x32 | 0x38..=0x3b | 0x4c..=0x7b))
+    {
+        return true;
+    }
+    index
+        .checked_sub(COMMAND_AT)
+        .is_some_and(|offset| (0x0c..0x10).contains(&offset))
+}
+
+fn normalized_start_code(transaction: &[u8]) -> [u8; 2] {
+    match &transaction[0x30..0x32] {
+        b"S " => *b"S ",
+        b"SD" => *b"SD",
+        _ => *b"TD",
+    }
 }
 
 fn put_u32(bytes: &mut [u8], offset: usize, value: usize) -> Result<(), HostProblem> {
@@ -248,6 +343,39 @@ mod tests {
         assert_eq!(frame.bytes().len(), DATA_AT);
         let transaction = &frame.bytes()[TRANSACTION_AT..COMMAND_AT];
         assert_eq!(&transaction[0x94..0x9c], &[0; 8]);
+    }
+
+    #[test]
+    fn bind_preserves_init_state_and_limits_exit_mutation() {
+        let init = frame();
+        let mut init_returned = init.bytes().to_vec();
+        init_returned[TRANSACTION_AT + 0x30..TRANSACTION_AT + 0x32].copy_from_slice(b"SD");
+        init_returned[TRANSACTION_AT + 0x4c..TRANSACTION_AT + 0x50].copy_from_slice(b"FLOW");
+        let bind = init.bind(&init_returned, *b"XY").unwrap();
+        assert_eq!(&bind.bytes()[COMMAND_AT + 0x08..COMMAND_AT + 0x0c], b"XMXY");
+        assert_eq!(&bind.bytes()[DATA_AT..], b"ABCD");
+        let mut returned = bind.bytes().to_vec();
+        returned[TRANSACTION_AT + 0x38..TRANSACTION_AT + 0x3c]
+            .copy_from_slice(&700_000u32.to_be_bytes());
+        let reply = bind.validate_reply(&returned).unwrap();
+        assert_eq!(reply.start_code, *b"SD");
+        assert_eq!(&reply.identifier[..4], b"FLOW");
+        assert_eq!(reply.facility_keep_time, 604_800);
+        returned[TRANSACTION_AT + 0x34] ^= 1;
+        assert_eq!(bind.validate_reply(&returned), Err(HostProblem::Malformed));
+        assert_eq!(
+            init.bind(&init_returned, *b"IN"),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            init.bind(&init_returned, [0, 0]),
+            Err(HostProblem::Malformed)
+        );
+        init_returned[0x10] ^= 1;
+        assert_eq!(
+            init.bind(&init_returned, *b"XY"),
+            Err(HostProblem::Malformed)
+        );
     }
 
     #[test]

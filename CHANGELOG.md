@@ -32,6 +32,11 @@ All notable changes to mainframe-env are documented here.
   virtual pointers, and the fields an Init exit may change. The ABI version
   remains an explicit input until its numeric constant is pinned.
 
+- Added a checked BRXA Bind transition that carries the validated Init image
+  forward, preserves its BRDATA pointer, accepts only source-listed Bind fields,
+  and caps facility keep time at one week. The Bind command code remains an
+  explicit reviewed input; execution dispatch remains closed.
+
 - Added a durable START BREXIT admission record and private work generation.
   Admission freezes the local transaction, selected installed exit artifact,
   principal, bounded BRDATA, priority, and producer digest. Exact replay,
