@@ -297,6 +297,16 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::IssueAbend,
+                CicsPlanOperation::GdsIssueAbend,
+                CicsPlanOperation::IssueConfirmation,
+                CicsPlanOperation::GdsIssueConfirmation,
+                CicsPlanOperation::IssueError,
+                CicsPlanOperation::GdsIssueError,
+                CicsPlanOperation::IssuePrepare,
+                CicsPlanOperation::GdsIssuePrepare,
+                CicsPlanOperation::GdsIssueSignal,
+                CicsPlanOperation::IssueSignal,
                 CicsPlanOperation::ChangePassword,
                 CicsPlanOperation::ChangePhrase,
                 CicsPlanOperation::QuerySecurity,

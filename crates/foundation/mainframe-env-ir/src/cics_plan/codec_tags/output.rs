@@ -2,6 +2,9 @@ use super::*;
 
 pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
+        CicsOutputName::IssueState => 1528,
+        CicsOutputName::IssueConvData => 1529,
+        CicsOutputName::IssueRetCode => 1530,
         CicsOutputName::TimerStatus => 376,
         CicsOutputName::EventName => 377,
         CicsOutputName::SubEventName => 378,
@@ -128,6 +131,9 @@ pub(in crate::cics_plan) fn output_from_tag(
     value: u16,
 ) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
+        1528 => Ok(CicsOutputName::IssueState),
+        1529 => Ok(CicsOutputName::IssueConvData),
+        1530 => Ok(CicsOutputName::IssueRetCode),
         376 => Ok(CicsOutputName::TimerStatus),
         377 => Ok(CicsOutputName::EventName),
         378 => Ok(CicsOutputName::SubEventName),

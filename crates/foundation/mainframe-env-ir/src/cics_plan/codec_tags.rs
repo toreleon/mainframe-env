@@ -1,3 +1,4 @@
+mod issue;
 mod output;
 pub(super) use output::{output_from_tag, output_tag};
 
@@ -21,6 +22,16 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::IssueAbend
+        | CicsPlanOperation::GdsIssueAbend
+        | CicsPlanOperation::IssueConfirmation
+        | CicsPlanOperation::GdsIssueConfirmation
+        | CicsPlanOperation::IssueError
+        | CicsPlanOperation::GdsIssueError
+        | CicsPlanOperation::IssuePrepare
+        | CicsPlanOperation::GdsIssuePrepare
+        | CicsPlanOperation::GdsIssueSignal
+        | CicsPlanOperation::IssueSignal => issue::operation_tag(value),
         CicsPlanOperation::AddSubevent => 105,
         CicsPlanOperation::RemoveSubevent => 113,
         CicsPlanOperation::DeleteEvent => 110,
@@ -177,6 +188,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        239..=258 => issue::operation_from_tag(value),
         105 => Ok(CicsPlanOperation::AddSubevent),
         113 => Ok(CicsPlanOperation::RemoveSubevent),
         110 => Ok(CicsPlanOperation::DeleteEvent),
@@ -334,6 +346,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
+        CicsOperandName::IssueConvid | CicsOperandName::IssueSession => issue::operand_tag(value),
         CicsOperandName::Event => 320,
         CicsOperandName::SubEvent => 329,
         CicsOperandName::SubEvent1 => 321,
@@ -619,6 +632,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
+        1472..=1599 => issue::operand_from_tag(value),
         320 => Ok(CicsOperandName::Event),
         329 => Ok(CicsOperandName::SubEvent),
         321 => Ok(CicsOperandName::SubEvent1),

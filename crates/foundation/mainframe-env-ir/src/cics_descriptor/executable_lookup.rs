@@ -6,6 +6,16 @@ pub const fn cics_executable_descriptor(
     operation: CicsPlanOperation,
 ) -> &'static CicsExecutableDescriptor {
     match operation {
+        CicsPlanOperation::IssueAbend => &CICS_EXECUTABLE_DESCRIPTORS[151],
+        CicsPlanOperation::GdsIssueAbend => &CICS_EXECUTABLE_DESCRIPTORS[152],
+        CicsPlanOperation::IssueConfirmation => &CICS_EXECUTABLE_DESCRIPTORS[153],
+        CicsPlanOperation::GdsIssueConfirmation => &CICS_EXECUTABLE_DESCRIPTORS[154],
+        CicsPlanOperation::IssueError => &CICS_EXECUTABLE_DESCRIPTORS[155],
+        CicsPlanOperation::GdsIssueError => &CICS_EXECUTABLE_DESCRIPTORS[156],
+        CicsPlanOperation::IssuePrepare => &CICS_EXECUTABLE_DESCRIPTORS[157],
+        CicsPlanOperation::GdsIssuePrepare => &CICS_EXECUTABLE_DESCRIPTORS[158],
+        CicsPlanOperation::GdsIssueSignal => &CICS_EXECUTABLE_DESCRIPTORS[159],
+        CicsPlanOperation::IssueSignal => &CICS_EXECUTABLE_DESCRIPTORS[160],
         CicsPlanOperation::Deq => &CICS_EXECUTABLE_DESCRIPTORS[0],
         CicsPlanOperation::Enq => &CICS_EXECUTABLE_DESCRIPTORS[1],
         CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[2],

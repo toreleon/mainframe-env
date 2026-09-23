@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Reserved typed MCEP v2 plan identities and source-shaped operand/output
+  bindings for the ten APPC mapped and GDS ISSUE control forms. These remain
+  internal until selected provider and host routes are sealed; MCEP v1 rejects
+  their operation tags, including the 256–258 width boundary.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

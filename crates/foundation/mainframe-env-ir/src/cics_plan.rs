@@ -17,6 +17,7 @@ mod file_mutation;
 mod handle_abend;
 mod identities;
 mod interval_control;
+mod issue;
 mod journal_control;
 mod option_shape;
 mod outboard;
@@ -649,6 +650,16 @@ fn validate_operation_shape(
         | CicsPlanOperation::IssueReplace
         | CicsPlanOperation::IssueSend
         | CicsPlanOperation::IssueWait => outboard::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::IssueAbend
+        | CicsPlanOperation::GdsIssueAbend
+        | CicsPlanOperation::IssueConfirmation
+        | CicsPlanOperation::GdsIssueConfirmation
+        | CicsPlanOperation::IssueError
+        | CicsPlanOperation::GdsIssueError
+        | CicsPlanOperation::IssuePrepare
+        | CicsPlanOperation::GdsIssuePrepare
+        | CicsPlanOperation::GdsIssueSignal
+        | CicsPlanOperation::IssueSignal => issue::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::Route => route::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::InvokeService
         | CicsPlanOperation::SoapFaultAdd
@@ -1353,6 +1364,35 @@ mod tests {
             canonical.tag(tag, VERSION).unwrap();
         }
         assert_eq!(canonical.finish(), [1, 0, 1, 1, 1, 2]);
+
+        let limits = CicsPlanLimits::default();
+        for operation in [
+            CicsPlanOperation::IssueAbend,
+            CicsPlanOperation::IssueSignal,
+        ] {
+            let plan = CicsEffectPlan {
+                operation,
+                operands: Vec::new(),
+                options: BTreeSet::new(),
+                outputs: Vec::new(),
+                condition: CicsCondition::Default,
+            };
+            assert_eq!(
+                encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+            let v2 = encode_cics_effect_plan(&plan, limits).unwrap();
+            assert_eq!(&v2[6..8], &operation_tag(operation).to_be_bytes());
+            assert_eq!(decode_cics_effect_plan(&v2, limits), Ok(plan));
+        }
+
+        let mut forged_v1 =
+            encode_cics_effect_plan_version(&read_plan(), limits, LEGACY_VERSION).unwrap();
+        forged_v1[6] = 239;
+        assert_eq!(
+            decode_cics_effect_plan(&forged_v1, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]

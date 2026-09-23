@@ -173,6 +173,26 @@ pub enum CicsPlanOperation {
     /// Outboard batch data interchange wait operation.
     Route,
     IssueWait,
+    /// APPC mapped ISSUE ABEND conversation flow.
+    IssueAbend,
+    /// APPC basic GDS ISSUE ABEND conversation flow.
+    GdsIssueAbend,
+    /// APPC mapped ISSUE CONFIRMATION conversation flow.
+    IssueConfirmation,
+    /// APPC basic GDS ISSUE CONFIRMATION conversation flow.
+    GdsIssueConfirmation,
+    /// APPC mapped ISSUE ERROR conversation flow.
+    IssueError,
+    /// APPC basic GDS ISSUE ERROR conversation flow.
+    GdsIssueError,
+    /// APPC mapped ISSUE PREPARE conversation flow.
+    IssuePrepare,
+    /// APPC basic GDS ISSUE PREPARE conversation flow.
+    GdsIssuePrepare,
+    /// APPC basic GDS ISSUE SIGNAL conversation flow.
+    GdsIssueSignal,
+    /// APPC mapped ISSUE SIGNAL conversation flow.
+    IssueSignal,
     /// Complete a full-BMS logical message and dispatch its final page.
     SendPage,
     /// Rewrite the record held by the current update context.
@@ -310,6 +330,10 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    /// Four-byte ISSUE conversation token.
+    IssueConvid,
+    /// Legacy SESSION alias for a mapped ISSUE conversation token.
+    IssueSession,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
