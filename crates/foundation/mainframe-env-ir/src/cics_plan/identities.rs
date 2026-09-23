@@ -208,6 +208,8 @@ pub enum CicsPlanOperation {
     WaitExternal,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
+    /// Query source-defined SAF access levels for a CICS or named resource.
+    QuerySecurity,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
     /// Schedule one local interval-control START data record.

@@ -460,6 +460,10 @@ impl PlanContext<'_> {
         Ok(CicsOutputBinding {
             name: match output.name {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
+                HirCicsOutputName::SecurityRead => CicsOutputName::SecurityRead,
+                HirCicsOutputName::SecurityUpdate => CicsOutputName::SecurityUpdate,
+                HirCicsOutputName::SecurityControl => CicsOutputName::SecurityControl,
+                HirCicsOutputName::SecurityAlter => CicsOutputName::SecurityAlter,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::Partn => CicsOutputName::Partn,

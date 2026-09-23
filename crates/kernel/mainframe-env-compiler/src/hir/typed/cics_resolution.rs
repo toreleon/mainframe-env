@@ -427,6 +427,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
         HirCicsOperation::Delay => interval_control::DELAY_CLAUSES,
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
+        HirCicsOperation::QuerySecurity => security_control::QUERY_CLAUSES,
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
@@ -500,6 +501,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Freemain
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
+        | HirCicsOperation::QuerySecurity
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -665,6 +667,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Assign
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
+        | HirCicsOperation::QuerySecurity
         | HirCicsOperation::Suspend
         | HirCicsOperation::InvokeApplication
         | HirCicsOperation::IssueAbort

@@ -308,6 +308,7 @@ pub struct CicsService {
     replay_clock: Option<Arc<dyn CicsReplayClock>>,
     work_store: Option<Arc<dyn WorkStore>>,
     artifacts: OnceLock<Arc<dyn ArtifactStore>>,
+    pub(crate) security_authority: OnceLock<Arc<dyn handlers::CicsSecurityAuthority>>,
     replay_unknown_after_persist: AtomicBool,
     diagnostic_run_opened: AtomicBool,
 }
@@ -448,6 +449,7 @@ impl CicsService {
             replay_clock,
             work_store,
             artifacts: OnceLock::new(),
+            security_authority: OnceLock::new(),
             replay_unknown_after_persist: AtomicBool::new(false),
             diagnostic_run_opened: AtomicBool::new(false),
             state: Mutex::new(State {
@@ -2504,13 +2506,10 @@ fn bounded(bytes: Vec<u8>) -> Result<BoundedPayload, HostProblem> {
 }
 
 fn access_for(operation: CicsOperation) -> AccessIntent {
-    match operation {
-        CicsOperation::Read
-        | CicsOperation::ReadNext
-        | CicsOperation::ReadPrev
-        | CicsOperation::StartBrowse
-        | CicsOperation::EndBrowse => AccessIntent::Read,
-        _ => AccessIntent::Update,
+    if operation.is_file_read() {
+        AccessIntent::Read
+    } else {
+        AccessIntent::Update
     }
 }
 
@@ -6704,7 +6703,7 @@ mod tests {
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
-        for descriptor in CICS_COMMAND_DESCRIPTORS {
+        for descriptor in crate::generated::CICS_COMMAND_DESCRIPTORS {
             assert!(operations.insert(format!("{:?}", descriptor.operation)));
             assert!(rows.insert(descriptor.official_row));
             assert!(!descriptor.syntax.is_empty());

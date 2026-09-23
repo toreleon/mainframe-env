@@ -5259,6 +5259,11 @@ mod tests {
         assert_eq!(operation_tag(CicsPlanOperation::ResetBrowse), 74);
         assert_eq!(operation_from_tag(74), Ok(CicsPlanOperation::ResetBrowse));
         assert_eq!(operation_tag(CicsPlanOperation::Unlock), 75);
+        assert_eq!(operation_tag(CicsPlanOperation::QuerySecurity), 132);
+        assert_eq!(operand_tag(CicsOperandName::ResClass), 448);
+        assert_eq!(operand_tag(CicsOperandName::LogMessage), 452);
+        assert_eq!(output_tag(CicsOutputName::SecurityRead), 504);
+        assert_eq!(output_tag(CicsOutputName::SecurityAlter), 507);
         assert_eq!(operation_from_tag(75), Ok(CicsPlanOperation::Unlock));
         assert_eq!(operation_tag(CicsPlanOperation::SendPartnset), 90);
         assert_eq!(operation_from_tag(90), Ok(CicsPlanOperation::SendPartnset));
@@ -5346,6 +5351,47 @@ mod tests {
         for tag in 241..=247 {
             assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }
+    }
+
+    #[test]
+    fn query_security_v2_plan_round_trips_and_cannot_be_encoded_as_v1() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::QuerySecurity,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::ResClass,
+                    value: CicsOperandValue::Literal(b"FACILITY".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ResId,
+                    value: CicsOperandValue::Literal(b"ITEM".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ResIdLength,
+                    value: CicsOperandValue::Integer(4),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SecurityRead,
+                target: slot(44, "READ-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[..6], b"MCEP\0\x02");
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut malformed = encoded;
+        malformed[6..8].copy_from_slice(&140_u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&malformed, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]

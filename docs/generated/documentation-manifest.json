@@ -713,7 +713,7 @@
       "path": "docs/decisions/0010-rust-module-review-budgets.md",
       "relative_links": 1,
       "scope": "Rust production-module size, crate facades, generated sources, and CICS family growth",
-      "sha256": "sha256:27a5c37fa1c6758e5c46ff2283df9f3fc0f1209e46eb32c7e3dfb44a4921e4c4",
+      "sha256": "sha256:61a6942dc82b46bbfb027af5e29123948aa65db5f56d03faf41c4ecaf67e5bfd",
       "status": "Accepted by repository owner",
       "title": "ADR-0010: Enforce Rust module review budgets and stable split boundaries",
       "xtask_commands": 1

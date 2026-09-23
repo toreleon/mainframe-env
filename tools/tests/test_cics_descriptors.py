@@ -1279,6 +1279,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "ASSIGN",
                 "CANCEL",
                 "PURGE MESSAGE",
+                "QUERY SECURITY",
                 "RETRIEVE",
                 "START",
                 "WAIT JOURNALNAME",

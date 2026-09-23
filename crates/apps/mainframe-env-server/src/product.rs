@@ -1,3 +1,6 @@
+mod cics_security;
+use cics_security::{MAX_AUTH_SESSIONS_PER_USER, terminal_principal};
+
 use crate::cobol::artifact::admit_executable_artifact;
 use crate::cobol::bind_compatible_runtime_services;
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
@@ -456,7 +459,6 @@ const AUTH_SESSION_INDEX_CONTRACT: &str = "mainframe-env.auth-session-index@2";
 const ONLINE_EXCHANGE_NAMESPACE: &str = "online-exchange-v1";
 const ONLINE_EXCHANGE_CONTRACT: &str = "mainframe-env.online-exchange@1";
 const MAX_AUTH_SESSIONS: usize = 65_536;
-const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
 const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
 static NEXT_JES_WORKER_POOL: AtomicU64 = AtomicU64::new(1);
@@ -736,6 +738,9 @@ impl ProductServer {
             enterprise_replay_clock,
         )?;
         cics.bind_artifact_store(artifacts.clone())?;
+        cics.bind_security_authority(Arc::new(cics_security::RacfCicsSecurityAuthority::new(
+            racf.clone(),
+        )))?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
@@ -5402,11 +5407,6 @@ fn dataset_name(value: &str) -> Result<DatasetName, GatewayProblem> {
 fn terminal_session_id(value: &str) -> Result<SessionId, GatewayProblem> {
     SessionId::new(value, InvocationLimits::default().max_binding_bytes)
         .map_err(|_| gateway_problem(HostProblem::Malformed))
-}
-
-fn terminal_principal(value: &str) -> Result<PrincipalId, GatewayProblem> {
-    PrincipalId::new(value, InvocationLimits::default())
-        .map_err(|_| gateway_problem(HostProblem::Unauthorized))
 }
 
 fn current_tick() -> Result<u64, GatewayProblem> {

@@ -108,6 +108,16 @@ generator emits its route, and `module-budgets.json` admits the module under the
 1,200-production-line limit. This amendment is limited to that family boundary
 and does not authorize rows that remain unready.
 
+### Amendment: security-control family (2026-09-23)
+
+The reviewed handler inventory includes `handlers/security_control.rs` and its
+bounded `authority.rs` child. CICS owns command-shape, task-context, and
+EIB/condition translation, while the server binds the accepted RACF/SAF
+authority through one narrow interface. The family adds no security database
+or credential store. The descriptor generator admits `security-control` only
+for individually registered rows, and the exact protected service root ceiling
+is unchanged. Both handler modules retain the ordinary 1,200-line limit.
+
 ## Consequences
 
 - `architecture-fast` now fails on a new oversized module, an expanded legacy

@@ -201,6 +201,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
         CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
         CicsOutputName::Resp
+        | CicsOutputName::SecurityRead
+        | CicsOutputName::SecurityUpdate
+        | CicsOutputName::SecurityControl
+        | CicsOutputName::SecurityAlter
         | CicsOutputName::Resp2
         | CicsOutputName::Length
         | CicsOutputName::NumItems
@@ -363,6 +367,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WaitExternal => CicsOperation::WaitExternal,
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
+        CicsPlanOperation::QuerySecurity => CicsOperation::QuerySecurity,
         CicsPlanOperation::Start => CicsOperation::Start,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
@@ -407,6 +412,11 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::ResClass => "RESCLASS",
+        CicsOperandName::ResId => "RESID",
+        CicsOperandName::ResIdLength => "RESIDLENGTH",
+        CicsOperandName::ResType => "RESTYPE",
+        CicsOperandName::LogMessage => "LOGMESSAGE",
         CicsOperandName::Abcode => "ABCODE",
         CicsOperandName::Event => "EVENT",
         CicsOperandName::SubEvent => "SUBEVENT",

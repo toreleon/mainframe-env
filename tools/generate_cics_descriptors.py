@@ -234,6 +234,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0148",
     ),
     ("PushHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0149"),
+    ("QuerySecurity", "api", "security-control", False, f"{OFFICIAL_BASELINE}:api-commands:0155"),
     ("Read", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0156"),
     ("ReadNext", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0157"),
     ("ReadPrev", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0158"),
@@ -774,6 +775,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SendText",
         "Assign",
         "PurgeMessage",
+        "QuerySecurity",
         "PopHandle",
         "PushHandle",
         "Read",
@@ -1159,6 +1161,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "Assign": frozenset({"memory-write", "condition", "transaction"}),
     "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
+    "QuerySecurity": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
     "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),

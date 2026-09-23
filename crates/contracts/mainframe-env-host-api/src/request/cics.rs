@@ -125,6 +125,8 @@ pub enum CicsOperation {
     PushHandle,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
+    /// Query a task or surrogate user's SAF resource access levels.
+    QuerySecurity,
     Read,
     ReadNext,
     ReadPrev,
@@ -340,6 +342,7 @@ impl CicsOperation {
             Self::PopHandle => "PopHandle",
             Self::PushHandle => "PushHandle",
             Self::PurgeMessage => "PurgeMessage",
+            Self::QuerySecurity => "QuerySecurity",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
@@ -563,6 +566,20 @@ impl CicsOperation {
         )
     }
 
+    /// Whether a file-control operation checks read authority on the bound dataset.
+    #[must_use]
+    pub const fn is_file_read(self) -> bool {
+        matches!(
+            self,
+            Self::Read
+                | Self::ReadNext
+                | Self::ReadPrev
+                | Self::StartBrowse
+                | Self::ResetBrowse
+                | Self::EndBrowse
+        )
+    }
+
     #[must_use]
     pub fn from_tokens(tokens: &[String]) -> Option<Self> {
         let words: Vec<String> = tokens
@@ -640,6 +657,7 @@ impl CicsOperation {
             ("POP", Some("HANDLE")) => Self::PopHandle,
             ("PUSH", Some("HANDLE")) => Self::PushHandle,
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
+            ("QUERY", Some("SECURITY")) => Self::QuerySecurity,
             ("READ", _) => Self::Read,
             ("READQ", Some("TD")) => Self::ReadTransientData,
             ("REMOVE", Some("SUBEVENT")) => Self::RemoveSubevent,

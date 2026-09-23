@@ -547,6 +547,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::QuerySecurity,
+        syntax: "QUERY SECURITY",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0155",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Read,
         syntax: "READ",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0156",

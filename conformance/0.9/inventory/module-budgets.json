@@ -332,6 +332,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control/temporary_storage.rs",
       "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/security_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/security_control/authority.rs",
       "crates/providers/mainframe-env-cics/src/handlers/spool_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/spool_control/ingress.rs",
       "crates/providers/mainframe-env-cics/src/handlers/spool_control/read.rs",

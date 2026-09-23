@@ -19,8 +19,8 @@ use super::super::{
 };
 use super::file_tokens::{self, FileUpdateToken};
 use mainframe_env_host_api::{
-    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
-    DatasetRequest, DatasetResult, HostProblem, HostRequest, HostResult, MemberName, RecordFormat,
+    CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName, DatasetRequest,
+    DatasetResult, HostProblem, HostRequest, HostResult, MemberName, RecordFormat,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateWrite};
 use std::collections::BTreeMap;
@@ -43,14 +43,6 @@ pub(in crate::service) fn invoke(
         | CicsOperation::EndBrowse => file(service, run, request),
         CicsOperation::Unlock => super::file_unlock::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
-    }
-}
-
-fn access_for(operation: CicsOperation) -> AccessIntent {
-    if operation == CicsOperation::ResetBrowse {
-        AccessIntent::Read
-    } else {
-        super::super::access_for(operation)
     }
 }
 
@@ -196,7 +188,7 @@ fn file(
             run,
             "DATASET",
             dataset.as_str(),
-            access_for(request.operation),
+            super::super::access_for(request.operation),
         )
         .map_err(|problem| match problem {
             HostProblem::Unauthorized => HostProblem::Condition {
