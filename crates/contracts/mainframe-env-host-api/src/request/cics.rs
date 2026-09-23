@@ -1,6 +1,6 @@
 //! Typed CICS host request and result boundary.
 
-use super::Mutation;
+use super::{HostLimits, HostProblem, Mutation};
 use mainframe_env_execution_api::BoundedPayload;
 use std::collections::BTreeMap;
 
@@ -76,6 +76,8 @@ pub enum CicsOperation {
     Read,
     ReadNext,
     ReadPrev,
+    /// Reposition an active file browse without replacing its cursor.
+    ResetBrowse,
     /// Read and consume one record from a local transient-data queue.
     ReadTransientData,
     ReceiveMap,
@@ -163,6 +165,7 @@ impl CicsOperation {
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
+            Self::ResetBrowse => "ResetBrowse",
             Self::ReadTransientData => "ReadTransientData",
             Self::ReceiveMap => "ReceiveMap",
             Self::Retrieve => "Retrieve",
@@ -202,6 +205,7 @@ impl CicsOperation {
                 | Self::DocumentDelete
                 | Self::DocumentInsert
                 | Self::DocumentSet
+                | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
                 | Self::ReadTemporaryStorage
@@ -302,6 +306,7 @@ impl CicsOperation {
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
             ("RETRIEVE", _) => Self::Retrieve,
             ("RETURN", _) => Self::Return,
+            ("RESETBR", _) => Self::ResetBrowse,
             ("REWRITE", _) => Self::Rewrite,
             ("SEND", Some("MAP")) => Self::SendMap,
             ("SEND", _) => Self::SendText,
@@ -349,6 +354,18 @@ pub struct CicsRequest {
     pub arguments: BTreeMap<String, BoundedPayload>,
     pub condition_policy: CicsConditionPolicy,
     pub mutation: Option<Mutation>,
+}
+
+impl CicsRequest {
+    pub(super) fn validate_mutation(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.operation.is_mutating() {
+            self.mutation
+                .as_ref()
+                .ok_or(HostProblem::MissingIdempotency)?
+                .validate(limits)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -621,26 +621,11 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::Return => &["TRANSID", "COMMAREA", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::StartBrowse => &[
-            "FILE",
-            "DATASET",
-            "RIDFLD",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
-        ],
-        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &[
-            "FILE",
-            "DATASET",
-            "INTO",
-            "RIDFLD",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
-        ],
-        HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
+        op @ (HirCicsOperation::StartBrowse
+        | HirCicsOperation::ResetBrowse
+        | HirCicsOperation::ReadNext
+        | HirCicsOperation::ReadPrev
+        | HirCicsOperation::EndBrowse) => file_operands::allowed_browse_clauses(op),
         HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "KEYLENGTH", "RESP", "RESP2"],
         HirCicsOperation::Write => &[
             "FILE",
@@ -780,6 +765,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
         HirCicsOperation::StartBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
+        HirCicsOperation::ResetBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],
@@ -856,6 +842,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Return
         | HirCicsOperation::StartBrowse
+        | HirCicsOperation::ResetBrowse
         | HirCicsOperation::ReadNext
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse

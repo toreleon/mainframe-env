@@ -27,6 +27,7 @@ pub(super) fn resolve(
         ["XCTL"] => HirCicsOperation::Xctl,
         ["RETURN"] => HirCicsOperation::Return,
         ["STARTBR"] => HirCicsOperation::StartBrowse,
+        ["RESETBR"] => HirCicsOperation::ResetBrowse,
         ["READNEXT"] => HirCicsOperation::ReadNext,
         ["READPREV"] => HirCicsOperation::ReadPrev,
         ["READQ", "TD"] => HirCicsOperation::ReadTransientData,

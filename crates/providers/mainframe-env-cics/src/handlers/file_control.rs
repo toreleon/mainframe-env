@@ -7,13 +7,13 @@ pub(in crate::service) struct DurableFileStatus {
 #[cfg(feature = "fault-injection")]
 use super::super::CicsFileFaultPoint;
 use super::super::{
-    CicsFileStatus, CicsService, DatasetUndo, Run, access_for, argument_bytes, argument_optional,
+    CicsFileStatus, CicsService, DatasetUndo, Run, argument_bytes, argument_optional,
     argument_text, bounded, decode_dataset_bytes, encode_dataset_bytes, encode_file_status,
     nested_mutation, normalize_terminal_name, store_error,
 };
 use mainframe_env_host_api::{
-    CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName, DatasetRequest,
-    DatasetResult, HostProblem, HostRequest, HostResult, MemberName, RecordFormat,
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName,
+    DatasetRequest, DatasetResult, HostProblem, HostRequest, HostResult, MemberName, RecordFormat,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateWrite};
 use std::collections::BTreeMap;
@@ -32,8 +32,17 @@ pub(in crate::service) fn invoke(
         | CicsOperation::StartBrowse
         | CicsOperation::ReadNext
         | CicsOperation::ReadPrev
+        | CicsOperation::ResetBrowse
         | CicsOperation::EndBrowse => file(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn access_for(operation: CicsOperation) -> AccessIntent {
+    if operation == CicsOperation::ResetBrowse {
+        AccessIntent::Read
+    } else {
+        super::super::access_for(operation)
     }
 }
 
@@ -165,6 +174,31 @@ fn file(
         }
     }
     let definition = {
+        let state = service.lock()?;
+        state.file_aliases.get(&logical_name).cloned()
+    };
+    let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
+    let name = definition
+        .map(|definition| definition.dataset.as_str().to_string())
+        .unwrap_or_else(|| logical_name.clone());
+    let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
+    let dataset_key = dataset.as_str().to_string();
+    service
+        .authorize(
+            run,
+            "DATASET",
+            dataset.as_str(),
+            access_for(request.operation),
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized => HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            },
+            other => other,
+        })?;
+    {
         let mut state = service.lock()?;
         match state.file_statuses.get(&logical_name).copied() {
             Some(DurableFileStatus {
@@ -223,29 +257,7 @@ fn file(
             })
             | None => {}
         }
-        state.file_aliases.get(&logical_name).cloned()
-    };
-    let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
-    let name = definition
-        .map(|definition| definition.dataset.as_str().to_string())
-        .unwrap_or_else(|| logical_name.clone());
-    let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
-    let dataset_key = dataset.as_str().to_string();
-    service
-        .authorize(
-            run,
-            "DATASET",
-            dataset.as_str(),
-            access_for(request.operation),
-        )
-        .map_err(|problem| match problem {
-            HostProblem::Unauthorized => HostProblem::Condition {
-                name: "NOTAUTH".into(),
-                response: 70,
-                response2: 101,
-            },
-            other => other,
-        })?;
+    }
     let length = decimal_argument(request, "LENGTH")?;
     let key_length = signed_decimal_argument(request, "KEYLENGTH")?;
     let attributes = if (length.is_some()
@@ -261,6 +273,7 @@ fn file(
                 | CicsOperation::Rewrite
                 | CicsOperation::Delete
                 | CicsOperation::StartBrowse
+                | CicsOperation::ResetBrowse
                 | CicsOperation::ReadNext
                 | CicsOperation::ReadPrev
         ) {
@@ -447,27 +460,34 @@ fn file(
                 mainframe_env_host_api::KeyRelation::GreaterOrEqual
             },
         },
+        CicsOperation::ResetBrowse => {
+            let cursor = owned_browse_cursor(run, request, &dataset_key, 36)?;
+            DatasetRequest::ResetBrowse {
+                dataset: dataset.clone(),
+                cursor,
+                key: encode_dataset_bytes(
+                    ccsid,
+                    &truncate_key(
+                        argument_bytes(request, "RIDFLD").ok_or(HostProblem::Malformed)?,
+                        key_length,
+                    )?,
+                )?,
+                relation: if !gteq && !generic {
+                    mainframe_env_host_api::KeyRelation::Equal
+                } else {
+                    mainframe_env_host_api::KeyRelation::GreaterOrEqual
+                },
+            }
+        }
         CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
             dataset: dataset.clone(),
-            cursor: argument_optional(request, "CURSOR")
-                .or_else(|| run.browses.get(&dataset_key).cloned())
-                .ok_or_else(|| HostProblem::Condition {
-                    name: "INVREQ".into(),
-                    response: 16,
-                    response2: 0,
-                })?,
+            cursor: owned_browse_cursor(run, request, &dataset_key, 0)?,
             reverse: request.operation == CicsOperation::ReadPrev,
             control: Default::default(),
         },
         CicsOperation::EndBrowse => DatasetRequest::EndBrowse {
             dataset: dataset.clone(),
-            cursor: argument_optional(request, "CURSOR")
-                .or_else(|| run.browses.get(&dataset_key).cloned())
-                .ok_or_else(|| HostProblem::Condition {
-                    name: "INVREQ".into(),
-                    response: 16,
-                    response2: 0,
-                })?,
+            cursor: owned_browse_cursor(run, request, &dataset_key, 0)?,
         },
         _ => return Err(HostProblem::Malformed),
     };
@@ -483,7 +503,9 @@ fn file(
     if service.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterIntent)? {
         return Err(HostProblem::InfrastructureFailure);
     }
-    if operation == CicsOperation::StartBrowse && generic && equal {
+    if (operation == CicsOperation::StartBrowse && generic && equal)
+        || (operation == CicsOperation::ResetBrowse && generic && !gteq)
+    {
         let key = argument_bytes(request, "RIDFLD")
             .map(|value| truncate_key(value, key_length))
             .transpose()?
@@ -491,7 +513,7 @@ fn file(
             .transpose()?
             .ok_or(HostProblem::Malformed)?;
         read_relational(service, run, dataset.clone(), key, true)
-            .map_err(|problem| normalize_file_not_found(CicsOperation::StartBrowse, problem))?;
+            .map_err(|problem| normalize_file_not_found(operation, problem))?;
     }
     let result = if operation == CicsOperation::Read && (gteq || generic) {
         let key = argument_bytes(request, "RIDFLD")
@@ -533,6 +555,9 @@ fn file(
         }) => {
             if operation == CicsOperation::StartBrowse {
                 run.browses.insert(dataset_key.clone(), cursor);
+            } else if operation == CicsOperation::ResetBrowse {
+                run.current_records.remove(&dataset_key);
+                run.current_record_values.remove(&dataset_key);
             } else if operation == CicsOperation::EndBrowse {
                 run.browses.remove(&dataset_key);
                 run.current_records.remove(&dataset_key);
@@ -689,17 +714,42 @@ fn truncate_key(mut value: Vec<u8>, key_length: Option<i32>) -> Result<Vec<u8>, 
     Ok(value)
 }
 
+fn owned_browse_cursor(
+    run: &Run,
+    request: &CicsRequest,
+    dataset_key: &str,
+    response2: i32,
+) -> Result<String, HostProblem> {
+    let cursor = run
+        .browses
+        .get(dataset_key)
+        .ok_or_else(|| HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2,
+        })?;
+    if argument_optional(request, "CURSOR").is_some_and(|requested| requested.as_str() != cursor) {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2,
+        });
+    }
+    Ok(cursor.clone())
+}
+
 fn normalize_file_not_found(operation: CicsOperation, problem: HostProblem) -> HostProblem {
     match (operation, problem) {
-        (CicsOperation::Read | CicsOperation::StartBrowse, HostProblem::NotFound) => {
-            HostProblem::Condition {
-                name: "NOTFND".into(),
-                response: 13,
-                response2: 80,
-            }
-        }
         (
-            CicsOperation::Read | CicsOperation::StartBrowse,
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse,
+            HostProblem::NotFound,
+        ) => HostProblem::Condition {
+            name: "NOTFND".into(),
+            response: 13,
+            response2: 80,
+        },
+        (
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse,
             HostProblem::Condition {
                 name, response: 13, ..
             },
@@ -720,7 +770,10 @@ fn validate_key_length(
     gteq: bool,
 ) -> Result<(), HostProblem> {
     if generic {
-        if !matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) {
+        if !matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse
+        ) {
             return Err(HostProblem::Malformed);
         }
         let key_length = key_length.ok_or(HostProblem::Malformed)?;
@@ -750,8 +803,10 @@ fn validate_key_length(
         }
         return Ok(());
     }
-    if matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse)
-        && gteq
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse
+    ) && gteq
         && key_length == Some(0)
     {
         return Ok(());
@@ -762,6 +817,7 @@ fn validate_key_length(
             | CicsOperation::Write
             | CicsOperation::Delete
             | CicsOperation::StartBrowse
+            | CicsOperation::ResetBrowse
     ) && let Some(key_length) = key_length
         && attributes
             .and_then(|attributes| attributes.key_length)
@@ -782,7 +838,12 @@ fn validate_search_relation(
     equal: bool,
     gteq: bool,
 ) -> Result<(), HostProblem> {
-    if equal && (!matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) || gteq) {
+    if equal
+        && (!matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse
+        ) || gteq)
+    {
         Err(HostProblem::Malformed)
     } else {
         Ok(())

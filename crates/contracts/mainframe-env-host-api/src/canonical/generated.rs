@@ -1798,19 +1798,9 @@ impl Canonical for DatasetRequest {
                 purge.encode(out)?;
                 Ok(())
             }
-            Self::StartBrowse {
-                dataset,
-                key,
-                relation,
-            } => {
-                out.variant("DatasetRequest", "StartBrowse", 3)?;
-                out.text("dataset")?;
-                dataset.encode(out)?;
-                out.text("key")?;
-                key.encode(out)?;
-                out.text("relation")?;
-                relation.encode(out)?;
-                Ok(())
+            // The browse encoder preserves the frozen variant field order.
+            Self::StartBrowse { .. } | Self::ResetBrowse { .. } => {
+                browse::encode_browse_request(self, out)
             }
             Self::ReadNext {
                 control,
@@ -1829,14 +1819,7 @@ impl Canonical for DatasetRequest {
                 reverse.encode(out)?;
                 Ok(())
             }
-            Self::EndBrowse { cursor, dataset } => {
-                out.variant("DatasetRequest", "EndBrowse", 2)?;
-                out.text("cursor")?;
-                cursor.encode(out)?;
-                out.text("dataset")?;
-                dataset.encode(out)?;
-                Ok(())
-            }
+            Self::EndBrowse { .. } => browse::encode_browse_request(self, out),
             Self::Close {
                 control,
                 cursor,

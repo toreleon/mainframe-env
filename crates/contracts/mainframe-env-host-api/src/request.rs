@@ -488,6 +488,12 @@ pub enum DatasetRequest {
         key: Vec<u8>,
         relation: KeyRelation,
     },
+    ResetBrowse {
+        dataset: DatasetName,
+        cursor: String,
+        key: Vec<u8>,
+        relation: KeyRelation,
+    },
     ReadNext {
         dataset: DatasetName,
         cursor: String,
@@ -911,6 +917,7 @@ pub struct MqResult {
     pub trigger_program: Option<String>,
 }
 
+mod browse;
 mod cics;
 pub use cics::*;
 mod program;
@@ -958,6 +965,7 @@ impl HostRequest {
                 | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
+                | DatasetRequest::ResetBrowse { .. }
                 | DatasetRequest::EndBrowse { .. }
                 | DatasetRequest::Close { .. },
             ) => "host.dataset.read",
@@ -1156,13 +1164,8 @@ impl HostRequest {
                 if request.arguments.len() > limits.max_fields {
                     return Err(HostProblem::ResourceExhausted);
                 }
-                if self.is_mutating() {
-                    request
-                        .mutation
-                        .as_ref()
-                        .ok_or(HostProblem::MissingIdempotency)?
-                        .validate(limits)?;
-                }
+                // The CICS request owns its replay validation rule.
+                request.validate_mutation(limits)?;
                 Ok(())
             }
             Self::Db2(request) => {
@@ -1993,25 +1996,11 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
-        DatasetRequest::StartBrowse { key, .. } if key.len() > limits.max_record_bytes => {
-            Err(HostProblem::ResourceExhausted)
-        }
-        DatasetRequest::ReadNext { cursor, .. } | DatasetRequest::EndBrowse { cursor, .. }
-            if cursor.is_empty() || cursor.len() > limits.max_name_bytes =>
-        {
-            Err(HostProblem::Malformed)
-        }
-        DatasetRequest::Close {
-            cursor, control, ..
-        } if cursor
-            .as_ref()
-            .is_some_and(|cursor| cursor.is_empty() || cursor.len() > limits.max_name_bytes)
-            || (control.lock
-                && (control.reel_or_unit.is_some() || control.no_rewind || control.removal))
-            || (control.removal && control.reel_or_unit.is_none()) =>
-        {
-            Err(HostProblem::Malformed)
-        }
+        DatasetRequest::StartBrowse { .. }
+        | DatasetRequest::ResetBrowse { .. }
+        | DatasetRequest::ReadNext { .. }
+        | DatasetRequest::EndBrowse { .. }
+        | DatasetRequest::Close { .. } => browse::validate(request, limits),
         _ => Ok(()),
     }
 }
@@ -2419,6 +2408,7 @@ mod tests {
             CicsOperation::Read,
             CicsOperation::ReadNext,
             CicsOperation::ReadPrev,
+            CicsOperation::ResetBrowse,
             CicsOperation::ReadTransientData,
             CicsOperation::ReceiveMap,
             CicsOperation::Retrieve,
@@ -2441,7 +2431,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 53);
+assert_eq!(forms.len(), 54);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

@@ -34,6 +34,44 @@ fn golden_request_and_unknown_result_are_versioned_and_domain_separated() {
 }
 
 #[test]
+fn browse_request_variants_keep_their_frozen_canonical_bytes() {
+    let dataset = DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap();
+    let cases = [
+        (
+            DatasetRequest::StartBrowse {
+                dataset: dataset.clone(),
+                key: b"AA".to_vec(),
+                relation: KeyRelation::GreaterOrEqual,
+            },
+            206,
+            "4b16e6c153ba020279a02234c1e62c08f5b5f6406665e9c1be4184d4962b9a9d",
+        ),
+        (
+            DatasetRequest::ResetBrowse {
+                dataset: dataset.clone(),
+                cursor: "CURSOR-1".into(),
+                key: b"BB".to_vec(),
+                relation: KeyRelation::GreaterOrEqual,
+            },
+            238,
+            "a0065f358f2631f2c4c15827a8ce47aa7f7e10db7156ed4b1d6d18dd65c9da48",
+        ),
+        (
+            DatasetRequest::EndBrowse {
+                dataset,
+                cursor: "CURSOR-1".into(),
+            },
+            144,
+            "e1ec2e136a887a753dda5193666dee679560def2b22f1add2ef20988839730cb",
+        ),
+    ];
+    for (request, size, expected_digest) in cases {
+        assert_eq!(bytes(&request, b"").len(), size);
+        assert_eq!(hex(&digest(&request, b"").unwrap()), expected_digest);
+    }
+}
+
+#[test]
 fn principal_validation_is_a_frozen_named_security_variant() {
     let principal = PrincipalId::new(
         "TARGET",

@@ -487,6 +487,7 @@ fn validate_operation_shape(
         CicsPlanOperation::Xctl => program_control::invalid_xctl_shape(plan, inputs, outputs),
         CicsPlanOperation::Return => program_control::invalid_return_shape(plan, inputs, outputs),
         CicsPlanOperation::StartBrowse
+        | CicsPlanOperation::ResetBrowse
         | CicsPlanOperation::ReadNext
         | CicsPlanOperation::ReadPrev
         | CicsPlanOperation::EndBrowse => browse::invalid_shape(plan, inputs, outputs),
@@ -2238,6 +2239,27 @@ mod tests {
             ],
             condition: CicsCondition::Default,
         };
+        let reset_browse = CicsEffectPlan {
+            operation: CicsPlanOperation::ResetBrowse,
+            ..start_browse.clone()
+        };
+        let reset_bytes =
+            encode_cics_effect_plan(&reset_browse, CicsPlanLimits::default()).unwrap();
+        assert_eq!(reset_bytes[6], 74);
+        assert_eq!(
+            decode_cics_effect_plan(&reset_bytes, CicsPlanLimits::default()),
+            Ok(reset_browse)
+        );
+        let mut invalid_reset_length = start_browse.clone();
+        invalid_reset_length.operation = CicsPlanOperation::ResetBrowse;
+        invalid_reset_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Storage(slot(12, "BROWSE.LENGTH")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_reset_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let read_prev = CicsEffectPlan {
             operation: CicsPlanOperation::ReadPrev,
             ..read_next.clone()
@@ -3808,6 +3830,43 @@ mod tests {
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             query
         );
+    }
+
+    #[test]
+    fn all_cics_wire_tag_spaces_are_unique_and_round_trip() {
+        let mut operations = BTreeSet::new();
+        let mut operands = BTreeSet::new();
+        let mut options = BTreeSet::new();
+        let mut outputs = BTreeSet::new();
+        for tag in u8::MIN..=u8::MAX {
+            if let Ok(value) = operation_from_tag(tag) {
+                assert!(operations.insert(value), "duplicate operation tag {tag}");
+                assert_eq!(operation_tag(value), tag);
+            }
+            if let Ok(value) = operand_from_tag(tag) {
+                assert!(operands.insert(value), "duplicate operand tag {tag}");
+                assert_eq!(operand_tag(value), tag);
+            }
+            if let Ok(value) = option_from_tag(tag) {
+                assert!(options.insert(value), "duplicate option tag {tag}");
+                assert_eq!(option_tag(value), tag);
+            }
+            if let Ok(value) = output_from_tag(tag) {
+                assert!(outputs.insert(value), "duplicate output tag {tag}");
+                assert_eq!(output_tag(value), tag);
+            }
+        }
+        assert_eq!(operation_tag(CicsPlanOperation::ResetBrowse), 74);
+        assert_eq!(operations.len(), crate::CICS_EXECUTABLE_DESCRIPTORS.len());
+        for tag in 182..=191 {
+            assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 116..=123 {
+            assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 240..=247 {
+            assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
     }
 
     proptest! {

@@ -345,6 +345,7 @@ pub fn canonical_result_size(
     encode(value, RESULT_DIGEST_DOMAIN, limit, &mut |_| {})
 }
 
+mod browse;
 mod cics;
 mod generated;
 mod security_request;

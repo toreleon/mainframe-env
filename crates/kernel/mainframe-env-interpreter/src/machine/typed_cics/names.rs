@@ -129,6 +129,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Xctl => CicsOperation::Xctl,
         CicsPlanOperation::Return => CicsOperation::Return,
         CicsPlanOperation::StartBrowse => CicsOperation::StartBrowse,
+        CicsPlanOperation::ResetBrowse => CicsOperation::ResetBrowse,
         CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
         CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
         CicsPlanOperation::ReadTransientData => CicsOperation::ReadTransientData,

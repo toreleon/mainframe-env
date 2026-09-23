@@ -193,6 +193,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0165"
     },
     {
+      "operation": "ResetBrowse",
+      "interface": "api",
+      "family": "file-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0171"
+    },
+    {
       "operation": "SetAssociationUserCorrData",
       "interface": "api",
       "family": "task-control",

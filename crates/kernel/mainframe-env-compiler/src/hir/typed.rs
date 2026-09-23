@@ -172,6 +172,7 @@ pub enum HirCicsOperation {
     Xctl,
     Return,
     StartBrowse,
+    ResetBrowse,
     ReadNext,
     ReadPrev,
     ReadTransientData,
@@ -5359,14 +5360,14 @@ mod tests {
     }
 
     #[test]
-    fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
+    fn resetbr_requires_a_file_and_ridfld_before_lowering() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. PROCEDURE DIVISION. \
             EXEC CICS RESETBR END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         assert!(analysis.hir.is_none());
         assert!(analysis.diagnostics.iter().any(|diagnostic| {
             let message = diagnostic.public_message();
-            message.contains("RESETBR") && message.contains("handler is unready")
+            message.contains("requires exactly one FILE or DATASET")
         }));
     }
 
@@ -6077,6 +6078,7 @@ mod tests {
         // that route with the file-control operands intact.
         for command in [
             "STARTBR DATASET('TRANSACT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "RESETBR DATASET('TRANSACT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
             "READNEXT DATASET('TRANSACT') INTO(REC-X) RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
             "ENDBR DATASET('TRANSACT') RESP(RESP-X) RESP2(RESP2-X)",
         ] {
@@ -6100,27 +6102,6 @@ mod tests {
                 "{command}"
             );
         }
-
-        // RESETBR is a `family: "file-control"` row that declares `FILE` and
-        // not `DATASET`, so the alias still applies and the command no
-        // longer fails with "unknown or unreviewed top-level option
-        // DATASET". It is a pre-existing `Unready` handler even for
-        // `FILE(...)`, so it still fails to compile -- for that unrelated,
-        // pre-existing reason, which this asserts by name so the DATASET
-        // option-acceptance regression cannot hide behind it.
-        let resetbr = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RESETBR DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
-        );
-        assert!(resetbr.hir.is_none());
-        assert!(resetbr.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("RESETBR") && message.contains("handler is unready")
-        }));
-        assert!(!resetbr.diagnostics.iter().any(|diagnostic| {
-            diagnostic
-                .public_message()
-                .contains("unknown or unreviewed top-level option")
-        }));
     }
 
     #[test]

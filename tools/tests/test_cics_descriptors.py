@@ -1169,6 +1169,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "XCTL",
                 "RETURN",
                 "STARTBR",
+                "RESETBR",
                 "READNEXT",
                 "READPREV",
                 "READQ TD",

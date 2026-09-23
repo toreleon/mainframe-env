@@ -51,6 +51,8 @@ pub enum CicsPlanOperation {
     Return,
     /// Position one default-key file browse without reading a record.
     StartBrowse,
+    /// Reposition an active file browse while retaining its cursor identity.
+    ResetBrowse,
     /// Read the next record in one default-key file browse.
     ReadNext,
     /// Read the previous record in one default-key file browse.

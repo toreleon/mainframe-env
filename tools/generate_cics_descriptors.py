@@ -208,6 +208,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
     ("Release", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0165"),
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
+    ("ResetBrowse", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0171"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
@@ -532,6 +533,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Xctl",
         "Return",
         "StartBrowse",
+        "ResetBrowse",
         "ReadNext",
         "ReadPrev",
         "ReadTransientData",
@@ -699,6 +701,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "StartBrowse": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ResetBrowse": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReadNext": frozenset(
@@ -1037,6 +1042,7 @@ def _load_typed_execution_registrations(
         "ReadTransientData",
         "ReadTemporaryStorage",
         "Release",
+        "ResetBrowse",
         "SetAssociationUserCorrData",
         "Start",
         "Suspend",

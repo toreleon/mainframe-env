@@ -13,6 +13,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS RESETBR for an active default-key file browse. The command
+  repositions the existing dataset cursor in place, preserves it on NOTFND or
+  ownership failure, invalidates the held update context after success, and
+  replays a completed reset without dispatching it again. Source: IBM CICS TS
+  6.x application API sources-b, `dfhp4_resetbr.html`, catalog row 0171.
+
 - Added typed CICS `DOCUMENT SET` for individual symbols and symbol lists,
   including case-sensitive replacement, bounded lengths, delimiter and
   UNESCAPED handling, atomic document and replay updates, and compiled EIBFN

@@ -206,6 +206,7 @@ pub(crate) fn execute_legacy(
             | CicsOperation::Rewrite
             | CicsOperation::Delete
             | CicsOperation::StartBrowse
+            | CicsOperation::ResetBrowse
             | CicsOperation::ReadNext
             | CicsOperation::ReadPrev
             | CicsOperation::EndBrowse

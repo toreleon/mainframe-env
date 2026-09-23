@@ -408,6 +408,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
         HirCicsOperation::Return => CicsPlanOperation::Return,
         HirCicsOperation::StartBrowse => CicsPlanOperation::StartBrowse,
+        HirCicsOperation::ResetBrowse => CicsPlanOperation::ResetBrowse,
         HirCicsOperation::ReadNext => CicsPlanOperation::ReadNext,
         HirCicsOperation::ReadPrev => CicsPlanOperation::ReadPrev,
         HirCicsOperation::ReadTransientData => CicsPlanOperation::ReadTransientData,

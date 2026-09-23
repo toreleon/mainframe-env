@@ -5,13 +5,42 @@ use super::super::{
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference, numeric_literal};
 use crate::{DataCategory, SemanticModel};
 
+pub(super) const fn allowed_browse_clauses(operation: HirCicsOperation) -> &'static [&'static str] {
+    match operation {
+        HirCicsOperation::StartBrowse => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::ResetBrowse => {
+            &["FILE", "DATASET", "RIDFLD", "KEYLENGTH", "RESP", "RESP2"]
+        }
+        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &[
+            "FILE",
+            "DATASET",
+            "INTO",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
+        _ => &[],
+    }
+}
+
 pub(super) fn validate_constraints(
     clauses: &Clauses,
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     let required: &[&str] = match operation {
-        HirCicsOperation::StartBrowse => &["RIDFLD"],
+        HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse => &["RIDFLD"],
         HirCicsOperation::Delete | HirCicsOperation::EndBrowse => &[],
         HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev | HirCicsOperation::Read => {
             &["RIDFLD", "INTO"]
@@ -41,7 +70,7 @@ pub(super) fn validate_constraints(
     }
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse
     ) && options.iter().any(|option| option == "GENERIC")
         && !clauses.contains_key("KEYLENGTH")
     {
@@ -51,7 +80,7 @@ pub(super) fn validate_constraints(
     }
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse
     ) && options.iter().any(|option| option == "EQUAL")
         && options.iter().any(|option| option == "GTEQ")
     {
@@ -61,7 +90,7 @@ pub(super) fn validate_constraints(
     }
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse
     ) && !options.iter().any(|option| option == "GTEQ")
         && matches!(
             clauses.get("KEYLENGTH").map(Vec::as_slice),
@@ -84,6 +113,7 @@ pub(super) fn resolve(
     if !matches!(
         operation,
         HirCicsOperation::StartBrowse
+            | HirCicsOperation::ResetBrowse
             | HirCicsOperation::ReadNext
             | HirCicsOperation::ReadPrev
             | HirCicsOperation::EndBrowse
@@ -96,7 +126,10 @@ pub(super) fn resolve(
     }
     let browse = matches!(
         operation,
-        HirCicsOperation::StartBrowse | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+        HirCicsOperation::StartBrowse
+            | HirCicsOperation::ResetBrowse
+            | HirCicsOperation::ReadNext
+            | HirCicsOperation::ReadPrev
     );
     let stored_file_input = matches!(
         operation,
@@ -152,6 +185,7 @@ pub(super) fn resolve(
                     | HirCicsOperation::Write
                     | HirCicsOperation::Delete
                     | HirCicsOperation::StartBrowse
+                    | HirCicsOperation::ResetBrowse
             ) && name == "KEYLENGTH"
             {
                 file_key_length_value(tokens, operation, semantic)?
@@ -183,6 +217,7 @@ pub(super) fn resolve(
                     | HirCicsOperation::Write
                     | HirCicsOperation::Delete
                     | HirCicsOperation::StartBrowse
+                    | HirCicsOperation::ResetBrowse
             ) && name == "KEYLENGTH"
                 && let HirCicsValue::LengthOf(length) = &value
                 && !operands.iter().any(|operand| {
@@ -264,7 +299,9 @@ fn file_key_length_value(
         HirCicsValue::Integer(value)
             if !(if matches!(
                 operation,
-                HirCicsOperation::Read | HirCicsOperation::StartBrowse
+                HirCicsOperation::Read
+                    | HirCicsOperation::StartBrowse
+                    | HirCicsOperation::ResetBrowse
             ) {
                 0..=32_767
             } else {

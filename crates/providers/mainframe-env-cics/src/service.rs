@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 66);
+debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 67);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -3866,6 +3866,7 @@ mod tests {
         deny_command: bool,
         deny_transform: bool,
         deny_journal: bool,
+        deny_dataset: bool,
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
         seen: CommandSecurityTrace,
@@ -4002,6 +4003,7 @@ mod tests {
                         if self.deny_command && class == "FACILITY"
                             || self.deny_transform && class == "TRANSFORM"
                             || self.deny_journal && class == "JOURNAL"
+                            || self.deny_dataset && class == "DATASET"
                             || self.deny_surrogate && class == "SURROGAT"
                         {
                             SecurityDecision::Deny
@@ -4089,6 +4091,14 @@ mod tests {
                             }))
                         }
                         DatasetRequest::StartBrowse { .. } => {
+                            Ok(HostResult::Dataset(DatasetResult::Browse {
+                                cursor: "CURSOR-1".into(),
+                                record: None,
+                                identity: None,
+                                key: None,
+                            }))
+                        }
+                        DatasetRequest::ResetBrowse { .. } => {
                             Ok(HostResult::Dataset(DatasetResult::Browse {
                                 cursor: "CURSOR-1".into(),
                                 record: None,
@@ -4297,6 +4307,7 @@ mod tests {
             deny_command,
             deny_transform: false,
             deny_journal: false,
+            deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
@@ -4395,6 +4406,7 @@ mod tests {
                 deny_command: false,
                 deny_transform: false,
                 deny_journal: false,
+                deny_dataset: false,
                 deny_surrogate,
                 principal_decision,
                 seen: seen.clone(),
@@ -4425,6 +4437,30 @@ mod tests {
             }) as Arc<dyn HostProvider>
         })
         .collect::<Vec<_>>();
+        for capability in ["host.dataset.read", "host.dataset.write"] {
+            providers.push(Arc::new(TracedDataset {
+                descriptor: descriptor(capability),
+                trace: trace.clone(),
+            }));
+        }
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
+    fn denied_dataset_authorities(
+        trace: Arc<DatasetTrace>,
+        seen: CommandSecurityTrace,
+    ) -> Arc<ScopedHostService> {
+        let mut providers = vec![Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command: false,
+            deny_dataset: true,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen,
+        }) as Arc<dyn HostProvider>];
         for capability in ["host.dataset.read", "host.dataset.write"] {
             providers.push(Arc::new(TracedDataset {
                 descriptor: descriptor(capability),
@@ -5215,6 +5251,7 @@ mod tests {
             ("READQ TS", CicsOperation::ReadTemporaryStorage),
             ("READNEXT", CicsOperation::ReadNext),
             ("READPREV", CicsOperation::ReadPrev),
+            ("RESETBR", CicsOperation::ResetBrowse),
             ("RECEIVE MAP", CicsOperation::ReceiveMap),
             ("RETRIEVE", CicsOperation::Retrieve),
             ("RETURN", CicsOperation::Return),
@@ -6471,7 +6508,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 66);
+assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 67);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -22044,6 +22081,220 @@ mod tests {
         assert_eq!(origins.len(), 2);
         assert_eq!(origins[0].1, "outer-3");
         assert_eq!(origins[1].1, "outer-4");
+    }
+
+    #[test]
+    fn resetbr_reuses_owned_cursor_invalidates_hold_and_replays_once() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let file = || ("FILE".into(), argument(b"CARDDAT"));
+        let start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([file(), ("RIDFLD".into(), argument(b"AA"))]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let other_run = invocation_for("resetbr-other-run", BTreeMap::new());
+        let other_session = SessionId::new("resetbr-other-session", 64).unwrap();
+        service.create_session(&other_session, 24, 80).unwrap();
+        service
+            .register_run(other_run.clone(), &other_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let stolen = request(
+            CicsOperation::ResetBrowse,
+            BTreeMap::from([
+                file(),
+                ("RIDFLD".into(), argument(b"BB")),
+                ("CURSOR".into(), argument(b"CURSOR-1")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(&effect(&other_run.run_unit_id, stolen.clone(), 1), stolen),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 36,
+            })
+        );
+        let read = request(
+            CicsOperation::ReadNext,
+            BTreeMap::from([file(), ("OPTION.UPDATE".into(), cics_option())]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 2), read)
+            .unwrap();
+        let reset = request(
+            CicsOperation::ResetBrowse,
+            BTreeMap::from([
+                file(),
+                ("RIDFLD".into(), argument(b"BB")),
+                ("OPTION.GTEQ".into(), cics_option()),
+            ]),
+            3,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, reset.clone(), 3),
+                reset.clone(),
+            )
+            .unwrap();
+        let replay = service
+            .invoke(&effect(&invocation.run_unit_id, reset.clone(), 3), reset)
+            .unwrap();
+        assert_eq!(first, replay);
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([file(), ("FROM".into(), argument(b"AA22"))]),
+            4,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 4),
+                rewrite
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 30,
+            })
+        );
+        let wrong_cursor = request(
+            CicsOperation::ResetBrowse,
+            BTreeMap::from([
+                file(),
+                ("RIDFLD".into(), argument(b"BB")),
+                ("CURSOR".into(), argument(b"CURSOR-OTHER")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, wrong_cursor.clone(), 5),
+                wrong_cursor
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 36,
+            })
+        );
+        let stolen_next = request(
+            CicsOperation::ReadNext,
+            BTreeMap::from([file(), ("CURSOR".into(), argument(b"CURSOR-OTHER"))]),
+            6,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, stolen_next.clone(), 6),
+                stolen_next,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
+        let next = request(CicsOperation::ReadNext, BTreeMap::from([file()]), 7);
+        service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 7), next)
+            .unwrap();
+        let requests = trace.requests.lock().unwrap();
+        assert_eq!(
+            requests
+                .iter()
+                .filter(|request| matches!(request, DatasetRequest::ResetBrowse { .. }))
+                .count(),
+            1
+        );
+        assert!(requests.iter().any(|request| matches!(
+            request,
+            DatasetRequest::ResetBrowse { cursor, key, relation, .. }
+                if cursor == "CURSOR-1"
+                    && key == b"BB"
+                    && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        )));
+        assert!(requests.iter().filter(|request| matches!(request, DatasetRequest::ReadNext { cursor, .. } if cursor == "CURSOR-1")).count() >= 2);
+    }
+
+    #[test]
+    fn resetbr_denial_does_not_auto_open_the_file_or_touch_the_dataset() {
+        let status = |value: &[u8]| {
+            BoundedPayload::new(
+                "mainframe-env.cics.file-status@1",
+                value.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let trace = Arc::new(DatasetTrace::default());
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            denied_dataset_authorities(trace.clone(), seen.clone()),
+            store,
+            Default::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let close = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("CARDDAT".into(), status(b"CLOSED-ENABLED"))]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 1), close)
+            .unwrap();
+        let reset = request(
+            CicsOperation::ResetBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"BB")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, reset.clone(), 2), reset),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            })
+        );
+        assert_eq!(
+            service.file_status("CARDDAT"),
+            Ok(CicsFileStatus::ClosedEnabled)
+        );
+        assert!(trace.requests.lock().unwrap().is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "DATASET"
+                        && resource == "CARDDEMO.CARDDAT"
+                        && *intent == AccessIntent::Read
+                })
+        );
     }
 
     #[test]
