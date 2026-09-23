@@ -3762,7 +3762,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_tcpip_non_cvda_outputs_use_reserved_v2_tags() {
+    fn extract_tcpip_outputs_use_reserved_v2_tags() {
         let limits = CicsPlanLimits::default();
         let plan = CicsEffectPlan {
             operation: CicsPlanOperation::ExtractTcpip,
@@ -3787,7 +3787,11 @@ mod tests {
             output_from_tag(732),
             Ok(CicsOutputName::Tcpip(CicsTcpipOutput::MaxDataLength))
         );
-        assert_eq!(output_from_tag(733), Err(CicsPlanCodecProblem::Malformed));
+        assert_eq!(
+            output_from_tag(733),
+            Ok(CicsOutputName::Tcpip(CicsTcpipOutput::Authenticate))
+        );
+        assert_eq!(output_from_tag(738), Err(CicsPlanCodecProblem::Malformed));
         assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
         assert_eq!(encode_cics_effect_plan(&plan, limits), Ok(bytes.clone()));
         assert_eq!(

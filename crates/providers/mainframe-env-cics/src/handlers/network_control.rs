@@ -1,6 +1,9 @@
 //! Source-bounded EXTRACT commands over trusted task TCP/IP context.
 
-use super::network_context::{CicsCertificateName, CicsClientCertificate};
+use super::network_context::{
+    CicsCertificateName, CicsClientCertificate, CicsTcpipAuthenticate, CicsTcpipPrivacy,
+    CicsTcpipSslType,
+};
 use crate::service::{CicsService, Run, bounded, decimal_payload};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
@@ -117,6 +120,41 @@ fn extract_tcpip(
                 );
                 None
             }
+            "AUTHENTICATE" => {
+                result.outputs.insert(
+                    name.clone(),
+                    decimal_payload(authenticate_cvda(context.authenticate))?,
+                );
+                None
+            }
+            "CLNTIPFAMILY" => {
+                result.outputs.insert(
+                    name.clone(),
+                    decimal_payload(ip_family_cvda(context.client_address))?,
+                );
+                None
+            }
+            "SRVRIPFAMILY" => {
+                result.outputs.insert(
+                    name.clone(),
+                    decimal_payload(ip_family_cvda(context.server_address))?,
+                );
+                None
+            }
+            "SSLTYPE" => {
+                result.outputs.insert(
+                    name.clone(),
+                    decimal_payload(ssl_type_cvda(context.ssl_type))?,
+                );
+                None
+            }
+            "PRIVACY" => {
+                result.outputs.insert(
+                    name.clone(),
+                    decimal_payload(privacy_cvda(context.privacy))?,
+                );
+                None
+            }
             _ => None,
         };
         if let Some(bytes) = bytes {
@@ -138,6 +176,43 @@ fn extract_tcpip(
         Ok(condition)
     } else {
         Ok(result)
+    }
+}
+
+// Exact CICS TS 6.x numeric CVDAs from pinned dfha80c.html.
+fn authenticate_cvda(value: CicsTcpipAuthenticate) -> i64 {
+    match value {
+        CicsTcpipAuthenticate::Asserted => 1104,
+        CicsTcpipAuthenticate::Autoauth => 1095,
+        CicsTcpipAuthenticate::Autoregister => 1094,
+        CicsTcpipAuthenticate::Basicauth => 1092,
+        CicsTcpipAuthenticate::Certificauth => 1093,
+        CicsTcpipAuthenticate::Noauthentic => 1091,
+    }
+}
+
+fn ip_family_cvda(address: Option<IpAddr>) -> i64 {
+    match address {
+        Some(IpAddr::V4(_)) => 300,
+        Some(IpAddr::V6(_)) => 301,
+        None => 1,
+    }
+}
+
+fn ssl_type_cvda(value: CicsTcpipSslType) -> i64 {
+    match value {
+        CicsTcpipSslType::Ssl => 1030,
+        CicsTcpipSslType::Nossl => 1031,
+        CicsTcpipSslType::Clientauth => 1032,
+        CicsTcpipSslType::Attlsaware => 1205,
+    }
+}
+
+fn privacy_cvda(value: CicsTcpipPrivacy) -> i64 {
+    match value {
+        CicsTcpipPrivacy::Notsupported => 15,
+        CicsTcpipPrivacy::Required => 666,
+        CicsTcpipPrivacy::Supported => 1106,
     }
 }
 
@@ -198,6 +273,11 @@ fn validate_tcpip_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PORTNUMBER",
         "PORTNUMNU",
         "MAXDATALEN",
+        "AUTHENTICATE",
+        "CLNTIPFAMILY",
+        "SRVRIPFAMILY",
+        "SSLTYPE",
+        "PRIVACY",
     ];
     const BUFFERS: &[&str] = &["CLIENTNAME", "SERVERNAME", "CLIENTADDR", "SERVERADDR"];
     let pairs = [
@@ -387,4 +467,48 @@ fn validate_certificate_request(request: &CicsRequest) -> Result<(), HostProblem
         return Err(HostProblem::Malformed);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pinned_numeric_cvda_values_cover_every_tcpip_context_variant() {
+        // CICS TS 6.x dfha80c.html, pinned as cics-misc-tail-cvda.
+        assert_eq!(
+            [
+                CicsTcpipAuthenticate::Asserted,
+                CicsTcpipAuthenticate::Autoauth,
+                CicsTcpipAuthenticate::Autoregister,
+                CicsTcpipAuthenticate::Basicauth,
+                CicsTcpipAuthenticate::Certificauth,
+                CicsTcpipAuthenticate::Noauthentic,
+            ]
+            .map(authenticate_cvda),
+            [1104, 1095, 1094, 1092, 1093, 1091]
+        );
+        assert_eq!(
+            [
+                CicsTcpipPrivacy::Notsupported,
+                CicsTcpipPrivacy::Required,
+                CicsTcpipPrivacy::Supported
+            ]
+            .map(privacy_cvda),
+            [15, 666, 1106]
+        );
+        assert_eq!(
+            [
+                CicsTcpipSslType::Ssl,
+                CicsTcpipSslType::Nossl,
+                CicsTcpipSslType::Clientauth,
+                CicsTcpipSslType::Attlsaware
+            ]
+            .map(ssl_type_cvda),
+            [1030, 1031, 1032, 1205]
+        );
+        assert_eq!(ip_family_cvda(None), 1);
+        assert_eq!(ip_family_cvda(Some("192.0.2.10".parse().unwrap())), 300);
+        assert_eq!(ip_family_cvda(Some("2001:db8::1".parse().unwrap())), 301);
+    }
 }

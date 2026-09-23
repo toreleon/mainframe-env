@@ -1,6 +1,6 @@
 # ADR-0014: Keep CICS TCP/IP and certificate facts in trusted ingress context
 
-Status: **Accepted for v0.9 development; bounded EXTRACT routes executable**
+Status: **Accepted for v0.9 development; typed EXTRACT routes executable**
 Owner: **CICS and network maintainers**
 Scope: **EXTRACT TCPIP and EXTRACT CERTIFICATE task context**
 Applies from: **mainframe-env 0.9.0 development**
@@ -19,7 +19,11 @@ repository PlainText parser. The shared argument-value topic at
 and CVDA overview at
 `sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25`
 were reviewed the same way. The overview links a numeric CVDA table that is
-not in the committed manifest; publication bodies remain outside Git.
+now pinned separately as baseline `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23`,
+topic `SSJL4D_6.x/reference-applications/commands-api/dfha80c.html`, at
+`sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`.
+Its retained raw HTML matched the committed hash and was read with the
+repository PlainText parser. Publication bodies remain outside Git.
 
 The existing online CICS task routes have no admitted socket or TLS handshake
 context. Reading process-wide network state would attribute the wrong peer to
@@ -44,9 +48,8 @@ would allow a program to forge client certificate identity.
 4. The context stores CVDA names, not invented numeric values. `EXTRACT
    CERTIFICATE` returns source-selected DER and name fields through checked
    virtual pointers that expire on the next CICS command. `EXTRACT TCPIP`
-   returns source-backed non-CVDA connection fields from the same authority;
-   its five numeric CVDA outputs remain closed pending a reviewed numeric
-   mapping from `dfha80c.html`.
+   returns connection fields and five fullword numeric CVDAs from the same
+   authority, using only the reviewed values in `dfha80c.html`.
 
 ## Consequences
 
@@ -63,5 +66,6 @@ and corrupt-row reopen tests cover this authority. The compiled COBOL
 `EXTRACT CERTIFICATE` route checks pointer values, lifetime, EIBFN, and
 RESP/RESP2. A selected `EXTRACT TCPIP` route checks IPv4/IPv6 binary
 representation and EIB/RESP fields; provider regressions check LENGERR and
-non-TCP/IP INVREQ. Module, public API docs, typed-semantic, documentation,
+non-TCP/IP INVREQ plus every source-reviewed numeric CVDA mapping. Module,
+public API docs, typed-semantic, documentation,
 formatting, dependency, and diff gates apply.

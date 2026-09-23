@@ -284,6 +284,9 @@ fn validate_candidate(
             (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
                 if descriptor.runtime_operation == Some("ExtractCertificate")
                     && certificate_control::bounded_output_name(name) => {}
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("ExtractTcpip")
+                    && matches!(*name, "CLNTIPFAMILY" | "SRVRIPFAMILY" | "SSLTYPE") => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
                 return Err(format!(
                     "CICS {} option {name} has a source-bounded operand shape",

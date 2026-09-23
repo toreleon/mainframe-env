@@ -12184,6 +12184,11 @@ mod tests {
             ("TCPIPSERVICE".into(), argument(b"SERVICE-X")),
             ("PORTNUMNU".into(), argument(b"PORT-NU")),
             ("MAXDATALEN".into(), argument(b"DATA-LEN")),
+            ("AUTHENTICATE".into(), argument(b"AUTH-X")),
+            ("CLNTIPFAMILY".into(), argument(b"CLIENT-FAMILY")),
+            ("SRVRIPFAMILY".into(), argument(b"SERVER-FAMILY")),
+            ("SSLTYPE".into(), argument(b"SSL-X")),
+            ("PRIVACY".into(), argument(b"PRIVACY-X")),
         ]);
         let missing = request(CicsOperation::ExtractTcpip, args.clone(), 1);
         assert!(matches!(
@@ -12232,6 +12237,11 @@ mod tests {
         assert_eq!(first.outputs["TCPIPSERVICE"].bytes(), b"HTTP0001");
         assert_eq!(first.outputs["PORTNUMNU"].bytes(), b"443");
         assert_eq!(first.outputs["MAXDATALEN"].bytes(), b"65536");
+        assert_eq!(first.outputs["AUTHENTICATE"].bytes(), b"1091");
+        assert_eq!(first.outputs["CLNTIPFAMILY"].bytes(), b"300");
+        assert_eq!(first.outputs["SRVRIPFAMILY"].bytes(), b"301");
+        assert_eq!(first.outputs["SSLTYPE"].bytes(), b"1030");
+        assert_eq!(first.outputs["PRIVACY"].bytes(), b"666");
         let mut short = args;
         short.insert("CADDRLENGTH".into(), cics_decimal(4));
         let mut short_request = request(CicsOperation::ExtractTcpip, short, 3);

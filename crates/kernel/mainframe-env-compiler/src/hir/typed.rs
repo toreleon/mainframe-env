@@ -5570,8 +5570,8 @@ mod tests {
     }
 
     #[test]
-    fn cics_extract_tcpip_requires_paired_buffers_and_rejects_unreviewed_cvda_outputs() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TCPEXTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP VALUE 16. 01 PORT-NU PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) PORTNUMNU(PORT-NU) END-EXEC. STOP RUN.";
+    fn cics_extract_tcpip_requires_paired_buffers_and_fullword_cvda_outputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TCPEXTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP VALUE 16. 01 PORT-NU PIC S9(9) COMP. 01 AUTH-X PIC S9(9) COMP. 01 FAMILY-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) PORTNUMNU(PORT-NU) AUTHENTICATE(AUTH-X) CLNTIPFAMILY(FAMILY-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -5587,12 +5587,15 @@ mod tests {
         assert_eq!(command.operation, HirCicsOperation::ExtractTcpip);
         assert!(command.outputs.iter().any(|output| output.name
             == HirCicsOutputName::Tcpip(mainframe_env_ir::CicsTcpipOutput::ClientAddress)));
+        assert!(command.outputs.iter().any(|output| output.name
+            == HirCicsOutputName::Tcpip(mainframe_env_ir::CicsTcpipOutput::Authenticate)));
         for clause in [
             "CLIENTADDR(ADDR-X)",
             "CADDRLENGTH(ADDR-LEN)",
             "CLIENTADDR(ADDR-LEN) CADDRLENGTH(ADDR-LEN)",
             "PORTNUMNU(ADDR-X)",
-            "AUTHENTICATE(PORT-NU)",
+            "AUTHENTICATE(ADDR-X)",
+            "CLNTIPFAMILY(ADDR-X)",
         ] {
             let invalid = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADTCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP. 01 PORT-NU PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP {clause} END-EXEC. STOP RUN."

@@ -24,6 +24,11 @@ pub(crate) const ALLOWED_CLAUSES: &[&str] = &[
     "PORTNUMBER",
     "PORTNUMNU",
     "MAXDATALEN",
+    "AUTHENTICATE",
+    "CLNTIPFAMILY",
+    "SRVRIPFAMILY",
+    "SSLTYPE",
+    "PRIVACY",
     "RESP",
     "RESP2",
 ];

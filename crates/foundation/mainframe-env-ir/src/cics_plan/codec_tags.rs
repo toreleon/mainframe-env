@@ -655,7 +655,7 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         700..=716 => CicsCertificateOutput::from_tag(value)
             .map(CicsOutputName::Certificate)
             .ok_or(CicsPlanCodecProblem::Malformed),
-        717..=732 => CicsTcpipOutput::from_tag(value)
+        717..=737 => CicsTcpipOutput::from_tag(value)
             .map(CicsOutputName::Tcpip)
             .ok_or(CicsPlanCodecProblem::Malformed),
         4 => Ok(CicsOutputName::Milliseconds),

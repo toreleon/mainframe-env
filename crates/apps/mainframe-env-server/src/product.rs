@@ -17802,7 +17802,7 @@ mod tests {
 
     #[test]
     fn online_extract_tcpip_reads_task_owned_ipv4_ipv6_fields() {
-        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. TCPEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ADDR-X PIC X(16).\n01 ADDR-LEN PIC S9(9) COMP VALUE 16.\n01 ADDR-NU PIC S9(9) COMP.\n01 SERVER6-X PIC X(16).\n01 SERVICE-X PIC X(8).\n01 PORT-X PIC X(5).\n01 PORT-NU PIC S9(9) COMP.\n01 MAXDATA-X PIC S9(9) COMP.\n01 TCP-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) CLIENTADDRNU(ADDR-NU) SRVRADDR6NU(SERVER6-X) TCPIPSERVICE(SERVICE-X) PORTNUMBER(PORT-X) PORTNUMNU(PORT-NU) MAXDATALEN(MAXDATA-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO TCP-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. TCPEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ADDR-X PIC X(16).\n01 ADDR-LEN PIC S9(9) COMP VALUE 16.\n01 ADDR-NU PIC S9(9) COMP.\n01 SERVER6-X PIC X(16).\n01 SERVICE-X PIC X(8).\n01 PORT-X PIC X(5).\n01 PORT-NU PIC S9(9) COMP.\n01 MAXDATA-X PIC S9(9) COMP.\n01 AUTH-X PIC S9(9) COMP.\n01 CLIENT-FAMILY-X PIC S9(9) COMP.\n01 SERVER-FAMILY-X PIC S9(9) COMP.\n01 SSL-X PIC S9(9) COMP.\n01 PRIVACY-X PIC S9(9) COMP.\n01 TCP-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) CLIENTADDRNU(ADDR-NU) SRVRADDR6NU(SERVER6-X) TCPIPSERVICE(SERVICE-X) PORTNUMBER(PORT-X) PORTNUMNU(PORT-NU) MAXDATALEN(MAXDATA-X) AUTHENTICATE(AUTH-X) CLNTIPFAMILY(CLIENT-FAMILY-X) SRVRIPFAMILY(SERVER-FAMILY-X) SSLTYPE(SSL-X) PRIVACY(PRIVACY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO TCP-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let artifact = published_source_fixture("TCPEXTR", source);
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
@@ -17917,6 +17917,26 @@ mod tests {
         assert_eq!(
             restored.variable("MAXDATA-X").unwrap().bytes(),
             &65_536u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("AUTH-X").unwrap().bytes(),
+            &1091u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("CLIENT-FAMILY-X").unwrap().bytes(),
+            &300u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("SERVER-FAMILY-X").unwrap().bytes(),
+            &301u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("SSL-X").unwrap().bytes(),
+            &1030u32.to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("PRIVACY-X").unwrap().bytes(),
+            &666u32.to_be_bytes()
         );
         assert_eq!(restored.variable("TCP-FN").unwrap().bytes(), &[0x3e, 0x0e]);
         assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);

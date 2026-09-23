@@ -1,4 +1,4 @@
-//! Source-reviewed non-CVDA results for EXTRACT TCPIP.
+//! Source-reviewed connection and numeric-CVDA results for EXTRACT TCPIP.
 
 /// One task TCP/IP result with an exact COBOL receiving representation.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -35,9 +35,19 @@ pub enum CicsTcpipOutput {
     PortNumberNumeric,
     /// Maximum HTTP server input bytes as fullword binary.
     MaxDataLength,
+    /// Requested client-authentication CVDA.
+    Authenticate,
+    /// Client IP-family CVDA.
+    ClientIpFamily,
+    /// Server IP-family CVDA.
+    ServerIpFamily,
+    /// TLS mode CVDA.
+    SslType,
+    /// Connection privacy CVDA.
+    Privacy,
 }
 
-/// Exact non-CVDA spellings in their reserved MCEP v2 tag order.
+/// Exact result spellings in their reserved MCEP v2 tag order.
 pub const CICS_TCPIP_OUTPUT_NAMES: &[(&str, CicsTcpipOutput)] = &[
     ("CLIENTNAME", CicsTcpipOutput::ClientName),
     ("CNAMELENGTH", CicsTcpipOutput::ClientNameLength),
@@ -55,6 +65,11 @@ pub const CICS_TCPIP_OUTPUT_NAMES: &[(&str, CicsTcpipOutput)] = &[
     ("PORTNUMBER", CicsTcpipOutput::PortNumber),
     ("PORTNUMNU", CicsTcpipOutput::PortNumberNumeric),
     ("MAXDATALEN", CicsTcpipOutput::MaxDataLength),
+    ("AUTHENTICATE", CicsTcpipOutput::Authenticate),
+    ("CLNTIPFAMILY", CicsTcpipOutput::ClientIpFamily),
+    ("SRVRIPFAMILY", CicsTcpipOutput::ServerIpFamily),
+    ("SSLTYPE", CicsTcpipOutput::SslType),
+    ("PRIVACY", CicsTcpipOutput::Privacy),
 ];
 
 impl CicsTcpipOutput {
@@ -95,7 +110,16 @@ impl CicsTcpipOutput {
 
     /// Whether this field receives fullword numeric data.
     pub const fn fullword(self) -> bool {
-        matches!(self, Self::PortNumberNumeric | Self::MaxDataLength)
+        matches!(
+            self,
+            Self::PortNumberNumeric
+                | Self::MaxDataLength
+                | Self::Authenticate
+                | Self::ClientIpFamily
+                | Self::ServerIpFamily
+                | Self::SslType
+                | Self::Privacy
+        )
     }
 
     /// Whether this field is fixed-width raw bytes.
