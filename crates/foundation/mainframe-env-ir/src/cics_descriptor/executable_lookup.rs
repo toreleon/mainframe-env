@@ -79,5 +79,13 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::SpoolOpenOutput => &CICS_EXECUTABLE_DESCRIPTORS[70],
         CicsPlanOperation::SpoolRead => &CICS_EXECUTABLE_DESCRIPTORS[71],
         CicsPlanOperation::SpoolWrite => &CICS_EXECUTABLE_DESCRIPTORS[72],
+        CicsPlanOperation::InvokeService => &CICS_EXECUTABLE_DESCRIPTORS[73],
+        CicsPlanOperation::SoapFaultAdd => &CICS_EXECUTABLE_DESCRIPTORS[74],
+        CicsPlanOperation::SoapFaultCreate => &CICS_EXECUTABLE_DESCRIPTORS[75],
+        CicsPlanOperation::SoapFaultDelete => &CICS_EXECUTABLE_DESCRIPTORS[76],
+        CicsPlanOperation::WsaContextBuild => &CICS_EXECUTABLE_DESCRIPTORS[77],
+        CicsPlanOperation::WsaContextDelete => &CICS_EXECUTABLE_DESCRIPTORS[78],
+        CicsPlanOperation::WsaContextGet => &CICS_EXECUTABLE_DESCRIPTORS[79],
+        CicsPlanOperation::WsaEprCreate => &CICS_EXECUTABLE_DESCRIPTORS[80],
     }
 }

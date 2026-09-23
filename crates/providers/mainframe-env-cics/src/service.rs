@@ -1,7 +1,9 @@
 #[path = "handlers/mod.rs"]
 mod handlers;
 
-use crate::generated::{CICS_COMMAND_DESCRIPTORS, CicsCommandFamily, command_descriptor};
+#[cfg(test)]
+use crate::generated::command_descriptor;
+use crate::generated::{CICS_COMMAND_DESCRIPTORS, CicsCommandFamily};
 use crate::retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
@@ -1715,17 +1717,9 @@ impl CicsService {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        self.authorize(
-            run,
-            "TCICSTRN",
-            &format!("CICS.{}", run.transaction),
-            AccessIntent::Execute,
-        )?;
-        let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 75);
-        debug_assert_eq!(descriptor.operation, request.operation);
-        debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
-        debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
+        let descriptor = handlers::authorize_and_describe(self, run, &request)?;
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 83);
+        handlers::assert_descriptor(descriptor, &request);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
                 handlers::invoke_task_control(self, run, &request, retention_tick)
@@ -1748,9 +1742,15 @@ impl CicsService {
             CicsCommandFamily::DocumentControl => {
                 handlers::invoke_document_control(self, run, &request, retention_tick)
             }
-            CicsCommandFamily::TransformControl | CicsCommandFamily::JournalControl => {
-                handlers::invoke_extended_control(self, run, &request, descriptor.family)
-            }
+            CicsCommandFamily::TransformControl
+            | CicsCommandFamily::JournalControl
+            | CicsCommandFamily::WebServiceControl => handlers::invoke_extended_control(
+                self,
+                run,
+                &request,
+                descriptor.family,
+                retention_tick,
+            ),
         }
         .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
     }
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 75);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 83);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -25788,6 +25788,658 @@ mod tests {
                 "outer-1",
             ),
             Err(HostProblem::ResourceExhausted)
+        );
+    }
+    #[test]
+    fn web_service_soap_fault_and_wsa_context_are_durable_and_conditioned() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let limits = InvocationLimits::default();
+        let binding = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), limits).unwrap()
+        };
+        let invocation = invocation_for(
+            "web-soap-run",
+            BTreeMap::from([
+                (
+                    "cics.channel".into(),
+                    binding("mainframe-env.cics.channel@1", b"WEBCHAN"),
+                ),
+                (
+                    "cics.soap.handler".into(),
+                    binding("mainframe-env.cics.soap-handler@1", b"supplied"),
+                ),
+                (
+                    "cics.web.role".into(),
+                    binding("mainframe-env.cics.web-role@1", b"requester"),
+                ),
+            ]),
+        );
+        let session = SessionId::new("web-soap-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        cics.put_transform_container(
+            "WEBCHAN",
+            "DFHWS-SOAPLEVEL",
+            CicsTransformContainerMode::Bit,
+            vec![0, 0, 0, 2],
+        )
+        .unwrap();
+        let create = request(
+            CicsOperation::SoapFaultCreate,
+            BTreeMap::from([
+                ("FAULTCODE".into(), cics_literal(b"SENDER")),
+                ("FAULTSTRING".into(), enqueue_value(b"initial")),
+                ("FAULTSTRLEN".into(), cics_decimal(7)),
+            ]),
+            201,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, create.clone(), 201),
+                create.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        let add = request(
+            CicsOperation::SoapFaultAdd,
+            BTreeMap::from([
+                ("FAULTSTRING".into(), enqueue_value(b"replacement")),
+                ("FAULTSTRLEN".into(), cics_decimal(11)),
+                ("SUBCODESTR".into(), enqueue_value(b"app:Failure")),
+                ("SUBCODELEN".into(), cics_decimal(11)),
+                ("NATLANG".into(), enqueue_value(b"fr      ")),
+            ]),
+            202,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, add.clone(), 202), add)
+                .unwrap()
+                .response,
+            0
+        );
+        let rows = store.list_provider_state("cics-web-channel-v1", 8).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0]
+                .payload
+                .windows(b"replacement".len())
+                .any(|window| window == b"replacement")
+        );
+        let delete = request(CicsOperation::SoapFaultDelete, BTreeMap::new(), 203);
+        cics.invoke(
+            &effect(&invocation.run_unit_id, delete.clone(), 203),
+            delete.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, delete.clone(), 203),
+                delete
+            )
+            .unwrap()
+            .response,
+            0
+        );
+        let missing = request(CicsOperation::SoapFaultDelete, BTreeMap::new(), 204);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 204),
+                missing
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 2
+            })
+        );
+
+        let mut action = b"urn:example:booking".to_vec();
+        action.resize(255, b' ');
+        let build = request(
+            CicsOperation::WsaContextBuild,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                ("ACTION".into(), enqueue_value(&action)),
+            ]),
+            205,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, build.clone(), 205), build)
+            .unwrap();
+        let get = request(
+            CicsOperation::WsaContextGet,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                ("CONTEXTTYPE".into(), cics_literal(b"REQCONTEXT")),
+                ("ACTION".into(), argument(b"ACTION-OUT")),
+            ]),
+            206,
+        );
+        let retrieved = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 206), get)
+            .unwrap();
+        assert_eq!(retrieved.outputs["ACTION"].bytes().len(), 255);
+        assert!(
+            retrieved.outputs["ACTION"]
+                .bytes()
+                .starts_with(b"urn:example:booking")
+        );
+        let remove = request(
+            CicsOperation::WsaContextDelete,
+            BTreeMap::from([("CHANNEL".into(), cics_literal(b"WEBCHAN"))]),
+            207,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, remove.clone(), 207),
+            remove,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn web_service_epr_create_checks_xml_lengths_and_escape() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let mut address = b"http://example.invalid/path?a=1&b=2".to_vec();
+        address.resize(255, b' ');
+        let create = request(
+            CicsOperation::WsaEprCreate,
+            BTreeMap::from([
+                ("ADDRESS".into(), enqueue_value(&address)),
+                ("EPRINTO".into(), argument(b"EPR-OUT")),
+                ("EPRLENGTH".into(), cics_decimal(4096)),
+                ("EPRINTO.MAXLENGTH".into(), cics_decimal(4096)),
+            ]),
+            211,
+        );
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, create.clone(), 211),
+                create,
+            )
+            .unwrap();
+        assert_eq!(response.response, 0);
+        assert!(
+            response.outputs["EPRINTO"]
+                .bytes()
+                .windows(5)
+                .any(|window| window == b"&amp;")
+        );
+        let short = request(
+            CicsOperation::WsaEprCreate,
+            BTreeMap::from([
+                ("ADDRESS".into(), enqueue_value(&address)),
+                ("EPRINTO".into(), argument(b"EPR-OUT")),
+                ("EPRLENGTH".into(), cics_decimal(8)),
+                ("EPRINTO.MAXLENGTH".into(), cics_decimal(8)),
+            ]),
+            212,
+        );
+        let response = cics
+            .invoke(&effect(&invocation.run_unit_id, short.clone(), 212), short)
+            .unwrap();
+        assert_eq!((response.response, response.response2), (22, 20));
+        assert_eq!(response.outputs["EPRINTO"].bytes().len(), 8);
+    }
+    #[test]
+    fn web_service_invoke_uses_installed_program_once_and_replays_durably() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = store.clone();
+        let links = Arc::new(Mutex::new(Vec::new()));
+        let cics = CicsService::open(
+            invoke_authorities(false, links.clone()),
+            provider_store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        cics.bind_artifact_store(artifact_store.clone()).unwrap();
+        let (artifact, identity) = install_program_artifact(store.as_ref(), b"WEBPROGRAM");
+        cics.register_program_definitions(&[CicsProgramDefinition {
+            name: "WEBPROG".into(),
+            generation: 1,
+            artifact,
+            semantic_identity: identity,
+            entry_offset: 0,
+            enabled: true,
+            remote: false,
+            reload: false,
+            java_status: CicsJavaStatus::NotJava,
+        }])
+        .unwrap();
+        cics.register_web_service(CicsWebServiceDefinition {
+            name: "WEBSVC".into(),
+            program: "WEBPROG".into(),
+            generation: 1,
+            operation: "FETCH".into(),
+            scope: None,
+            uri: None,
+            urimap: None,
+            channel_based: true,
+            enabled: true,
+            addressing: false,
+        })
+        .unwrap();
+        let limits = InvocationLimits::default();
+        let invocation = invocation_for(
+            "web-invoke-run",
+            BTreeMap::from([
+                (
+                    "cics.channel".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.channel@1",
+                        b"WEBCHAN".to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.web.role".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.web-role@1",
+                        b"requester".to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        let session = SessionId::new("web-invoke-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        cics.put_transform_container(
+            "WEBCHAN",
+            "DFHWS-BODY",
+            CicsTransformContainerMode::Char,
+            b"<request/>".to_vec(),
+        )
+        .unwrap();
+        let call = request(
+            CicsOperation::InvokeService,
+            BTreeMap::from([
+                ("SERVICE".into(), cics_literal(b"WEBSVC")),
+                ("OPERATION".into(), cics_literal(b"FETCH")),
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+            ]),
+            221,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, call.clone(), 221),
+                call.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.payload.bytes(), b"CHILD");
+        assert_eq!(
+            cics.transform_container("WEBCHAN", "DFHWS-BODY").unwrap().1,
+            b"CHILD"
+        );
+        assert_eq!(links.lock().unwrap().len(), 1);
+        let repeated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, call.clone(), 221),
+                call.clone(),
+            )
+            .unwrap();
+        assert_eq!(repeated, first);
+        assert_eq!(links.lock().unwrap().len(), 1);
+        assert_eq!(
+            store
+                .list_provider_state("cics-web-channel-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+        let reopened = CicsService::open(
+            invoke_authorities(false, links.clone()),
+            provider_store,
+            CicsLimits::default(),
+        )
+        .unwrap();
+        reopened.bind_artifact_store(artifact_store).unwrap();
+        let reopened_session = SessionId::new("web-invoke-reopen", 64).unwrap();
+        reopened.create_session(&reopened_session, 24, 80).unwrap();
+        reopened
+            .register_run(
+                invocation.clone(),
+                &reopened_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        assert_eq!(
+            reopened
+                .invoke(&effect(&invocation.run_unit_id, call.clone(), 221), call)
+                .unwrap(),
+            first
+        );
+        assert_eq!(links.lock().unwrap().len(), 1);
+        reopened
+            .register_web_service(CicsWebServiceDefinition {
+                name: "WEBSVC".into(),
+                program: "WEBPROG".into(),
+                generation: 1,
+                operation: "FETCH".into(),
+                scope: Some("BANK".into()),
+                uri: None,
+                urimap: None,
+                channel_based: true,
+                enabled: true,
+                addressing: false,
+            })
+            .unwrap();
+        let scoped = request(
+            CicsOperation::InvokeService,
+            BTreeMap::from([
+                ("SERVICE".into(), cics_literal(b"WEBSVC")),
+                ("OPERATION".into(), cics_literal(b"FETCH")),
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                ("SCOPE".into(), cics_literal(b"BANK")),
+                ("SCOPELEN".into(), cics_decimal(4)),
+            ]),
+            222,
+        );
+        assert_eq!(
+            reopened
+                .invoke(
+                    &effect(&invocation.run_unit_id, scoped.clone(), 222),
+                    scoped
+                )
+                .unwrap()
+                .payload
+                .bytes(),
+            b"CHILD"
+        );
+        assert_eq!(links.lock().unwrap().len(), 2);
+        let missing_length = request(
+            CicsOperation::InvokeService,
+            BTreeMap::from([
+                ("SERVICE".into(), cics_literal(b"WEBSVC")),
+                ("SCOPE".into(), cics_literal(b"BANK")),
+            ]),
+            223,
+        );
+        assert_eq!(
+            reopened.invoke(
+                &effect(&invocation.run_unit_id, missing_length.clone(), 223),
+                missing_length
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 1
+            })
+        );
+    }
+    #[test]
+    fn web_service_context_reopens_from_sqlite_and_denial_leaves_no_state() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-web-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for(
+            "web-sqlite-run",
+            BTreeMap::from([
+                (
+                    "cics.channel".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.channel@1",
+                        b"SQLWEB".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.web.role".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.web-role@1",
+                        b"requester".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            let session = SessionId::new("web-sqlite-session", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let build = request(
+                CicsOperation::WsaContextBuild,
+                BTreeMap::from([
+                    ("CHANNEL".into(), cics_literal(b"SQLWEB")),
+                    ("ACTION".into(), enqueue_value(b"urn:sql:action")),
+                ]),
+                231,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, build.clone(), 231), build)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let session = SessionId::new("web-sqlite-reopen", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let get = request(
+                CicsOperation::WsaContextGet,
+                BTreeMap::from([
+                    ("CHANNEL".into(), cics_literal(b"SQLWEB")),
+                    ("ACTION".into(), argument(b"ACTION-OUT")),
+                ]),
+                232,
+            );
+            let response = cics
+                .invoke(&effect(&invocation.run_unit_id, get.clone(), 232), get)
+                .unwrap();
+            assert!(
+                response.outputs["ACTION"]
+                    .bytes()
+                    .starts_with(b"urn:sql:action")
+            );
+            assert_eq!(
+                store
+                    .list_provider_state("cics-web-channel-v1", 8)
+                    .unwrap()
+                    .len(),
+                1
+            );
+        }
+        let _ = std::fs::remove_file(root.join("state.db"));
+        let _ = std::fs::remove_dir(root);
+
+        let denied_store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = command_authorities(true);
+        let denied = CicsService::open(host, denied_store.clone(), CicsLimits::default()).unwrap();
+        let denied_invocation = invocation_for(
+            "web-denied-run",
+            BTreeMap::from([
+                (
+                    "cics.channel".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.channel@1",
+                        b"DENYWEB".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.web.role".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.web-role@1",
+                        b"requester".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        let session = SessionId::new("web-denied-session", 64).unwrap();
+        denied.create_session(&session, 24, 80).unwrap();
+        denied
+            .register_run(
+                denied_invocation.clone(),
+                &session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let build = request(
+            CicsOperation::WsaContextBuild,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"DENYWEB")),
+                ("ACTION".into(), enqueue_value(b"urn:denied")),
+            ]),
+            233,
+        );
+        assert_eq!(
+            denied.invoke(
+                &effect(&denied_invocation.run_unit_id, build.clone(), 233),
+                build
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            denied_store
+                .list_provider_state("cics-web-channel-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, _)| class == "FACILITY"
+                    && resource == "CICS.WEB.CHANNEL.DENYWEB")
+        );
+        assert!(
+            denied_store
+                .audit_records(&denied_invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == AuditDecision::Deny)
+        );
+    }
+
+    #[test]
+    fn web_service_effects_cancel_or_expire_before_mutation_with_audit() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let cases = [
+            request(CicsOperation::SoapFaultDelete, BTreeMap::new(), 241),
+            request(
+                CicsOperation::WsaContextDelete,
+                BTreeMap::from([("CHANNEL".into(), cics_literal(b"DFHTRANSACTION"))]),
+                242,
+            ),
+            request(
+                CicsOperation::InvokeService,
+                BTreeMap::from([("SERVICE".into(), cics_literal(b"UNINSTALLED"))]),
+                243,
+            ),
+        ];
+        for (index, request) in cases.into_iter().enumerate() {
+            let sequence = 241 + index as u64;
+            for (cancelled, now_tick, expected) in [
+                (true, 1, HostProblem::Cancelled),
+                (false, 100, HostProblem::TimedOut),
+            ] {
+                let result = cics.invoke_host(
+                    &invocation,
+                    now_tick,
+                    cancelled,
+                    effect(&invocation.run_unit_id, request.clone(), sequence),
+                );
+                assert_eq!(result.outcome, Err(expected));
+            }
+        }
+        assert!(
+            store
+                .list_provider_state("cics-web-channel-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            store
+                .audit_records(&invocation.execution_id, 241, 16)
+                .unwrap()
+                .len(),
+            6
+        );
+    }
+
+    #[cfg(feature = "fault-injection")]
+    #[test]
+    fn web_service_post_dispatch_unknown_outcome_replays_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let invocation = invocation_for(
+            "web-unknown-run",
+            BTreeMap::from([
+                (
+                    "cics.channel".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.channel@1",
+                        b"UNKNOWN".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.web.role".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.web-role@1",
+                        b"requester".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        let session = SessionId::new("web-unknown-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let build = request(
+            CicsOperation::WsaContextBuild,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"UNKNOWN")),
+                ("ACTION".into(), enqueue_value(b"urn:once")),
+            ]),
+            251,
+        );
+        cics.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, build.clone(), 251),
+                build.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let rows = store.list_provider_state("cics-web-channel-v1", 8).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, build.clone(), 251), build)
+                .unwrap()
+                .response,
+            0
+        );
+        assert_eq!(
+            store.list_provider_state("cics-web-channel-v1", 8).unwrap(),
+            rows
         );
     }
 }

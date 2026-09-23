@@ -113,6 +113,22 @@ pub enum CicsOperation {
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
     Syncpoint,
+    /// Typed CICS web-service-control command InvokeService.
+    InvokeService,
+    /// Typed CICS web-service-control command SoapFaultAdd.
+    SoapFaultAdd,
+    /// Typed CICS web-service-control command SoapFaultCreate.
+    SoapFaultCreate,
+    /// Typed CICS web-service-control command SoapFaultDelete.
+    SoapFaultDelete,
+    /// Typed CICS web-service-control command WsaContextBuild.
+    WsaContextBuild,
+    /// Typed CICS web-service-control command WsaContextDelete.
+    WsaContextDelete,
+    /// Typed CICS web-service-control command WsaContextGet.
+    WsaContextGet,
+    /// Typed CICS web-service-control command WsaEprCreate.
+    WsaEprCreate,
     /// Convert one BIT-mode application-data container to canonical JSON.
     TransformDataToJson,
     /// Convert one BIT-mode application-data container to deterministic XML.
@@ -204,6 +220,14 @@ impl CicsOperation {
             Self::WaitEvent => "WaitEvent",
             Self::WaitExternal => "WaitExternal",
             Self::Syncpoint => "Syncpoint",
+            Self::InvokeService => "InvokeService",
+            Self::SoapFaultAdd => "SoapFaultAdd",
+            Self::SoapFaultCreate => "SoapFaultCreate",
+            Self::SoapFaultDelete => "SoapFaultDelete",
+            Self::WsaContextBuild => "WsaContextBuild",
+            Self::WsaContextDelete => "WsaContextDelete",
+            Self::WsaContextGet => "WsaContextGet",
+            Self::WsaEprCreate => "WsaEprCreate",
             Self::TransformDataToJson => "TransformDataToJson",
             Self::TransformDataToXml => "TransformDataToXml",
             Self::TransformJsonToData => "TransformJsonToData",
@@ -249,6 +273,13 @@ impl CicsOperation {
                 | Self::WriteTransientData
                 | Self::Link
                 | Self::InvokeApplication
+                | Self::InvokeService
+                | Self::SoapFaultAdd
+                | Self::SoapFaultCreate
+                | Self::SoapFaultDelete
+                | Self::WsaContextBuild
+                | Self::WsaContextDelete
+                | Self::WsaEprCreate
                 | Self::Load
                 | Self::Release
                 | Self::ReceiveMap
@@ -327,6 +358,14 @@ impl CicsOperation {
             ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
             ("INQUIRE", _) => Self::Inquire,
             ("INVOKE", Some("APPLICATION")) => Self::InvokeApplication,
+            ("INVOKE", Some("SERVICE")) => Self::InvokeService,
+            ("SOAPFAULT", Some("ADD")) => Self::SoapFaultAdd,
+            ("SOAPFAULT", Some("CREATE")) => Self::SoapFaultCreate,
+            ("SOAPFAULT", Some("DELETE")) => Self::SoapFaultDelete,
+            ("WSACONTEXT", Some("BUILD")) => Self::WsaContextBuild,
+            ("WSACONTEXT", Some("DELETE")) => Self::WsaContextDelete,
+            ("WSACONTEXT", Some("GET")) => Self::WsaContextGet,
+            ("WSAEPR", Some("CREATE")) => Self::WsaEprCreate,
             ("LOAD", _) => Self::Load,
             ("RELEASE", _) => Self::Release,
             ("LINK", _) => Self::Link,

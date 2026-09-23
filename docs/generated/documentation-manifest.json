@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 188,
+    "markdown_documents": 189,
     "navigation_groups": 5,
-    "normative_documents": 40,
+    "normative_documents": 41,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:056ca14d96f2f360d229173c113ad6261cc5a7c0c0f4e78b371c867785e5ce6c",
+      "sha256": "sha256:18fa406bc3c3c5ba2710fbf09fc956da677880d506b8f5f735f8924fceca4da4",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 75,
-      "sha256": "sha256:2fd25cd3686033c0a331eaab3d0227e49d6f38f3e20ca786f7dd570db995bb76",
+      "relative_links": 76,
+      "sha256": "sha256:7bcd6ef6223c6710d302f44b76919a6dfa012566f37183a789130508f0190636",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -731,10 +731,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and execution maintainers",
+      "path": "docs/decisions/0013-cics-web-service-control-boundary.md",
+      "relative_links": 1,
+      "scope": "Eight typed web-service-control rows, local service transport, and durable channel state",
+      "sha256": "sha256:3eef96d1a8691d39099c414372db89d28b7d2e6fa3e5544a52ad02fd497ba03a",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0013: Bounded CICS web-service-control authority",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 12,
-      "sha256": "sha256:8d8766c4416b933f6f57cdca53dcbafe9263e861bac18007fcbd0bcbcc536849",
+      "relative_links": 13,
+      "sha256": "sha256:26e1a5d6476c6638ce7602a5a51c50adcca883cefa6e208486a3038beefa6087",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1074,7 +1086,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:11b7a41c333ccdc078a71accb598cd00f5bf6233dedc5de2b4189f78cd054fe2",
+      "sha256": "sha256:ae989fc9a375eeacaec37623a67c98ca6c3123d193f8d5ae5c5c5128a5bc9b41",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1820,6 +1832,10 @@
           "path": "docs/decisions/0012-checked-amode64-storage-boundary.md"
         },
         {
+          "label": "ADR-0013: CICS web service control boundary",
+          "path": "docs/decisions/0013-cics-web-service-control-boundary.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -1983,7 +1999,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:1294dcd9b00cba6f394d581182f15be7375ce80ee4c2b92f03c6b5901d7abf5e",
+  "registry_sha256": "sha256:2ef813f5fb831e925b9bfaee6faa06abc820103c112d221eb9ff15b5c3a7bbd1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

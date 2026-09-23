@@ -294,3 +294,7 @@ fn persist_query_effect(
         .map_err(store_error)
         .map_err(mutation_problem)
 }
+
+pub(in crate::service) fn valid_web_xml(source: &str, limits: CicsLimits) -> bool {
+    parser::parse_xml(source, None, limits).is_ok()
+}

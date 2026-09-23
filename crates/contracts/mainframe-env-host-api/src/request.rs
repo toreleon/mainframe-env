@@ -2469,6 +2469,14 @@ mod tests {
             CicsOperation::WaitEvent,
             CicsOperation::WaitExternal,
             CicsOperation::Syncpoint,
+            CicsOperation::InvokeService,
+            CicsOperation::SoapFaultAdd,
+            CicsOperation::SoapFaultCreate,
+            CicsOperation::SoapFaultDelete,
+            CicsOperation::WsaContextBuild,
+            CicsOperation::WsaContextDelete,
+            CicsOperation::WsaContextGet,
+            CicsOperation::WsaEprCreate,
             CicsOperation::TransformDataToJson,
             CicsOperation::TransformDataToXml,
             CicsOperation::TransformJsonToData,
@@ -2478,7 +2486,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 63);
+        assert_eq!(forms.len(), 71);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

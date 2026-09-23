@@ -14,11 +14,14 @@ mod assign;
 mod legacy;
 mod names;
 mod response;
+mod response_output;
+pub(super) use response_output::write_output;
 mod retrieve;
 mod runtime_validation;
 mod spool_control;
 mod storage64;
 mod task_wait;
+mod web_service_control;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
@@ -56,6 +59,7 @@ pub(super) fn write_response_state(
     response: &CicsResponse,
 ) -> Result<Option<usize>, MachineProblem> {
     storage64::validate_response(operation, storage64_intent, response)?;
+    web_service_control::validate_response(operation, outputs, response)?;
     for (target, value) in [
         (response_target, response.response),
         (response2_target, response.response2),
@@ -259,6 +263,9 @@ pub(super) fn execute(
     let plan = plan(operation)?;
     validate_declared_slots(operation, &plan)?;
     validate_runtime_plan(machine, operation, &plan)?;
+    if plan.operation == CicsPlanOperation::WsaContextGet {
+        web_service_control::release_previous_set(machine);
+    }
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
     }
@@ -394,7 +401,7 @@ pub(super) fn execute(
                         | CicsOperandName::SpoolRecordLength
                         | CicsOperandName::SpoolMaxFlength
                         | CicsOperandName::SpoolFlength
-                ) =>
+                ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
                     "mainframe-env.cics.decimal@1",
@@ -451,6 +458,7 @@ pub(super) fn execute(
             );
         }
         let target = CicsTarget::Resolved(output.target.clone());
+        web_service_control::output_arguments(machine, output.name, &target, &mut arguments)?;
         match output.name {
             CicsOutputName::Abstime
             | CicsOutputName::Commarea
@@ -478,6 +486,13 @@ pub(super) fn execute(
             | CicsOutputName::Token
             | CicsOutputName::SpoolToken
             | CicsOutputName::SpoolToFlength
+            | CicsOutputName::WebAction
+            | CicsOutputName::WebMessageId
+            | CicsOutputName::WebRelatesUri
+            | CicsOutputName::WebRelatesType
+            | CicsOutputName::WebEprInto
+            | CicsOutputName::WebEprSet
+            | CicsOutputName::WebEprLength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -654,95 +669,6 @@ pub(super) fn write_target(
         }
         CicsTarget::Resolved(slot) => write_resolved(machine, slot, value),
     }
-}
-
-pub(super) fn write_output(
-    machine: &mut ReferenceMachine,
-    operation: CicsOperation,
-    name: &str,
-    target: &CicsTarget,
-    value: &BoundedPayload,
-    load_base: Option<usize>,
-) -> Result<(), MachineProblem> {
-    if matches!(name, "SET" | "ENTRY")
-        && let Some(load_base) = load_base
-    {
-        return retrieve::write_load_pointer(machine, target, value, load_base);
-    }
-    if name == "SET" {
-        return retrieve::write_set_output(machine, operation, target, value);
-    }
-    if name == "SET64" {
-        return retrieve::write_set64_output(machine, target, value);
-    }
-    if matches!(
-        name,
-        "ABSTIME"
-            | "MILLISECONDS"
-            | "LENGTH"
-            | "FLENGTH"
-            | "NUMITEMS"
-            | "TOFLENGTH"
-            | "ELEMNAMELEN"
-            | "ELEMNSLEN"
-            | "TYPENAMELEN"
-            | "TYPENSLEN"
-    ) && value.schema() != "mainframe-env.cics.decimal@1"
-        || name == "TOKEN"
-            && operation == CicsOperation::Read
-            && value.schema() != "mainframe-env.cics.decimal@1"
-        || matches!(
-            name,
-            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
-        ) && value.schema() != "mainframe-env.cics.payload@1"
-        || name == "TOKEN"
-            && matches!(
-                operation,
-                CicsOperation::SpoolOpenInput | CicsOperation::SpoolOpenOutput
-            )
-            && value.schema() != "mainframe-env.cics.payload@1"
-        || matches!(name, "ELEMNAME" | "ELEMNS" | "TYPENAME" | "TYPENS")
-            && value.schema() != "mainframe-env.cics.payload@1"
-        || matches!(
-            name,
-            "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"
-        ) && value.schema() != "mainframe-env.cics.payload@1"
-    {
-        return Err(MachineProblem::UnexpectedHostResult);
-    }
-    if matches!(
-        name,
-        "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"
-    ) && let CicsTarget::Resolved(slot) = target
-        && value.bytes().len() < resolved_slot(machine, slot)?.length
-    {
-        return write_resolved_prefix(machine, slot, value.bytes());
-    }
-    if value.schema() == "mainframe-env.cics.decimal@1" {
-        let coefficient = String::from_utf8_lossy(value.bytes())
-            .parse::<i128>()
-            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-        write_target(
-            machine,
-            target,
-            &CobolValue::Decimal(Decimal {
-                coefficient,
-                scale: 0,
-            }),
-        )
-    } else {
-        write_target(machine, target, &CobolValue::Bytes(value.bytes().to_vec()))
-    }
-}
-
-fn write_resolved_prefix(
-    machine: &mut ReferenceMachine,
-    slot: &CicsStorageSlot,
-    value: &[u8],
-) -> Result<(), MachineProblem> {
-    let mut reference = resolved_slot(machine, slot)?;
-    reference.length = value.len();
-    machine.write_reference(&reference, value)
 }
 
 fn resolved_slot(

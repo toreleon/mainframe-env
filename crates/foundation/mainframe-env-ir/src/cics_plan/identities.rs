@@ -123,6 +123,22 @@ pub enum CicsPlanOperation {
     Start,
     /// Consume one expired interval-control START data record.
     Retrieve,
+    /// Typed CICS web-service-control operation InvokeService.
+    InvokeService,
+    /// Typed CICS web-service-control operation SoapFaultAdd.
+    SoapFaultAdd,
+    /// Typed CICS web-service-control operation SoapFaultCreate.
+    SoapFaultCreate,
+    /// Typed CICS web-service-control operation SoapFaultDelete.
+    SoapFaultDelete,
+    /// Typed CICS web-service-control operation WsaContextBuild.
+    WsaContextBuild,
+    /// Typed CICS web-service-control operation WsaContextDelete.
+    WsaContextDelete,
+    /// Typed CICS web-service-control operation WsaContextGet.
+    WsaContextGet,
+    /// Typed CICS web-service-control operation WsaEprCreate.
+    WsaEprCreate,
     /// Create one bounded transaction-owned document.
     DocumentCreate,
     /// Delete one transaction-owned document and release its storage.
@@ -317,6 +333,84 @@ pub enum CicsOperandName {
     CharacterSet,
     /// `VALUE(...)` supplies one document symbol value.
     SymbolValue,
+    /// Source-reviewed web-service-control operand Service.
+    Service,
+    /// Source-reviewed web-service-control operand ServiceOperation.
+    ServiceOperation,
+    /// Source-reviewed web-service-control operand Uri.
+    Uri,
+    /// Source-reviewed web-service-control operand UriMap.
+    UriMap,
+    /// Source-reviewed web-service-control operand Scope.
+    Scope,
+    /// Source-reviewed web-service-control operand ScopeLen.
+    ScopeLen,
+    /// Source-reviewed web-service-control operand FaultCode.
+    FaultCode,
+    /// Source-reviewed web-service-control operand FaultCodeStr.
+    FaultCodeStr,
+    /// Source-reviewed web-service-control operand FaultCodeLen.
+    FaultCodeLen,
+    /// Source-reviewed web-service-control operand FaultString.
+    FaultString,
+    /// Source-reviewed web-service-control operand FaultStrLen.
+    FaultStrLen,
+    /// Source-reviewed web-service-control operand NatLang.
+    NatLang,
+    /// Source-reviewed web-service-control operand SoapRole.
+    SoapRole,
+    /// Source-reviewed web-service-control operand RoleLength.
+    RoleLength,
+    /// Source-reviewed web-service-control operand FaultActor.
+    FaultActor,
+    /// Source-reviewed web-service-control operand FaultActLen.
+    FaultActLen,
+    /// Source-reviewed web-service-control operand Detail.
+    Detail,
+    /// Source-reviewed web-service-control operand DetailLength.
+    DetailLength,
+    /// Source-reviewed web-service-control operand FromCcsid.
+    FromCcsid,
+    /// Source-reviewed web-service-control operand SubcodeStr.
+    SubcodeStr,
+    /// Source-reviewed web-service-control operand SubcodeLen.
+    SubcodeLen,
+    /// Source-reviewed web-service-control operand ContextType.
+    ContextType,
+    /// Source-reviewed web-service-control operand Action.
+    Action,
+    /// Source-reviewed web-service-control operand MessageId.
+    MessageId,
+    /// Source-reviewed web-service-control operand RelatesUri.
+    RelatesUri,
+    /// Source-reviewed web-service-control operand RelatesType.
+    RelatesType,
+    /// Source-reviewed web-service-control operand RelatesIndex.
+    RelatesIndex,
+    /// Source-reviewed web-service-control operand EprType.
+    EprType,
+    /// Source-reviewed web-service-control operand EprField.
+    EprField,
+    /// Source-reviewed web-service-control operand EprFrom.
+    EprFrom,
+    /// Source-reviewed web-service-control operand EprLength.
+    EprLength,
+    /// Source-reviewed web-service-control operand FromCodepage.
+    FromCodepage,
+    /// Source-reviewed web-service-control operand IntoCcsid.
+    IntoCcsid,
+    /// Source-reviewed web-service-control operand IntoCodepage.
+    IntoCodepage,
+    /// Source-reviewed web-service-control operand Address.
+    Address,
+    /// Source-reviewed web-service-control operand RefParms.
+    RefParms,
+    /// Source-reviewed web-service-control operand RefParmsLen.
+    RefParmsLen,
+    /// Source-reviewed web-service-control operand Metadata.
+    Metadata,
+    /// Source-reviewed web-service-control operand MetadataLen.
+    MetadataLen,
     /// Transform input-container name.
     InContainer,
     /// Transform output-container name.
@@ -539,6 +633,20 @@ pub enum CicsOutputName {
     DocumentToken,
     /// Current maximum retrieval size destination.
     DocumentSize,
+    /// Web-service-control result WebAction.
+    WebAction,
+    /// Web-service-control result WebMessageId.
+    WebMessageId,
+    /// Web-service-control result WebRelatesUri.
+    WebRelatesUri,
+    /// Web-service-control result WebRelatesType.
+    WebRelatesType,
+    /// Web-service-control result WebEprInto.
+    WebEprInto,
+    /// Web-service-control result WebEprSet.
+    WebEprSet,
+    /// Web-service-control result WebEprLength.
+    WebEprLength,
     /// XML element local name.
     ElementName,
     /// XML element local-name length.

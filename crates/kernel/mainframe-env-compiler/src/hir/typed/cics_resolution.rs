@@ -39,6 +39,7 @@ mod terminal_control;
 mod transaction_name;
 mod transform_control;
 mod value;
+mod web_service_control;
 
 use clause_parser::{clauses, matching_close};
 use numeric_value::{cics_cvda_value, cics_integer_value};
@@ -576,6 +577,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let operation = operation::resolve(descriptor)?;
     let transform_shape = transform_control::shape(operation);
+    let web_shape = web_service_control::shape(operation);
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
         HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
@@ -607,6 +609,16 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
         HirCicsOperation::InvokeApplication => program_control::INVOKE_CLAUSES,
+        op @ (HirCicsOperation::InvokeService
+        | HirCicsOperation::SoapFaultAdd
+        | HirCicsOperation::SoapFaultCreate
+        | HirCicsOperation::SoapFaultDelete
+        | HirCicsOperation::WsaContextBuild
+        | HirCicsOperation::WsaContextDelete
+        | HirCicsOperation::WsaContextGet
+        | HirCicsOperation::WsaEprCreate) => {
+            web_service_control::shape(op).expect("web shape").clauses
+        }
         HirCicsOperation::Load => program_control::LOAD_CLAUSES,
         HirCicsOperation::Release => program_control::RELEASE_CLAUSES,
         HirCicsOperation::Link | HirCicsOperation::Xctl => &[
@@ -699,6 +711,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
         HirCicsOperation::InvokeApplication => &["EXACTMATCH", "MINIMUM", "NOHANDLE"],
+        HirCicsOperation::InvokeService
+        | HirCicsOperation::SoapFaultAdd
+        | HirCicsOperation::SoapFaultCreate
+        | HirCicsOperation::SoapFaultDelete
+        | HirCicsOperation::WsaContextBuild
+        | HirCicsOperation::WsaContextDelete
+        | HirCicsOperation::WsaContextGet
+        | HirCicsOperation::WsaEprCreate => &["NOHANDLE"],
         HirCicsOperation::Load => &["HOLD", "NOHANDLE"],
         HirCicsOperation::Release => &["NOHANDLE"],
         HirCicsOperation::Address
@@ -817,6 +837,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
     let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     transform_control::validate_constraints(&clauses, operation)?;
+    web_service_control::validate(&clauses, operation)?;
     for required in match operation {
         HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
@@ -859,6 +880,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Suspend
         | HirCicsOperation::InvokeApplication => &[][..],
         HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
+        HirCicsOperation::InvokeService
+        | HirCicsOperation::SoapFaultAdd
+        | HirCicsOperation::SoapFaultCreate
+        | HirCicsOperation::SoapFaultDelete
+        | HirCicsOperation::WsaContextBuild
+        | HirCicsOperation::WsaContextDelete
+        | HirCicsOperation::WsaContextGet
+        | HirCicsOperation::WsaEprCreate => web_shape.as_ref().expect("web shape").required,
         HirCicsOperation::Load => &["PROGRAM"][..],
         HirCicsOperation::Release => &["PROGRAM"][..],
         HirCicsOperation::DocumentCreate => &["DOCTOKEN"][..],
@@ -1010,6 +1039,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
+    operands.extend(web_service_control::operands(
+        &clauses, operation, semantic,
+    )?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
@@ -1051,6 +1083,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

@@ -101,6 +101,26 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WsaContextGet => matches!(
+            output,
+            CicsOutputName::WebAction
+                | CicsOutputName::WebMessageId
+                | CicsOutputName::WebRelatesUri
+                | CicsOutputName::WebRelatesType
+                | CicsOutputName::WebEprInto
+                | CicsOutputName::WebEprSet
+                | CicsOutputName::WebEprLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::WsaEprCreate => matches!(
+            output,
+            CicsOutputName::WebEprInto
+                | CicsOutputName::WebEprSet
+                | CicsOutputName::WebEprLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::TransformDataToXml | CicsPlanOperation::TransformXmlToData => matches!(
             output,
             CicsOutputName::ElementName

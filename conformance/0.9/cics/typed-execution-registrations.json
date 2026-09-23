@@ -46,18 +46,18 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0039"
     },
     {
-      "operation": "DeleteTransientData",
-      "interface": "api",
-      "family": "queue-control",
-      "mutating": true,
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0048"
-    },
-    {
       "operation": "DeleteTemporaryStorage",
       "interface": "api",
       "family": "queue-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0049"
+    },
+    {
+      "operation": "DeleteTransientData",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0048"
     },
     {
       "operation": "Deq",
@@ -158,6 +158,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0106"
     },
     {
+      "operation": "InvokeService",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0107"
+    },
+    {
       "operation": "Load",
       "interface": "api",
       "family": "program-control",
@@ -186,18 +193,18 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0149"
     },
     {
-      "operation": "ReadTransientData",
-      "interface": "api",
-      "family": "queue-control",
-      "mutating": true,
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0159"
-    },
-    {
       "operation": "ReadTemporaryStorage",
       "interface": "api",
       "family": "queue-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0160"
+    },
+    {
+      "operation": "ReadTransientData",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0159"
     },
     {
       "operation": "Release",
@@ -219,6 +226,27 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0193"
+    },
+    {
+      "operation": "SoapFaultAdd",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0197"
+    },
+    {
+      "operation": "SoapFaultCreate",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0198"
+    },
+    {
+      "operation": "SoapFaultDelete",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0199"
     },
     {
       "operation": "SpoolClose",
@@ -352,6 +380,34 @@
       "family": "queue-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0258"
+    },
+    {
+      "operation": "WsaContextBuild",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0259"
+    },
+    {
+      "operation": "WsaContextDelete",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0260"
+    },
+    {
+      "operation": "WsaContextGet",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0261"
+    },
+    {
+      "operation": "WsaEprCreate",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0262"
     }
   ]
 }

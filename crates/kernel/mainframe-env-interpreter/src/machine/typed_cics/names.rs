@@ -56,6 +56,19 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::JournalPfxLeng => SlotUse::HalfwordInput,
         CicsOperandName::Token => SlotUse::FullwordInput,
         CicsOperandName::Flength64 => SlotUse::FullwordInput,
+        CicsOperandName::ScopeLen
+        | CicsOperandName::FaultCodeLen
+        | CicsOperandName::FaultStrLen
+        | CicsOperandName::RoleLength
+        | CicsOperandName::FaultActLen
+        | CicsOperandName::DetailLength
+        | CicsOperandName::FromCcsid
+        | CicsOperandName::SubcodeLen
+        | CicsOperandName::RelatesIndex
+        | CicsOperandName::EprLength
+        | CicsOperandName::IntoCcsid
+        | CicsOperandName::RefParmsLen
+        | CicsOperandName::MetadataLen => SlotUse::FullwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataPointer64 => SlotUse::Pointer64Input,
         CicsOperandName::DataArea => SlotUse::Input,
@@ -102,6 +115,13 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::SetPointer => SlotUse::PointerOutput,
         CicsOutputName::SetPointer64 => SlotUse::Pointer64Output,
+        CicsOutputName::WebEprSet => SlotUse::PointerOutput,
+        CicsOutputName::WebEprLength => SlotUse::FullwordOutput,
+        CicsOutputName::WebAction
+        | CicsOutputName::WebMessageId
+        | CicsOutputName::WebRelatesUri
+        | CicsOutputName::WebRelatesType
+        | CicsOutputName::WebEprInto => SlotUse::Output,
         CicsOutputName::Ridfld => SlotUse::Output,
         CicsOutputName::Token => SlotUse::FullwordOutput,
         CicsOutputName::ReturnTransId | CicsOutputName::ReturnTermId | CicsOutputName::Queue => {
@@ -201,6 +221,14 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
         CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
         CicsPlanOperation::DocumentSet => CicsOperation::DocumentSet,
+        CicsPlanOperation::InvokeService => CicsOperation::InvokeService,
+        CicsPlanOperation::SoapFaultAdd => CicsOperation::SoapFaultAdd,
+        CicsPlanOperation::SoapFaultCreate => CicsOperation::SoapFaultCreate,
+        CicsPlanOperation::SoapFaultDelete => CicsOperation::SoapFaultDelete,
+        CicsPlanOperation::WsaContextBuild => CicsOperation::WsaContextBuild,
+        CicsPlanOperation::WsaContextDelete => CicsOperation::WsaContextDelete,
+        CicsPlanOperation::WsaContextGet => CicsOperation::WsaContextGet,
+        CicsPlanOperation::WsaEprCreate => CicsOperation::WsaEprCreate,
         CicsPlanOperation::TransformDataToJson => CicsOperation::TransformDataToJson,
         CicsPlanOperation::TransformDataToXml => CicsOperation::TransformDataToXml,
         CicsPlanOperation::TransformJsonToData => CicsOperation::TransformJsonToData,
@@ -298,6 +326,45 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::MaximumLength => "MAXLENGTH",
         CicsOperandName::CharacterSet => "CHARACTERSET",
         CicsOperandName::SymbolValue => "VALUE",
+        CicsOperandName::Service => "SERVICE",
+        CicsOperandName::ServiceOperation => "OPERATION",
+        CicsOperandName::Uri => "URI",
+        CicsOperandName::UriMap => "URIMAP",
+        CicsOperandName::Scope => "SCOPE",
+        CicsOperandName::ScopeLen => "SCOPELEN",
+        CicsOperandName::FaultCode => "FAULTCODE",
+        CicsOperandName::FaultCodeStr => "FAULTCODESTR",
+        CicsOperandName::FaultCodeLen => "FAULTCODELEN",
+        CicsOperandName::FaultString => "FAULTSTRING",
+        CicsOperandName::FaultStrLen => "FAULTSTRLEN",
+        CicsOperandName::NatLang => "NATLANG",
+        CicsOperandName::SoapRole => "ROLE",
+        CicsOperandName::RoleLength => "ROLELENGTH",
+        CicsOperandName::FaultActor => "FAULTACTOR",
+        CicsOperandName::FaultActLen => "FAULTACTLEN",
+        CicsOperandName::Detail => "DETAIL",
+        CicsOperandName::DetailLength => "DETAILLENGTH",
+        CicsOperandName::FromCcsid => "FROMCCSID",
+        CicsOperandName::SubcodeStr => "SUBCODESTR",
+        CicsOperandName::SubcodeLen => "SUBCODELEN",
+        CicsOperandName::ContextType => "CONTEXTTYPE",
+        CicsOperandName::Action => "ACTION",
+        CicsOperandName::MessageId => "MESSAGEID",
+        CicsOperandName::RelatesUri => "RELATESURI",
+        CicsOperandName::RelatesType => "RELATESTYPE",
+        CicsOperandName::RelatesIndex => "RELATESINDEX",
+        CicsOperandName::EprType => "EPRTYPE",
+        CicsOperandName::EprField => "EPRFIELD",
+        CicsOperandName::EprFrom => "EPRFROM",
+        CicsOperandName::EprLength => "EPRLENGTH",
+        CicsOperandName::FromCodepage => "FROMCODEPAGE",
+        CicsOperandName::IntoCcsid => "INTOCCSID",
+        CicsOperandName::IntoCodepage => "INTOCODEPAGE",
+        CicsOperandName::Address => "ADDRESS",
+        CicsOperandName::RefParms => "REFPARMS",
+        CicsOperandName::RefParmsLen => "REFPARMSLEN",
+        CicsOperandName::Metadata => "METADATA",
+        CicsOperandName::MetadataLen => "METADATALEN",
         CicsOperandName::InContainer => "INCONTAINER",
         CicsOperandName::OutContainer => "OUTCONTAINER",
         CicsOperandName::Transformer => "TRANSFORMER",
@@ -359,6 +426,13 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::NumItems => "NUMITEMS",
         CicsOutputName::DocumentToken => "DOCTOKEN",
         CicsOutputName::DocumentSize => "DOCSIZE",
+        CicsOutputName::WebAction => "ACTION",
+        CicsOutputName::WebMessageId => "MESSAGEID",
+        CicsOutputName::WebRelatesUri => "RELATESURI",
+        CicsOutputName::WebRelatesType => "RELATESTYPE",
+        CicsOutputName::WebEprInto => "EPRINTO",
+        CicsOutputName::WebEprSet => "EPRSET",
+        CicsOutputName::WebEprLength => "EPRLENGTH",
         CicsOutputName::ElementName => "ELEMNAME",
         CicsOutputName::ElementNameLength => "ELEMNAMELEN",
         CicsOutputName::ElementNamespace => "ELEMNS",

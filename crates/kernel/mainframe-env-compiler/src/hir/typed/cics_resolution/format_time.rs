@@ -140,6 +140,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::JournalReqId
         | HirCicsOutputName::SpoolToken
         | HirCicsOutputName::SpoolToFlength
+        | HirCicsOutputName::WebAction
+        | HirCicsOutputName::WebMessageId
+        | HirCicsOutputName::WebRelatesUri
+        | HirCicsOutputName::WebRelatesType
+        | HirCicsOutputName::WebEprInto
+        | HirCicsOutputName::WebEprSet
+        | HirCicsOutputName::WebEprLength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

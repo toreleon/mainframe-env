@@ -99,22 +99,30 @@ def check(root: Path) -> None:
         "typed CICS compiler ownership",
     )
 
-    cics_descriptors = production(
+    cics_descriptor_root = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
     )
+    cics_descriptor_entries = production(
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable.rs")
+    )
+    for required in [
+        "mod executable;",
+        "pub use executable::CICS_EXECUTABLE_DESCRIPTORS;",
+        'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
+        "Effect::DatasetRead",
+        "Effect::DatasetWrite",
+        "Effect::Transaction",
+    ]:
+        require(required in cics_descriptor_root, f"typed CICS descriptor facade omits {required}")
     for required in [
         "pub const CICS_EXECUTABLE_DESCRIPTORS",
-        'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
         'namespace: "cics.file"',
         'namespace: "cics.recovery"',
         "operation: CicsPlanOperation::Read",
         "operation: CicsPlanOperation::Rewrite",
         "operation: CicsPlanOperation::Syncpoint",
-        "Effect::DatasetRead",
-        "Effect::DatasetWrite",
-        "Effect::Transaction",
     ]:
-        require(required in cics_descriptors, f"typed CICS descriptor registry omits {required}")
+        require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
 
     lower = production(read(root, "crates/kernel/mainframe-env-compiler/src/lower.rs"))
     for required in [

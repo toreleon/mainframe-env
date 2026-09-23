@@ -16,7 +16,7 @@ mod xml_to_data;
 use reader::Reader;
 
 const RESOURCE_NAMESPACE: &str = "cics-transform-resource-v1";
-const CONTAINER_NAMESPACE: &str = "cics-transform-container-v1";
+pub(in crate::service) const CONTAINER_NAMESPACE: &str = "cics-transform-container-v1";
 const EFFECT_NAMESPACE: &str = "cics-transform-effect-v1";
 const DEFAULT_JSON_OUTPUT: &str = "DFHJSON-JSON";
 const DEFAULT_JSON_DATA_OUTPUT: &str = "DFHJSON-DATA";
@@ -203,10 +203,16 @@ pub(crate) fn put_container(
             Err(HostProblem::IdempotencyConflict)
         };
     }
-    if state.transform_containers.len() >= service.limits.max_transform_containers
+    let (web_rows, web_bytes) = super::web_service_control::usage(service)?;
+    if state
+        .transform_containers
+        .len()
+        .checked_add(web_rows)
+        .is_none_or(|count| count >= service.limits.max_transform_containers)
         || state
             .transform_bytes
-            .checked_add(bytes.len())
+            .checked_add(web_bytes)
+            .and_then(|total| total.checked_add(bytes.len()))
             .is_none_or(|total| total > service.limits.max_transform_bytes)
     {
         return Err(HostProblem::ResourceExhausted);
@@ -959,7 +965,7 @@ fn resource_key(format: CicsTransformFormat, name: &str) -> String {
     }
 }
 
-fn container_key(channel: &str, name: &str) -> String {
+pub(in crate::service) fn container_key(channel: &str, name: &str) -> String {
     format!("{channel}/{name}")
 }
 
@@ -1080,7 +1086,9 @@ fn decode_definition(
     .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
-fn encode_container(container: &TransformContainer) -> Result<Vec<u8>, HostProblem> {
+pub(in crate::service) fn encode_container(
+    container: &TransformContainer,
+) -> Result<Vec<u8>, HostProblem> {
     let mut out = b"METC1".to_vec();
     out.push(match container.mode {
         CicsTransformContainerMode::Bit => 1,
@@ -1164,4 +1172,8 @@ fn decode_effect(bytes: &[u8], limits: CicsLimits) -> Result<TransformEffect, Ho
         request_digest,
         outputs,
     })
+}
+
+pub(in crate::service) fn valid_web_xml(source: &str, limits: CicsLimits) -> bool {
+    xml_to_data::valid_web_xml(source, limits)
 }

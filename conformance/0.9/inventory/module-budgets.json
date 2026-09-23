@@ -331,7 +331,12 @@
       "crates/providers/mainframe-env-cics/src/handlers/transform_control/reader.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control/xml_to_data.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control/xml_to_data/parser.rs",
-      "crates/providers/mainframe-env-cics/src/handlers/transient_data.rs"
+      "crates/providers/mainframe-env-cics/src/handlers/transient_data.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/web_service_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/web_service_control/invoke.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/web_service_control/soap_fault.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/web_service_control/state.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/web_service_control/wsa.rs"
     ]
   }
 }

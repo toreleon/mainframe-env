@@ -26,12 +26,36 @@ mod terminal_run;
 mod time;
 mod transform_control;
 pub(in crate::service) mod transient_data;
+mod web_service_control;
 
 use super::{CicsService, Run};
 use crate::generated::CicsCommandFamily;
-use mainframe_env_host_api::{CicsRequest, CicsResponse, HostProblem};
+use mainframe_env_host_api::{AccessIntent, CicsRequest, CicsResponse, HostProblem};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
+
+pub(super) fn assert_descriptor(
+    descriptor: &crate::generated::CicsCommandDescriptor,
+    request: &CicsRequest,
+) {
+    debug_assert_eq!(descriptor.operation, request.operation);
+    debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
+    debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
+}
+
+pub(super) fn authorize_and_describe(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<&'static crate::generated::CicsCommandDescriptor, HostProblem> {
+    service.authorize(
+        run,
+        "TCICSTRN",
+        &format!("CICS.{}", run.transaction),
+        AccessIntent::Execute,
+    )?;
+    Ok(crate::generated::command_descriptor(request.operation))
+}
 
 pub(super) fn argument_bytes(request: &CicsRequest, name: &str) -> Option<Vec<u8>> {
     request
@@ -119,11 +143,13 @@ pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
+pub use web_service_control::CicsWebServiceDefinition;
 pub(super) fn invoke_extended_control(
     service: &CicsService,
     run: &mut Run,
     request: &CicsRequest,
     family: crate::generated::CicsCommandFamily,
+    retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match family {
         crate::generated::CicsCommandFamily::TransformControl => {
@@ -131,6 +157,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::JournalControl => {
             journal_control::invoke(service, run, request)
+        }
+        crate::generated::CicsCommandFamily::WebServiceControl => {
+            web_service_control::invoke(service, run, request, retention_tick)
         }
         _ => unreachable!("only extended control families delegate here"),
     }
@@ -172,7 +201,8 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     task_wait::release_task(service, run)?;
     document_control::release_task(service, run)?;
     interval_control::release_task(service, run)?;
-    program_control::release_task_program_loads(service, run)
+    program_control::release_task_program_loads(service, run)?;
+    web_service_control::release_task(service, run)
 }
 
 pub(super) fn rollback_task(

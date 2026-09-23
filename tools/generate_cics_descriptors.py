@@ -95,6 +95,7 @@ EXPECTED_FAMILIES = {
 TYPED_EXECUTION_FAMILIES = {
     "document-control": "DocumentControl",
     "journal-control": "JournalControl",
+    "web-service-control": "WebServiceControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -175,6 +176,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0106",
     ),
+    ("InvokeService", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0107"),
     (
         "Inquire",
         "spi-compatibility",
@@ -225,6 +227,9 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0193",
     ),
+    ("SoapFaultAdd", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0197"),
+    ("SoapFaultCreate", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0198"),
+    ("SoapFaultDelete", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0199"),
     ("SpoolClose", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0200"),
     (
         "SpoolOpenInput",
@@ -253,6 +258,11 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
+    ("WsaContextBuild", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0259"),
+    ("WsaContextDelete", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0260"),
+    ("WsaContextGet", "api", "web-service-control", False, f"{OFFICIAL_BASELINE}:api-commands:0261"),
+    ("WsaEprCreate", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0262"),
+
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
@@ -552,6 +562,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "HandleCondition",
         "IgnoreCondition",
         "InvokeApplication",
+        "InvokeService",
         "Load",
         "Release",
         "Link",
@@ -585,6 +596,9 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Read",
         "Rewrite",
         "SetAssociationUserCorrData",
+        "SoapFaultAdd",
+        "SoapFaultCreate",
+        "SoapFaultDelete",
         "SpoolClose",
         "SpoolOpenInput",
         "SpoolOpenOutput",
@@ -605,6 +619,10 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WaitJournalNum",
         "WriteJournalName",
         "WriteJournalNum",
+        "WsaContextBuild",
+        "WsaContextDelete",
+        "WsaContextGet",
+        "WsaEprCreate",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -686,6 +704,14 @@ TYPED_RUNTIME_IR_EFFECTS = {
             "transaction",
         }
     ),
+    "InvokeService": frozenset({"memory-read", "memory-write", "condition", "transaction", "program-control"}),
+    "SoapFaultAdd": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "SoapFaultCreate": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "SoapFaultDelete": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaContextBuild": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaContextDelete": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaContextGet": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaEprCreate": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Load": frozenset(
         {
             "memory-read",
@@ -1076,8 +1102,8 @@ def _load_typed_execution_registrations(
         "Cancel",
         "ChangeTask",
         "Delay",
-        "DeleteTransientData",
         "DeleteTemporaryStorage",
+        "DeleteTransientData",
         "Deq",
         "DocumentCreate",
         "DocumentDelete",
@@ -1092,15 +1118,19 @@ def _load_typed_execution_registrations(
         "HandleAid",
         "IgnoreCondition",
         "InvokeApplication",
+        "InvokeService",
         "Load",
         "PopHandle",
         "PurgeMessage",
         "PushHandle",
-        "ReadTransientData",
         "ReadTemporaryStorage",
+        "ReadTransientData",
         "Release",
         "ResetBrowse",
         "SetAssociationUserCorrData",
+        "SoapFaultAdd",
+        "SoapFaultCreate",
+        "SoapFaultDelete",
         "SpoolClose",
         "SpoolOpenInput",
         "SpoolOpenOutput",
@@ -1120,6 +1150,10 @@ def _load_typed_execution_registrations(
         "WriteJournalName",
         "WriteJournalNum",
         "WriteTemporaryStorage",
+        "WsaContextBuild",
+        "WsaContextDelete",
+        "WsaContextGet",
+        "WsaEprCreate",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized

@@ -23,6 +23,7 @@ mod storage_control;
 mod task_wait;
 mod terminal_control;
 mod transform_control;
+mod web_service_control;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
 pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
@@ -601,6 +602,14 @@ fn validate_operation_shape(
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::InvokeService
+        | CicsPlanOperation::SoapFaultAdd
+        | CicsPlanOperation::SoapFaultCreate
+        | CicsPlanOperation::SoapFaultDelete
+        | CicsPlanOperation::WsaContextBuild
+        | CicsPlanOperation::WsaContextDelete
+        | CicsPlanOperation::WsaContextGet
+        | CicsPlanOperation::WsaEprCreate => web_service_control::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::TransformDataToJson
         | CicsPlanOperation::TransformDataToXml
         | CicsPlanOperation::TransformJsonToData
@@ -4270,7 +4279,7 @@ mod tests {
         let mut operands = BTreeSet::new();
         let mut options = BTreeSet::new();
         let mut outputs = BTreeSet::new();
-        for tag in u16::from(u8::MIN)..=u16::from(u8::MAX) {
+        for tag in u16::MIN..=u16::MAX {
             if let Ok(value) = operation_from_tag(tag) {
                 assert!(operations.insert(value), "duplicate operation tag {tag}");
                 assert_eq!(operation_tag(value), tag);
@@ -4375,5 +4384,137 @@ mod tests {
         fn arbitrary_input_never_panics(bytes in prop::collection::vec(any::<u8>(), 0..4096)) {
             let _ = decode_cics_effect_plan(&bytes, CicsPlanLimits::default());
         }
+    }
+    #[test]
+    fn web_service_tag_envelopes_are_unique_round_trip_and_v1_safe() {
+        let operations = [
+            CicsPlanOperation::InvokeService,
+            CicsPlanOperation::SoapFaultAdd,
+            CicsPlanOperation::SoapFaultCreate,
+            CicsPlanOperation::SoapFaultDelete,
+            CicsPlanOperation::WsaContextBuild,
+            CicsPlanOperation::WsaContextDelete,
+            CicsPlanOperation::WsaContextGet,
+            CicsPlanOperation::WsaEprCreate,
+        ];
+        for (offset, operation) in operations.into_iter().enumerate() {
+            let tag = 140 + offset as u16;
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        let operands = [
+            CicsOperandName::Service,
+            CicsOperandName::ServiceOperation,
+            CicsOperandName::Uri,
+            CicsOperandName::UriMap,
+            CicsOperandName::Scope,
+            CicsOperandName::ScopeLen,
+            CicsOperandName::FaultCode,
+            CicsOperandName::FaultCodeStr,
+            CicsOperandName::FaultCodeLen,
+            CicsOperandName::FaultString,
+            CicsOperandName::FaultStrLen,
+            CicsOperandName::NatLang,
+            CicsOperandName::SoapRole,
+            CicsOperandName::RoleLength,
+            CicsOperandName::FaultActor,
+            CicsOperandName::FaultActLen,
+            CicsOperandName::Detail,
+            CicsOperandName::DetailLength,
+            CicsOperandName::FromCcsid,
+            CicsOperandName::SubcodeStr,
+            CicsOperandName::SubcodeLen,
+            CicsOperandName::ContextType,
+            CicsOperandName::Action,
+            CicsOperandName::MessageId,
+            CicsOperandName::RelatesUri,
+            CicsOperandName::RelatesType,
+            CicsOperandName::RelatesIndex,
+            CicsOperandName::EprType,
+            CicsOperandName::EprField,
+            CicsOperandName::EprFrom,
+            CicsOperandName::EprLength,
+            CicsOperandName::FromCodepage,
+            CicsOperandName::IntoCcsid,
+            CicsOperandName::IntoCodepage,
+            CicsOperandName::Address,
+            CicsOperandName::RefParms,
+            CicsOperandName::RefParmsLen,
+            CicsOperandName::Metadata,
+            CicsOperandName::MetadataLen,
+        ];
+        for (offset, operand) in operands.into_iter().enumerate() {
+            let tag = 512 + offset as u16;
+            assert_eq!(operand_tag(operand), tag);
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        for tag in 512 + operands.len() as u16..=575 {
+            assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        let outputs = [
+            CicsOutputName::WebAction,
+            CicsOutputName::WebMessageId,
+            CicsOutputName::WebRelatesUri,
+            CicsOutputName::WebRelatesType,
+            CicsOutputName::WebEprInto,
+            CicsOutputName::WebEprSet,
+            CicsOutputName::WebEprLength,
+        ];
+        for (offset, output) in outputs.into_iter().enumerate() {
+            let tag = 568 + offset as u16;
+            assert_eq!(output_tag(output), tag);
+            assert_eq!(output_from_tag(tag), Ok(output));
+        }
+        for tag in 568 + outputs.len() as u16..=631 {
+            assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 444..=507 {
+            assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        let length = slot(3, "EPR-LEN");
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WsaEprCreate,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::EprLength,
+                    value: CicsOperandValue::Storage(length.clone()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Address,
+                    value: CicsOperandValue::Literal(b"http://example.invalid".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::WebEprInto,
+                    target: slot(4, "EPR-OUT"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebEprLength,
+                    target: length,
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(&bytes[..6], b"MCEP\0\x02");
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut forged = plan;
+        forged.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::WebEprSet,
+            target: slot(5, "EPR-POINTER"),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&forged, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 }

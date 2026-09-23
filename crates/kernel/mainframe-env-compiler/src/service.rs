@@ -1652,6 +1652,14 @@ mod tests {
                 CicsPlanOperation::DocumentInsert => crate::HirCicsOperation::DocumentInsert,
                 CicsPlanOperation::DocumentRetrieve => crate::HirCicsOperation::DocumentRetrieve,
                 CicsPlanOperation::DocumentSet => crate::HirCicsOperation::DocumentSet,
+                CicsPlanOperation::InvokeService => crate::HirCicsOperation::InvokeService,
+                CicsPlanOperation::SoapFaultAdd => crate::HirCicsOperation::SoapFaultAdd,
+                CicsPlanOperation::SoapFaultCreate => crate::HirCicsOperation::SoapFaultCreate,
+                CicsPlanOperation::SoapFaultDelete => crate::HirCicsOperation::SoapFaultDelete,
+                CicsPlanOperation::WsaContextBuild => crate::HirCicsOperation::WsaContextBuild,
+                CicsPlanOperation::WsaContextDelete => crate::HirCicsOperation::WsaContextDelete,
+                CicsPlanOperation::WsaContextGet => crate::HirCicsOperation::WsaContextGet,
+                CicsPlanOperation::WsaEprCreate => crate::HirCicsOperation::WsaEprCreate,
                 CicsPlanOperation::TransformDataToJson => {
                     crate::HirCicsOperation::TransformDataToJson
                 }
