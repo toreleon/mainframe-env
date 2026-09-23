@@ -305,6 +305,7 @@ fn validate_plan(
                 | CicsOperandName::KeyLength
                 | CicsOperandName::ListLength
                 | CicsOperandName::MaximumLength
+                | CicsOperandName::RecordLength
         );
         if (numeric_length && matches!(&operand.value, CicsOperandValue::Literal(_)))
             || (!numeric_length && matches!(&operand.value, CicsOperandValue::LengthOf(_)))
@@ -459,6 +460,38 @@ fn validate_operation_shape(
                     (field.map(|operand| &operand.value), result),
                     (Some(CicsOperandValue::Storage(slot)), Some(binding)) if slot == &binding.target
                 )
+                || scheduling_options
+        }
+        CicsPlanOperation::BifDigest => {
+            let selectors = [
+                CicsPlanOption::DigestHex,
+                CicsPlanOption::DigestBinary,
+                CicsPlanOption::DigestBase64,
+            ]
+            .into_iter()
+            .filter(|selector| plan.options.contains(selector))
+            .count();
+            let record = plan.operands.iter().find(|operand| operand.name == CicsOperandName::Record);
+            let record_length = plan
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::RecordLength);
+            let digest_type = plan
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::DigestType);
+            !inputs.contains(&CicsOperandName::Record)
+                || !inputs.contains(&CicsOperandName::RecordLength)
+                || !inputs.is_subset(&BTreeSet::from([
+                    CicsOperandName::Record,
+                    CicsOperandName::RecordLength,
+                    CicsOperandName::DigestType,
+                ]))
+                || !matches!(record.map(|operand| &operand.value), Some(CicsOperandValue::Storage(_) | CicsOperandValue::Literal(_)))
+                || !matches!(record_length.map(|operand| &operand.value), Some(CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_) | CicsOperandValue::LengthOf(_)))
+                || digest_type.is_some_and(|operand| !matches!(&operand.value, CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)))
+                || selectors + usize::from(digest_type.is_some()) != 1
+                || !outputs.contains(&CicsOutputName::DigestResult)
                 || scheduling_options
         }
         CicsPlanOperation::ChangeTask => {
@@ -1361,6 +1394,52 @@ mod tests {
                 Err(CicsPlanCodecProblem::Malformed)
             );
         }
+    }
+
+    #[test]
+    fn bif_digest_uses_exclusive_v2_tag_ranges_and_exact_shape() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::BifDigest,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Record,
+                    value: CicsOperandValue::Storage(slot(1, "WORK.RECORD")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::RecordLength,
+                    value: CicsOperandValue::Integer(3),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::DigestHex]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::DigestResult,
+                target: slot(2, "WORK.RESULT"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[4..8], &[0, 2, 0, 156]);
+        for tag in [642u16, 643, 572, 697] {
+            assert!(encoded.windows(2).any(|bytes| bytes == tag.to_be_bytes()));
+        }
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits).unwrap(), encoded);
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut bad = plan;
+        bad.options.insert(CicsPlanOption::DigestBinary);
+        assert_eq!(
+            encode_cics_effect_plan(&bad, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        bad.options.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&bad, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     /// Issue #212: unrelated file and UOW plans reject extension flags.

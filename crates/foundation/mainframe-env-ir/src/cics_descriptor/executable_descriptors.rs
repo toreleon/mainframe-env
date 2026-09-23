@@ -3,7 +3,7 @@
 use super::*;
 
 /// Complete registry of executable typed CICS operations.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 75] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 76] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -600,6 +600,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 75] = [
         operation: CicsPlanOperation::BifDeedit,
         namespace: "cics.builtin",
         name: "deedit",
+        major: 1,
+        effects: BUILTIN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::BifDigest,
+        namespace: "cics.builtin",
+        name: "digest",
         major: 1,
         effects: BUILTIN_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

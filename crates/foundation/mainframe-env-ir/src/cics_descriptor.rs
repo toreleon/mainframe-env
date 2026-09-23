@@ -652,7 +652,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 75);
+        assert_eq!(typed.len(), 76);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -670,7 +670,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 188);
+        assert_eq!(unready.len(), 187);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -879,6 +879,7 @@ mod tests {
                 CicsPlanOperation::FormatTime,
                 CicsPlanOperation::ConvertTime,
                 CicsPlanOperation::BifDeedit,
+                CicsPlanOperation::BifDigest,
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,

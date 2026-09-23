@@ -17,6 +17,7 @@ pub(super) fn resolve(
         ["FORMATTIME"] => HirCicsOperation::FormatTime,
         ["CONVERTTIME"] => HirCicsOperation::ConvertTime,
         ["BIF", "DEEDIT"] => HirCicsOperation::BifDeedit,
+        ["BIF", "DIGEST"] => HirCicsOperation::BifDigest,
         ["FREEMAIN"] => HirCicsOperation::Freemain,
         ["GETMAIN"] => HirCicsOperation::Getmain,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
@@ -88,6 +89,9 @@ pub(super) fn resolve(
 
 pub(super) fn resolve_option(option: &str) -> HirCicsOption {
     match option {
+        "HEX" => HirCicsOption::DigestHex,
+        "BINARY" => HirCicsOption::DigestBinary,
+        "BASE64" => HirCicsOption::DigestBase64,
         "CANCEL" => HirCicsOption::Cancel,
         "NODUMP" => HirCicsOption::NoDump,
         "RESET" => HirCicsOption::Reset,

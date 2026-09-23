@@ -2365,6 +2365,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cics_bif_digest_resolves_source_format_and_result_extent() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BIFDIGEST. DATA DIVISION. WORKING-STORAGE SECTION. 01 HASH-X PIC X(40). PROCEDURE DIVISION. EXEC CICS BIF DIGEST RECORD('abc') RECORDLEN(3) HEX RESULT(HASH-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("BIF DIGEST: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed BIF DIGEST");
+        assert_eq!(command.operation, HirCicsOperation::BifDigest);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Record
+                && matches!(&operand.value, HirCicsValue::Literal(value) if value == "abc")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::DigestResult
+                && output.target.qualified_name == "HASH-X"
+        }));
+        for invalid_clause in [
+            "RECORD('abc') RECORDLEN(3) HEX BINARY RESULT(HASH-X)",
+            "RECORD('abc') RECORDLEN(3) DIGESTTYPE(DFHVALUE(UNKNOWN)) RESULT(HASH-X)",
+            "RECORD('abc') RECORDLEN(3) RESULT(HASH-X)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADHASH. DATA DIVISION. WORKING-STORAGE SECTION. 01 HASH-X PIC X(40). PROCEDURE DIVISION. EXEC CICS BIF DIGEST {invalid_clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {invalid_clause}");
+        }
+    }
+
     /// Issue #207: bare DATESEP and TIMESEP select the documented defaults.
     #[test]
     fn cics_formattime_bare_separators_lower_as_default_options() {

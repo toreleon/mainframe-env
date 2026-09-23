@@ -15,6 +15,8 @@ pub enum CicsOperation {
     Asktime,
     /// Remove editing characters from one numeric field in place.
     BifDeedit,
+    /// Calculate a bounded SHA-1 digest of caller supplied data.
+    BifDigest,
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
@@ -150,6 +152,7 @@ impl CicsOperation {
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
             Self::BifDeedit => "BifDeedit",
+            Self::BifDigest => "BifDigest",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
@@ -306,6 +309,7 @@ impl CicsOperation {
             }
             ("ASKTIME", _) => Self::AsktimeEib,
             ("BIF", Some("DEEDIT")) => Self::BifDeedit,
+            ("BIF", Some("DIGEST")) => Self::BifDigest,
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,

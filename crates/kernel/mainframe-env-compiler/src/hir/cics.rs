@@ -215,6 +215,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Abstime => CicsOperandName::Abstime,
                 HirCicsOperandName::DateString => CicsOperandName::DateString,
                 HirCicsOperandName::Field => CicsOperandName::Field,
+                HirCicsOperandName::Record => CicsOperandName::Record,
+                HirCicsOperandName::RecordLength => CicsOperandName::RecordLength,
+                HirCicsOperandName::DigestType => CicsOperandName::DigestType,
                 HirCicsOperandName::DateSep => CicsOperandName::DateSep,
                 HirCicsOperandName::TimeSep => CicsOperandName::TimeSep,
                 HirCicsOperandName::KeyLength => CicsOperandName::KeyLength,
@@ -317,6 +320,7 @@ impl PlanContext<'_> {
             name: match output.name {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::Field => CicsOutputName::Field,
+                HirCicsOutputName::DigestResult => CicsOutputName::DigestResult,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::SetPointer => CicsOutputName::SetPointer,
@@ -401,6 +405,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::FormatTime => CicsPlanOperation::FormatTime,
         HirCicsOperation::ConvertTime => CicsPlanOperation::ConvertTime,
         HirCicsOperation::BifDeedit => CicsPlanOperation::BifDeedit,
+        HirCicsOperation::BifDigest => CicsPlanOperation::BifDigest,
         HirCicsOperation::Cancel => CicsPlanOperation::Cancel,
         HirCicsOperation::Delay => CicsPlanOperation::Delay,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
@@ -473,6 +478,9 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
 
 const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
+        HirCicsOption::DigestHex => CicsPlanOption::DigestHex,
+        HirCicsOption::DigestBinary => CicsPlanOption::DigestBinary,
+        HirCicsOption::DigestBase64 => CicsPlanOption::DigestBase64,
         HirCicsOption::Cancel => CicsPlanOption::Cancel,
         HirCicsOption::NoDump => CicsPlanOption::NoDump,
         HirCicsOption::Reset => CicsPlanOption::Reset,

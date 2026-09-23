@@ -37,6 +37,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::FormatTime => 16,
         CicsPlanOperation::ConvertTime => 154,
         CicsPlanOperation::BifDeedit => 155,
+        CicsPlanOperation::BifDigest => 156,
         CicsPlanOperation::Abend => 17,
         CicsPlanOperation::HandleAbend => 18,
         CicsPlanOperation::Link => 19,
@@ -117,6 +118,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         16 => Ok(CicsPlanOperation::FormatTime),
         154 => Ok(CicsPlanOperation::ConvertTime),
         155 => Ok(CicsPlanOperation::BifDeedit),
+        156 => Ok(CicsPlanOperation::BifDigest),
         17 => Ok(CicsPlanOperation::Abend),
         18 => Ok(CicsPlanOperation::HandleAbend),
         19 => Ok(CicsPlanOperation::Link),
@@ -197,6 +199,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::Abstime => 15,
         CicsOperandName::DateString => 640,
         CicsOperandName::Field => 641,
+        CicsOperandName::Record => 642,
+        CicsOperandName::RecordLength => 643,
+        CicsOperandName::DigestType => 644,
         CicsOperandName::DateSep => 16,
         CicsOperandName::TimeSep => 17,
         CicsOperandName::Abcode => 18,
@@ -320,6 +325,9 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         15 => Ok(CicsOperandName::Abstime),
         640 => Ok(CicsOperandName::DateString),
         641 => Ok(CicsOperandName::Field),
+        642 => Ok(CicsOperandName::Record),
+        643 => Ok(CicsOperandName::RecordLength),
+        644 => Ok(CicsOperandName::DigestType),
         16 => Ok(CicsOperandName::DateSep),
         17 => Ok(CicsOperandName::TimeSep),
         18 => Ok(CicsOperandName::Abcode),
@@ -426,6 +434,9 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
 
 pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
     match value {
+        CicsPlanOption::DigestHex => 572,
+        CicsPlanOption::DigestBinary => 573,
+        CicsPlanOption::DigestBase64 => 574,
         CicsPlanOption::Update => 0,
         CicsPlanOption::Rollback => 1,
         CicsPlanOption::NoHandle => 2,
@@ -483,6 +494,9 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
 
 pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
+        572 => Ok(CicsPlanOption::DigestHex),
+        573 => Ok(CicsPlanOption::DigestBinary),
+        574 => Ok(CicsPlanOption::DigestBase64),
         0 => Ok(CicsPlanOption::Update),
         1 => Ok(CicsPlanOption::Rollback),
         2 => Ok(CicsPlanOption::NoHandle),
@@ -546,6 +560,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::Resp2 => 2,
         CicsOutputName::Abstime => 3,
         CicsOutputName::Field => 696,
+        CicsOutputName::DigestResult => 697,
         CicsOutputName::Milliseconds => 4,
         CicsOutputName::Mmddyy => 5,
         CicsOutputName::Mmddyyyy => 6,
@@ -594,6 +609,7 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         2 => Ok(CicsOutputName::Resp2),
         3 => Ok(CicsOutputName::Abstime),
         696 => Ok(CicsOutputName::Field),
+        697 => Ok(CicsOutputName::DigestResult),
         4 => Ok(CicsOutputName::Milliseconds),
         5 => Ok(CicsOutputName::Mmddyy),
         6 => Ok(CicsOutputName::Mmddyyyy),

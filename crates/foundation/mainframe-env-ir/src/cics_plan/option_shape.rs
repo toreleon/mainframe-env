@@ -2,6 +2,13 @@ use super::{CicsEffectPlan, CicsPlanOperation, CicsPlanOption};
 
 pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
     plan.options.iter().any(|option| match plan.operation {
+        CicsPlanOperation::BifDigest => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::DigestHex
+                | CicsPlanOption::DigestBinary
+                | CicsPlanOption::DigestBase64
+        ),
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

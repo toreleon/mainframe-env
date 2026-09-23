@@ -4,6 +4,7 @@ use mainframe_env_ir::CicsAssignOutput;
 pub enum HirCicsOutputName {
     Abstime,
     Field,
+    DigestResult,
     Commarea,
     Into,
     SetPointer,

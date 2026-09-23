@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 77);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 78);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 77);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 78);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -12628,6 +12628,124 @@ mod tests {
                     response: 22,
                     response2: 0,
                 })
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bif_digest_formats_and_conditions_agree_on_memory_and_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bif-digest-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let stores: [Arc<dyn ProviderStateStore>; 2] = [
+            Arc::new(MemoryStore::new(Default::default())),
+            Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap()),
+        ];
+        for store in stores {
+            let cics = service(store);
+            let (invocation, _) = registered(&cics);
+            for (sequence, format, expected) in [
+                (
+                    1,
+                    "DIGESTHEX",
+                    b"A9993E364706816ABA3E25717850C26C9CD0D89D".as_slice(),
+                ),
+                (
+                    2,
+                    "DIGESTBINARY",
+                    &[
+                        0xa9, 0x99, 0x3e, 0x36, 0x47, 0x06, 0x81, 0x6a, 0xba, 0x3e, 0x25, 0x71,
+                        0x78, 0x50, 0xc2, 0x6c, 0x9c, 0xd0, 0xd8, 0x9d,
+                    ],
+                ),
+                (
+                    3,
+                    "DIGESTBASE64",
+                    b"qZk+NkcGgWq6PiVxeFDCbJzQ2J0=".as_slice(),
+                ),
+            ] {
+                let valid = request(
+                    CicsOperation::BifDigest,
+                    BTreeMap::from([
+                        ("RECORD".into(), enqueue_value(b"abcTRAIL")),
+                        ("RECORDLEN".into(), cics_decimal(3)),
+                        ("RESULT".into(), argument(b"HASH-X")),
+                        ("RESULT.MAXLENGTH".into(), cics_decimal(40)),
+                        (format!("OPTION.{format}"), cics_option()),
+                    ]),
+                    sequence,
+                );
+                let result = cics
+                    .invoke(
+                        &effect(&invocation.run_unit_id, valid.clone(), sequence),
+                        valid,
+                    )
+                    .unwrap();
+                assert_eq!(result.outputs["RESULT"].bytes(), expected);
+            }
+            let invalid = request(
+                CicsOperation::BifDigest,
+                BTreeMap::from([
+                    ("RECORD".into(), enqueue_value(b"abc")),
+                    ("RECORDLEN".into(), cics_decimal(0)),
+                    ("RESULT".into(), argument(b"HASH-X")),
+                ]),
+                4,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), 4),
+                    invalid
+                ),
+                Err(HostProblem::Condition {
+                    name: "LENGERR".into(),
+                    response: 22,
+                    response2: 2
+                })
+            );
+            let invalid_type = request(
+                CicsOperation::BifDigest,
+                BTreeMap::from([
+                    ("RECORD".into(), enqueue_value(b"abc")),
+                    ("RECORDLEN".into(), cics_decimal(3)),
+                    ("DIGESTTYPE".into(), cics_literal(b"UNKNOWN")),
+                    ("RESULT".into(), argument(b"HASH-X")),
+                ]),
+                5,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, invalid_type.clone(), 5),
+                    invalid_type
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 1
+                })
+            );
+            let short_target = request(
+                CicsOperation::BifDigest,
+                BTreeMap::from([
+                    ("RECORD".into(), enqueue_value(b"abc")),
+                    ("RECORDLEN".into(), cics_decimal(3)),
+                    ("RESULT".into(), argument(b"HASH-X")),
+                    ("RESULT.MAXLENGTH".into(), cics_decimal(19)),
+                    ("OPTION.DIGESTBINARY".into(), cics_option()),
+                ]),
+                6,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, short_target.clone(), 6),
+                    short_target
+                ),
+                Err(HostProblem::Malformed)
             );
         }
         std::fs::remove_dir_all(root).unwrap();

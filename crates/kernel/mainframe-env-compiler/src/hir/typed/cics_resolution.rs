@@ -454,22 +454,24 @@ fn option_value_shape(
     descriptor: &CicsApplicationRegistryDescriptor,
     name: &str,
 ) -> Option<CicsApplicationOptionValueShape> {
-    journal_control::option_value_shape(descriptor, name).or_else(|| {
-        descriptor
-            .options
-            .iter()
-            .find(|option| option.name == name)
-            .map(|option| option.value_shape)
-            .or_else(|| {
-                compatibility_alias_target(descriptor, name).and_then(|canonical| {
-                    descriptor
-                        .options
-                        .iter()
-                        .find(|option| option.name == canonical)
-                        .map(|option| option.value_shape)
+    builtin_function::option_value_shape(descriptor, name)
+        .or_else(|| journal_control::option_value_shape(descriptor, name))
+        .or_else(|| {
+            descriptor
+                .options
+                .iter()
+                .find(|option| option.name == name)
+                .map(|option| option.value_shape)
+                .or_else(|| {
+                    compatibility_alias_target(descriptor, name).and_then(|canonical| {
+                        descriptor
+                            .options
+                            .iter()
+                            .find(|option| option.name == canonical)
+                            .map(|option| option.value_shape)
+                    })
                 })
-            })
-    })
+        })
 }
 
 fn compatibility_alias_target(
@@ -600,6 +602,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ],
         HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::BifDeedit => &["FIELD", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::BifDigest => &[
+            "RECORD",
+            "RECORDLEN",
+            "DIGESTTYPE",
+            "RESULT",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -751,6 +761,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
         HirCicsOperation::ConvertTime => &["NOHANDLE"],
         HirCicsOperation::BifDeedit => &["NOHANDLE"],
+        HirCicsOperation::BifDigest => &["HEX", "BINARY", "BASE64", "NOHANDLE"],
         HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
         HirCicsOperation::SendMap => &[
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
@@ -830,6 +841,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
         HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME"][..],
         HirCicsOperation::BifDeedit => &["FIELD"][..],
+        HirCicsOperation::BifDigest => &["RECORD", "RECORDLEN", "RESULT"][..],
         HirCicsOperation::Abend
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -1061,9 +1073,19 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::BifDeedit {
         operands.extend(builtin_function::deedit_operands(&clauses, semantic)?);
     }
+    if operation == HirCicsOperation::BifDigest {
+        operands.extend(builtin_function::digest_operands(&clauses, semantic)?);
+    }
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
     if operation == HirCicsOperation::BifDeedit {
         outputs.push(builtin_function::deedit_output(&clauses, semantic)?);
+    }
+    if operation == HirCicsOperation::BifDigest {
+        outputs.push(builtin_function::digest_output(
+            &clauses,
+            &raw_options,
+            semantic,
+        )?);
     }
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);

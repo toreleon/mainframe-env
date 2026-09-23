@@ -118,6 +118,7 @@ pub(super) fn require_output_shape(
             }
         }
         HirCicsOutputName::Field
+        | HirCicsOutputName::DigestResult
         | HirCicsOutputName::Commarea
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer

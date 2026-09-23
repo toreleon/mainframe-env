@@ -46,6 +46,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::DateString => SlotUse::DateStringInput,
         CicsOperandName::Field => SlotUse::Input,
+        CicsOperandName::Record => SlotUse::Input,
+        CicsOperandName::RecordLength => SlotUse::FullwordInput,
+        CicsOperandName::DigestType => SlotUse::Input,
         CicsOperandName::MajorVersion | CicsOperandName::MinorVersion => SlotUse::FullwordInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
@@ -103,6 +106,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Field => SlotUse::Output,
+        CicsOutputName::DigestResult => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::SetPointer => SlotUse::PointerOutput,
         CicsOutputName::SetPointer64 => SlotUse::Pointer64Output,
@@ -148,6 +152,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::FormatTime => CicsOperation::FormatTime,
         CicsPlanOperation::ConvertTime => CicsOperation::ConvertTime,
         CicsPlanOperation::BifDeedit => CicsOperation::BifDeedit,
+        CicsPlanOperation::BifDigest => CicsOperation::BifDigest,
         CicsPlanOperation::Cancel => CicsOperation::Cancel,
         CicsPlanOperation::Delay => CicsOperation::Delay,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
@@ -255,6 +260,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Abstime => "ABSTIME",
         CicsOperandName::DateString => "DATESTRING",
         CicsOperandName::Field => "FIELD",
+        CicsOperandName::Record => "RECORD",
+        CicsOperandName::RecordLength => "RECORDLEN",
+        CicsOperandName::DigestType => "DIGESTTYPE",
         CicsOperandName::DateSep => "DATESEP",
         CicsOperandName::TimeSep => "TIMESEP",
         CicsOperandName::KeyLength => "KEYLENGTH",
@@ -345,6 +353,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
         CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Field => "FIELD",
+        CicsOutputName::DigestResult => "RESULT",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
         CicsOutputName::SetPointer => "SET",
@@ -384,6 +393,9 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::DigestHex => "DIGESTHEX",
+        CicsPlanOption::DigestBinary => "DIGESTBINARY",
+        CicsPlanOption::DigestBase64 => "DIGESTBASE64",
         CicsPlanOption::Cancel => "CANCEL",
         CicsPlanOption::NoDump => "NODUMP",
         CicsPlanOption::Reset => "RESET",

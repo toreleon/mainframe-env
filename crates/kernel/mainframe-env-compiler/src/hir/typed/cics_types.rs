@@ -13,6 +13,7 @@ pub enum HirCicsOperation {
     FormatTime,
     ConvertTime,
     BifDeedit,
+    BifDigest,
     Freemain,
     Getmain,
     Cancel,
@@ -118,6 +119,9 @@ pub enum HirCicsOperandName {
     Abstime,
     DateString,
     Field,
+    Record,
+    RecordLength,
+    DigestType,
     DateSep,
     TimeSep,
     KeyLength,
@@ -215,6 +219,9 @@ pub struct HirCicsNamedOperand {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOption {
+    DigestHex,
+    DigestBinary,
+    DigestBase64,
     Cancel,
     NoDump,
     Reset,

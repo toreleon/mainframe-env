@@ -10,6 +10,7 @@ impl Canonical for CicsOperation {
             Self::AddressSet => out.variant("CicsOperation", "AddressSet", 0),
             Self::Asktime => out.variant("CicsOperation", "Asktime", 0),
             Self::BifDeedit => out.variant("CicsOperation", "BifDeedit", 0),
+            Self::BifDigest => out.variant("CicsOperation", "BifDigest", 0),
             Self::AsktimeEib => out.variant("CicsOperation", "AsktimeEib", 0),
             Self::Assign => out.variant("CicsOperation", "Assign", 0),
             Self::Cancel => out.variant("CicsOperation", "Cancel", 0),

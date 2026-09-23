@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `BIF DIGEST` for row `0014`. An explicit HEX, BINARY,
+  BASE64, or named DIGESTTYPE selector returns the reviewed SHA-1 representation
+  into a bounded caller result area. Bad record lengths and selectors return
+  their source conditions. MCEP v2 uses operation tag 156, operand tags
+  642–644, option tags 572–574, and output tag 697.
+
 - Added typed CICS `BIF DEEDIT` for row `0013`. The command edits caller-owned
   character storage in place, removes editing bytes, right-aligns digits,
   preserves terminal zoned overpunch, and returns `LENGERR` for an invalid

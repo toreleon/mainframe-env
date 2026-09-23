@@ -14,6 +14,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Field | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::BifDigest => matches!(
+            output,
+            CicsOutputName::DigestResult | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

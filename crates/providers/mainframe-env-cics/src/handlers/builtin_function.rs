@@ -4,6 +4,7 @@ use super::super::{CicsService, Run, bounded};
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
+mod digest;
 
 pub(super) fn invoke(
     service: &CicsService,
@@ -12,6 +13,7 @@ pub(super) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::BifDeedit => deedit_request(service, run, request),
+        CicsOperation::BifDigest => digest::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

@@ -286,6 +286,7 @@
     "handler_modules": [
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
       "crates/providers/mainframe-env-cics/src/handlers/builtin_function.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/builtin_function/digest.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/insert.rs",

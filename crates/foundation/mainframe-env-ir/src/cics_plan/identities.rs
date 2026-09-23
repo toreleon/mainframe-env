@@ -19,6 +19,8 @@ pub enum CicsPlanOperation {
     ConvertTime,
     /// Remove editing characters from one EBCDIC numeric field in place.
     BifDeedit,
+    /// Compute a source-bounded SHA-1 digest in one of three representations.
+    BifDigest,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -228,6 +230,12 @@ pub enum CicsOperandName {
     DateString,
     /// `FIELD(...)` in-place built-in DEEDIT source.
     Field,
+    /// `RECORD(...)` source for BIF DIGEST.
+    Record,
+    /// `RECORDLEN(...)` source byte count for BIF DIGEST.
+    RecordLength,
+    /// `DIGESTTYPE(...)` named CVDA selector for BIF DIGEST.
+    DigestType,
     /// Optional one-byte date separator.
     DateSep,
     /// Optional one-byte time separator.
@@ -394,6 +402,12 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    /// Return a 40-byte uppercase hexadecimal SHA-1 digest.
+    DigestHex,
+    /// Return a 20-byte binary SHA-1 digest.
+    DigestBinary,
+    /// Return a 28-byte base64 SHA-1 digest.
+    DigestBase64,
     /// Ignore and clear active abnormal-termination exits.
     Cancel,
     /// Suppress transaction-dump creation.
@@ -519,6 +533,8 @@ pub enum CicsOutputName {
     Abstime,
     /// In-place `FIELD(...)` result of BIF DEEDIT.
     Field,
+    /// `RESULT(...)` destination of BIF DIGEST.
+    DigestResult,
     /// `MILLISECONDS(...)` fullword-binary destination.
     Milliseconds,
     /// `MMDDYY(...)` character destination.
