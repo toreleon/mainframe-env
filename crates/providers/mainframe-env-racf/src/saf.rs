@@ -2813,7 +2813,7 @@ mod tests {
             Some(RacrouteResult::PassTicketIssued {
                 ticket: Some(ticket),
                 ..
-            }) => *ticket.bytes(),
+            }) => ticket.bytes().to_vec(),
             other => panic!("expected ticket: {other:?}"),
         };
         assert!(ticket.iter().all(u8::is_ascii_alphanumeric));
@@ -2836,7 +2836,7 @@ mod tests {
             ),
             Err(HostProblem::IdempotencyConflict)
         );
-        resolver.insert("secret:ticket", ticket.to_vec());
+        resolver.insert("secret:ticket", ticket.clone());
         let redeem = RacrouteRequest::RedeemPassTicket {
             user: admin.clone(),
             application: "APP1".into(),
@@ -2917,7 +2917,7 @@ mod tests {
                 Some(RacrouteResult::PassTicketIssued {
                     ticket: Some(ticket),
                     ..
-                }) => *ticket.bytes(),
+                }) => ticket.bytes().to_vec(),
                 other => panic!("ticket missing: {other:?}"),
             }
         };
@@ -2933,7 +2933,7 @@ mod tests {
             let serialized =
                 serde_json::to_string(&service.database.read().unwrap().transactions).unwrap();
             assert!(!serialized.contains(std::str::from_utf8(&ticket).unwrap()));
-            resolver.insert("secret:sqlite-ticket", ticket.to_vec());
+            resolver.insert("secret:sqlite-ticket", ticket.clone());
             let redeemed = service
                 .racroute(
                     &saf_context(&admin, None, "REDEEM-SQLITE-TICKET", 6),

@@ -131,6 +131,8 @@ pub enum CicsOperation {
     PurgeMessage,
     /// Query a task or surrogate user's SAF resource access levels.
     QuerySecurity,
+    /// Request one bounded RACF PassTicket for the current task principal.
+    RequestPassTicket,
     Read,
     ReadNext,
     ReadPrev,
@@ -353,6 +355,7 @@ impl CicsOperation {
             Self::PushHandle => "PushHandle",
             Self::PurgeMessage => "PurgeMessage",
             Self::QuerySecurity => "QuerySecurity",
+            Self::RequestPassTicket => "RequestPassTicket",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
@@ -674,6 +677,7 @@ impl CicsOperation {
             ("PUSH", Some("HANDLE")) => Self::PushHandle,
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("QUERY", Some("SECURITY")) => Self::QuerySecurity,
+            ("REQUEST", Some("PASSTICKET")) => Self::RequestPassTicket,
             ("READ", _) => Self::Read,
             ("READQ", Some("TD")) => Self::ReadTransientData,
             ("REMOVE", Some("SUBEVENT")) => Self::RemoveSubevent,

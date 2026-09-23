@@ -3,10 +3,11 @@
 use super::*;
 use mainframe_env_cics::{
     CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
-    CicsCredentialRequest, CicsCredentialVerification, CicsSecurityAccess,
-    CicsSecurityAccessReason, CicsSecurityAuthority,
+    CicsCredentialRequest, CicsCredentialVerification, CicsPassTicketFailure,
+    CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess, CicsSecurityAccessReason,
+    CicsSecurityAuthority,
 };
-use mainframe_env_execution_api::PrincipalId;
+use mainframe_env_execution_api::{BoundedPayload, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_racf::{
     AccessEnvironment, AccessLevel, CredentialFailure, CredentialKind, DecisionReason, RacfService,
@@ -159,6 +160,69 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
             },
         )?;
         map_credential_outcome(outcome)
+    }
+
+    fn issue_passticket(
+        &self,
+        request: CicsPassTicketRequest<'_>,
+    ) -> Result<CicsPassTicketOutcome, HostProblem> {
+        let context = SafRequestContext::new(
+            request.actor.clone(),
+            None,
+            None,
+            request.idempotency_key,
+            request.correlation,
+            request.tick,
+        )?;
+        let outcome = self.racf.racroute(
+            &context,
+            RacrouteRequest::IssuePassTicket {
+                application: request.application.into(),
+                binding_digest: request.binding_digest,
+            },
+        )?;
+        let (ticket, failure) = match outcome.result {
+            Some(RacrouteResult::PassTicketIssued { ticket, .. })
+                if outcome.status.reason == DecisionReason::Granted =>
+            {
+                (
+                    Some(
+                        BoundedPayload::new(
+                            "mainframe-env.cics.secret@1",
+                            ticket.ok_or(HostProblem::UnknownOutcome)?.into_bytes(),
+                            InvocationLimits::default(),
+                        )
+                        .map_err(|_| HostProblem::ResourceExhausted)?,
+                    ),
+                    None,
+                )
+            }
+            Some(RacrouteResult::PassTicketIssued { origin_denied, .. }) => {
+                let failure = if matches!(
+                    outcome.status.reason,
+                    DecisionReason::PolicyUnavailable | DecisionReason::StoreUnavailable
+                ) {
+                    CicsPassTicketFailure::SecurityUnavailable
+                } else if origin_denied {
+                    CicsPassTicketFailure::RegionDenied
+                } else if outcome.status.reason == DecisionReason::ClassInactive {
+                    CicsPassTicketFailure::Unsupported
+                } else {
+                    CicsPassTicketFailure::TargetDenied
+                };
+                (None, Some(failure))
+            }
+            None if outcome.status.reason == DecisionReason::CredentialInvalid => {
+                (None, Some(CicsPassTicketFailure::DefaultUser))
+            }
+            _ => return Err(HostProblem::ProviderFailure),
+        };
+        Ok(CicsPassTicketOutcome {
+            ticket,
+            failure,
+            esm_response: i64::from(outcome.status.racf_return_code),
+            esm_reason: i64::from(outcome.status.racf_reason_code),
+        })
     }
 }
 

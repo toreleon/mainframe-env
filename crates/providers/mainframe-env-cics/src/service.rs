@@ -31454,6 +31454,12 @@ mod tests {
         ) -> Result<crate::CicsCredentialVerification, HostProblem> {
             Err(HostProblem::Unsupported)
         }
+        fn issue_passticket(
+            &self,
+            _: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
     }
 
     #[test]
@@ -33980,6 +33986,12 @@ mod tests {
                 esm_reason: 0,
             })
         }
+        fn issue_passticket(
+            &self,
+            _: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
     }
 
     fn change_phrase_request(sequence: u64) -> CicsRequest {
@@ -34072,6 +34084,185 @@ mod tests {
             ("INVREQ", 16, 2)
         );
         assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    struct FixedPassTicketAuthority {
+        calls: Arc<AtomicUsize>,
+        failure: Option<crate::CicsPassTicketFailure>,
+        cancel: Option<mainframe_env_execution_api::CancellationProbe>,
+    }
+
+    impl crate::CicsSecurityAuthority for FixedPassTicketAuthority {
+        fn query_access(
+            &self,
+            _: &PrincipalId,
+            _: &PrincipalId,
+            _: &str,
+            _: &str,
+            _: u64,
+            _: &str,
+        ) -> Result<crate::CicsSecurityAccess, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn verify_credential(
+            &self,
+            _: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn change_credential(
+            &self,
+            _: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn issue_passticket(
+            &self,
+            request: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            assert_eq!(request.actor.as_str(), "IBMUSER");
+            assert_eq!(request.application, "APP1");
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(cancel) = &self.cancel {
+                cancel.request();
+            }
+            Ok(crate::CicsPassTicketOutcome {
+                ticket: self.failure.is_none().then(|| {
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"ABCDEFGH".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap()
+                }),
+                failure: self.failure,
+                esm_response: if self.failure.is_some() { 8 } else { 0 },
+                esm_reason: 0,
+            })
+        }
+    }
+
+    fn passticket_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::RequestPassTicket,
+            BTreeMap::from([
+                (
+                    "ESMAPPNAME".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.storage-value@1",
+                        b"APP1    ".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("PASSTICKET".into(), argument(b"TICKET-X")),
+                ("ESMRESP".into(), argument(b"ESM-X")),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    #[test]
+    fn passticket_provider_replays_output_and_rejects_bad_application_before_saf() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = passticket_request(19);
+        let bound_effect = effect(&invocation.run_unit_id, request.clone(), 19);
+        let first = service.invoke(&bound_effect, request.clone()).unwrap();
+        assert_eq!(first.outputs["PASSTICKET"].bytes(), b"ABCDEFGH");
+        assert_eq!(
+            first.outputs["PASSTICKET"].schema(),
+            "mainframe-env.cics.secret@1"
+        );
+        assert_eq!(service.invoke(&bound_effect, request).unwrap(), first);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let mut invalid = passticket_request(20);
+        invalid.arguments.insert(
+            "ESMAPPNAME".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.storage-value@1",
+                b"BAD APP ".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let rejected = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 20),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (rejected.condition.as_str(), rejected.response2),
+            ("INVREQ", 247)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn passticket_provider_maps_denial_and_postdispatch_cancellation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let denied_service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        denied_service
+            .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                calls: calls.clone(),
+                failure: Some(crate::CicsPassTicketFailure::TargetDenied),
+                cancel: None,
+            }))
+            .unwrap();
+        let (denial_invocation, _) = registered(&denied_service);
+        let request = passticket_request(21);
+        let denied = denied_service
+            .invoke(
+                &effect(&denial_invocation.run_unit_id, request.clone(), 21),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (denied.condition.as_str(), denied.response2),
+            ("NOTAUTH", 250)
+        );
+        assert!(!denied.outputs.contains_key("PASSTICKET"));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let other: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(other);
+        let cancel = mainframe_env_execution_api::CancellationProbe::new();
+        service
+            .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                calls: Arc::new(AtomicUsize::new(0)),
+                failure: None,
+                cancel: Some(cancel.clone()),
+            }))
+            .unwrap();
+        let invocation = invocation().with_cancellation_probe(cancel);
+        let session = SessionId::new("ticket-cancel", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let request = passticket_request(22);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 22),
+                request
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
     }
 
     #[test]

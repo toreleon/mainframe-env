@@ -64,6 +64,14 @@ pub(super) const CHANGE_PHRASE_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const PASSTICKET_CLAUSES: &[&str] = &[
+    "PASSTICKET",
+    "ESMAPPNAME",
+    "ESMRESP",
+    "ESMREASON",
+    "RESP",
+    "RESP2",
+];
 pub(super) const VERIFY_PHRASE_CLAUSES: &[&str] = &[
     "PHRASE",
     "PHRASELEN",
@@ -93,6 +101,9 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::ChangePhrase {
         return validate_change_phrase(clauses, semantic);
+    }
+    if operation == HirCicsOperation::RequestPassTicket {
+        return validate_passticket(clauses, semantic);
     }
     if operation == HirCicsOperation::VerifyPhrase {
         return validate_verify_phrase(clauses, semantic);
@@ -155,6 +166,17 @@ pub(super) fn operands(
     if operation == HirCicsOperation::ChangePhrase {
         return change_phrase_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::RequestPassTicket {
+        let HirCicsValue::Data(application) = cics_value(&clauses["ESMAPPNAME"], semantic)? else {
+            return Err(ResolutionFailure::Invalid(
+                "CICS REQUEST PASSTICKET ESMAPPNAME requires storage".into(),
+            ));
+        };
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::SecurityEsmAppName,
+            value: HirCicsValue::Data(application),
+        }]);
+    }
     if operation == HirCicsOperation::VerifyPhrase {
         return verify_phrase_operands(clauses, semantic);
     }
@@ -194,6 +216,9 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation == HirCicsOperation::RequestPassTicket {
+        return passticket_outputs(clauses, semantic);
+    }
     if matches!(
         operation,
         HirCicsOperation::VerifyPassword
@@ -217,6 +242,69 @@ pub(super) fn outputs(
             let reference = complete_data_reference(value, semantic)?;
             require_writable(&reference)?;
             fullword(&reference, name)?;
+            out.push(HirCicsOutputBinding {
+                name: identity,
+                target: reference,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn validate_passticket(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    if !clauses.contains_key("PASSTICKET") || !clauses.contains_key("ESMAPPNAME") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS REQUEST PASSTICKET requires PASSTICKET and ESMAPPNAME".into(),
+        ));
+    }
+    for name in ["PASSTICKET", "ESMAPPNAME"] {
+        if name == "ESMAPPNAME"
+            && !matches!(cics_value(&clauses[name], semantic)?, HirCicsValue::Data(_))
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS REQUEST PASSTICKET ESMAPPNAME requires storage".into(),
+            ));
+        }
+        let reference = complete_data_reference(&clauses[name], semantic)?;
+        if reference.length != 8
+            || !matches!(
+                reference.category,
+                DataCategory::Alphabetic | DataCategory::Alphanumeric
+            )
+        {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS REQUEST PASSTICKET {name} requires an 8-character data area"
+            )));
+        }
+        if name == "PASSTICKET" {
+            require_writable(&reference)?;
+        }
+    }
+    Ok(())
+}
+
+fn passticket_outputs(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    let mut out = Vec::new();
+    for (name, identity) in [
+        ("PASSTICKET", HirCicsOutputName::SecurityPassTicket),
+        ("ESMRESP", HirCicsOutputName::SecurityEsmResp),
+        ("ESMREASON", HirCicsOutputName::SecurityEsmReason),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            let reference = complete_data_reference(value, semantic)?;
+            require_writable(&reference)?;
+            if name == "PASSTICKET" {
+                if reference.length != 8 {
+                    return Err(ResolutionFailure::Invalid(
+                        "CICS REQUEST PASSTICKET output must be eight characters".into(),
+                    ));
+                }
+            } else {
+                fullword(&reference, name)?;
+            }
             out.push(HirCicsOutputBinding {
                 name: identity,
                 target: reference,

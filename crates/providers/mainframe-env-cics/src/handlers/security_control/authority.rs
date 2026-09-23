@@ -1,7 +1,7 @@
 //! Narrow bridge from CICS application security commands to the installed SAF authority.
 
 use crate::service::CicsService;
-use mainframe_env_execution_api::PrincipalId;
+use mainframe_env_execution_api::{BoundedPayload, PrincipalId};
 use mainframe_env_host_api::HostProblem;
 use std::sync::Arc;
 
@@ -86,6 +86,49 @@ pub struct CicsCredentialChangeRequest<'a> {
     pub tick: u64,
 }
 
+/// Borrowed CICS PassTicket issuance request bound to one durable SAF effect.
+pub struct CicsPassTicketRequest<'a> {
+    /// Task principal for which the ticket is issued.
+    pub actor: &'a PrincipalId,
+    /// Destination ESM application profile.
+    pub application: &'a str,
+    /// Digest of the complete canonical CICS request.
+    pub binding_digest: [u8; 32],
+    /// Durable replay identity.
+    pub idempotency_key: &'a str,
+    /// Redacted SAF audit correlation.
+    pub correlation: &'a str,
+    /// Observed finite logical time.
+    pub tick: u64,
+}
+
+/// Source-distinct PassTicket issuance failure.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsPassTicketFailure {
+    /// The task is running under a default or credentialless principal.
+    DefaultUser,
+    /// The issuing region lacks SAF generation authority.
+    RegionDenied,
+    /// The user/application pair lacks a PTKTDATA grant.
+    TargetDenied,
+    /// The external security interface is inactive.
+    SecurityUnavailable,
+    /// PassTicket generation is not available from the active policy.
+    Unsupported,
+}
+
+/// Redacted ticket or denial returned by the installed RACF adapter.
+pub struct CicsPassTicketOutcome {
+    /// Secret-tagged ticket output, present only on success.
+    pub ticket: Option<BoundedPayload>,
+    /// Source-distinct failure, absent on success.
+    pub failure: Option<CicsPassTicketFailure>,
+    /// ESM response code.
+    pub esm_response: i64,
+    /// ESM reason code.
+    pub esm_reason: i64,
+}
+
 /// Source-distinct SAF credential failures used for CICS condition translation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsCredentialFailure {
@@ -163,6 +206,12 @@ pub trait CicsSecurityAuthority: Send + Sync {
         &self,
         request: CicsCredentialChangeRequest<'_>,
     ) -> Result<CicsCredentialVerification, HostProblem>;
+
+    /// Authorize and issue one bounded, one-use PassTicket through SAF.
+    fn issue_passticket(
+        &self,
+        request: CicsPassTicketRequest<'_>,
+    ) -> Result<CicsPassTicketOutcome, HostProblem>;
 }
 
 impl CicsService {

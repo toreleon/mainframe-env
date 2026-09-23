@@ -210,6 +210,8 @@ pub enum CicsPlanOperation {
     Assign,
     /// Query source-defined SAF access levels for a CICS or named resource.
     QuerySecurity,
+    /// Issue a one-use PassTicket for the current task principal.
+    RequestPassTicket,
     /// Verify a standard password through the installed SAF authority.
     VerifyPassword,
     /// Verify a password or phrase selected by its explicit length.

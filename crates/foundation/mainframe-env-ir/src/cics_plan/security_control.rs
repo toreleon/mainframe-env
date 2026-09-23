@@ -222,3 +222,30 @@ pub(super) fn invalid_change_phrase_shape(
             ),
         })
 }
+
+pub(super) fn invalid_request_passticket_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    inputs != &BTreeSet::from([CicsOperandName::SecurityEsmAppName])
+        || !outputs.contains(&CicsOutputName::SecurityPassTicket)
+        || outputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOutputName::SecurityPassTicket
+                    | CicsOutputName::SecurityEsmResp
+                    | CicsOutputName::SecurityEsmReason
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || plan
+            .operands
+            .iter()
+            .any(|operand| !matches!(operand.value, CicsOperandValue::Storage(_)))
+}

@@ -7,13 +7,19 @@ use zeroize::Zeroize;
 
 /// Eight-character one-use ticket returned only to the issuing CICS call.
 #[derive(Clone, Eq, PartialEq)]
-pub struct IssuedPassTicket([u8; 8]);
+pub struct IssuedPassTicket(Vec<u8>);
 
 impl IssuedPassTicket {
     /// Borrow the ticket bytes for the single scoped output assignment.
     #[must_use]
-    pub fn bytes(&self) -> &[u8; 8] {
+    pub fn bytes(&self) -> &[u8] {
         &self.0
+    }
+
+    /// Move clear bytes into the single zeroizing CICS output allocation.
+    #[must_use]
+    pub fn into_bytes(mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0)
     }
 }
 
@@ -518,7 +524,7 @@ pub(super) fn issue_passticket(
     let key = hmac::Key::new(hmac::HMAC_SHA256, verifier.encoded_verifier.as_bytes());
     let tag = hmac::sign(&key, &input);
     const ALPHABET: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let mut ticket = [0; 8];
+    let mut ticket = vec![0; 8];
     for (position, byte) in ticket.iter_mut().zip(tag.as_ref()) {
         *position = ALPHABET[usize::from(*byte & 31)];
     }
@@ -660,7 +666,7 @@ fn passticket_digest(
     verifier: &CredentialVerifier,
     user: &str,
     application: &str,
-    ticket: &[u8; 8],
+    ticket: &[u8],
 ) -> String {
     let mut input = Vec::new();
     input.extend_from_slice(b"mainframe-env.passticket.digest@1\0");

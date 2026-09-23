@@ -7934,6 +7934,38 @@ mod tests {
     }
 
     #[test]
+    fn cics_request_passticket_requires_eight_character_input_and_output_areas() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. PTKT. DATA DIVISION. WORKING-STORAGE SECTION. 01 APP-X PIC X(8) VALUE 'APP1'. 01 TICKET-X PIC X(8). 01 ESM-X PIC S9(9) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(TICKET-X) ESMAPPNAME(APP-X) ESMRESP(ESM-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("REQUEST PASSTICKET: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed REQUEST PASSTICKET");
+        assert_eq!(command.operation, HirCicsOperation::RequestPassTicket);
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SecurityPassTicket
+                && output.target.qualified_name == "TICKET-X"
+        }));
+        assert!(
+            analyze(&source.replace("ESMAPPNAME(APP-X)", "ESMAPPNAME('APP1')"))
+                .hir
+                .is_none()
+        );
+        assert!(
+            analyze(&source.replace("TICKET-X PIC X(8)", "TICKET-X PIC X(7)"))
+                .hir
+                .is_none()
+        );
+    }
+
+    #[test]
     fn cics_verify_phrase_requires_explicit_bounded_length_and_storage_secret() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. VPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PHRASE-X PIC X(20) VALUE 'LONG-PHRASE-1234'. 01 DAYS-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS VERIFY PHRASE(PHRASE-X) PHRASELEN(16) USERID('IBMUSER') DAYSLEFT(DAYS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

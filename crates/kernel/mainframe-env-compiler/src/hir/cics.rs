@@ -471,6 +471,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::SecurityExpiryTime => CicsOutputName::SecurityExpiryTime,
                 HirCicsOutputName::SecurityInvalidCount => CicsOutputName::SecurityInvalidCount,
                 HirCicsOutputName::SecurityLastUseTime => CicsOutputName::SecurityLastUseTime,
+                HirCicsOutputName::SecurityPassTicket => CicsOutputName::SecurityPassTicket,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::Partn => CicsOutputName::Partn,

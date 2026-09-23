@@ -92,6 +92,7 @@ pub(super) fn resolve(
         ["VERIFY", "PASSWORD"] => HirCicsOperation::VerifyPassword,
         ["CHANGE", "PASSWORD"] => HirCicsOperation::ChangePassword,
         ["CHANGE", "PHRASE"] => HirCicsOperation::ChangePhrase,
+        ["REQUEST", "PASSTICKET"] => HirCicsOperation::RequestPassTicket,
         ["VERIFY", "PHRASE"] => HirCicsOperation::VerifyPhrase,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,

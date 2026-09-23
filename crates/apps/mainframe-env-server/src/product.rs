@@ -23410,4 +23410,154 @@ mod tests {
             mainframe_env_racf::DecisionReason::Granted
         );
     }
+
+    #[test]
+    fn compiled_request_passticket_issues_one_use_ticket_with_7410() {
+        let artifact = published_source_fixture(
+            "PTKT",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. PTKT. DATA DIVISION. WORKING-STORAGE SECTION. 01 APP-X PIC X(8) VALUE 'APP1'. 01 TICKET-X PIC X(8). 01 RESP-X PIC S9(9) COMP. 01 ESM-X PIC S9(9) COMP. 01 REQUEST-FN PIC X(2). PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(TICKET-X) ESMAPPNAME(APP-X) ESMRESP(ESM-X) RESP(RESP-X) END-EXEC. MOVE EIBFN TO REQUEST-FN. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let admin = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        server
+            .racf
+            .define_profile(
+                "FACILITY",
+                "IRR.RCVTPTGN",
+                "IBMUSER",
+                Some(AccessIntent::Read),
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("PTKTDATA", "APP1", "IBMUSER", Some(AccessIntent::Read))
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &mainframe_env_racf::CommandContext::new(
+                    admin.clone(),
+                    "ACTIVATE-PTKT-PRODUCT",
+                    "PTKT-TEST",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(PTKTDATA)",
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "PTKT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("PTK".into(), "PTKT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "PTKT".into(),
+                    map: "PTKT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("passticket-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "PTK", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "PTK",
+                24,
+                80,
+                "passticket-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &admin, "PTKT", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("REQUEST-FN").unwrap().bytes(),
+            &[0x74, 0x10]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("ESM-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let ticket = restored.variable("TICKET-X").unwrap().bytes().to_vec();
+        assert_eq!(ticket.len(), 8);
+        assert!(ticket.iter().all(u8::is_ascii_alphanumeric));
+        server.secrets.insert("secret:compiled-ticket", ticket);
+        let redeem = mainframe_env_racf::RacrouteRequest::RedeemPassTicket {
+            user: admin.clone(),
+            application: "APP1".into(),
+            ticket_reference: SecretRef::new("secret:compiled-ticket", HostLimits::default())
+                .unwrap(),
+            binding_digest: [3; 32],
+        };
+        let first = server
+            .racf
+            .racroute(
+                &mainframe_env_racf::SafRequestContext::new(
+                    admin.clone(),
+                    None,
+                    None,
+                    "REDEEM-COMPILED-TICKET",
+                    "REDEEM-COMPILED-TICKET",
+                    3,
+                )
+                .unwrap(),
+                redeem.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            first.status.reason,
+            mainframe_env_racf::DecisionReason::Granted
+        );
+        let second = server
+            .racf
+            .racroute(
+                &mainframe_env_racf::SafRequestContext::new(
+                    admin,
+                    None,
+                    None,
+                    "REDEEM-COMPILED-AGAIN",
+                    "REDEEM-COMPILED-AGAIN",
+                    4,
+                )
+                .unwrap(),
+                redeem,
+            )
+            .unwrap();
+        assert_eq!(
+            second.status.reason,
+            mainframe_env_racf::DecisionReason::CredentialInvalid
+        );
+    }
 }
