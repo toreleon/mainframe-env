@@ -25925,13 +25925,103 @@ mod tests {
                 .bytes()
                 .starts_with(b"urn:example:booking")
         );
-        let remove = request(
-            CicsOperation::WsaContextDelete,
-            BTreeMap::from([("CHANNEL".into(), cics_literal(b"WEBCHAN"))]),
+        let endpoint = format!(
+            "<wsa:EndpointReference xmlns:wsa=\"http://www.w3.org/2005/08/addressing\"><wsa:Address>http://example.invalid/?a=1&amp;b=2</wsa:Address><wsa:Metadata><Schema>v1</Schema></wsa:Metadata></wsa:EndpointReference>"
+        );
+        let build_epr = request(
+            CicsOperation::WsaContextBuild,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                ("EPRTYPE".into(), cics_literal(b"TOEPR")),
+                ("EPRFIELD".into(), cics_literal(b"ALL")),
+                ("EPRFROM".into(), enqueue_value(endpoint.as_bytes())),
+                ("EPRLENGTH".into(), cics_decimal(endpoint.len() as i64)),
+            ]),
             207,
         );
         cics.invoke(
-            &effect(&invocation.run_unit_id, remove.clone(), 207),
+            &effect(&invocation.run_unit_id, build_epr.clone(), 207),
+            build_epr,
+        )
+        .unwrap();
+        for (field, expected) in [
+            ("ADDRESS", "http://example.invalid/?a=1&b=2"),
+            ("METADATA", "<wsa:Metadata"),
+        ] {
+            let sequence = if field == "ADDRESS" { 208 } else { 209 };
+            let get_epr = request(
+                CicsOperation::WsaContextGet,
+                BTreeMap::from([
+                    ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                    ("EPRTYPE".into(), cics_literal(b"TOEPR")),
+                    ("EPRFIELD".into(), cics_literal(field.as_bytes())),
+                    ("EPRINTO".into(), argument(b"EPR-OUT")),
+                    ("EPRLENGTH".into(), cics_decimal(4096)),
+                ]),
+                sequence,
+            );
+            let output = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, get_epr.clone(), sequence),
+                    get_epr,
+                )
+                .unwrap();
+            assert!(
+                std::str::from_utf8(output.outputs["EPRINTO"].bytes())
+                    .unwrap()
+                    .starts_with(expected)
+            );
+        }
+        let replace_address = request(
+            CicsOperation::WsaContextBuild,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                ("EPRTYPE".into(), cics_literal(b"TOEPR")),
+                ("EPRFIELD".into(), cics_literal(b"ADDRESS")),
+                (
+                    "EPRFROM".into(),
+                    enqueue_value(b"https://replacement.invalid/"),
+                ),
+                (
+                    "EPRLENGTH".into(),
+                    cics_decimal(b"https://replacement.invalid/".len() as i64),
+                ),
+            ]),
+            210,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, replace_address.clone(), 210),
+            replace_address,
+        )
+        .unwrap();
+        let get_all = request(
+            CicsOperation::WsaContextGet,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WEBCHAN")),
+                ("EPRTYPE".into(), cics_literal(b"TOEPR")),
+                ("EPRFIELD".into(), cics_literal(b"ALL")),
+                ("EPRINTO".into(), argument(b"EPR-OUT")),
+                ("EPRLENGTH".into(), cics_decimal(4096)),
+            ]),
+            211,
+        );
+        let output = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, get_all.clone(), 211),
+                get_all,
+            )
+            .unwrap();
+        let xml = std::str::from_utf8(output.outputs["EPRINTO"].bytes()).unwrap();
+        assert!(xml.contains("https://replacement.invalid/"));
+        assert!(xml.contains("<wsa:Metadata"));
+        assert!(!xml.contains("http://example.invalid/?a=1"));
+        let remove = request(
+            CicsOperation::WsaContextDelete,
+            BTreeMap::from([("CHANNEL".into(), cics_literal(b"WEBCHAN"))]),
+            212,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, remove.clone(), 212),
             remove,
         )
         .unwrap();

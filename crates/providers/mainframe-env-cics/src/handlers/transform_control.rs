@@ -1177,3 +1177,10 @@ fn decode_effect(bytes: &[u8], limits: CicsLimits) -> Result<TransformEffect, Ho
 pub(in crate::service) fn valid_web_xml(source: &str, limits: CicsLimits) -> bool {
     xml_to_data::valid_web_xml(source, limits)
 }
+
+pub(in crate::service) fn web_endpoint_fields(
+    source: &str,
+    limits: CicsLimits,
+) -> Option<BTreeMap<String, Vec<u8>>> {
+    xml_to_data::web_endpoint_fields(source, limits)
+}

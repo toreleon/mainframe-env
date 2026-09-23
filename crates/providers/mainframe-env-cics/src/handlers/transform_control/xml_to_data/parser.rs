@@ -1,6 +1,7 @@
 use super::super::*;
 
 const XSI_NAMESPACE: &str = "http://www.w3.org/2001/XMLSchema-instance";
+const WSA_NAMESPACE: &str = "http://www.w3.org/2005/08/addressing";
 
 struct XmlNode {
     name: String,
@@ -254,6 +255,90 @@ pub(super) fn parse_xml(
         },
         namespaces,
     })
+}
+
+pub(super) fn endpoint_fields(
+    source: &str,
+    limits: CicsLimits,
+) -> Option<BTreeMap<String, Vec<u8>>> {
+    let parsed = parse_xml(source, None, limits).ok()?;
+    if parsed.metadata.element_name != "EndpointReference"
+        || parsed.metadata.element_namespace != WSA_NAMESPACE
+    {
+        return None;
+    }
+    let mut fields = BTreeMap::new();
+    for child in &parsed.root.children {
+        let mut namespaces = parsed.namespaces.clone();
+        merge_namespaces(&mut namespaces, &child.attributes).ok()?;
+        let (name, namespace) = resolve_qname(&child.name, &namespaces, true).ok()?;
+        if namespace != WSA_NAMESPACE {
+            continue;
+        }
+        let (key, bytes) = match name.as_str() {
+            "Address" if child.children.is_empty() => ("ADDRESS", child.text.as_bytes().to_vec()),
+            "Metadata" => (
+                "METADATA",
+                serialize_endpoint_child(child, &parsed.root.attributes),
+            ),
+            "ReferenceParameters" => (
+                "REFPARMS",
+                serialize_endpoint_child(child, &parsed.root.attributes),
+            ),
+            _ => continue,
+        };
+        if fields.insert(key.into(), bytes).is_some() {
+            return None;
+        }
+    }
+    fields.contains_key("ADDRESS").then_some(fields)
+}
+
+fn serialize_endpoint_child(node: &XmlNode, inherited: &BTreeMap<String, String>) -> Vec<u8> {
+    let mut output = String::new();
+    let mut attributes = node.attributes.clone();
+    for (name, value) in inherited {
+        if name == "xmlns" || name.starts_with("xmlns:") {
+            attributes
+                .entry(name.clone())
+                .or_insert_with(|| value.clone());
+        }
+    }
+    serialize_node(node, &attributes, &mut output);
+    output.into_bytes()
+}
+
+fn serialize_node(node: &XmlNode, attributes: &BTreeMap<String, String>, output: &mut String) {
+    output.push('<');
+    output.push_str(&node.name);
+    for (name, value) in attributes {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str("=\"");
+        escape_xml(value, output);
+        output.push('"');
+    }
+    output.push('>');
+    escape_xml(&node.text, output);
+    for child in &node.children {
+        serialize_node(child, &child.attributes, output);
+    }
+    output.push_str("</");
+    output.push_str(&node.name);
+    output.push('>');
+}
+
+fn escape_xml(value: &str, output: &mut String) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&apos;"),
+            _ => output.push(character),
+        }
+    }
 }
 
 fn namespace_list(

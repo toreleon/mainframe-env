@@ -31,6 +31,8 @@ All notable changes to mainframe-env are documented here.
   focused regressions. New MCEP v2 tags remain in the exclusive web ranges.
   Source: IBM CICS TS 6.x application API sources-b/c, catalog rows 0107,
   0197-0199, and 0259-0262; exact topic hashes are recorded in the v0.9 status.
+- WSACONTEXT now resolves ADDRESS, METADATA, and REFPARMS from a complete
+  endpoint reference and rebuilds ALL after a partial field replacement.
 
 
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.

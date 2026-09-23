@@ -106,6 +106,23 @@ fn build(
                 return Err(condition("INVREQ", 16, 15));
             }
             uri.to_string()
+        } else if field == "ALL" {
+            let parts = transform_control::web_endpoint_fields(&data, service.limits)
+                .ok_or_else(|| condition("INVREQ", 16, 10))?;
+            let address =
+                std::str::from_utf8(&parts["ADDRESS"]).map_err(|_| condition("INVREQ", 16, 15))?;
+            if !soap_fault::valid_uri(address) {
+                return Err(condition("INVREQ", 16, 15));
+            }
+            let prefix = format!("WSA.{context}.EPR.{kind}.");
+            state.fields.retain(|key, _| !key.starts_with(&prefix));
+            for (name, bytes) in parts {
+                if bytes.len() > service.limits.max_screen_bytes {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                state.fields.insert(format!("{prefix}{name}"), bytes);
+            }
+            data
         } else {
             if !transform_control::valid_web_xml(&data, service.limits) {
                 return Err(condition(
@@ -120,6 +137,11 @@ fn build(
             }
             data.into()
         };
+        if field != "ALL" {
+            state
+                .fields
+                .remove(&format!("WSA.{context}.EPR.{kind}.ALL"));
+        }
         state.fields.insert(
             format!("WSA.{context}.EPR.{kind}.{field}"),
             normalized.into_bytes(),
@@ -246,14 +268,47 @@ fn get(
             return Err(HostProblem::Malformed);
         }
         let key = format!("WSA.{context}.EPR.{epr_type}.{epr_field}");
-        let bytes = state
-            .fields
-            .get(&key)
-            .ok_or_else(|| condition("NOTFND", 13, 3))?;
-        let encoded = encode_output(bytes, target_page)?;
+        let bytes = if let Some(bytes) = state.fields.get(&key) {
+            bytes.clone()
+        } else if epr_field == "ALL" {
+            complete_epr(&state, context, &epr_type, service.limits)?
+                .ok_or_else(|| condition("NOTFND", 13, 3))?
+        } else {
+            return Err(condition("NOTFND", 13, 3));
+        };
+        let encoded = encode_output(&bytes, target_page)?;
         epr_output(request, &mut response, &encoded)?;
     }
     Ok(response)
+}
+
+fn complete_epr(
+    state: &state::WebState,
+    context: &str,
+    kind: &str,
+    limits: CicsLimits,
+) -> Result<Option<Vec<u8>>, HostProblem> {
+    let prefix = format!("WSA.{context}.EPR.{kind}.");
+    let Some(address) = state.fields.get(&format!("{prefix}ADDRESS")) else {
+        return Ok(None);
+    };
+    let address = std::str::from_utf8(address).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let mut xml = format!(
+        "<wsa:EndpointReference xmlns:wsa=\"{WSA_NS}\"><wsa:Address>{}</wsa:Address>",
+        escape(address)
+    );
+    for field in ["REFPARMS", "METADATA"] {
+        if let Some(value) = state.fields.get(&format!("{prefix}{field}")) {
+            xml.push_str(
+                std::str::from_utf8(value).map_err(|_| HostProblem::InfrastructureFailure)?,
+            );
+        }
+    }
+    xml.push_str("</wsa:EndpointReference>");
+    if xml.len() > limits.max_screen_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    Ok(Some(xml.into_bytes()))
 }
 
 fn create_epr(

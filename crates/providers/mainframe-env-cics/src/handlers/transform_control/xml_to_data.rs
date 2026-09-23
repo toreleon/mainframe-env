@@ -298,3 +298,10 @@ fn persist_query_effect(
 pub(in crate::service) fn valid_web_xml(source: &str, limits: CicsLimits) -> bool {
     parser::parse_xml(source, None, limits).is_ok()
 }
+
+pub(in crate::service) fn web_endpoint_fields(
+    source: &str,
+    limits: CicsLimits,
+) -> Option<BTreeMap<String, Vec<u8>>> {
+    parser::endpoint_fields(source, limits)
+}
