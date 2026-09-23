@@ -430,6 +430,10 @@ impl PlanContext<'_> {
                 HirCicsOperandName::WebQueryInput => CicsOperandName::WebQueryInput,
                 HirCicsOperandName::WebMediaType => CicsOperandName::WebMediaType,
                 HirCicsOperandName::WebSendUriMap => CicsOperandName::WebSendUriMap,
+                HirCicsOperandName::WebReceiveMaxLength => CicsOperandName::WebReceiveMaxLength,
+                HirCicsOperandName::WebReceiveStatusLength => {
+                    CicsOperandName::WebReceiveStatusLength
+                }
                 HirCicsOperandName::WebPortNumber => CicsOperandName::WebPortNumber,
                 HirCicsOperandName::WebScheme => CicsOperandName::WebScheme,
                 HirCicsOperandName::WebUriMap => CicsOperandName::WebUriMap,
@@ -534,6 +538,13 @@ impl PlanContext<'_> {
                 HirCicsOutputName::WebRetrieveDocumentToken => {
                     CicsOutputName::WebRetrieveDocumentToken
                 }
+                HirCicsOutputName::WebReceiveInto => CicsOutputName::WebReceiveInto,
+                HirCicsOutputName::WebReceiveLength => CicsOutputName::WebReceiveLength,
+                HirCicsOutputName::WebReceiveStatusCode => CicsOutputName::WebReceiveStatusCode,
+                HirCicsOutputName::WebReceiveStatusText => CicsOutputName::WebReceiveStatusText,
+                HirCicsOutputName::WebReceiveStatusLength => CicsOutputName::WebReceiveStatusLength,
+                HirCicsOutputName::WebReceiveMediaType => CicsOutputName::WebReceiveMediaType,
+                HirCicsOutputName::WebReceiveBodyCharset => CicsOutputName::WebReceiveBodyCharset,
             },
             target: self.slot(&output.target)?,
         })
@@ -712,6 +723,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WebWrite => CicsPlanOperation::WebWrite,
         HirCicsOperation::WebSend => CicsPlanOperation::WebSend,
         HirCicsOperation::WebRetrieve => CicsPlanOperation::WebRetrieve,
+        HirCicsOperation::WebReceive => CicsPlanOperation::WebReceive,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,
@@ -837,5 +849,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::WebBrowseHttpHeader => CicsPlanOption::WebBrowseHttpHeader,
         HirCicsOption::WebBrowseQueryParm => CicsPlanOption::WebBrowseQueryParm,
         HirCicsOption::WebBrowseFormField => CicsPlanOption::WebBrowseFormField,
+        HirCicsOption::WebNotruncate => CicsPlanOption::WebNotruncate,
+        HirCicsOption::WebNoClientConvert => CicsPlanOption::WebNoClientConvert,
+        HirCicsOption::WebNoServerConvert => CicsPlanOption::WebNoServerConvert,
     }
 }

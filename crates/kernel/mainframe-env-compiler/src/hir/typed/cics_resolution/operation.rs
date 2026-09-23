@@ -142,6 +142,7 @@ pub(super) fn resolve(
         ["WEB", "WRITE"] => HirCicsOperation::WebWrite,
         ["WEB", "SEND"] => HirCicsOperation::WebSend,
         ["WEB", "RETRIEVE"] => HirCicsOperation::WebRetrieve,
+        ["WEB", "RECEIVE"] => HirCicsOperation::WebReceive,
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
         ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,
@@ -239,6 +240,9 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "HTTPHEADER" => HirCicsOption::WebBrowseHttpHeader,
         "QUERYPARM" => HirCicsOption::WebBrowseQueryParm,
         "FORMFIELD" => HirCicsOption::WebBrowseFormField,
+        "NOTRUNCATE" => HirCicsOption::WebNotruncate,
+        "NOCLICONVERT" => HirCicsOption::WebNoClientConvert,
+        "NOSRVCONVERT" => HirCicsOption::WebNoServerConvert,
         _ => super::spool_control::option(option).expect("allowed CICS option"),
     }
 }

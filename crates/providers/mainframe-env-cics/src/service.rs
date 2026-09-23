@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 141);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 142);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7981,13 +7981,104 @@ mod tests {
             ("INVREQ", 16, 79)
         );
         assert_eq!(transport.calls.load(Ordering::SeqCst), 1);
+        let mut receive = request(
+            CicsOperation::WebReceive,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(token)),
+                ("INTO".into(), argument(b"BODY-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+                ("MAXLENGTH".into(), cics_decimal(2)),
+                ("STATUSCODE".into(), argument(b"STATUS-X")),
+                ("OPTION.NOTRUNCATE".into(), cics_option()),
+            ]),
+            5,
+        );
+        receive.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let part = service
+            .invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 5),
+                receive,
+            )
+            .unwrap();
+        assert_eq!(
+            (part.outputs["INTO"].bytes(), part.response2),
+            (b"po".as_slice(), 36)
+        );
+        let next = request(
+            CicsOperation::WebReceive,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(token)),
+                ("INTO".into(), argument(b"BODY-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+                ("MAXLENGTH".into(), cics_decimal(8)),
+            ]),
+            6,
+        );
+        let next = service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 6), next)
+            .unwrap();
+        assert_eq!(next.outputs["INTO"].bytes(), b"ng");
+        let header = request(
+            CicsOperation::WebRead,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(token)),
+                ("HTTPHEADER".into(), cics_literal(b"X-Reply")),
+                ("NAMELENGTH".into(), cics_decimal(7)),
+                ("VALUE".into(), argument(b"VALUE-X")),
+                ("VALUELENGTH".into(), cics_decimal(8)),
+            ]),
+            7,
+        );
+        let header = service
+            .invoke(&effect(&invocation.run_unit_id, header.clone(), 7), header)
+            .unwrap();
+        assert_eq!(header.outputs["VALUE"].bytes(), b"yes");
+        let browse = request(
+            CicsOperation::WebStartBrowse,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(token)),
+                ("OPTION.HTTPHEADER".into(), cics_option()),
+            ]),
+            8,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, browse.clone(), 8), browse)
+            .unwrap();
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .web
+                .browses
+                .values()
+                .next()
+                .unwrap()
+                .entries,
+            vec![(b"X-Reply".to_vec(), b"yes".to_vec())]
+        );
+        let end = request(
+            CicsOperation::WebEndBrowse,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(token)),
+                ("OPTION.HTTPHEADER".into(), cics_option()),
+            ]),
+            9,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, end.clone(), 9), end)
+            .unwrap();
         let close = request(
             CicsOperation::WebClose,
             BTreeMap::from([("SESSTOKEN".into(), argument(token))]),
-            5,
+            10,
         );
         service
-            .invoke(&effect(&invocation.run_unit_id, close.clone(), 5), close)
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 10), close)
             .unwrap();
         assert!(
             store
@@ -8252,6 +8343,167 @@ mod tests {
             ),
             ("NOTFND", 13, 1)
         );
+    }
+
+    #[test]
+    fn web_receive_server_retains_or_discards_bounded_body_with_replay() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-web-receive-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let service = service(store.clone());
+        let invocation = invocation_for("web-receive", BTreeMap::new());
+        let session = SessionId::new("web-receive", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "POST".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: String::new(),
+                    urimap: None,
+                    body: b"abcdef".to_vec(),
+                    headers: vec![("Content-Type".into(), "text/plain".into())],
+                },
+            )
+            .unwrap();
+        let receive = |sequence, maximum, keep| {
+            let mut arguments = BTreeMap::from([
+                ("INTO".into(), argument(b"BODY-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+                ("MAXLENGTH".into(), cics_decimal(maximum)),
+                ("MEDIATYPE".into(), argument(b"MEDIA-X")),
+            ]);
+            if keep {
+                arguments.insert("OPTION.NOTRUNCATE".into(), cics_option());
+            }
+            let mut command = request(CicsOperation::WebReceive, arguments, sequence);
+            command.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            command
+        };
+        let first = receive(1, 2, true);
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, first.clone(), 1),
+                first.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let first = service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        assert_eq!(
+            (
+                first.outputs["INTO"].bytes(),
+                first.outputs["LENGTH"].bytes(),
+                first.response2
+            ),
+            (b"ab".as_slice(), b"2".as_slice(), 36)
+        );
+        assert_eq!(first.outputs["MEDIATYPE"].bytes(), b"text/plain");
+        drop(service);
+        drop(store);
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let service =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .web
+                .body_cursors
+                .values()
+                .next()
+                .unwrap()
+                .cursor,
+            2
+        );
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "POST".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: String::new(),
+                    urimap: None,
+                    body: b"abcdef".to_vec(),
+                    headers: vec![("Content-Type".into(), "text/plain".into())],
+                },
+            )
+            .unwrap();
+        let second = receive(2, 2, false);
+        let second = service
+            .invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second)
+            .unwrap();
+        assert_eq!(
+            (second.outputs["INTO"].bytes(), second.response2),
+            (b"cd".as_slice(), 57)
+        );
+        let empty = receive(3, 8, false);
+        let empty = service
+            .invoke(&effect(&invocation.run_unit_id, empty.clone(), 3), empty)
+            .unwrap();
+        assert_eq!(
+            (
+                empty.outputs["INTO"].bytes(),
+                empty.outputs["LENGTH"].bytes(),
+                empty.response
+            ),
+            (b"".as_slice(), b"0".as_slice(), 0)
+        );
+        let reopened_store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let reopened =
+            CicsService::open(authorities(), reopened_store, CicsLimits::default()).unwrap();
+        assert_eq!(
+            reopened
+                .lock()
+                .unwrap()
+                .web
+                .body_cursors
+                .values()
+                .next()
+                .unwrap()
+                .cursor,
+            6
+        );
+        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-web-body-cursor-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        drop(reopened);
+        drop(service);
+        drop(store);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

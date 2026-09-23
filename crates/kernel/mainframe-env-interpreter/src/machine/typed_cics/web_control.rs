@@ -14,6 +14,8 @@ pub(super) fn output_capacity(
         CicsOutputName::WebRealm => "REALM.MAXLENGTH",
         CicsOutputName::WebValue => "VALUE.MAXLENGTH",
         CicsOutputName::WebBrowseName => "BROWSENAME.MAXLENGTH",
+        CicsOutputName::WebReceiveInto => "INTO.MAXLENGTH",
+        CicsOutputName::WebReceiveStatusText => "STATUSTEXT.MAXLENGTH",
         _ => return Ok(None),
     };
     let CicsTarget::Resolved(slot) = target else {

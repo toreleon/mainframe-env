@@ -38,6 +38,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB RECEIVE` for bounded server and client body buffers,
+  durable retain or discard cursors, response metadata, and client header
+  inspection after receive. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0248` binds
+  `dfhp4_webreceive.html` at
+  `sha256:4b49e5dec28edd2dc00da545fb368b9d8538f31fa2494597a5fcacf9ecaa401c`
+  and `dfhp4_webreceiveclient.html` at
+  `sha256:5c610ca807d29a9af74bddfc4936e2921ffef9c7c2dcf724e85ff6a682881c9b`.
+
 - Added typed CICS `WEB RETRIEVE` for the task-owned token from the last
   pending EVENTUAL document send, with documented INVREQ and NOTFND cases.
   IBM CICS TS 6.x baseline `ibm-cics-ts-6x-2026-08-31:api-commands` row

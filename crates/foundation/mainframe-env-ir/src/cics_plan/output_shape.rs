@@ -179,6 +179,18 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::WebRetrieveDocumentToken | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WebReceive => matches!(
+            output,
+            CicsOutputName::WebReceiveInto
+                | CicsOutputName::WebReceiveLength
+                | CicsOutputName::WebReceiveStatusCode
+                | CicsOutputName::WebReceiveStatusText
+                | CicsOutputName::WebReceiveStatusLength
+                | CicsOutputName::WebReceiveMediaType
+                | CicsOutputName::WebReceiveBodyCharset
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::DocumentInsert => matches!(
             output,
             CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2

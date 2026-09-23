@@ -12,6 +12,7 @@ mod open;
 mod parse_url;
 mod read;
 mod read_next;
+mod receive;
 mod retrieve;
 mod send;
 mod start_browse;
@@ -272,10 +273,21 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
         })
         .map(|(key, response)| (key.clone(), response.clone()))
         .collect::<Vec<_>>();
+    let owned_cursors = state
+        .web
+        .body_cursors
+        .iter()
+        .filter(|(_, cursor)| {
+            cursor.owner_execution == run.invocation.execution_id.as_str()
+                && cursor.owner_run_unit == run.invocation.run_unit_id.as_str()
+        })
+        .map(|(key, cursor)| (key.clone(), cursor.clone()))
+        .collect::<Vec<_>>();
     if owned.is_empty()
         && owned_browses.is_empty()
         && owned_headers.is_empty()
         && owned_responses.is_empty()
+        && owned_cursors.is_empty()
     {
         return Ok(());
     }
@@ -312,6 +324,15 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
                 namespace: model::CLIENT_RESPONSE_NAMESPACE.into(),
                 key: key.clone(),
                 expected_version: response.version,
+            }),
+    );
+    deletes.extend(
+        owned_cursors
+            .iter()
+            .map(|(key, cursor)| ProviderStateMutation::Delete {
+                namespace: model::BODY_CURSOR_NAMESPACE.into(),
+                key: key.clone(),
+                expected_version: cursor.version,
             }),
     );
     service
@@ -351,6 +372,14 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
             .ok_or(HostProblem::InfrastructureFailure)?;
         state.web.client_responses.remove(key);
     }
+    for (key, cursor) in &owned_cursors {
+        state.web.bytes = state
+            .web
+            .bytes
+            .checked_sub(model::encode_body_cursor(cursor)?.len())
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.web.body_cursors.remove(key);
+    }
     drop(state);
     if let Some(transport) = transport {
         for (_, session) in owned {
@@ -378,6 +407,9 @@ pub(in crate::service) fn invoke(
         CicsOperation::WebRead => read::invoke(service, run, request),
         CicsOperation::WebReadNext => {
             read_next::invoke(service, run, request, run.invocation.deadline_tick)
+        }
+        CicsOperation::WebReceive => {
+            receive::invoke(service, run, request, run.invocation.deadline_tick)
         }
         CicsOperation::WebEndBrowse => {
             end_browse::invoke(service, run, request, run.invocation.deadline_tick)

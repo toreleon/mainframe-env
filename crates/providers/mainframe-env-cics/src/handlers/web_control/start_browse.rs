@@ -1,7 +1,9 @@
 use super::super::super::{CicsService, Run};
 use super::{model, open, read};
 use mainframe_env_execution_api::AuditDecision;
-use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
+use mainframe_env_host_api::{
+    AccessIntent, CicsDisposition, CicsRequest, CicsResponse, HostProblem,
+};
 use mainframe_env_store_api::{ProviderStateMutation, ProviderStateRecord, ProviderStateWrite};
 use std::sync::atomic::Ordering;
 
@@ -27,11 +29,36 @@ pub(super) fn invoke(
 
 fn invoke_inner(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     let kind = validate_request(request)?;
+    if let Some(value) = request.arguments.get("SESSTOKEN") {
+        let token: [u8; 8] = value
+            .bytes()
+            .try_into()
+            .map_err(|_| condition("NOTOPEN", 19, 27))?;
+        let urimap = {
+            let state = service.lock()?;
+            state
+                .web
+                .sessions
+                .get(&model::token_key(token))
+                .filter(|session| {
+                    session.owner_execution == run.invocation.execution_id.as_str()
+                        && session.owner_run_unit == run.invocation.run_unit_id.as_str()
+                        && session.transaction == run.transaction
+                })
+                .ok_or_else(|| condition("NOTOPEN", 19, 27))?
+                .endpoint
+                .urimap
+                .clone()
+        };
+        if let Some(name) = urimap.as_deref() {
+            service.authorize(run, "URIMAP", name, AccessIntent::Read)?;
+        }
+    }
     if run.invocation.cancellation_requested() {
         return Err(HostProblem::Cancelled);
     }
@@ -59,7 +86,24 @@ fn invoke_inner(
                     && session.transaction == run.transaction
             })
             .ok_or_else(|| condition("NOTOPEN", 19, 27))?;
-        return Err(condition("INVREQ", 16, 43));
+        let response = state
+            .web
+            .client_responses
+            .get(&model::token_key(token))
+            .filter(|response| {
+                response.received
+                    && response.owner_execution == run.invocation.execution_id.as_str()
+                    && response.owner_run_unit == run.invocation.run_unit_id.as_str()
+                    && response.transaction == run.transaction
+            })
+            .ok_or_else(|| condition("INVREQ", 16, 43))?;
+        let entries = response
+            .response
+            .headers
+            .iter()
+            .map(|(name, value)| (name.as_bytes().to_vec(), value.as_bytes().to_vec()))
+            .collect();
+        (entries, Some(token))
     } else {
         let inbound = state
             .web

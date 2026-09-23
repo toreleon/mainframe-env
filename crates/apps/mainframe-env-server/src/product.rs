@@ -11728,6 +11728,115 @@ mod tests {
     }
 
     #[test]
+    fn compiled_web_receive_consumes_selected_inbound_body() {
+        let artifact = published_source_fixture(
+            "WEBOPEN",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. WEBOPEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 BODY-X PIC X(4).\n01 LEN-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WEB RECEIVE INTO(BODY-X) LENGTH(LEN-X) MAXLENGTH(4) NOTRUNCATE NOHANDLE END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("URIMAP", "ORDERS", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("URIMAP", "ORDERS", "IBMUSER", AccessIntent::Read)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "WEBOPEN".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("WEBO".into(), "WEBOPEN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "WEBOPEN".into(),
+                    map: "WEBOPEN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("web-open-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "WEBO", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "WEBO",
+                24,
+                80,
+                "web-open-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .cics
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                mainframe_env_cics::CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTPS".into(),
+                    host: "example.com".into(),
+                    port: 443,
+                    method: "GET".into(),
+                    version: mainframe_env_cics::CicsWebVersion { major: 1, minor: 1 },
+                    path: "/orders".into(),
+                    query: "x=1&y=2".into(),
+                    urimap: Some("ORDERS".into()),
+                    body: b"DATAxx".to_vec(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "WEBOPEN", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("BODY-X").unwrap().bytes(), b"DATA");
+        assert_eq!(restored.variable("LEN-X").unwrap().bytes(), &[0, 0, 0, 4]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::WebReceive
+                    && entry.response == 22
+                    && entry.response2 == 36)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_web_retrieve_returns_pending_document_token() {
         let artifact = published_source_fixture(
             "WEBOPEN",

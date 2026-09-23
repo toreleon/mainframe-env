@@ -272,6 +272,8 @@ pub enum CicsPlanOperation {
     WebSend,
     /// Return the pending server WEB SEND document token.
     WebRetrieve,
+    /// Consume a bounded HTTP body for a server request or client response.
+    WebReceive,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -761,6 +763,10 @@ pub enum CicsOperandName {
     WebMediaType,
     /// Client URIMAP selected for this request.
     WebSendUriMap,
+    /// Maximum body bytes requested by WEB RECEIVE.
+    WebReceiveMaxLength,
+    /// Client status-text receiving capacity for WEB RECEIVE.
+    WebReceiveStatusLength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -944,6 +950,12 @@ pub enum CicsPlanOption {
     WebBrowseQueryParm,
     /// Browse HTML form fields.
     WebBrowseFormField,
+    /// Retain the unread HTTP body after a short WEB RECEIVE.
+    WebNotruncate,
+    /// Return client response bytes without code-page conversion.
+    WebNoClientConvert,
+    /// Return inbound request bytes without code-page conversion.
+    WebNoServerConvert,
 }
 
 /// Named result binding written after the host result arrives.
@@ -1105,4 +1117,18 @@ pub enum CicsOutputName {
     WebBrowseNameLength,
     /// Document token returned by WEB RETRIEVE.
     WebRetrieveDocumentToken,
+    /// Body bytes returned by WEB RECEIVE.
+    WebReceiveInto,
+    /// Actual WEB RECEIVE body byte count.
+    WebReceiveLength,
+    /// Client response status code returned by WEB RECEIVE.
+    WebReceiveStatusCode,
+    /// Client response reason returned by WEB RECEIVE.
+    WebReceiveStatusText,
+    /// Actual client response reason length.
+    WebReceiveStatusLength,
+    /// HTTP content media type returned by WEB RECEIVE.
+    WebReceiveMediaType,
+    /// HTTP body charset returned by WEB RECEIVE.
+    WebReceiveBodyCharset,
 }

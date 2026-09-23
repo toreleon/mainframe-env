@@ -572,3 +572,55 @@ pub(super) fn invalid_retrieve_shape(
             )
         })
 }
+
+pub(super) fn invalid_receive_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let client = inputs.contains(&CicsOperandName::WebSessionToken);
+    !inputs.contains(&CicsOperandName::WebReceiveMaxLength)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::WebSessionToken,
+            CicsOperandName::WebReceiveMaxLength,
+            CicsOperandName::WebReceiveStatusLength,
+        ]))
+        || !outputs.contains(&CicsOutputName::WebReceiveInto)
+        || !outputs.contains(&CicsOutputName::WebReceiveLength)
+        || outputs.contains(&CicsOutputName::WebReceiveStatusText)
+            != inputs.contains(&CicsOperandName::WebReceiveStatusLength)
+        || outputs.contains(&CicsOutputName::WebReceiveStatusLength)
+            != inputs.contains(&CicsOperandName::WebReceiveStatusLength)
+        || !client
+            && [
+                CicsOutputName::WebReceiveStatusCode,
+                CicsOutputName::WebReceiveStatusText,
+                CicsOutputName::WebReceiveStatusLength,
+            ]
+            .into_iter()
+            .any(|name| outputs.contains(&name))
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::WebNotruncate
+                    | CicsPlanOption::WebNoClientConvert
+                    | CicsPlanOption::WebNoServerConvert
+            )
+        })
+        || client && plan.options.contains(&CicsPlanOption::WebNoServerConvert)
+        || !client && plan.options.contains(&CicsPlanOption::WebNoClientConvert)
+        || !matches!(
+            operand_value(plan, CicsOperandName::WebReceiveMaxLength),
+            Some(
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            )
+        )
+        || inputs.contains(&CicsOperandName::WebReceiveStatusLength)
+            && !matches!(
+                operand_value(plan, CicsOperandName::WebReceiveStatusLength),
+                Some(CicsOperandValue::Storage(_))
+            )
+}

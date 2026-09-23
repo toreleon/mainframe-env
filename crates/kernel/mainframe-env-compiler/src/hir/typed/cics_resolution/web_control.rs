@@ -6,6 +6,7 @@ use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 use mainframe_env_ir::CicsApplicationRegistryDescriptor;
 
+mod receive;
 mod send;
 mod write;
 
@@ -15,6 +16,10 @@ pub(super) fn reviewed_ambiguous_shape(
     has_value: bool,
 ) -> bool {
     if has_value && descriptor.label_tokens == ["WEB", "RETRIEVE"] && name == "DOCTOKEN" {
+        return true;
+    }
+    if has_value && descriptor.label_tokens == ["WEB", "RECEIVE"] && RECEIVE_CLAUSES.contains(&name)
+    {
         return true;
     }
     if descriptor.label_tokens == ["WEB", "STARTBROWSE"]
@@ -167,6 +172,25 @@ pub(super) const SEND_CLAUSES: &[&str] = &[
     "RESP2",
 ];
 pub(super) const RETRIEVE_CLAUSES: &[&str] = &["DOCTOKEN", "RESP", "RESP2"];
+pub(super) const RECEIVE_CLAUSES: &[&str] = &[
+    "SESSTOKEN",
+    "INTO",
+    "LENGTH",
+    "MAXLENGTH",
+    "STATUSCODE",
+    "STATUSTEXT",
+    "STATUSLEN",
+    "MEDIATYPE",
+    "BODYCHARSET",
+    "CLIENTCONV",
+    "SERVERCONV",
+    "RESP",
+    "RESP2",
+];
+
+pub(super) fn receive_options(clauses: &Clauses) -> Resolution<Vec<super::HirCicsOption>> {
+    receive::options(clauses)
+}
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -198,6 +222,9 @@ pub(super) fn validate(
             ));
         }
         return Ok(());
+    }
+    if operation == HirCicsOperation::WebReceive {
+        return receive::validate(clauses, options, semantic);
     }
     if matches!(
         operation,
@@ -459,6 +486,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::WebSend {
         return send::operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::WebReceive {
+        return receive::operands(clauses, semantic);
+    }
     if matches!(
         operation,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
@@ -553,6 +583,9 @@ pub(super) fn outputs(
             name: HirCicsOutputName::WebRetrieveDocumentToken,
             target: complete_data_reference(&clauses["DOCTOKEN"], semantic)?,
         }]);
+    }
+    if operation == HirCicsOperation::WebReceive {
+        return receive::outputs(clauses, semantic);
     }
     if matches!(
         operation,

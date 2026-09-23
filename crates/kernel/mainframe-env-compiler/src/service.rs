@@ -1952,6 +1952,7 @@ mod tests {
                 CicsPlanOperation::WebWrite => crate::HirCicsOperation::WebWrite,
                 CicsPlanOperation::WebSend => crate::HirCicsOperation::WebSend,
                 CicsPlanOperation::WebRetrieve => crate::HirCicsOperation::WebRetrieve,
+                CicsPlanOperation::WebReceive => crate::HirCicsOperation::WebReceive,
                 CicsPlanOperation::WaitJournalName => crate::HirCicsOperation::WaitJournalName,
                 CicsPlanOperation::WaitJournalNum => crate::HirCicsOperation::WaitJournalNum,
                 CicsPlanOperation::WriteJournalName => crate::HirCicsOperation::WriteJournalName,

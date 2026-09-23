@@ -378,6 +378,8 @@ pub(super) fn execute(
                         | CicsOperandName::WebStatusCode
                         | CicsOperandName::WebStatusLength
                         | CicsOperandName::WebFromLength
+                        | CicsOperandName::WebReceiveMaxLength
+                        | CicsOperandName::WebReceiveStatusLength
                         | CicsOperandName::WebPortNumber
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
@@ -525,6 +527,13 @@ pub(super) fn execute(
             | CicsOutputName::WebBrowseName
             | CicsOutputName::WebBrowseNameLength
             | CicsOutputName::WebRetrieveDocumentToken
+            | CicsOutputName::WebReceiveInto
+            | CicsOutputName::WebReceiveLength
+            | CicsOutputName::WebReceiveStatusCode
+            | CicsOutputName::WebReceiveStatusText
+            | CicsOutputName::WebReceiveStatusLength
+            | CicsOutputName::WebReceiveMediaType
+            | CicsOutputName::WebReceiveBodyCharset
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

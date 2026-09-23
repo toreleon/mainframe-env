@@ -1291,6 +1291,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "WEB PARSE URL",
                 "WEB READ",
                 "WEB READNEXT",
+                "WEB RECEIVE",
                 "WEB RETRIEVE",
                 "WEB SEND",
                 "WEB STARTBROWSE",

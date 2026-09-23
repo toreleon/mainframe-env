@@ -327,6 +327,7 @@ fn validate_plan(
                 | CicsOperandName::KeyLength
                 | CicsOperandName::ListLength
                 | CicsOperandName::MaximumLength
+                | CicsOperandName::WebReceiveMaxLength
         );
         if (numeric_length && matches!(&operand.value, CicsOperandValue::Literal(_)))
             || (!numeric_length && matches!(&operand.value, CicsOperandValue::LengthOf(_)))
@@ -665,6 +666,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WebSend => web_control::invalid_send_shape(plan, inputs, outputs),
         CicsPlanOperation::WebRetrieve => {
             web_control::invalid_retrieve_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::WebReceive => {
+            web_control::invalid_receive_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
@@ -2474,6 +2478,43 @@ mod tests {
         invalid.outputs.clear();
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_receive_codec_preserves_bounded_body_and_notruncate() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebReceive), 103);
+        assert_eq!(operation_from_tag(103), Ok(CicsPlanOperation::WebReceive));
+        assert_eq!(operand_tag(CicsOperandName::WebReceiveMaxLength), 291);
+        assert_eq!(option_tag(CicsPlanOption::WebNotruncate), 191);
+        assert_eq!(output_tag(CicsOutputName::WebReceiveInto), 338);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebReceive,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::WebReceiveMaxLength,
+                value: CicsOperandValue::Integer(4),
+            }],
+            options: BTreeSet::from([CicsPlanOption::WebNotruncate]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::WebReceiveInto,
+                    target: slot(0, "BODY-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebReceiveLength,
+                    target: slot(1, "LENGTH-X"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

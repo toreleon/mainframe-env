@@ -409,6 +409,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0247",
     ),
     (
+        "WebReceive",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0248",
+    ),
+    (
         "WebRetrieve",
         "api",
         "web-control",
@@ -799,6 +806,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WebParseUrl",
         "WebRead",
         "WebReadNext",
+        "WebReceive",
         "WebRetrieve",
         "WebSend",
         "WebStartBrowse",
@@ -1242,6 +1250,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WebRetrieve": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "WebReceive": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "WebOpen": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
@@ -1529,6 +1540,7 @@ def _load_typed_execution_registrations(
         "WebParseUrl",
         "WebRead",
         "WebReadNext",
+        "WebReceive",
         "WebRetrieve",
         "WebSend",
         "WebStartBrowse",
@@ -1912,6 +1924,7 @@ def load_catalog(
                 "WebParseUrl",
                 "WebRead",
                 "WebReadNext",
+                "WebReceive",
                 "WebRetrieve",
                 "WebSend",
                 "WebStartBrowse",

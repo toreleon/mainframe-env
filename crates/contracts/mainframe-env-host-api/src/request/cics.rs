@@ -253,6 +253,8 @@ pub enum CicsOperation {
     WebSend,
     /// Retrieve the document token from the last pending server WEB SEND.
     WebRetrieve,
+    /// Consume an inbound request body or a retained client HTTP response body.
+    WebReceive,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -406,6 +408,7 @@ impl CicsOperation {
             Self::WebWrite => "WebWrite",
             Self::WebSend => "WebSend",
             Self::WebRetrieve => "WebRetrieve",
+            Self::WebReceive => "WebReceive",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -466,6 +469,7 @@ impl CicsOperation {
                 | Self::WebEndBrowse
                 | Self::WebWrite
                 | Self::WebSend
+                | Self::WebReceive
                 | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
@@ -697,6 +701,7 @@ impl CicsOperation {
             ("WEB", Some("WRITE")) => Self::WebWrite,
             ("WEB", Some("SEND")) => Self::WebSend,
             ("WEB", Some("RETRIEVE")) => Self::WebRetrieve,
+            ("WEB", Some("RECEIVE")) => Self::WebReceive,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

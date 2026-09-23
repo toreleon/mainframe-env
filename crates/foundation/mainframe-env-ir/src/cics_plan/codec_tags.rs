@@ -115,6 +115,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::WebWrite => 100,
         CicsPlanOperation::WebSend => 101,
         CicsPlanOperation::WebRetrieve => 102,
+        CicsPlanOperation::WebReceive => 103,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -259,6 +260,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         100 => Ok(CicsPlanOperation::WebWrite),
         101 => Ok(CicsPlanOperation::WebSend),
         102 => Ok(CicsPlanOperation::WebRetrieve),
+        103 => Ok(CicsPlanOperation::WebReceive),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -565,6 +567,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebQueryInput => 288,
         CicsOperandName::WebMediaType => 289,
         CicsOperandName::WebSendUriMap => 290,
+        CicsOperandName::WebReceiveMaxLength => 291,
+        CicsOperandName::WebReceiveStatusLength => 292,
     }
 }
 
@@ -828,6 +832,8 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         288 => Ok(CicsOperandName::WebQueryInput),
         289 => Ok(CicsOperandName::WebMediaType),
         290 => Ok(CicsOperandName::WebSendUriMap),
+        291 => Ok(CicsOperandName::WebReceiveMaxLength),
+        292 => Ok(CicsOperandName::WebReceiveStatusLength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -955,6 +961,9 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::WebBrowseHttpHeader => 188,
         CicsPlanOption::WebBrowseQueryParm => 189,
         CicsPlanOption::WebBrowseFormField => 190,
+        CicsPlanOption::WebNotruncate => 191,
+        CicsPlanOption::WebNoClientConvert => 192,
+        CicsPlanOption::WebNoServerConvert => 193,
     }
 }
 
@@ -1081,6 +1090,9 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         188 => Ok(CicsPlanOption::WebBrowseHttpHeader),
         189 => Ok(CicsPlanOption::WebBrowseQueryParm),
         190 => Ok(CicsPlanOption::WebBrowseFormField),
+        191 => Ok(CicsPlanOption::WebNotruncate),
+        192 => Ok(CicsPlanOption::WebNoClientConvert),
+        193 => Ok(CicsPlanOption::WebNoServerConvert),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1172,6 +1184,13 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::WebBrowseName => 335,
         CicsOutputName::WebBrowseNameLength => 336,
         CicsOutputName::WebRetrieveDocumentToken => 337,
+        CicsOutputName::WebReceiveInto => 338,
+        CicsOutputName::WebReceiveLength => 339,
+        CicsOutputName::WebReceiveStatusCode => 340,
+        CicsOutputName::WebReceiveStatusText => 341,
+        CicsOutputName::WebReceiveStatusLength => 342,
+        CicsOutputName::WebReceiveMediaType => 343,
+        CicsOutputName::WebReceiveBodyCharset => 344,
     }
 }
 
@@ -1254,6 +1273,13 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         335 => Ok(CicsOutputName::WebBrowseName),
         336 => Ok(CicsOutputName::WebBrowseNameLength),
         337 => Ok(CicsOutputName::WebRetrieveDocumentToken),
+        338 => Ok(CicsOutputName::WebReceiveInto),
+        339 => Ok(CicsOutputName::WebReceiveLength),
+        340 => Ok(CicsOutputName::WebReceiveStatusCode),
+        341 => Ok(CicsOutputName::WebReceiveStatusText),
+        342 => Ok(CicsOutputName::WebReceiveStatusLength),
+        343 => Ok(CicsOutputName::WebReceiveMediaType),
+        344 => Ok(CicsOutputName::WebReceiveBodyCharset),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

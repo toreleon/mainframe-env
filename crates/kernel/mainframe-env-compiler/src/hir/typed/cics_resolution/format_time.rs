@@ -183,6 +183,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebBrowseName
         | HirCicsOutputName::WebBrowseNameLength
         | HirCicsOutputName::WebRetrieveDocumentToken
+        | HirCicsOutputName::WebReceiveInto
+        | HirCicsOutputName::WebReceiveLength
+        | HirCicsOutputName::WebReceiveStatusCode
+        | HirCicsOutputName::WebReceiveStatusText
+        | HirCicsOutputName::WebReceiveStatusLength
+        | HirCicsOutputName::WebReceiveMediaType
+        | HirCicsOutputName::WebReceiveBodyCharset
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

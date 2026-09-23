@@ -117,6 +117,9 @@ pub(super) fn resolve(
         if name == "PARTN" && operation != HirCicsOperation::ReceivePartn {
             continue;
         }
+        if name == "INTO" && operation == HirCicsOperation::WebReceive {
+            continue;
+        }
         if name == "TIME" && operation != HirCicsOperation::FormatTime {
             continue;
         }

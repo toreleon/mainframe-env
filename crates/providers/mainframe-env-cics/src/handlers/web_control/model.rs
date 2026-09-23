@@ -12,12 +12,16 @@ pub(super) const HEADER_NAMESPACE: &str = "cics-web-header-stage-v1";
 pub(super) const CLIENT_RESPONSE_NAMESPACE: &str = "cics-web-client-response-v1";
 pub(super) const SERVER_RESPONSE_NAMESPACE: &str = "cics-web-server-response-v1";
 pub(super) const DISPATCH_NAMESPACE: &str = "cics-web-dispatch-v1";
+pub(super) const BODY_CURSOR_NAMESPACE: &str = "cics-web-body-cursor-v1";
 const SESSION_MAGIC: &[u8; 8] = b"MECWEB01";
 const URIMAP_MAGIC: &[u8; 8] = b"MECWURI1";
 const BROWSE_MAGIC: &[u8; 8] = b"MECWBR01";
 const HEADER_MAGIC: &[u8; 8] = b"MECWHDR1";
 
+mod body;
 mod message;
+pub(in crate::service) use body::WebServerBodyCursor;
+pub(in crate::service) use body::{decode_body_cursor, encode_body_cursor};
 pub use message::{CicsWebRequest, CicsWebResponse, CicsWebServerResponse};
 pub(in crate::service) use message::{WebClientResponseState, WebServerReply};
 pub(super) use message::{
@@ -74,7 +78,7 @@ pub struct CicsWebInboundRequest {
     pub query: String,
     /// Matched inbound URIMAP, if any.
     pub urimap: Option<String>,
-    /// Request entity bytes for WEB RECEIVE and WEB RETRIEVE.
+    /// Request entity bytes for WEB RECEIVE.
     pub body: Vec<u8>,
     /// Ordered HTTP headers, retaining repeated fields.
     pub headers: Vec<(String, String)>,
@@ -174,6 +178,7 @@ pub(in crate::service) struct WebState {
     pub pending_headers: BTreeMap<String, WebHeaderStage>,
     pub client_responses: BTreeMap<String, WebClientResponseState>,
     pub server_responses: BTreeMap<String, WebServerReply>,
+    pub body_cursors: BTreeMap<String, WebServerBodyCursor>,
     pub inbound: BTreeMap<String, CicsWebInboundRequest>,
     pub urimaps: BTreeMap<String, CicsWebUriMapDefinition>,
     pub transport: Option<Arc<dyn CicsWebTransport>>,
@@ -190,6 +195,7 @@ pub(in crate::service) fn load(
         pending_headers: BTreeMap::new(),
         client_responses: BTreeMap::new(),
         server_responses: BTreeMap::new(),
+        body_cursors: BTreeMap::new(),
         inbound: BTreeMap::new(),
         urimaps: BTreeMap::new(),
         transport: None,
@@ -282,6 +288,21 @@ pub(in crate::service) fn load(
         let response = decode_server_reply(&row.payload, row.version)?;
         if row.key != response.owner_run_unit
             || state.server_responses.insert(row.key, response).is_some()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        state.bytes = state
+            .bytes
+            .checked_add(row.payload.len())
+            .filter(|total| *total <= limits.max_web_bytes)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
+    for row in store
+        .list_provider_state(BODY_CURSOR_NAMESPACE, limits.max_web_sessions)
+        .map_err(store_error)?
+    {
+        let cursor = decode_body_cursor(&row.payload, row.version)?;
+        if row.key != cursor.owner_run_unit || state.body_cursors.insert(row.key, cursor).is_some()
         {
             return Err(HostProblem::InfrastructureFailure);
         }

@@ -676,6 +676,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0247"
     },
     {
+      "operation": "WebReceive",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0248"
+    },
+    {
       "operation": "WebRetrieve",
       "interface": "api",
       "family": "web-control",

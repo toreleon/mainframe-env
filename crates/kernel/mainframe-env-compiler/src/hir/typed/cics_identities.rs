@@ -137,6 +137,7 @@ pub enum HirCicsOperation {
     WebWrite,
     WebSend,
     WebRetrieve,
+    WebReceive,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -396,6 +397,8 @@ pub enum HirCicsOperandName {
     WebQueryInput,
     WebMediaType,
     WebSendUriMap,
+    WebReceiveMaxLength,
+    WebReceiveStatusLength,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -516,4 +519,7 @@ pub enum HirCicsOption {
     WebBrowseHttpHeader,
     WebBrowseQueryParm,
     WebBrowseFormField,
+    WebNotruncate,
+    WebNoClientConvert,
+    WebNoServerConvert,
 }

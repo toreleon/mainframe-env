@@ -72,7 +72,30 @@ fn invoke_inner(
                     && session.transaction == run.transaction
             })
             .ok_or_else(|| condition("NOTOPEN", 19, 27))?;
-        return Err(condition("INVREQ", 16, 43));
+        if selector != "HTTPHEADER" {
+            return Err(HostProblem::Malformed);
+        }
+        let response = state
+            .web
+            .client_responses
+            .get(&model::token_key(token))
+            .filter(|response| {
+                response.received
+                    && response.owner_execution == run.invocation.execution_id.as_str()
+                    && response.owner_run_unit == run.invocation.run_unit_id.as_str()
+                    && response.transaction == run.transaction
+            })
+            .ok_or_else(|| condition("INVREQ", 16, 43))?;
+        if response.response.headers.is_empty() {
+            return Err(condition("INVREQ", 16, 43));
+        }
+        response
+            .response
+            .headers
+            .iter()
+            .find(|(header, _)| header.as_bytes().eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_bytes().to_vec())
+            .ok_or_else(|| condition("NOTFND", 13, 1))?
     } else {
         let inbound = state
             .web

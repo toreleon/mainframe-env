@@ -155,6 +155,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::WebRealmLength => SlotUse::FullwordInput,
         CicsOperandName::WebNameLength | CicsOperandName::WebValueLength => SlotUse::FullwordInput,
         CicsOperandName::WebStatusLength | CicsOperandName::WebFromLength => SlotUse::FullwordInput,
+        CicsOperandName::WebReceiveMaxLength | CicsOperandName::WebReceiveStatusLength => {
+            SlotUse::FullwordInput
+        }
         CicsOperandName::WebStatusCode => SlotUse::HalfwordInput,
         CicsOperandName::WebPortNumber => SlotUse::FullwordInput,
         _ => SlotUse::Input,
@@ -223,6 +226,14 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::WebValue => SlotUse::Output,
         CicsOutputName::WebBrowseName => SlotUse::Output,
         CicsOutputName::WebRetrieveDocumentToken => SlotUse::Output,
+        CicsOutputName::WebReceiveInto
+        | CicsOutputName::WebReceiveStatusText
+        | CicsOutputName::WebReceiveMediaType
+        | CicsOutputName::WebReceiveBodyCharset => SlotUse::Output,
+        CicsOutputName::WebReceiveLength | CicsOutputName::WebReceiveStatusLength => {
+            SlotUse::FullwordOutput
+        }
+        CicsOutputName::WebReceiveStatusCode => SlotUse::HalfwordOutput,
         CicsOutputName::WebHostLength
         | CicsOutputName::WebHostType
         | CicsOutputName::WebPortNumber
@@ -381,6 +392,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebWrite => CicsOperation::WebWrite,
         CicsPlanOperation::WebSend => CicsOperation::WebSend,
         CicsPlanOperation::WebRetrieve => CicsOperation::WebRetrieve,
+        CicsPlanOperation::WebReceive => CicsOperation::WebReceive,
     }
 }
 
@@ -639,6 +651,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebQueryInput => "QUERYSTRING",
         CicsOperandName::WebMediaType => "MEDIATYPE",
         CicsOperandName::WebSendUriMap => "URIMAP",
+        CicsOperandName::WebReceiveMaxLength => "MAXLENGTH",
+        CicsOperandName::WebReceiveStatusLength => "STATUSLEN",
         CicsOperandName::WebPortNumber => "PORTNUMBER",
         CicsOperandName::WebScheme => "SCHEME",
         CicsOperandName::WebUriMap => "URIMAP",
@@ -747,6 +761,13 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::WebBrowseName => "BROWSENAME",
         CicsOutputName::WebBrowseNameLength => "NAMELENGTH",
         CicsOutputName::WebRetrieveDocumentToken => "DOCTOKEN",
+        CicsOutputName::WebReceiveInto => "INTO",
+        CicsOutputName::WebReceiveLength => "LENGTH",
+        CicsOutputName::WebReceiveStatusCode => "STATUSCODE",
+        CicsOutputName::WebReceiveStatusText => "STATUSTEXT",
+        CicsOutputName::WebReceiveStatusLength => "STATUSLEN",
+        CicsOutputName::WebReceiveMediaType => "MEDIATYPE",
+        CicsOutputName::WebReceiveBodyCharset => "BODYCHARSET",
     }
 }
 
@@ -873,5 +894,8 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::WebBrowseHttpHeader => "HTTPHEADER",
         CicsPlanOption::WebBrowseQueryParm => "QUERYPARM",
         CicsPlanOption::WebBrowseFormField => "FORMFIELD",
+        CicsPlanOption::WebNotruncate => "NOTRUNCATE",
+        CicsPlanOption::WebNoClientConvert => "NOCLICONVERT",
+        CicsPlanOption::WebNoServerConvert => "NOSRVCONVERT",
     }
 }
