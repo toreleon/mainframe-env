@@ -307,6 +307,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/retrieve.rs",
       "crates/providers/mainframe-env-cics/src/handlers/journal_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/limits.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/operator_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/operator_control/authority.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",

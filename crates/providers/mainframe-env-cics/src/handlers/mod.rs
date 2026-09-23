@@ -11,6 +11,7 @@ mod interval;
 mod interval_control;
 mod journal_control;
 mod limits;
+mod operator_control;
 mod program_control;
 mod queue_control;
 mod recovery;
@@ -86,6 +87,14 @@ pub(super) use document_control::{
 };
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use file_tokens::FileUpdateState;
+pub(super) fn validate_owned_stores(
+    store: &dyn mainframe_env_store_api::ProviderStateStore,
+    limits: super::CicsLimits,
+) -> Result<(), HostProblem> {
+    task_enqueue::validate_store(store, limits)?;
+    operator_control::load_operator_messages(store, limits)?;
+    Ok(())
+}
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };
@@ -137,10 +146,7 @@ pub(super) use task_control::{
     new_run_with_state,
 };
 pub use task_enqueue::CicsEnqueueModelDefinition;
-pub(super) use task_enqueue::{
-    load_enqueue_models, release_uow as release_uow_enqueues,
-    validate_store as validate_enqueue_store,
-};
+pub(super) use task_enqueue::{load_enqueue_models, release_uow as release_uow_enqueues};
 pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };

@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a bounded durable operator-message and reply authority for the pending
+  CICS `WRITE OPERATOR` route. It validates console names, route codes, action
+  codes, text and reply limits, strict record encoding, deadline transitions,
+  replay, and SQLite recovery. The command remains unready until its compiled
+  dispatch, console ingress, and wait/wakeup semantics are connected.
+
 - Added typed CICS `POST` for row `0147`. A task-owned four-byte timer-event
   area starts at zero, is posted with bytes `40 00 80 00` on expiry or cross-task
   CANCEL, and can wake WAIT EVENT, WAIT EXTERNAL, or WAITCICS. The durable timer

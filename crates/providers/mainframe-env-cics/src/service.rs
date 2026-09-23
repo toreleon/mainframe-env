@@ -422,7 +422,7 @@ impl CicsService {
         }
         let enqueue_models = handlers::load_enqueue_models(store.as_ref(), limits)?;
         let transient = handlers::load_transient_data(store.as_ref(), limits)?;
-        handlers::validate_enqueue_store(store.as_ref(), limits)?;
+        handlers::validate_owned_stores(store.as_ref(), limits)?;
         let (documents, document_templates, document_bytes) =
             handlers::load_document_authority(store.as_ref(), limits)?;
         let interval_records = handlers::load_interval_records(store.as_ref(), limits)?;
