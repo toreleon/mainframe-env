@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 190,
+    "markdown_documents": 191,
     "navigation_groups": 5,
-    "normative_documents": 42,
+    "normative_documents": 43,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a17550e5204c5d0c68668daecfa724e80880151b2c8121e2c351ac1bbc8add98",
+      "sha256": "sha256:a858a696b38dea34808eaff53d6a6a6e7fd2189443c2394985df12b38efb0392",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 77,
-      "sha256": "sha256:4916df061cfe9dc35d91c09ab504d3e87b100961598db1ce5a58fb5b056d92f2",
+      "relative_links": 78,
+      "sha256": "sha256:4de2d29c5bb6783e258503af3a4a3b706e6b2cc1108791770893ab95755a67c6",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -755,10 +755,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and server maintainers",
+      "path": "docs/decisions/0015-cics-immediate-start-target-authority.md",
+      "relative_links": 0,
+      "scope": "START ATTACH and START BREXIT transaction admission",
+      "sha256": "sha256:bd91a50be4a8a46d2ee8d4f9a0015f661bdcc615d4a57d338638ff7089a99b07",
+      "status": "Proposed for v0.9 development; command rows pending",
+      "title": "ADR-0015: Resolve immediate START targets from installed durable definitions",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 14,
-      "sha256": "sha256:dd017dbf470215fa45150615008d9e314c71f786916a91bccd540e43dc3e6b17",
+      "relative_links": 15,
+      "sha256": "sha256:84e656f8d9ad8a8fbd00718cc2c1943048ff117f8d38ce79e327881df1cf937c",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1098,7 +1110,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:df651e550398bb4f1656b5710e8155af326ad9bdf204ac0534e4f258ece2dca6",
+      "sha256": "sha256:89055a5b3926f882a44cbcc03cca6454fbe3d8cbe8b87c8d59fed18a32e29402",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1852,6 +1864,10 @@
           "path": "docs/decisions/0014-cics-tcpip-ingress-context.md"
         },
         {
+          "label": "ADR-0015: CICS immediate START target authority",
+          "path": "docs/decisions/0015-cics-immediate-start-target-authority.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2015,7 +2031,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:fa9de13ac25021fdd2e4f78fa572508133ecc3c6dbe825529b0ec1c7a3c55c3a",
+  "registry_sha256": "sha256:162d6766e20c1364825bb77410deecd2e9a5ddef06f8cd8b5bd72aaad11e05e2",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

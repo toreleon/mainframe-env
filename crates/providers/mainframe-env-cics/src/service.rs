@@ -9816,6 +9816,94 @@ mod tests {
     }
 
     #[test]
+    fn local_start_target_lookup_is_durable_and_rejects_undefined_or_corrupt_rows() {
+        let seed = |store: &dyn ProviderStateStore, artifacts: &dyn ArtifactStore| {
+            let (artifact, _) = install_program_artifact(artifacts, b"local-start-target");
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "online-program".into(),
+                        key: "TARGET".into(),
+                        version: 1,
+                        payload: artifact.as_str().as_bytes().to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "online-transaction".into(),
+                        key: "NX00".into(),
+                        version: 1,
+                        payload: b"TARGET".to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+        };
+        let memory = Arc::new(MemoryStore::new(Default::default()));
+        let memory_cics = service(memory.clone());
+        memory_cics.bind_artifact_store(memory.clone()).unwrap();
+        assert!(matches!(
+            memory_cics.local_transaction_program("NX00"),
+            Err(HostProblem::Condition {
+                response: 28,
+                response2: 0,
+                ..
+            })
+        ));
+        seed(memory.as_ref(), memory.as_ref());
+        assert_eq!(
+            memory_cics.local_transaction_program("nx00"),
+            Ok("TARGET".into())
+        );
+
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-local-start-target-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            seed(store.as_ref(), store.as_ref());
+            let cics =
+                CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(store).unwrap();
+            assert_eq!(cics.local_transaction_program("NX00"), Ok("TARGET".into()));
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        cics.bind_artifact_store(store.clone()).unwrap();
+        assert_eq!(cics.local_transaction_program("NX00"), Ok("TARGET".into()));
+        let record = store
+            .get_provider_state("online-transaction", "NX00")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(&record.namespace, &record.key, record.version)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    payload: b"missing-program".to_vec(),
+                    ..record
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            cics.local_transaction_program("NX00"),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        drop(cics);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn start_without_data_schedules_and_retrieve_returns_source_defined_enddata() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

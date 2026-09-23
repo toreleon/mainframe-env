@@ -337,6 +337,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/time.rs",
       "crates/providers/mainframe-env-cics/src/handlers/time/convert_time.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/transaction_definition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control/json_to_data.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control/reader.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control/xml_to_data.rs",

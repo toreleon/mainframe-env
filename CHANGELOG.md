@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a read-only durable local transaction lookup for the pending CICS
+  `START ATTACH` and `START BREXIT` routes. It resolves installed targets from
+  the existing server catalog, returns TRANSIDERR 28/0 for undefined names,
+  and rejects malformed or missing executable artifacts before scheduling.
+
 - Completed the typed `EXTRACT TCPIP` route for row `0074`. It returns the
   task's trusted IPv4/IPv6 addresses, DNS names supplied by ingress, service,
   port, and maximum data length with source-defined buffer lengths and

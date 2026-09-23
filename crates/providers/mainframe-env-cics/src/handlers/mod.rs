@@ -28,6 +28,7 @@ mod task_wait;
 mod terminal_control;
 mod terminal_run;
 mod time;
+mod transaction_definition;
 mod transform_control;
 pub(in crate::service) mod transient_data;
 
