@@ -1,5 +1,6 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    AddSubevent,
     Abend,
     Address,
     AddressSet,
@@ -28,6 +29,7 @@ pub enum HirCicsOperation {
     ReadNext,
     ReadPrev,
     ReadTransientData,
+    RemoveSubevent,
     EndBrowse,
     Delete,
     DefineInputEvent,

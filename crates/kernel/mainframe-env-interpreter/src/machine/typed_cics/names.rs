@@ -189,6 +189,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
         CicsPlanOperation::Abend => CicsOperation::Abend,
+        CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
+        CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
         CicsPlanOperation::Address => CicsOperation::Address,
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
         CicsPlanOperation::Asktime => CicsOperation::Asktime,
@@ -290,6 +292,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
         CicsOperandName::Abcode => "ABCODE",
         CicsOperandName::Event => "EVENT",
+        CicsOperandName::SubEvent => "SUBEVENT",
         CicsOperandName::SubEvent1 => "SUBEVENT1",
         CicsOperandName::SubEvent2 => "SUBEVENT2",
         CicsOperandName::SubEvent3 => "SUBEVENT3",

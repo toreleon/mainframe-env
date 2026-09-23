@@ -4,6 +4,13 @@
   "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
   "registrations": [
     {
+      "operation": "AddSubevent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0004"
+    },
+    {
       "operation": "Address",
       "interface": "api",
       "family": "task-control",
@@ -310,6 +317,13 @@
       "family": "program-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0165"
+    },
+    {
+      "operation": "RemoveSubevent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0166"
     },
     {
       "operation": "ResetBrowse",

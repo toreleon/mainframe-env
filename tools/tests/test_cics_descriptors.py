@@ -1162,6 +1162,7 @@ class CicsDescriptorTests(unittest.TestCase):
             typed,
             {
                 "ABEND",
+                "ADD SUBEVENT",
                 "ADDRESS",
                 "ADDRESS SET",
                 "ASKTIME",
@@ -1202,6 +1203,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "PUSH HANDLE",
                 "READ",
                 "READQ TS",
+                "REMOVE SUBEVENT",
                 "REWRITE",
                 "SET ASSOCIATION USERCORRDATA",
                 "SOAPFAULT ADD",

@@ -2410,6 +2410,7 @@ mod tests {
     fn all_cics_runtime_operation_names_are_unique() {
         let forms = [
             CicsOperation::Abend,
+            CicsOperation::AddSubevent,
             CicsOperation::Address,
             CicsOperation::AddressSet,
             CicsOperation::Asktime,
@@ -2453,6 +2454,7 @@ mod tests {
             CicsOperation::ReadPrev,
             CicsOperation::ResetBrowse,
             CicsOperation::ReadTransientData,
+            CicsOperation::RemoveSubevent,
             CicsOperation::ReceiveMap,
             CicsOperation::Retrieve,
             CicsOperation::Return,

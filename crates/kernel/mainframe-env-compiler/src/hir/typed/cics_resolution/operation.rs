@@ -10,6 +10,7 @@ pub(super) fn resolve(
 ) -> Resolution<HirCicsOperation> {
     Ok(match descriptor.label_tokens {
         ["ABEND"] => HirCicsOperation::Abend,
+        ["ADD", "SUBEVENT"] => HirCicsOperation::AddSubevent,
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
         ["ADDRESS"] => HirCicsOperation::Address,
         ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
@@ -56,6 +57,7 @@ pub(super) fn resolve(
         ["READNEXT"] => HirCicsOperation::ReadNext,
         ["READPREV"] => HirCicsOperation::ReadPrev,
         ["READQ", "TD"] => HirCicsOperation::ReadTransientData,
+        ["REMOVE", "SUBEVENT"] => HirCicsOperation::RemoveSubevent,
         ["ENDBR"] => HirCicsOperation::EndBrowse,
         ["DELETE"] => HirCicsOperation::Delete,
         ["WRITE", "FILE"] => HirCicsOperation::Write,

@@ -48,6 +48,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::AddSubevent,
+        syntax: "ADD SUBEVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0004",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Address,
         syntax: "ADDRESS",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0005",
@@ -549,6 +556,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "SPOOLWRITE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0204",
         family: CicsCommandFamily::SpoolControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::RemoveSubevent,
+        syntax: "REMOVE SUBEVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0166",
+        family: CicsCommandFamily::EventControl,
         mutating: true,
     },
     CicsCommandDescriptor {

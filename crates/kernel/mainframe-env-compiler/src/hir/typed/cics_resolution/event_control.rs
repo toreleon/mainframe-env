@@ -28,6 +28,11 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             options: &["AND", "OR", "NOHANDLE"],
             required: &["EVENT"],
         }),
+        HirCicsOperation::AddSubevent | HirCicsOperation::RemoveSubevent => Some(CommandShape {
+            clauses: &["EVENT", "SUBEVENT", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["EVENT", "SUBEVENT"],
+        }),
         _ => None,
     }
 }
@@ -55,7 +60,10 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     if !matches!(
         operation,
-        HirCicsOperation::DefineInputEvent | HirCicsOperation::DefineCompositeEvent
+        HirCicsOperation::DefineInputEvent
+            | HirCicsOperation::DefineCompositeEvent
+            | HirCicsOperation::AddSubevent
+            | HirCicsOperation::RemoveSubevent
     ) {
         return Ok(Vec::new());
     }
@@ -81,6 +89,15 @@ pub(super) fn operands(
                 });
             }
         }
+    }
+    if matches!(
+        operation,
+        HirCicsOperation::AddSubevent | HirCicsOperation::RemoveSubevent
+    ) {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::SubEvent,
+            value: cics_value(&clauses["SUBEVENT"], semantic)?,
+        });
     }
     Ok(operands)
 }

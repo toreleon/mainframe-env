@@ -61,3 +61,26 @@ pub(super) fn invalid_define_composite_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_membership_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    inputs.len() != 2
+        || !inputs.contains(&CicsOperandName::Event)
+        || !inputs.contains(&CicsOperandName::SubEvent)
+        || plan.operands.iter().any(|operand| {
+            !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

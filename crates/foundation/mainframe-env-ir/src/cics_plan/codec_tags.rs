@@ -18,6 +18,8 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::AddSubevent => 105,
+        CicsPlanOperation::RemoveSubevent => 113,
         CicsPlanOperation::Read => 0,
         CicsPlanOperation::Rewrite => 1,
         CicsPlanOperation::Syncpoint => 2,
@@ -118,6 +120,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        105 => Ok(CicsPlanOperation::AddSubevent),
+        113 => Ok(CicsPlanOperation::RemoveSubevent),
         0 => Ok(CicsPlanOperation::Read),
         1 => Ok(CicsPlanOperation::Rewrite),
         2 => Ok(CicsPlanOperation::Syncpoint),
@@ -220,6 +224,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
         CicsOperandName::Event => 320,
+        CicsOperandName::SubEvent => 329,
         CicsOperandName::SubEvent1 => 321,
         CicsOperandName::SubEvent2 => 322,
         CicsOperandName::SubEvent3 => 323,
@@ -397,6 +402,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
         320 => Ok(CicsOperandName::Event),
+        329 => Ok(CicsOperandName::SubEvent),
         321 => Ok(CicsOperandName::SubEvent1),
         322 => Ok(CicsOperandName::SubEvent2),
         323 => Ok(CicsOperandName::SubEvent3),

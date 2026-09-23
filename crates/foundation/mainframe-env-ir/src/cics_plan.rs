@@ -719,6 +719,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DefineCompositeEvent => {
             event_control::invalid_define_composite_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::AddSubevent | CicsPlanOperation::RemoveSubevent => {
+            event_control::invalid_membership_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1375,6 +1378,38 @@ mod tests {
             encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn composite_membership_uses_exclusive_v2_operation_and_operand_tags() {
+        let limits = CicsPlanLimits::default();
+        for (operation, tag) in [
+            (CicsPlanOperation::AddSubevent, 105),
+            (CicsPlanOperation::RemoveSubevent, 113),
+        ] {
+            let plan = CicsEffectPlan {
+                operation,
+                operands: vec![
+                    CicsNamedOperand {
+                        name: CicsOperandName::Event,
+                        value: CicsOperandValue::Literal(b"GROUP".to_vec()),
+                    },
+                    CicsNamedOperand {
+                        name: CicsOperandName::SubEvent,
+                        value: CicsOperandValue::Literal(b"GO".to_vec()),
+                    },
+                ],
+                options: BTreeSet::new(),
+                outputs: Vec::new(),
+                condition: CicsCondition::Default,
+            };
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+            assert_eq!(operand_tag(CicsOperandName::SubEvent), 329);
+            assert_eq!(operand_from_tag(329), Ok(CicsOperandName::SubEvent));
+            let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+            assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan));
+        }
     }
 
     /// Issue #212: unrelated file and UOW plans reject extension flags.

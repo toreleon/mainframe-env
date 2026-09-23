@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
+    /// Add one atomic event to an activity-owned composite predicate.
+    AddSubevent,
     /// Return checked virtual addresses for task storage areas.
     Address,
     /// Copy one checked virtual pointer/address relationship.
@@ -112,6 +114,8 @@ pub enum CicsOperation {
     ResetBrowse,
     /// Read and consume one record from a local transient-data queue.
     ReadTransientData,
+    /// Remove one atomic child without deleting or resetting it.
+    RemoveSubevent,
     ReceiveMap,
     Retrieve,
     Return,
@@ -186,6 +190,7 @@ impl CicsOperation {
     pub const fn runtime_name(self) -> &'static str {
         match self {
             Self::Abend => "Abend",
+            Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
@@ -243,6 +248,7 @@ impl CicsOperation {
             Self::ReadPrev => "ReadPrev",
             Self::ResetBrowse => "ResetBrowse",
             Self::ReadTransientData => "ReadTransientData",
+            Self::RemoveSubevent => "RemoveSubevent",
             Self::ReceiveMap => "ReceiveMap",
             Self::Retrieve => "Retrieve",
             Self::Return => "Return",
@@ -311,6 +317,7 @@ impl CicsOperation {
         matches!(
             self,
             Self::Delete
+                | Self::AddSubevent
                 | Self::DefineInputEvent
                 | Self::DefineCompositeEvent
                 | Self::DocumentCreate
@@ -358,6 +365,7 @@ impl CicsOperation {
                 | Self::Release
                 | Self::ReceiveMap
                 | Self::ReadTransientData
+                | Self::RemoveSubevent
                 | Self::PurgeMessage
                 | Self::SendMap
                 | Self::SendText
@@ -394,6 +402,7 @@ impl CicsOperation {
         let first = words.first()?.as_str();
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ABEND", _) => Self::Abend,
+            ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
             ("ADDRESS", _) => Self::Address,
             ("ASKTIME", _)
@@ -462,6 +471,7 @@ impl CicsOperation {
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("READ", _) => Self::Read,
             ("READQ", Some("TD")) => Self::ReadTransientData,
+            ("REMOVE", Some("SUBEVENT")) => Self::RemoveSubevent,
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,

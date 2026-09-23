@@ -27458,4 +27458,141 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn add_remove_subevent_recompute_and_replay_durable_membership() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        for (sequence, operation, name, option) in [
+            (1, CicsOperation::DefineInputEvent, b"GO".as_slice(), None),
+            (
+                2,
+                CicsOperation::DefineCompositeEvent,
+                b"GROUP".as_slice(),
+                Some("OR"),
+            ),
+        ] {
+            let mut arguments = BTreeMap::from([("EVENT".into(), argument(name))]);
+            if let Some(option) = option {
+                arguments.insert(format!("OPTION.{option}"), cics_option());
+            }
+            let request = request(operation, arguments, sequence);
+            cics.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+            .unwrap();
+        }
+        let add = request(
+            CicsOperation::AddSubevent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GROUP")),
+                ("SUBEVENT".into(), argument(b"GO")),
+            ]),
+            3,
+        );
+        let added = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, add.clone(), 3),
+                add.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, add.clone(), 3), add)
+                .unwrap(),
+            added
+        );
+        cics.post_input_event("CURRENT", "GO").unwrap();
+        let before_repeat = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        cics.post_input_event("CURRENT", "GO").unwrap();
+        assert_eq!(
+            store
+                .get_provider_state("cics-event-activity-v1", "CURRENT")
+                .unwrap()
+                .unwrap()
+                .version,
+            before_repeat.version
+        );
+        let fired: serde_json::Value = serde_json::from_slice(&before_repeat.payload).unwrap();
+        assert_eq!(fired["events"]["GO"]["fired"], true);
+        assert_eq!(fired["events"]["GROUP"]["fired"], true);
+        assert_eq!(fired["events"]["GROUP"]["kind"]["fired_queue"][0], "GO");
+        assert_eq!(fired["reattach"][0], "GROUP");
+
+        let remove = request(
+            CicsOperation::RemoveSubevent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GROUP")),
+                ("SUBEVENT".into(), argument(b"GO")),
+            ]),
+            4,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, remove.clone(), 4),
+            remove.clone(),
+        )
+        .unwrap();
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["events"]["GO"]["parent"], serde_json::Value::Null);
+        assert_eq!(state["events"]["GO"]["fired"], true);
+        assert_eq!(state["events"]["GROUP"]["fired"], false);
+        assert_eq!(
+            state["events"]["GROUP"]["kind"]["fired_queue"],
+            serde_json::json!([])
+        );
+        assert_eq!(state["reattach"], serde_json::json!([]));
+        let duplicate = request(
+            CicsOperation::RemoveSubevent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GROUP")),
+                ("SUBEVENT".into(), argument(b"GO")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, duplicate.clone(), 5),
+                duplicate
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 3,
+            })
+        );
+        for (sequence, composite, child, response2) in [
+            (6, b"ABSENT".as_slice(), b"GO".as_slice(), 4),
+            (7, b"GROUP".as_slice(), b"ABSENT".as_slice(), 5),
+        ] {
+            let invalid = request(
+                CicsOperation::AddSubevent,
+                BTreeMap::from([
+                    ("EVENT".into(), argument(composite)),
+                    ("SUBEVENT".into(), argument(child)),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid
+                ),
+                Err(HostProblem::Condition {
+                    name: "EVENTERR".into(),
+                    response: 111,
+                    response2,
+                })
+            );
+        }
+    }
 }

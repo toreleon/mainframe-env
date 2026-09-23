@@ -3,6 +3,8 @@ use super::CicsAssignOutput;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Add an atomic child to a BTS composite event.
+    AddSubevent,
     /// Terminate the issuing task abnormally or transfer to its active exit.
     Abend,
     /// Return checked virtual addresses for task storage areas.
@@ -109,6 +111,8 @@ pub enum CicsPlanOperation {
     DeleteTemporaryStorage,
     /// Read and consume one record from a local transient-data queue.
     ReadTransientData,
+    /// Remove an atomic child from a BTS composite event.
+    RemoveSubevent,
     /// Read one item from a local temporary-storage queue.
     ReadTemporaryStorage,
     /// Append or replace one item in a local temporary-storage queue.
@@ -200,6 +204,8 @@ pub enum CicsPlanOperation {
 pub enum CicsOperandName {
     /// Name of a BTS event or SIGNAL EVENT capture point.
     Event,
+    /// One atomic child of a BTS composite predicate.
+    SubEvent,
     /// Initial atomic child of a composite event, numbered one through eight.
     SubEvent1,
     SubEvent2,

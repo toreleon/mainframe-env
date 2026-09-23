@@ -69,6 +69,11 @@ All notable changes to mainframe-env are documented here.
   up to eight initial atomic children, durable child ownership and reevaluation,
   exact missing/invalid child conditions, SAF, replay, and a compiled v2 route.
 
+- Added typed CICS `ADD SUBEVENT` and `REMOVE SUBEVENT` for durable composite
+  membership. Atomic input delivery updates child queues and reevaluates
+  predicates; removal preserves the child's fire status and both commands
+  enforce source-specific conditions, SAF, replay, and compiled v2 routes.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

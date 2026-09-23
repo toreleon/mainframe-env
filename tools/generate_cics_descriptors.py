@@ -101,6 +101,7 @@ TYPED_EXECUTION_FAMILIES = {
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
+    ("AddSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0004"),
     ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
@@ -263,6 +264,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("SpoolRead", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0203"),
     ("SpoolWrite", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0204"),
+    ("RemoveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0166"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -559,6 +561,7 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "Abend",
+        "AddSubevent",
         "Address",
         "Cancel",
         "ChangeTask",
@@ -610,6 +613,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DeleteTransientData",
         "DeleteTemporaryStorage",
         "ReadTemporaryStorage",
+        "RemoveSubevent",
         "WriteTemporaryStorage",
         "DocumentCreate",
         "DocumentDelete",
@@ -702,6 +706,12 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "AddSubevent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "RemoveSubevent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Abend": frozenset(
         {
             "memory-read",
@@ -1170,6 +1180,7 @@ def _load_typed_execution_registrations(
             }
         )
     if [row["operation"] for row in normalized] != [
+        "AddSubevent",
         "Address",
         "AddressSet",
         "AsktimeEib",
@@ -1214,6 +1225,7 @@ def _load_typed_execution_registrations(
         "ReadTemporaryStorage",
         "ReadTransientData",
         "Release",
+        "RemoveSubevent",
         "ResetBrowse",
         "SetAssociationUserCorrData",
         "SoapFaultAdd",

@@ -141,6 +141,75 @@ impl CicsService {
             )
             .map_err(store_error)
     }
+
+    /// Deliver one BTS `RUN` input event to an activity's durable event pool.
+    ///
+    /// The BTS adapter owns this ingress. Repeating a delivery while the event
+    /// remains FIRED is idempotent; retrieval must reset it before it can fire
+    /// again. A composite child is queued under its parent instead of directly
+    /// reattaching the activity.
+    pub fn post_input_event(&self, activity: &str, event: &str) -> Result<(), HostProblem> {
+        let activity = event_name(activity)?;
+        let event = event_name(event)?;
+        for _ in 0..MAX_CAS_ATTEMPTS {
+            let mut state = load_activity(self, &activity)?;
+            let Some(record) = state.events.get(&event) else {
+                return Err(event_error(4));
+            };
+            if !matches!(record.kind, EventKind::Input) {
+                return Err(HostProblem::Malformed);
+            }
+            if !fire_atomic(&mut state, &event)? {
+                return Ok(());
+            }
+            match persist_activity(self, &activity, &mut state) {
+                Ok(()) => return Ok(()),
+                Err(HostProblem::IdempotencyConflict) => continue,
+                Err(problem) => return Err(problem),
+            }
+        }
+        Err(HostProblem::IdempotencyConflict)
+    }
+}
+
+pub(super) fn fire_atomic(state: &mut ActivityState, event: &str) -> Result<bool, HostProblem> {
+    let record = state.events.get(event).ok_or_else(|| event_error(4))?;
+    if record.fired {
+        return Ok(false);
+    }
+    let parent = record.parent.clone();
+    if let Some(parent_name) = parent.as_deref() {
+        let Some(composite) = state.events.get(parent_name) else {
+            return Err(HostProblem::InfrastructureFailure);
+        };
+        let EventKind::Composite { fired_queue, .. } = &composite.kind else {
+            return Err(HostProblem::InfrastructureFailure);
+        };
+        if fired_queue.len() == MAX_QUEUE {
+            return Err(HostProblem::ResourceExhausted);
+        }
+    } else if state.reattach.len() == MAX_QUEUE {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    state
+        .events
+        .get_mut(event)
+        .expect("validated atomic event")
+        .fired = true;
+    if let Some(parent_name) = parent {
+        let composite = state
+            .events
+            .get_mut(&parent_name)
+            .expect("validated composite");
+        let EventKind::Composite { fired_queue, .. } = &mut composite.kind else {
+            unreachable!("validated composite")
+        };
+        fired_queue.push_back(event.into());
+        composite::reevaluate(state, &parent_name)?;
+    } else {
+        state.reattach.push_back(event.into());
+    }
+    Ok(true)
 }
 
 pub(in crate::service) fn invoke(
@@ -151,6 +220,8 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::DefineInputEvent => define_input_event(service, run, request),
         CicsOperation::DefineCompositeEvent => composite::define(service, run, request),
+        CicsOperation::AddSubevent => composite::add(service, run, request),
+        CicsOperation::RemoveSubevent => composite::remove(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
