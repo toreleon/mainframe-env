@@ -432,6 +432,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::ChangePassword => security_control::CHANGE_PASSWORD_CLAUSES,
         HirCicsOperation::ChangePhrase => security_control::CHANGE_PHRASE_CLAUSES,
         HirCicsOperation::RequestPassTicket => security_control::PASSTICKET_CLAUSES,
+        HirCicsOperation::Signon => security_control::SIGNON_CLAUSES,
         HirCicsOperation::VerifyPhrase => security_control::VERIFY_PHRASE_CLAUSES,
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
@@ -511,6 +512,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ChangePassword
         | HirCicsOperation::ChangePhrase
         | HirCicsOperation::RequestPassTicket
+        | HirCicsOperation::Signon
         | HirCicsOperation::VerifyPhrase
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
@@ -734,6 +736,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             &["PHRASE", "PHRASELEN", "NEWPHRASE", "NEWPHRASELEN", "USERID"][..]
         }
         HirCicsOperation::RequestPassTicket => &["PASSTICKET", "ESMAPPNAME"][..],
+        HirCicsOperation::Signon => &["USERID"][..],
         HirCicsOperation::VerifyPhrase => &["PHRASE", "PHRASELEN", "USERID"][..],
         HirCicsOperation::Syncpoint => &[][..],
         HirCicsOperation::WaitJournalName

@@ -225,6 +225,7 @@ pub(super) fn execute(
                     CicsOperandName::SecurityPassword
                         | CicsOperandName::SecurityNewPassword
                         | CicsOperandName::SecurityNewPhrase
+                        | CicsOperandName::SecurityOidCard
                         | CicsOperandName::SecurityPhrase
                 ) =>
             {

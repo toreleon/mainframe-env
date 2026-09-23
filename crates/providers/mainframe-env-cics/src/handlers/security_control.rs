@@ -4,6 +4,8 @@ use super::super::{CicsService, Run, decimal_payload};
 mod authority;
 mod change;
 mod passticket;
+mod signon;
+mod terminal_state;
 mod verify;
 pub use authority::{
     CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
@@ -14,6 +16,10 @@ pub use authority::{
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+};
+pub(in crate::service) use terminal_state::{
+    TerminalIdentity, decode_terminal_identity, encode_terminal_identity,
+    validate_terminal_identity,
 };
 
 const QUERY_LEVELS: [(&str, u8, i64, i64); 4] = [
@@ -33,6 +39,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::ChangePassword => change::password(service, run, request, tick),
         CicsOperation::ChangePhrase => change::phrase(service, run, request, tick),
         CicsOperation::RequestPassTicket => passticket::issue(service, run, request, tick),
+        CicsOperation::Signon => signon::invoke(service, run, request, tick),
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
         CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
         CicsOperation::VerifyPhrase => verify::phrase(service, run, request, tick),

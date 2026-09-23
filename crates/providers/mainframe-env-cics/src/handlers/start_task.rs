@@ -133,6 +133,7 @@ impl CicsService {
         }
         let new_session = existing.is_none();
         let current = existing.unwrap_or_else(|| Session {
+            terminal_identity: super::TerminalIdentity::default(),
             rows: 1,
             columns: 1,
             principal: invocation.principal.id().as_str().into(),

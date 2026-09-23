@@ -212,6 +212,8 @@ pub enum CicsPlanOperation {
     QuerySecurity,
     /// Issue a one-use PassTicket for the current task principal.
     RequestPassTicket,
+    /// Authenticate a user and bind that identity to the terminal.
+    Signon,
     /// Verify a standard password through the installed SAF authority.
     VerifyPassword,
     /// Verify a password or phrase selected by its explicit length.

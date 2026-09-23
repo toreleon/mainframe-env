@@ -7966,6 +7966,38 @@ mod tests {
     }
 
     #[test]
+    fn cics_signon_requires_one_storage_secret_and_terminal_status_shapes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TSON. DATA DIVISION. WORKING-STORAGE SECTION. 01 PASS-X PIC X(8) VALUE 'PASSWORD'. 01 LANG-X PIC X(3). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SIGNON USERID('PHUSER') PASSWORD(PASS-X) LANGINUSE(LANG-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SIGNON: {:?}", analysis.diagnostics));
+        let signon = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SIGNON");
+        assert_eq!(signon.operation, HirCicsOperation::Signon);
+        assert!(signon.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SecurityLangInUse
+                && output.target.qualified_name == "LANG-X"
+        }));
+        assert!(
+            analyze(&source.replace("PASSWORD(PASS-X)", "PASSWORD('PASSWORD')"))
+                .hir
+                .is_none()
+        );
+        assert!(
+            analyze(&source.replace(" USERID('PHUSER')", ""))
+                .hir
+                .is_none()
+        );
+    }
+
+    #[test]
     fn cics_verify_phrase_requires_explicit_bounded_length_and_storage_secret() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. VPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PHRASE-X PIC X(20) VALUE 'LONG-PHRASE-1234'. 01 DAYS-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS VERIFY PHRASE(PHRASE-X) PHRASELEN(16) USERID('IBMUSER') DAYSLEFT(DAYS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

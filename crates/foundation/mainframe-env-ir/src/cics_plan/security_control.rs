@@ -249,3 +249,75 @@ pub(super) fn invalid_request_passticket_shape(
             .iter()
             .any(|operand| !matches!(operand.value, CicsOperandValue::Storage(_)))
 }
+
+pub(super) fn invalid_signon_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let password = inputs.contains(&CicsOperandName::SecurityPassword);
+    let phrase = inputs.contains(&CicsOperandName::SecurityPhrase);
+    !inputs.contains(&CicsOperandName::SecurityUserId)
+        || password == phrase
+        || phrase != inputs.contains(&CicsOperandName::SecurityPhraseLen)
+        || inputs.contains(&CicsOperandName::SecurityNewPassword) && !password
+        || inputs.contains(&CicsOperandName::SecurityNewPhrase) && !phrase
+        || inputs.contains(&CicsOperandName::SecurityNewPhrase)
+            != inputs.contains(&CicsOperandName::SecurityNewPhraseLen)
+        || inputs.contains(&CicsOperandName::SecurityLanguageCode)
+            && inputs.contains(&CicsOperandName::SecurityNatLang)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::SecurityUserId,
+            CicsOperandName::SecurityGroupId,
+            CicsOperandName::SecurityPassword,
+            CicsOperandName::SecurityNewPassword,
+            CicsOperandName::SecurityPhrase,
+            CicsOperandName::SecurityPhraseLen,
+            CicsOperandName::SecurityNewPhrase,
+            CicsOperandName::SecurityNewPhraseLen,
+            CicsOperandName::SecurityLanguageCode,
+            CicsOperandName::SecurityNatLang,
+            CicsOperandName::SecurityOidCard,
+        ]))
+        || outputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOutputName::SecurityChangeTime
+                    | CicsOutputName::SecurityDaysLeft
+                    | CicsOutputName::SecurityEsmReason
+                    | CicsOutputName::SecurityEsmResp
+                    | CicsOutputName::SecurityExpiryTime
+                    | CicsOutputName::SecurityInvalidCount
+                    | CicsOutputName::SecurityLastUseTime
+                    | CicsOutputName::SecurityLangInUse
+                    | CicsOutputName::SecurityNatLangInUse
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::SecurityPassword
+            | CicsOperandName::SecurityNewPassword
+            | CicsOperandName::SecurityPhrase
+            | CicsOperandName::SecurityNewPhrase
+            | CicsOperandName::SecurityOidCard => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::SecurityPhraseLen => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(1..=100) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::SecurityNewPhraseLen => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(0..=100) | CicsOperandValue::Storage(_)
+            ),
+            _ => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+        })
+}

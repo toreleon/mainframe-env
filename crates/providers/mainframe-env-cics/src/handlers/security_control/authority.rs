@@ -76,6 +76,8 @@ pub struct CicsCredentialChangeRequest<'a> {
     pub proposed: &'a [u8],
     /// Standard password or length-selected phrase mode.
     pub kind: CicsCredentialKind,
+    /// Optional group connection checked before the verifier is replaced.
+    pub group: Option<&'a str>,
     /// Digest of the complete canonical CICS request.
     pub binding_digest: [u8; 32],
     /// Durable replay identity.

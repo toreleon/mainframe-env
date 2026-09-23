@@ -133,6 +133,8 @@ pub enum CicsOperation {
     QuerySecurity,
     /// Request one bounded RACF PassTicket for the current task principal.
     RequestPassTicket,
+    /// Associate a verified user with the current terminal for subsequent tasks.
+    Signon,
     Read,
     ReadNext,
     ReadPrev,
@@ -356,6 +358,7 @@ impl CicsOperation {
             Self::PurgeMessage => "PurgeMessage",
             Self::QuerySecurity => "QuerySecurity",
             Self::RequestPassTicket => "RequestPassTicket",
+            Self::Signon => "Signon",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
@@ -678,6 +681,7 @@ impl CicsOperation {
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("QUERY", Some("SECURITY")) => Self::QuerySecurity,
             ("REQUEST", Some("PASSTICKET")) => Self::RequestPassTicket,
+            ("SIGNON", _) => Self::Signon,
             ("READ", _) => Self::Read,
             ("READQ", Some("TD")) => Self::ReadTransientData,
             ("REMOVE", Some("SUBEVENT")) => Self::RemoveSubevent,

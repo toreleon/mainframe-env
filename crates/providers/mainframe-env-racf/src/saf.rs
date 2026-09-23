@@ -1,8 +1,5 @@
 mod credential;
 mod request_shape;
-pub use credential::{CredentialDetails, CredentialFailure, CredentialKind, IssuedPassTicket};
-use credential::{build_mfa_proof, verify_credential};
-
 use crate::RacfService;
 use crate::command::{RacrouteRequestType, racroute_descriptors};
 use crate::model::{
@@ -14,6 +11,8 @@ use crate::model::{
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
+pub use credential::{CredentialDetails, CredentialFailure, CredentialKind, IssuedPassTicket};
+use credential::{build_mfa_proof, verify_credential};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::{HostProblem, SecretRef};
 use serde::{Deserialize, Serialize};
@@ -141,6 +140,7 @@ pub enum RacrouteRequest {
         user: PrincipalId,
         credential_reference: SecretRef,
         kind: CredentialKind,
+        group: Option<String>,
         binding_digest: [u8; 32],
     },
     /// Generate a bounded one-time PassTicket for the issuing principal and application.
@@ -985,12 +985,12 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
                 normalized_id(acee_id.clone(), 246).map_err(DecisionReason::from)?;
             }
         }
-        RacrouteRequest::VerifyCredential { group, .. } => {
+        RacrouteRequest::VerifyCredential { group, .. }
+        | RacrouteRequest::ChangeCredential { group, .. } => {
             if let Some(group) = group {
                 normalized_principal(group)?;
             }
         }
-        RacrouteRequest::ChangeCredential { .. } => {}
         RacrouteRequest::IssuePassTicket { application, .. }
         | RacrouteRequest::RedeemPassTicket { application, .. } => {
             normalized_profile(application)?;
@@ -1385,8 +1385,8 @@ fn apply_request(
             group.as_deref(),
             states,
         ),
-        RacrouteRequest::ChangeCredential { user, kind, .. } => {
-            credential::change_cics_request(service, snapshot, context, user, secret, *kind, states)
+        RacrouteRequest::ChangeCredential { .. } => {
+            credential::apply_change_request(service, snapshot, context, request, secret, states)
         }
         RacrouteRequest::IssuePassTicket { application, .. } => {
             credential::issue_passticket(snapshot, context, application, states)
@@ -2717,6 +2717,7 @@ mod tests {
             user: user.clone(),
             credential_reference: SecretRef::new(reference, Default::default()).unwrap(),
             kind: CredentialKind::Password,
+            group: None,
             binding_digest,
         };
         let wrong = service
@@ -2772,6 +2773,72 @@ mod tests {
             )
             .unwrap();
         assert_eq!(verified.status.reason, DecisionReason::Granted);
+    }
+
+    #[test]
+    fn cics_expired_credential_change_checks_group_before_replacing_verifier() {
+        let (service, resolver, admin) = setup();
+        resolver.insert("secret:expired-old", b"PASSWORD".to_vec());
+        service
+            .add_user(
+                "CHANGE1",
+                &SecretRef::new("secret:expired-old", Default::default()).unwrap(),
+            )
+            .unwrap();
+        service
+            .set_user_state("CHANGE1", true, false, false)
+            .unwrap();
+        let before = service.database.read().unwrap().principals["CHANGE1"]
+            .credential
+            .as_ref()
+            .unwrap()
+            .encoded_verifier
+            .clone();
+        let mut packet = Vec::from([0, 8, 0, 8]);
+        packet.extend_from_slice(b"PASSWORD");
+        packet.extend_from_slice(b"NEWPASS1");
+        resolver.insert("secret:expired-change", packet);
+        let user = PrincipalId::new("CHANGE1", InvocationLimits::default()).unwrap();
+        let request = |group: Option<&str>, binding_digest| RacrouteRequest::ChangeCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:expired-change", Default::default())
+                .unwrap(),
+            kind: CredentialKind::Password,
+            group: group.map(str::to_string),
+            binding_digest,
+        };
+        let denied = service
+            .racroute(
+                &saf_context(&admin, None, "CHANGE-EXPIRED-BAD-GROUP", 6),
+                request(Some("NOGROUP"), [1; 32]),
+            )
+            .unwrap();
+        assert!(matches!(
+            denied.result,
+            Some(RacrouteResult::CredentialVerified {
+                failure: Some(CredentialFailure::UnknownGroup),
+                ..
+            })
+        ));
+        assert_eq!(
+            service.database.read().unwrap().principals["CHANGE1"]
+                .credential
+                .as_ref()
+                .unwrap()
+                .encoded_verifier,
+            before
+        );
+        let changed = service
+            .racroute(
+                &saf_context(&admin, None, "CHANGE-EXPIRED-VALID", 7),
+                request(None, [2; 32]),
+            )
+            .unwrap();
+        assert_eq!(changed.status.reason, DecisionReason::Granted);
+        assert_eq!(
+            service.database.read().unwrap().principals["CHANGE1"].state,
+            PrincipalState::Active
+        );
     }
 
     #[test]
@@ -2979,6 +3046,7 @@ mod tests {
             user: user.clone(),
             credential_reference: SecretRef::new("secret:change", Default::default()).unwrap(),
             kind: CredentialKind::Password,
+            group: None,
             binding_digest: [7; 32],
         };
         let first = {

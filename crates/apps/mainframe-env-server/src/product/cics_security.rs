@@ -156,6 +156,7 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
                     CicsCredentialKind::Password => CredentialKind::Password,
                     CicsCredentialKind::Phrase => CredentialKind::Phrase,
                 },
+                group: request.group.map(str::to_string),
                 binding_digest: request.binding_digest,
             },
         )?;

@@ -19,6 +19,7 @@ pub(in crate::service) fn session_schema_version(schema: &[u8]) -> Option<u8> {
         b"MECS9" => Some(9),
         b"MECSA" => Some(10),
         b"MECSB" => Some(11),
+        b"MECSC" => Some(12),
         _ => None,
     }
 }
@@ -301,7 +302,7 @@ pub(in crate::service) fn decode_session_handle_state(
         6 => decode_handle_state(reader, true, 0),
         7 => decode_handle_state(reader, false, 0),
         8 => decode_handle_state(reader, false, 1),
-        9..=11 => decode_handle_state(reader, false, 2),
+        9..=12 => decode_handle_state(reader, false, 2),
         _ => Ok(HandleState::default()),
     }
 }

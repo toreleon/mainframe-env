@@ -107,6 +107,7 @@ fn change(
             current: &old[..old_len],
             proposed: &new[..new_len],
             kind,
+            group: None,
             binding_digest,
             idempotency_key: &idempotency_key,
             correlation: &idempotency_key,

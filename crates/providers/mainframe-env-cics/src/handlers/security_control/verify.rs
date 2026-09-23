@@ -134,6 +134,25 @@ pub(super) fn respond(
     request: &CicsRequest,
     verified: CicsCredentialVerification,
 ) -> Result<CicsResponse, HostProblem> {
+    respond_inner(service, run, request, verified, false)
+}
+
+pub(super) fn respond_signon(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    verified: CicsCredentialVerification,
+) -> Result<CicsResponse, HostProblem> {
+    respond_inner(service, run, request, verified, true)
+}
+
+fn respond_inner(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    verified: CicsCredentialVerification,
+    signon: bool,
+) -> Result<CicsResponse, HostProblem> {
     let mut response = if let Some(failure) = verified.failure {
         let problem = match failure {
             CicsCredentialFailure::UnknownUser => condition("USERIDERR", 69, 8),
@@ -142,8 +161,9 @@ pub(super) fn respond(
             CicsCredentialFailure::InvalidCredential => condition("NOTAUTH", 70, 2),
             CicsCredentialFailure::UnacceptableNewCredential => condition("NOTAUTH", 70, 4),
             CicsCredentialFailure::MismatchedCredentialKind => condition("INVREQ", 16, 2),
-            CicsCredentialFailure::UnknownGroup | CicsCredentialFailure::GroupNotConnected => {
-                condition("NOTAUTH", 70, 23)
+            CicsCredentialFailure::UnknownGroup => condition("NOTAUTH", 70, 23),
+            CicsCredentialFailure::GroupNotConnected => {
+                condition("NOTAUTH", 70, if signon { 24 } else { 23 })
             }
             CicsCredentialFailure::GroupRevoked => condition("NOTAUTH", 70, 20),
             CicsCredentialFailure::PolicyUnavailable => condition("INVREQ", 16, 18),

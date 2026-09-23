@@ -119,6 +119,7 @@ struct Session {
     rows: u16,
     columns: u16,
     principal: String,
+    terminal_identity: handlers::TerminalIdentity,
     transaction: String,
     run_unit: String,
     user_corr_data: Vec<u8>,
@@ -145,6 +146,9 @@ struct Session {
 pub struct CicsTerminalSnapshot {
     pub session: String,
     pub principal: String,
+    /// Signed-on terminal user for subsequent tasks, if one is associated.
+    /// The issuing task retains the `principal` fixed at attachment.
+    pub signed_on_user: Option<String>,
     pub transaction: String,
     pub run_unit: String,
     pub rows: u16,
@@ -574,6 +578,7 @@ impl CicsService {
             rows,
             columns,
             principal: String::new(),
+            terminal_identity: handlers::TerminalIdentity::default(),
             transaction: String::new(),
             run_unit: String::new(),
             user_corr_data: Vec::new(),
@@ -640,6 +645,7 @@ impl CicsService {
             rows,
             columns,
             principal: invocation.principal.id().as_str().into(),
+            terminal_identity: handlers::TerminalIdentity::default(),
             transaction: transaction.to_ascii_uppercase(),
             run_unit: invocation.run_unit_id.as_str().into(),
             user_corr_data: Vec::new(),
@@ -2262,6 +2268,7 @@ fn terminal_snapshot(session: &str, value: &Session) -> CicsTerminalSnapshot {
     CicsTerminalSnapshot {
         session: session.into(),
         principal: value.principal.clone(),
+        signed_on_user: value.terminal_identity.user.clone(),
         transaction: value.transaction.clone(),
         run_unit: value.run_unit.clone(),
         rows: value.rows,
@@ -2278,16 +2285,7 @@ fn terminal_snapshot(session: &str, value: &Session) -> CicsTerminalSnapshot {
 }
 
 fn validate_terminal_identity(value: &str, max: usize) -> Result<(), HostProblem> {
-    if value.is_empty()
-        || value.len() > max
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_graphic() && byte != b'/' && byte != b'\\')
-    {
-        Err(HostProblem::Malformed)
-    } else {
-        Ok(())
-    }
+    handlers::validate_terminal_identity(value, max)
 }
 
 fn normalize_terminal_name(value: &str, max: usize) -> Result<String, HostProblem> {
@@ -3247,6 +3245,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         (Vec::new(), None, None)
     };
     let (handle_state, input) = handlers::decode_session_tail(&mut reader, schema, input_payload)?;
+    let terminal_identity = handlers::decode_terminal_identity(&mut reader, schema)?;
     if reader.at != bytes.len() || rows == 0 || columns == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -3254,6 +3253,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         rows,
         columns,
         principal,
+        terminal_identity,
         transaction,
         run_unit,
         user_corr_data,
@@ -23560,7 +23560,8 @@ mod tests {
             assert!(!latest.dump_requested);
             assert_eq!(latest.program, None);
             let mut legacy8 = handlers::encode_session(&state.sessions[session.as_str()]).unwrap();
-            assert_eq!(&legacy8[..5], b"MECSB");
+            assert_eq!(&legacy8[..5], b"MECSC");
+            legacy8.truncate(legacy8.len() - 17);
             let terminal_field_bytes = 4 + state.sessions[session.as_str()]
                 .input
                 .terminal_id
@@ -24626,15 +24627,24 @@ mod tests {
             assert_eq!(current.input.message_length, 15);
             assert_eq!(current.input.terminal_id.as_deref(), Some("T000"));
             let encoded = handlers::encode_session(&current).unwrap();
-            assert_eq!(&encoded[..5], b"MECSB");
+            assert_eq!(&encoded[..5], b"MECSC");
             let mut corrupted = encoded.clone();
-            let depth = corrupted.len() - 17;
+            let depth = corrupted.len() - 34;
             corrupted[depth..depth + 4].copy_from_slice(&65_u32.to_be_bytes());
             assert!(matches!(
                 decode_session(&corrupted, current.version, CicsLimits::default()),
                 Err(HostProblem::ResourceExhausted)
             ));
-            let mut legacy10 = encoded;
+            let mut legacy11 = encoded;
+            legacy11.truncate(legacy11.len() - 17);
+            legacy11[..5].copy_from_slice(b"MECSB");
+            let decoded =
+                decode_session(&legacy11, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(
+                decoded.terminal_identity,
+                handlers::TerminalIdentity::default()
+            );
+            let mut legacy10 = legacy11;
             legacy10.truncate(legacy10.len() - 8);
             legacy10[..5].copy_from_slice(b"MECSA");
             let decoded =
@@ -24718,6 +24728,64 @@ mod tests {
         }
         std::fs::remove_file(path).unwrap();
         std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn terminal_signed_on_identity_survives_sqlite_without_changing_task_principal() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-terminal-sign-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let invocation = invocation_for("signed-terminal", BTreeMap::new());
+        let session = SessionId::new("signed-terminal", 64).unwrap();
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "MENU",
+                    24,
+                    80,
+                    "signed-terminal-csrf",
+                    1,
+                    100,
+                )
+                .unwrap();
+            let mut state = service.lock().unwrap();
+            let current = state.sessions[session.as_str()].clone();
+            let mut next = current.clone();
+            next.version += 1;
+            next.terminal_identity = handlers::TerminalIdentity {
+                user: Some("PHUSER".into()),
+                group: Some("GRP1".into()),
+                language: Some("ENU".into()),
+                effect_key: Some("CICS-SIGNON-1".into()),
+                request_digest: Some([9; 32]),
+            };
+            service
+                .persist_session(session.as_str(), &next, Some(current.version))
+                .unwrap();
+            state.sessions.insert(session.as_str().into(), next);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let snapshot = service
+                .terminal_snapshot(&session, invocation.principal.id(), 2)
+                .unwrap();
+            assert_eq!(snapshot.signed_on_user.as_deref(), Some("PHUSER"));
+            assert_eq!(snapshot.principal, invocation.principal.id().as_str());
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]

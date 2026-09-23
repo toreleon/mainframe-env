@@ -2,7 +2,10 @@
 
 mod effects;
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
-use effects::{DEQ_EFFECTS, ENQ_EFFECTS, SPOOL_EFFECTS, STORAGE_EFFECTS, SYNCPOINT_EFFECTS};
+use effects::{
+    ADDRESS_SET_EFFECTS, DEQ_EFFECTS, ENQ_EFFECTS, SPOOL_EFFECTS, STORAGE_EFFECTS, SUSPEND_EFFECTS,
+    SYNCPOINT_EFFECTS,
+};
 
 mod effects;
 mod executable_entries;

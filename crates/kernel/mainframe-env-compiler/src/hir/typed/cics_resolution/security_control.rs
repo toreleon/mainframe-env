@@ -72,6 +72,30 @@ pub(super) const PASSTICKET_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const SIGNON_CLAUSES: &[&str] = &[
+    "USERID",
+    "GROUPID",
+    "PASSWORD",
+    "NEWPASSWORD",
+    "PHRASE",
+    "PHRASELEN",
+    "NEWPHRASE",
+    "NEWPHRASELEN",
+    "LANGUAGECODE",
+    "NATLANG",
+    "OIDCARD",
+    "CHANGETIME",
+    "DAYSLEFT",
+    "ESMRESP",
+    "ESMREASON",
+    "EXPIRYTIME",
+    "INVALIDCOUNT",
+    "LASTUSETIME",
+    "LANGINUSE",
+    "NATLANGINUSE",
+    "RESP",
+    "RESP2",
+];
 pub(super) const VERIFY_PHRASE_CLAUSES: &[&str] = &[
     "PHRASE",
     "PHRASELEN",
@@ -104,6 +128,9 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::RequestPassTicket {
         return validate_passticket(clauses, semantic);
+    }
+    if operation == HirCicsOperation::Signon {
+        return validate_signon(clauses, semantic);
     }
     if operation == HirCicsOperation::VerifyPhrase {
         return validate_verify_phrase(clauses, semantic);
@@ -177,6 +204,9 @@ pub(super) fn operands(
             value: HirCicsValue::Data(application),
         }]);
     }
+    if operation == HirCicsOperation::Signon {
+        return signon_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::VerifyPhrase {
         return verify_phrase_operands(clauses, semantic);
     }
@@ -218,6 +248,28 @@ pub(super) fn outputs(
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
     if operation == HirCicsOperation::RequestPassTicket {
         return passticket_outputs(clauses, semantic);
+    }
+    if operation == HirCicsOperation::Signon {
+        let mut out = verify_credential_outputs(clauses, semantic, operation)?;
+        for (name, identity, width) in [
+            ("LANGINUSE", HirCicsOutputName::SecurityLangInUse, 3),
+            ("NATLANGINUSE", HirCicsOutputName::SecurityNatLangInUse, 1),
+        ] {
+            if let Some(value) = clauses.get(name) {
+                let reference = complete_data_reference(value, semantic)?;
+                require_writable(&reference)?;
+                if reference.length != width {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS SIGNON {name} requires {width}-character storage"
+                    )));
+                }
+                out.push(HirCicsOutputBinding {
+                    name: identity,
+                    target: reference,
+                });
+            }
+        }
+        return Ok(out);
     }
     if matches!(
         operation,
@@ -426,6 +478,7 @@ fn verify_credential_outputs(
         HirCicsOperation::VerifyPhrase => "VERIFY PHRASE",
         HirCicsOperation::ChangePassword => "CHANGE PASSWORD",
         HirCicsOperation::ChangePhrase => "CHANGE PHRASE",
+        HirCicsOperation::Signon => "SIGNON",
         _ => "VERIFY PASSWORD",
     };
     let mut out = Vec::new();
@@ -596,5 +649,148 @@ fn change_phrase_operands(
         name: HirCicsOperandName::SecurityNewPhraseLen,
         value: cics_integer_value(&clauses["NEWPHRASELEN"], semantic)?,
     });
+    Ok(out)
+}
+
+fn validate_signon(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    let password = clauses.contains_key("PASSWORD");
+    let phrase = clauses.contains_key("PHRASE");
+    if !clauses.contains_key("USERID")
+        || password == phrase
+        || phrase != clauses.contains_key("PHRASELEN")
+        || clauses.contains_key("NEWPASSWORD") && !password
+        || clauses.contains_key("NEWPHRASE") && !phrase
+        || clauses.contains_key("NEWPHRASE") != clauses.contains_key("NEWPHRASELEN")
+        || clauses.contains_key("LANGUAGECODE") && clauses.contains_key("NATLANG")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SIGNON requires USERID, one of PASSWORD or PHRASE, and matching length/new-credential options".into(),
+        ));
+    }
+    for (name, width) in [("PASSWORD", 8), ("NEWPASSWORD", 8), ("OIDCARD", 65)] {
+        if let Some(value) = clauses.get(name) {
+            secret_storage(value, semantic, name, width, width)?;
+        }
+    }
+    for name in ["PHRASE", "NEWPHRASE"] {
+        if let Some(value) = clauses.get(name) {
+            secret_storage(value, semantic, name, 1, 100)?;
+        }
+    }
+    for (name, minimum, maximum, storage_name) in [
+        ("PHRASELEN", 1, 100, "PHRASE"),
+        ("NEWPHRASELEN", 0, 100, "NEWPHRASE"),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            let storage = complete_data_reference(&clauses[storage_name], semantic)?;
+            match cics_integer_value(value, semantic)? {
+                HirCicsValue::Integer(length)
+                    if !(minimum..=maximum).contains(&length)
+                        || length as usize > storage.length =>
+                {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS SIGNON {name} is out of range or exceeds storage"
+                    )));
+                }
+                HirCicsValue::Data(reference) => fullword(&reference, name)?,
+                _ => {}
+            }
+        }
+    }
+    for (name, width) in [
+        ("USERID", 8),
+        ("GROUPID", 8),
+        ("LANGUAGECODE", 3),
+        ("NATLANG", 1),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            match cics_value(value, semantic)? {
+                HirCicsValue::Literal(ref literal)
+                    if literal.is_empty() || literal.len() > width =>
+                {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS SIGNON {name} exceeds {width} characters"
+                    )));
+                }
+                HirCicsValue::Data(ref reference) if reference.length != width => {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS SIGNON {name} requires {width}-character storage"
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+fn secret_storage(
+    value: &[String],
+    semantic: &SemanticModel,
+    name: &str,
+    minimum: usize,
+    maximum: usize,
+) -> Resolution<()> {
+    let HirCicsValue::Data(reference) = cics_value(value, semantic)? else {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS SIGNON {name} requires resolved secret storage"
+        )));
+    };
+    if !(minimum..=maximum).contains(&reference.length)
+        || !matches!(
+            reference.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric
+        )
+    {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS SIGNON {name} storage shape is invalid"
+        )));
+    }
+    Ok(())
+}
+
+fn signon_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut out = Vec::new();
+    for (name, identity) in [
+        ("USERID", HirCicsOperandName::SecurityUserId),
+        ("GROUPID", HirCicsOperandName::SecurityGroupId),
+        ("LANGUAGECODE", HirCicsOperandName::SecurityLanguageCode),
+        ("NATLANG", HirCicsOperandName::SecurityNatLang),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: cics_value(value, semantic)?,
+            });
+        }
+    }
+    for (name, identity) in [
+        ("PASSWORD", HirCicsOperandName::SecurityPassword),
+        ("NEWPASSWORD", HirCicsOperandName::SecurityNewPassword),
+        ("PHRASE", HirCicsOperandName::SecurityPhrase),
+        ("NEWPHRASE", HirCicsOperandName::SecurityNewPhrase),
+        ("OIDCARD", HirCicsOperandName::SecurityOidCard),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: HirCicsValue::Data(complete_data_reference(value, semantic)?),
+            });
+        }
+    }
+    for (name, identity) in [
+        ("PHRASELEN", HirCicsOperandName::SecurityPhraseLen),
+        ("NEWPHRASELEN", HirCicsOperandName::SecurityNewPhraseLen),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: cics_integer_value(value, semantic)?,
+            });
+        }
+    }
     Ok(out)
 }

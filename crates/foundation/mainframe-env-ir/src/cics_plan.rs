@@ -741,6 +741,7 @@ fn validate_operation_shape(
         CicsPlanOperation::RequestPassTicket => {
             security_control::invalid_request_passticket_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::Signon => security_control::invalid_signon_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -5279,6 +5280,7 @@ mod tests {
         assert_eq!(operation_tag(CicsPlanOperation::ChangePassword), 130);
         assert_eq!(operation_tag(CicsPlanOperation::ChangePhrase), 131);
         assert_eq!(operation_tag(CicsPlanOperation::RequestPassTicket), 134);
+        assert_eq!(operation_tag(CicsPlanOperation::Signon), 136);
         assert_eq!(operation_tag(CicsPlanOperation::VerifyPhrase), 138);
         assert_eq!(operand_tag(CicsOperandName::ResClass), 448);
         assert_eq!(operand_tag(CicsOperandName::LogMessage), 452);
@@ -5288,12 +5290,17 @@ mod tests {
         assert_eq!(operand_tag(CicsOperandName::SecurityNewPhrase), 459);
         assert_eq!(operand_tag(CicsOperandName::SecurityNewPhraseLen), 460);
         assert_eq!(operand_tag(CicsOperandName::SecurityEsmAppName), 461);
+        assert_eq!(operand_tag(CicsOperandName::SecurityLanguageCode), 462);
+        assert_eq!(operand_tag(CicsOperandName::SecurityNatLang), 463);
+        assert_eq!(operand_tag(CicsOperandName::SecurityOidCard), 464);
         assert_eq!(operand_tag(CicsOperandName::SecurityPhrase), 456);
         assert_eq!(operand_tag(CicsOperandName::SecurityPhraseLen), 457);
         assert_eq!(output_tag(CicsOutputName::SecurityRead), 504);
         assert_eq!(output_tag(CicsOutputName::SecurityAlter), 507);
         assert_eq!(output_tag(CicsOutputName::SecurityInvalidCount), 513);
         assert_eq!(output_tag(CicsOutputName::SecurityPassTicket), 515);
+        assert_eq!(output_tag(CicsOutputName::SecurityLangInUse), 516);
+        assert_eq!(output_tag(CicsOutputName::SecurityNatLangInUse), 517);
         assert_eq!(operation_from_tag(75), Ok(CicsPlanOperation::Unlock));
         assert_eq!(operation_tag(CicsPlanOperation::SendPartnset), 90);
         assert_eq!(operation_from_tag(90), Ok(CicsPlanOperation::SendPartnset));
@@ -5532,6 +5539,46 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
         plan.operands[0].value = CicsOperandValue::Literal(b"APP1".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn signon_plan_requires_one_storage_secret_and_v2_tags() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Signon,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::SecurityUserId,
+                    value: CicsOperandValue::Literal(b"PHUSER".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SecurityPassword,
+                    value: CicsOperandValue::Storage(slot(48, "PASS-X")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SecurityLangInUse,
+                target: slot(49, "LANG-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        plan.operands.sort_by_key(|operand| operand.name);
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::SecurityPassword)
+            .unwrap()
+            .value = CicsOperandValue::Literal(b"PASSWORD".to_vec());
         assert_eq!(
             encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)

@@ -124,7 +124,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECSB".to_vec();
+    let mut out = b"MECSC".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -200,6 +200,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
             .unwrap_or("")
             .as_bytes(),
     )?;
+    super::encode_terminal_identity(&mut out, &session.terminal_identity)?;
     Ok(out)
 }
 

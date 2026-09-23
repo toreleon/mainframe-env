@@ -229,6 +229,7 @@ pub(super) fn change_cics_request(
     user: &PrincipalId,
     packed: Option<&[u8]>,
     kind: CredentialKind,
+    group: Option<&str>,
     states: &mut Vec<RacrouteState>,
 ) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
     let packed = packed.ok_or(DecisionReason::CredentialInvalid)?;
@@ -302,6 +303,29 @@ pub(super) fn change_cics_request(
             CredentialFailure::InvalidCredential,
         ));
     }
+    if let Some(group) = group {
+        if !snapshot.groups.contains_key(group) {
+            return Ok(denied(
+                DecisionReason::InsufficientAccess,
+                CredentialFailure::UnknownGroup,
+            ));
+        }
+        let Some(connection) = snapshot
+            .connections
+            .get(&connection_key(user.as_str(), group))
+        else {
+            return Ok(denied(
+                DecisionReason::InsufficientAccess,
+                CredentialFailure::GroupNotConnected,
+            ));
+        };
+        if connection.revoked {
+            return Ok(denied(
+                DecisionReason::InsufficientAccess,
+                CredentialFailure::GroupRevoked,
+            ));
+        }
+    }
     let next = match service.credential_from_bytes(
         &snapshot.policy,
         user.as_str(),
@@ -358,6 +382,32 @@ pub(super) fn change_cics_request(
     ))
 }
 
+pub(super) fn apply_change_request(
+    service: &RacfService,
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &SafRequestContext,
+    request: &RacrouteRequest,
+    secret: Option<&[u8]>,
+    states: &mut Vec<RacrouteState>,
+) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
+    let RacrouteRequest::ChangeCredential {
+        user, kind, group, ..
+    } = request
+    else {
+        unreachable!("only credential changes reach this child")
+    };
+    change_cics_request(
+        service,
+        snapshot,
+        context,
+        user,
+        secret,
+        *kind,
+        group.as_deref(),
+        states,
+    )
+}
+
 pub(super) fn is_authentication_request(request: &RacrouteRequest) -> bool {
     matches!(
         request,
@@ -397,6 +447,7 @@ pub(super) fn digest_cics_request(digest: &mut Sha256, request: &RacrouteRequest
             user,
             credential_reference,
             kind,
+            group,
             binding_digest,
         } => {
             digest_saf_tag(digest, 0xc2);
@@ -410,6 +461,10 @@ pub(super) fn digest_cics_request(digest: &mut Sha256, request: &RacrouteRequest
                 },
             );
             digest_saf_field(digest, binding_digest);
+            if group.is_some() {
+                digest_saf_tag(digest, 0xc5);
+                digest_saf_optional(digest, group.as_deref());
+            }
         }
         RacrouteRequest::IssuePassTicket {
             application,
