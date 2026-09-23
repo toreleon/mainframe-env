@@ -1,5 +1,6 @@
 mod bms_map;
 mod bridge_definition;
+mod bridge_start;
 mod builtin_function;
 mod condition;
 mod document_control;
@@ -86,6 +87,11 @@ pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
 pub use bridge_definition::{CicsBridgeExitDefault, CicsBridgeExitSelection};
+#[allow(
+    unused_imports,
+    reason = "bridge worker is the next START BREXIT slice"
+)]
+pub use bridge_start::{CICS_BRIDGE_START_WORK_GENERATION, CicsBridgeStartIntent};
 pub(super) use condition::respond as condition;
 pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
@@ -110,6 +116,7 @@ pub(super) fn validate_owned_stores(
     operator_control::validate_active_operator_commands(store, limits)?;
     network_context::validate_store(store, limits)?;
     bridge_definition::validate_store(store, limits)?;
+    bridge_start::validate_store(store, limits)?;
     Ok(())
 }
 pub(super) use handle_state::{

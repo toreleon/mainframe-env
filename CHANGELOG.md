@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a durable START BREXIT admission record and private work generation.
+  Admission freezes the local transaction, selected installed exit artifact,
+  principal, bounded BRDATA, priority, and producer digest. Exact replay,
+  interrupted enqueue repair, and corrupt-row rejection are covered before
+  the command is registered for execution.
+
 - Added typed CICS `START ATTACH` for the no-FROM local task form of row
   `0206`. It resolves an installed target, authorizes before scheduling,
   creates noncancelable durable work with STARTCODE `U`, leaves EIBREQID null,

@@ -10217,6 +10217,169 @@ mod tests {
     }
 
     #[test]
+    fn bridge_start_admission_replays_exact_work_and_rejects_corrupt_recovery() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bridge-intent-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let clock = Arc::new(TestCicsClock::fixed(1_000));
+        let digest = Sha256::digest(b"source request").into();
+        let first;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            for (name, bytes) in [
+                ("TARGET", b"target-program".as_slice()),
+                ("BRXIT", b"bridge-exit".as_slice()),
+            ] {
+                let (artifact, _) = install_program_artifact(store.as_ref(), bytes);
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            namespace: "online-program".into(),
+                            key: name.into(),
+                            version: 1,
+                            payload: artifact.as_str().as_bytes().to_vec(),
+                        },
+                        None,
+                    )
+                    .unwrap();
+            }
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "online-transaction".into(),
+                        key: "NX00".into(),
+                        version: 1,
+                        payload: b"TARGET".to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                clock.clone(),
+            )
+            .unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            cics.register_bridge_exit_defaults(&[CicsBridgeExitDefault {
+                transaction: "NX00".into(),
+                exit: "BRXIT".into(),
+            }])
+            .unwrap();
+            assert!(matches!(
+                cics.schedule_bridge_start(
+                    "NX00",
+                    None,
+                    "ISSUER",
+                    None,
+                    Some(b"ABCD"),
+                    Some(0),
+                    "bridge-1",
+                    digest,
+                    4
+                ),
+                Err(HostProblem::Condition {
+                    response: 22,
+                    response2: 0,
+                    ..
+                })
+            ));
+            first = cics
+                .schedule_bridge_start(
+                    "NX00",
+                    None,
+                    "ISSUER",
+                    None,
+                    Some(b"ABCD"),
+                    Some(3),
+                    "bridge-1",
+                    digest,
+                    4,
+                )
+                .unwrap();
+            assert_eq!(first.transaction, "NX00");
+            assert_eq!(first.exit, "BRXIT");
+            assert_eq!(first.principal, "ISSUER");
+            assert_eq!(first.data, b"ABC");
+            clock.tick.store(2_000, Ordering::SeqCst);
+            assert_eq!(
+                cics.schedule_bridge_start(
+                    "NX00",
+                    None,
+                    "ISSUER",
+                    None,
+                    Some(b"ABCD"),
+                    Some(3),
+                    "bridge-1",
+                    digest,
+                    4,
+                )
+                .unwrap(),
+                first
+            );
+            assert_eq!(
+                cics.schedule_bridge_start(
+                    "NX00",
+                    None,
+                    "ISSUER",
+                    None,
+                    Some(b"ABCD"),
+                    Some(4),
+                    "bridge-1",
+                    digest,
+                    4,
+                ),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            let work = store
+                .claim("bridge-worker", Some("cics-bridge-start-v1"), 2_000, 100)
+                .unwrap()
+                .unwrap();
+            assert_eq!(cics.promote_bridge_start(&work, 2_000).unwrap(), first);
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            clock,
+        )
+        .unwrap();
+        cics.bind_artifact_store(store.clone()).unwrap();
+        cics.recover_bridge_starts().unwrap();
+        let row = store
+            .get_provider_state("cics-bridge-start-v1", &first.request_id)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(&row.namespace, &row.key, row.version)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    payload: b"{".to_vec(),
+                    ..row
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        drop(cics);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn start_without_data_schedules_and_retrieve_returns_source_defined_enddata() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(
