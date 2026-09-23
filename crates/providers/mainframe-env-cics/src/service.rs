@@ -65,6 +65,10 @@ pub struct CicsLimits {
     pub max_spool_replays: usize,
     pub max_spool_bytes: usize,
     pub max_spool_outdescr_bytes: usize,
+    pub max_diagnostic_entries: usize,
+    pub max_diagnostic_bytes: usize,
+    pub max_diagnostic_replays: usize,
+    pub max_diagnostic_payload_bytes: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -633,7 +637,7 @@ impl CicsService {
             user_corr_data: Vec::new(),
             user_corr_effect_key: None,
             user_corr_request_digest: None,
-            csrf_sha256: terminal_secret_digest(csrf_token),
+            csrf_sha256: handlers::terminal_secret_digest(csrf_token),
             idle_timeout_ticks,
             expires_at_tick,
             connected: true,
@@ -1949,7 +1953,7 @@ impl CicsService {
             return Err(HostProblem::Unauthorized);
         }
         if let Some(token) = csrf_token
-            && (token.is_empty() || terminal_secret_digest(token) != current.csrf_sha256)
+            && (token.is_empty() || handlers::terminal_secret_digest(token) != current.csrf_sha256)
         {
             return Err(HostProblem::Unauthorized);
         }
@@ -2269,10 +2273,6 @@ fn terminal_snapshot(session: &str, value: &Session) -> CicsTerminalSnapshot {
         expires_at_tick: value.expires_at_tick,
         version: value.version,
     }
-}
-
-fn terminal_secret_digest(value: &str) -> String {
-    format!("{:x}", Sha256::digest(value.as_bytes()))
 }
 
 fn validate_terminal_identity(value: &str, max: usize) -> Result<(), HostProblem> {
@@ -15073,6 +15073,58 @@ mod tests {
             assert_eq!(report.user_id, "MEAPUSER");
             assert_eq!(report.class, b'B');
             assert_eq!(report.records, [b"ONE".to_vec(), b"TWO".to_vec()]);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn diagnostic_configuration_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-diagnostics-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let configuration = CicsTraceConfiguration {
+            user_trace: false,
+            internal: true,
+            auxiliary: true,
+            system: false,
+        };
+        let dump_code = CicsDumpCodeDefinition {
+            code: "ABCD".into(),
+            suppress: false,
+            maximum: 2,
+            system_dump: false,
+        };
+        let monitor_point = CicsMonitorPointDefinition {
+            entry_name: "USER".into(),
+            point: 11,
+            action: CicsMonitorAction::AddCounter { slot: 1 },
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service.configure_diagnostic_trace(configuration).unwrap();
+            service
+                .register_diagnostic_resources(&[dump_code.clone()], &[monitor_point.clone()])
+                .unwrap();
+            assert_eq!(service.diagnostic_snapshot().unwrap().version, 2);
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let snapshot = service.diagnostic_snapshot().unwrap();
+            assert_eq!(snapshot.configuration, configuration);
+            assert_eq!(snapshot.dump_definitions["ABCD"], dump_code);
+            assert_eq!(snapshot.monitor_definitions["USER:011"], monitor_point);
+            assert!(snapshot.traces.is_empty() && snapshot.dumps.is_empty());
+            service.configure_diagnostic_trace(configuration).unwrap();
+            service
+                .register_diagnostic_resources(&[dump_code.clone()], &[monitor_point.clone()])
+                .unwrap();
+            assert_eq!(service.diagnostic_snapshot().unwrap().version, 2);
         }
         std::fs::remove_dir_all(root).unwrap();
     }

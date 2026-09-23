@@ -26,6 +26,10 @@ impl Default for CicsLimits {
             max_spool_replays: 65_536,
             max_spool_bytes: 4 * 1024 * 1024,
             max_spool_outdescr_bytes: 4096,
+            max_diagnostic_entries: 4096,
+            max_diagnostic_bytes: 4 * 1024 * 1024,
+            max_diagnostic_replays: 65_536,
+            max_diagnostic_payload_bytes: 1024 * 1024,
         }
     }
 }

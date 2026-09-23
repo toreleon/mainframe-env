@@ -337,6 +337,16 @@ row cannot duplicate or reverse the close. The route uses EIBFN `5610`; open,
 record transfer, implicit-close, and broader JES interface states are owned by
 the following spool-control slices.
 
+The diagnostics provider has a separate versioned `cics-diagnostics-v1`
+authority for local trace and dump records. A trusted region adapter can set
+`CicsTraceConfiguration`, register dump-code and MCT user-point definitions,
+and inspect `CicsDiagnosticSnapshot`; no trace
+destination is active by default. `CicsLimits` bounds retained entries,
+aggregate encoded bytes, replay keys, and each captured payload. Command
+handlers use this state through versioned compare-and-swap writes, so later
+diagnostic commands can retain exact results across SQLite reopen and a
+post-dispatch retry without adding state to the frozen CICS service root.
+
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or
 NOHANDLE. USERID must share the issuing CICS APPLID's first four characters.

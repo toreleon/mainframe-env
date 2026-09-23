@@ -1,6 +1,11 @@
 use super::super::{CicsService, CicsTraceEntry, handlers};
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId, RunUnitId};
 use mainframe_env_host_api::{CicsUnitOfWorkOutcome, HostProblem, SessionId};
+use sha2::{Digest, Sha256};
+
+pub(in crate::service) fn terminal_secret_digest(value: &str) -> String {
+    format!("{:x}", Sha256::digest(value.as_bytes()))
+}
 
 impl CicsService {
     pub fn complete_terminal_run(

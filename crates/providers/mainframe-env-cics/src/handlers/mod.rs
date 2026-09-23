@@ -1,6 +1,7 @@
 mod bms_map;
 mod condition;
 mod counter_control;
+mod diagnostics;
 mod document_control;
 mod event_control;
 mod file_control;
@@ -104,6 +105,10 @@ pub(super) use bms_map::{
 };
 pub(super) use condition::respond as condition;
 pub(super) use counter_control::invoke as invoke_counter;
+pub use diagnostics::{
+    CicsDiagnosticDumpRecord, CicsDiagnosticSnapshot, CicsDiagnosticTraceRecord,
+    CicsDumpCodeDefinition, CicsMonitorAction, CicsMonitorPointDefinition, CicsTraceConfiguration,
+};
 pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
 };
@@ -154,6 +159,7 @@ pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, release_bms_message_for_task,
     release_outboard_task, release_partition_set_for_task, valid_aid as valid_terminal_aid,
 };
+pub(in crate::service) use terminal_run::terminal_secret_digest;
 pub(super) use time::invoke as invoke_time;
 pub use web_service_control::CicsWebServiceDefinition;
 pub(super) fn invoke_extended_control(

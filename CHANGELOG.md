@@ -99,6 +99,10 @@ All notable changes to mainframe-env are documented here.
   duplicate and pool-rebuild conditions, SAF authorization, fenced replay,
   and compiled COBOL routing. IBM CICS TS 6.x application API
   `dfhp4_definecounter.html`, catalog rows 0034 and 0035.
+- Added a bounded durable CICS diagnostics authority with a versioned state
+  codec, trace-destination configuration, retained diagnostic snapshots, and
+  strict malformed/capacity checks. Command registration follows in separate
+  diagnostics slices.
 
 - Added typed CICS `DEFINE COMPOSITE EVENT` with exclusive AND/OR predicates,
   up to eight initial atomic children, durable child ownership and reevaluation,
