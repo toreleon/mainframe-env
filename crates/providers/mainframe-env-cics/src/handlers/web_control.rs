@@ -266,6 +266,7 @@ pub(in crate::service) fn invoke(
             close::invoke(service, run, request, run.invocation.deadline_tick)
         }
         CicsOperation::WebExtract => extract::invoke(service, run, request),
+        CicsOperation::ExtractWeb => extract::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

@@ -641,6 +641,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WebOpen => web_control::invalid_open_shape(plan, inputs, outputs),
         CicsPlanOperation::WebClose => web_control::invalid_close_shape(plan, inputs, outputs),
         CicsPlanOperation::WebExtract => web_control::invalid_extract_shape(plan, inputs, outputs),
+        CicsPlanOperation::ExtractWeb => web_control::invalid_extract_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2037,6 +2038,8 @@ mod tests {
     fn web_extract_uses_reserved_v2_tags_and_checked_length_pair() {
         assert_eq!(operation_tag(CicsPlanOperation::WebExtract), 94);
         assert_eq!(operation_from_tag(94), Ok(CicsPlanOperation::WebExtract));
+        assert_eq!(operation_tag(CicsPlanOperation::ExtractWeb), 95);
+        assert_eq!(operation_from_tag(95), Ok(CicsPlanOperation::ExtractWeb));
         for (name, tag) in [
             (CicsOperandName::WebMethodLength, 268),
             (CicsOperandName::WebVersionLength, 269),
@@ -2088,6 +2091,13 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
             Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut synonym = plan.clone();
+        synonym.operation = CicsPlanOperation::ExtractWeb;
+        let encoded = encode_cics_effect_plan(&synonym, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(synonym)
         );
         let mut invalid = plan;
         invalid.outputs.remove(1);

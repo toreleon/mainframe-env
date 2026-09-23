@@ -1944,6 +1944,7 @@ mod tests {
                 CicsPlanOperation::WebOpen => crate::HirCicsOperation::WebOpen,
                 CicsPlanOperation::WebClose => crate::HirCicsOperation::WebClose,
                 CicsPlanOperation::WebExtract => crate::HirCicsOperation::WebExtract,
+                CicsPlanOperation::ExtractWeb => crate::HirCicsOperation::ExtractWeb,
                 CicsPlanOperation::WaitJournalName => crate::HirCicsOperation::WaitJournalName,
                 CicsPlanOperation::WaitJournalNum => crate::HirCicsOperation::WaitJournalNum,
                 CicsPlanOperation::WriteJournalName => crate::HirCicsOperation::WriteJournalName,

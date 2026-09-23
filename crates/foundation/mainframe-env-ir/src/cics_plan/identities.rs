@@ -256,6 +256,8 @@ pub enum CicsPlanOperation {
     WebClose,
     /// Extract metadata from one inbound request or client session.
     WebExtract,
+    /// EXTRACT WEB spelling of the checked Web metadata command.
+    ExtractWeb,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.

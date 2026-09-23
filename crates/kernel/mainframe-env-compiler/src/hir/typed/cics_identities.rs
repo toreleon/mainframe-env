@@ -129,6 +129,7 @@ pub enum HirCicsOperation {
     SendPage,
     SendPartnset,
     WebExtract,
+    ExtractWeb,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

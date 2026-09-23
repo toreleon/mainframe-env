@@ -38,6 +38,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `EXTRACT WEB` as the separately registered synonym of
+  `WEB EXTRACT`, with the same checked server/client metadata behavior and a
+  distinct compiled route. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0076` binds
+  `dfhp4_extractweb.html` at
+  `sha256:34412c24defd5a6e0063edd6697c2091e6737f9ee5ab13744fde6fea44d591b4`.
+
 - Added typed CICS `WEB EXTRACT` for task-bound inbound HTTP requests and
   durable client sessions, with source length/condition handling and a compiled
   COBOL route. IBM CICS TS 6.x baseline

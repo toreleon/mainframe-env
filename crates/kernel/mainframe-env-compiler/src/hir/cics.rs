@@ -677,6 +677,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WebOpen => CicsPlanOperation::WebOpen,
         HirCicsOperation::WebClose => CicsPlanOperation::WebClose,
         HirCicsOperation::WebExtract => CicsPlanOperation::WebExtract,
+        HirCicsOperation::ExtractWeb => CicsPlanOperation::ExtractWeb,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,

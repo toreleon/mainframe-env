@@ -11,27 +11,19 @@ pub(super) fn reviewed_ambiguous_shape(
     name: &str,
     has_value: bool,
 ) -> bool {
+    if has_value
+        && matches!(
+            descriptor.label_tokens,
+            ["WEB", "EXTRACT"] | ["EXTRACT", "WEB"]
+        )
+        && EXTRACT_CLAUSES.contains(&name)
+    {
+        return true;
+    }
     has_value
         && matches!(
             (descriptor.label_tokens, name),
-            (["WEB", "OPEN"], "SCHEME")
-                | (["WEB", "PARSE", "URL"], "HOSTTYPE")
-                | (["WEB", "EXTRACT"], "HOST")
-                | (["WEB", "EXTRACT"], "HOSTTYPE")
-                | (["WEB", "EXTRACT"], "HTTPMETHOD")
-                | (["WEB", "EXTRACT"], "HTTPVERSION")
-                | (["WEB", "EXTRACT"], "METHODLENGTH")
-                | (["WEB", "EXTRACT"], "PATH")
-                | (["WEB", "EXTRACT"], "PATHLENGTH")
-                | (["WEB", "EXTRACT"], "PORTNUMBER")
-                | (["WEB", "EXTRACT"], "QUERYSTRING")
-                | (["WEB", "EXTRACT"], "QUERYSTRLEN")
-                | (["WEB", "EXTRACT"], "REALM")
-                | (["WEB", "EXTRACT"], "REALMLEN")
-                | (["WEB", "EXTRACT"], "REQUESTTYPE")
-                | (["WEB", "EXTRACT"], "SCHEME")
-                | (["WEB", "EXTRACT"], "URIMAP")
-                | (["WEB", "EXTRACT"], "VERSIONLEN")
+            (["WEB", "OPEN"], "SCHEME") | (["WEB", "PARSE", "URL"], "HOSTTYPE")
         )
 }
 
@@ -93,7 +85,10 @@ pub(super) fn validate(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
-    if operation == HirCicsOperation::WebExtract {
+    if matches!(
+        operation,
+        HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
+    ) {
         return validate_extract(clauses, semantic);
     }
     if operation == HirCicsOperation::WebClose {
@@ -332,7 +327,10 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    if operation == HirCicsOperation::WebExtract {
+    if matches!(
+        operation,
+        HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
+    ) {
         return extract_operands(clauses, semantic);
     }
     if operation == HirCicsOperation::WebClose {
@@ -415,7 +413,10 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
-    if operation == HirCicsOperation::WebExtract {
+    if matches!(
+        operation,
+        HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
+    ) {
         return extract_outputs(clauses, semantic);
     }
     if operation == HirCicsOperation::WebOpen {

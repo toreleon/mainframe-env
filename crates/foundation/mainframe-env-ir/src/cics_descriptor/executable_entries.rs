@@ -1,7 +1,7 @@
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 131] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 132] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1046,6 +1046,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 131] = [
         operation: CicsPlanOperation::WebExtract,
         namespace: "cics.web",
         name: "extract",
+        major: 1,
+        effects: WEB_PARSE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ExtractWeb,
+        namespace: "cics.web",
+        name: "extract-web",
         major: 1,
         effects: WEB_PARSE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

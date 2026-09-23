@@ -6965,7 +6965,9 @@ mod tests {
         for command in [
             "WEB EXTRACT HOST(HOST-X) HOSTLENGTH(HOST-LEN) PATH(PATH-X) PATHLENGTH(PATH-LEN) HTTPMETHOD(METHOD-X) METHODLENGTH(METHOD-LEN) SCHEME(SCHEME-X)",
             "WEB EXTRACT SESSTOKEN(TOKEN-X) HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(SCHEME-X)",
+            "EXTRACT WEB HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(SCHEME-X)",
         ] {
+            let alias = command.starts_with("EXTRACT WEB");
             let analysis = analyze(&format!(
                 "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
             ));
@@ -6980,7 +6982,14 @@ mod tests {
                     _ => None,
                 })
                 .expect("typed WEB EXTRACT");
-            assert_eq!(command.operation, HirCicsOperation::WebExtract);
+            assert_eq!(
+                command.operation,
+                if alias {
+                    HirCicsOperation::ExtractWeb
+                } else {
+                    HirCicsOperation::WebExtract
+                }
+            );
             assert!(command.outputs.iter().any(|output| {
                 output.name == HirCicsOutputName::WebScheme
                     && output.target.qualified_name == "SCHEME-X"

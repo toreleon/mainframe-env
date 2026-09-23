@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 133);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 134);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7946,6 +7946,18 @@ mod tests {
             ),
             Err(HostProblem::Malformed)
         );
+        let synonym = request(
+            CicsOperation::ExtractWeb,
+            BTreeMap::from([("REQUESTTYPE".into(), argument(b"TYPE-X"))]),
+            5,
+        );
+        let alias = service
+            .invoke(
+                &effect(&invocation.run_unit_id, synonym.clone(), 5),
+                synonym,
+            )
+            .unwrap();
+        assert_eq!(alias.outputs["REQUESTTYPE"].bytes(), b"1");
         let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         handlers::release_task_state(&service, &run).unwrap();
         assert!(service.lock().unwrap().web.inbound.is_empty());

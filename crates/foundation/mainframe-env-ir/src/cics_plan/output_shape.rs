@@ -137,7 +137,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
-        CicsPlanOperation::WebExtract => matches!(
+        CicsPlanOperation::WebExtract | CicsPlanOperation::ExtractWeb => matches!(
             output,
             CicsOutputName::WebScheme
                 | CicsOutputName::WebHost

@@ -188,6 +188,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
+    ("ExtractWeb", "api", "web-control", False, f"{OFFICIAL_BASELINE}:api-commands:0076"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("Freemain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0084"),
     ("Freemain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0085"),
@@ -645,6 +646,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "AsktimeEib",
         "Deq",
         "Enq",
+        "ExtractWeb",
         "FormatTime",
         "Freemain",
         "Freemain64",
@@ -1160,6 +1162,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WebExtract": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "ExtractWeb": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "WebOpen": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
@@ -1385,6 +1390,7 @@ def _load_typed_execution_registrations(
         "Enq",
         "EnterTraceId",
         "EnterTraceNum",
+        "ExtractWeb",
         "Freemain",
         "Freemain64",
         "Getmain",
@@ -1778,6 +1784,7 @@ def load_catalog(
                 "DocumentRetrieve",
                 "DocumentSet",
                 "Enq",
+                "ExtractWeb",
                 "Freemain",
                 "Freemain64",
                 "Getmain",
