@@ -27595,4 +27595,103 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn delete_event_unlinks_children_and_rejects_system_events() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        for (sequence, operation, arguments) in [
+            (
+                1,
+                CicsOperation::DefineInputEvent,
+                BTreeMap::from([("EVENT".into(), argument(b"GO"))]),
+            ),
+            (
+                2,
+                CicsOperation::DefineCompositeEvent,
+                BTreeMap::from([
+                    ("EVENT".into(), argument(b"GROUP")),
+                    ("SUBEVENT1".into(), argument(b"GO")),
+                    ("OPTION.OR".into(), cics_option()),
+                ]),
+            ),
+        ] {
+            let command = request(operation, arguments, sequence);
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), sequence),
+                command,
+            )
+            .unwrap();
+        }
+        cics.post_input_event("CURRENT", "GO").unwrap();
+        let delete_child = request(
+            CicsOperation::DeleteEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"GO"))]),
+            3,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, delete_child.clone(), 3),
+            delete_child,
+        )
+        .unwrap();
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert!(state["events"].get("GO").is_none());
+        assert_eq!(state["events"]["GROUP"]["fired"], false);
+        assert_eq!(
+            state["events"]["GROUP"]["kind"]["children"],
+            serde_json::json!([])
+        );
+        let missing = request(
+            CicsOperation::DeleteEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"GO"))]),
+            4,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 4),
+                missing
+            ),
+            Err(HostProblem::Condition {
+                name: "EVENTERR".into(),
+                response: 111,
+                response2: 4,
+            })
+        );
+        let system = request(
+            CicsOperation::DeleteEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"DFHINITIAL"))]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, system.clone(), 5), system),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 2,
+            })
+        );
+        let delete_composite = request(
+            CicsOperation::DeleteEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"GROUP"))]),
+            6,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, delete_composite.clone(), 6),
+            delete_composite,
+        )
+        .unwrap();
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert!(state["events"].as_object().unwrap().is_empty());
+    }
 }

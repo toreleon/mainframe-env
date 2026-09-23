@@ -1232,6 +1232,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "READQ TD",
                 "ENDBR",
                 "DELETE",
+                "DELETE EVENT",
                 "DELETEQ TD",
                 "DELETEQ TS",
                 "DELAY",

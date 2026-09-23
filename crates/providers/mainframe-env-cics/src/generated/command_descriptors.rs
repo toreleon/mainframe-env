@@ -216,6 +216,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::DeleteEvent,
+        syntax: "DELETE EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0046",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::DeleteTransientData,
         syntax: "DELETEQ TD",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0048",

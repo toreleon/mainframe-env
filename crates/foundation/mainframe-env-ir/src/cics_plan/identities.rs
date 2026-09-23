@@ -101,6 +101,8 @@ pub enum CicsPlanOperation {
     DefineInputEvent,
     /// Define a BTS composite event with an AND or OR predicate.
     DefineCompositeEvent,
+    /// Delete one BTS input or composite event.
+    DeleteEvent,
     /// Write one explicitly keyed file record.
     Write,
     /// Write one bounded record to a transient data queue.

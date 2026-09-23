@@ -2455,6 +2455,7 @@ mod tests {
             CicsOperation::ResetBrowse,
             CicsOperation::ReadTransientData,
             CicsOperation::RemoveSubevent,
+            CicsOperation::DeleteEvent,
             CicsOperation::ReceiveMap,
             CicsOperation::Retrieve,
             CicsOperation::Return,

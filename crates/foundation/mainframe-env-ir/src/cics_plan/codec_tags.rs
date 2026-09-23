@@ -20,6 +20,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
         CicsPlanOperation::AddSubevent => 105,
         CicsPlanOperation::RemoveSubevent => 113,
+        CicsPlanOperation::DeleteEvent => 110,
         CicsPlanOperation::Read => 0,
         CicsPlanOperation::Rewrite => 1,
         CicsPlanOperation::Syncpoint => 2,
@@ -122,6 +123,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
     match value {
         105 => Ok(CicsPlanOperation::AddSubevent),
         113 => Ok(CicsPlanOperation::RemoveSubevent),
+        110 => Ok(CicsPlanOperation::DeleteEvent),
         0 => Ok(CicsPlanOperation::Read),
         1 => Ok(CicsPlanOperation::Rewrite),
         2 => Ok(CicsPlanOperation::Syncpoint),

@@ -21,6 +21,7 @@ const MAX_REPLAYS: usize = 512;
 const MAX_CAS_ATTEMPTS: usize = 8;
 
 mod composite;
+mod delete;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -222,6 +223,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::DefineCompositeEvent => composite::define(service, run, request),
         CicsOperation::AddSubevent => composite::add(service, run, request),
         CicsOperation::RemoveSubevent => composite::remove(service, run, request),
+        CicsOperation::DeleteEvent => delete::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

@@ -713,7 +713,7 @@ fn validate_operation_shape(
         CicsPlanOperation::DocumentSet => {
             document_control::invalid_set_shape(plan, inputs, outputs)
         }
-        CicsPlanOperation::DefineInputEvent => {
+        CicsPlanOperation::DefineInputEvent | CicsPlanOperation::DeleteEvent => {
             event_control::invalid_define_input_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::DefineCompositeEvent => {
@@ -1410,6 +1410,27 @@ mod tests {
             let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
             assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan));
         }
+    }
+
+    #[test]
+    fn delete_event_uses_reserved_v2_operation_tag() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DeleteEvent,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Event,
+                value: CicsOperandValue::Literal(b"GO".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        assert_eq!(operation_tag(plan.operation), 110);
+        assert_eq!(operation_from_tag(110), Ok(plan.operation));
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan)
+        );
     }
 
     /// Issue #212: unrelated file and UOW plans reject extension flags.

@@ -56,6 +56,8 @@ pub enum CicsOperation {
     DefineInputEvent,
     /// Define an AND or OR predicate over activity-owned atomic events.
     DefineCompositeEvent,
+    /// Delete one input or composite event from the current activity.
+    DeleteEvent,
     /// Create one bounded transaction-owned document.
     DocumentCreate,
     /// Delete one transaction-owned document and release its storage.
@@ -215,6 +217,7 @@ impl CicsOperation {
             Self::Delete => "Delete",
             Self::DefineInputEvent => "DefineInputEvent",
             Self::DefineCompositeEvent => "DefineCompositeEvent",
+            Self::DeleteEvent => "DeleteEvent",
             Self::DocumentCreate => "DocumentCreate",
             Self::DocumentDelete => "DocumentDelete",
             Self::DocumentInsert => "DocumentInsert",
@@ -320,6 +323,7 @@ impl CicsOperation {
                 | Self::AddSubevent
                 | Self::DefineInputEvent
                 | Self::DefineCompositeEvent
+                | Self::DeleteEvent
                 | Self::DocumentCreate
                 | Self::DocumentDelete
                 | Self::DocumentInsert

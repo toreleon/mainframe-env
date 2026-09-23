@@ -31,6 +31,7 @@ impl Canonical for CicsOperation {
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DefineInputEvent => out.variant("CicsOperation", "DefineInputEvent", 0),
             Self::DefineCompositeEvent => out.variant("CicsOperation", "DefineCompositeEvent", 0),
+            Self::DeleteEvent => out.variant("CicsOperation", "DeleteEvent", 0),
             Self::DocumentCreate => out.variant("CicsOperation", "DocumentCreate", 0),
             Self::DocumentDelete => out.variant("CicsOperation", "DocumentDelete", 0),
             Self::DocumentInsert => out.variant("CicsOperation", "DocumentInsert", 0),

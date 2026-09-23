@@ -191,6 +191,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
+        CicsPlanOperation::DeleteEvent => CicsOperation::DeleteEvent,
         CicsPlanOperation::Address => CicsOperation::Address,
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
         CicsPlanOperation::Asktime => CicsOperation::Asktime,

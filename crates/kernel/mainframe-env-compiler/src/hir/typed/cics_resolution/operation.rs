@@ -92,6 +92,7 @@ pub(super) fn resolve(
         ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,
         ["DEFINE", "INPUT", "EVENT"] => HirCicsOperation::DefineInputEvent,
         ["DEFINE", "COMPOSITE", "EVENT"] => HirCicsOperation::DefineCompositeEvent,
+        ["DELETE", "EVENT"] => HirCicsOperation::DeleteEvent,
         ["DOCUMENT", "DELETE"] => HirCicsOperation::DocumentDelete,
         ["DOCUMENT", "INSERT"] => HirCicsOperation::DocumentInsert,
         ["DOCUMENT", "RETRIEVE"] => HirCicsOperation::DocumentRetrieve,

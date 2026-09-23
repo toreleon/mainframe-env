@@ -6,7 +6,7 @@ use crate::SemanticModel;
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
     match operation {
-        HirCicsOperation::DefineInputEvent => Some(CommandShape {
+        HirCicsOperation::DefineInputEvent | HirCicsOperation::DeleteEvent => Some(CommandShape {
             clauses: &["EVENT", "RESP", "RESP2"],
             options: &["NOHANDLE"],
             required: &["EVENT"],
@@ -61,6 +61,7 @@ pub(super) fn operands(
     if !matches!(
         operation,
         HirCicsOperation::DefineInputEvent
+            | HirCicsOperation::DeleteEvent
             | HirCicsOperation::DefineCompositeEvent
             | HirCicsOperation::AddSubevent
             | HirCicsOperation::RemoveSubevent

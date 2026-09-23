@@ -125,6 +125,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("UpdateCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0226"),
     ("UpdateDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0227"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
+    ("DeleteEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0046"),
     (
         "DeleteTransientData",
         "api",
@@ -608,6 +609,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "ReadTransientData",
         "EndBrowse",
         "Delete",
+        "DeleteEvent",
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
@@ -706,6 +708,9 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "DeleteEvent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "AddSubevent": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),

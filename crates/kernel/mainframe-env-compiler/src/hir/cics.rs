@@ -533,6 +533,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DefineInputEvent => CicsPlanOperation::DefineInputEvent,
         HirCicsOperation::AddSubevent => CicsPlanOperation::AddSubevent,
         HirCicsOperation::RemoveSubevent => CicsPlanOperation::RemoveSubevent,
+        HirCicsOperation::DeleteEvent => CicsPlanOperation::DeleteEvent,
         HirCicsOperation::DefineCompositeEvent => CicsPlanOperation::DefineCompositeEvent,
         HirCicsOperation::DocumentDelete => CicsPlanOperation::DocumentDelete,
         HirCicsOperation::DocumentInsert => CicsPlanOperation::DocumentInsert,
