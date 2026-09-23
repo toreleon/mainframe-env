@@ -297,6 +297,15 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::AllocateConversation,
+                CicsPlanOperation::GdsAllocateConversation,
+                CicsPlanOperation::GdsAssignConversation,
+                CicsPlanOperation::BuildAttach,
+                CicsPlanOperation::ConnectProcess,
+                CicsPlanOperation::GdsConnectProcess,
+                CicsPlanOperation::Converse,
+                CicsPlanOperation::FreeConversation,
+                CicsPlanOperation::GdsFreeConversation,
                 CicsPlanOperation::ChangePassword,
                 CicsPlanOperation::ChangePhrase,
                 CicsPlanOperation::QuerySecurity,

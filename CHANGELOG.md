@@ -49,6 +49,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Began the CIC-905 APPC/MRO conversation-open slice with a transport-neutral
+  state contract, versioned provider-state allocation ledger, source-defined
+  GDS six-byte return codes, and reserved MCEP v2 conversation identities.
+  The nine command routes remain unregistered while selected execution and
+  recovery gates are completed. IBM CICS TS 6.x `sources-a` catalog rows
+  `0007`, `0008`, `0012`, `0015`, `0028`, `0029`, `0030`, `0081`, and `0082`
+  bind this work; no licensed differential credit is claimed.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

@@ -2,6 +2,19 @@ use super::{CicsEffectPlan, CicsPlanOperation, CicsPlanOption};
 
 pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
     plan.options.iter().any(|option| match plan.operation {
+        CicsPlanOperation::AllocateConversation | CicsPlanOperation::GdsAllocateConversation => {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle | CicsPlanOption::ConversationNoQueue
+            )
+        }
+        CicsPlanOperation::Converse => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::ConversationNotruncate
+                | CicsPlanOption::ConversationDefresp
+                | CicsPlanOption::ConversationFmh
+        ),
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

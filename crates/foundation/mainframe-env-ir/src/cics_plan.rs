@@ -9,6 +9,7 @@ mod assign;
 mod browse;
 mod codec_tags;
 mod condition_handlers;
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -165,7 +166,8 @@ fn encode_cics_effect_plan_version(
     validate_plan(plan, limits)?;
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag(plan.operation))
-            || (130..=139).contains(&operation_tag(plan.operation)))
+            || (130..=139).contains(&operation_tag(plan.operation))
+            || (222..=230).contains(&operation_tag(plan.operation)))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -237,7 +239,9 @@ pub fn decode_cics_effect_plan(
     }
     let operation_tag = reader.tag(version)?;
     if version == LEGACY_VERSION
-        && ((91..=104).contains(&operation_tag) || (130..=139).contains(&operation_tag))
+        && ((91..=104).contains(&operation_tag)
+            || (130..=139).contains(&operation_tag)
+            || (222..=230).contains(&operation_tag))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -424,6 +428,17 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
+        CicsPlanOperation::AllocateConversation
+        | CicsPlanOperation::GdsAllocateConversation
+        | CicsPlanOperation::GdsAssignConversation
+        | CicsPlanOperation::BuildAttach
+        | CicsPlanOperation::ConnectProcess
+        | CicsPlanOperation::GdsConnectProcess
+        | CicsPlanOperation::Converse
+        | CicsPlanOperation::FreeConversation
+        | CicsPlanOperation::GdsFreeConversation => {
+            conversation_control::invalid_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::Address => address::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::AddressSet => {
