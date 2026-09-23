@@ -12485,6 +12485,96 @@ mod tests {
     }
 
     #[test]
+    fn compiled_spoolwrite_appends_page_and_line_records_with_5606() {
+        let artifact = published_source_fixture(
+            "SPWRITE",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SPWRITE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(8).\n01 FROM-X PIC X(7) VALUE 'ABCDEFG'.\n01 RECORD-X PIC S9(4) COMP VALUE 5.\n01 FLENGTH-X PIC S9(9) COMP VALUE 5.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\n01 WRITE-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID('ME01USER') NODE('LOCAL') RECORDLENGTH(RECORD-X) RESP(RESP-X) END-EXEC.\nEXEC CICS SPOOLWRITE TOKEN(TOKEN-X) FROM(FROM-X) FLENGTH(FLENGTH-X) PAGE RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO WRITE-FN.\nEXEC CICS SPOOLWRITE TOKEN(TOKEN-X) FROM(FROM-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SPWRITE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SPWR".into(), "SPWRITE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SPWRITE".into(),
+                    map: "SPWRITE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("spoolwrite-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SPWR", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SPWR",
+                24,
+                80,
+                "spoolwrite-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SPWRITE", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("WRITE-FN").unwrap().bytes(),
+            &[0x56, 0x06]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 22]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 2]);
+        let token =
+            String::from_utf8(restored.variable("TOKEN-X").unwrap().bytes().to_vec()).unwrap();
+        let report = server.cics.spool_report_snapshot(&token).unwrap();
+        assert_eq!(report.state, "open-output");
+        assert_eq!(report.records, [b"ABCDE".to_vec(), b"ABCDE".to_vec()]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SpoolWrite)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_set_allocates_checkpointed_record_storage() {
         let artifact = published_source_fixture(
             "READQSET",

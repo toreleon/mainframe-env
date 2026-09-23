@@ -60,6 +60,7 @@ pub(super) fn resolve(
         ["SPOOLOPEN", "INPUT"] => HirCicsOperation::SpoolOpenInput,
         ["SPOOLOPEN", "OUTPUT"] => HirCicsOperation::SpoolOpenOutput,
         ["SPOOLREAD"] => HirCicsOperation::SpoolRead,
+        ["SPOOLWRITE"] => HirCicsOperation::SpoolWrite,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,

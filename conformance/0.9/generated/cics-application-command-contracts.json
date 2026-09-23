@@ -687,8 +687,8 @@
     "id": "INT-1601.cics-participant",
     "status": "bounded-ambiguity",
     "owner": "shared-execution-coordinator-and-cics-provider",
-    "mutating_rows": 50,
-    "bounded_effect_rows": 191,
+    "mutating_rows": 51,
+    "bounded_effect_rows": 190,
     "explicit_uow_boundary_rows": 1,
     "bounded_uow_rows": 240,
     "execution_credit": 0,
@@ -758,10 +758,10 @@
   },
   "registry": {
     "shape_commands": 263,
-    "typed_handlers": 72,
+    "typed_handlers": 73,
     "legacy_compatibility_handlers": 0,
-    "advertised_commands": 72,
-    "unready_handlers": 191,
+    "advertised_commands": 73,
+    "unready_handlers": 190,
     "automatic_registration": false,
     "default_handler": null,
     "unready_result": "explicit-unsupported",
@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:6a9d0558118f74a48b1e82d129f6373fdf1b94b0d1b7786346b458a03702698e"
+    "registry_sha256": "sha256:1a83f9e321c0361b369a0cde5605537eb3330ba3455f83b22256ebfbe9b1ea49"
   },
   "counts": {
     "batches": 3,
@@ -806,11 +806,11 @@
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
-    "runtime_backed_commands": 72,
-    "typed_runtime_commands": 72,
+    "runtime_backed_commands": 73,
+    "typed_runtime_commands": 73,
     "legacy_compatibility_commands": 0,
-    "advertised_commands": 72,
-    "unready_commands": 191
+    "advertised_commands": 73,
+    "unready_commands": 190
   },
   "batches": [
     {
@@ -333355,9 +333355,9 @@
           "eibfn": "5606",
           "source_status": "bounded-ambiguity",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "SpoolWrite",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -334179,7 +334179,7 @@
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -334195,15 +334195,15 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
@@ -334216,12 +334216,8 @@
             "operand-direction",
             "option-bounds",
             "resource-key",
-            "capability-intent",
             "eib-response",
             "conditions",
-            "effect-class",
-            "cancellation",
-            "audit",
             "recovery"
           ],
           "source_issue_ids": [
@@ -334445,6 +334441,28 @@
                   "host_max_value_bytes": 0
                 },
                 {
+                  "name": "PAGE",
+                  "authorities": [
+                    "command-source"
+                  ],
+                  "argument_markers": [
+                    "none"
+                  ],
+                  "value_shape": "flag",
+                  "directions": [
+                    "none"
+                  ],
+                  "direction_status": "resolved",
+                  "source_stacks": [
+                    [
+                      "PAGE"
+                    ]
+                  ],
+                  "bound_status": "not-applicable",
+                  "source_max_value_bytes": null,
+                  "host_max_value_bytes": 0
+                },
+                {
                   "name": "RESP",
                   "authorities": [
                     "global-command-format"
@@ -334509,7 +334527,15 @@
                 "status": "bounded-ambiguity",
                 "source_scope": "syntax-diagram-only",
                 "required": [],
-                "alternatives": [],
+                "alternatives": [
+                  {
+                    "members": [
+                      "LINE",
+                      "PAGE"
+                    ],
+                    "required": false
+                  }
+                ],
                 "dependencies": [
                   {
                     "option": "RESP2",
@@ -334518,7 +334544,12 @@
                     ]
                   }
                 ],
-                "mutual_exclusions": []
+                "mutual_exclusions": [
+                  [
+                    "LINE",
+                    "PAGE"
+                  ]
+                ]
               },
               "unknown_option": "reject",
               "duplicate_option": "reject",
@@ -334977,7 +335008,7 @@
             },
             "resource": {
               "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "scope": "spool",
               "selectors": [],
               "ambiguous_selectors": [
                 {
@@ -334989,49 +335020,58 @@
                 }
               ],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
+              "selector_authority": "source-bound-runtime",
               "selector_completeness": "bounded-ambiguity",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "update",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
                 "host.cics.execute",
-                "host.security.authorize"
+                "host.security.authorize",
+                "host.spool.write"
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "mutating",
+              "mutating": true,
+              "ir_effects": [
+                "audit",
+                "condition",
+                "memory-read",
+                "memory-write",
+                "security",
+                "spool",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
               "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
+              "durable_effect_intent": true,
               "uow_participation": "bounded-ambiguity",
               "prepare": "bounded-ambiguity",
               "rollback": "bounded-ambiguity",
               "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
               "fenced_reconciliation": null,
               "retention_protected": null
@@ -335039,15 +335079,15 @@
             "registry": {
               "family": "spool-control",
               "handler_id": "mainframe-env-cics.handlers.spool-control.spoolwrite@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "SpoolWrite",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:472d36be413dad745785c13ad856afc32e65af49e688e48b9c0912431f428fba"
+              "unready_result": null,
+              "handler_sha256": "sha256:9182c91ba84a439d1be6303356e8fd294b3bc0648af873296c0c693a900dacb2"
             }
           },
-          "row_contract_sha256": "sha256:eda8b8d0e1708d10e4e4653e51b75b3393366eb2e8344a14119ec9ab4efc9d0e"
+          "row_contract_sha256": "sha256:cf707fb42cc15a33b6a3b8e010b7d2bae5729fc8cfd3325f4182789836e4ee91"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0205",
@@ -446706,5 +446746,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:e041fd59bd872696e7e1246c1fe10247be6810f53289f6bc79ed29140708b5d2"
+  "contract_sha256": "sha256:c5c96c488765c85b9e856c27909a6a2623f4c4502563b5827e2d54e29db97d9c"
 }

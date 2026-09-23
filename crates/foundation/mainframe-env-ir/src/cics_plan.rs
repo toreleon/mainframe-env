@@ -619,6 +619,7 @@ fn validate_operation_shape(
             spool_control::invalid_open_output_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::SpoolRead => spool_control::invalid_read_shape(plan, inputs, outputs),
+        CicsPlanOperation::SpoolWrite => spool_control::invalid_write_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2034,6 +2035,7 @@ mod tests {
             (CicsPlanOperation::SpoolOpenInput, 59),
             (CicsPlanOperation::SpoolOpenOutput, 60),
             (CicsPlanOperation::SpoolRead, 61),
+            (CicsPlanOperation::SpoolWrite, 62),
         ];
         let operands = [
             (CicsOperandName::SpoolToken, 112),
@@ -2043,6 +2045,8 @@ mod tests {
             (CicsOperandName::SpoolRecordLength, 116),
             (CicsOperandName::SpoolOutDescr, 117),
             (CicsOperandName::SpoolMaxFlength, 118),
+            (CicsOperandName::SpoolFrom, 119),
+            (CicsOperandName::SpoolFlength, 120),
         ];
         let options = [
             (CicsPlanOption::SpoolKeep, 72),
@@ -2052,6 +2056,8 @@ mod tests {
             (CicsPlanOption::SpoolMcc, 76),
             (CicsPlanOption::SpoolPrint, 77),
             (CicsPlanOption::SpoolPunch, 78),
+            (CicsPlanOption::SpoolLine, 79),
+            (CicsPlanOption::SpoolPage, 80),
         ];
         assert_eq!(
             operations

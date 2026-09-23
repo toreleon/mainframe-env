@@ -149,6 +149,13 @@ All notable changes to mainframe-env are documented here.
   user-key task returns INVREQ 16/2. Checkpoint v12 preserves area bindings and
   restored stale-pointer rejection. The route uses the existing authorization,
   audit, cancellation, deadline, and Memory/SQLite replay boundary.
+- Added typed CICS `SPOOLWRITE` with operation tag 62, FROM/FLENGTH operand
+  tags 119–120, and LINE/PAGE option tags 79–80. It appends bounded output
+  records with default LINE mode, applies the report's RECORDLENGTH and exact
+  LENGERR RESP2 difference, preserves append/reply replay through SQLite
+  restart, and checks SURROGAT authority for an internal-reader JOB USER card.
+  The compiled route proves EIBFN `5606`.
+
 - Added typed CICS `SPOOLREAD` with operation tag 61, MAXFLENGTH operand tag
   118, and TOFLENGTH output tag 209. A short buffer receives the bounded
   prefix, reports the truncated byte count and actual record length, and leaves

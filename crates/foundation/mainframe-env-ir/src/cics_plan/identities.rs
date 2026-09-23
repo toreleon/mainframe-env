@@ -107,6 +107,8 @@ pub enum CicsPlanOperation {
     SpoolOpenOutput,
     /// Read the next record of an input spool report.
     SpoolRead,
+    /// Append one record to an output spool report.
+    SpoolWrite,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -375,6 +377,10 @@ pub enum CicsOperandName {
     SpoolOutDescr,
     /// Maximum SPOOLREAD transfer length.
     SpoolMaxFlength,
+    /// SPOOLWRITE record source.
+    SpoolFrom,
+    /// Optional SPOOLWRITE transfer length.
+    SpoolFlength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -476,6 +482,10 @@ pub enum CicsPlanOption {
     SpoolPrint,
     /// Create a punch report.
     SpoolPunch,
+    /// Write a line-mode spool record.
+    SpoolLine,
+    /// Write a page-mode spool record.
+    SpoolPage,
 }
 
 /// Named result binding written after the host result arrives.

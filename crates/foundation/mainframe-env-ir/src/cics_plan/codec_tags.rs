@@ -90,6 +90,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::SpoolOpenInput => 59,
         CicsPlanOperation::SpoolOpenOutput => 60,
         CicsPlanOperation::SpoolRead => 61,
+        CicsPlanOperation::SpoolWrite => 62,
     }
 }
 
@@ -167,6 +168,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         59 => Ok(CicsPlanOperation::SpoolOpenInput),
         60 => Ok(CicsPlanOperation::SpoolOpenOutput),
         61 => Ok(CicsPlanOperation::SpoolRead),
+        62 => Ok(CicsPlanOperation::SpoolWrite),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -287,6 +289,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::SpoolRecordLength => 116,
         CicsOperandName::SpoolOutDescr => 117,
         CicsOperandName::SpoolMaxFlength => 118,
+        CicsOperandName::SpoolFrom => 119,
+        CicsOperandName::SpoolFlength => 120,
     }
 }
 
@@ -406,6 +410,8 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         116 => Ok(CicsOperandName::SpoolRecordLength),
         117 => Ok(CicsOperandName::SpoolOutDescr),
         118 => Ok(CicsOperandName::SpoolMaxFlength),
+        119 => Ok(CicsOperandName::SpoolFrom),
+        120 => Ok(CicsOperandName::SpoolFlength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -462,6 +468,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::SpoolMcc => 76,
         CicsPlanOption::SpoolPrint => 77,
         CicsPlanOption::SpoolPunch => 78,
+        CicsPlanOption::SpoolLine => 79,
+        CicsPlanOption::SpoolPage => 80,
     }
 }
 
@@ -517,6 +525,8 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         76 => Ok(CicsPlanOption::SpoolMcc),
         77 => Ok(CicsPlanOption::SpoolPrint),
         78 => Ok(CicsPlanOption::SpoolPunch),
+        79 => Ok(CicsPlanOption::SpoolLine),
+        80 => Ok(CicsPlanOption::SpoolPage),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

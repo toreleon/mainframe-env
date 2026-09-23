@@ -393,6 +393,7 @@ pub(super) fn execute(
                         | CicsOperandName::Token
                         | CicsOperandName::SpoolRecordLength
                         | CicsOperandName::SpoolMaxFlength
+                        | CicsOperandName::SpoolFlength
                 ) =>
             {
                 (

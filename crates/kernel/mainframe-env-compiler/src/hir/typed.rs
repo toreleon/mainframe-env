@@ -198,6 +198,7 @@ pub enum HirCicsOperation {
     SpoolOpenInput,
     SpoolOpenOutput,
     SpoolRead,
+    SpoolWrite,
     Syncpoint,
     Unlock,
     Suspend,
@@ -333,6 +334,8 @@ pub enum HirCicsOperandName {
     SpoolRecordLength,
     SpoolOutDescr,
     SpoolMaxFlength,
+    SpoolFrom,
+    SpoolFlength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -396,6 +399,8 @@ pub enum HirCicsOption {
     SpoolMcc,
     SpoolPrint,
     SpoolPunch,
+    SpoolLine,
+    SpoolPage,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1099,15 +1104,12 @@ fn require_writable(reference: &HirDataReference) -> Resolution<()> {
 }
 
 fn size_error_policy(options: &[StatementOption]) -> HirSizeErrorPolicy {
+    let has_option = |expected| options.iter().any(|option| option.kind == expected);
     HirSizeErrorPolicy {
-        on_size_error: has_option(options, StatementOptionKind::OnSizeError),
-        not_on_size_error: has_option(options, StatementOptionKind::NotOnSizeError),
-        explicit_terminator: has_option(options, StatementOptionKind::ExplicitTerminator),
+        on_size_error: has_option(StatementOptionKind::OnSizeError),
+        not_on_size_error: has_option(StatementOptionKind::NotOnSizeError),
+        explicit_terminator: has_option(StatementOptionKind::ExplicitTerminator),
     }
-}
-
-fn has_option(options: &[StatementOption], expected: StatementOptionKind) -> bool {
-    options.iter().any(|option| option.kind == expected)
 }
 
 const fn is_numeric(category: DataCategory) -> bool {
@@ -4214,6 +4216,66 @@ mod tests {
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 INTO-X PIC X(8). 01 MAX-X PIC S9(9) COMP. 01 BAD-MAX-X PIC S9(4) COMP. 01 BAD-TO-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_spoolwrite_resolves_source_length_and_mode() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SPWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 FROM-X PIC X(16). 01 FLENGTH-X PIC S9(9) COMP VALUE 8. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SPOOLWRITE TOKEN(TOKEN-X) FROM(FROM-X) FLENGTH(FLENGTH-X) PAGE RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SPOOLWRITE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SPOOLWRITE");
+        assert_eq!(command.operation, HirCicsOperation::SpoolWrite);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolFrom
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "FROM-X")
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolFlength
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "FLENGTH-X")
+        }));
+        assert!(command.options.contains(&HirCicsOption::SpoolPage));
+
+        for (command, expected) in [
+            ("SPOOLWRITE TOKEN(TOKEN-X) NOHANDLE", "requires FROM"),
+            (
+                "SPOOLWRITE TOKEN(TOKEN-X) FROM(FROM-X)",
+                "requires RESP or NOHANDLE",
+            ),
+            (
+                "SPOOLWRITE TOKEN(BAD-TOKEN-X) FROM(FROM-X) NOHANDLE",
+                "8-character data area",
+            ),
+            (
+                "SPOOLWRITE TOKEN(TOKEN-X) FROM(FROM-X) FLENGTH(BAD-FLENGTH-X) NOHANDLE",
+                "fullword binary",
+            ),
+            (
+                "SPOOLWRITE TOKEN(TOKEN-X) FROM(FROM-X) LINE PAGE NOHANDLE",
+                "mutually exclusive",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPW. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 BAD-TOKEN-X PIC X(7). 01 FROM-X PIC X(16). 01 BAD-FLENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{command}");
             assert!(

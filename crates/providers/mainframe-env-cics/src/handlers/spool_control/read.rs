@@ -127,15 +127,3 @@ fn validate_read_request(request: &CicsRequest) -> Result<(), HostProblem> {
     }
     Ok(())
 }
-
-fn spool_decimal(request: &CicsRequest, name: &str) -> Result<i64, HostProblem> {
-    let value = request
-        .arguments
-        .get(name)
-        .ok_or(HostProblem::Malformed)?
-        .bytes();
-    std::str::from_utf8(value)
-        .map_err(|_| HostProblem::Malformed)?
-        .parse::<i64>()
-        .map_err(|_| HostProblem::Malformed)
-}

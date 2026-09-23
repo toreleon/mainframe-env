@@ -2463,6 +2463,7 @@ mod tests {
             CicsOperation::SpoolOpenInput,
             CicsOperation::SpoolOpenOutput,
             CicsOperation::SpoolRead,
+            CicsOperation::SpoolWrite,
             CicsOperation::StartBrowse,
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,

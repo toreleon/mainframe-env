@@ -380,6 +380,15 @@ retry returns the full record and advances. ENDFILE is emitted once and then
 INVREQ 16/12 is returned for read-after-EOF. The cursor and exact reply are
 durable and replay-safe. The command records EIBFN `5604`.
 
+`EXEC CICS SPOOLWRITE` reads its FROM area without modifying it. A fullword
+FLENGTH selects a prefix, or the full source area is used when FLENGTH is
+omitted. The provider appends LINE records by default and PAGE records when
+requested. It enforces the report's RECORDLENGTH, returns LENGERR with the
+omitted byte count when a bounded prefix is accepted, and keeps the append and
+response in one durable replay CAS. A JOB card with a different USER on an
+INTRDR report is checked against task-user SURROGAT authority before append.
+The command records EIBFN `5606`.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

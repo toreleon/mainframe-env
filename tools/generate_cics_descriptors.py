@@ -37,6 +37,8 @@ SCHEMA_VERSION = "mainframe-env.cics-command-descriptors@2"
 CONTRACT_SCHEMA_VERSION = "mainframe-env.cics-application-command-contracts@2"
 OFFICIAL_SCHEMA_VERSION = "mainframe-env.official-catalog@1"
 OFFICIAL_BASELINE = "ibm-cics-ts-6x-2026-08-31"
+SPOOLWRITE_ROW = f"{OFFICIAL_BASELINE}:api-commands:0204"
+SPOOLWRITE_PAGE_STRUCTURE = "sha256:2770d1e356ff9eeccec9be06cccd5bc70d2d060ebba7bde2938751cdba6a9d30"
 OFFICIAL_CATALOG_DIGEST = (
     "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"
 )
@@ -239,6 +241,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0202",
     ),
     ("SpoolRead", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0203"),
+    ("SpoolWrite", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0204"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -586,6 +589,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SpoolOpenInput",
         "SpoolOpenOutput",
         "SpoolRead",
+        "SpoolWrite",
         "Suspend",
         "WaitEvent",
         "WaitExternal",
@@ -852,6 +856,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "SpoolRead": frozenset(
         {"spool", "memory-read", "memory-write", "condition", "transaction"}
     ),
+    "SpoolWrite": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1098,6 +1105,7 @@ def _load_typed_execution_registrations(
         "SpoolOpenInput",
         "SpoolOpenOutput",
         "SpoolRead",
+        "SpoolWrite",
         "Start",
         "Suspend",
         "TransformDataToJson",
@@ -1437,6 +1445,7 @@ def load_catalog(
                 "SpoolOpenInput",
                 "SpoolOpenOutput",
                 "SpoolRead",
+                "SpoolWrite",
                 "Start",
                 "Suspend",
                 "WaitEvent",
@@ -1926,6 +1935,34 @@ def _source_contract_status(dimension: dict[str, Any]) -> str:
     return "pending"
 
 
+def _spoolwrite_page_choice(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> bool:
+    if command["official_row"] != SPOOLWRITE_ROW:
+        return False
+    if _source_dimension(dimensions, "grammar")["verification_status"] != "verified":
+        return False
+    grammar = _grammar_contract(dimensions)
+    variants = [
+        value
+        for value in grammar["variants"]
+        if value.get("type") == "syntax" and value.get("syntax_head") == "SPOOLWRITE"
+    ]
+    if len(variants) != 1 or variants[0].get("structure_sha256") != SPOOLWRITE_PAGE_STRUCTURE:
+        raise DescriptorError("SPOOLWRITE PAGE source syntax identity changed")
+    tokens = [
+        token
+        for token in variants[0]["tokens"]
+        if token.get("kind") == "keyword"
+        and token.get("value") in {"LINE", "PAGE"}
+        and token.get("relation") == "optional"
+        and token.get("group_path") == "groupchoice[5]"
+    ]
+    if {token["value"] for token in tokens} != {"LINE", "PAGE"} or len(tokens) != 2:
+        raise DescriptorError("SPOOLWRITE LINE/PAGE source choice changed")
+    return True
+
+
 def _top_level_source_option_names(
     command: dict[str, Any], dimensions: list[dict[str, Any]]
 ) -> list[str]:
@@ -1946,6 +1983,8 @@ def _top_level_source_option_names(
         names.update({"TASK", "UOW"})
     if command["official_row"] in WAIT_EXTERNAL_COMMAND_ROWS:
         names.update({"PURGEABLE", "NOTPURGEABLE"})
+    if _spoolwrite_page_choice(command, dimensions):
+        names.add("PAGE")
     return sorted(names)
 
 
@@ -2319,6 +2358,17 @@ def _option_contract(
             entry["authorities"].add("global-command-format")
 
     grammar = _grammar_contract(dimensions)
+    if _spoolwrite_page_choice(command, dimensions):
+        if "PAGE" in options:
+            raise DescriptorError("SPOOLWRITE PAGE is now duplicated in option projection")
+        options["PAGE"] = {
+            "markers": {"none"},
+            "directions": {"none"},
+            "stacks": {("PAGE",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
     detachable_operand_options = _detachable_operand_options(grammar["variants"])
 
     entries = []
@@ -2409,6 +2459,13 @@ def _option_contract(
         raise DescriptorError("dynamic condition clause facts conflict")
     condition_clauses = next(iter(condition_clause_material.values()), None)
     constraints = _option_constraints(grammar, top_level_options, applicable, option_status)
+    if _spoolwrite_page_choice(command, dimensions):
+        choice = {"members": ["LINE", "PAGE"], "required": False}
+        constraints["alternatives"] = [*constraints["alternatives"], choice]
+        constraints["mutual_exclusions"] = [
+            *constraints["mutual_exclusions"],
+            choice["members"],
+        ]
     if enqueue_source_projected:
         constraints["required"] = ["RESOURCE"]
         lifetime = {"members": ["MAXLIFETIME", "TASK", "UOW"], "required": False}

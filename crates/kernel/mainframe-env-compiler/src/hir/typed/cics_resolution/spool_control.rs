@@ -22,6 +22,7 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         HirCicsOperation::SpoolRead => {
             &["TOKEN", "INTO", "MAXFLENGTH", "TOFLENGTH", "RESP", "RESP2"]
         }
+        HirCicsOperation::SpoolWrite => &["TOKEN", "FROM", "FLENGTH", "RESP", "RESP2"],
         _ => panic!("non-spool CICS operation reached spool clause validation"),
     }
 }
@@ -32,6 +33,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
         HirCicsOperation::SpoolOpenInput => &["NOHANDLE"],
         HirCicsOperation::SpoolOpenOutput => &["NOHANDLE", "NOCC", "ASA", "MCC", "PRINT", "PUNCH"],
         HirCicsOperation::SpoolRead => &["NOHANDLE"],
+        HirCicsOperation::SpoolWrite => &["NOHANDLE", "LINE", "PAGE"],
         _ => panic!("non-spool CICS operation reached spool option validation"),
     }
 }
@@ -42,6 +44,7 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::SpoolOpenInput => &["TOKEN", "USERID"],
         HirCicsOperation::SpoolOpenOutput => &["TOKEN", "USERID", "NODE"],
         HirCicsOperation::SpoolRead => &["TOKEN", "INTO", "MAXFLENGTH"],
+        HirCicsOperation::SpoolWrite => &["TOKEN", "FROM"],
         _ => panic!("non-spool CICS operation reached spool required validation"),
     }
 }
@@ -55,6 +58,8 @@ pub(super) fn option(name: &str) -> Option<HirCicsOption> {
         "MCC" => Some(HirCicsOption::SpoolMcc),
         "PRINT" => Some(HirCicsOption::SpoolPrint),
         "PUNCH" => Some(HirCicsOption::SpoolPunch),
+        "LINE" => Some(HirCicsOption::SpoolLine),
+        "PAGE" => Some(HirCicsOption::SpoolPage),
         _ => None,
     }
 }
@@ -71,6 +76,7 @@ pub(super) fn operands(
             | HirCicsOperation::SpoolOpenInput
             | HirCicsOperation::SpoolOpenOutput
             | HirCicsOperation::SpoolRead
+            | HirCicsOperation::SpoolWrite
     ) {
         return Ok(Vec::new());
     }
@@ -107,6 +113,50 @@ pub(super) fn operands(
                 value: HirCicsValue::Data(maxflength),
             },
         ]);
+    }
+    if operation == HirCicsOperation::SpoolWrite {
+        if options.iter().any(|option| option == "LINE")
+            && options.iter().any(|option| option == "PAGE")
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SPOOLWRITE accepts at most one of LINE or PAGE".into(),
+            ));
+        }
+        let token = complete_data_reference(&clauses["TOKEN"], semantic)?;
+        if token.length != 8
+            || !matches!(
+                token.category,
+                DataCategory::Alphabetic | DataCategory::Alphanumeric
+            )
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SPOOLWRITE TOKEN requires an 8-character data area".into(),
+            ));
+        }
+        let from = complete_data_reference(&clauses["FROM"], semantic)?;
+        let mut operands = vec![
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::SpoolToken,
+                value: HirCicsValue::Data(token),
+            },
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::SpoolFrom,
+                value: HirCicsValue::Data(from),
+            },
+        ];
+        if let Some(length) = clauses.get("FLENGTH") {
+            let length = complete_data_reference(length, semantic)?;
+            if length.category != DataCategory::Binary || length.length != 4 {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS SPOOLWRITE FLENGTH requires fullword binary storage".into(),
+                ));
+            }
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::SpoolFlength,
+                value: HirCicsValue::Data(length),
+            });
+        }
+        return Ok(operands);
     }
     if matches!(
         operation,

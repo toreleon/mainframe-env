@@ -2,6 +2,7 @@
 
 mod ingress;
 mod read;
+mod write;
 
 use super::{field, store_error};
 use crate::service::{CicsLimits, CicsService, Run, bounded};
@@ -41,6 +42,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::SpoolOpenInput => open_input(service, run, request),
         CicsOperation::SpoolOpenOutput => open_output(service, run, request),
         CicsOperation::SpoolRead => read::invoke(service, run, request),
+        CicsOperation::SpoolWrite => write::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -528,6 +530,17 @@ fn spool_text(request: &CicsRequest, name: &str, maximum: usize) -> Result<Strin
     Ok(value)
 }
 
+fn spool_decimal(request: &CicsRequest, name: &str) -> Result<i64, HostProblem> {
+    let value = request
+        .arguments
+        .get(name)
+        .ok_or(HostProblem::Malformed)?
+        .bytes();
+    std::str::from_utf8(value)
+        .map_err(|_| HostProblem::Malformed)?
+        .parse::<i64>()
+        .map_err(|_| HostProblem::Malformed)
+}
 fn spool_token(request: &CicsRequest) -> Result<String, HostProblem> {
     let value = request
         .arguments

@@ -157,3 +157,37 @@ pub(super) fn invalid_read_shape(
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
         || matches!(plan.condition, CicsCondition::Default)
 }
+
+pub(super) fn invalid_write_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::SpoolToken)
+        || !inputs.contains(&CicsOperandName::SpoolFrom)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::SpoolToken,
+            CicsOperandName::SpoolFrom,
+            CicsOperandName::SpoolFlength,
+        ]))
+        || plan.operands.iter().any(|operand| {
+            !matches!(
+                (operand.name, &operand.value),
+                (CicsOperandName::SpoolToken, CicsOperandValue::Storage(_))
+                    | (CicsOperandName::SpoolFrom, CicsOperandValue::Storage(_))
+                    | (CicsOperandName::SpoolFlength, CicsOperandValue::Storage(_))
+            )
+        })
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle | CicsPlanOption::SpoolLine | CicsPlanOption::SpoolPage
+            )
+        })
+        || plan.options.contains(&CicsPlanOption::SpoolLine)
+            && plan.options.contains(&CicsPlanOption::SpoolPage)
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || matches!(plan.condition, CicsCondition::Default)
+}

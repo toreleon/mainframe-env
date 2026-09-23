@@ -89,6 +89,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::SpoolRecordLength => SlotUse::SpoolRecordLengthInput,
         CicsOperandName::SpoolOutDescr => SlotUse::SpoolOutDescrInput,
         CicsOperandName::SpoolMaxFlength => SlotUse::SpoolMaxFlengthInput,
+        CicsOperandName::SpoolFrom => SlotUse::Input,
+        CicsOperandName::SpoolFlength => SlotUse::SpoolMaxFlengthInput,
         _ => SlotUse::Input,
     }
 }
@@ -185,6 +187,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SpoolOpenInput => CicsOperation::SpoolOpenInput,
         CicsPlanOperation::SpoolOpenOutput => CicsOperation::SpoolOpenOutput,
         CicsPlanOperation::SpoolRead => CicsOperation::SpoolRead,
+        CicsPlanOperation::SpoolWrite => CicsOperation::SpoolWrite,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -325,6 +328,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::SpoolRecordLength => "RECORDLENGTH",
         CicsOperandName::SpoolOutDescr => "OUTDESCR",
         CicsOperandName::SpoolMaxFlength => "MAXFLENGTH",
+        CicsOperandName::SpoolFrom => "FROM",
+        CicsOperandName::SpoolFlength => "FLENGTH",
     }
 }
 
@@ -420,5 +425,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::SpoolMcc => "MCC",
         CicsPlanOption::SpoolPrint => "PRINT",
         CicsPlanOption::SpoolPunch => "PUNCH",
+        CicsPlanOption::SpoolLine => "LINE",
+        CicsPlanOption::SpoolPage => "PAGE",
     }
 }

@@ -368,6 +368,19 @@ reads return INVREQ 16/12. Wrong ownership returns NOTOPEN 19/8, while a
 task-owned output report returns NOTOPEN 19/12. The reply and cursor/EOF state
 share one replay CAS. The selected compiled route uses EIBFN `5604`.
 
+Typed `SPOOLWRITE` requires a task-owned output TOKEN, a storage-backed FROM
+area, and RESP or NOHANDLE. Optional fullword FLENGTH selects a prefix of FROM;
+when omitted, the source area's full length is used. LINE is the default and
+PAGE marks an AFP page record; the source-backed choice excludes both flags
+at once. FLENGTH outside 1–32,760 returns LENGERR 22/0 without mutation.
+When the requested record exceeds the output report's RECORDLENGTH, the bounded
+prefix is appended and LENGERR 22 reports the omitted byte count in RESP2.
+Writing an input report returns NOTOPEN 19/16; wrong task ownership returns
+NOTOPEN 19/8. A JOB card with USER= on the INTRDR destination requires the
+task user's SURROGAT read authority for `job_user.SUBMIT`; a denial returns
+NOTAUTH 70/1 before append. The record and reply share one durable replay CAS,
+and the compiled route uses EIBFN `5606`.
+
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
