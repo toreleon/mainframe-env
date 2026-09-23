@@ -7,6 +7,7 @@ pub enum HirCicsOutputName {
     Into,
     SetPointer,
     Ridfld,
+    Token,
     Milliseconds,
     Mmddyy,
     Mmddyyyy,

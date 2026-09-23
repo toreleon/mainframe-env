@@ -92,7 +92,7 @@ pub(in crate::service) fn new_run_with_state(
         latest_abend,
         retrieve: seed.retrieve,
         current_records: BTreeMap::new(),
-        current_record_values: BTreeMap::new(),
+        file_updates: Default::default(),
         undo: seed.undo,
         undo_version: seed.undo_version,
         browses: BTreeMap::new(),

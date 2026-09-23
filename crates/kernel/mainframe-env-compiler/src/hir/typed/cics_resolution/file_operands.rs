@@ -5,7 +5,7 @@ use super::super::{
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference, numeric_literal};
 use crate::{DataCategory, SemanticModel};
 
-pub(super) const fn allowed_browse_clauses(operation: HirCicsOperation) -> &'static [&'static str] {
+pub(super) const fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::StartBrowse => &[
             "FILE",
@@ -30,6 +30,40 @@ pub(super) const fn allowed_browse_clauses(operation: HirCicsOperation) -> &'sta
             "RESP2",
         ],
         HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
+        HirCicsOperation::Delete => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "KEYLENGTH",
+            "TOKEN",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Unlock => &["FILE", "DATASET", "TOKEN", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::Write => &[
+            "FILE",
+            "DATASET",
+            "FROM",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Read => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "INTO",
+            "LENGTH",
+            "KEYLENGTH",
+            "TOKEN",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Rewrite => &[
+            "FILE", "DATASET", "FROM", "LENGTH", "TOKEN", "RESP", "RESP2",
+        ],
         _ => &[],
     }
 }
@@ -41,7 +75,7 @@ pub(super) fn validate_constraints(
 ) -> Resolution<()> {
     let required: &[&str] = match operation {
         HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse => &["RIDFLD"],
-        HirCicsOperation::Delete | HirCicsOperation::EndBrowse => &[],
+        HirCicsOperation::Delete | HirCicsOperation::EndBrowse | HirCicsOperation::Unlock => &[],
         HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev | HirCicsOperation::Read => {
             &["RIDFLD", "INTO"]
         }
@@ -67,6 +101,14 @@ pub(super) fn validate_constraints(
         return Err(ResolutionFailure::Invalid(format!(
             "CICS {operation:?} KEYLENGTH requires RIDFLD"
         )));
+    }
+    if operation == HirCicsOperation::Delete
+        && clauses.contains_key("TOKEN")
+        && clauses.contains_key("RIDFLD")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DELETE TOKEN and RIDFLD are mutually exclusive".into(),
+        ));
     }
     if matches!(
         operation,
@@ -121,6 +163,7 @@ pub(super) fn resolve(
             | HirCicsOperation::Write
             | HirCicsOperation::Read
             | HirCicsOperation::Rewrite
+            | HirCicsOperation::Unlock
     ) {
         return Ok(Vec::new());
     }
@@ -141,10 +184,18 @@ pub(super) fn resolve(
         ("DATASET", HirCicsOperandName::Dataset),
         ("FROM", HirCicsOperandName::From),
         ("RIDFLD", HirCicsOperandName::Ridfld),
+        ("TOKEN", HirCicsOperandName::Token),
+        ("SYSID", HirCicsOperandName::SysId),
     ] {
         let Some(tokens) = clauses.get(name) else {
             continue;
         };
+        if name == "TOKEN" && operation == HirCicsOperation::Read {
+            continue;
+        }
+        if name == "SYSID" && operation != HirCicsOperation::Unlock {
+            continue;
+        }
         let value = if browse && name == "RIDFLD" {
             let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {
                 return Err(ResolutionFailure::Invalid(
@@ -152,6 +203,21 @@ pub(super) fn resolve(
                 ));
             };
             require_writable(&reference)?;
+            HirCicsValue::Data(reference)
+        } else if name == "TOKEN" {
+            let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS TOKEN requires a fullword binary data area".into(),
+                ));
+            };
+            if reference.category != DataCategory::Binary
+                || reference.length != 4
+                || reference.scale != 0
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS TOKEN requires a fullword binary data area".into(),
+                ));
+            }
             HirCicsValue::Data(reference)
         } else if stored_file_input && matches!(name, "FROM" | "RIDFLD") {
             let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {

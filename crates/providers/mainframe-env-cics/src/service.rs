@@ -202,7 +202,7 @@ struct Run {
     latest_abend: Option<handlers::AbendRecord>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
-    current_record_values: BTreeMap<String, Vec<u8>>,
+    file_updates: handlers::FileUpdateState,
     undo: Vec<DatasetUndo>,
     undo_version: Option<u64>,
     browses: BTreeMap<String, String>,
@@ -1440,7 +1440,7 @@ impl CicsService {
         if !request.operation.supported() {
             return Err(HostProblem::Unsupported);
         }
-        let replay_identity = if request.operation.is_mutating() {
+        let replay_identity = if request.is_mutating() {
             let mutation = request
                 .mutation
                 .as_ref()
@@ -5003,11 +5003,16 @@ mod tests {
         arguments: BTreeMap<String, BoundedPayload>,
         sequence: u64,
     ) -> CicsRequest {
+        let mutating = operation.is_mutating()
+            || matches!(
+                operation,
+                CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+            ) && arguments.contains_key("TOKEN");
         CicsRequest {
             operation,
             arguments,
             condition_policy: CicsConditionPolicy::Default,
-            mutation: operation.is_mutating().then(|| Mutation {
+            mutation: mutating.then(|| Mutation {
                 sequence,
                 idempotency_key: IdempotencyKey::new(
                     format!("outer-{sequence}"),
@@ -5277,6 +5282,7 @@ mod tests {
                 CicsOperation::WriteJournalName,
             ),
             ("WRITE JOURNALNUM(7)", CicsOperation::WriteJournalNum),
+            ("UNLOCK", CicsOperation::Unlock),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6508,7 +6514,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 67);
+assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 68);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -22294,6 +22300,799 @@ assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 67);
                         && resource == "CARDDEMO.CARDDAT"
                         && *intent == AccessIntent::Read
                 })
+        );
+    }
+
+    #[test]
+    fn unlock_token_is_exactly_task_and_file_owned_replay_safe_and_restart_fenced() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            traced_authorities(trace.clone()),
+            store.clone(),
+            Default::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([
+                (
+                    "ACCTDAT".into(),
+                    DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+                ),
+                (
+                    "OTHER".into(),
+                    DatasetName::new("CARDDEMO.OTHER", 128).unwrap(),
+                ),
+            ]))
+            .unwrap();
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("TOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            1,
+        );
+        let read_response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, read.clone(), 1),
+                read.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+                .unwrap(),
+            read_response
+        );
+        let token = std::str::from_utf8(read_response.outputs["TOKEN"].bytes())
+            .unwrap()
+            .parse::<i64>()
+            .unwrap();
+        assert!(token > 0);
+        let no_token = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([("FILE".into(), argument(b"ACCTDAT"))]),
+            2,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, no_token.clone(), 2),
+                    no_token
+                )
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        for (sequence, file, value) in [
+            (3, b"ACCTDAT".as_slice(), token + 1),
+            (4, b"OTHER".as_slice(), token),
+            (5, b"ACCTDAT".as_slice(), -1),
+        ] {
+            let invalid = request(
+                CicsOperation::Unlock,
+                BTreeMap::from([
+                    ("FILE".into(), argument(file)),
+                    ("TOKEN".into(), cics_decimal(value)),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 47,
+                })
+            );
+        }
+        let other = invocation_for("unlock-other", BTreeMap::new());
+        let other_session = SessionId::new("unlock-other-session", 64).unwrap();
+        service.create_session(&other_session, 24, 80).unwrap();
+        service
+            .register_run(other.clone(), &other_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let stolen = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(token)),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(&effect(&other.run_unit_id, stolen.clone(), 5), stolen),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 47,
+            })
+        );
+        let unlock = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(token)),
+            ]),
+            6,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, unlock.clone(), 6),
+                unlock.clone(),
+            )
+            .unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, unlock.clone(), 6), unlock)
+                .unwrap(),
+            response
+        );
+        let repeat = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(token)),
+            ]),
+            7,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, repeat.clone(), 7), repeat),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 47,
+            })
+        );
+        drop(service);
+        let restarted =
+            CicsService::open(traced_authorities(trace), store, Default::default()).unwrap();
+        let reopened_invocation = invocation_for("unlock-reopen", BTreeMap::new());
+        let reopened_session = SessionId::new("unlock-reopen-session", 64).unwrap();
+        restarted.create_session(&reopened_session, 24, 80).unwrap();
+        restarted
+            .register_run(
+                reopened_invocation.clone(),
+                &reopened_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let read_again = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("TOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            20,
+        );
+        let next = restarted
+            .invoke(
+                &effect(&reopened_invocation.run_unit_id, read_again.clone(), 20),
+                read_again,
+            )
+            .unwrap();
+        let next_token = std::str::from_utf8(next.outputs["TOKEN"].bytes())
+            .unwrap()
+            .parse::<i64>()
+            .unwrap();
+        assert_eq!(next_token, token + 1);
+    }
+
+    #[test]
+    fn unlock_no_token_clears_only_the_matching_update_hold() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let read = |sequence| {
+            request(
+                CicsOperation::Read,
+                BTreeMap::from([
+                    ("FILE".into(), argument(b"ACCTDAT")),
+                    ("RIDFLD".into(), argument(b"AA")),
+                    ("OPTION.UPDATE".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let first = read(1);
+        service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        let repeated_read = read(2);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, repeated_read.clone(), 2),
+                repeated_read
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 28
+            })
+        );
+        for sequence in [3, 4] {
+            let unlock = request(
+                CicsOperation::Unlock,
+                BTreeMap::from([("FILE".into(), argument(b"ACCTDAT"))]),
+                sequence,
+            );
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, unlock.clone(), sequence),
+                        unlock
+                    )
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+        }
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("FROM".into(), argument(b"AA22")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 5),
+                rewrite
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 30
+            })
+        );
+        assert_eq!(trace.requests.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn unlock_denial_precedes_status_mutation() {
+        let trace = Arc::new(DatasetTrace::default());
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            denied_dataset_authorities(trace.clone(), seen.clone()),
+            store,
+            Default::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let status = BoundedPayload::new(
+            "mainframe-env.cics.file-status@1",
+            b"CLOSED-ENABLED".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let close = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("ACCTDAT".into(), status)]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 1), close)
+            .unwrap();
+        let unlock = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([("FILE".into(), argument(b"ACCTDAT"))]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, unlock.clone(), 2), unlock),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101
+            })
+        );
+        assert_eq!(
+            service.file_status("ACCTDAT"),
+            Ok(CicsFileStatus::ClosedEnabled)
+        );
+        assert!(trace.requests.lock().unwrap().is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| class == "DATASET"
+                    && resource == "CARDDEMO.ACCTDAT"
+                    && *intent == AccessIntent::Update)
+        );
+    }
+
+    #[test]
+    fn unlock_no_hold_reports_file_status_conditions_exactly() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let unknown = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([("FILE".into(), argument(b"UNKNOWN"))]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown.clone(), 1),
+                unknown
+            ),
+            Err(HostProblem::Condition {
+                name: "FILENOTFOUND".into(),
+                response: 12,
+                response2: 1
+            })
+        );
+        for (sequence, status, expected) in [
+            (2, b"DISABLED".as_slice(), ("DISABLED", 84, 50)),
+            (4, b"CLOSED".as_slice(), ("NOTOPEN", 19, 60)),
+        ] {
+            let value = BoundedPayload::new(
+                "mainframe-env.cics.file-status@1",
+                status.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap();
+            let set = request(
+                CicsOperation::SetFileStatus,
+                BTreeMap::from([("ACCTDAT".into(), value)]),
+                sequence,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, set.clone(), sequence), set)
+                .unwrap();
+            let unlock = request(
+                CicsOperation::Unlock,
+                BTreeMap::from([("FILE".into(), argument(b"ACCTDAT"))]),
+                sequence + 1,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, unlock.clone(), sequence + 1),
+                    unlock
+                ),
+                Err(HostProblem::Condition {
+                    name: expected.0.into(),
+                    response: expected.1,
+                    response2: expected.2,
+                })
+            );
+        }
+        let remote = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("SYSID".into(), argument(b"REMOTE")),
+            ]),
+            6,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, remote.clone(), 6), remote),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 130,
+            })
+        );
+    }
+
+    #[test]
+    fn token_rewrite_and_delete_consume_only_their_read_update_token() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let read_token = |sequence| {
+            let read = request(
+                CicsOperation::Read,
+                BTreeMap::from([
+                    ("FILE".into(), argument(b"ACCTDAT")),
+                    ("RIDFLD".into(), argument(b"AA")),
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                ]),
+                sequence,
+            );
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, read.clone(), sequence),
+                    read,
+                )
+                .unwrap();
+            std::str::from_utf8(response.outputs["TOKEN"].bytes())
+                .unwrap()
+                .parse::<i64>()
+                .unwrap()
+        };
+        let first = read_token(1);
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("FROM".into(), argument(b"AA22")),
+                ("TOKEN".into(), cics_decimal(first)),
+            ]),
+            2,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 2),
+                rewrite,
+            )
+            .unwrap();
+        let second = read_token(3);
+        let delete = request(
+            CicsOperation::Delete,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(second)),
+            ]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, delete.clone(), 4), delete)
+            .unwrap();
+        assert!(second > first);
+        let third = read_token(5);
+        let syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 6);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, syncpoint.clone(), 6),
+                syncpoint,
+            )
+            .unwrap();
+        let stale = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(third)),
+            ]),
+            7,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, stale.clone(), 7), stale),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 47,
+            })
+        );
+        let requests = trace.requests.lock().unwrap();
+        assert!(requests.iter().any(|request| matches!(request,
+            DatasetRequest::RewriteRecord { key, record, .. } if key == b"AA" && record == b"AA22"
+        )));
+        assert!(requests.iter().any(|request| matches!(request,
+            DatasetRequest::DeleteRecord { key, .. } if key == b"AA"
+        )));
+    }
+
+    #[test]
+    fn browse_token_is_invalidated_by_reset_and_following_read_without_losing_cursor() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let file = || ("FILE".into(), argument(b"ACCTDAT"));
+        let start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([file(), ("RIDFLD".into(), argument(b"AA"))]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let read_token = |sequence| {
+            let read = request(
+                CicsOperation::ReadNext,
+                BTreeMap::from([file(), ("TOKEN".into(), argument(b"TOKEN-X"))]),
+                sequence,
+            );
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, read.clone(), sequence),
+                    read,
+                )
+                .unwrap();
+            std::str::from_utf8(response.outputs["TOKEN"].bytes())
+                .unwrap()
+                .parse::<i64>()
+                .unwrap()
+        };
+        let first = read_token(2);
+        let reset = request(
+            CicsOperation::ResetBrowse,
+            BTreeMap::from([
+                file(),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("OPTION.GTEQ".into(), cics_option()),
+            ]),
+            3,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, reset.clone(), 3), reset)
+            .unwrap();
+        let invalid = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([file(), ("TOKEN".into(), cics_decimal(first))]),
+            4,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 4),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 47
+            })
+        );
+        let second = read_token(5);
+        let next = request(CicsOperation::ReadNext, BTreeMap::from([file()]), 6);
+        service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 6), next)
+            .unwrap();
+        let invalid = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([file(), ("TOKEN".into(), cics_decimal(second))]),
+            7,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 7),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 47
+            })
+        );
+        let third = read_token(8);
+        let unlock = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([file(), ("TOKEN".into(), cics_decimal(third))]),
+            9,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, unlock.clone(), 9), unlock)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let next = request(CicsOperation::ReadNext, BTreeMap::from([file()]), 10);
+        service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 10), next)
+            .unwrap();
+        assert!(
+            trace
+                .requests
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|request| matches!(request,
+                    DatasetRequest::ReadNext { cursor, .. } if cursor == "CURSOR-1"
+                ))
+                .count()
+                >= 5
+        );
+    }
+
+    #[test]
+    fn unlock_token_counter_survives_sqlite_reopen_without_reusing_a_stale_token() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-unlock-token-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let trace = Arc::new(DatasetTrace::default());
+        let token = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service =
+                CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                    .unwrap();
+            let (invocation, _) = registered(&service);
+            service
+                .register_file_aliases(&BTreeMap::from([(
+                    "ACCTDAT".into(),
+                    DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+                )]))
+                .unwrap();
+            let read = request(
+                CicsOperation::Read,
+                BTreeMap::from([
+                    ("FILE".into(), argument(b"ACCTDAT")),
+                    ("RIDFLD".into(), argument(b"AA")),
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                ]),
+                1,
+            );
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+                .unwrap();
+            std::str::from_utf8(response.outputs["TOKEN"].bytes())
+                .unwrap()
+                .parse::<i64>()
+                .unwrap()
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service =
+                CicsService::open(traced_authorities(trace), store, Default::default()).unwrap();
+            let invocation = invocation_for("unlock-sqlite-reopen", BTreeMap::new());
+            let session = SessionId::new("unlock-sqlite-session", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let read = request(
+                CicsOperation::Read,
+                BTreeMap::from([
+                    ("FILE".into(), argument(b"ACCTDAT")),
+                    ("RIDFLD".into(), argument(b"AA")),
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                ]),
+                20,
+            );
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 20), read)
+                .unwrap();
+            let next = std::str::from_utf8(response.outputs["TOKEN"].bytes())
+                .unwrap()
+                .parse::<i64>()
+                .unwrap();
+            assert_eq!(next, token + 1);
+            let stale = request(
+                CicsOperation::Unlock,
+                BTreeMap::from([
+                    ("FILE".into(), argument(b"ACCTDAT")),
+                    ("TOKEN".into(), cics_decimal(token)),
+                ]),
+                21,
+            );
+            assert_eq!(
+                service.invoke(&effect(&invocation.run_unit_id, stale.clone(), 21), stale),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 47
+                })
+            );
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[cfg(feature = "fault-injection")]
+    #[test]
+    fn token_read_unknown_outcome_replays_one_held_token() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        service.inject_replay_unknown_after_persist_once();
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("TOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, read.clone(), 1),
+                read.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let replay = service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+            .unwrap();
+        assert_eq!(replay.outputs["TOKEN"].bytes(), b"1");
+        assert_eq!(trace.requests.lock().unwrap().len(), 1);
+        let unlock = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(1)),
+            ]),
+            2,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unlock.clone(), 2),
+                unlock.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, unlock.clone(), 2), unlock)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let repeated = request(
+            CicsOperation::Unlock,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("TOKEN".into(), cics_decimal(1)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, repeated.clone(), 3),
+                repeated
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 47
+            })
         );
     }
 

@@ -230,6 +230,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
+    ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
@@ -564,6 +565,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WaitEvent",
         "WaitExternal",
         "Syncpoint",
+        "Unlock",
         "Start",
         "Retrieve",
         "TransformDataToJson",
@@ -704,6 +706,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "ResetBrowse": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Unlock": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReadNext": frozenset(
@@ -1050,6 +1055,7 @@ def _load_typed_execution_registrations(
         "TransformDataToXml",
         "TransformJsonToData",
         "TransformXmlToData",
+        "Unlock",
         "WaitEvent",
         "WaitExternal",
         "WaitJournalName",

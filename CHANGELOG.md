@@ -13,6 +13,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
+  READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
+  across restart; UNLOCK consumes only the matching task and file token, and a
+  missing no-token hold returns NORMAL. TOKEN-based REWRITE and DELETE use the
+  same held record authority. Source: IBM CICS TS 6.x application API sources-c,
+  `dfhp4_unlock.html`, catalog row 0225.
+
 - Added typed CICS RESETBR for an active default-key file browse. The command
   repositions the existing dataset cursor in place, preserves it on NOTFND or
   ownership failure, invalidates the held update context after success, and

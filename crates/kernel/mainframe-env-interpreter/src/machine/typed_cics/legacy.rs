@@ -157,7 +157,8 @@ pub(crate) fn execute_legacy(
             "MILLISECONDS",
         ],
         CicsOperation::Link => &["COMMAREA"],
-        CicsOperation::ReadNext | CicsOperation::ReadPrev => &["RIDFLD"],
+        CicsOperation::Read => &["TOKEN"],
+        CicsOperation::ReadNext | CicsOperation::ReadPrev => &["RIDFLD", "TOKEN"],
         _ => &[],
     };
     let outputs = output_names
@@ -207,12 +208,13 @@ pub(crate) fn execute_legacy(
             | CicsOperation::Delete
             | CicsOperation::StartBrowse
             | CicsOperation::ResetBrowse
+            | CicsOperation::Unlock
             | CicsOperation::ReadNext
             | CicsOperation::ReadPrev
             | CicsOperation::EndBrowse
             | CicsOperation::SendText
     ) {
-        for key in ["LENGTH", "KEYLENGTH"] {
+        for key in ["LENGTH", "KEYLENGTH", "TOKEN"] {
             let Some(argument) = arguments.get(key) else {
                 continue;
             };
@@ -257,10 +259,13 @@ pub(crate) fn execute_legacy(
         );
     }
     let condition_policy = legacy_condition_policy(args, &arguments)?;
-    let mut mutation = operation
-        .is_mutating()
-        .then(|| machine.mutation())
-        .transpose()?;
+    let mut mutation = (operation.is_mutating()
+        || matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ) && arguments.contains_key("TOKEN"))
+    .then(|| machine.mutation())
+    .transpose()?;
     if let Some(mutation) = &mut mutation {
         mutation.transaction = Some(
             machine

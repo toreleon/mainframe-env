@@ -1040,7 +1040,7 @@ impl HostRequest {
                     | ProgramRequest::Cancel { .. }
                     | ProgramRequest::Abend { .. }
             ) | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
-        ) || matches!(self, Self::Cics(CicsRequest { operation, .. }) if operation.is_mutating())
+        ) || matches!(self, Self::Cics(request) if request.is_mutating())
             || matches!(self, Self::Db2(request) if request.operation.is_mutating())
             || matches!(self, Self::Ims(request) if request.operation.is_mutating())
             || matches!(self, Self::Mq(request) if request.operation.is_mutating())
@@ -2314,6 +2314,34 @@ mod tests {
     }
 
     #[test]
+    fn token_producing_read_requires_mutation_replay_identity() {
+        let token_target = BoundedPayload::new(
+            "mainframe-env.cics.argument@1",
+            b"TOKEN-X".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let token_read = HostRequest::Cics(CicsRequest {
+            operation: CicsOperation::Read,
+            arguments: BTreeMap::from([("TOKEN".into(), token_target)]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        });
+        assert!(token_read.is_mutating());
+        assert_eq!(
+            token_read.validate(HostLimits::default()),
+            Err(HostProblem::MissingIdempotency)
+        );
+        let plain_read = HostRequest::Cics(CicsRequest {
+            operation: CicsOperation::Read,
+            arguments: BTreeMap::new(),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        });
+        assert!(!plain_read.is_mutating());
+    }
+
+    #[test]
     fn records_are_bounded() {
         let invocation = InvocationLimits::default();
         let limits = HostLimits {
@@ -2427,11 +2455,12 @@ mod tests {
             CicsOperation::TransformDataToXml,
             CicsOperation::TransformJsonToData,
             CicsOperation::TransformXmlToData,
+            CicsOperation::Unlock,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-assert_eq!(forms.len(), 54);
+assert_eq!(forms.len(), 55);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

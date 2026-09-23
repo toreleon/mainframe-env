@@ -28,6 +28,7 @@ pub(super) fn resolve(
         ["RETURN"] => HirCicsOperation::Return,
         ["STARTBR"] => HirCicsOperation::StartBrowse,
         ["RESETBR"] => HirCicsOperation::ResetBrowse,
+        ["UNLOCK"] => HirCicsOperation::Unlock,
         ["READNEXT"] => HirCicsOperation::ReadNext,
         ["READPREV"] => HirCicsOperation::ReadPrev,
         ["READQ", "TD"] => HirCicsOperation::ReadTransientData,

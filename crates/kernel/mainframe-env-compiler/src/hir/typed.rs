@@ -195,6 +195,7 @@ pub enum HirCicsOperation {
     Rewrite,
     SetAssociationUserCorrData,
     Syncpoint,
+    Unlock,
     Suspend,
     WaitEvent,
     WaitExternal,
@@ -229,6 +230,7 @@ pub enum HirCicsOperandName {
     Dataset,
     From,
     Ridfld,
+    Token,
     Queue,
     Qname,
     SysId,
@@ -6142,6 +6144,48 @@ mod tests {
             statement.resolved.as_ref(),
             Some(HirResolvedStatement::Cics(_))
         ));
+    }
+
+    #[test]
+    fn cics_unlock_and_token_update_forms_are_typed_and_fullword_bound() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSUL. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(4). 01 KEY-X PIC X(2). 01 TOKEN-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') TOKEN(TOKEN-X) INTO(REC-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS UNLOCK FILE('ACCTDAT') TOKEN(TOKEN-X) SYSID('MESYS') END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) TOKEN(TOKEN-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') TOKEN(TOKEN-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("{:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match &statement.resolved {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 4);
+        assert_eq!(commands[0].operation, HirCicsOperation::Read);
+        assert!(commands[0].outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Token && output.target.qualified_name == "TOKEN-X"
+        }));
+        assert_eq!(commands[1].operation, HirCicsOperation::Unlock);
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Token
+                && matches!(&operand.value, HirCicsValue::Data(reference) if reference.qualified_name == "TOKEN-X")
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && matches!(&operand.value, HirCicsValue::Literal(value) if value == "MESYS")
+        }));
+        assert_eq!(commands[2].operation, HirCicsOperation::Rewrite);
+        assert_eq!(commands[3].operation, HirCicsOperation::Delete);
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADUL. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(4). PROCEDURE DIVISION. EXEC CICS UNLOCK FILE('ACCTDAT') TOKEN(TOKEN-X) END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("TOKEN requires a fullword binary data area")
+        }));
     }
 
     #[test]

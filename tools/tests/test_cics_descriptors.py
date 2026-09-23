@@ -1170,6 +1170,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "RETURN",
                 "STARTBR",
                 "RESETBR",
+                "UNLOCK",
                 "READNEXT",
                 "READPREV",
                 "READQ TD",

@@ -6,7 +6,8 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
-        CicsPlanOperation::Read | CicsPlanOperation::Retrieve => matches!(
+        CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
+            matches!(
             output,
             CicsOutputName::Into
                 | CicsOutputName::SetPointer
@@ -16,7 +17,8 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::ReturnTransId
                 | CicsOutputName::ReturnTermId
                 | CicsOutputName::Queue
-        ),
+            ) || matches!((operation, output), (CicsPlanOperation::Read, CicsOutputName::Token))
+        }
         CicsPlanOperation::ReadTemporaryStorage => matches!(
             output,
             CicsOutputName::Into

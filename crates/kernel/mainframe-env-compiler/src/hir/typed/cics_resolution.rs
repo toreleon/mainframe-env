@@ -625,18 +625,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ResetBrowse
         | HirCicsOperation::ReadNext
         | HirCicsOperation::ReadPrev
-        | HirCicsOperation::EndBrowse) => file_operands::allowed_browse_clauses(op),
-        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "KEYLENGTH", "RESP", "RESP2"],
-        HirCicsOperation::Write => &[
-            "FILE",
-            "DATASET",
-            "FROM",
-            "RIDFLD",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
-        ],
+        | HirCicsOperation::EndBrowse
+        | HirCicsOperation::Delete
+        | HirCicsOperation::Unlock
+        | HirCicsOperation::Write
+        | HirCicsOperation::Read
+        | HirCicsOperation::Rewrite) => file_operands::allowed_clauses(op),
         HirCicsOperation::WriteTransientData => {
             &["QUEUE", "FROM", "LENGTH", "SYSID", "RESP", "RESP2"]
         }
@@ -677,17 +671,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
-        HirCicsOperation::Read => &[
-            "FILE",
-            "DATASET",
-            "RIDFLD",
-            "INTO",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
-        ],
-        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
@@ -731,6 +714,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
         | HirCicsOperation::Delete
+        | HirCicsOperation::Unlock
         | HirCicsOperation::Write
         | HirCicsOperation::WriteTransientData
         | HirCicsOperation::ReadTransientData
@@ -847,6 +831,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
         | HirCicsOperation::Delete
+        | HirCicsOperation::Unlock
         | HirCicsOperation::Write
         | HirCicsOperation::Read
         | HirCicsOperation::Rewrite

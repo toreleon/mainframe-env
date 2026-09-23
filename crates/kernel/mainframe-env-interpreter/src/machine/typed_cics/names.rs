@@ -8,6 +8,7 @@ pub(super) enum SlotUse {
     Input,
     HalfwordInput,
     FullwordInput,
+    FullwordOutput,
     AbcodeInput,
     ProgramNameInput,
     AbstimeInput,
@@ -42,6 +43,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::JournalReqId => SlotUse::FullwordInput,
         CicsOperandName::JournalFlength => SlotUse::FullwordInput,
         CicsOperandName::JournalPfxLeng => SlotUse::HalfwordInput,
+        CicsOperandName::Flength => SlotUse::FullwordInput,
+        CicsOperandName::Token => SlotUse::FullwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataArea => SlotUse::Input,
         CicsOperandName::EventControlAddress => SlotUse::PointerInput,
@@ -77,6 +80,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::SetPointer => SlotUse::PointerOutput,
         CicsOutputName::Ridfld => SlotUse::Output,
+        CicsOutputName::Token => SlotUse::FullwordOutput,
         CicsOutputName::ReturnTransId | CicsOutputName::ReturnTermId | CicsOutputName::Queue => {
             SlotUse::Output
         }
@@ -130,6 +134,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Return => CicsOperation::Return,
         CicsPlanOperation::StartBrowse => CicsOperation::StartBrowse,
         CicsPlanOperation::ResetBrowse => CicsOperation::ResetBrowse,
+        CicsPlanOperation::Unlock => CicsOperation::Unlock,
         CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
         CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
         CicsPlanOperation::ReadTransientData => CicsOperation::ReadTransientData,
@@ -190,6 +195,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
         CicsOperandName::Ridfld => "RIDFLD",
+        CicsOperandName::Token => "TOKEN",
         CicsOperandName::Queue => "QUEUE",
         CicsOperandName::Qname => "QNAME",
         CicsOperandName::SysId => "SYSID",
@@ -288,6 +294,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Into => "INTO",
         CicsOutputName::SetPointer => "SET",
         CicsOutputName::Ridfld => "RIDFLD",
+        CicsOutputName::Token => "TOKEN",
         CicsOutputName::Milliseconds => "MILLISECONDS",
         CicsOutputName::Mmddyy => "MMDDYY",
         CicsOutputName::Mmddyyyy => "MMDDYYYY",

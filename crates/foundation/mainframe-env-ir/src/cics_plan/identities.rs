@@ -91,6 +91,8 @@ pub enum CicsPlanOperation {
     Rewrite,
     /// Commit or roll back the current unit of work.
     Syncpoint,
+    /// Invalidate a task-owned file update token or no-token hold.
+    Unlock,
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
     /// Yield the issuing task once for redispatch.
@@ -162,6 +164,8 @@ pub enum CicsOperandName {
     From,
     /// `RIDFLD(...)` record identifier.
     Ridfld,
+    /// `TOKEN(...)` fullword update identifier supplied to UNLOCK/REWRITE/DELETE.
+    Token,
     /// `QUEUE(...)` transient-data or temporary-storage resource.
     Queue,
     /// `QNAME(...)` long temporary-storage resource.
@@ -425,6 +429,8 @@ pub enum CicsOutputName {
     SetPointer,
     /// Returned browse record identifier.
     Ridfld,
+    /// `TOKEN(...)` fullword update identifier returned by READ UPDATE.
+    Token,
     /// Returned communication-area destination.
     Commarea,
     /// Primary response code destination.

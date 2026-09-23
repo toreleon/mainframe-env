@@ -121,6 +121,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer
         | HirCicsOutputName::Ridfld
+        | HirCicsOutputName::Token
         | HirCicsOutputName::Length
         | HirCicsOutputName::ReturnTransId
         | HirCicsOutputName::ReturnTermId

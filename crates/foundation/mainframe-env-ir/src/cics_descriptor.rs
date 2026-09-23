@@ -592,7 +592,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 65] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 66] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1113,6 +1113,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 65] = [
         effects: READ_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Unlock,
+        namespace: "cics.file",
+        name: "unlock",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -1145,6 +1153,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Return => &CICS_EXECUTABLE_DESCRIPTORS[21],
         CicsPlanOperation::StartBrowse => &CICS_EXECUTABLE_DESCRIPTORS[22],
         CicsPlanOperation::ResetBrowse => &CICS_EXECUTABLE_DESCRIPTORS[64],
+        CicsPlanOperation::Unlock => &CICS_EXECUTABLE_DESCRIPTORS[65],
         CicsPlanOperation::ReadNext => &CICS_EXECUTABLE_DESCRIPTORS[23],
         CicsPlanOperation::ReadPrev => &CICS_EXECUTABLE_DESCRIPTORS[24],
         CicsPlanOperation::EndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[25],
@@ -1487,6 +1496,7 @@ mod tests {
                 CicsPlanOperation::Return,
                 CicsPlanOperation::StartBrowse,
                 CicsPlanOperation::ResetBrowse,
+                CicsPlanOperation::Unlock,
                 CicsPlanOperation::ReadNext,
                 CicsPlanOperation::ReadPrev,
                 CicsPlanOperation::ReadTransientData,

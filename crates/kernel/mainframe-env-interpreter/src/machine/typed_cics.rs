@@ -377,6 +377,7 @@ pub(super) fn execute(
                         | CicsOperandName::JournalNum
                         | CicsOperandName::JournalFlength
                         | CicsOperandName::JournalPfxLeng
+                        | CicsOperandName::Token
                 ) =>
             {
                 (
@@ -458,6 +459,7 @@ pub(super) fn execute(
             | CicsOutputName::TypeNamespace
             | CicsOutputName::TypeNamespaceLength
             | CicsOutputName::JournalReqId
+            | CicsOutputName::Token
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -544,10 +546,13 @@ pub(super) fn execute(
     };
     let no_handle = matches!(plan.condition, CicsCondition::NoHandle);
 
-    let mut mutation = host_operation
-        .is_mutating()
-        .then(|| machine.mutation())
-        .transpose()?;
+    let mut mutation = (host_operation.is_mutating()
+        || matches!(
+            host_operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ) && arguments.contains_key("TOKEN"))
+    .then(|| machine.mutation())
+    .transpose()?;
     if let Some(mutation) = &mut mutation {
         mutation.transaction = Some(
             machine
@@ -642,6 +647,7 @@ pub(super) fn write_output(
         "ABSTIME"
             | "MILLISECONDS"
             | "LENGTH"
+            | "TOKEN"
             | "FLENGTH"
             | "NUMITEMS"
             | "ELEMNAMELEN"
@@ -963,6 +969,11 @@ fn validate_machine_slot(
         && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
     {
         return Err(invalid_plan("fullword CICS input must be fullword binary"));
+    }
+    if matches!(slot_use, SlotUse::FullwordOutput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
+    {
+        return Err(invalid_plan("TOKEN output must be fullword binary"));
     }
     if let SlotUse::AssignOutput(output) = slot_use {
         assign::validate_output(layout, output)?;
@@ -1609,6 +1620,53 @@ mod tests {
                 })
             );
         }
+    }
+
+    #[test]
+    fn selected_unlock_route_emits_a_mutating_typed_host_effect() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Unlock,
+            operands: vec![mainframe_env_ir::CicsNamedOperand {
+                name: CicsOperandName::File,
+                value: CicsOperandValue::Literal(b"ACCTDAT".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let descriptor = cics_executable_descriptor(CicsPlanOperation::Unlock);
+        let module = module(
+            descriptor.identity(),
+            &plan,
+            descriptor.effects.to_vec(),
+            false,
+            false,
+            |bytes| bytes,
+        );
+        assert!(super::super::validate_module(&module).is_ok());
+        let bytes = mainframe_env_ir::encode_binary(&module, CodecLimits::default()).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            &bytes,
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let operation = machine
+            .operations
+            .iter()
+            .find(|operation| operation.identity == descriptor.identity())
+            .unwrap()
+            .clone();
+        let Step::Effect(effect) = execute(&mut machine, &operation).unwrap() else {
+            panic!("selected UNLOCK route must emit one host effect");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("selected UNLOCK route must use the CICS host boundary");
+        };
+        assert_eq!(request.operation, CicsOperation::Unlock);
+        assert!(request.is_mutating());
+        assert!(request.mutation.is_some());
+        assert_eq!(request.arguments["FILE"].bytes(), b"ACCTDAT");
     }
 
     #[test]

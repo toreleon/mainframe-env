@@ -3,7 +3,7 @@ use super::super::{
     HirCicsOutputName, HirCicsValue, HirDataReference, Resolution, require_writable,
 };
 use super::{Clauses, complete_data_reference, format_time, program_control};
-use crate::{CobolUsage, SemanticModel};
+use crate::{CobolUsage, DataCategory, SemanticModel};
 use mainframe_env_ir::CicsAssignOutput;
 
 pub(super) fn inout_length(
@@ -46,6 +46,7 @@ pub(super) fn resolve(
         ("RESP", HirCicsOutputName::Resp),
         ("RESP2", HirCicsOutputName::Resp2),
         ("RIDFLD", HirCicsOutputName::Ridfld),
+        ("TOKEN", HirCicsOutputName::Token),
         ("RTRANSID", HirCicsOutputName::ReturnTransId),
         ("RTERMID", HirCicsOutputName::ReturnTermId),
         ("QUEUE", HirCicsOutputName::Queue),
@@ -68,6 +69,9 @@ pub(super) fn resolve(
         {
             continue;
         }
+        if name == "TOKEN" && operation != HirCicsOperation::Read {
+            continue;
+        }
         if name == "SET"
             && !matches!(
                 operation,
@@ -87,6 +91,15 @@ pub(super) fn resolve(
         if let Some(value) = clauses.get(name) {
             let target = complete_data_reference(value, semantic)?;
             require_writable(&target)?;
+            if name == "TOKEN"
+                && (target.category != DataCategory::Binary
+                    || target.length != 4
+                    || target.scale != 0)
+            {
+                return Err(super::super::ResolutionFailure::Invalid(
+                    "CICS TOKEN requires a fullword binary data area".into(),
+                ));
+            }
             if name == "SET" && !matches!(target.usage, CobolUsage::Pointer | CobolUsage::Pointer32)
             {
                 return Err(super::super::ResolutionFailure::Invalid(format!(

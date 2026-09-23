@@ -561,6 +561,7 @@ fn validate_operation_shape(
         | CicsPlanOperation::Rewrite => {
             file_mutation::invalid_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::Unlock => file_mutation::invalid_unlock_shape(plan, inputs, outputs),
         CicsPlanOperation::WriteTransientData => {
             queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
@@ -3857,16 +3858,66 @@ mod tests {
             }
         }
         assert_eq!(operation_tag(CicsPlanOperation::ResetBrowse), 74);
+        assert_eq!(operation_from_tag(74), Ok(CicsPlanOperation::ResetBrowse));
+        assert_eq!(operation_tag(CicsPlanOperation::Unlock), 75);
+        assert_eq!(operation_from_tag(75), Ok(CicsPlanOperation::Unlock));
+        assert_eq!(operand_tag(CicsOperandName::Token), 182);
+        assert_eq!(operand_from_tag(182), Ok(CicsOperandName::Token));
+        assert_eq!(output_tag(CicsOutputName::Token), 240);
+        assert_eq!(output_from_tag(240), Ok(CicsOutputName::Token));
         assert_eq!(operations.len(), crate::CICS_EXECUTABLE_DESCRIPTORS.len());
-        for tag in 182..=191 {
+        for tag in 183..=191 {
             assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }
         for tag in 116..=123 {
             assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }
-        for tag in 240..=247 {
+        for tag in 241..=247 {
             assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }
+    }
+
+    #[test]
+    fn unlock_token_plan_round_trips_and_rejects_forged_token_shape() {
+        let token = slot(15, "FILE.TOKEN");
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Unlock,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::File,
+                    value: CicsOperandValue::Literal(b"ACCTDAT".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Token,
+                    value: CicsOperandValue::Storage(token),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        let mut read = read_plan();
+        read.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::Token,
+            target: slot(15, "FILE.TOKEN"),
+        });
+        let read_bytes = encode_cics_effect_plan(&read, CicsPlanLimits::default()).unwrap();
+        let decoded = decode_cics_effect_plan(&read_bytes, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            encode_cics_effect_plan(&decoded, CicsPlanLimits::default()),
+            Ok(read_bytes)
+        );
+        let mut forged = plan;
+        forged.operands[1].value = CicsOperandValue::Integer(1);
+        assert_eq!(
+            encode_cics_effect_plan(&forged, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     proptest! {

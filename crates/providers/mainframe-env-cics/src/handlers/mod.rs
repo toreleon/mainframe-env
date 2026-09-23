@@ -2,6 +2,8 @@ mod bms_map;
 mod condition;
 mod document_control;
 mod file_control;
+mod file_tokens;
+mod file_unlock;
 mod handle_state;
 mod host_boundary;
 mod interval;
@@ -73,6 +75,7 @@ pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
 };
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
+pub(super) use file_tokens::FileUpdateState;
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };

@@ -42,6 +42,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Return => 21,
         CicsPlanOperation::StartBrowse => 22,
         CicsPlanOperation::ResetBrowse => 74,
+        CicsPlanOperation::Unlock => 75,
         CicsPlanOperation::ReadNext => 23,
         CicsPlanOperation::ReadPrev => 24,
         CicsPlanOperation::EndBrowse => 25,
@@ -112,6 +113,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         21 => Ok(CicsPlanOperation::Return),
         22 => Ok(CicsPlanOperation::StartBrowse),
         74 => Ok(CicsPlanOperation::ResetBrowse),
+        75 => Ok(CicsPlanOperation::Unlock),
         23 => Ok(CicsPlanOperation::ReadNext),
         24 => Ok(CicsPlanOperation::ReadPrev),
         25 => Ok(CicsPlanOperation::EndBrowse),
@@ -260,6 +262,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::JournalFlength => 101,
         CicsOperandName::JournalPrefix => 102,
         CicsOperandName::JournalPfxLeng => 103,
+        CicsOperandName::Token => 182,
     }
 }
 
@@ -366,6 +369,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         101 => Ok(CicsOperandName::JournalFlength),
         102 => Ok(CicsOperandName::JournalPrefix),
         103 => Ok(CicsOperandName::JournalPfxLeng),
+        182 => Ok(CicsOperandName::Token),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -474,6 +478,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Yyyymmdd => 10,
         CicsOutputName::Commarea => 11,
         CicsOutputName::Ridfld => 12,
+        CicsOutputName::Token => 240,
         CicsOutputName::Assign(output) => {
             let tag = output.tag();
             if tag < ASSIGN_OUTPUT_LEGACY_COUNT {
@@ -517,6 +522,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         10 => Ok(CicsOutputName::Yyyymmdd),
         11 => Ok(CicsOutputName::Commarea),
         12 => Ok(CicsOutputName::Ridfld),
+        240 => Ok(CicsOutputName::Token),
         91 => Ok(CicsOutputName::Length),
         92 => Ok(CicsOutputName::ReturnTransId),
         93 => Ok(CicsOutputName::ReturnTermId),

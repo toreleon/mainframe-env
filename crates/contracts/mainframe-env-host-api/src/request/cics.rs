@@ -115,6 +115,8 @@ pub enum CicsOperation {
     WriteJournalName,
     /// Create one numbered journal record with synchronous or deferred output.
     WriteJournalNum,
+    /// Invalidate one task-owned file update context.
+    Unlock,
     Write,
     WriteTransientData,
     Xctl,
@@ -189,6 +191,7 @@ impl CicsOperation {
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
             Self::WriteJournalNum => "WriteJournalNum",
+            Self::Unlock => "Unlock",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -239,6 +242,7 @@ impl CicsOperation {
                 | Self::TransformDataToXml
                 | Self::TransformJsonToData
                 | Self::TransformXmlToData
+                | Self::Unlock
                 | Self::SetFileStatus
                 | Self::Start
                 | Self::Retrieve
@@ -325,6 +329,7 @@ impl CicsOperation {
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,
             ("WRITE", Some("JOURNALNUM")) => Self::WriteJournalNum,
+            ("UNLOCK", _) => Self::Unlock,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,
@@ -358,13 +363,23 @@ pub struct CicsRequest {
 
 impl CicsRequest {
     pub(super) fn validate_mutation(&self, limits: HostLimits) -> Result<(), HostProblem> {
-        if self.operation.is_mutating() {
+        if self.is_mutating() {
             self.mutation
                 .as_ref()
                 .ok_or(HostProblem::MissingIdempotency)?
                 .validate(limits)?;
         }
         Ok(())
+    }
+
+    /// A token-producing update read changes task state and needs outer replay.
+    #[must_use]
+    pub fn is_mutating(&self) -> bool {
+        self.operation.is_mutating()
+            || matches!(
+                self.operation,
+                CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+            ) && self.arguments.contains_key("TOKEN")
     }
 }
 
