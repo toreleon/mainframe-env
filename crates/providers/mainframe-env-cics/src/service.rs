@@ -9904,6 +9904,130 @@ mod tests {
     }
 
     #[test]
+    fn bridge_exit_default_selects_installed_program_and_survives_sqlite_reopen() {
+        let seed = |store: &dyn ProviderStateStore, artifacts: &dyn ArtifactStore| {
+            for (name, bytes) in [
+                ("TARGET", b"target-program".as_slice()),
+                ("BRXIT", b"bridge-exit".as_slice()),
+                ("BRXIT2", b"other-bridge-exit".as_slice()),
+            ] {
+                let (artifact, _) = install_program_artifact(artifacts, bytes);
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            namespace: "online-program".into(),
+                            key: name.into(),
+                            version: 1,
+                            payload: artifact.as_str().as_bytes().to_vec(),
+                        },
+                        None,
+                    )
+                    .unwrap();
+            }
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "online-transaction".into(),
+                        key: "NX00".into(),
+                        version: 1,
+                        payload: b"TARGET".to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+        };
+        let selected = CicsBridgeExitDefault {
+            transaction: "NX00".into(),
+            exit: "BRXIT".into(),
+        };
+        let memory = Arc::new(MemoryStore::new(Default::default()));
+        seed(memory.as_ref(), memory.as_ref());
+        let cics = service(memory.clone());
+        cics.bind_artifact_store(memory).unwrap();
+        assert!(matches!(
+            cics.resolve_bridge_exit("NX00", None),
+            Err(HostProblem::Condition {
+                response: 27,
+                response2: 0,
+                ..
+            })
+        ));
+        assert_eq!(
+            cics.resolve_bridge_exit("NX00", Some("BRXIT"))
+                .unwrap()
+                .exit,
+            "BRXIT"
+        );
+        cics.register_bridge_exit_defaults(&[selected.clone()])
+            .unwrap();
+        cics.register_bridge_exit_defaults(&[selected.clone()])
+            .unwrap();
+        assert_eq!(
+            cics.resolve_bridge_exit("NX00", None).unwrap().exit,
+            "BRXIT"
+        );
+        assert_eq!(
+            cics.resolve_bridge_exit("NX00", Some("BRXIT2"))
+                .unwrap()
+                .exit,
+            "BRXIT2"
+        );
+        assert_eq!(
+            cics.register_bridge_exit_defaults(&[CicsBridgeExitDefault {
+                transaction: "NX00".into(),
+                exit: "BRXIT2".into(),
+            }]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bridge-default-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            seed(store.as_ref(), store.as_ref());
+            let cics =
+                CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(store).unwrap();
+            cics.register_bridge_exit_defaults(&[selected]).unwrap();
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        cics.bind_artifact_store(store.clone()).unwrap();
+        assert_eq!(
+            cics.resolve_bridge_exit("NX00", None).unwrap().exit,
+            "BRXIT"
+        );
+        let row = store
+            .get_provider_state("cics-bridge-default-v1", "NX00")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(&row.namespace, &row.key, row.version)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    payload: b"{".to_vec(),
+                    ..row
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        drop(cics);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn start_without_data_schedules_and_retrieve_returns_source_defined_enddata() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

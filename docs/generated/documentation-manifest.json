@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a858a696b38dea34808eaff53d6a6a6e7fd2189443c2394985df12b38efb0392",
+      "sha256": "sha256:3e11cc17fe0e1060c169ed692ae22ef740652f7e7db36faa5a4b9872bf3ad8ca",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -761,7 +761,7 @@
       "path": "docs/decisions/0015-cics-immediate-start-target-authority.md",
       "relative_links": 0,
       "scope": "START ATTACH and START BREXIT transaction admission",
-      "sha256": "sha256:bd91a50be4a8a46d2ee8d4f9a0015f661bdcc615d4a57d338638ff7089a99b07",
+      "sha256": "sha256:dfd77023cceb6f55763df17f0ea5b1e8343d1d8a51dcc1747dd675e1c28ec43e",
       "status": "Proposed for v0.9 development; command rows pending",
       "title": "ADR-0015: Resolve immediate START targets from installed durable definitions",
       "xtask_commands": 0
@@ -1110,7 +1110,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:89055a5b3926f882a44cbcc03cca6454fbe3d8cbe8b87c8d59fed18a32e29402",
+      "sha256": "sha256:a54b39e9526cde36e478d51ceee84ca9deb2ef1948b80058f124fc85c0dc5ca0",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

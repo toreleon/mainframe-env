@@ -42,11 +42,22 @@ fn local_program(service: &CicsService, transaction: &str) -> Result<String, Hos
     if program.as_bytes() != row.payload {
         return Err(HostProblem::InfrastructureFailure);
     }
-    let installed = service
+    installed_program_artifact(service, &program)?.ok_or(HostProblem::InfrastructureFailure)?;
+    Ok(program)
+}
+
+pub(super) fn installed_program_artifact(
+    service: &CicsService,
+    program: &str,
+) -> Result<Option<ArtifactRef>, HostProblem> {
+    let program = normalized(program, 128)?;
+    let Some(installed) = service
         .store
         .get_provider_state("online-program", &program)
         .map_err(store_error)?
-        .ok_or(HostProblem::InfrastructureFailure)?;
+    else {
+        return Ok(None);
+    };
     if installed.namespace != "online-program" || installed.key != program || installed.version != 1
     {
         return Err(HostProblem::InfrastructureFailure);
@@ -82,7 +93,7 @@ fn local_program(service: &CicsService, transaction: &str) -> Result<String, Hos
     {
         return Err(HostProblem::InfrastructureFailure);
     }
-    Ok(program)
+    Ok(Some(artifact))
 }
 
 fn normalized(value: &str, max: usize) -> Result<String, HostProblem> {

@@ -1,4 +1,5 @@
 mod bms_map;
+mod bridge_definition;
 mod builtin_function;
 mod condition;
 mod document_control;
@@ -84,6 +85,7 @@ pub use bms_map::{BmsFieldDefinition, BmsMapDefinition};
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
+pub use bridge_definition::{CicsBridgeExitDefault, CicsBridgeExitSelection};
 pub(super) use condition::respond as condition;
 pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
@@ -107,6 +109,7 @@ pub(super) fn validate_owned_stores(
     operator_control::load_operator_messages(store, limits)?;
     operator_control::validate_active_operator_commands(store, limits)?;
     network_context::validate_store(store, limits)?;
+    bridge_definition::validate_store(store, limits)?;
     Ok(())
 }
 pub(super) use handle_state::{

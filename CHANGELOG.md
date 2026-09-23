@@ -28,6 +28,12 @@ All notable changes to mainframe-env are documented here.
   the existing server catalog, returns TRANSIDERR 28/0 for undefined names,
   and rejects malformed or missing executable artifacts before scheduling.
 
+- Added immutable `START BREXIT` default exit definitions over installed local
+  programs. Explicit BREXIT names override the transaction default; a missing
+  default returns PGMIDERR 27/0. Canonical rows survive SQLite reopen and
+  malformed rows fail during CICS open. The command row remains unready until
+  BRXA invocation and terminal interception are connected.
+
 - Completed the typed `EXTRACT TCPIP` route for row `0074`. It returns the
   task's trusted IPv4/IPv6 addresses, DNS names supplied by ingress, service,
   port, and maximum data length with source-defined buffer lengths and

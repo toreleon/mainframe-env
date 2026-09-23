@@ -32,7 +32,12 @@ reported as a successful start and silently discarded by the worker later.
    verifies the executable payload and manifest metadata.
 2. An absent transaction returns TRANSIDERR 28/0. A malformed or inconsistent
    retained row returns infrastructure failure. Neither result enqueues work.
-3. This lookup grants no START ATTACH or START BREXIT route by itself. Those
+3. A source-defined default BREXIT name is stored immutably in a canonical
+   `cics-bridge-default-v1` row bound to one installed local transaction.
+   Explicit BREXIT names override that default; a missing default returns
+   PGMIDERR 27/0. Exit selection verifies the installed executable artifact,
+   and CICS open rejects malformed default rows.
+4. These lookups grant no START ATTACH or START BREXIT route by themselves. Those
    routes still require live-address and bridge-exit authorities, respectively.
 
 ## Consequences
@@ -47,5 +52,6 @@ read-only boundary.
 ## Verification
 
 Focused memory and SQLite reopen tests cover undefined, valid installed, and
-corrupt durable rows. Module, API documentation, typed-semantic,
+corrupt durable rows, plus explicit/default exit selection, immutable replay,
+and malformed default rows. Module, API documentation, typed-semantic,
 documentation, formatting, dependency, and diff gates apply.
