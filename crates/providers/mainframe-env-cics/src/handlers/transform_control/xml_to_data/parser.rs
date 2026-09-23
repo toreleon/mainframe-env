@@ -473,13 +473,6 @@ fn unescape(value: &str) -> Result<String, XmlReadProblem> {
     Ok(output)
 }
 
-fn xml_character_allowed(character: char) -> bool {
-    matches!(character, '\u{9}' | '\u{a}' | '\u{d}')
-        || ('\u{20}'..='\u{d7ff}').contains(&character)
-        || ('\u{e000}'..='\u{fffd}').contains(&character)
-        || ('\u{10000}'..='\u{10ffff}').contains(&character)
-}
-
 pub(super) fn data_from_xml(
     definition: &CicsTransformDefinition,
     parsed: &ParsedXml,

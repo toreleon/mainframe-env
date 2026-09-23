@@ -715,6 +715,9 @@ fn xml_from_data(
         let text = std::str::from_utf8(bytes)
             .map_err(|_| XmlTransformProblem::InvalidData)?
             .trim_end_matches(' ');
+        if !text.chars().all(xml_character_allowed) {
+            return Err(XmlTransformProblem::InvalidData);
+        }
         let value = match field_definition.kind {
             CicsTransformFieldKind::Text => text.to_string(),
             CicsTransformFieldKind::SignedInteger => text
@@ -754,6 +757,13 @@ fn push_xml_escaped(output: &mut String, value: &str, attribute: bool) {
             _ => output.push(character),
         }
     }
+}
+
+fn xml_character_allowed(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{a}' | '\u{d}')
+        || ('\u{20}'..='\u{d7ff}').contains(&character)
+        || ('\u{e000}'..='\u{fffd}').contains(&character)
+        || ('\u{10000}'..='\u{10ffff}').contains(&character)
 }
 
 fn persist_effect_and_output(
@@ -898,15 +908,18 @@ fn normalize_definition(
             if valid_field_name(&metadata.element_name)
                 && metadata.element_name.len() <= 255
                 && metadata.element_namespace.len() <= 255
+                && metadata
+                    .element_namespace
+                    .chars()
+                    .all(xml_character_allowed)
                 && metadata.type_name.as_deref().is_none_or(valid_field_name)
                 && metadata
                     .type_name
                     .as_ref()
                     .is_none_or(|name| name.len() <= 255)
-                && metadata
-                    .type_namespace
-                    .as_ref()
-                    .is_none_or(|namespace| namespace.len() <= 255)
+                && metadata.type_namespace.as_ref().is_none_or(|namespace| {
+                    namespace.len() <= 255 && namespace.chars().all(xml_character_allowed)
+                })
                 && metadata.type_name.is_some() == metadata.type_namespace.is_some() => {}
         _ => return Err(HostProblem::Malformed),
     }

@@ -78,8 +78,9 @@ All notable changes to mainframe-env are documented here.
 - Added typed CICS `TRANSFORM DATATOXML` on the shared transform runtime.
   Bounded XML bindings emit deterministic namespace/type-qualified documents,
   return paired element/type metadata with exact fullword lengths, enforce the
-  source LENGERR matrix, and replay both container bytes and metadata from the
-  atomic transform ledger.
+  source LENGERR matrix, reject illegal XML characters in data or binding
+  namespaces, and replay both container bytes and metadata from the atomic
+  transform ledger.
 
 - Added typed CICS `TRANSFORM DATATOJSON` over a shared bounded transform
   runtime. Digest-pinned JSON bindings map fixed application-data fields to

@@ -8182,6 +8182,12 @@ mod tests {
         ] {
             service.register_transform_definition(definition).unwrap();
         }
+        let mut invalid_namespace = xml_transform_definition("INVALIDNS", true);
+        invalid_namespace.xml.as_mut().unwrap().element_namespace = "urn:\0invalid".into();
+        assert_eq!(
+            service.register_transform_definition(invalid_namespace),
+            Err(HostProblem::Malformed)
+        );
         for (name, mode, bytes) in [
             (
                 "SOURCE",
@@ -8207,6 +8213,11 @@ mod tests {
                 "INVALID",
                 CicsTransformContainerMode::Bit,
                 b"\xffLICE007".as_slice(),
+            ),
+            (
+                "CONTROL",
+                CicsTransformContainerMode::Bit,
+                b"AL\0CE007".as_slice(),
             ),
         ] {
             service
@@ -8283,6 +8294,14 @@ mod tests {
             (
                 441,
                 b"INVALID".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                5,
+            ),
+            (
+                442,
+                b"CONTROL".as_slice(),
                 b"CUSTOMERXML".as_slice(),
                 "INVREQ",
                 16,
