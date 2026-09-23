@@ -771,15 +771,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
-        HirCicsOperation::WaitEvent => &["ECADDR", "NAME", "RESP", "RESP2"],
-        HirCicsOperation::WaitExternal => &[
-            "ECBLIST",
-            "NAME",
-            "NUMEVENTS",
-            "PURGEABILITY",
-            "RESP",
-            "RESP2",
-        ],
+        op @ (HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal) => task_wait::names(op),
         HirCicsOperation::Start => &[
             "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
             "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
@@ -817,9 +809,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
-        | HirCicsOperation::Suspend => &["NOHANDLE"],
-        HirCicsOperation::WaitEvent => &["NOHANDLE"],
-        HirCicsOperation::WaitExternal => &["PURGEABLE", "NOTPURGEABLE", "NOHANDLE"],
+        | HirCicsOperation::Suspend
+        | HirCicsOperation::WaitEvent => &["NOHANDLE"],
+        HirCicsOperation::WaitExternal => task_wait::WAIT_EXTERNAL_OPTIONS,
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -878,7 +870,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
-    task_wait::validate_constraints(&clauses, &raw_options, operation)?;
+    let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     for required in match operation {
         HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
@@ -915,8 +907,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend => &[][..],
-        HirCicsOperation::WaitEvent => &["ECADDR"][..],
-        HirCicsOperation::WaitExternal => &["ECBLIST", "NUMEVENTS"][..],
+        HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -931,7 +922,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             )));
         }
     }
-    let mut operands = Vec::new();
     if operation == HirCicsOperation::Abend
         && let Some(operand) = abend::operand(&clauses, semantic)?
     {
@@ -1037,7 +1027,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
-    operands.extend(task_wait::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
@@ -1129,9 +1118,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "NOCHECK" => HirCicsOption::NoCheck,
             "MAPONLY" => HirCicsOption::MapOnly,
             "DATAONLY" => HirCicsOption::DataOnly,
-            "PURGEABLE" => HirCicsOption::Purgeable,
-            "NOTPURGEABLE" => HirCicsOption::NotPurgeable,
-            _ => unreachable!("allowed CICS option"),
+            option => task_wait::option(option),
         })
         .collect::<BTreeSet<_>>();
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();

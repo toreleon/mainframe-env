@@ -1,11 +1,60 @@
 use super::{
-    Clauses, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
-    ResolutionFailure, cics_integer_value, cics_value, complete_data_reference,
+    Clauses, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption,
+    HirCicsValue, Resolution, ResolutionFailure, cics_integer_value, cics_value,
+    complete_data_reference,
 };
 use crate::{CobolUsage, DataCategory, SemanticModel};
 use std::collections::BTreeMap;
 
-pub(super) fn validate_constraints(
+const WAIT_EVENT_CLAUSES: &[&str] = &["ECADDR", "NAME", "RESP", "RESP2"];
+const WAIT_EXTERNAL_CLAUSES: &[&str] = &[
+    "ECBLIST",
+    "NAME",
+    "NUMEVENTS",
+    "PURGEABILITY",
+    "RESP",
+    "RESP2",
+];
+pub(super) const WAIT_EXTERNAL_OPTIONS: &[&str] = &["PURGEABLE", "NOTPURGEABLE", "NOHANDLE"];
+
+pub(super) fn names(operation: HirCicsOperation) -> &'static [&'static str] {
+    match operation {
+        HirCicsOperation::WaitEvent => WAIT_EVENT_CLAUSES,
+        HirCicsOperation::WaitExternal => WAIT_EXTERNAL_CLAUSES,
+        _ => unreachable!("WAIT clause contract requested for another operation"),
+    }
+}
+
+pub(super) fn resolve(
+    clauses: &Clauses,
+    options: &[String],
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    validate_constraints(clauses, options, operation)?;
+    for required in match operation {
+        HirCicsOperation::WaitEvent => &["ECADDR"][..],
+        HirCicsOperation::WaitExternal => &["ECBLIST", "NUMEVENTS"][..],
+        _ => return Ok(Vec::new()),
+    } {
+        if !clauses.contains_key(*required) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} requires {required}"
+            )));
+        }
+    }
+    operands(clauses, operation, semantic)
+}
+
+pub(super) fn option(name: &str) -> HirCicsOption {
+    match name {
+        "PURGEABLE" => HirCicsOption::Purgeable,
+        "NOTPURGEABLE" => HirCicsOption::NotPurgeable,
+        _ => unreachable!("allowed CICS option"),
+    }
+}
+
+fn validate_constraints(
     clauses: &Clauses,
     options: &[String],
     operation: HirCicsOperation,
@@ -27,7 +76,7 @@ pub(super) fn validate_constraints(
     Ok(())
 }
 
-pub(super) fn operands(
+fn operands(
     clauses: &BTreeMap<String, Vec<String>>,
     operation: HirCicsOperation,
     semantic: &SemanticModel,
