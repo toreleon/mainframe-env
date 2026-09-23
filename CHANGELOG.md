@@ -27,6 +27,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a source-pinned BRXA Init COMMAREA layout for the pending START BREXIT
+  adapter. It checks the fixed header, transaction, command and BRDATA offsets,
+  virtual pointers, and the fields an Init exit may change. The ABI version
+  remains an explicit input until its numeric constant is pinned.
+
 - Added a durable START BREXIT admission record and private work generation.
   Admission freezes the local transaction, selected installed exit artifact,
   principal, bounded BRDATA, priority, and producer digest. Exact replay,

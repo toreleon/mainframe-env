@@ -1,4 +1,9 @@
 mod bms_map;
+#[allow(
+    dead_code,
+    reason = "START BREXIT bridge adapter is not yet dispatched"
+)]
+mod bridge_abi;
 mod bridge_definition;
 mod bridge_start;
 mod builtin_function;
