@@ -530,6 +530,13 @@ pub(super) fn execute(
             CicsOutputName::DocumentSize => {
                 outputs.insert(key.into(), target);
             }
+            CicsOutputName::CounterValue => {
+                arguments.insert(
+                    "VALUE".into(),
+                    payload("mainframe-env.cics.output@1", Vec::new())?,
+                );
+                outputs.insert(key.into(), target);
+            }
         }
     }
     if plan.operation == CicsPlanOperation::WriteTemporaryStorage
@@ -842,6 +849,7 @@ fn validate_machine_slot(
     if matches!(
         slot_use,
         SlotUse::Output
+            | SlotUse::CounterNumber
             | SlotUse::AbstimeOutput
             | SlotUse::FormatTextOutput(_)
             | SlotUse::MillisecondsOutput

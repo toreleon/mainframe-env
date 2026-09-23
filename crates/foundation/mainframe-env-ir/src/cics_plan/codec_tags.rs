@@ -103,6 +103,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::DefineDCounter => 119,
         CicsPlanOperation::DeleteCounter => 120,
         CicsPlanOperation::DeleteDCounter => 121,
+        CicsPlanOperation::GetCounter => 122,
+        CicsPlanOperation::GetDCounter => 123,
     }
 }
 
@@ -193,6 +195,8 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         119 => Ok(CicsPlanOperation::DefineDCounter),
         120 => Ok(CicsPlanOperation::DeleteCounter),
         121 => Ok(CicsPlanOperation::DeleteDCounter),
+        122 => Ok(CicsPlanOperation::GetCounter),
+        123 => Ok(CicsPlanOperation::GetDCounter),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -359,6 +363,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::CounterValue => 386,
         CicsOperandName::CounterMinimum => 387,
         CicsOperandName::CounterMaximum => 388,
+        CicsOperandName::CounterIncrement => 389,
+        CicsOperandName::CounterCompareMin => 390,
+        CicsOperandName::CounterCompareMax => 391,
     }
 }
 
@@ -524,6 +531,9 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         386 => Ok(CicsOperandName::CounterValue),
         387 => Ok(CicsOperandName::CounterMinimum),
         388 => Ok(CicsOperandName::CounterMaximum),
+        389 => Ok(CicsOperandName::CounterIncrement),
+        390 => Ok(CicsOperandName::CounterCompareMin),
+        391 => Ok(CicsOperandName::CounterCompareMax),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -583,6 +593,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::SpoolLine => 79,
         CicsPlanOption::SpoolPage => 80,
         CicsPlanOption::CounterNoSuspend => 316,
+        CicsPlanOption::CounterReduce => 317,
+        CicsPlanOption::CounterWrap => 318,
     }
 }
 
@@ -641,6 +653,8 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         79 => Ok(CicsPlanOption::SpoolLine),
         80 => Ok(CicsPlanOption::SpoolPage),
         316 => Ok(CicsPlanOption::CounterNoSuspend),
+        317 => Ok(CicsPlanOption::CounterReduce),
+        318 => Ok(CicsPlanOption::CounterWrap),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -648,6 +662,7 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
 pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
         CicsOutputName::Into => 0,
+        CicsOutputName::CounterValue => 440,
         CicsOutputName::Resp => 1,
         CicsOutputName::Resp2 => 2,
         CicsOutputName::Abstime => 3,
@@ -702,6 +717,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
 pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
         0 => Ok(CicsOutputName::Into),
+        440 => Ok(CicsOutputName::CounterValue),
         1 => Ok(CicsOutputName::Resp),
         2 => Ok(CicsOutputName::Resp2),
         3 => Ok(CicsOutputName::Abstime),

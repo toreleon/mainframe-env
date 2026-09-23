@@ -699,7 +699,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DefineCounter
         | HirCicsOperation::DefineDCounter
         | HirCicsOperation::DeleteCounter
-        | HirCicsOperation::DeleteDCounter => counter_control::allowed_clauses(operation),
+        | HirCicsOperation::DeleteDCounter
+        | HirCicsOperation::GetCounter
+        | HirCicsOperation::GetDCounter => counter_control::allowed_clauses(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -790,7 +792,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DefineCounter
         | HirCicsOperation::DefineDCounter
         | HirCicsOperation::DeleteCounter
-        | HirCicsOperation::DeleteDCounter => counter_control::allowed_options(),
+        | HirCicsOperation::DeleteDCounter
+        | HirCicsOperation::GetCounter
+        | HirCicsOperation::GetDCounter => counter_control::allowed_options(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -918,7 +922,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DefineCounter
         | HirCicsOperation::DefineDCounter
         | HirCicsOperation::DeleteCounter
-        | HirCicsOperation::DeleteDCounter => counter_control::required(operation),
+        | HirCicsOperation::DeleteDCounter
+        | HirCicsOperation::GetCounter
+        | HirCicsOperation::GetDCounter => counter_control::required(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -1098,6 +1104,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

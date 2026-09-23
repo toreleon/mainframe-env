@@ -114,7 +114,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     Ok(())
 }
 
-fn number(
+pub(super) fn number(
     request: &CicsRequest,
     name: &str,
     kind: CounterKind,

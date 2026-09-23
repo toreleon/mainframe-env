@@ -1,8 +1,8 @@
 use super::super::{
-    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption, HirCicsValue,
-    Resolution, ResolutionFailure,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
 };
-use super::{Clauses, cics_integer_value, cics_value};
+use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) const fn is_counter(operation: HirCicsOperation) -> bool {
@@ -12,6 +12,8 @@ pub(super) const fn is_counter(operation: HirCicsOperation) -> bool {
             | HirCicsOperation::DefineDCounter
             | HirCicsOperation::DeleteCounter
             | HirCicsOperation::DeleteDCounter
+            | HirCicsOperation::GetCounter
+            | HirCicsOperation::GetDCounter
     )
 }
 
@@ -25,24 +27,72 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         ],
         HirCicsOperation::DeleteCounter => &["COUNTER", "POOL", "RESP", "RESP2"],
         HirCicsOperation::DeleteDCounter => &["DCOUNTER", "POOL", "RESP", "RESP2"],
+        HirCicsOperation::GetCounter => &[
+            "COUNTER",
+            "POOL",
+            "VALUE",
+            "INCREMENT",
+            "COMPAREMIN",
+            "COMPAREMAX",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::GetDCounter => &[
+            "DCOUNTER",
+            "POOL",
+            "VALUE",
+            "INCREMENT",
+            "COMPAREMIN",
+            "COMPAREMAX",
+            "RESP",
+            "RESP2",
+        ],
         _ => unreachable!("counter clause contract requested for another operation"),
     }
 }
 
-pub(super) fn allowed_options() -> &'static [&'static str] {
-    &["NOSUSPEND", "NOHANDLE"]
+pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static str] {
+    if matches!(
+        operation,
+        HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+    ) {
+        &["NOSUSPEND", "NOHANDLE", "REDUCE", "WRAP"]
+    } else {
+        &["NOSUSPEND", "NOHANDLE"]
+    }
 }
 
 pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::DefineCounter | HirCicsOperation::DeleteCounter => &["COUNTER"],
         HirCicsOperation::DefineDCounter | HirCicsOperation::DeleteDCounter => &["DCOUNTER"],
+        HirCicsOperation::GetCounter => &["COUNTER", "VALUE"],
+        HirCicsOperation::GetDCounter => &["DCOUNTER", "VALUE"],
         _ => unreachable!("counter required clause contract requested for another operation"),
     }
 }
 
 pub(super) fn option(operation: HirCicsOperation, option: &str) -> Option<HirCicsOption> {
-    (is_counter(operation) && option == "NOSUSPEND").then_some(HirCicsOption::CounterNoSuspend)
+    match option {
+        "NOSUSPEND" if is_counter(operation) => Some(HirCicsOption::CounterNoSuspend),
+        "REDUCE"
+            if matches!(
+                operation,
+                HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+            ) =>
+        {
+            Some(HirCicsOption::CounterReduce)
+        }
+        "WRAP"
+            if matches!(
+                operation,
+                HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+            ) =>
+        {
+            Some(HirCicsOption::CounterWrap)
+        }
+        _ => None,
+    }
 }
 
 pub(super) fn operands(
@@ -78,11 +128,23 @@ pub(super) fn operands(
             value,
         });
     }
-    for (label, name) in [
-        ("VALUE", HirCicsOperandName::CounterValue),
-        ("MINIMUM", HirCicsOperandName::CounterMinimum),
-        ("MAXIMUM", HirCicsOperandName::CounterMaximum),
-    ] {
+    let numeric: &[(&str, HirCicsOperandName)] = if matches!(
+        operation,
+        HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+    ) {
+        &[
+            ("INCREMENT", HirCicsOperandName::CounterIncrement),
+            ("COMPAREMIN", HirCicsOperandName::CounterCompareMin),
+            ("COMPAREMAX", HirCicsOperandName::CounterCompareMax),
+        ]
+    } else {
+        &[
+            ("VALUE", HirCicsOperandName::CounterValue),
+            ("MINIMUM", HirCicsOperandName::CounterMinimum),
+            ("MAXIMUM", HirCicsOperandName::CounterMaximum),
+        ]
+    };
+    for &(label, name) in numeric {
         let Some(tokens) = clauses.get(label) else {
             continue;
         };
@@ -91,6 +153,36 @@ pub(super) fn operands(
         operands.push(HirCicsNamedOperand { name, value });
     }
     Ok(operands)
+}
+
+pub(super) fn outputs(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if !matches!(
+        operation,
+        HirCicsOperation::GetCounter | HirCicsOperation::GetDCounter
+    ) {
+        return Ok(Vec::new());
+    }
+    let target = complete_data_reference(&clauses["VALUE"], semantic)?;
+    require_writable(&target)?;
+    let doubleword = operation == HirCicsOperation::GetDCounter;
+    if target.usage != CobolUsage::Binary
+        || target.length != if doubleword { 8 } else { 4 }
+        || target.scale != 0
+        || target.signed == doubleword
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS GET counter VALUE requires matching signed fullword or unsigned doubleword storage"
+                .into(),
+        ));
+    }
+    Ok(vec![HirCicsOutputBinding {
+        name: HirCicsOutputName::CounterValue,
+        target,
+    }])
 }
 
 fn validate_text(
@@ -133,7 +225,10 @@ fn validate_number(
     operation: HirCicsOperation,
     label: &str,
 ) -> Resolution<()> {
-    let doubleword = operation == HirCicsOperation::DefineDCounter;
+    let doubleword = matches!(
+        operation,
+        HirCicsOperation::DefineDCounter | HirCicsOperation::GetDCounter
+    );
     let valid = match value {
         HirCicsValue::Integer(value) => {
             *value >= 0 && (doubleword || *value <= i64::from(i32::MAX))

@@ -58,6 +58,13 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::CounterNoSuspend
         ),
+        CicsPlanOperation::GetCounter | CicsPlanOperation::GetDCounter => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::CounterNoSuspend
+                | CicsPlanOption::CounterReduce
+                | CicsPlanOption::CounterWrap
+        ),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

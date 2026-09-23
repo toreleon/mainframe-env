@@ -147,6 +147,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebEprInto
         | HirCicsOutputName::WebEprSet
         | HirCicsOutputName::WebEprLength
+        | HirCicsOutputName::CounterValue
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

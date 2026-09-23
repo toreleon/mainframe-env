@@ -1583,6 +1583,8 @@ mod tests {
                 CicsPlanOperation::DefineDCounter => crate::HirCicsOperation::DefineDCounter,
                 CicsPlanOperation::DeleteCounter => crate::HirCicsOperation::DeleteCounter,
                 CicsPlanOperation::DeleteDCounter => crate::HirCicsOperation::DeleteDCounter,
+                CicsPlanOperation::GetCounter => crate::HirCicsOperation::GetCounter,
+                CicsPlanOperation::GetDCounter => crate::HirCicsOperation::GetDCounter,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
                 CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
                 CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,

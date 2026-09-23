@@ -5,12 +5,16 @@ use mainframe_env_ir::{
 
 pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Option<(usize, bool)> {
     match operation {
-        Some(CicsPlanOperation::DefineCounter | CicsPlanOperation::DeleteCounter) => {
-            Some((4, true))
-        }
-        Some(CicsPlanOperation::DefineDCounter | CicsPlanOperation::DeleteDCounter) => {
-            Some((8, false))
-        }
+        Some(
+            CicsPlanOperation::DefineCounter
+            | CicsPlanOperation::DeleteCounter
+            | CicsPlanOperation::GetCounter,
+        ) => Some((4, true)),
+        Some(
+            CicsPlanOperation::DefineDCounter
+            | CicsPlanOperation::DeleteDCounter
+            | CicsPlanOperation::GetDCounter,
+        ) => Some((8, false)),
         _ => None,
     }
 }
@@ -119,13 +123,17 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::SpoolFlength => SlotUse::SpoolMaxFlengthInput,
         CicsOperandName::CounterValue
         | CicsOperandName::CounterMinimum
-        | CicsOperandName::CounterMaximum => SlotUse::CounterNumber,
+        | CicsOperandName::CounterMaximum
+        | CicsOperandName::CounterIncrement
+        | CicsOperandName::CounterCompareMin
+        | CicsOperandName::CounterCompareMax => SlotUse::CounterNumber,
         _ => SlotUse::Input,
     }
 }
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::CounterValue => SlotUse::CounterNumber,
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
@@ -184,6 +192,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DefineDCounter => CicsOperation::DefineDCounter,
         CicsPlanOperation::DeleteCounter => CicsOperation::DeleteCounter,
         CicsPlanOperation::DeleteDCounter => CicsOperation::DeleteDCounter,
+        CicsPlanOperation::GetCounter => CicsOperation::GetCounter,
+        CicsPlanOperation::GetDCounter => CicsOperation::GetDCounter,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -422,6 +432,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::CounterValue => "VALUE",
         CicsOperandName::CounterMinimum => "MINIMUM",
         CicsOperandName::CounterMaximum => "MAXIMUM",
+        CicsOperandName::CounterIncrement => "INCREMENT",
+        CicsOperandName::CounterCompareMin => "COMPAREMIN",
+        CicsOperandName::CounterCompareMax => "COMPAREMAX",
     }
 }
 
@@ -431,7 +444,9 @@ pub(super) const fn operand_for(
 ) -> &'static str {
     if matches!(
         operation,
-        CicsPlanOperation::DefineDCounter | CicsPlanOperation::DeleteDCounter
+        CicsPlanOperation::DefineDCounter
+            | CicsPlanOperation::DeleteDCounter
+            | CicsPlanOperation::GetDCounter
     ) && matches!(name, CicsOperandName::CounterName)
     {
         "DCOUNTER"
@@ -442,6 +457,7 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
@@ -499,6 +515,8 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Uow => "UOW",
         CicsPlanOption::NoSuspend => "NOSUSPEND",
         CicsPlanOption::CounterNoSuspend => "NOSUSPEND",
+        CicsPlanOption::CounterReduce => "REDUCE",
+        CicsPlanOption::CounterWrap => "WRAP",
         CicsPlanOption::Erase => "ERASE",
         CicsPlanOption::Cursor => "CURSOR",
         CicsPlanOption::DateSep => "DATESEP",

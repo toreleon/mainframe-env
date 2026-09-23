@@ -18,6 +18,8 @@ impl Canonical for CicsOperation {
             Self::DefineDCounter => out.variant("CicsOperation", "DefineDCounter", 0),
             Self::DeleteCounter => out.variant("CicsOperation", "DeleteCounter", 0),
             Self::DeleteDCounter => out.variant("CicsOperation", "DeleteDCounter", 0),
+            Self::GetCounter => out.variant("CicsOperation", "GetCounter", 0),
+            Self::GetDCounter => out.variant("CicsOperation", "GetDCounter", 0),
             Self::Deq => out.variant("CicsOperation", "Deq", 0),
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DocumentCreate => out.variant("CicsOperation", "DocumentCreate", 0),

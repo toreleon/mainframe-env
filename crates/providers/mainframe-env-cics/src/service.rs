@@ -26645,4 +26645,139 @@ mod tests {
         let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         assert!(state["records"].as_object().unwrap().is_empty());
     }
+
+    #[test]
+    fn named_counter_get_reserves_ranges_and_rewinds() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"TICKET")),
+                ("VALUE".into(), cics_decimal(1)),
+                ("MAXIMUM".into(), cics_decimal(2)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let get_args = BTreeMap::from([
+            ("COUNTER".into(), cics_literal(b"TICKET")),
+            ("VALUE".into(), argument(b"")),
+            ("INCREMENT".into(), cics_decimal(2)),
+        ]);
+        let get = request(CicsOperation::GetCounter, get_args.clone(), 2);
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, get.clone(), 2),
+                get.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.outputs["VALUE"].bytes(), b"1");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+                .unwrap(),
+            first
+        );
+        let at_limit = request(CicsOperation::GetCounter, get_args.clone(), 3);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, at_limit.clone(), 3),
+                at_limit
+            ),
+            Err(HostProblem::Condition {
+                name: "SUPPRESSED".into(),
+                response: 72,
+                response2: 101,
+            })
+        );
+        let wrapped = request(
+            CicsOperation::GetCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"TICKET")),
+                ("VALUE".into(), argument(b"")),
+                ("OPTION.WRAP".into(), cics_option()),
+            ]),
+            4,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wrapped.clone(), 4),
+                wrapped,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["VALUE"].bytes(), b"0");
+        let reduced = request(
+            CicsOperation::GetCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"TICKET")),
+                ("VALUE".into(), argument(b"")),
+                ("INCREMENT".into(), cics_decimal(3)),
+                ("OPTION.REDUCE".into(), cics_option()),
+            ]),
+            5,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, reduced.clone(), 5),
+                reduced,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["VALUE"].bytes(), b"1");
+    }
+
+    #[test]
+    fn named_counter_get_rejects_large_reservations_and_warns_after_wide_allocation() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineDCounter,
+            BTreeMap::from([
+                ("DCOUNTER".into(), cics_literal(b"WIDE")),
+                ("VALUE".into(), cics_decimal(i64::MAX)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"WIDE")),
+                ("VALUE".into(), argument(b"")),
+            ]),
+            2,
+        );
+        let reply = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(
+            (reply.condition.as_str(), reply.response, reply.response2),
+            ("LENGERR", 22, 3)
+        );
+        assert_eq!(reply.outputs["VALUE"].bytes(), b"-1");
+        let invalid = request(
+            CicsOperation::GetDCounter,
+            BTreeMap::from([
+                ("DCOUNTER".into(), cics_literal(b"WIDE")),
+                ("VALUE".into(), argument(b"")),
+                (
+                    "INCREMENT".into(),
+                    argument(u64::MAX.to_string().as_bytes()),
+                ),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 406,
+            })
+        );
+    }
 }

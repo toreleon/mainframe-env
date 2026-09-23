@@ -74,6 +74,60 @@ fn invalid_pool(bytes: &[u8]) -> bool {
         })
 }
 
+pub(super) fn invalid_get_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::CounterName)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::CounterName,
+            CicsOperandName::CounterPool,
+            CicsOperandName::CounterIncrement,
+            CicsOperandName::CounterCompareMin,
+            CicsOperandName::CounterCompareMax,
+        ]))
+        || !outputs.contains(&CicsOutputName::CounterValue)
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::CounterValue,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::CounterNoSuspend
+                    | CicsPlanOption::CounterReduce
+                    | CicsPlanOption::CounterWrap
+            )
+        })
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::CounterName => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_name(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterPool => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_pool(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterIncrement
+            | CicsOperandName::CounterCompareMin
+            | CicsOperandName::CounterCompareMax => match &operand.value {
+                CicsOperandValue::Integer(value) => {
+                    *value < 0
+                        || plan.operation == CicsPlanOperation::GetCounter
+                            && *value > i64::from(i32::MAX)
+                }
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            _ => true,
+        })
+}
+
 pub(super) fn invalid_delete_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,

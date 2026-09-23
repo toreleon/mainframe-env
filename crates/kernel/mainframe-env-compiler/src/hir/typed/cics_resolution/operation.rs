@@ -23,6 +23,8 @@ pub(super) fn resolve(
         ["DEFINE", "DCOUNTER"] => HirCicsOperation::DefineDCounter,
         ["DELETE", "COUNTER"] => HirCicsOperation::DeleteCounter,
         ["DELETE", "DCOUNTER"] => HirCicsOperation::DeleteDCounter,
+        ["GET", "COUNTER"] => HirCicsOperation::GetCounter,
+        ["GET", "DCOUNTER"] => HirCicsOperation::GetDCounter,
         ["ENQ"] => HirCicsOperation::Enq,
         ["HANDLE", "ABEND"] => HirCicsOperation::HandleAbend,
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,

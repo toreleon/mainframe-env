@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS GET COUNTER and GET DCOUNTER with atomic current-value
+  allocation, increment ranges, inclusive comparisons, REDUCE and WRAP,
+  at-limit SUPPRESSED conditions, fullword LENGERR warning, and replay.
+  IBM CICS TS 6.x application API `dfhp4_getcounter.html`, rows 0087/0088.
+
 - Added the eight typed v0.9 CICS web-service-control commands: INVOKE SERVICE,
   SOAPFAULT ADD/CREATE/DELETE, WSACONTEXT BUILD/DELETE/GET, and WSAEPR CREATE.
   The bounded local service route uses installed immutable program generations

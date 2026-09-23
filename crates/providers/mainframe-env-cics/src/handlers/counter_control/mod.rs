@@ -2,6 +2,7 @@
 
 mod define;
 mod delete;
+mod get;
 mod state;
 
 use super::super::{CicsService, Run};
@@ -38,6 +39,9 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::DeleteCounter | CicsOperation::DeleteDCounter => {
             delete::invoke(service, run, request)
+        }
+        CicsOperation::GetCounter | CicsOperation::GetDCounter => {
+            get::invoke(service, run, request)
         }
         _ => Err(HostProblem::InfrastructureFailure),
     }
@@ -105,7 +109,7 @@ fn normalize_pool(bytes: &[u8]) -> Result<String, HostProblem> {
 fn selector(request: &CicsRequest) -> Result<(String, CounterKey), HostProblem> {
     let field = if matches!(
         request.operation,
-        CicsOperation::DefineDCounter | CicsOperation::DeleteDCounter
+        CicsOperation::DefineDCounter | CicsOperation::DeleteDCounter | CicsOperation::GetDCounter
     ) {
         "DCOUNTER"
     } else {
@@ -223,7 +227,9 @@ fn response(
         {
             let signed = if matches!(
                 request.operation,
-                CicsOperation::DefineCounter | CicsOperation::DeleteCounter
+                CicsOperation::DefineCounter
+                    | CicsOperation::DeleteCounter
+                    | CicsOperation::GetCounter
             ) {
                 i128::from(value as u32 as i32)
             } else {

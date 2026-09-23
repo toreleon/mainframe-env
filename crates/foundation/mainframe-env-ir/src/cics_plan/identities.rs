@@ -37,6 +37,10 @@ pub enum CicsPlanOperation {
     DeleteCounter,
     /// IBM DELETE named-counter command.
     DeleteDCounter,
+    /// IBM GET named-counter command.
+    GetCounter,
+    /// IBM GET named-counter command.
+    GetDCounter,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -459,6 +463,12 @@ pub enum CicsOperandName {
     CounterMinimum,
     /// `MAXIMUM(...)` named-counter upper bound.
     CounterMaximum,
+    /// `INCREMENT(...)` GET or REWIND reservation size.
+    CounterIncrement,
+    /// `COMPAREMIN(...)` inclusive lower comparison.
+    CounterCompareMin,
+    /// `COMPAREMAX(...)` inclusive upper comparison.
+    CounterCompareMax,
     /// `JOURNALNAME(...)` named journal identity.
     JournalName,
     /// `JOURNALNUM(...)` numeric journal identity from 1 to 99.
@@ -582,6 +592,10 @@ pub enum CicsPlanOption {
     Executable64,
     /// Fail immediately while the selected counter pool is rebuilding.
     CounterNoSuspend,
+    /// Reserve the remaining numbers when a GET increment reaches the limit.
+    CounterReduce,
+    /// Rewind at limit or when the reservation exceeds the remaining range.
+    CounterWrap,
     /// Retain a closed spool report.
     SpoolKeep,
     /// Delete a closed spool report.
@@ -605,6 +619,8 @@ pub enum CicsPlanOption {
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    /// Current named-counter value returned by GET or QUERY.
+    CounterValue,
     /// Record payload destination.
     Into,
     /// Pointer receiving interpreter-owned retrieved storage.
