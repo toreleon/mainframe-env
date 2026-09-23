@@ -108,7 +108,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         CicsPlanOperation::WaitJournalName | CicsPlanOperation::WaitJournalNum => {
             matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2)
         }
-        CicsPlanOperation::WriteJournalName => matches!(
+        CicsPlanOperation::WriteJournalName | CicsPlanOperation::WriteJournalNum => matches!(
             output,
             CicsOutputName::JournalReqId | CicsOutputName::Resp | CicsOutputName::Resp2
         ),

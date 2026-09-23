@@ -163,6 +163,7 @@ pub(super) fn suspension(
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         CicsOperation::WriteJournalName => ("cics-journal", true),
+        CicsOperation::WriteJournalNum => ("cics-journal", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };

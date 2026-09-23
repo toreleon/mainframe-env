@@ -442,6 +442,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,
+        HirCicsOperation::WriteJournalNum => CicsPlanOperation::WriteJournalNum,
     }
 }
 

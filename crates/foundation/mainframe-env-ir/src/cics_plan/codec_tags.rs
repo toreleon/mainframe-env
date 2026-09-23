@@ -81,6 +81,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
+        CicsPlanOperation::WriteJournalNum => 57,
     }
 }
 
@@ -149,6 +150,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
+        57 => Ok(CicsPlanOperation::WriteJournalNum),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -170,6 +170,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WaitJournalName => CicsOperation::WaitJournalName,
         CicsPlanOperation::WaitJournalNum => CicsOperation::WaitJournalNum,
         CicsPlanOperation::WriteJournalName => CicsOperation::WriteJournalName,
+        CicsPlanOperation::WriteJournalNum => CicsOperation::WriteJournalNum,
     }
 }
 

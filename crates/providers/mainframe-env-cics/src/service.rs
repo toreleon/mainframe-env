@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 65);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 66);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5239,6 +5239,7 @@ mod tests {
                 "WRITE JOURNALNAME('ACCTS')",
                 CicsOperation::WriteJournalName,
             ),
+            ("WRITE JOURNALNUM(7)", CicsOperation::WriteJournalNum),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6470,7 +6471,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 65);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 66);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9608,6 +9609,100 @@ mod tests {
             assert!(service.journal_record_bytes("ACCOUNTS", 2).is_err());
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn write_journalnum_maps_to_dfhj_and_shares_named_wait_state() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = journal_authorities(false);
+        let service = CicsService::open(host, store, CicsLimits::default()).unwrap();
+        let (issuer, _) = registered(&service);
+        service
+            .register_journals(&BTreeSet::from(["DFHJ01".into(), "DFHJ07".into()]))
+            .unwrap();
+        let write = |number: i64, sequence: u64| {
+            let mut request = request(
+                CicsOperation::WriteJournalNum,
+                BTreeMap::from([
+                    ("JOURNALNUM".into(), cics_decimal(number)),
+                    ("JTYPEID".into(), cics_literal(b"UR")),
+                    ("FROM".into(), enqueue_value(b"PAYLOAD")),
+                    ("REQID".into(), argument(b"REQUEST-X")),
+                    ("RESP".into(), argument(b"RESP-X")),
+                ]),
+                sequence,
+            );
+            request.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: None,
+            };
+            request
+        };
+        let first_write = write(7, 1);
+        let response = service
+            .invoke(
+                &effect(&issuer.run_unit_id, first_write.clone(), 1),
+                first_write,
+            )
+            .unwrap();
+        assert_eq!(response.outputs["REQID"].bytes(), b"1");
+        assert_eq!(
+            service.journal_record_bytes("DFHJ07", 1).unwrap(),
+            (*b"UR", Vec::new(), b"PAYLOAD".to_vec(), false)
+        );
+        assert!(service.journal_record_bytes("DFHJ01", 1).is_err());
+        let wait = request(
+            CicsOperation::WaitJournalName,
+            BTreeMap::from([
+                ("JOURNALNAME".into(), cics_literal(b"DFHJ07")),
+                ("REQID".into(), cics_decimal(1)),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&issuer.run_unit_id, wait.clone(), 2), wait.clone())
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        service
+            .acknowledge_journal_output("DFHJ07", 1, false)
+            .unwrap();
+        let numbered_wait = request(
+            CicsOperation::WaitJournalNum,
+            BTreeMap::from([
+                ("JOURNALNUM".into(), cics_decimal(7)),
+                ("REQID".into(), cics_decimal(1)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&issuer.run_unit_id, numbered_wait.clone(), 3),
+                    numbered_wait,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        let unknown = write(8, 4);
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, unknown.clone(), 4), unknown)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("JIDERR", 43)
+        );
+        assert!(seen.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "JOURNAL".into(),
+                    "CICS.JOURNAL.DFHJ07".into(),
+                    AccessIntent::Update,
+                )
+        }));
     }
 
     #[test]

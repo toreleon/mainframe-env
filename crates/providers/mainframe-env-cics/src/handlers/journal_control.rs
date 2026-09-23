@@ -322,7 +322,10 @@ pub(in crate::service) fn invoke(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    if request.operation == CicsOperation::WriteJournalName {
+    if matches!(
+        request.operation,
+        CicsOperation::WriteJournalName | CicsOperation::WriteJournalNum
+    ) {
         return write(service, run, request);
     }
     if !matches!(
@@ -399,7 +402,11 @@ fn write(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_write_request(request)?;
-    let name = journal_name(request)?;
+    let name = match request.operation {
+        CicsOperation::WriteJournalName => journal_name(request)?,
+        CicsOperation::WriteJournalNum => journal_num_name(request)?,
+        _ => unreachable!(),
+    };
     service.authorize(
         run,
         "JOURNAL",
@@ -613,7 +620,17 @@ fn validate_write_request(request: &CicsRequest) -> Result<(), HostProblem> {
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
-                "JOURNALNAME" | "JTYPEID" => !matches!(
+                "JOURNALNAME" => {
+                    !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                    ) || request.operation != CicsOperation::WriteJournalName
+                }
+                "JOURNALNUM" => {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                        || request.operation != CicsOperation::WriteJournalNum
+                }
+                "JTYPEID" => !matches!(
                     value.schema(),
                     "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
                 ),
@@ -625,9 +642,17 @@ fn validate_write_request(request: &CicsRequest) -> Result<(), HostProblem> {
                 }
                 _ => true,
             })
-        || !["JOURNALNAME", "JTYPEID", "FROM"]
-            .iter()
-            .all(|name| request.arguments.contains_key(*name))
+        || ![
+            if request.operation == CicsOperation::WriteJournalName {
+                "JOURNALNAME"
+            } else {
+                "JOURNALNUM"
+            },
+            "JTYPEID",
+            "FROM",
+        ]
+        .iter()
+        .all(|name| request.arguments.contains_key(*name))
     {
         return Err(HostProblem::Malformed);
     }

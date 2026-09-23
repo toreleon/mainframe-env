@@ -87,6 +87,12 @@ All notable changes to mainframe-env are documented here.
   canonical JSON, named channel containers persist in BIT/CHAR modes, SAF
   protects the transformer, exact source conditions are retained, and an
   atomic transform ledger makes output replacement replay-safe across reopen.
+- Added typed CICS `WRITE JOURNALNUM` as a distinct compatibility route for
+  numeric journals 1–99. It maps to `DFHJnn` and shares the durable record,
+  idempotency, synchronous WAIT, asynchronous REQID, SAF, and condition path
+  with WRITE JOURNALNAME. Operation tag 57 is append-only; the numbered form
+  reuses the reserved journal operand and output identities.
+
 - Added typed CICS `WRITE JOURNALNAME` over the shared durable journal authority.
   The local writer preserves JTYPEID, FROM and optional PREFIX bytes with checked
   FLENGTH/PFXLENG, returns a task-owned fullword REQID for deferred output, and

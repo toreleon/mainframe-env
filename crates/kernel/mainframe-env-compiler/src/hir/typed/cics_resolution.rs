@@ -716,7 +716,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ],
         HirCicsOperation::WaitJournalName
         | HirCicsOperation::WaitJournalNum
-        | HirCicsOperation::WriteJournalName => journal_control::allowed_clauses(operation),
+        | HirCicsOperation::WriteJournalName
+        | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -787,7 +788,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
         HirCicsOperation::WaitJournalName
         | HirCicsOperation::WaitJournalNum
-        | HirCicsOperation::WriteJournalName => journal_control::allowed_options(operation),
+        | HirCicsOperation::WriteJournalName
+        | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -894,7 +896,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Syncpoint => &[][..],
         HirCicsOperation::WaitJournalName
         | HirCicsOperation::WaitJournalNum
-        | HirCicsOperation::WriteJournalName => journal_control::required_clauses(operation),
+        | HirCicsOperation::WriteJournalName
+        | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()

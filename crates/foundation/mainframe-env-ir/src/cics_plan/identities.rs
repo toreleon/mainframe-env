@@ -129,6 +129,8 @@ pub enum CicsPlanOperation {
     WaitJournalNum,
     /// Create one named journal record for synchronous or deferred output.
     WriteJournalName,
+    /// Create one numbered journal record for synchronous or deferred output.
+    WriteJournalNum,
 }
 
 /// Named input accepted by the typed CICS pilot.

@@ -211,6 +211,7 @@ pub enum HirCicsOperation {
     WaitJournalName,
     WaitJournalNum,
     WriteJournalName,
+    WriteJournalNum,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -6828,6 +6829,38 @@ mod tests {
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 REQUEST-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );
             assert!(analyze(&source).hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn cics_write_journalnum_uses_distinct_numeric_compatibility_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEJNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(5) VALUE 'HELLO'. 01 JOURNAL-X PIC 99 VALUE 7. 01 REQUEST-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITE JOURNALNUM(JOURNAL-X) JTYPEID('UR') FROM(DATA-X) FLENGTH(5) REQID(REQUEST-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE JOURNALNUM: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WRITE JOURNALNUM");
+        assert_eq!(command.operation, HirCicsOperation::WriteJournalNum);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::JournalNum
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::JournalReqId
+                && output.target.qualified_name == "REQUEST-X"
+        }));
+        for number in [0, 100] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADJNUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(5). PROCEDURE DIVISION. EXEC CICS WRITE JOURNALNUM({number}) JTYPEID('UR') FROM(DATA-X) END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&source).hir.is_none(), "{number}");
         }
     }
 }

@@ -57,8 +57,8 @@ coverage, semantic and differential credit.
 
 The contract also binds one 121-name EIBRESP authority for dynamic
 `HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
-records 26 known mutating rows, 218 bounded-effect rows, one explicit UOW
-boundary and 244 bounded-UOW rows. Those values describe current contract
+records 42 known mutating rows, 199 bounded-effect rows, one explicit UOW
+boundary and 240 bounded-UOW rows. Those values describe current contract
 certainty; they are not execution or conformance counts.
 
 The same generator emits the compact
@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 47 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 48 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 216 `unready` rows that are recognized but fail explicitly as unsupported.
+- 215 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 47 API routes are the only advertised application commands.
+The current 48 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -314,6 +314,12 @@ disabled, and denied journals map to JIDERR 43, NOTOPEN 19, and NOTAUTH 70.
 The `cics-journal-v1` namespace now writes codec version 2 while reading
 version 1 WAIT state. Native System Logger/SMF transport and JOURNALMODEL
 resolution remain outside this local execution boundary.
+Typed `WRITE JOURNALNUM` uses a separate compatibility command identity and
+maps numeric values 1–99 to `DFHJnn` before the same authorization and durable
+writer. It reuses the reviewed WRITE JOURNALNAME record options and condition
+path with a numeric selector. The pinned 0255 page identifies the compatibility
+successor without an option diagram, so this local option mapping remains an
+explicit bounded inference rather than a source-projected equivalence claim.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
@@ -463,7 +469,7 @@ differentials, or make 0.9.0 release-ready.
 | `storage-control` | bounded task-local virtual storage allocation and release |
 | `journal-control` | durable named-journal output state and task synchronization |
 
-This table describes the ten families present in the 49-operation runtime
+This table describes the ten families present in the 50-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

@@ -341,6 +341,11 @@ trusted local output acknowledgement; WAIT hardens synchronously and excludes
 REQID. NOSUSPEND returns NOJBUFSP when both local output buffer slots are
 pending. The version 2 durable record retains data, prefix, token ownership,
 and replay identity while remaining able to read version 1 WAIT records.
+Typed WRITE JOURNALNUM is a separate compatibility operation. It accepts a
+numeric 1–99 selector, maps that selector to `DFHJnn`, and uses the same local
+record, output token, WAIT, NOSUSPEND, and condition rules as the named form.
+The pinned compatibility page has no full option syntax; this bounded option
+mapping is inferred from the adjacent named WRITE contract.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

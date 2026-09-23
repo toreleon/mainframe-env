@@ -1,4 +1,7 @@
-use super::{CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, CicsPlanOption};
+use super::{
+    CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, CicsPlanOperation,
+    CicsPlanOption,
+};
 use std::collections::BTreeSet;
 
 pub(super) fn invalid_wait_journal_name_shape(
@@ -64,13 +67,18 @@ pub(super) fn invalid_wait_journal_num_shape(
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
 }
 
-pub(super) fn invalid_write_journal_name_shape(
+pub(super) fn invalid_write_journal_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
+    let selector = match plan.operation {
+        CicsPlanOperation::WriteJournalName => CicsOperandName::JournalName,
+        CicsPlanOperation::WriteJournalNum => CicsOperandName::JournalNum,
+        _ => unreachable!("only journal writes delegate write shape"),
+    };
     let allowed_inputs = BTreeSet::from([
-        CicsOperandName::JournalName,
+        selector,
         CicsOperandName::JournalTypeId,
         CicsOperandName::JournalFrom,
         CicsOperandName::JournalFlength,
@@ -78,7 +86,7 @@ pub(super) fn invalid_write_journal_name_shape(
         CicsOperandName::JournalPfxLeng,
     ]);
     ![
-        CicsOperandName::JournalName,
+        selector,
         CicsOperandName::JournalTypeId,
         CicsOperandName::JournalFrom,
     ]
@@ -90,18 +98,29 @@ pub(super) fn invalid_write_journal_name_shape(
         || plan.options.contains(&CicsPlanOption::Wait)
             && outputs.contains(&CicsOutputName::JournalReqId)
         || plan.operands.iter().any(|operand| match operand.name {
-            CicsOperandName::JournalName => match &operand.value {
-                CicsOperandValue::Literal(value) => {
-                    !(1..=8).contains(&value.len())
-                        || !value.iter().all(|byte| {
-                            byte.is_ascii_uppercase()
-                                || byte.is_ascii_digit()
-                                || matches!(byte, b'$' | b'@' | b'#')
-                        })
-                }
-                CicsOperandValue::Storage(_) => false,
-                _ => true,
-            },
+            CicsOperandName::JournalName => {
+                selector != CicsOperandName::JournalName
+                    || match &operand.value {
+                        CicsOperandValue::Literal(value) => {
+                            !(1..=8).contains(&value.len())
+                                || !value.iter().all(|byte| {
+                                    byte.is_ascii_uppercase()
+                                        || byte.is_ascii_digit()
+                                        || matches!(byte, b'$' | b'@' | b'#')
+                                })
+                        }
+                        CicsOperandValue::Storage(_) => false,
+                        _ => true,
+                    }
+            }
+            CicsOperandName::JournalNum => {
+                selector != CicsOperandName::JournalNum
+                    || match &operand.value {
+                        CicsOperandValue::Integer(value) => !(1..=99).contains(value),
+                        CicsOperandValue::Storage(_) => false,
+                        _ => true,
+                    }
+            }
             CicsOperandName::JournalTypeId => match &operand.value {
                 CicsOperandValue::Literal(value) => value.len() != 2,
                 CicsOperandValue::Storage(_) => false,

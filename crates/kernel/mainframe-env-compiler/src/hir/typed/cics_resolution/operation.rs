@@ -68,6 +68,7 @@ pub(super) fn resolve(
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
         ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,
+        ["WRITE", "JOURNALNUM"] => HirCicsOperation::WriteJournalNum,
         _ => return Err(ResolutionFailure::Unsupported),
     })
 }
