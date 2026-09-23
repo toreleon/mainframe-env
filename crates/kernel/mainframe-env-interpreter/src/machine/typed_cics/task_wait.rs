@@ -147,7 +147,7 @@ fn wait_external_arguments(
         else {
             return invalid(1);
         };
-        if selected.is_none() && event != [0, 0, 0, 0] {
+        if selected.is_none() && event[0] & POSTED_ECB[0] != 0 {
             selected = Some(index);
         }
         events.extend_from_slice(

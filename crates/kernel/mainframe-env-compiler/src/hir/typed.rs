@@ -2082,11 +2082,20 @@ mod tests {
             Some(HirCicsValue::Literal(value)) if value == "NOTPURGEABLE"
         ));
 
+        let ordinary_pointer = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WAITPTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-LIST-PTR POINTER. 01 EVENT-COUNT PIC S9(9) COMP VALUE 1. PROCEDURE DIVISION. EXEC CICS WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT) END-EXEC. STOP RUN.",
+        );
+        assert!(
+            ordinary_pointer.hir.is_some(),
+            "ordinary POINTER ECBLIST: {:?}",
+            ordinary_pointer.diagnostics
+        );
+
         for (declarations, command, expected) in [
             (
-                "01 ECB-LIST-PTR POINTER. 01 EVENT-COUNT PIC S9(9) COMP.",
+                "01 ECB-LIST-PTR PIC X(4). 01 EVENT-COUNT PIC S9(9) COMP.",
                 "WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT)",
-                "four-byte POINTER-32",
+                "four-byte POINTER or POINTER-32",
             ),
             (
                 "01 ECB-LIST-PTR POINTER-32. 01 EVENT-COUNT PIC S9(4) COMP.",

@@ -83,9 +83,10 @@ fn external_operands(
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let list = complete_data_reference(&clauses["ECBLIST"], semantic)?;
-    if list.usage != CobolUsage::Pointer32 || list.length != 4 {
+    if !matches!(list.usage, CobolUsage::Pointer | CobolUsage::Pointer32) || list.length != 4 {
         return Err(ResolutionFailure::Invalid(
-            "CICS WAIT EXTERNAL ECBLIST requires a four-byte POINTER-32 reference".into(),
+            "CICS WAIT EXTERNAL ECBLIST requires a four-byte POINTER or POINTER-32 reference"
+                .into(),
         ));
     }
     let count = cics_integer_value(&clauses["NUMEVENTS"], semantic)?;

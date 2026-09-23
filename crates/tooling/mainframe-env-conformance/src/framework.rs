@@ -4343,7 +4343,7 @@ mod tests {
             HostResult,
         };
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-ONE PIC S9(9) COMP VALUE 0. 01 ECB-TWO PIC S9(9) COMP VALUE 0. 01 ECB-LIST. 05 ECB-PTR-ONE POINTER-32. 05 ECB-PTR-TWO POINTER-32. 01 ECB-LIST-PTR POINTER-32. 01 DONE-X PIC X VALUE '0'. PROCEDURE DIVISION. SET ECB-PTR-ONE TO ADDRESS OF ECB-ONE. SET ECB-PTR-TWO TO ADDRESS OF ECB-TWO. SET ECB-LIST-PTR TO ADDRESS OF ECB-LIST. EXEC CICS WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(2) NOTPURGEABLE NAME('EXTERNAL') END-EXEC. MOVE '1' TO DONE-X. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-ONE PIC S9(9) COMP VALUE 0. 01 ECB-TWO PIC S9(9) COMP VALUE 1. 01 ECB-LIST. 05 ECB-PTR-ONE POINTER-32. 05 ECB-PTR-TWO POINTER-32. 01 ECB-LIST-PTR POINTER. 01 DONE-X PIC X VALUE '0'. PROCEDURE DIVISION. SET ECB-PTR-ONE TO ADDRESS OF ECB-ONE. SET ECB-PTR-TWO TO ADDRESS OF ECB-TWO. SET ECB-LIST-PTR TO ADDRESS OF ECB-LIST. EXEC CICS WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(2) NOTPURGEABLE NAME('EXTERNAL') END-EXEC. MOVE '1' TO DONE-X. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -4373,7 +4373,7 @@ mod tests {
         ));
         let posted = mainframe_env_execution_api::BoundedPayload::new(
             "mainframe-env.cics.event-index@1",
-            b"1".to_vec(),
+            b"0".to_vec(),
             InvocationLimits::default(),
         )
         .unwrap();
@@ -4407,11 +4407,11 @@ mod tests {
             ),
             MachineDrive::Completed(_)
         ));
-        assert_eq!(machine.variable("ECB-ONE").unwrap().bytes(), &[0, 0, 0, 0]);
         assert_eq!(
-            machine.variable("ECB-TWO").unwrap().bytes(),
+            machine.variable("ECB-ONE").unwrap().bytes(),
             &[0x40, 0, 0, 0]
         );
+        assert_eq!(machine.variable("ECB-TWO").unwrap().bytes(), &[0, 0, 0, 1]);
         assert_eq!(machine.variable("DONE-X").unwrap().bytes(), b"1");
         assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x5e, 0x22]);
     }
