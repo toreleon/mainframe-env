@@ -180,6 +180,18 @@ pub enum CicsOperation {
     Route,
     /// Complete one pending outboard send.
     IssueWait,
+    /// APPC mapped ISSUE ABEND conversation flow.
+    IssueAbend,
+    /// APPC basic GDS ISSUE ABEND conversation flow.
+    GdsIssueAbend,
+    IssueConfirmation,
+    GdsIssueConfirmation,
+    IssueError,
+    GdsIssueError,
+    IssuePrepare,
+    GdsIssuePrepare,
+    GdsIssueSignal,
+    IssueSignal,
     /// Complete and dispatch the active BMS logical message.
     SendPage,
     /// Associate a registered partition set or return the terminal to base state.
@@ -392,6 +404,16 @@ impl CicsOperation {
             Self::IssueSend => "IssueSend",
             Self::Route => "Route",
             Self::IssueWait => "IssueWait",
+            Self::IssueAbend => "IssueAbend",
+            Self::GdsIssueAbend => "GdsIssueAbend",
+            Self::IssueConfirmation => "IssueConfirmation",
+            Self::GdsIssueConfirmation => "GdsIssueConfirmation",
+            Self::IssueError => "IssueError",
+            Self::GdsIssueError => "GdsIssueError",
+            Self::IssuePrepare => "IssuePrepare",
+            Self::GdsIssuePrepare => "GdsIssuePrepare",
+            Self::GdsIssueSignal => "GdsIssueSignal",
+            Self::IssueSignal => "IssueSignal",
             Self::SendPage => "SendPage",
             Self::SendPartnset => "SendPartnset",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
@@ -570,6 +592,16 @@ impl CicsOperation {
                 | Self::IssueSend
                 | Self::Route
                 | Self::IssueWait
+                | Self::IssueAbend
+                | Self::GdsIssueAbend
+                | Self::IssueConfirmation
+                | Self::GdsIssueConfirmation
+                | Self::IssueError
+                | Self::GdsIssueError
+                | Self::IssuePrepare
+                | Self::GdsIssuePrepare
+                | Self::GdsIssueSignal
+                | Self::IssueSignal
                 | Self::SendPage
                 | Self::SendText
                 | Self::SendPartnset
@@ -624,6 +656,16 @@ impl CicsOperation {
             .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
             .collect();
         let first = words.first()?.as_str();
+        if words.get(1).is_some_and(|word| word == "ISSUE") && first == "GDS" {
+            return match words.get(2).map(String::as_str) {
+                Some("ABEND") => Some(Self::GdsIssueAbend),
+                Some("CONFIRMATION") => Some(Self::GdsIssueConfirmation),
+                Some("ERROR") => Some(Self::GdsIssueError),
+                Some("PREPARE") => Some(Self::GdsIssuePrepare),
+                Some("SIGNAL") => Some(Self::GdsIssueSignal),
+                _ => None,
+            };
+        }
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
@@ -718,6 +760,11 @@ impl CicsOperation {
             ("SEND", Some("MAP")) => Self::SendMap,
             ("SEND", Some("CONTROL")) => Self::SendControl,
             ("ISSUE", Some("ABORT")) => Self::IssueAbort,
+            ("ISSUE", Some("ABEND")) => Self::IssueAbend,
+            ("ISSUE", Some("CONFIRMATION")) => Self::IssueConfirmation,
+            ("ISSUE", Some("ERROR")) => Self::IssueError,
+            ("ISSUE", Some("PREPARE")) => Self::IssuePrepare,
+            ("ISSUE", Some("SIGNAL")) => Self::IssueSignal,
             ("ISSUE", Some("ADD")) => Self::IssueAdd,
             ("ISSUE", Some("END")) => Self::IssueEnd,
             ("ISSUE", Some("ERASE")) => Self::IssueErase,
