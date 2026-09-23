@@ -262,6 +262,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
         CicsPlanOperation::DefineInputEvent => CicsOperation::DefineInputEvent,
+        CicsPlanOperation::DefineCompositeEvent => CicsOperation::DefineCompositeEvent,
         CicsPlanOperation::DocumentDelete => CicsOperation::DocumentDelete,
         CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
         CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
@@ -289,6 +290,14 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
         CicsOperandName::Abcode => "ABCODE",
         CicsOperandName::Event => "EVENT",
+        CicsOperandName::SubEvent1 => "SUBEVENT1",
+        CicsOperandName::SubEvent2 => "SUBEVENT2",
+        CicsOperandName::SubEvent3 => "SUBEVENT3",
+        CicsOperandName::SubEvent4 => "SUBEVENT4",
+        CicsOperandName::SubEvent5 => "SUBEVENT5",
+        CicsOperandName::SubEvent6 => "SUBEVENT6",
+        CicsOperandName::SubEvent7 => "SUBEVENT7",
+        CicsOperandName::SubEvent8 => "SUBEVENT8",
         CicsOperandName::Label => "LABEL",
         CicsOperandName::Program => "PROGRAM",
         CicsOperandName::Commarea => "COMMAREA",
@@ -581,5 +590,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::SpoolPunch => "PUNCH",
         CicsPlanOption::SpoolLine => "LINE",
         CicsPlanOption::SpoolPage => "PAGE",
+        CicsPlanOption::EventAnd => "AND",
+        CicsPlanOption::EventOr => "OR",
     }
 }

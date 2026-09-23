@@ -97,6 +97,8 @@ pub enum CicsPlanOperation {
     Delete,
     /// Define one input event in the current BTS activity.
     DefineInputEvent,
+    /// Define a BTS composite event with an AND or OR predicate.
+    DefineCompositeEvent,
     /// Write one explicitly keyed file record.
     Write,
     /// Write one bounded record to a transient data queue.
@@ -198,6 +200,15 @@ pub enum CicsPlanOperation {
 pub enum CicsOperandName {
     /// Name of a BTS event or SIGNAL EVENT capture point.
     Event,
+    /// Initial atomic child of a composite event, numbered one through eight.
+    SubEvent1,
+    SubEvent2,
+    SubEvent3,
+    SubEvent4,
+    SubEvent5,
+    SubEvent6,
+    SubEvent7,
+    SubEvent8,
     /// Optional application transaction abend code.
     Abcode,
     /// Source label used by a task-local control transfer.
@@ -524,6 +535,10 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    /// The composite predicate requires all child events.
+    EventAnd,
+    /// The composite predicate requires any child event.
+    EventOr,
     /// Ignore and clear active abnormal-termination exits.
     Cancel,
     /// Suppress transaction-dump creation.

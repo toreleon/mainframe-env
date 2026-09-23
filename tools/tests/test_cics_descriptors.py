@@ -197,6 +197,14 @@ class CicsDescriptorTests(unittest.TestCase):
             170,
         )
         rows_by_label = {row["label"]: row for row in contract_rows}
+        composite_options = {
+            option["name"]: option
+            for option in rows_by_label["DEFINE COMPOSITE EVENT"]["contract"]["options"]["entries"]
+        }
+        for index in range(1, 9):
+            option = composite_options[f"SUBEVENT{index}"]
+            self.assertEqual(option["value_shape"], "value")
+            self.assertEqual(option["directions"], ["input"])
         self.assertEqual(rows_by_label["ABEND"]["registration_status"], "typed-runtime")
         self.assertEqual(rows_by_label["ABEND"]["existing_runtime_operation"], "Abend")
         self.assertEqual(
@@ -1172,6 +1180,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "UPDATE COUNTER",
                 "UPDATE DCOUNTER",
                 "DEQ",
+                "DEFINE COMPOSITE EVENT",
                 "DEFINE INPUT EVENT",
                 "DOCUMENT CREATE",
                 "DOCUMENT DELETE",

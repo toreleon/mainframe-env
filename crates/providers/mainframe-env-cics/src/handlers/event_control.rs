@@ -2,6 +2,7 @@
 
 use super::super::{CicsService, Run, store_error};
 use mainframe_env_execution_api::RunUnitId;
+use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
     HostRequest, canonical_request_digest,
@@ -18,6 +19,8 @@ const MAX_TIMERS: usize = 256;
 const MAX_QUEUE: usize = 256;
 const MAX_REPLAYS: usize = 512;
 const MAX_CAS_ATTEMPTS: usize = 8;
+
+mod composite;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,7 +75,14 @@ pub(super) struct EventReplay {
     pub(super) condition: String,
     pub(super) response: i32,
     pub(super) response2: i32,
-    pub(super) outputs: BTreeMap<String, Vec<u8>>,
+    pub(super) outputs: BTreeMap<String, EventOutput>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct EventOutput {
+    pub(super) schema: String,
+    pub(super) bytes: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -140,6 +150,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::DefineInputEvent => define_input_event(service, run, request),
+        CicsOperation::DefineCompositeEvent => composite::define(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -181,34 +192,13 @@ fn define_input_event(
         &format!("CICS.BTS.{}.{}", context.activity, name),
         AccessIntent::Update,
     )?;
-    let mutation = request
-        .mutation
-        .as_ref()
-        .ok_or(HostProblem::MissingIdempotency)?;
-    let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-    for _ in 0..MAX_CAS_ATTEMPTS {
-        let mut state = load_activity(service, &context.activity)?;
-        if let Some(replay) = state.replays.get(mutation.idempotency_key.as_str()) {
-            if replay.request_digest != digest {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            return event_response(service, run, replay);
-        }
+    mutate_activity(service, run, request, &context.activity, |state| {
         if name == "DFHINITIAL" || state.events.contains_key(&name) {
             return Err(event_error(7));
         }
-        if state.events.len() == MAX_EVENTS || state.replays.len() == MAX_REPLAYS {
+        if state.events.len() == MAX_EVENTS {
             return Err(HostProblem::ResourceExhausted);
         }
-        let replay = EventReplay {
-            request_digest: digest,
-            condition: "NORMAL".into(),
-            response: 0,
-            response2: 0,
-            outputs: BTreeMap::new(),
-        };
-        let response = event_response(service, run, &replay)?;
         state.events.insert(
             name.clone(),
             EventRecord {
@@ -217,10 +207,47 @@ fn define_input_event(
                 parent: None,
             },
         );
+        Ok(BTreeMap::new())
+    })
+}
+
+pub(super) fn mutate_activity(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    activity: &str,
+    transition: impl Fn(&mut ActivityState) -> Result<BTreeMap<String, EventOutput>, HostProblem>,
+) -> Result<CicsResponse, HostProblem> {
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    for _ in 0..MAX_CAS_ATTEMPTS {
+        let mut state = load_activity(service, activity)?;
+        if let Some(replay) = state.replays.get(mutation.idempotency_key.as_str()) {
+            if replay.request_digest != digest {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            return event_response(service, run, replay);
+        }
+        if state.replays.len() == MAX_REPLAYS {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let outputs = transition(&mut state)?;
+        let replay = EventReplay {
+            request_digest: digest,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            outputs,
+        };
+        let response = event_response(service, run, &replay)?;
         state
             .replays
             .insert(mutation.idempotency_key.as_str().into(), replay);
-        match persist_activity(service, &context.activity, &mut state) {
+        match persist_activity(service, activity, &mut state) {
             Ok(()) => return Ok(response),
             Err(HostProblem::IdempotencyConflict) => continue,
             Err(problem) => return Err(problem),
@@ -244,10 +271,16 @@ fn event_response(
         None,
         Vec::new(),
     )?;
-    for (name, bytes) in &replay.outputs {
-        response
-            .outputs
-            .insert(name.clone(), super::super::bounded(bytes.clone())?);
+    for (name, output) in &replay.outputs {
+        response.outputs.insert(
+            name.clone(),
+            BoundedPayload::new(
+                &output.schema,
+                output.bytes.clone(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
     }
     Ok(response)
 }

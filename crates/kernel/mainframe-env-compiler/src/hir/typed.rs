@@ -311,6 +311,8 @@ pub enum HirCicsOption {
     SpoolPunch,
     SpoolLine,
     SpoolPage,
+    EventAnd,
+    EventOr,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

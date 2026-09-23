@@ -65,6 +65,10 @@ All notable changes to mainframe-env are documented here.
   and compiled COBOL routing. IBM CICS TS 6.x application API
   `dfhp4_definecounter.html`, catalog rows 0034 and 0035.
 
+- Added typed CICS `DEFINE COMPOSITE EVENT` with exclusive AND/OR predicates,
+  up to eight initial atomic children, durable child ownership and reevaluation,
+  exact missing/invalid child conditions, SAF, replay, and a compiled v2 route.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

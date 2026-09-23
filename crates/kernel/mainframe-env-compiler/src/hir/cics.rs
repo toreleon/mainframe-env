@@ -182,6 +182,14 @@ impl PlanContext<'_> {
             name: match operand.name {
                 HirCicsOperandName::Abcode => CicsOperandName::Abcode,
                 HirCicsOperandName::Event => CicsOperandName::Event,
+                HirCicsOperandName::SubEvent1 => CicsOperandName::SubEvent1,
+                HirCicsOperandName::SubEvent2 => CicsOperandName::SubEvent2,
+                HirCicsOperandName::SubEvent3 => CicsOperandName::SubEvent3,
+                HirCicsOperandName::SubEvent4 => CicsOperandName::SubEvent4,
+                HirCicsOperandName::SubEvent5 => CicsOperandName::SubEvent5,
+                HirCicsOperandName::SubEvent6 => CicsOperandName::SubEvent6,
+                HirCicsOperandName::SubEvent7 => CicsOperandName::SubEvent7,
+                HirCicsOperandName::SubEvent8 => CicsOperandName::SubEvent8,
                 HirCicsOperandName::Label => CicsOperandName::Label,
                 HirCicsOperandName::Program => CicsOperandName::Program,
                 HirCicsOperandName::Commarea => CicsOperandName::Commarea,
@@ -522,6 +530,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
         HirCicsOperation::DocumentCreate => CicsPlanOperation::DocumentCreate,
         HirCicsOperation::DefineInputEvent => CicsPlanOperation::DefineInputEvent,
+        HirCicsOperation::DefineCompositeEvent => CicsPlanOperation::DefineCompositeEvent,
         HirCicsOperation::DocumentDelete => CicsPlanOperation::DocumentDelete,
         HirCicsOperation::DocumentInsert => CicsPlanOperation::DocumentInsert,
         HirCicsOperation::DocumentRetrieve => CicsPlanOperation::DocumentRetrieve,
@@ -597,5 +606,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::SpoolPunch => CicsPlanOption::SpoolPunch,
         HirCicsOption::SpoolLine => CicsPlanOption::SpoolLine,
         HirCicsOption::SpoolPage => CicsPlanOption::SpoolPage,
+        HirCicsOption::EventAnd => CicsPlanOption::EventAnd,
+        HirCicsOption::EventOr => CicsPlanOption::EventOr,
     }
 }

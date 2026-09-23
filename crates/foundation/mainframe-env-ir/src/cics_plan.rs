@@ -716,6 +716,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DefineInputEvent => {
             event_control::invalid_define_input_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DefineCompositeEvent => {
+            event_control::invalid_define_composite_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1331,6 +1334,46 @@ mod tests {
                 outputs: Vec::new(),
                 condition: CicsCondition::Default,
             })
+        );
+    }
+
+    #[test]
+    fn define_composite_event_tags_and_predicate_choice_are_exact() {
+        let limits = CicsPlanLimits::default();
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DefineCompositeEvent,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Event,
+                    value: CicsOperandValue::Literal(b"GROUP".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SubEvent1,
+                    value: CicsOperandValue::Literal(b"GO".to_vec()),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::EventOr]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        assert_eq!(operation_tag(plan.operation), 107);
+        assert_eq!(operand_tag(CicsOperandName::SubEvent1), 321);
+        assert_eq!(option_tag(CicsPlanOption::EventAnd), 252);
+        assert_eq!(option_tag(CicsPlanOption::EventOr), 253);
+        assert_eq!(operation_from_tag(107), Ok(plan.operation));
+        assert_eq!(operand_from_tag(321), Ok(CicsOperandName::SubEvent1));
+        assert_eq!(option_from_tag(253), Ok(CicsPlanOption::EventOr));
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        plan.options.insert(CicsPlanOption::EventAnd);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.options.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

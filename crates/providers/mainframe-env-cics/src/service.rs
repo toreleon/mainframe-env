@@ -27353,4 +27353,109 @@ mod tests {
         let store = Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
         concurrent_counter_get(store);
     }
+
+    #[test]
+    fn define_composite_event_validates_children_and_empty_predicates() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        let input = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"GO"))]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, input.clone(), 1), input)
+            .unwrap();
+        let composite = request(
+            CicsOperation::DefineCompositeEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"GROUP")),
+                ("SUBEVENT1".into(), argument(b"GO")),
+                ("OPTION.OR".into(), cics_option()),
+            ]),
+            2,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, composite.clone(), 2),
+                composite.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.response, first.response2), (0, 0));
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, composite.clone(), 2),
+                composite
+            )
+            .unwrap(),
+            first
+        );
+        let empty_and = request(
+            CicsOperation::DefineCompositeEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"EMPTYAND")),
+                ("OPTION.AND".into(), cics_option()),
+            ]),
+            3,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, empty_and.clone(), 3),
+            empty_and,
+        )
+        .unwrap();
+        let empty_or = request(
+            CicsOperation::DefineCompositeEvent,
+            BTreeMap::from([
+                ("EVENT".into(), argument(b"EMPTYOR")),
+                ("OPTION.OR".into(), cics_option()),
+            ]),
+            4,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, empty_or.clone(), 4),
+            empty_or,
+        )
+        .unwrap();
+        let row = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["events"]["GO"]["parent"], "GROUP");
+        assert_eq!(state["events"]["GROUP"]["fired"], false);
+        assert_eq!(state["events"]["EMPTYAND"]["fired"], true);
+        assert_eq!(state["events"]["EMPTYOR"]["fired"], false);
+        assert_eq!(state["reattach"][0], "EMPTYAND");
+
+        for (sequence, child, option, condition, response, response2) in [
+            (5, b"MISSING".as_slice(), "OR", "EVENTERR", 111, 21),
+            (6, b"GO".as_slice(), "AND", "INVREQ", 16, 31),
+        ] {
+            let invalid = request(
+                CicsOperation::DefineCompositeEvent,
+                BTreeMap::from([
+                    (
+                        "EVENT".into(),
+                        argument(format!("BAD{sequence}").as_bytes()),
+                    ),
+                    ("SUBEVENT1".into(), argument(child)),
+                    (format!("OPTION.{option}"), cics_option()),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid
+                ),
+                Err(HostProblem::Condition {
+                    name: condition.into(),
+                    response,
+                    response2,
+                })
+            );
+        }
+    }
 }

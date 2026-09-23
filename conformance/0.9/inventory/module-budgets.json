@@ -299,6 +299,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/document_control/set.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/transport.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/event_control/composite.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_tokens.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_unlock.rs",

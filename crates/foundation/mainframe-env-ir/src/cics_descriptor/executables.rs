@@ -1,6 +1,6 @@
 use super::*;
 
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 74] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 75] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -589,6 +589,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 74] = [
         operation: CicsPlanOperation::DefineInputEvent,
         namespace: "cics.event",
         name: "define-input-event",
+        major: 1,
+        effects: EVENT_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::DefineCompositeEvent,
+        namespace: "cics.event",
+        name: "define-composite-event",
         major: 1,
         effects: EVENT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

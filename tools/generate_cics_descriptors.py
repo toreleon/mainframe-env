@@ -108,6 +108,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
+    ("DefineCompositeEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0033"),
     ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
     ("DefineCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0034"),
@@ -561,6 +562,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Address",
         "Cancel",
         "ChangeTask",
+        "DefineCompositeEvent",
         "DefineInputEvent",
         "Delay",
         "DefineCounter",
@@ -662,6 +664,8 @@ ENQUEUE_COMMAND_ROWS = frozenset(
 WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
     {f"{OFFICIAL_BASELINE}:api-commands:0234"}
 )
+COMPOSITE_SUBEVENT_ROW = f"{OFFICIAL_BASELINE}:api-commands:0033"
+COMPOSITE_SUBEVENT_OPTIONS = tuple(f"SUBEVENT{index}" for index in range(1, 9))
 # Each profile is a reviewed compiler-only route to a pre-existing runtime
 # operation. It does not change application-registry readiness or counts.
 COMPILER_SPI_COMPATIBILITY = {
@@ -891,6 +895,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "DefineInputEvent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DefineCompositeEvent": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "Getmain": frozenset(
@@ -1184,6 +1191,7 @@ def _load_typed_execution_registrations(
         "DeleteTemporaryStorage",
         "DeleteTransientData",
         "Deq",
+        "DefineCompositeEvent",
         "DefineInputEvent",
         "DocumentCreate",
         "DocumentDelete",
@@ -2109,6 +2117,8 @@ def _top_level_source_option_names(
         names.update({"TASK", "UOW"})
     if command["official_row"] in WAIT_EXTERNAL_COMMAND_ROWS:
         names.update({"PURGEABLE", "NOTPURGEABLE"})
+    if command["official_row"] == COMPOSITE_SUBEVENT_ROW:
+        names.update(COMPOSITE_SUBEVENT_OPTIONS)
     if _spoolwrite_page_choice(command, dimensions):
         names.add("PAGE")
     return sorted(names)
@@ -2465,6 +2475,23 @@ def _option_contract(
             entry["directions"].add("none")
             entry["authorities"].add("command-source")
             entry["legalities"].add("structural")
+
+    if command["official_row"] == COMPOSITE_SUBEVENT_ROW:
+        # The pinned 6.x DEFINE COMPOSITE EVENT topic names SUBEVENT1..8, while
+        # the bounded source projection retains only its unnumbered diagram
+        # summary. Keep this row-specific overlay tied to catalog 0033 and the
+        # verified topic SHA-256 6cb693cbb57d78f7a5b2fbb6f9bba40442924bffdac6de3d077c7be89e465b04.
+        for name in COMPOSITE_SUBEVENT_OPTIONS:
+            if name in options:
+                raise DescriptorError(f"duplicate composite subevent option {name}")
+            options[name] = {
+                "markers": {"data-value"},
+                "directions": {"input"},
+                "stacks": {(name,)},
+                "authorities": {"command-source"},
+                "source_bounds": set(),
+                "legalities": {"structural"},
+            }
 
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():

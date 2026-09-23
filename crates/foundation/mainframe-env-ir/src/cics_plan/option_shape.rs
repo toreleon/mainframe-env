@@ -89,6 +89,10 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         CicsPlanOperation::DocumentSet => {
             !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Unescaped)
         }
+        CicsPlanOperation::DefineCompositeEvent => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::EventAnd | CicsPlanOption::EventOr
+        ),
         CicsPlanOperation::TransformDataToJson
         | CicsPlanOperation::TransformDataToXml
         | CicsPlanOperation::TransformJsonToData

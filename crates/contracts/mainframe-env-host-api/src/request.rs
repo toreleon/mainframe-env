@@ -2419,6 +2419,7 @@ mod tests {
             CicsOperation::Deq,
             CicsOperation::Delete,
             CicsOperation::DefineInputEvent,
+            CicsOperation::DefineCompositeEvent,
             CicsOperation::DocumentCreate,
             CicsOperation::DocumentDelete,
             CicsOperation::DocumentInsert,

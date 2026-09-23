@@ -31,6 +31,7 @@ pub enum HirCicsOperation {
     EndBrowse,
     Delete,
     DefineInputEvent,
+    DefineCompositeEvent,
     Write,
     WriteTransientData,
     DeleteTransientData,
