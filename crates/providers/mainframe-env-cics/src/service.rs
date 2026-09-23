@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 135);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 136);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7828,6 +7828,172 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn web_startbrowse_persists_query_cursor_and_replays_unknown_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("web-startbrowse", BTreeMap::new());
+        let session = SessionId::new("web-startbrowse", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: "a=one&b=two".into(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let start = request(
+            CicsOperation::WebStartBrowse,
+            BTreeMap::from([
+                ("OPTION.QUERYPARM".into(), argument(b"")),
+                ("BROWSESTARTNAME".into(), cics_literal(b"b")),
+                ("NAMELENGTH".into(), cics_decimal(1)),
+            ]),
+            1,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, start.clone(), 1),
+                start.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-web-browse-v1", 8)
+                .unwrap()
+                .len(),
+            1
+        );
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        let reopened =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        let cursor = reopened
+            .lock()
+            .unwrap()
+            .web
+            .browses
+            .values()
+            .next()
+            .unwrap()
+            .cursor;
+        assert_eq!(cursor, 1);
+        let mut duplicate = request(
+            CicsOperation::WebStartBrowse,
+            BTreeMap::from([("OPTION.QUERYPARM".into(), argument(b""))]),
+            2,
+        );
+        duplicate.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let duplicate = service
+            .invoke(
+                &effect(&invocation.run_unit_id, duplicate.clone(), 2),
+                duplicate,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                duplicate.condition.as_str(),
+                duplicate.response,
+                duplicate.response2
+            ),
+            ("ILLOGIC", 21, 5)
+        );
+        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-web-browse-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn web_startbrowse_snapshot_survives_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-web-browse-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let service =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        let invocation = invocation_for("web-browse-sqlite", BTreeMap::new());
+        let session = SessionId::new("web-browse-sqlite", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: "a=one&b=two".into(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let start = request(
+            CicsOperation::WebStartBrowse,
+            BTreeMap::from([("OPTION.QUERYPARM".into(), argument(b""))]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        drop(service);
+        drop(store);
+        let reopened_store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let reopened =
+            CicsService::open(authorities(), reopened_store, CicsLimits::default()).unwrap();
+        let state = reopened.lock().unwrap();
+        let browse = state.web.browses.values().next().unwrap();
+        assert_eq!(browse.kind, "QUERYPARM");
+        assert_eq!(
+            browse.entries,
+            vec![
+                (b"a".to_vec(), b"one".to_vec()),
+                (b"b".to_vec(), b"two".to_vec())
+            ]
+        );
+        assert_eq!(browse.cursor, 0);
+        drop(state);
+        drop(reopened);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

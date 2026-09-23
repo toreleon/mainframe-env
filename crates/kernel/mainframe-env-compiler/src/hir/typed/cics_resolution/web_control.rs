@@ -11,6 +11,11 @@ pub(super) fn reviewed_ambiguous_shape(
     name: &str,
     has_value: bool,
 ) -> bool {
+    if descriptor.label_tokens == ["WEB", "STARTBROWSE"]
+        && matches!(name, "FORMFIELD" | "QUERYPARM" | "HTTPHEADER")
+    {
+        return true;
+    }
     if has_value
         && matches!(
             descriptor.label_tokens,
@@ -93,12 +98,26 @@ pub(super) const READ_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const START_BROWSE_CLAUSES: &[&str] = &[
+    "FORMFIELD",
+    "QUERYPARM",
+    "NAMELENGTH",
+    "SESSTOKEN",
+    "RESP",
+    "RESP2",
+];
+pub(super) const START_BROWSE_OPTIONS: &[&str] =
+    &["HTTPHEADER", "FORMFIELD", "QUERYPARM", "NOHANDLE"];
 
 pub(super) fn validate(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::WebStartBrowse {
+        return validate_start_browse(clauses, options, semantic);
+    }
     if matches!(
         operation,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
@@ -344,6 +363,9 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::WebStartBrowse {
+        return start_browse_operands(clauses, semantic);
+    }
     if matches!(
         operation,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
@@ -750,4 +772,104 @@ fn read_outputs(
             target: complete_data_reference(&clauses["VALUELENGTH"], semantic)?,
         },
     ])
+}
+
+fn validate_start_browse(
+    clauses: &Clauses,
+    options: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<()> {
+    let kinds = ["HTTPHEADER", "QUERYPARM", "FORMFIELD"];
+    let selected = kinds
+        .iter()
+        .filter(|name| {
+            clauses.contains_key(**name) || options.iter().any(|option| option == **name)
+        })
+        .count();
+    if selected != 1 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB STARTBROWSE requires exactly one browse kind".into(),
+        ));
+    }
+    let header = options.iter().any(|option| option == "HTTPHEADER");
+    if header
+        && (clauses.contains_key("NAMELENGTH")
+            || clauses.contains_key("FORMFIELD")
+            || clauses.contains_key("QUERYPARM"))
+        || !header && clauses.contains_key("SESSTOKEN")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB STARTBROWSE options conflict with the selected kind".into(),
+        ));
+    }
+    let name = ["FORMFIELD", "QUERYPARM"]
+        .into_iter()
+        .find(|name| clauses.contains_key(*name));
+    if name.is_some() != clauses.contains_key("NAMELENGTH") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WEB STARTBROWSE name and NAMELENGTH must occur together".into(),
+        ));
+    }
+    if let Some(name) = name {
+        let value = cics_value(&clauses[name], semantic)?;
+        if !matches!(value, HirCicsValue::Literal(_) | HirCicsValue::Data(_)) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB STARTBROWSE name requires character input".into(),
+            ));
+        }
+        let length = cics_integer_value(&clauses["NAMELENGTH"], semantic)?;
+        if matches!(length, HirCicsValue::Integer(number) if number < 1) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB STARTBROWSE NAMELENGTH must be positive".into(),
+            ));
+        }
+        if let HirCicsValue::Data(reference) = length
+            && (reference.usage != CobolUsage::Binary
+                || reference.length != 4
+                || reference.scale != 0)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB STARTBROWSE NAMELENGTH requires fullword binary input".into(),
+            ));
+        }
+    }
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        let token = cics_value(tokens, semantic)?;
+        if !matches!(&token, HirCicsValue::Data(reference) if reference.length == 8)
+            && !matches!(&token, HirCicsValue::Literal(bytes) if bytes.len() == 8)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB STARTBROWSE SESSTOKEN requires eight bytes".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn start_browse_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = Vec::new();
+    for name in ["FORMFIELD", "QUERYPARM"] {
+        if let Some(tokens) = clauses.get(name) {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::WebBrowseStartName,
+                value: cics_value(tokens, semantic)?,
+            });
+        }
+    }
+    if let Some(tokens) = clauses.get("NAMELENGTH") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::WebNameLength,
+            value: cics_integer_value(tokens, semantic)?,
+        });
+    }
+    if let Some(tokens) = clauses.get("SESSTOKEN") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::WebSessionToken,
+            value: cics_value(tokens, semantic)?,
+        });
+    }
+    Ok(operands)
 }

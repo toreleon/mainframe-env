@@ -109,6 +109,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::WebExtract => 94,
         CicsPlanOperation::ExtractWeb => 95,
         CicsPlanOperation::WebRead => 96,
+        CicsPlanOperation::WebStartBrowse => 97,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -247,6 +248,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         94 => Ok(CicsPlanOperation::WebExtract),
         95 => Ok(CicsPlanOperation::ExtractWeb),
         96 => Ok(CicsPlanOperation::WebRead),
+        97 => Ok(CicsPlanOperation::WebStartBrowse),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -538,6 +540,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebFormFieldName => 273,
         CicsOperandName::WebNameLength => 274,
         CicsOperandName::WebValueLength => 275,
+        CicsOperandName::WebBrowseStartName => 276,
     }
 }
 
@@ -786,6 +789,7 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         273 => Ok(CicsOperandName::WebFormFieldName),
         274 => Ok(CicsOperandName::WebNameLength),
         275 => Ok(CicsOperandName::WebValueLength),
+        276 => Ok(CicsOperandName::WebBrowseStartName),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -910,6 +914,9 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::TraceAccount => 528,
         CicsPlanOption::TraceMonitor => 529,
         CicsPlanOption::TracePerform => 530,
+        CicsPlanOption::WebBrowseHttpHeader => 188,
+        CicsPlanOption::WebBrowseQueryParm => 189,
+        CicsPlanOption::WebBrowseFormField => 190,
     }
 }
 
@@ -1033,6 +1040,9 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         528 => Ok(CicsPlanOption::TraceAccount),
         529 => Ok(CicsPlanOption::TraceMonitor),
         530 => Ok(CicsPlanOption::TracePerform),
+        188 => Ok(CicsPlanOption::WebBrowseHttpHeader),
+        189 => Ok(CicsPlanOption::WebBrowseQueryParm),
+        190 => Ok(CicsPlanOption::WebBrowseFormField),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -7,8 +7,10 @@ use std::sync::Arc;
 
 pub(super) const SESSION_NAMESPACE: &str = "cics-web-session-v1";
 pub(super) const URIMAP_NAMESPACE: &str = "cics-web-urimap-v1";
+pub(super) const BROWSE_NAMESPACE: &str = "cics-web-browse-v1";
 const SESSION_MAGIC: &[u8; 8] = b"MECWEB01";
 const URIMAP_MAGIC: &[u8; 8] = b"MECWURI1";
+const BROWSE_MAGIC: &[u8; 8] = b"MECWBR01";
 
 /// A bounded HTTP endpoint selected by WEB OPEN, independent of the transport.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -120,8 +122,21 @@ pub(in crate::service) struct WebClientSession {
     pub version: u64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::service) struct WebBrowse {
+    pub owner_execution: String,
+    pub owner_run_unit: String,
+    pub transaction: String,
+    pub kind: String,
+    pub client_token: Option<[u8; 8]>,
+    pub entries: Vec<(Vec<u8>, Vec<u8>)>,
+    pub cursor: usize,
+    pub version: u64,
+}
+
 pub(in crate::service) struct WebState {
     pub sessions: BTreeMap<String, WebClientSession>,
+    pub browses: BTreeMap<String, WebBrowse>,
     pub inbound: BTreeMap<String, CicsWebInboundRequest>,
     pub urimaps: BTreeMap<String, CicsWebUriMapDefinition>,
     pub transport: Option<Arc<dyn CicsWebTransport>>,
@@ -134,6 +149,7 @@ pub(in crate::service) fn load(
 ) -> Result<WebState, HostProblem> {
     let mut state = WebState {
         sessions: BTreeMap::new(),
+        browses: BTreeMap::new(),
         inbound: BTreeMap::new(),
         urimaps: BTreeMap::new(),
         transport: None,
@@ -171,7 +187,98 @@ pub(in crate::service) fn load(
             .filter(|total| *total <= limits.max_web_bytes)
             .ok_or(HostProblem::ResourceExhausted)?;
     }
+    for row in store
+        .list_provider_state(BROWSE_NAMESPACE, limits.max_web_sessions)
+        .map_err(store_error)?
+    {
+        let browse = decode_browse(&row.payload, row.version)?;
+        if row.key != browse_key(&browse.owner_run_unit, &browse.kind)
+            || state.browses.insert(row.key, browse).is_some()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        state.bytes = state
+            .bytes
+            .checked_add(row.payload.len())
+            .filter(|total| *total <= limits.max_web_bytes)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
     Ok(state)
+}
+
+pub(super) fn browse_key(run_unit: &str, kind: &str) -> String {
+    format!("{run_unit}:{kind}")
+}
+
+pub(super) fn encode_browse(browse: &WebBrowse) -> Result<Vec<u8>, HostProblem> {
+    let mut out = BROWSE_MAGIC.to_vec();
+    for text in [
+        browse.owner_execution.as_str(),
+        browse.owner_run_unit.as_str(),
+        browse.transaction.as_str(),
+        browse.kind.as_str(),
+    ] {
+        field(&mut out, text.as_bytes())?;
+    }
+    out.extend_from_slice(&browse.client_token.unwrap_or([0; 8]));
+    out.extend_from_slice(
+        &u16::try_from(browse.entries.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, value) in &browse.entries {
+        field(&mut out, name)?;
+        field(&mut out, value)?;
+    }
+    out.extend_from_slice(
+        &u16::try_from(browse.cursor)
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    Ok(out)
+}
+
+fn decode_browse(bytes: &[u8], version: u64) -> Result<WebBrowse, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    if reader.take(8)? != BROWSE_MAGIC || version == 0 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let owner_execution = read_text(&mut reader, 128)?;
+    let owner_run_unit = read_text(&mut reader, 128)?;
+    let transaction = read_text(&mut reader, 8)?;
+    let kind = read_text(&mut reader, 16)?;
+    let token: [u8; 8] = reader
+        .take(8)?
+        .try_into()
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let count = usize::from(read_u16(&mut reader)?);
+    if count > 128 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let mut entries = Vec::with_capacity(count);
+    for _ in 0..count {
+        entries.push((reader.field(8192)?, reader.field(8192)?));
+    }
+    let cursor = usize::from(read_u16(&mut reader)?);
+    if reader.at != bytes.len()
+        || owner_execution.is_empty()
+        || owner_run_unit.is_empty()
+        || transaction.is_empty()
+        || !matches!(kind.as_str(), "HTTPHEADER" | "FORMFIELD" | "QUERYPARM")
+        || cursor > entries.len()
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(WebBrowse {
+        owner_execution,
+        owner_run_unit,
+        transaction,
+        kind,
+        client_token: (token != [0; 8]).then_some(token),
+        entries,
+        cursor,
+        version,
+    })
 }
 
 pub(super) fn token_key(token: [u8; 8]) -> String {

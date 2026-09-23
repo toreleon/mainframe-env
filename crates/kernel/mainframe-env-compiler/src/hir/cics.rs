@@ -415,6 +415,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::WebFormFieldName => CicsOperandName::WebFormFieldName,
                 HirCicsOperandName::WebNameLength => CicsOperandName::WebNameLength,
                 HirCicsOperandName::WebValueLength => CicsOperandName::WebValueLength,
+                HirCicsOperandName::WebBrowseStartName => CicsOperandName::WebBrowseStartName,
                 HirCicsOperandName::WebPortNumber => CicsOperandName::WebPortNumber,
                 HirCicsOperandName::WebScheme => CicsOperandName::WebScheme,
                 HirCicsOperandName::WebUriMap => CicsOperandName::WebUriMap,
@@ -686,6 +687,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WebExtract => CicsPlanOperation::WebExtract,
         HirCicsOperation::ExtractWeb => CicsPlanOperation::ExtractWeb,
         HirCicsOperation::WebRead => CicsPlanOperation::WebRead,
+        HirCicsOperation::WebStartBrowse => CicsPlanOperation::WebStartBrowse,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,
@@ -808,5 +810,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::TraceAccount => CicsPlanOption::TraceAccount,
         HirCicsOption::TraceMonitor => CicsPlanOption::TraceMonitor,
         HirCicsOption::TracePerform => CicsPlanOption::TracePerform,
+        HirCicsOption::WebBrowseHttpHeader => CicsPlanOption::WebBrowseHttpHeader,
+        HirCicsOption::WebBrowseQueryParm => CicsPlanOption::WebBrowseQueryParm,
+        HirCicsOption::WebBrowseFormField => CicsPlanOption::WebBrowseFormField,
     }
 }

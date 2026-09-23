@@ -83,7 +83,7 @@ pub(super) fn validated_command(
     for candidate in candidates {
         let tokens =
             command_recognition::clause_tokens(body, candidate.head_tokens, candidate.descriptor);
-        let (clauses, options) = match clauses(&tokens, Some(candidate.descriptor)) {
+        let (clauses, mut options) = match clauses(&tokens, Some(candidate.descriptor)) {
             Ok(parsed) => parsed,
             Err(ResolutionFailure::Invalid(detail)) => {
                 keep_best_failure(
@@ -97,6 +97,15 @@ pub(super) fn validated_command(
             }
             Err(ResolutionFailure::Unsupported) => unreachable!("clause parser is fail-closed"),
         };
+        if candidate.descriptor.label_tokens == ["WEB", "STARTBROWSE"]
+            && candidate.head_tokens.len() == 3
+            && let Some(kind) = candidate.head_tokens.last()
+            && *kind != "HTTPHEADER"
+            && !clauses.contains_key(*kind)
+            && !options.iter().any(|option| option == *kind)
+        {
+            options.push((*kind).into());
+        }
         let present = clauses
             .keys()
             .chain(options.iter())
@@ -143,6 +152,12 @@ pub(super) fn validated_command(
                 },
             );
             continue;
+        }
+
+        if candidate.descriptor.label_tokens == ["WEB", "STARTBROWSE"]
+            && candidate.head_tokens.last() == Some(&"HTTPHEADER")
+        {
+            options.push("HTTPHEADER".into());
         }
 
         let validated = ValidatedCandidate {
@@ -641,6 +656,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebClose => web_control::CLOSE_CLAUSES,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => web_control::EXTRACT_CLAUSES,
         HirCicsOperation::WebRead => web_control::READ_CLAUSES,
+        HirCicsOperation::WebStartBrowse => web_control::START_BROWSE_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -749,6 +765,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebClose => &["NOHANDLE"],
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &["NOHANDLE"],
         HirCicsOperation::WebRead => &["NOHANDLE"],
+        HirCicsOperation::WebStartBrowse => web_control::START_BROWSE_OPTIONS,
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -840,7 +857,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
-    web_control::validate(&clauses, operation, semantic)?;
+    web_control::validate(&clauses, &raw_options, operation, semantic)?;
     let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     transform_control::validate_constraints(&clauses, operation)?;
     event_control::validate_constraints(operation, &raw_options)?;
@@ -922,6 +939,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebClose => &["SESSTOKEN"][..],
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &[][..],
         HirCicsOperation::WebRead => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
+        HirCicsOperation::WebStartBrowse => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1174,6 +1192,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 .unwrap_or_else(|| operation::resolve_option(option, operation))
         })
         .collect::<BTreeSet<_>>();
+    if operation == HirCicsOperation::WebStartBrowse {
+        if clauses.contains_key("FORMFIELD") {
+            options.insert(HirCicsOption::WebBrowseFormField);
+        }
+        if clauses.contains_key("QUERYPARM") {
+            options.insert(HirCicsOption::WebBrowseQueryParm);
+        }
+    }
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();
     let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();
     if response.is_none() && response2.is_some() {

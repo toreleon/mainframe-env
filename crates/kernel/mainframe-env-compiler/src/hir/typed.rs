@@ -6960,6 +6960,52 @@ mod tests {
     }
 
     #[test]
+    fn web_startbrowse_selects_header_or_named_query_cursor() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBBROWSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAME-X PIC X(8) VALUE 'q'. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
+        for (source, kind) in [
+            (
+                "WEB STARTBROWSE HTTPHEADER",
+                HirCicsOption::WebBrowseHttpHeader,
+            ),
+            (
+                "WEB STARTBROWSE QUERYPARM(NAME-X) NAMELENGTH(1)",
+                HirCicsOption::WebBrowseQueryParm,
+            ),
+            (
+                "WEB STARTBROWSE FORMFIELD",
+                HirCicsOption::WebBrowseFormField,
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed WEB STARTBROWSE");
+            assert_eq!(command.operation, HirCicsOperation::WebStartBrowse);
+            assert!(command.options.contains(&kind));
+        }
+        for source in [
+            "WEB STARTBROWSE HTTPHEADER QUERYPARM",
+            "WEB STARTBROWSE QUERYPARM(NAME-X)",
+            "WEB STARTBROWSE HTTPHEADER NAMELENGTH(1)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn web_read_lowers_selected_header_and_rejects_ambiguous_sources() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBREAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADER-X PIC X(6) VALUE 'X-Test'. 01 VALUE-X PIC X(16). 01 VALUE-LEN PIC S9(9) COMP VALUE 16. PROCEDURE DIVISION. ";
         let source = format!(

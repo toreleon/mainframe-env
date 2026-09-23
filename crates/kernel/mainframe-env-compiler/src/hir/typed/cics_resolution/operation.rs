@@ -136,6 +136,7 @@ pub(super) fn resolve(
         ["WEB", "EXTRACT"] => HirCicsOperation::WebExtract,
         ["EXTRACT", "WEB"] => HirCicsOperation::ExtractWeb,
         ["WEB", "READ"] => HirCicsOperation::WebRead,
+        ["WEB", "STARTBROWSE"] => HirCicsOperation::WebStartBrowse,
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
         ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,
@@ -230,6 +231,9 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "MINIMUM" => HirCicsOption::Minimum,
         "HOLD" => HirCicsOption::Hold,
         "EXCEPTION" => HirCicsOption::TraceException,
+        "HTTPHEADER" => HirCicsOption::WebBrowseHttpHeader,
+        "QUERYPARM" => HirCicsOption::WebBrowseQueryParm,
+        "FORMFIELD" => HirCicsOption::WebBrowseFormField,
         _ => super::spool_control::option(option).expect("allowed CICS option"),
     }
 }

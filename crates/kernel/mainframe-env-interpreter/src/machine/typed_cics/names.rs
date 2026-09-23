@@ -370,6 +370,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebExtract => CicsOperation::WebExtract,
         CicsPlanOperation::ExtractWeb => CicsOperation::ExtractWeb,
         CicsPlanOperation::WebRead => CicsOperation::WebRead,
+        CicsPlanOperation::WebStartBrowse => CicsOperation::WebStartBrowse,
     }
 }
 
@@ -613,6 +614,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebFormFieldName => "FORMFIELD",
         CicsOperandName::WebNameLength => "NAMELENGTH",
         CicsOperandName::WebValueLength => "VALUELENGTH",
+        CicsOperandName::WebBrowseStartName => "BROWSESTARTNAME",
         CicsOperandName::WebPortNumber => "PORTNUMBER",
         CicsOperandName::WebScheme => "SCHEME",
         CicsOperandName::WebUriMap => "URIMAP",
@@ -841,5 +843,8 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::TraceAccount => "ACCOUNT",
         CicsPlanOption::TraceMonitor => "MONITOR",
         CicsPlanOption::TracePerform => "PERFORM",
+        CicsPlanOption::WebBrowseHttpHeader => "HTTPHEADER",
+        CicsPlanOption::WebBrowseQueryParm => "QUERYPARM",
+        CicsPlanOption::WebBrowseFormField => "FORMFIELD",
     }
 }

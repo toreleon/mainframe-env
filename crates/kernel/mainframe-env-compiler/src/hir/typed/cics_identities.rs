@@ -131,6 +131,7 @@ pub enum HirCicsOperation {
     WebExtract,
     ExtractWeb,
     WebRead,
+    WebStartBrowse,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -375,6 +376,7 @@ pub enum HirCicsOperandName {
     WebFormFieldName,
     WebNameLength,
     WebValueLength,
+    WebBrowseStartName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -492,4 +494,7 @@ pub enum HirCicsOption {
     TraceAccount,
     TraceMonitor,
     TracePerform,
+    WebBrowseHttpHeader,
+    WebBrowseQueryParm,
+    WebBrowseFormField,
 }

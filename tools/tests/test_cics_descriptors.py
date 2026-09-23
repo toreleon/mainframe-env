@@ -1289,6 +1289,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "WEB OPEN",
                 "WEB PARSE URL",
                 "WEB READ",
+                "WEB STARTBROWSE",
                 "WRITE JOURNALNAME",
                 "WRITE JOURNALNUM",
                 "WSACONTEXT BUILD",

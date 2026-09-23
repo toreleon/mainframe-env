@@ -643,6 +643,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WebExtract => web_control::invalid_extract_shape(plan, inputs, outputs),
         CicsPlanOperation::ExtractWeb => web_control::invalid_extract_shape(plan, inputs, outputs),
         CicsPlanOperation::WebRead => web_control::invalid_read_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebStartBrowse => web_control::invalid_start_browse_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2174,6 +2175,59 @@ mod tests {
         });
         assert_eq!(
             encode_cics_effect_plan(&ambiguous, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_startbrowse_codec_reserves_kind_options_and_start_name() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebStartBrowse), 97);
+        assert_eq!(
+            operation_from_tag(97),
+            Ok(CicsPlanOperation::WebStartBrowse)
+        );
+        assert_eq!(operand_tag(CicsOperandName::WebBrowseStartName), 276);
+        assert_eq!(
+            operand_from_tag(276),
+            Ok(CicsOperandName::WebBrowseStartName)
+        );
+        for (option, tag) in [
+            (CicsPlanOption::WebBrowseHttpHeader, 188),
+            (CicsPlanOption::WebBrowseQueryParm, 189),
+            (CicsPlanOption::WebBrowseFormField, 190),
+        ] {
+            assert_eq!(option_tag(option), tag);
+            assert_eq!(option_from_tag(tag), Ok(option));
+        }
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebStartBrowse,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::WebNameLength,
+                    value: CicsOperandValue::Integer(1),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebBrowseStartName,
+                    value: CicsOperandValue::Literal(b"b".to_vec()),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::WebBrowseQueryParm]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut conflict = plan;
+        conflict.options.insert(CicsPlanOption::WebBrowseFormField);
+        assert_eq!(
+            encode_cics_effect_plan(&conflict, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

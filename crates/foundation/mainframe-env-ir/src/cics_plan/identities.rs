@@ -260,6 +260,8 @@ pub enum CicsPlanOperation {
     ExtractWeb,
     /// Read one bounded HTTP header, query parameter, or form field.
     WebRead,
+    /// Start one task-owned Web header, query, or form browse.
+    WebStartBrowse,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -719,6 +721,8 @@ pub enum CicsOperandName {
     WebNameLength,
     /// Fullword receiving capacity for a Web read value.
     WebValueLength,
+    /// Optional name at which a Web browse starts.
+    WebBrowseStartName,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -896,6 +900,12 @@ pub enum CicsPlanOption {
     TraceAccount,
     TraceMonitor,
     TracePerform,
+    /// Browse HTTP request or response headers.
+    WebBrowseHttpHeader,
+    /// Browse URL query parameters.
+    WebBrowseQueryParm,
+    /// Browse HTML form fields.
+    WebBrowseFormField,
 }
 
 /// Named result binding written after the host result arrives.

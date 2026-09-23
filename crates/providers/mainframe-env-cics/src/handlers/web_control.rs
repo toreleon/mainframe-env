@@ -10,6 +10,7 @@ mod model;
 mod open;
 mod parse_url;
 mod read;
+mod start_browse;
 pub use model::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
     CicsWebVersion,
@@ -220,10 +221,20 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
         })
         .map(|(key, session)| (key.clone(), session.clone()))
         .collect::<Vec<_>>();
-    if owned.is_empty() {
+    let owned_browses = state
+        .web
+        .browses
+        .iter()
+        .filter(|(_, browse)| {
+            browse.owner_execution == run.invocation.execution_id.as_str()
+                && browse.owner_run_unit == run.invocation.run_unit_id.as_str()
+        })
+        .map(|(key, browse)| (key.clone(), browse.clone()))
+        .collect::<Vec<_>>();
+    if owned.is_empty() && owned_browses.is_empty() {
         return Ok(());
     }
-    let deletes = owned
+    let mut deletes: Vec<ProviderStateMutation> = owned
         .iter()
         .map(|(key, session)| ProviderStateMutation::Delete {
             namespace: model::SESSION_NAMESPACE.into(),
@@ -231,6 +242,15 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
             expected_version: session.version,
         })
         .collect();
+    deletes.extend(
+        owned_browses
+            .iter()
+            .map(|(key, browse)| ProviderStateMutation::Delete {
+                namespace: model::BROWSE_NAMESPACE.into(),
+                key: key.clone(),
+                expected_version: browse.version,
+            }),
+    );
     service
         .store
         .mutate_provider_states_atomic(deletes)
@@ -243,6 +263,14 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
             .checked_sub(model::encode_session(session)?.len())
             .ok_or(HostProblem::InfrastructureFailure)?;
         state.web.sessions.remove(key);
+    }
+    for (key, browse) in &owned_browses {
+        state.web.bytes = state
+            .web
+            .bytes
+            .checked_sub(model::encode_browse(browse)?.len())
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.web.browses.remove(key);
     }
     drop(state);
     if let Some(transport) = transport {
@@ -269,6 +297,9 @@ pub(in crate::service) fn invoke(
         CicsOperation::WebExtract => extract::invoke(service, run, request),
         CicsOperation::ExtractWeb => extract::invoke(service, run, request),
         CicsOperation::WebRead => read::invoke(service, run, request),
+        CicsOperation::WebStartBrowse => {
+            start_browse::invoke(service, run, request, run.invocation.deadline_tick)
+        }
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

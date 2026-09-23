@@ -1,5 +1,6 @@
 use super::{
-    CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, operand_value, output_target,
+    CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, CicsPlanOption,
+    operand_value, output_target,
 };
 use std::collections::BTreeSet;
 
@@ -251,4 +252,58 @@ pub(super) fn invalid_read_shape(
                 CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
             )
         })
+}
+
+pub(super) fn invalid_start_browse_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let kinds = [
+        CicsPlanOption::WebBrowseHttpHeader,
+        CicsPlanOption::WebBrowseQueryParm,
+        CicsPlanOption::WebBrowseFormField,
+    ];
+    let header = plan.options.contains(&kinds[0]);
+    kinds
+        .iter()
+        .filter(|kind| plan.options.contains(kind))
+        .count()
+        != 1
+        || !plan
+            .options
+            .iter()
+            .all(|option| kinds.contains(option) || *option == CicsPlanOption::NoHandle)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::WebBrowseStartName,
+            CicsOperandName::WebNameLength,
+            CicsOperandName::WebSessionToken,
+        ]))
+        || inputs.contains(&CicsOperandName::WebBrowseStartName)
+            != inputs.contains(&CicsOperandName::WebNameLength)
+        || header && inputs.contains(&CicsOperandName::WebBrowseStartName)
+        || !header && inputs.contains(&CicsOperandName::WebSessionToken)
+        || operand_value(plan, CicsOperandName::WebBrowseStartName).is_some_and(|value| {
+            !matches!(
+                value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            )
+        })
+        || operand_value(plan, CicsOperandName::WebNameLength).is_some_and(|value| {
+            !matches!(
+                value,
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            )
+        })
+        || operand_value(plan, CicsOperandName::WebSessionToken).is_some_and(|value| {
+            !matches!(
+                value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            )
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }

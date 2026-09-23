@@ -38,6 +38,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB STARTBROWSE` for header, query, and URL-encoded form
+  snapshots, with named starts, durable cursor state and a compiled route.
+  IBM CICS TS 6.x baseline `ibm-cics-ts-6x-2026-08-31:api-commands` row
+  `0251` binds `dfhp4_webstartbrowseformfield.html` at
+  `sha256:1fc8d0fcb8c30e4e56c3b596d1a40104462a6f2800dd6128e8ac0042f973568f`,
+  `dfhp4_webstartbrowsehttpheader.html` at
+  `sha256:15d1b7bda4e34dd9c0c0be1a461f61bfe18bf21d2b5ad6d47e89a423c21bf9f0`,
+  and `dfhp4_webstartbrowsequeryparm.html` at
+  `sha256:ff2b1f672cfaa2729c446bdcfb478b21e02f3d68458602fab695ba70e97301e8`.
+
 - Added typed CICS `WEB READ` for HTTP headers, escaped query parameters, and
   URL-encoded form fields, with checked value lengths and a compiled route.
   IBM CICS TS 6.x baseline `ibm-cics-ts-6x-2026-08-31:api-commands` row
