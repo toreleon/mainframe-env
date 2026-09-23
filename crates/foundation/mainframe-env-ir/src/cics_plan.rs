@@ -1224,8 +1224,8 @@ mod tests {
         assert_eq!(operand_from_tag(70), Ok(CicsOperandName::Item));
         assert_eq!(option_tag(CicsPlanOption::Next), 44);
         assert_eq!(option_from_tag(44), Ok(CicsPlanOption::Next));
-        assert_eq!(output_tag(CicsOutputName::NumItems), 110);
-        assert_eq!(output_from_tag(110), Ok(CicsOutputName::NumItems));
+        assert_eq!(output_tag(CicsOutputName::NumItems), 200);
+        assert_eq!(output_from_tag(200), Ok(CicsOutputName::NumItems));
         assert_eq!(operation_tag(CicsPlanOperation::WriteTemporaryStorage), 50);
         assert_eq!(
             operation_from_tag(50),
@@ -1274,6 +1274,46 @@ mod tests {
             decode_cics_effect_plan(&unknown_value_tag, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn every_cics_output_tag_is_unique_and_round_trips() {
+        let mut outputs = vec![
+            CicsOutputName::Into,
+            CicsOutputName::SetPointer,
+            CicsOutputName::Ridfld,
+            CicsOutputName::Commarea,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+            CicsOutputName::Abstime,
+            CicsOutputName::Milliseconds,
+            CicsOutputName::Mmddyy,
+            CicsOutputName::Mmddyyyy,
+            CicsOutputName::Time,
+            CicsOutputName::Yyddd,
+            CicsOutputName::Yymmdd,
+            CicsOutputName::Yyyymmdd,
+            CicsOutputName::Length,
+            CicsOutputName::ReturnTransId,
+            CicsOutputName::ReturnTermId,
+            CicsOutputName::Queue,
+            CicsOutputName::NumItems,
+        ];
+        outputs.extend(CICS_ASSIGN_OUTPUT_NAMES.iter().map(|name| {
+            CicsOutputName::Assign(
+                CicsAssignOutput::from_name(name).expect("canonical ASSIGN output"),
+            )
+        }));
+
+        let mut tags = BTreeSet::new();
+        for output in outputs {
+            let tag = output_tag(output);
+            assert!(
+                tags.insert(tag),
+                "duplicate output tag {tag} for {output:?}"
+            );
+            assert_eq!(output_from_tag(tag), Ok(output));
+        }
     }
 
     #[test]

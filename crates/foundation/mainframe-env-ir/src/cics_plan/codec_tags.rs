@@ -336,7 +336,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::ReturnTermId => 93,
         CicsOutputName::Queue => 94,
         CicsOutputName::SetPointer => 95,
-        CicsOutputName::NumItems => 110,
+        CicsOutputName::NumItems => 200,
     }
 }
 
@@ -360,7 +360,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         93 => Ok(CicsOutputName::ReturnTermId),
         94 => Ok(CicsOutputName::Queue),
         95 => Ok(CicsOutputName::SetPointer),
-        110 => Ok(CicsOutputName::NumItems),
+        200 => Ok(CicsOutputName::NumItems),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),
