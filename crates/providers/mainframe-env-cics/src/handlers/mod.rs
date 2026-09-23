@@ -1,5 +1,6 @@
 mod bms_map;
 mod condition;
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -117,6 +118,13 @@ pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
 pub(super) use condition::respond as condition;
+pub use conversation_control::{
+    CONVERSATION_RECORD_VERSION, CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader,
+    ConversationContext, ConversationKind, ConversationLedger, ConversationOwner,
+    ConversationProblem, ConversationRecord, ConversationState, ConversationSystemDefinition,
+    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+};
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
 pub use diagnostics::{

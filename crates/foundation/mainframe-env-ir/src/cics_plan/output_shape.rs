@@ -2,6 +2,17 @@ use super::{CicsOutputName, CicsPlanOperation};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        CicsPlanOperation::AllocateConversation
+        | CicsPlanOperation::GdsAllocateConversation
+        | CicsPlanOperation::GdsAssignConversation
+        | CicsPlanOperation::BuildAttach
+        | CicsPlanOperation::ConnectProcess
+        | CicsPlanOperation::GdsConnectProcess
+        | CicsPlanOperation::Converse
+        | CicsPlanOperation::FreeConversation
+        | CicsPlanOperation::GdsFreeConversation => {
+            super::conversation_control::output_allowed(operation, output)
+        }
         CicsPlanOperation::Asktime => matches!(
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2

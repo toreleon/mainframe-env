@@ -1,3 +1,4 @@
+mod conversation;
 mod output;
 pub(super) use output::{output_from_tag, output_tag};
 
@@ -172,6 +173,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::VerifyToken => 139,
         CicsPlanOperation::Signon => 136,
         CicsPlanOperation::Signoff => 135,
+        other => conversation::operation_tag(other),
     }
 }
 
@@ -328,7 +330,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         139 => Ok(CicsPlanOperation::VerifyToken),
         136 => Ok(CicsPlanOperation::Signon),
         135 => Ok(CicsPlanOperation::Signoff),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::operation_from_tag(value),
     }
 }
 
@@ -614,6 +616,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebSendUriMap => 290,
         CicsOperandName::WebReceiveMaxLength => 291,
         CicsOperandName::WebReceiveStatusLength => 292,
+        other => conversation::operand_tag(other),
     }
 }
 
@@ -899,7 +902,7 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         290 => Ok(CicsOperandName::WebSendUriMap),
         291 => Ok(CicsOperandName::WebReceiveMaxLength),
         292 => Ok(CicsOperandName::WebReceiveStatusLength),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::operand_from_tag(value),
     }
 }
 
@@ -1034,6 +1037,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::WebNotruncate => 191,
         CicsPlanOption::WebNoClientConvert => 192,
         CicsPlanOption::WebNoServerConvert => 193,
+        other => conversation::option_tag(other),
     }
 }
 
@@ -1168,6 +1172,6 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         191 => Ok(CicsPlanOption::WebNotruncate),
         192 => Ok(CicsPlanOption::WebNoClientConvert),
         193 => Ok(CicsPlanOption::WebNoServerConvert),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::option_from_tag(value),
     }
 }

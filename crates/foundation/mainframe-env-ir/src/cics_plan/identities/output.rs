@@ -3,6 +3,16 @@ use super::super::CicsAssignOutput;
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    ConversationState,
+    ConversationConvid,
+    ConversationRetcode,
+    ConversationPrinConvid,
+    ConversationPrinSysid,
+    ConversationConvData,
+    ConversationInto,
+    ConversationSet,
+    ConversationToLength,
+    ConversationToFullLength,
     /// Verified eight-character user identity.
     SecurityIsUserId,
     /// Four-byte token encryption-key handle.

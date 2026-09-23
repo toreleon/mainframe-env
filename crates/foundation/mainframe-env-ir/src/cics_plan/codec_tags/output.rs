@@ -2,6 +2,16 @@ use super::*;
 
 pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
+        CicsOutputName::ConversationState => 1272,
+        CicsOutputName::ConversationConvid => 1273,
+        CicsOutputName::ConversationRetcode => 1274,
+        CicsOutputName::ConversationPrinConvid => 1275,
+        CicsOutputName::ConversationPrinSysid => 1276,
+        CicsOutputName::ConversationConvData => 1277,
+        CicsOutputName::ConversationInto => 1278,
+        CicsOutputName::ConversationSet => 1279,
+        CicsOutputName::ConversationToLength => 1280,
+        CicsOutputName::ConversationToFullLength => 1281,
         CicsOutputName::TimerStatus => 376,
         CicsOutputName::EventName => 377,
         CicsOutputName::SubEventName => 378,
@@ -128,6 +138,16 @@ pub(in crate::cics_plan) fn output_from_tag(
     value: u16,
 ) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
+        1272 => Ok(CicsOutputName::ConversationState),
+        1273 => Ok(CicsOutputName::ConversationConvid),
+        1274 => Ok(CicsOutputName::ConversationRetcode),
+        1275 => Ok(CicsOutputName::ConversationPrinConvid),
+        1276 => Ok(CicsOutputName::ConversationPrinSysid),
+        1277 => Ok(CicsOutputName::ConversationConvData),
+        1278 => Ok(CicsOutputName::ConversationInto),
+        1279 => Ok(CicsOutputName::ConversationSet),
+        1280 => Ok(CicsOutputName::ConversationToLength),
+        1281 => Ok(CicsOutputName::ConversationToFullLength),
         376 => Ok(CicsOutputName::TimerStatus),
         377 => Ok(CicsOutputName::EventName),
         378 => Ok(CicsOutputName::SubEventName),
