@@ -264,11 +264,16 @@ impl PlanContext<'_> {
                 HirCicsOperandName::DataContainer => CicsOperandName::DataContainer,
                 HirCicsOperandName::XmlContainer => CicsOperandName::XmlContainer,
                 HirCicsOperandName::XmlTransform => CicsOperandName::XmlTransform,
+                HirCicsOperandName::NsContainer => CicsOperandName::NsContainer,
+                HirCicsOperandName::ElementName => CicsOperandName::ElementName,
                 HirCicsOperandName::ElementNameLength => CicsOperandName::ElementNameLength,
+                HirCicsOperandName::ElementNamespace => CicsOperandName::ElementNamespace,
                 HirCicsOperandName::ElementNamespaceLength => {
                     CicsOperandName::ElementNamespaceLength
                 }
                 HirCicsOperandName::TypeNameLength => CicsOperandName::TypeNameLength,
+                HirCicsOperandName::TypeName => CicsOperandName::TypeName,
+                HirCicsOperandName::TypeNamespace => CicsOperandName::TypeNamespace,
                 HirCicsOperandName::TypeNamespaceLength => CicsOperandName::TypeNamespaceLength,
             },
             value: match &operand.value {
@@ -424,6 +429,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::TransformDataToJson => CicsPlanOperation::TransformDataToJson,
         HirCicsOperation::TransformDataToXml => CicsPlanOperation::TransformDataToXml,
         HirCicsOperation::TransformJsonToData => CicsPlanOperation::TransformJsonToData,
+        HirCicsOperation::TransformXmlToData => CicsPlanOperation::TransformXmlToData,
     }
 }
 

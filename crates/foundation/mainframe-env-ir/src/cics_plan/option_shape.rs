@@ -52,7 +52,8 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         }
         CicsPlanOperation::TransformDataToJson
         | CicsPlanOperation::TransformDataToXml
-        | CicsPlanOperation::TransformJsonToData => !matches!(option, CicsPlanOption::NoHandle),
+        | CicsPlanOperation::TransformJsonToData
+        | CicsPlanOperation::TransformXmlToData => !matches!(option, CicsPlanOption::NoHandle),
         _ => !matches!(option, CicsPlanOption::NoHandle),
     })
 }

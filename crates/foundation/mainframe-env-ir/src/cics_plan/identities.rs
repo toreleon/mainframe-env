@@ -121,6 +121,8 @@ pub enum CicsPlanOperation {
     TransformDataToXml,
     /// Convert one JSON container to BIT-mode application data.
     TransformJsonToData,
+    /// Query XML metadata or convert XML to BIT-mode application data.
+    TransformXmlToData,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -289,6 +291,16 @@ pub enum CicsOperandName {
     XmlContainer,
     /// XML transformer resource name.
     XmlTransform,
+    /// XML namespace-declarations container.
+    NsContainer,
+    /// XML element local-name input/output storage.
+    ElementName,
+    /// XML element namespace input/output storage.
+    ElementNamespace,
+    /// XML type local-name input/output storage.
+    TypeName,
+    /// XML type namespace input/output storage.
+    TypeNamespace,
     /// Element-name buffer length.
     ElementNameLength,
     /// Element-namespace buffer length.

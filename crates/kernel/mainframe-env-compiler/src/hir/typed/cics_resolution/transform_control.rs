@@ -43,6 +43,26 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<TransformShape> {
             ],
             &["CHANNEL", "DATCONTAINER", "XMLCONTAINER", "XMLTRANSFORM"],
         ),
+        HirCicsOperation::TransformXmlToData => (
+            &[
+                "CHANNEL",
+                "DATCONTAINER",
+                "ELEMNAME",
+                "ELEMNAMELEN",
+                "ELEMNS",
+                "ELEMNSLEN",
+                "NSCONTAINER",
+                "RESP",
+                "RESP2",
+                "TYPENAME",
+                "TYPENAMELEN",
+                "TYPENS",
+                "TYPENSLEN",
+                "XMLCONTAINER",
+                "XMLTRANSFORM",
+            ],
+            &["CHANNEL", "XMLCONTAINER"],
+        ),
         _ => return None,
     };
     Some(TransformShape {
@@ -63,6 +83,7 @@ pub(super) fn validate_constraints(
         HirCicsOperation::TransformDataToJson => "DATATOJSON",
         HirCicsOperation::TransformJsonToData => "JSONTODATA",
         HirCicsOperation::TransformDataToXml => "DATATOXML",
+        HirCicsOperation::TransformXmlToData => "XMLTODATA",
         _ => unreachable!("transform operation was checked above"),
     };
     for required in shape.required {
@@ -72,11 +93,22 @@ pub(super) fn validate_constraints(
             )));
         }
     }
-    if operation == HirCicsOperation::TransformDataToXml {
+    if operation == HirCicsOperation::TransformXmlToData
+        && clauses.contains_key("XMLTRANSFORM")
+        && !clauses.contains_key("DATCONTAINER")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS TRANSFORM XMLTODATA requires DATCONTAINER with XMLTRANSFORM".into(),
+        ));
+    }
+    if matches!(
+        operation,
+        HirCicsOperation::TransformDataToXml | HirCicsOperation::TransformXmlToData
+    ) {
         for (text, length) in metadata_clauses() {
             if clauses.contains_key(text) != clauses.contains_key(length) {
                 return Err(ResolutionFailure::Invalid(format!(
-                    "CICS TRANSFORM DATATOXML requires {text} and {length} together"
+                    "CICS TRANSFORM {label} requires {text} and {length} together"
                 )));
             }
         }
@@ -102,6 +134,13 @@ pub(super) fn operands(
             ("XMLCONTAINER", HirCicsOperandName::XmlContainer),
             ("XMLTRANSFORM", HirCicsOperandName::XmlTransform),
         ][..],
+        HirCicsOperation::TransformXmlToData => &[
+            ("CHANNEL", HirCicsOperandName::Channel),
+            ("DATCONTAINER", HirCicsOperandName::DataContainer),
+            ("NSCONTAINER", HirCicsOperandName::NsContainer),
+            ("XMLCONTAINER", HirCicsOperandName::XmlContainer),
+            ("XMLTRANSFORM", HirCicsOperandName::XmlTransform),
+        ][..],
         _ => return Ok(Vec::new()),
     };
     let mut operands = text_operands
@@ -114,7 +153,33 @@ pub(super) fn operands(
             })
         })
         .collect::<Resolution<Vec<_>>>()?;
-    if operation == HirCicsOperation::TransformDataToXml {
+    if operation == HirCicsOperation::TransformXmlToData {
+        for (name, identity) in [
+            ("ELEMNAME", HirCicsOperandName::ElementName),
+            ("ELEMNS", HirCicsOperandName::ElementNamespace),
+            ("TYPENAME", HirCicsOperandName::TypeName),
+            ("TYPENS", HirCicsOperandName::TypeNamespace),
+        ] {
+            let Some(value) = clauses.get(name) else {
+                continue;
+            };
+            let target = complete_data_reference(value, semantic)?;
+            require_writable(&target)?;
+            operands.push(HirCicsNamedOperand {
+                name: identity,
+                value: HirCicsValue::Data(target),
+            });
+        }
+    }
+    if matches!(
+        operation,
+        HirCicsOperation::TransformDataToXml | HirCicsOperation::TransformXmlToData
+    ) {
+        let label = if operation == HirCicsOperation::TransformDataToXml {
+            "DATATOXML"
+        } else {
+            "XMLTODATA"
+        };
         for (name, identity) in [
             ("ELEMNAMELEN", HirCicsOperandName::ElementNameLength),
             ("ELEMNSLEN", HirCicsOperandName::ElementNamespaceLength),
@@ -131,7 +196,7 @@ pub(super) fn operands(
                 || target.scale != 0
             {
                 return Err(ResolutionFailure::Invalid(format!(
-                    "CICS TRANSFORM DATATOXML {name} requires writable fullword binary storage"
+                    "CICS TRANSFORM {label} {name} requires writable fullword binary storage"
                 )));
             }
             operands.push(HirCicsNamedOperand {
@@ -148,7 +213,10 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
-    if operation != HirCicsOperation::TransformDataToXml {
+    if !matches!(
+        operation,
+        HirCicsOperation::TransformDataToXml | HirCicsOperation::TransformXmlToData
+    ) {
         return Ok(Vec::new());
     }
     let mut outputs = Vec::new();

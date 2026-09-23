@@ -77,6 +77,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::TransformDataToJson => 68,
         CicsPlanOperation::TransformDataToXml => 69,
         CicsPlanOperation::TransformJsonToData => 70,
+        CicsPlanOperation::TransformXmlToData => 71,
     }
 }
 
@@ -141,6 +142,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         68 => Ok(CicsPlanOperation::TransformDataToJson),
         69 => Ok(CicsPlanOperation::TransformDataToXml),
         70 => Ok(CicsPlanOperation::TransformJsonToData),
+        71 => Ok(CicsPlanOperation::TransformXmlToData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -231,9 +233,14 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::DataContainer => 156,
         CicsOperandName::XmlContainer => 157,
         CicsOperandName::XmlTransform => 158,
+        CicsOperandName::NsContainer => 159,
+        CicsOperandName::ElementName => 160,
         CicsOperandName::ElementNameLength => 161,
+        CicsOperandName::ElementNamespace => 162,
         CicsOperandName::ElementNamespaceLength => 163,
+        CicsOperandName::TypeName => 164,
         CicsOperandName::TypeNameLength => 165,
+        CicsOperandName::TypeNamespace => 166,
         CicsOperandName::TypeNamespaceLength => 167,
     }
 }
@@ -324,9 +331,14 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         156 => Ok(CicsOperandName::DataContainer),
         157 => Ok(CicsOperandName::XmlContainer),
         158 => Ok(CicsOperandName::XmlTransform),
+        159 => Ok(CicsOperandName::NsContainer),
+        160 => Ok(CicsOperandName::ElementName),
         161 => Ok(CicsOperandName::ElementNameLength),
+        162 => Ok(CicsOperandName::ElementNamespace),
         163 => Ok(CicsOperandName::ElementNamespaceLength),
+        164 => Ok(CicsOperandName::TypeName),
         165 => Ok(CicsOperandName::TypeNameLength),
+        166 => Ok(CicsOperandName::TypeNamespace),
         167 => Ok(CicsOperandName::TypeNamespaceLength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }

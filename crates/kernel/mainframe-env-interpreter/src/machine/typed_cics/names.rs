@@ -162,6 +162,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::TransformDataToJson => CicsOperation::TransformDataToJson,
         CicsPlanOperation::TransformDataToXml => CicsOperation::TransformDataToXml,
         CicsPlanOperation::TransformJsonToData => CicsOperation::TransformJsonToData,
+        CicsPlanOperation::TransformXmlToData => CicsOperation::TransformXmlToData,
     }
 }
 
@@ -251,9 +252,14 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::DataContainer => "DATCONTAINER",
         CicsOperandName::XmlContainer => "XMLCONTAINER",
         CicsOperandName::XmlTransform => "XMLTRANSFORM",
+        CicsOperandName::NsContainer => "NSCONTAINER",
+        CicsOperandName::ElementName => "ELEMNAME",
         CicsOperandName::ElementNameLength => "ELEMNAMELEN",
+        CicsOperandName::ElementNamespace => "ELEMNS",
         CicsOperandName::ElementNamespaceLength => "ELEMNSLEN",
+        CicsOperandName::TypeName => "TYPENAME",
         CicsOperandName::TypeNameLength => "TYPENAMELEN",
+        CicsOperandName::TypeNamespace => "TYPENS",
         CicsOperandName::TypeNamespaceLength => "TYPENSLEN",
     }
 }

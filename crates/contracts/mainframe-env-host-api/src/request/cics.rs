@@ -103,6 +103,8 @@ pub enum CicsOperation {
     TransformDataToXml,
     /// Convert JSON from a channel container to application data.
     TransformJsonToData,
+    /// Query XML metadata or convert an XML container to application data.
+    TransformXmlToData,
     Write,
     WriteTransientData,
     Xctl,
@@ -171,6 +173,7 @@ impl CicsOperation {
             Self::TransformDataToJson => "TransformDataToJson",
             Self::TransformDataToXml => "TransformDataToXml",
             Self::TransformJsonToData => "TransformJsonToData",
+            Self::TransformXmlToData => "TransformXmlToData",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -217,6 +220,7 @@ impl CicsOperation {
                 | Self::TransformDataToJson
                 | Self::TransformDataToXml
                 | Self::TransformJsonToData
+                | Self::TransformXmlToData
                 | Self::SetFileStatus
                 | Self::Start
                 | Self::Retrieve
@@ -297,6 +301,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,
             ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
+            ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

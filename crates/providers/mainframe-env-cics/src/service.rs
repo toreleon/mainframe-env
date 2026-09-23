@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 61);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 62);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5023,6 +5023,8 @@ mod tests {
         }
     }
 
+    const CUSTOMER_XML: &[u8] = br#"<customer xmlns="urn:customer" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="t:CustomerType" xmlns:t="urn:types"><name>ALICE</name><count>7</count></customer>"#;
+
     fn xml_transform_request(
         sequence: u64,
         input: &[u8],
@@ -5050,6 +5052,40 @@ mod tests {
             }
         }
         request(CicsOperation::TransformDataToXml, arguments, sequence)
+    }
+
+    fn xml_to_data_request(
+        sequence: u64,
+        input: &[u8],
+        transformer: Option<&[u8]>,
+        output: Option<&[u8]>,
+        metadata_lengths: Option<[i64; 4]>,
+    ) -> CicsRequest {
+        let mut arguments = BTreeMap::from([
+            ("CHANNEL".into(), cics_literal(b"WORK")),
+            ("XMLCONTAINER".into(), cics_literal(input)),
+        ]);
+        if let Some(transformer) = transformer {
+            arguments.insert("XMLTRANSFORM".into(), cics_literal(transformer));
+        }
+        if let Some(output) = output {
+            arguments.insert("DATCONTAINER".into(), cics_literal(output));
+        }
+        if let Some(lengths) = metadata_lengths {
+            for ((name, length), maximum) in [
+                ("ELEMNAME", "ELEMNAMELEN"),
+                ("ELEMNS", "ELEMNSLEN"),
+                ("TYPENAME", "TYPENAMELEN"),
+                ("TYPENS", "TYPENSLEN"),
+            ]
+            .into_iter()
+            .zip(lengths)
+            {
+                arguments.insert(name.into(), argument(b""));
+                arguments.insert(length.into(), cics_decimal(maximum));
+            }
+        }
+        request(CicsOperation::TransformXmlToData, arguments, sequence)
     }
 
     fn effect(run: &RunUnitId, request: CicsRequest, sequence: u64) -> EffectRequest {
@@ -5168,6 +5204,7 @@ mod tests {
             ("TRANSFORM DATATOJSON", CicsOperation::TransformDataToJson),
             ("TRANSFORM DATATOXML", CicsOperation::TransformDataToXml),
             ("TRANSFORM JSONTODATA", CicsOperation::TransformJsonToData),
+            ("TRANSFORM XMLTODATA", CicsOperation::TransformXmlToData),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6399,7 +6436,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 61);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 62);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8265,6 +8302,566 @@ mod tests {
                 (name, response, response2)
             );
         }
+    }
+
+    #[test]
+    fn transform_xmltodata_queries_metadata_and_replays_bit_output_after_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-transform-xml-reverse-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let (host, security) = transform_authorities(false);
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service =
+            CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, session) = registered(&service);
+        service
+            .register_transform_definition(xml_transform_definition("CUSTOMERXML", true))
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "XML",
+                CicsTransformContainerMode::Char,
+                CUSTOMER_XML.to_vec(),
+            )
+            .unwrap();
+        let query = xml_to_data_request(470, b"XML", None, None, Some([32; 4]));
+        let queried = service
+            .invoke(
+                &effect(&invocation.run_unit_id, query.clone(), 470),
+                query.clone(),
+            )
+            .unwrap();
+        for (name, expected) in [
+            ("ELEMNAME", b"customer".as_slice()),
+            ("ELEMNS", b"urn:customer".as_slice()),
+            ("TYPENAME", b"CustomerType".as_slice()),
+            ("TYPENS", b"urn:types".as_slice()),
+        ] {
+            assert_eq!(queried.outputs[name].bytes(), expected);
+        }
+        assert_eq!(
+            service.transform_container("WORK", "DATA"),
+            Err(HostProblem::NotFound)
+        );
+        let query_outer = store
+            .get_provider_state("cics-effect-replay-v1", "outer-470")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-470", query_outer.version)
+            .unwrap();
+        let query_replay = service
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 470), query)
+            .unwrap();
+        assert_eq!(query_replay, queried);
+        let request = xml_to_data_request(
+            471,
+            b"XML",
+            Some(b"CUSTOMERXML"),
+            Some(b"DATA"),
+            Some([32; 4]),
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 471),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(response.outputs, queried.outputs);
+        assert_eq!(
+            service.transform_container("WORK", "DATA").unwrap(),
+            (CicsTransformContainerMode::Bit, b"ALICE007".to_vec())
+        );
+        assert!(security.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "TRANSFORM".into(),
+                    "CICS.XML.CUSTOMERXML".into(),
+                    AccessIntent::Update,
+                )
+        }));
+        let output_before = store
+            .get_provider_state("cics-transform-container-v1", "WORK/DATA")
+            .unwrap()
+            .unwrap();
+        let outer = store
+            .get_provider_state("cics-effect-replay-v1", "outer-471")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-471", outer.version)
+            .unwrap();
+        drop(service);
+        drop(store);
+
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let restarted = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        restarted
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let replayed = restarted
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 471),
+                request,
+            )
+            .unwrap();
+        assert_eq!(replayed, response);
+        assert_eq!(
+            store
+                .get_provider_state("cics-transform-container-v1", "WORK/DATA")
+                .unwrap()
+                .unwrap(),
+            output_before
+        );
+        drop(restarted);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn transform_xmltodata_conditions_namespace_container_and_buffers_are_exact() {
+        let service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        for definition in [
+            xml_transform_definition("CUSTOMERXML", true),
+            xml_transform_definition("DISABLEDXML", false),
+        ] {
+            service.register_transform_definition(definition).unwrap();
+        }
+        let sample = std::str::from_utf8(CUSTOMER_XML).unwrap();
+        let wrong_root = sample.replace("customer", "other");
+        let wrong_type = sample.replace("CustomerType", "OtherType");
+        let bad_field = sample.replace("<count>7</count>", "<count>X</count>");
+        let prefixed = sample
+            .replace("<customer", "<p:customer")
+            .replace("</customer>", "</p:customer>")
+            .replace("<name>", "<p:name>")
+            .replace("</name>", "</p:name>")
+            .replace("<count>", "<p:count>")
+            .replace("</count>", "</p:count>")
+            .replace(" xmlns=\"urn:customer\"", "");
+        let decorated = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!--before-->{}<?after?>",
+            sample.replace(
+                "<name>ALICE</name>",
+                "<!--field--><name><![CDATA[AL&CE]]></name>"
+            )
+        );
+        for (name, mode, bytes) in [
+            (
+                "XML",
+                CicsTransformContainerMode::Char,
+                CUSTOMER_XML.to_vec(),
+            ),
+            (
+                "BITXML",
+                CicsTransformContainerMode::Bit,
+                CUSTOMER_XML.to_vec(),
+            ),
+            (
+                "DECORATED",
+                CicsTransformContainerMode::Char,
+                decorated.into_bytes(),
+            ),
+            ("EMPTY", CicsTransformContainerMode::Char, Vec::new()),
+            (
+                "MALFORMED",
+                CicsTransformContainerMode::Char,
+                b"<customer>".to_vec(),
+            ),
+            ("BINARY", CicsTransformContainerMode::Bit, vec![0xff]),
+            (
+                "WRONGROOT",
+                CicsTransformContainerMode::Char,
+                wrong_root.into_bytes(),
+            ),
+            (
+                "WRONGTYPE",
+                CicsTransformContainerMode::Char,
+                wrong_type.into_bytes(),
+            ),
+            (
+                "BADFIELD",
+                CicsTransformContainerMode::Char,
+                bad_field.into_bytes(),
+            ),
+            (
+                "PREFIXED",
+                CicsTransformContainerMode::Char,
+                prefixed.into_bytes(),
+            ),
+            (
+                "NSDECL",
+                CicsTransformContainerMode::Char,
+                b"xmlns:p=\"urn:customer\"".to_vec(),
+            ),
+            (
+                "NSBIT",
+                CicsTransformContainerMode::Bit,
+                b"xmlns:p=\"urn:customer\"".to_vec(),
+            ),
+            (
+                "DOCTYPE",
+                CicsTransformContainerMode::Char,
+                b"<!DOCTYPE customer><customer/>".to_vec(),
+            ),
+            (
+                "BADENC",
+                CicsTransformContainerMode::Char,
+                [
+                    b"<?xml version=\"1.0\" encoding=\"UTF-16\"?>".as_slice(),
+                    CUSTOMER_XML,
+                ]
+                .concat(),
+            ),
+        ] {
+            service
+                .put_transform_container("WORK", name, mode, bytes)
+                .unwrap();
+        }
+        let mut namespaced = xml_to_data_request(
+            472,
+            b"PREFIXED",
+            Some(b"CUSTOMERXML"),
+            Some(b"NAMESPACE-DATA"),
+            Some([256; 4]),
+        );
+        namespaced
+            .arguments
+            .insert("NSCONTAINER".into(), cics_literal(b"NSDECL"));
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, namespaced.clone(), 472),
+                namespaced,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .transform_container("WORK", "NAMESPACE-DATA")
+                .unwrap(),
+            (CicsTransformContainerMode::Bit, b"ALICE007".to_vec())
+        );
+        let bit_query = xml_to_data_request(493, b"BITXML", None, None, Some([32; 4]));
+        let bit_metadata = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bit_query.clone(), 493),
+                bit_query,
+            )
+            .unwrap();
+        assert_eq!(bit_metadata.outputs["ELEMNAME"].bytes(), b"customer");
+        let long_name = "n".repeat(129);
+        service
+            .put_transform_container(
+                "WORK",
+                "LONGNAME",
+                CicsTransformContainerMode::Char,
+                format!("<{long_name}/>").into_bytes(),
+            )
+            .unwrap();
+        let long_query = xml_to_data_request(495, b"LONGNAME", None, None, Some([255; 4]));
+        let long_metadata = service
+            .invoke(
+                &effect(&invocation.run_unit_id, long_query.clone(), 495),
+                long_query,
+            )
+            .unwrap();
+        assert_eq!(
+            long_metadata.outputs["ELEMNAME"].bytes(),
+            long_name.as_bytes()
+        );
+        assert_eq!(long_metadata.outputs["ELEMNAMELEN"].bytes(), b"129");
+        let decorated_request = xml_to_data_request(
+            494,
+            b"DECORATED",
+            Some(b"CUSTOMERXML"),
+            Some(b"CDATA-DATA"),
+            None,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, decorated_request.clone(), 494),
+                decorated_request,
+            )
+            .unwrap();
+        assert_eq!(
+            service.transform_container("WORK", "CDATA-DATA").unwrap(),
+            (CicsTransformContainerMode::Bit, b"AL&CE007".to_vec())
+        );
+        for (sequence, input, transformer, condition, response, response2) in [
+            (
+                473,
+                b"EMPTY".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                2,
+            ),
+            (
+                474,
+                b"MALFORMED".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                3,
+            ),
+            (
+                475,
+                b"BINARY".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                7,
+            ),
+            (
+                476,
+                b"WRONGROOT".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                9,
+            ),
+            (
+                477,
+                b"WRONGTYPE".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                10,
+            ),
+            (
+                478,
+                b"BADFIELD".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                4,
+            ),
+            (
+                479,
+                b"XML".as_slice(),
+                b"DISABLEDXML".as_slice(),
+                "INVREQ",
+                16,
+                1,
+            ),
+            (
+                480,
+                b"XML".as_slice(),
+                b"MISSING".as_slice(),
+                "NOTFND",
+                13,
+                1,
+            ),
+            (
+                481,
+                b"MISSING".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "CONTAINERERR",
+                110,
+                1,
+            ),
+            (
+                491,
+                b"DOCTYPE".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                3,
+            ),
+            (
+                492,
+                b"BADENC".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                3,
+            ),
+        ] {
+            let mut request =
+                xml_to_data_request(sequence, input, Some(transformer), Some(b"FAILED"), None);
+            request.condition_policy = CicsConditionPolicy::NoHandle;
+            let actual = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (actual.condition.as_str(), actual.response, actual.response2),
+                (condition, response, response2)
+            );
+        }
+        assert_eq!(
+            service.transform_container("WORK", "FAILED"),
+            Err(HostProblem::NotFound)
+        );
+        for (sequence, lengths, response2) in [
+            (482, [7, 32, 32, 32], 2),
+            (483, [32, 11, 32, 32], 3),
+            (484, [32, 32, 11, 32], 4),
+            (485, [32, 32, 32, 8], 5),
+        ] {
+            let mut request = xml_to_data_request(sequence, b"XML", None, None, Some(lengths));
+            request.condition_policy = CicsConditionPolicy::NoHandle;
+            let actual = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (actual.condition.as_str(), actual.response, actual.response2),
+                ("LENGERR", 22, response2)
+            );
+        }
+        let mut missing_output = xml_to_data_request(486, b"XML", Some(b"CUSTOMERXML"), None, None);
+        missing_output.condition_policy = CicsConditionPolicy::NoHandle;
+        let actual = service
+            .invoke(
+                &effect(&invocation.run_unit_id, missing_output.clone(), 486),
+                missing_output,
+            )
+            .unwrap();
+        assert_eq!(
+            (actual.condition.as_str(), actual.response, actual.response2),
+            ("INVREQ", 16, 16)
+        );
+        let mut missing_ns = xml_to_data_request(487, b"XML", None, None, None);
+        missing_ns
+            .arguments
+            .insert("NSCONTAINER".into(), cics_literal(b"MISSING"));
+        missing_ns.condition_policy = CicsConditionPolicy::NoHandle;
+        let actual = service
+            .invoke(
+                &effect(&invocation.run_unit_id, missing_ns.clone(), 487),
+                missing_ns,
+            )
+            .unwrap();
+        assert_eq!(
+            (actual.condition.as_str(), actual.response, actual.response2),
+            ("CONTAINERERR", 110, 2)
+        );
+        let mut bit_ns = xml_to_data_request(488, b"XML", None, None, None);
+        bit_ns
+            .arguments
+            .insert("NSCONTAINER".into(), cics_literal(b"NSBIT"));
+        bit_ns.condition_policy = CicsConditionPolicy::NoHandle;
+        let actual = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bit_ns.clone(), 488),
+                bit_ns,
+            )
+            .unwrap();
+        assert_eq!(
+            (actual.condition.as_str(), actual.response, actual.response2),
+            ("INVREQ", 16, 7)
+        );
+    }
+
+    #[test]
+    fn transform_xmltodata_type_override_and_authorization_are_explicit() {
+        let service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_transform_definition(xml_transform_definition("CUSTOMERXML", true))
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "OTHER-TYPE",
+                CicsTransformContainerMode::Char,
+                std::str::from_utf8(CUSTOMER_XML)
+                    .unwrap()
+                    .replace("CustomerType", "OtherType")
+                    .into_bytes(),
+            )
+            .unwrap();
+        let mut request = xml_to_data_request(
+            489,
+            b"OTHER-TYPE",
+            Some(b"CUSTOMERXML"),
+            Some(b"OVERRIDE-DATA"),
+            Some([32; 4]),
+        );
+        request
+            .arguments
+            .insert("TYPENAME".into(), argument(b"CustomerType"));
+        request
+            .arguments
+            .insert("TYPENS".into(), argument(b"urn:types"));
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 489),
+                request,
+            )
+            .unwrap();
+        assert_eq!(response.outputs["TYPENAME"].bytes(), b"OtherType");
+        assert_eq!(
+            service
+                .transform_container("WORK", "OVERRIDE-DATA")
+                .unwrap(),
+            (CicsTransformContainerMode::Bit, b"ALICE007".to_vec())
+        );
+
+        let (denied_host, denied_trace) = transform_authorities(true);
+        let denied = CicsService::open(
+            denied_host,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (denied_invocation, _) = registered(&denied);
+        denied
+            .register_transform_definition(xml_transform_definition("CUSTOMERXML", true))
+            .unwrap();
+        denied
+            .put_transform_container(
+                "WORK",
+                "XML",
+                CicsTransformContainerMode::Char,
+                CUSTOMER_XML.to_vec(),
+            )
+            .unwrap();
+        let mut request =
+            xml_to_data_request(490, b"XML", Some(b"CUSTOMERXML"), Some(b"DATA"), None);
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        let actual = denied
+            .invoke(
+                &effect(&denied_invocation.run_unit_id, request.clone(), 490),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (actual.condition.as_str(), actual.response, actual.response2),
+            ("INVREQ", 16, 101)
+        );
+        assert_eq!(
+            denied.transform_container("WORK", "DATA"),
+            Err(HostProblem::NotFound)
+        );
+        assert!(denied_trace.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "TRANSFORM".into(),
+                    "CICS.XML.CUSTOMERXML".into(),
+                    AccessIntent::Update,
+                )
+        }));
     }
 
     #[test]

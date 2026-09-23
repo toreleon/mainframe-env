@@ -583,7 +583,8 @@ fn validate_operation_shape(
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::TransformDataToJson
         | CicsPlanOperation::TransformDataToXml
-        | CicsPlanOperation::TransformJsonToData => {
+        | CicsPlanOperation::TransformJsonToData
+        | CicsPlanOperation::TransformXmlToData => {
             transform_control::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Syncpoint => {
@@ -3394,11 +3395,14 @@ mod tests {
 
     #[test]
     fn transform_tags_are_unique_reserved_and_round_trip() {
-        for operation in [
+        let operations = [
             CicsPlanOperation::TransformDataToJson,
             CicsPlanOperation::TransformDataToXml,
             CicsPlanOperation::TransformJsonToData,
-        ] {
+            CicsPlanOperation::TransformXmlToData,
+        ];
+        assert_eq!(operations.map(operation_tag), [68, 69, 70, 71]);
+        for operation in operations {
             let tag = operation_tag(operation);
             assert!(codec_tags::TRANSFORM_OPERATION_TAGS.contains(&tag));
             assert_eq!(operation_from_tag(tag), Ok(operation));
@@ -3411,12 +3415,23 @@ mod tests {
             CicsOperandName::DataContainer,
             CicsOperandName::XmlContainer,
             CicsOperandName::XmlTransform,
+            CicsOperandName::NsContainer,
+            CicsOperandName::ElementName,
             CicsOperandName::ElementNameLength,
+            CicsOperandName::ElementNamespace,
             CicsOperandName::ElementNamespaceLength,
+            CicsOperandName::TypeName,
             CicsOperandName::TypeNameLength,
+            CicsOperandName::TypeNamespace,
             CicsOperandName::TypeNamespaceLength,
         ];
         let tags = operands.map(operand_tag);
+        assert_eq!(
+            tags,
+            [
+                152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167
+            ]
+        );
         assert!(
             tags.iter()
                 .all(|tag| *tag == 61 || codec_tags::TRANSFORM_OPERAND_TAGS.contains(tag))
@@ -3427,6 +3442,12 @@ mod tests {
         }
         assert_eq!(codec_tags::TRANSFORM_OPTION_TAGS, 96..=107);
         assert_eq!(codec_tags::TRANSFORM_OUTPUT_TAGS, 224..=231);
+        for tag in 168..=171 {
+            assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 96..=107 {
+            assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
         for (output, tag) in [
             (CicsOutputName::ElementName, 224),
             (CicsOutputName::ElementNameLength, 225),
@@ -3520,6 +3541,45 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             xml
+        );
+
+        let query = CicsEffectPlan {
+            operation: CicsPlanOperation::TransformXmlToData,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Channel,
+                    value: CicsOperandValue::Literal(b"WORK".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::XmlContainer,
+                    value: CicsOperandValue::Literal(b"XML".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ElementName,
+                    value: CicsOperandValue::Storage(slot(3, "ELEMENT-NAME")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ElementNameLength,
+                    value: CicsOperandValue::Storage(slot(2, "ELEMENT-LENGTH")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::ElementName,
+                    target: slot(3, "ELEMENT-NAME"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::ElementNameLength,
+                    target: slot(2, "ELEMENT-LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&query, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            query
         );
     }
 

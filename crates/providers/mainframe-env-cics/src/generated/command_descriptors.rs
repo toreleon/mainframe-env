@@ -435,6 +435,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::TransformXmlToData,
+        syntax: "TRANSFORM XMLTODATA",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0224",
+        family: CicsCommandFamily::TransformControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Write,
         syntax: "WRITE FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
@@ -523,9 +530,10 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::TransformDataToJson => &CICS_COMMAND_DESCRIPTORS[54],
         CicsOperation::TransformDataToXml => &CICS_COMMAND_DESCRIPTORS[55],
         CicsOperation::TransformJsonToData => &CICS_COMMAND_DESCRIPTORS[56],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[57],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[58],
-        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[59],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[60],
+        CicsOperation::TransformXmlToData => &CICS_COMMAND_DESCRIPTORS[57],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[58],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[59],
+        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[60],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[61],
     }
 }

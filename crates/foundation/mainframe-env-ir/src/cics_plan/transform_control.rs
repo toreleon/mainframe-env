@@ -21,6 +21,7 @@ pub(super) fn invalid_shape(
             invalid_data_to_json(plan, inputs)
         }
         CicsPlanOperation::TransformDataToXml => invalid_data_to_xml(plan, inputs, outputs),
+        CicsPlanOperation::TransformXmlToData => invalid_xml_to_data(plan, inputs, outputs),
         _ => true,
     }
 }
@@ -106,6 +107,83 @@ fn invalid_data_to_xml(
             CicsOutputName::TypeNamespace,
             CicsOutputName::TypeNamespaceLength,
         )
+}
+
+fn invalid_xml_to_data(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let required = BTreeSet::from([CicsOperandName::Channel, CicsOperandName::XmlContainer]);
+    let allowed = BTreeSet::from([
+        CicsOperandName::Channel,
+        CicsOperandName::DataContainer,
+        CicsOperandName::XmlContainer,
+        CicsOperandName::XmlTransform,
+        CicsOperandName::NsContainer,
+        CicsOperandName::ElementName,
+        CicsOperandName::ElementNameLength,
+        CicsOperandName::ElementNamespace,
+        CicsOperandName::ElementNamespaceLength,
+        CicsOperandName::TypeName,
+        CicsOperandName::TypeNameLength,
+        CicsOperandName::TypeNamespace,
+        CicsOperandName::TypeNamespaceLength,
+    ]);
+    !required.is_subset(inputs)
+        || !inputs.is_subset(&allowed)
+        || inputs.contains(&CicsOperandName::XmlTransform)
+            && !inputs.contains(&CicsOperandName::DataContainer)
+        || plan.operands.iter().any(|operand| {
+            if matches!(
+                operand.name,
+                CicsOperandName::ElementName
+                    | CicsOperandName::ElementNameLength
+                    | CicsOperandName::ElementNamespace
+                    | CicsOperandName::ElementNamespaceLength
+                    | CicsOperandName::TypeName
+                    | CicsOperandName::TypeNameLength
+                    | CicsOperandName::TypeNamespace
+                    | CicsOperandName::TypeNamespaceLength
+            ) {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            } else {
+                invalid_text_operand(operand)
+            }
+        })
+        || [
+            (
+                CicsOperandName::ElementName,
+                CicsOperandName::ElementNameLength,
+                CicsOutputName::ElementName,
+                CicsOutputName::ElementNameLength,
+            ),
+            (
+                CicsOperandName::ElementNamespace,
+                CicsOperandName::ElementNamespaceLength,
+                CicsOutputName::ElementNamespace,
+                CicsOutputName::ElementNamespaceLength,
+            ),
+            (
+                CicsOperandName::TypeName,
+                CicsOperandName::TypeNameLength,
+                CicsOutputName::TypeName,
+                CicsOutputName::TypeNameLength,
+            ),
+            (
+                CicsOperandName::TypeNamespace,
+                CicsOperandName::TypeNamespaceLength,
+                CicsOutputName::TypeNamespace,
+                CicsOutputName::TypeNamespaceLength,
+            ),
+        ]
+        .into_iter()
+        .any(|(text, length, output_text, output_length)| {
+            let present = inputs.contains(&text);
+            present != inputs.contains(&length)
+                || present != outputs.contains(&output_text)
+                || present != outputs.contains(&output_length)
+        })
 }
 
 fn invalid_text_operand(operand: &super::CicsNamedOperand) -> bool {

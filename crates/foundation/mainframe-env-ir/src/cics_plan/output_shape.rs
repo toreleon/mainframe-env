@@ -92,7 +92,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
-        CicsPlanOperation::TransformDataToXml => matches!(
+        CicsPlanOperation::TransformDataToXml | CicsPlanOperation::TransformXmlToData => matches!(
             output,
             CicsOutputName::ElementName
                 | CicsOutputName::ElementNameLength

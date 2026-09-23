@@ -207,6 +207,7 @@ pub enum HirCicsOperation {
     TransformDataToJson,
     TransformDataToXml,
     TransformJsonToData,
+    TransformXmlToData,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -297,9 +298,14 @@ pub enum HirCicsOperandName {
     DataContainer,
     XmlContainer,
     XmlTransform,
+    NsContainer,
+    ElementName,
     ElementNameLength,
+    ElementNamespace,
     ElementNamespaceLength,
+    TypeName,
     TypeNameLength,
+    TypeNamespace,
     TypeNamespaceLength,
 }
 
@@ -1922,6 +1928,46 @@ mod tests {
             diagnostic
                 .public_message()
                 .contains("TRANSFORM JSONTODATA requires CHANNEL")
+        }));
+    }
+
+    #[test]
+    fn transform_xmltodata_resolves_query_and_transform_modes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. XMLREVERSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 ELEM-X PIC X(32). 01 ELEM-LEN PIC S9(9) COMP VALUE 32. PROCEDURE DIVISION. EXEC CICS TRANSFORM XMLTODATA CHANNEL('WORK') XMLCONTAINER('SOURCE') ELEMNAME(ELEM-X) ELEMNAMELEN(ELEM-LEN) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed XML query HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved TRANSFORM XMLTODATA");
+        assert_eq!(command.operation, HirCicsOperation::TransformXmlToData);
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::ElementName)
+        );
+        assert!(
+            command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::ElementName)
+        );
+        let transform = source.replace(
+            " XMLCONTAINER('SOURCE')",
+            " DATCONTAINER('DATA') XMLCONTAINER('SOURCE') XMLTRANSFORM('CUSTOMERXML')",
+        );
+        assert!(analyze(&transform).hir.is_some());
+        let missing_output = transform.replace(" DATCONTAINER('DATA')", "");
+        let analysis = analyze(&missing_output);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("requires DATCONTAINER with XMLTRANSFORM")
         }));
     }
 

@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod json_to_data;
 mod reader;
+mod xml_to_data;
 use reader::Reader;
 
 const RESOURCE_NAMESPACE: &str = "cics-transform-resource-v1";
@@ -96,6 +97,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::TransformDataToJson => data_to_json(service, run, request),
         CicsOperation::TransformDataToXml => data_to_xml(service, run, request),
         CicsOperation::TransformJsonToData => json_to_data::invoke(service, run, request),
+        CicsOperation::TransformXmlToData => xml_to_data::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -402,7 +404,7 @@ fn data_to_xml(
         .xml
         .as_ref()
         .ok_or(HostProblem::InfrastructureFailure)?;
-    let outputs = metadata_outputs(request, metadata)?;
+    let outputs = metadata_outputs(request, metadata, true)?;
     let transformed = match xml_from_data(&definition, metadata, &source.bytes, service.limits) {
         Ok(bytes) => bytes,
         Err(XmlTransformProblem::ShortInput) => return condition("LENGERR", 22, 1),
@@ -572,6 +574,7 @@ fn normal_response(
 fn metadata_outputs(
     request: &CicsRequest,
     metadata: &CicsXmlTransformMetadata,
+    enforce_name_namespace_maximum: bool,
 ) -> Result<BTreeMap<String, Vec<u8>>, HostProblem> {
     let mut outputs = BTreeMap::new();
     for (name, length, value, small, too_large) in [
@@ -608,7 +611,8 @@ fn metadata_outputs(
             continue;
         }
         let maximum = decimal_argument(request, length)?;
-        if let Some(response2) = too_large
+        if enforce_name_namespace_maximum
+            && let Some(response2) = too_large
             && maximum > 255
         {
             return condition("LENGERR", 22, response2);
@@ -1102,6 +1106,7 @@ fn encode_effect(effect: &TransformEffect) -> Result<Vec<u8>, HostProblem> {
         CicsOperation::TransformDataToJson => 1,
         CicsOperation::TransformDataToXml => 2,
         CicsOperation::TransformJsonToData => 3,
+        CicsOperation::TransformXmlToData => 4,
         _ => return Err(HostProblem::InfrastructureFailure),
     });
     out.extend_from_slice(&effect.request_digest);
@@ -1123,6 +1128,7 @@ fn decode_effect(bytes: &[u8], limits: CicsLimits) -> Result<TransformEffect, Ho
         1 => CicsOperation::TransformDataToJson,
         2 => CicsOperation::TransformDataToXml,
         3 => CicsOperation::TransformJsonToData,
+        4 => CicsOperation::TransformXmlToData,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let request_digest = reader
