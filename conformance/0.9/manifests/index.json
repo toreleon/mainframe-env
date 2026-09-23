@@ -71,6 +71,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-misc-tail-bridge",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-misc-tail-bridge-2026-09-23",
+      "manifest": "conformance/0.9/manifests/cics-misc-tail-bridge-topics.json",
+      "manifest_sha256": "sha256:6469742775dfcda755c0f9947b056f3c812cf7dbcd86a893c412657ece59bd46",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:49add946a2acdb28e6879dad0a84eb01b4123e08e7e244bf3639d8c5e249ead9",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-misc-tail-cvda",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
