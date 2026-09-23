@@ -64,6 +64,12 @@ All notable changes to mainframe-env are documented here.
   template sources produce deterministic 16-byte tokens and optional DOCSIZE;
   symbol lists, host code pages, template READ authorization, atomic replay,
   task cleanup, capacity failure, and SQLite reopen are covered.
+- Added typed CICS `TRANSFORM DATATOXML` on the shared transform runtime.
+  Bounded XML bindings emit deterministic namespace/type-qualified documents,
+  return paired element/type metadata with exact fullword lengths, enforce the
+  source LENGERR matrix, and replay both container bytes and metadata from the
+  atomic transform ledger.
+
 - Added typed CICS `TRANSFORM DATATOJSON` over a shared bounded transform
   runtime. Digest-pinned JSON bindings map fixed application-data fields to
   canonical JSON, named channel containers persist in BIT/CHAR modes, SAF

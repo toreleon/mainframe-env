@@ -117,6 +117,8 @@ pub enum CicsPlanOperation {
     DocumentSet,
     /// Convert one BIT-mode application-data container to canonical JSON.
     TransformDataToJson,
+    /// Convert one BIT-mode application-data container to deterministic XML.
+    TransformDataToXml,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -279,6 +281,20 @@ pub enum CicsOperandName {
     OutContainer,
     /// JSON transformer resource name.
     Transformer,
+    /// Application-data container used by XML transformation.
+    DataContainer,
+    /// XML container used by XML transformation.
+    XmlContainer,
+    /// XML transformer resource name.
+    XmlTransform,
+    /// Element-name buffer length.
+    ElementNameLength,
+    /// Element-namespace buffer length.
+    ElementNamespaceLength,
+    /// Type-name buffer length.
+    TypeNameLength,
+    /// Type-namespace buffer length.
+    TypeNamespaceLength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -407,4 +423,20 @@ pub enum CicsOutputName {
     DocumentToken,
     /// Current maximum retrieval size destination.
     DocumentSize,
+    /// XML element local name.
+    ElementName,
+    /// XML element local-name length.
+    ElementNameLength,
+    /// XML element namespace.
+    ElementNamespace,
+    /// XML element namespace length.
+    ElementNamespaceLength,
+    /// XML type local name.
+    TypeName,
+    /// XML type local-name length.
+    TypeNameLength,
+    /// XML type namespace.
+    TypeNamespace,
+    /// XML type namespace length.
+    TypeNamespaceLength,
 }

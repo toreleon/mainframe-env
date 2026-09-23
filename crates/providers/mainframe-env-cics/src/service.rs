@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 59);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 60);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4339,6 +4339,7 @@ mod tests {
         let security = Arc::new(CommandSecurityAuthority {
             descriptor: descriptor("host.security.authorize"),
             deny_command,
+            deny_transform: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: Arc::new(Mutex::new(Vec::new())),
@@ -4991,7 +4992,52 @@ mod tests {
                     kind: CicsTransformFieldKind::SignedInteger,
                 },
             ],
+            xml: None,
         }
+    }
+
+    fn xml_transform_definition(name: &str, enabled: bool) -> CicsTransformDefinition {
+        CicsTransformDefinition {
+            name: name.into(),
+            enabled,
+            format: CicsTransformFormat::Xml,
+            fields: json_transform_definition("JSON", true).fields,
+            xml: Some(CicsXmlTransformMetadata {
+                element_name: "customer".into(),
+                element_namespace: "urn:customer".into(),
+                type_name: Some("CustomerType".into()),
+                type_namespace: Some("urn:types".into()),
+            }),
+        }
+    }
+
+    fn xml_transform_request(
+        sequence: u64,
+        input: &[u8],
+        transformer: &[u8],
+        metadata_lengths: Option<[i64; 4]>,
+    ) -> CicsRequest {
+        let mut arguments = BTreeMap::from([
+            ("CHANNEL".into(), cics_literal(b"WORK")),
+            ("DATCONTAINER".into(), cics_literal(input)),
+            ("XMLCONTAINER".into(), cics_literal(b"XML")),
+            ("XMLTRANSFORM".into(), cics_literal(transformer)),
+        ]);
+        if let Some(lengths) = metadata_lengths {
+            for ((name, length), maximum) in [
+                ("ELEMNAME", "ELEMNAMELEN"),
+                ("ELEMNS", "ELEMNSLEN"),
+                ("TYPENAME", "TYPENAMELEN"),
+                ("TYPENS", "TYPENSLEN"),
+            ]
+            .into_iter()
+            .zip(lengths)
+            {
+                arguments.insert(name.into(), argument(name.as_bytes()));
+                arguments.insert(length.into(), cics_decimal(maximum));
+            }
+        }
+        request(CicsOperation::TransformDataToXml, arguments, sequence)
     }
 
     fn effect(run: &RunUnitId, request: CicsRequest, sequence: u64) -> EffectRequest {
@@ -5108,6 +5154,7 @@ mod tests {
             ("SUSPEND", CicsOperation::Suspend),
             ("SYNCPOINT", CicsOperation::Syncpoint),
             ("TRANSFORM DATATOJSON", CicsOperation::TransformDataToJson),
+            ("TRANSFORM DATATOXML", CicsOperation::TransformDataToXml),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
             ("WRITEQ TS", CicsOperation::WriteTemporaryStorage),
@@ -6339,7 +6386,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 59);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 60);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7619,6 +7666,296 @@ mod tests {
             ),
             Err(HostProblem::ResourceExhausted)
         );
+    }
+
+    #[test]
+    fn transform_datatoxml_returns_metadata_and_replays_without_rewriting() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_transform_definition(xml_transform_definition("CUSTOMERXML", true))
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".to_vec(),
+            )
+            .unwrap();
+        let request = xml_transform_request(420, b"SOURCE", b"CUSTOMERXML", Some([32; 4]));
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 420),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            service.transform_container("WORK", "XML").unwrap(),
+            (
+                CicsTransformContainerMode::Char,
+                br#"<customer xmlns="urn:customer" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="t:CustomerType" xmlns:t="urn:types"><name>ALICE</name><count>7</count></customer>"#.to_vec(),
+            )
+        );
+        for (name, expected) in [
+            ("ELEMNAME", b"customer".as_slice()),
+            ("ELEMNAMELEN", b"8".as_slice()),
+            ("ELEMNS", b"urn:customer".as_slice()),
+            ("ELEMNSLEN", b"12".as_slice()),
+            ("TYPENAME", b"CustomerType".as_slice()),
+            ("TYPENAMELEN", b"12".as_slice()),
+            ("TYPENS", b"urn:types".as_slice()),
+            ("TYPENSLEN", b"9".as_slice()),
+        ] {
+            assert_eq!(response.outputs[name].bytes(), expected);
+        }
+        let outer = store
+            .get_provider_state("cics-effect-replay-v1", "outer-420")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-420", outer.version)
+            .unwrap();
+        let before = store
+            .get_provider_state("cics-transform-container-v1", "WORK/XML")
+            .unwrap()
+            .unwrap();
+        let replayed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 420),
+                request,
+            )
+            .unwrap();
+        assert_eq!(replayed, response);
+        assert_eq!(
+            store
+                .get_provider_state("cics-transform-container-v1", "WORK/XML")
+                .unwrap()
+                .unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn transform_datatoxml_reopens_long_resource_name() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-transform-xml-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, session) = registered(&service);
+        service
+            .register_transform_definition(xml_transform_definition("CUSTOMERXMLRESOURCE", true))
+            .unwrap();
+        service
+            .put_transform_container(
+                "WORK",
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".to_vec(),
+            )
+            .unwrap();
+        drop(service);
+        drop(store);
+
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let reopened =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        reopened
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let request = xml_transform_request(421, b"SOURCE", b"CUSTOMERXMLRESOURCE", Some([32; 4]));
+        let response = reopened
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 421),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            reopened.transform_container("WORK", "XML").unwrap().0,
+            CicsTransformContainerMode::Char
+        );
+        let output_before = store
+            .get_provider_state("cics-transform-container-v1", "WORK/XML")
+            .unwrap()
+            .unwrap();
+        let outer = store
+            .get_provider_state("cics-effect-replay-v1", "outer-421")
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-421", outer.version)
+            .unwrap();
+        drop(reopened);
+        drop(store);
+
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let replayed_service =
+            CicsService::open(authorities(), store.clone(), CicsLimits::default()).unwrap();
+        replayed_service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let replayed = replayed_service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 421),
+                request,
+            )
+            .unwrap();
+        assert_eq!(replayed, response);
+        assert_eq!(
+            store
+                .get_provider_state("cics-transform-container-v1", "WORK/XML")
+                .unwrap()
+                .unwrap(),
+            output_before
+        );
+        drop(replayed_service);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn transform_datatoxml_lengths_and_conversion_conditions_are_exact() {
+        let service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        for definition in [
+            xml_transform_definition("CUSTOMERXML", true),
+            xml_transform_definition("DISABLEDXML", false),
+        ] {
+            service.register_transform_definition(definition).unwrap();
+        }
+        for (name, mode, bytes) in [
+            (
+                "SOURCE",
+                CicsTransformContainerMode::Bit,
+                b"ALICE007".as_slice(),
+            ),
+            (
+                "CHAR",
+                CicsTransformContainerMode::Char,
+                b"ALICE007".as_slice(),
+            ),
+            (
+                "BAD",
+                CicsTransformContainerMode::Bit,
+                b"ALICEXXX".as_slice(),
+            ),
+            (
+                "SHORT",
+                CicsTransformContainerMode::Bit,
+                b"ALICE".as_slice(),
+            ),
+            (
+                "INVALID",
+                CicsTransformContainerMode::Bit,
+                b"\xffLICE007".as_slice(),
+            ),
+        ] {
+            service
+                .put_transform_container("WORK", name, mode, bytes.to_vec())
+                .unwrap();
+        }
+        for (sequence, lengths, response2) in [
+            (430, [7, 32, 32, 32], 2),
+            (431, [32, 11, 32, 32], 3),
+            (432, [32, 32, 11, 32], 4),
+            (433, [32, 32, 32, 8], 5),
+            (434, [256, 32, 32, 32], 6),
+            (435, [32, 256, 32, 32], 7),
+        ] {
+            let mut request =
+                xml_transform_request(sequence, b"SOURCE", b"CUSTOMERXML", Some(lengths));
+            request.condition_policy = CicsConditionPolicy::NoHandle;
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("LENGERR", 22, response2)
+            );
+        }
+        for (sequence, input, transformer, name, response, response2) in [
+            (
+                436,
+                b"SOURCE".as_slice(),
+                b"MISSING".as_slice(),
+                "NOTFND",
+                13,
+                1,
+            ),
+            (
+                437,
+                b"SOURCE".as_slice(),
+                b"DISABLEDXML".as_slice(),
+                "INVREQ",
+                16,
+                1,
+            ),
+            (
+                438,
+                b"BAD".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                6,
+            ),
+            (
+                439,
+                b"CHAR".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                8,
+            ),
+            (
+                440,
+                b"SHORT".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "LENGERR",
+                22,
+                1,
+            ),
+            (
+                441,
+                b"INVALID".as_slice(),
+                b"CUSTOMERXML".as_slice(),
+                "INVREQ",
+                16,
+                5,
+            ),
+        ] {
+            let mut request = xml_transform_request(sequence, input, transformer, None);
+            request.condition_policy = CicsConditionPolicy::NoHandle;
+            let actual = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (actual.condition.as_str(), actual.response, actual.response2),
+                (name, response, response2)
+            );
+        }
     }
 
     #[test]

@@ -110,7 +110,7 @@ pub(super) use transform_control::invoke as invoke_transform_control;
 #[allow(unused_imports)]
 pub use transform_control::{
     CicsTransformContainerMode, CicsTransformDefinition, CicsTransformFieldDefinition,
-    CicsTransformFieldKind, CicsTransformFormat,
+    CicsTransformFieldKind, CicsTransformFormat, CicsXmlTransformMetadata,
 };
 pub(crate) use transform_control::{
     TransformContainer, container as transform_container,

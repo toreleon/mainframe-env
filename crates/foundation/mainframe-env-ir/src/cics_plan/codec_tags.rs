@@ -10,7 +10,7 @@ const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u8 = 96;
 #[cfg(test)]
 pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u8> = 68..=71;
 #[cfg(test)]
-pub(super) const TRANSFORM_OPERAND_TAGS: std::ops::RangeInclusive<u8> = 152..=171;
+pub(super) const TRANSFORM_OPERAND_TAGS: std::ops::RangeInclusive<u8> = 153..=171;
 #[cfg(test)]
 pub(super) const TRANSFORM_OPTION_TAGS: std::ops::RangeInclusive<u8> = 96..=107;
 #[cfg(test)]
@@ -75,6 +75,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DocumentRetrieve => 66,
         CicsPlanOperation::DocumentSet => 67,
         CicsPlanOperation::TransformDataToJson => 68,
+        CicsPlanOperation::TransformDataToXml => 69,
     }
 }
 
@@ -137,6 +138,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         66 => Ok(CicsPlanOperation::DocumentRetrieve),
         67 => Ok(CicsPlanOperation::DocumentSet),
         68 => Ok(CicsPlanOperation::TransformDataToJson),
+        69 => Ok(CicsPlanOperation::TransformDataToXml),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -224,6 +226,13 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::InContainer => 153,
         CicsOperandName::OutContainer => 154,
         CicsOperandName::Transformer => 155,
+        CicsOperandName::DataContainer => 156,
+        CicsOperandName::XmlContainer => 157,
+        CicsOperandName::XmlTransform => 158,
+        CicsOperandName::ElementNameLength => 161,
+        CicsOperandName::ElementNamespaceLength => 163,
+        CicsOperandName::TypeNameLength => 165,
+        CicsOperandName::TypeNamespaceLength => 167,
     }
 }
 
@@ -310,6 +319,13 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         153 => Ok(CicsOperandName::InContainer),
         154 => Ok(CicsOperandName::OutContainer),
         155 => Ok(CicsOperandName::Transformer),
+        156 => Ok(CicsOperandName::DataContainer),
+        157 => Ok(CicsOperandName::XmlContainer),
+        158 => Ok(CicsOperandName::XmlTransform),
+        161 => Ok(CicsOperandName::ElementNameLength),
+        163 => Ok(CicsOperandName::ElementNamespaceLength),
+        165 => Ok(CicsOperandName::TypeNameLength),
+        167 => Ok(CicsOperandName::TypeNamespaceLength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -434,6 +450,14 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::NumItems => 200,
         CicsOutputName::DocumentToken => 216,
         CicsOutputName::DocumentSize => 217,
+        CicsOutputName::ElementName => 224,
+        CicsOutputName::ElementNameLength => 225,
+        CicsOutputName::ElementNamespace => 226,
+        CicsOutputName::ElementNamespaceLength => 227,
+        CicsOutputName::TypeName => 228,
+        CicsOutputName::TypeNameLength => 229,
+        CicsOutputName::TypeNamespace => 230,
+        CicsOutputName::TypeNamespaceLength => 231,
     }
 }
 
@@ -460,6 +484,14 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         200 => Ok(CicsOutputName::NumItems),
         216 => Ok(CicsOutputName::DocumentToken),
         217 => Ok(CicsOutputName::DocumentSize),
+        224 => Ok(CicsOutputName::ElementName),
+        225 => Ok(CicsOutputName::ElementNameLength),
+        226 => Ok(CicsOutputName::ElementNamespace),
+        227 => Ok(CicsOutputName::ElementNamespaceLength),
+        228 => Ok(CicsOutputName::TypeName),
+        229 => Ok(CicsOutputName::TypeNameLength),
+        230 => Ok(CicsOutputName::TypeNamespace),
+        231 => Ok(CicsOutputName::TypeNamespaceLength),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

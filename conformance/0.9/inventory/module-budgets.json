@@ -319,6 +319,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/terminal_run.rs",
       "crates/providers/mainframe-env-cics/src/handlers/time.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transform_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/transform_control/reader.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/transform_control/reader.rs",
       "crates/providers/mainframe-env-cics/src/handlers/transient_data.rs"
     ]
   }

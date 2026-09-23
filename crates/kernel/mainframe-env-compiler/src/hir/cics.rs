@@ -261,6 +261,15 @@ impl PlanContext<'_> {
                 HirCicsOperandName::InContainer => CicsOperandName::InContainer,
                 HirCicsOperandName::OutContainer => CicsOperandName::OutContainer,
                 HirCicsOperandName::Transformer => CicsOperandName::Transformer,
+                HirCicsOperandName::DataContainer => CicsOperandName::DataContainer,
+                HirCicsOperandName::XmlContainer => CicsOperandName::XmlContainer,
+                HirCicsOperandName::XmlTransform => CicsOperandName::XmlTransform,
+                HirCicsOperandName::ElementNameLength => CicsOperandName::ElementNameLength,
+                HirCicsOperandName::ElementNamespaceLength => {
+                    CicsOperandName::ElementNamespaceLength
+                }
+                HirCicsOperandName::TypeNameLength => CicsOperandName::TypeNameLength,
+                HirCicsOperandName::TypeNamespaceLength => CicsOperandName::TypeNamespaceLength,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -303,6 +312,14 @@ impl PlanContext<'_> {
                 HirCicsOutputName::NumItems => CicsOutputName::NumItems,
                 HirCicsOutputName::DocumentToken => CicsOutputName::DocumentToken,
                 HirCicsOutputName::DocumentSize => CicsOutputName::DocumentSize,
+                HirCicsOutputName::ElementName => CicsOutputName::ElementName,
+                HirCicsOutputName::ElementNameLength => CicsOutputName::ElementNameLength,
+                HirCicsOutputName::ElementNamespace => CicsOutputName::ElementNamespace,
+                HirCicsOutputName::ElementNamespaceLength => CicsOutputName::ElementNamespaceLength,
+                HirCicsOutputName::TypeName => CicsOutputName::TypeName,
+                HirCicsOutputName::TypeNameLength => CicsOutputName::TypeNameLength,
+                HirCicsOutputName::TypeNamespace => CicsOutputName::TypeNamespace,
+                HirCicsOutputName::TypeNamespaceLength => CicsOutputName::TypeNamespaceLength,
             },
             target: self.slot(&output.target)?,
         })
@@ -405,6 +422,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::DocumentRetrieve => CicsPlanOperation::DocumentRetrieve,
         HirCicsOperation::DocumentSet => CicsPlanOperation::DocumentSet,
         HirCicsOperation::TransformDataToJson => CicsPlanOperation::TransformDataToJson,
+        HirCicsOperation::TransformDataToXml => CicsPlanOperation::TransformDataToXml,
     }
 }
 

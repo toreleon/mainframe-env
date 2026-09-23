@@ -92,6 +92,19 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::TransformDataToXml => matches!(
+            output,
+            CicsOutputName::ElementName
+                | CicsOutputName::ElementNameLength
+                | CicsOutputName::ElementNamespace
+                | CicsOutputName::ElementNamespaceLength
+                | CicsOutputName::TypeName
+                | CicsOutputName::TypeNameLength
+                | CicsOutputName::TypeNamespace
+                | CicsOutputName::TypeNamespaceLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

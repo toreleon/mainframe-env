@@ -1058,6 +1058,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
     outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

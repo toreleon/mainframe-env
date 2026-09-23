@@ -128,6 +128,14 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::NumItems
         | HirCicsOutputName::DocumentToken
         | HirCicsOutputName::DocumentSize
+        | HirCicsOutputName::ElementName
+        | HirCicsOutputName::ElementNameLength
+        | HirCicsOutputName::ElementNamespace
+        | HirCicsOutputName::ElementNamespaceLength
+        | HirCicsOutputName::TypeName
+        | HirCicsOutputName::TypeNameLength
+        | HirCicsOutputName::TypeNamespace
+        | HirCicsOutputName::TypeNamespaceLength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

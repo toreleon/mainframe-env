@@ -1,13 +1,14 @@
 use super::{HirProblem, HirStatement, StatementKind, StatementOption, StatementOptionKind};
 use crate::{CobolLayout, CobolUsage, DataCategory, LosslessSyntax, SemanticModel, SourceSpan};
 use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
-use mainframe_env_ir::CicsAssignOutput;
 use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
+mod cics_output_names;
 mod cics_resolution;
 mod corresponding_reference;
+pub use cics_output_names::HirCicsOutputName;
 use corresponding_reference::corresponding_group_reference_at;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -204,6 +205,7 @@ pub enum HirCicsOperation {
     DocumentRetrieve,
     DocumentSet,
     TransformDataToJson,
+    TransformDataToXml,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -291,6 +293,13 @@ pub enum HirCicsOperandName {
     InContainer,
     OutContainer,
     Transformer,
+    DataContainer,
+    XmlContainer,
+    XmlTransform,
+    ElementNameLength,
+    ElementNamespaceLength,
+    TypeNameLength,
+    TypeNamespaceLength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -347,32 +356,6 @@ pub enum HirCicsOption {
     Minimum,
     Hold,
     Unescaped,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum HirCicsOutputName {
-    Abstime,
-    Commarea,
-    Into,
-    SetPointer,
-    Ridfld,
-    Milliseconds,
-    Mmddyy,
-    Mmddyyyy,
-    Resp,
-    Resp2,
-    Time,
-    Yyddd,
-    Yymmdd,
-    Yyyymmdd,
-    Assign(CicsAssignOutput),
-    Length,
-    ReturnTransId,
-    ReturnTermId,
-    Queue,
-    NumItems,
-    DocumentToken,
-    DocumentSize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1914,6 +1897,47 @@ mod tests {
             diagnostic
                 .public_message()
                 .contains("TRANSFORM DATATOJSON requires CHANNEL")
+        }));
+    }
+
+    #[test]
+    fn transform_datatoxml_resolves_metadata_input_output_pairs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TRXML. DATA DIVISION. WORKING-STORAGE SECTION. 01 ELEM-X PIC X(32). 01 ELEM-LEN PIC S9(9) COMP VALUE 32. 01 NS-X PIC X(32). 01 NS-LEN PIC S9(9) COMP VALUE 32. PROCEDURE DIVISION. EXEC CICS TRANSFORM DATATOXML CHANNEL('WORK') DATCONTAINER('SOURCE') XMLCONTAINER('XML') XMLTRANSFORM('CUSTOMERXML') ELEMNAME(ELEM-X) ELEMNAMELEN(ELEM-LEN) ELEMNS(NS-X) ELEMNSLEN(NS-LEN) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed XML transform HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved TRANSFORM DATATOXML");
+        assert_eq!(command.operation, HirCicsOperation::TransformDataToXml);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::ElementNameLength
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert_eq!(
+            command
+                .outputs
+                .iter()
+                .map(|output| output.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOutputName::ElementName,
+                HirCicsOutputName::ElementNameLength,
+                HirCicsOutputName::ElementNamespace,
+                HirCicsOutputName::ElementNamespaceLength,
+            ])
+        );
+
+        let missing_pair = source.replace(" ELEMNAMELEN(ELEM-LEN)", "");
+        let analysis = analyze(&missing_pair);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("requires ELEMNAME and ELEMNAMELEN together")
         }));
     }
 

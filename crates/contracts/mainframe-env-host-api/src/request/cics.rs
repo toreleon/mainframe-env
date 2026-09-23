@@ -99,6 +99,8 @@ pub enum CicsOperation {
     Syncpoint,
     /// Convert one BIT-mode application-data container to canonical JSON.
     TransformDataToJson,
+    /// Convert one BIT-mode application-data container to deterministic XML.
+    TransformDataToXml,
     Write,
     WriteTransientData,
     Xctl,
@@ -165,6 +167,7 @@ impl CicsOperation {
             Self::WaitExternal => "WaitExternal",
             Self::Syncpoint => "Syncpoint",
             Self::TransformDataToJson => "TransformDataToJson",
+            Self::TransformDataToXml => "TransformDataToXml",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -209,6 +212,7 @@ impl CicsOperation {
                 | Self::Abend
                 | Self::Syncpoint
                 | Self::TransformDataToJson
+                | Self::TransformDataToXml
                 | Self::SetFileStatus
                 | Self::Start
                 | Self::Retrieve
@@ -287,6 +291,7 @@ impl CicsOperation {
             ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
+            ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

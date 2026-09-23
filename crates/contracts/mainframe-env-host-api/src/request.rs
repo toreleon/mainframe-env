@@ -2434,11 +2434,12 @@ mod tests {
             CicsOperation::WaitExternal,
             CicsOperation::Syncpoint,
             CicsOperation::TransformDataToJson,
+            CicsOperation::TransformDataToXml,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 50);
+        assert_eq!(forms.len(), 51);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

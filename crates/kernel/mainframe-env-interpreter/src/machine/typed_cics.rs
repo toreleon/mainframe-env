@@ -365,6 +365,10 @@ pub(super) fn execute(
                         | CicsOperandName::MinorVersion
                         | CicsOperandName::ListLength
                         | CicsOperandName::MaximumLength
+                        | CicsOperandName::ElementNameLength
+                        | CicsOperandName::ElementNamespaceLength
+                        | CicsOperandName::TypeNameLength
+                        | CicsOperandName::TypeNamespaceLength
                 ) =>
             {
                 (
@@ -437,6 +441,14 @@ pub(super) fn execute(
             | CicsOutputName::Queue
             | CicsOutputName::NumItems
             | CicsOutputName::DocumentToken
+            | CicsOutputName::ElementName
+            | CicsOutputName::ElementNameLength
+            | CicsOutputName::ElementNamespace
+            | CicsOutputName::ElementNamespaceLength
+            | CicsOutputName::TypeName
+            | CicsOutputName::TypeNameLength
+            | CicsOutputName::TypeNamespace
+            | CicsOutputName::TypeNamespaceLength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -618,12 +630,22 @@ pub(super) fn write_output(
     }
     if matches!(
         name,
-        "ABSTIME" | "MILLISECONDS" | "LENGTH" | "FLENGTH" | "NUMITEMS"
+        "ABSTIME"
+            | "MILLISECONDS"
+            | "LENGTH"
+            | "FLENGTH"
+            | "NUMITEMS"
+            | "ELEMNAMELEN"
+            | "ELEMNSLEN"
+            | "TYPENAMELEN"
+            | "TYPENSLEN"
     ) && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
             "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
         ) && value.schema() != "mainframe-env.cics.payload@1"
+        || matches!(name, "ELEMNAME" | "ELEMNS" | "TYPENAME" | "TYPENS")
+            && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(
             name,
             "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"

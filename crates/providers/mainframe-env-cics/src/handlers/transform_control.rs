@@ -1,4 +1,6 @@
-use super::super::{CicsLimits, CicsService, Run, argument_text, bounded, mutation_problem};
+use super::super::{
+    CicsLimits, CicsService, Run, argument_text, bounded, decimal_payload, mutation_problem,
+};
 use super::{field, store_error};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
@@ -8,14 +10,26 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, ProviderS
 use serde_json::{Map, Number, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod reader;
+use reader::Reader;
+
 const RESOURCE_NAMESPACE: &str = "cics-transform-resource-v1";
 const CONTAINER_NAMESPACE: &str = "cics-transform-container-v1";
 const EFFECT_NAMESPACE: &str = "cics-transform-effect-v1";
 const DEFAULT_JSON_OUTPUT: &str = "DFHJSON-JSON";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum XmlTransformProblem {
+    ShortInput,
+    InvalidData,
+    Conversion,
+    ResourceExhausted,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum CicsTransformFormat {
     Json,
+    Xml,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -38,6 +52,15 @@ pub struct CicsTransformDefinition {
     pub enabled: bool,
     pub format: CicsTransformFormat,
     pub fields: Vec<CicsTransformFieldDefinition>,
+    pub xml: Option<CicsXmlTransformMetadata>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsXmlTransformMetadata {
+    pub element_name: String,
+    pub element_namespace: String,
+    pub type_name: Option<String>,
+    pub type_namespace: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -69,6 +92,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::TransformDataToJson => data_to_json(service, run, request),
+        CicsOperation::TransformDataToXml => data_to_xml(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -308,8 +332,99 @@ fn data_to_json(
     normal_response(service, run, BTreeMap::new())
 }
 
+fn data_to_xml(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_request(request, CicsOperation::TransformDataToXml)?;
+    let channel = request_name(request, "CHANNEL", 16, "CHANNELERR", 122, 1)?;
+    let input = request_name(request, "DATCONTAINER", 16, "CONTAINERERR", 110, 3)?;
+    let output = request_name(request, "XMLCONTAINER", 16, "CONTAINERERR", 110, 1)?;
+    let transformer = request_name(request, "XMLTRANSFORM", 32, "INVREQ", 16, 6)?;
+    match service.authorize(
+        run,
+        "TRANSFORM",
+        &format!("CICS.XML.{transformer}"),
+        AccessIntent::Update,
+    ) {
+        Ok(()) => {}
+        Err(HostProblem::Unauthorized) => return condition("INVREQ", 16, 101),
+        Err(problem) => return Err(problem),
+    }
+
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let effect_key = mutation.idempotency_key.as_str();
+    let request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    if let Some(effect) = replay_effect(service, effect_key, request_digest, request.operation)? {
+        return normal_response(service, run, effect.outputs);
+    }
+
+    let (definition, source) = {
+        let state = service.lock()?;
+        if !state
+            .transform_containers
+            .keys()
+            .any(|(candidate, _)| candidate == &channel)
+        {
+            return condition("CHANNELERR", 122, 2);
+        }
+        let source = match state
+            .transform_containers
+            .get(&(channel.clone(), input.clone()))
+        {
+            Some(container) => container.clone(),
+            None => return condition("CONTAINERERR", 110, 3),
+        };
+        if source.mode != CicsTransformContainerMode::Bit {
+            return condition("INVREQ", 16, 8);
+        }
+        let definition = match state
+            .transform_resources
+            .get(&(CicsTransformFormat::Xml, transformer.clone()))
+        {
+            Some(definition) => definition.clone(),
+            None => return condition("NOTFND", 13, 1),
+        };
+        if !definition.enabled {
+            return condition("INVREQ", 16, 1);
+        }
+        (definition, source)
+    };
+    let metadata = definition
+        .xml
+        .as_ref()
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let outputs = metadata_outputs(request, metadata)?;
+    let transformed = match xml_from_data(&definition, metadata, &source.bytes, service.limits) {
+        Ok(bytes) => bytes,
+        Err(XmlTransformProblem::ShortInput) => return condition("LENGERR", 22, 1),
+        Err(XmlTransformProblem::InvalidData) => return condition("INVREQ", 16, 5),
+        Err(XmlTransformProblem::Conversion) => return condition("INVREQ", 16, 6),
+        Err(XmlTransformProblem::ResourceExhausted) => return Err(HostProblem::ResourceExhausted),
+    };
+    persist_effect_and_output(
+        service,
+        &channel,
+        &output,
+        effect_key,
+        TransformEffect {
+            operation: request.operation,
+            request_digest,
+            outputs: outputs.clone(),
+        },
+        CicsTransformContainerMode::Char,
+        transformed,
+    )?;
+    normal_response(service, run, outputs)
+}
+
 fn validate_request(request: &CicsRequest, operation: CicsOperation) -> Result<(), HostProblem> {
-    const ALLOWED: &[&str] = &[
+    const JSON_ALLOWED: &[&str] = &[
         "CHANNEL",
         "INCONTAINER",
         "OPTION.NOHANDLE",
@@ -318,19 +433,63 @@ fn validate_request(request: &CicsRequest, operation: CicsOperation) -> Result<(
         "RESP2",
         "TRANSFORMER",
     ];
+    const XML_ALLOWED: &[&str] = &[
+        "CHANNEL",
+        "DATCONTAINER",
+        "ELEMNAME",
+        "ELEMNAMELEN",
+        "ELEMNS",
+        "ELEMNSLEN",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+        "TYPENAME",
+        "TYPENAMELEN",
+        "TYPENS",
+        "TYPENSLEN",
+        "XMLCONTAINER",
+        "XMLTRANSFORM",
+    ];
+    let (allowed, required) = match operation {
+        CicsOperation::TransformDataToJson => {
+            (JSON_ALLOWED, &["CHANNEL", "INCONTAINER", "TRANSFORMER"][..])
+        }
+        CicsOperation::TransformDataToXml => (
+            XML_ALLOWED,
+            &["CHANNEL", "DATCONTAINER", "XMLCONTAINER", "XMLTRANSFORM"][..],
+        ),
+        _ => return Err(HostProblem::Malformed),
+    };
     if request.operation != operation
         || request.mutation.is_none()
         || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
-        || !request.arguments.contains_key("CHANNEL")
-        || !request.arguments.contains_key("INCONTAINER")
-        || !request.arguments.contains_key("TRANSFORMER")
+        || required
+            .iter()
+            .any(|name| !request.arguments.contains_key(*name))
+        || [
+            ("ELEMNAME", "ELEMNAMELEN"),
+            ("ELEMNS", "ELEMNSLEN"),
+            ("TYPENAME", "TYPENAMELEN"),
+            ("TYPENS", "TYPENSLEN"),
+        ]
+        .iter()
+        .any(|(text, length)| {
+            request.arguments.contains_key(*text) != request.arguments.contains_key(*length)
+        })
         || request.arguments.iter().any(|(name, value)| {
-            !ALLOWED.contains(&name.as_str())
+            !allowed.contains(&name.as_str())
                 || match name.as_str() {
-                    "CHANNEL" | "INCONTAINER" | "OUTCONTAINER" | "TRANSFORMER" => !matches!(
+                    "CHANNEL" | "DATCONTAINER" | "INCONTAINER" | "OUTCONTAINER" | "TRANSFORMER"
+                    | "XMLCONTAINER" | "XMLTRANSFORM" => !matches!(
                         value.schema(),
                         "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
                     ),
+                    "ELEMNAMELEN" | "ELEMNSLEN" | "TYPENAMELEN" | "TYPENSLEN" => {
+                        value.schema() != "mainframe-env.cics.decimal@1"
+                    }
+                    "ELEMNAME" | "ELEMNS" | "TYPENAME" | "TYPENS" => {
+                        value.schema() != "mainframe-env.cics.argument@1"
+                    }
                     "OPTION.NOHANDLE" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }
@@ -386,9 +545,87 @@ fn normal_response(
         Vec::new(),
     )?;
     for (name, bytes) in outputs {
-        response.outputs.insert(name, bounded(bytes)?);
+        let payload = if matches!(
+            name.as_str(),
+            "ELEMNAMELEN" | "ELEMNSLEN" | "TYPENAMELEN" | "TYPENSLEN"
+        ) {
+            decimal_payload(
+                std::str::from_utf8(&bytes)
+                    .ok()
+                    .and_then(|value| value.parse::<i64>().ok())
+                    .ok_or(HostProblem::InfrastructureFailure)?,
+            )?
+        } else {
+            bounded(bytes)?
+        };
+        response.outputs.insert(name, payload);
     }
     Ok(response)
+}
+
+fn metadata_outputs(
+    request: &CicsRequest,
+    metadata: &CicsXmlTransformMetadata,
+) -> Result<BTreeMap<String, Vec<u8>>, HostProblem> {
+    let mut outputs = BTreeMap::new();
+    for (name, length, value, small, too_large) in [
+        (
+            "ELEMNAME",
+            "ELEMNAMELEN",
+            metadata.element_name.as_str(),
+            2,
+            Some(6),
+        ),
+        (
+            "ELEMNS",
+            "ELEMNSLEN",
+            metadata.element_namespace.as_str(),
+            3,
+            Some(7),
+        ),
+        (
+            "TYPENAME",
+            "TYPENAMELEN",
+            metadata.type_name.as_deref().unwrap_or_default(),
+            4,
+            None,
+        ),
+        (
+            "TYPENS",
+            "TYPENSLEN",
+            metadata.type_namespace.as_deref().unwrap_or_default(),
+            5,
+            None,
+        ),
+    ] {
+        if !request.arguments.contains_key(name) {
+            continue;
+        }
+        let maximum = decimal_argument(request, length)?;
+        if let Some(response2) = too_large
+            && maximum > 255
+        {
+            return condition("LENGERR", 22, response2);
+        }
+        let actual = i64::try_from(value.len()).map_err(|_| HostProblem::ResourceExhausted)?;
+        if maximum < actual || maximum < 0 {
+            return condition("LENGERR", 22, small);
+        }
+        outputs.insert(name.into(), value.as_bytes().to_vec());
+        outputs.insert(length.into(), actual.to_string().into_bytes());
+    }
+    Ok(outputs)
+}
+
+fn decimal_argument(request: &CicsRequest, name: &str) -> Result<i64, HostProblem> {
+    let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(HostProblem::Malformed);
+    }
+    std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .parse::<i64>()
+        .map_err(|_| HostProblem::Malformed)
 }
 
 fn json_from_data(
@@ -421,6 +658,91 @@ fn json_from_data(
         Err(HostProblem::ResourceExhausted)
     } else {
         Ok(bytes)
+    }
+}
+
+fn xml_from_data(
+    definition: &CicsTransformDefinition,
+    metadata: &CicsXmlTransformMetadata,
+    data: &[u8],
+    limits: CicsLimits,
+) -> Result<Vec<u8>, XmlTransformProblem> {
+    let mut xml = String::new();
+    xml.push('<');
+    xml.push_str(&metadata.element_name);
+    if !metadata.element_namespace.is_empty() {
+        xml.push_str(" xmlns=\"");
+        push_xml_escaped(&mut xml, &metadata.element_namespace, true);
+        xml.push('"');
+    }
+    if let Some(type_name) = metadata.type_name.as_deref() {
+        xml.push_str(" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"");
+        xml.push_str(" xsi:type=\"");
+        if let Some(namespace) = metadata.type_namespace.as_deref()
+            && !namespace.is_empty()
+        {
+            xml.push_str("t:");
+        }
+        push_xml_escaped(&mut xml, type_name, true);
+        xml.push('"');
+        if let Some(namespace) = metadata.type_namespace.as_deref()
+            && !namespace.is_empty()
+        {
+            xml.push_str(" xmlns:t=\"");
+            push_xml_escaped(&mut xml, namespace, true);
+            xml.push('"');
+        }
+    }
+    xml.push('>');
+    for field_definition in &definition.fields {
+        let end = field_definition
+            .offset
+            .checked_add(field_definition.length)
+            .ok_or(XmlTransformProblem::ResourceExhausted)?;
+        let bytes = data
+            .get(field_definition.offset..end)
+            .ok_or(XmlTransformProblem::ShortInput)?;
+        let text = std::str::from_utf8(bytes)
+            .map_err(|_| XmlTransformProblem::InvalidData)?
+            .trim_end_matches(' ');
+        let value = match field_definition.kind {
+            CicsTransformFieldKind::Text => text.to_string(),
+            CicsTransformFieldKind::SignedInteger => text
+                .parse::<i64>()
+                .map_err(|_| XmlTransformProblem::Conversion)?
+                .to_string(),
+        };
+        xml.push('<');
+        xml.push_str(&field_definition.name);
+        xml.push('>');
+        push_xml_escaped(&mut xml, &value, false);
+        xml.push_str("</");
+        xml.push_str(&field_definition.name);
+        xml.push('>');
+        if xml.len() > limits.max_transform_bytes {
+            return Err(XmlTransformProblem::ResourceExhausted);
+        }
+    }
+    xml.push_str("</");
+    xml.push_str(&metadata.element_name);
+    xml.push('>');
+    if xml.len() > limits.max_transform_bytes {
+        Err(XmlTransformProblem::ResourceExhausted)
+    } else {
+        Ok(xml.into_bytes())
+    }
+}
+
+fn push_xml_escaped(output: &mut String, value: &str, attribute: bool) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' if attribute => output.push_str("&quot;"),
+            '\'' if attribute => output.push_str("&apos;"),
+            _ => output.push(character),
+        }
     }
 }
 
@@ -528,7 +850,13 @@ fn normalize_definition(
     mut definition: CicsTransformDefinition,
     limits: CicsLimits,
 ) -> Result<CicsTransformDefinition, HostProblem> {
-    definition.name = normalize_name(&definition.name, 16)?;
+    definition.name = normalize_name(
+        &definition.name,
+        match definition.format {
+            CicsTransformFormat::Json => 16,
+            CicsTransformFormat::Xml => 32,
+        },
+    )?;
     if definition.fields.is_empty() || definition.fields.len() > limits.max_fields {
         return Err(HostProblem::ResourceExhausted);
     }
@@ -553,6 +881,24 @@ fn normalize_definition(
     extents.sort_unstable();
     if extents.windows(2).any(|pair| pair[0].1 > pair[1].0) {
         return Err(HostProblem::Malformed);
+    }
+    match (definition.format, definition.xml.as_ref()) {
+        (CicsTransformFormat::Json, None) => {}
+        (CicsTransformFormat::Xml, Some(metadata))
+            if valid_field_name(&metadata.element_name)
+                && metadata.element_name.len() <= 255
+                && metadata.element_namespace.len() <= 255
+                && metadata.type_name.as_deref().is_none_or(valid_field_name)
+                && metadata
+                    .type_name
+                    .as_ref()
+                    .is_none_or(|name| name.len() <= 255)
+                && metadata
+                    .type_namespace
+                    .as_ref()
+                    .is_none_or(|namespace| namespace.len() <= 255)
+                && metadata.type_name.is_some() == metadata.type_namespace.is_some() => {}
+        _ => return Err(HostProblem::Malformed),
     }
     Ok(definition)
 }
@@ -586,6 +932,7 @@ fn normalize_name(value: &str, maximum: usize) -> Result<String, HostProblem> {
 fn resource_key(format: CicsTransformFormat, name: &str) -> String {
     match format {
         CicsTransformFormat::Json => format!("JSON/{name}"),
+        CicsTransformFormat::Xml => format!("XML/{name}"),
     }
 }
 
@@ -604,6 +951,7 @@ fn encode_definition(definition: &CicsTransformDefinition) -> Result<Vec<u8>, Ho
     let mut out = b"METR1".to_vec();
     out.push(match definition.format {
         CicsTransformFormat::Json => 1,
+        CicsTransformFormat::Xml => 2,
     });
     out.push(u8::from(definition.enabled));
     field(&mut out, definition.name.as_bytes())?;
@@ -629,6 +977,19 @@ fn encode_definition(definition: &CicsTransformDefinition) -> Result<Vec<u8>, Ho
             CicsTransformFieldKind::SignedInteger => 2,
         });
     }
+    if let Some(metadata) = &definition.xml {
+        field(&mut out, metadata.element_name.as_bytes())?;
+        field(&mut out, metadata.element_namespace.as_bytes())?;
+        match (&metadata.type_name, &metadata.type_namespace) {
+            (Some(name), Some(namespace)) => {
+                out.push(1);
+                field(&mut out, name.as_bytes())?;
+                field(&mut out, namespace.as_bytes())?;
+            }
+            (None, None) => out.push(0),
+            _ => return Err(HostProblem::Malformed),
+        }
+    }
     Ok(out)
 }
 
@@ -639,6 +1000,7 @@ fn decode_definition(
     let mut reader = Reader::new(bytes, b"METR1")?;
     let format = match reader.byte()? {
         1 => CicsTransformFormat::Json,
+        2 => CicsTransformFormat::Xml,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let enabled = match reader.byte()? {
@@ -646,7 +1008,10 @@ fn decode_definition(
         1 => true,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let name = reader.text(16)?;
+    let name = reader.text(match format {
+        CicsTransformFormat::Json => 16,
+        CicsTransformFormat::Xml => 32,
+    })?;
     let count = reader.count(limits.max_fields)?;
     let mut fields = Vec::with_capacity(count);
     for _ in 0..count {
@@ -661,6 +1026,23 @@ fn decode_definition(
             },
         });
     }
+    let xml = if format == CicsTransformFormat::Xml {
+        let element_name = reader.text(255)?;
+        let element_namespace = reader.text(255)?;
+        let (type_name, type_namespace) = match reader.byte()? {
+            0 => (None, None),
+            1 => (Some(reader.text(255)?), Some(reader.text(255)?)),
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        Some(CicsXmlTransformMetadata {
+            element_name,
+            element_namespace,
+            type_name,
+            type_namespace,
+        })
+    } else {
+        None
+    };
     reader.finish()?;
     normalize_definition(
         CicsTransformDefinition {
@@ -668,6 +1050,7 @@ fn decode_definition(
             enabled,
             format,
             fields,
+            xml,
         },
         limits,
     )
@@ -711,6 +1094,7 @@ fn encode_effect(effect: &TransformEffect) -> Result<Vec<u8>, HostProblem> {
     let mut out = b"METE1".to_vec();
     out.push(match effect.operation {
         CicsOperation::TransformDataToJson => 1,
+        CicsOperation::TransformDataToXml => 2,
         _ => return Err(HostProblem::InfrastructureFailure),
     });
     out.extend_from_slice(&effect.request_digest);
@@ -730,6 +1114,7 @@ fn decode_effect(bytes: &[u8], limits: CicsLimits) -> Result<TransformEffect, Ho
     let mut reader = Reader::new(bytes, b"METE1")?;
     let operation = match reader.byte()? {
         1 => CicsOperation::TransformDataToJson,
+        2 => CicsOperation::TransformDataToXml,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let request_digest = reader
@@ -752,86 +1137,4 @@ fn decode_effect(bytes: &[u8], limits: CicsLimits) -> Result<TransformEffect, Ho
         request_digest,
         outputs,
     })
-}
-
-struct Reader<'a> {
-    bytes: &'a [u8],
-    at: usize,
-}
-
-impl<'a> Reader<'a> {
-    fn new(bytes: &'a [u8], magic: &[u8]) -> Result<Self, HostProblem> {
-        if !bytes.starts_with(magic) {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        Ok(Self {
-            bytes,
-            at: magic.len(),
-        })
-    }
-
-    fn take(&mut self, amount: usize) -> Result<&'a [u8], HostProblem> {
-        let end = self
-            .at
-            .checked_add(amount)
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let value = self
-            .bytes
-            .get(self.at..end)
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        self.at = end;
-        Ok(value)
-    }
-
-    fn byte(&mut self) -> Result<u8, HostProblem> {
-        Ok(self.take(1)?[0])
-    }
-
-    fn bytes(&mut self, maximum: usize) -> Result<Vec<u8>, HostProblem> {
-        let length = usize::try_from(u32::from_be_bytes(
-            self.take(4)?
-                .try_into()
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        ))
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if length > maximum {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        Ok(self.take(length)?.to_vec())
-    }
-
-    fn text(&mut self, maximum: usize) -> Result<String, HostProblem> {
-        String::from_utf8(self.bytes(maximum)?).map_err(|_| HostProblem::InfrastructureFailure)
-    }
-
-    fn count(&mut self, maximum: usize) -> Result<usize, HostProblem> {
-        let count = usize::try_from(u32::from_be_bytes(
-            self.take(4)?
-                .try_into()
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        ))
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if count > maximum {
-            Err(HostProblem::ResourceExhausted)
-        } else {
-            Ok(count)
-        }
-    }
-
-    fn usize(&mut self) -> Result<usize, HostProblem> {
-        usize::try_from(u64::from_be_bytes(
-            self.take(8)?
-                .try_into()
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        ))
-        .map_err(|_| HostProblem::ResourceExhausted)
-    }
-
-    fn finish(self) -> Result<(), HostProblem> {
-        if self.at == self.bytes.len() {
-            Ok(())
-        } else {
-            Err(HostProblem::InfrastructureFailure)
-        }
-    }
 }

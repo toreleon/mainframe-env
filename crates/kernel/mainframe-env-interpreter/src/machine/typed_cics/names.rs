@@ -34,7 +34,11 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::MajorVersion | CicsOperandName::MinorVersion => SlotUse::FullwordInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
-        CicsOperandName::Flength => SlotUse::FullwordInput,
+        CicsOperandName::Flength
+        | CicsOperandName::ElementNameLength
+        | CicsOperandName::ElementNamespaceLength
+        | CicsOperandName::TypeNameLength
+        | CicsOperandName::TypeNamespaceLength => SlotUse::FullwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataArea => SlotUse::Input,
         CicsOperandName::EventControlAddress => SlotUse::PointerInput,
@@ -73,6 +77,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::ReturnTransId | CicsOutputName::ReturnTermId | CicsOutputName::Queue => {
             SlotUse::Output
         }
+        CicsOutputName::ElementName
+        | CicsOutputName::ElementNamespace
+        | CicsOutputName::TypeName
+        | CicsOutputName::TypeNamespace => SlotUse::Output,
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
             SlotUse::FormatTextOutput(8)
@@ -83,6 +91,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::Resp2
         | CicsOutputName::Length
         | CicsOutputName::NumItems => SlotUse::NumericOutput,
+        CicsOutputName::ElementNameLength
+        | CicsOutputName::ElementNamespaceLength
+        | CicsOutputName::TypeNameLength
+        | CicsOutputName::TypeNamespaceLength => SlotUse::NumericOutput,
         CicsOutputName::Assign(output) => SlotUse::AssignOutput(output),
         CicsOutputName::DocumentToken => SlotUse::Output,
         CicsOutputName::DocumentSize => SlotUse::NumericOutput,
@@ -148,6 +160,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
         CicsPlanOperation::DocumentSet => CicsOperation::DocumentSet,
         CicsPlanOperation::TransformDataToJson => CicsOperation::TransformDataToJson,
+        CicsPlanOperation::TransformDataToXml => CicsOperation::TransformDataToXml,
     }
 }
 
@@ -234,6 +247,13 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::InContainer => "INCONTAINER",
         CicsOperandName::OutContainer => "OUTCONTAINER",
         CicsOperandName::Transformer => "TRANSFORMER",
+        CicsOperandName::DataContainer => "DATCONTAINER",
+        CicsOperandName::XmlContainer => "XMLCONTAINER",
+        CicsOperandName::XmlTransform => "XMLTRANSFORM",
+        CicsOperandName::ElementNameLength => "ELEMNAMELEN",
+        CicsOperandName::ElementNamespaceLength => "ELEMNSLEN",
+        CicsOperandName::TypeNameLength => "TYPENAMELEN",
+        CicsOperandName::TypeNamespaceLength => "TYPENSLEN",
     }
 }
 
@@ -261,6 +281,14 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::NumItems => "NUMITEMS",
         CicsOutputName::DocumentToken => "DOCTOKEN",
         CicsOutputName::DocumentSize => "DOCSIZE",
+        CicsOutputName::ElementName => "ELEMNAME",
+        CicsOutputName::ElementNameLength => "ELEMNAMELEN",
+        CicsOutputName::ElementNamespace => "ELEMNS",
+        CicsOutputName::ElementNamespaceLength => "ELEMNSLEN",
+        CicsOutputName::TypeName => "TYPENAME",
+        CicsOutputName::TypeNameLength => "TYPENAMELEN",
+        CicsOutputName::TypeNamespace => "TYPENS",
+        CicsOutputName::TypeNamespaceLength => "TYPENSLEN",
     }
 }
 

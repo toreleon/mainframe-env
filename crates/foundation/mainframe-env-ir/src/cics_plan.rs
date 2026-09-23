@@ -20,6 +20,7 @@ mod queue_control;
 mod storage_control;
 mod task_wait;
 mod terminal_control;
+mod transform_control;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
 pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
@@ -580,27 +581,8 @@ fn validate_operation_shape(
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
-        CicsPlanOperation::TransformDataToJson => {
-            let required = BTreeSet::from([
-                CicsOperandName::Channel,
-                CicsOperandName::InContainer,
-                CicsOperandName::Transformer,
-            ]);
-            let allowed = BTreeSet::from([
-                CicsOperandName::Channel,
-                CicsOperandName::InContainer,
-                CicsOperandName::OutContainer,
-                CicsOperandName::Transformer,
-            ]);
-            !required.is_subset(inputs)
-                || !inputs.is_subset(&allowed)
-                || plan.operands.iter().any(|operand| {
-                    !matches!(
-                        operand.value,
-                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
-                    )
-                })
-                || scheduling_options
+        CicsPlanOperation::TransformDataToJson | CicsPlanOperation::TransformDataToXml => {
+            transform_control::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
@@ -3409,23 +3391,32 @@ mod tests {
     }
 
     #[test]
-    fn transform_datatojson_tags_are_unique_reserved_and_round_trip() {
-        let operation_tag = operation_tag(CicsPlanOperation::TransformDataToJson);
-        assert!(codec_tags::TRANSFORM_OPERATION_TAGS.contains(&operation_tag));
-        assert_eq!(
-            operation_from_tag(operation_tag),
-            Ok(CicsPlanOperation::TransformDataToJson)
-        );
+    fn transform_tags_are_unique_reserved_and_round_trip() {
+        for operation in [
+            CicsPlanOperation::TransformDataToJson,
+            CicsPlanOperation::TransformDataToXml,
+        ] {
+            let tag = operation_tag(operation);
+            assert!(codec_tags::TRANSFORM_OPERATION_TAGS.contains(&tag));
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
         let operands = [
             CicsOperandName::Channel,
             CicsOperandName::InContainer,
             CicsOperandName::OutContainer,
             CicsOperandName::Transformer,
+            CicsOperandName::DataContainer,
+            CicsOperandName::XmlContainer,
+            CicsOperandName::XmlTransform,
+            CicsOperandName::ElementNameLength,
+            CicsOperandName::ElementNamespaceLength,
+            CicsOperandName::TypeNameLength,
+            CicsOperandName::TypeNamespaceLength,
         ];
         let tags = operands.map(operand_tag);
         assert!(
             tags.iter()
-                .all(|tag| codec_tags::TRANSFORM_OPERAND_TAGS.contains(tag))
+                .all(|tag| *tag == 61 || codec_tags::TRANSFORM_OPERAND_TAGS.contains(tag))
         );
         assert_eq!(tags.into_iter().collect::<BTreeSet<_>>().len(), tags.len());
         for (name, tag) in operands.into_iter().zip(tags) {
@@ -3433,6 +3424,19 @@ mod tests {
         }
         assert_eq!(codec_tags::TRANSFORM_OPTION_TAGS, 96..=107);
         assert_eq!(codec_tags::TRANSFORM_OUTPUT_TAGS, 224..=231);
+        for (output, tag) in [
+            (CicsOutputName::ElementName, 224),
+            (CicsOutputName::ElementNameLength, 225),
+            (CicsOutputName::ElementNamespace, 226),
+            (CicsOutputName::ElementNamespaceLength, 227),
+            (CicsOutputName::TypeName, 228),
+            (CicsOutputName::TypeNameLength, 229),
+            (CicsOutputName::TypeNamespace, 230),
+            (CicsOutputName::TypeNamespaceLength, 231),
+        ] {
+            assert_eq!(output_tag(output), tag);
+            assert_eq!(output_from_tag(tag), Ok(output));
+        }
 
         let plan = CicsEffectPlan {
             operation: CicsPlanOperation::TransformDataToJson,
@@ -3462,6 +3466,49 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
             plan
+        );
+
+        let xml = CicsEffectPlan {
+            operation: CicsPlanOperation::TransformDataToXml,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Channel,
+                    value: CicsOperandValue::Literal(b"WORK".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::DataContainer,
+                    value: CicsOperandValue::Literal(b"DATA".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::XmlContainer,
+                    value: CicsOperandValue::Literal(b"XML".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::XmlTransform,
+                    value: CicsOperandValue::Literal(b"CUSTOMERXML".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ElementNameLength,
+                    value: CicsOperandValue::Storage(slot(2, "ELEMENT-LENGTH")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::ElementName,
+                    target: slot(3, "ELEMENT-NAME"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::ElementNameLength,
+                    target: slot(2, "ELEMENT-LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&xml, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            xml
         );
     }
 

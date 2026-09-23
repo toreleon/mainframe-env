@@ -1,8 +1,9 @@
 use super::super::{
-    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, Resolution, ResolutionFailure,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
 };
-use super::{Clauses, cics_value};
-use crate::SemanticModel;
+use super::{Clauses, cics_value, complete_data_reference};
+use crate::{CobolUsage, SemanticModel};
 
 pub(super) struct TransformShape {
     pub(super) clauses: &'static [&'static str],
@@ -11,20 +12,43 @@ pub(super) struct TransformShape {
 }
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<TransformShape> {
-    if operation != HirCicsOperation::TransformDataToJson {
-        return None;
-    }
+    let (clauses, required): (&'static [&'static str], &'static [&'static str]) = match operation {
+        HirCicsOperation::TransformDataToJson => (
+            &[
+                "CHANNEL",
+                "INCONTAINER",
+                "OUTCONTAINER",
+                "TRANSFORMER",
+                "RESP",
+                "RESP2",
+            ],
+            &["CHANNEL", "INCONTAINER", "TRANSFORMER"],
+        ),
+        HirCicsOperation::TransformDataToXml => (
+            &[
+                "CHANNEL",
+                "DATCONTAINER",
+                "ELEMNAME",
+                "ELEMNAMELEN",
+                "ELEMNS",
+                "ELEMNSLEN",
+                "RESP",
+                "RESP2",
+                "TYPENAME",
+                "TYPENAMELEN",
+                "TYPENS",
+                "TYPENSLEN",
+                "XMLCONTAINER",
+                "XMLTRANSFORM",
+            ],
+            &["CHANNEL", "DATCONTAINER", "XMLCONTAINER", "XMLTRANSFORM"],
+        ),
+        _ => return None,
+    };
     Some(TransformShape {
-        clauses: &[
-            "CHANNEL",
-            "INCONTAINER",
-            "OUTCONTAINER",
-            "TRANSFORMER",
-            "RESP",
-            "RESP2",
-        ],
+        clauses,
         options: &["NOHANDLE"],
-        required: &["CHANNEL", "INCONTAINER", "TRANSFORMER"],
+        required,
     })
 }
 
@@ -35,11 +59,25 @@ pub(super) fn validate_constraints(
     let Some(shape) = shape(operation) else {
         return Ok(());
     };
+    let label = match operation {
+        HirCicsOperation::TransformDataToJson => "DATATOJSON",
+        HirCicsOperation::TransformDataToXml => "DATATOXML",
+        _ => unreachable!("transform operation was checked above"),
+    };
     for required in shape.required {
         if !clauses.contains_key(*required) {
             return Err(ResolutionFailure::Invalid(format!(
-                "CICS TRANSFORM DATATOJSON requires {required}"
+                "CICS TRANSFORM {label} requires {required}"
             )));
+        }
+    }
+    if operation == HirCicsOperation::TransformDataToXml {
+        for (text, length) in metadata_clauses() {
+            if clauses.contains_key(text) != clauses.contains_key(length) {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS TRANSFORM DATATOXML requires {text} and {length} together"
+                )));
+            }
         }
     }
     Ok(())
@@ -50,22 +88,121 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    if operation != HirCicsOperation::TransformDataToJson {
+    let text_operands = match operation {
+        HirCicsOperation::TransformDataToJson => &[
+            ("CHANNEL", HirCicsOperandName::Channel),
+            ("INCONTAINER", HirCicsOperandName::InContainer),
+            ("OUTCONTAINER", HirCicsOperandName::OutContainer),
+            ("TRANSFORMER", HirCicsOperandName::Transformer),
+        ][..],
+        HirCicsOperation::TransformDataToXml => &[
+            ("CHANNEL", HirCicsOperandName::Channel),
+            ("DATCONTAINER", HirCicsOperandName::DataContainer),
+            ("XMLCONTAINER", HirCicsOperandName::XmlContainer),
+            ("XMLTRANSFORM", HirCicsOperandName::XmlTransform),
+        ][..],
+        _ => return Ok(Vec::new()),
+    };
+    let mut operands = text_operands
+        .iter()
+        .filter_map(|(name, identity)| clauses.get(*name).map(|value| (identity, value)))
+        .map(|(name, value)| {
+            Ok(HirCicsNamedOperand {
+                name: *name,
+                value: cics_value(value, semantic)?,
+            })
+        })
+        .collect::<Resolution<Vec<_>>>()?;
+    if operation == HirCicsOperation::TransformDataToXml {
+        for (name, identity) in [
+            ("ELEMNAMELEN", HirCicsOperandName::ElementNameLength),
+            ("ELEMNSLEN", HirCicsOperandName::ElementNamespaceLength),
+            ("TYPENAMELEN", HirCicsOperandName::TypeNameLength),
+            ("TYPENSLEN", HirCicsOperandName::TypeNamespaceLength),
+        ] {
+            let Some(value) = clauses.get(name) else {
+                continue;
+            };
+            let target = complete_data_reference(value, semantic)?;
+            require_writable(&target)?;
+            if !matches!(target.usage, CobolUsage::Binary | CobolUsage::NativeBinary)
+                || target.length != 4
+                || target.scale != 0
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS TRANSFORM DATATOXML {name} requires writable fullword binary storage"
+                )));
+            }
+            operands.push(HirCicsNamedOperand {
+                name: identity,
+                value: HirCicsValue::Data(target),
+            });
+        }
+    }
+    Ok(operands)
+}
+
+pub(super) fn outputs(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation != HirCicsOperation::TransformDataToXml {
         return Ok(Vec::new());
     }
+    let mut outputs = Vec::new();
+    for (text, length, text_identity, length_identity) in [
+        (
+            "ELEMNAME",
+            "ELEMNAMELEN",
+            HirCicsOutputName::ElementName,
+            HirCicsOutputName::ElementNameLength,
+        ),
+        (
+            "ELEMNS",
+            "ELEMNSLEN",
+            HirCicsOutputName::ElementNamespace,
+            HirCicsOutputName::ElementNamespaceLength,
+        ),
+        (
+            "TYPENAME",
+            "TYPENAMELEN",
+            HirCicsOutputName::TypeName,
+            HirCicsOutputName::TypeNameLength,
+        ),
+        (
+            "TYPENS",
+            "TYPENSLEN",
+            HirCicsOutputName::TypeNamespace,
+            HirCicsOutputName::TypeNamespaceLength,
+        ),
+    ] {
+        let Some(text_value) = clauses.get(text) else {
+            continue;
+        };
+        let text_target = complete_data_reference(text_value, semantic)?;
+        let length_target = complete_data_reference(&clauses[length], semantic)?;
+        require_writable(&text_target)?;
+        require_writable(&length_target)?;
+        outputs.extend([
+            HirCicsOutputBinding {
+                name: text_identity,
+                target: text_target,
+            },
+            HirCicsOutputBinding {
+                name: length_identity,
+                target: length_target,
+            },
+        ]);
+    }
+    Ok(outputs)
+}
+
+fn metadata_clauses() -> [(&'static str, &'static str); 4] {
     [
-        ("CHANNEL", HirCicsOperandName::Channel),
-        ("INCONTAINER", HirCicsOperandName::InContainer),
-        ("OUTCONTAINER", HirCicsOperandName::OutContainer),
-        ("TRANSFORMER", HirCicsOperandName::Transformer),
+        ("ELEMNAME", "ELEMNAMELEN"),
+        ("ELEMNS", "ELEMNSLEN"),
+        ("TYPENAME", "TYPENAMELEN"),
+        ("TYPENS", "TYPENSLEN"),
     ]
-    .into_iter()
-    .filter_map(|(name, identity)| clauses.get(name).map(|value| (identity, value)))
-    .map(|(name, value)| {
-        Ok(HirCicsNamedOperand {
-            name,
-            value: cics_value(value, semantic)?,
-        })
-    })
-    .collect()
 }

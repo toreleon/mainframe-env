@@ -28,7 +28,7 @@ pub use service::{
     CicsTerminalSnapshot, CicsTraceEntry, CicsTransformContainerMode, CicsTransformDefinition,
     CicsTransformFieldDefinition, CicsTransformFieldKind, CicsTransformFormat,
     CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
-    cics_provider,
+    CicsXmlTransformMetadata, cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]
