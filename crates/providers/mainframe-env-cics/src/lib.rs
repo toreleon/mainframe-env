@@ -21,7 +21,7 @@ pub use retention::{
 };
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsApplicationEntryDefinition, CicsContinuation, CicsDocumentTemplateDefinition,
+    CicsApplicationEntryDefinition, CicsBmsControlSnapshot, CicsContinuation, CicsDocumentTemplateDefinition,
     CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
     CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsPartitionDefinition,
     CicsPartitionSetDefinition, CicsProgramDefinition,

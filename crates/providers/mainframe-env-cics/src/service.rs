@@ -6640,7 +6640,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 110);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 112);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -29191,6 +29191,330 @@ mod tests {
             cics.partition_set_for_run(&invocation.run_unit_id).unwrap(),
             Some("PSET1".into())
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn send_control_page_and_purge_preserve_durable_logical_message_rules() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        let direct = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OPTION.ERASE".into(), cics_option()),
+                ("OPTION.FREEKB".into(), cics_option()),
+                ("OPTION.ALARM".into(), cics_option()),
+                ("CURSOR".into(), cics_decimal(7)),
+            ]),
+            1,
+        );
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, direct.clone(), 1),
+                direct.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        let snapshot = cics.terminal_control_snapshot(&session).unwrap();
+        assert_eq!((snapshot.cursor, snapshot.alarm_count), (7, 1));
+        assert!(snapshot.keyboard_unlocked);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, direct.clone(), 1), direct)
+                .unwrap(),
+            response
+        );
+        assert_eq!(
+            cics.terminal_control_snapshot(&session)
+                .unwrap()
+                .alarm_count,
+            1
+        );
+
+        let accum = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OPTION.ACCUM".into(), cics_option()),
+                ("OPTION.PAGING".into(), cics_option()),
+                ("OPTION.PRINT".into(), cics_option()),
+                ("REQID".into(), cics_literal(b"AB")),
+                ("CURSOR".into(), cics_decimal(9)),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, accum.clone(), 2), accum)
+            .unwrap();
+        assert!(
+            cics.terminal_control_snapshot(&session)
+                .unwrap()
+                .pending_logical_message
+        );
+        assert_eq!(
+            cics.terminal_control_snapshot(&session)
+                .unwrap()
+                .print_count,
+            0
+        );
+        let conflict = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OPTION.ACCUM".into(), cics_option()),
+                ("OPTION.PAGING".into(), cics_option()),
+                ("REQID".into(), cics_literal(b"CD")),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, conflict.clone(), 3),
+                conflict
+            ),
+            Err(HostProblem::Condition {
+                name: "IGREQID".into(),
+                response: 39,
+                response2: 0,
+            })
+        );
+        let set = request(CicsOperation::SendPartnset, BTreeMap::new(), 4);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, set.clone(), 4), set),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
+        let page = request(
+            CicsOperation::SendPage,
+            BTreeMap::from([
+                ("OPTION.RETAIN".into(), cics_option()),
+                ("OPTION.NOAUTOPAGE".into(), cics_option()),
+            ]),
+            5,
+        );
+        let page_response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, page.clone(), 5),
+                page.clone(),
+            )
+            .unwrap();
+        assert_eq!(page_response.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, page.clone(), 5), page)
+                .unwrap(),
+            page_response
+        );
+        let snapshot = cics.terminal_control_snapshot(&session).unwrap();
+        assert!(!snapshot.pending_logical_message);
+        assert_eq!(
+            (snapshot.cursor, snapshot.print_count, snapshot.queued_pages),
+            (9, 1, 1)
+        );
+        let purge = request(CicsOperation::PurgeMessage, BTreeMap::new(), 6);
+        cics.invoke(&effect(&invocation.run_unit_id, purge.clone(), 6), purge)
+            .unwrap();
+        let second_accum = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OPTION.ACCUM".into(), cics_option()),
+                ("OPTION.ALARM".into(), cics_option()),
+            ]),
+            7,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, second_accum.clone(), 7),
+            second_accum,
+        )
+        .unwrap();
+        let purge = request(CicsOperation::PurgeMessage, BTreeMap::new(), 8);
+        cics.invoke(&effect(&invocation.run_unit_id, purge.clone(), 8), purge)
+            .unwrap();
+        let snapshot = cics.terminal_control_snapshot(&session).unwrap();
+        assert!(!snapshot.pending_logical_message);
+        assert_eq!(snapshot.alarm_count, 1);
+        let set_control = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(12)),
+            ]),
+            9,
+        );
+        let returned = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, set_control.clone(), 9),
+                set_control,
+            )
+            .unwrap();
+        assert_eq!(
+            (returned.condition.as_str(), returned.response),
+            ("RETPAGE", 32)
+        );
+        assert_eq!(returned.outputs["SET"].bytes(), &[0; 12]);
+        let outside_cursor = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("CURSOR".into(), cics_decimal(99_999))]),
+            10,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, outside_cursor.clone(), 10),
+                outside_cursor,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        let invalid_ldc = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("LDC".into(), cics_literal(b"ZZ"))]),
+            11,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid_ldc.clone(), 11),
+                invalid_ldc
+            ),
+            Err(HostProblem::Condition {
+                name: "INVLDC".into(),
+                response: 41,
+                response2: 0,
+            })
+        );
+        let no_message = request(CicsOperation::SendPage, BTreeMap::new(), 12);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, no_message.clone(), 12),
+                no_message
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
+        let ignored_partition = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OUTPARTN".into(), cics_literal(b"P")),
+                ("ACTPARTN".into(), cics_literal(b"P")),
+            ]),
+            13,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, ignored_partition.clone(), 13),
+            ignored_partition,
+        )
+        .unwrap();
+        assert_eq!(
+            cics.terminal_control_snapshot(&session)
+                .unwrap()
+                .active_partition,
+            None
+        );
+        let explicit_default_reqid = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([
+                ("OPTION.ACCUM".into(), cics_option()),
+                ("REQID".into(), cics_literal(b"**")),
+            ]),
+            14,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, explicit_default_reqid.clone(), 14),
+            explicit_default_reqid,
+        )
+        .unwrap();
+        let purge = request(CicsOperation::PurgeMessage, BTreeMap::new(), 15);
+        cics.invoke(&effect(&invocation.run_unit_id, purge.clone(), 15), purge)
+            .unwrap();
+    }
+
+    #[test]
+    fn send_control_page_sqlite_recovery_and_saf_denial_keep_state_exact() {
+        let (authorities, seen) = command_authorities(true);
+        let denied = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (denied_invocation, denied_session) = registered(&denied);
+        let erase = request(
+            CicsOperation::SendControl,
+            BTreeMap::from([("OPTION.ERASE".into(), cics_option())]),
+            1,
+        );
+        assert_eq!(
+            denied.invoke(
+                &effect(&denied_invocation.run_unit_id, erase.clone(), 1),
+                erase
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            denied
+                .terminal_control_snapshot(&denied_session)
+                .unwrap()
+                .alarm_count,
+            0
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.TERMINAL.CONTROL"
+                        && *intent == AccessIntent::Update
+                })
+        );
+
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-bms-control-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let session = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            let (invocation, session) = registered(&cics);
+            let accum = request(
+                CicsOperation::SendControl,
+                BTreeMap::from([
+                    ("OPTION.ACCUM".into(), cics_option()),
+                    ("OPTION.PAGING".into(), cics_option()),
+                    ("OPTION.ALARM".into(), cics_option()),
+                ]),
+                1,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, accum.clone(), 1), accum)
+                .unwrap();
+            assert!(
+                cics.terminal_control_snapshot(&session)
+                    .unwrap()
+                    .pending_logical_message
+            );
+            session
+        };
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let cics = service(store);
+        assert!(
+            cics.terminal_control_snapshot(&session)
+                .unwrap()
+                .pending_logical_message
+        );
+        let invocation = invocation_for("bms-reopened", BTreeMap::new());
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let page = request(CicsOperation::SendPage, BTreeMap::new(), 2);
+        cics.invoke(&effect(&invocation.run_unit_id, page.clone(), 2), page)
+            .unwrap();
+        let snapshot = cics.terminal_control_snapshot(&session).unwrap();
+        assert!(!snapshot.pending_logical_message);
+        assert_eq!((snapshot.alarm_count, snapshot.queued_pages), (1, 1));
         std::fs::remove_dir_all(root).unwrap();
     }
 

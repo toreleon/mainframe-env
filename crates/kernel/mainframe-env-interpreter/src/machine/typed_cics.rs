@@ -290,6 +290,7 @@ pub(super) fn execute(
                 if matches!(
                     operand.name,
                     CicsOperandName::Length
+                        | CicsOperandName::ControlCursor
                         | CicsOperandName::DataLength
                         | CicsOperandName::KeyLength
                         | CicsOperandName::MaxLifetime

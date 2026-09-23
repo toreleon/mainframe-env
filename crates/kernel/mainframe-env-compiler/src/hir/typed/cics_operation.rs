@@ -51,6 +51,8 @@ pub enum HirCicsOperation {
     ReceiveMap,
     SendMap,
     ReceivePartn,
+    SendControl,
+    SendPage,
     SendPartnset,
     SendText,
     Assign,

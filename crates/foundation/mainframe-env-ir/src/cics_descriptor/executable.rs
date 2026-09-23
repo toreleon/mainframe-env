@@ -1,7 +1,7 @@
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 108] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 110] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -864,6 +864,22 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 108] = [
         name: "receive-partn",
         major: 1,
         effects: TERMINAL_RECEIVE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendControl,
+        namespace: "cics.terminal",
+        name: "send-control",
+        major: 1,
+        effects: TERMINAL_SEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendPage,
+        namespace: "cics.terminal",
+        name: "send-page",
+        major: 1,
+        effects: TERMINAL_SEND_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];

@@ -81,6 +81,8 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::SpoolWrite => &CICS_EXECUTABLE_DESCRIPTORS[72],
         CicsPlanOperation::SendPartnset => &CICS_EXECUTABLE_DESCRIPTORS[106],
         CicsPlanOperation::ReceivePartn => &CICS_EXECUTABLE_DESCRIPTORS[107],
+        CicsPlanOperation::SendControl => &CICS_EXECUTABLE_DESCRIPTORS[108],
+        CicsPlanOperation::SendPage => &CICS_EXECUTABLE_DESCRIPTORS[109],
         CicsPlanOperation::InvokeService => &CICS_EXECUTABLE_DESCRIPTORS[73],
         CicsPlanOperation::SoapFaultAdd => &CICS_EXECUTABLE_DESCRIPTORS[74],
         CicsPlanOperation::SoapFaultCreate => &CICS_EXECUTABLE_DESCRIPTORS[75],

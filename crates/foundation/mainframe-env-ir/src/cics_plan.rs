@@ -605,7 +605,9 @@ fn validate_operation_shape(
         | CicsPlanOperation::ReceivePartn
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText
-        | CicsPlanOperation::SendPartnset => terminal_control::invalid_shape(plan, inputs, outputs),
+        | CicsPlanOperation::SendPartnset
+        | CicsPlanOperation::SendControl
+        | CicsPlanOperation::SendPage => terminal_control::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::InvokeService
         | CicsPlanOperation::SoapFaultAdd
         | CicsPlanOperation::SoapFaultCreate
@@ -4479,6 +4481,10 @@ mod tests {
         assert_eq!(operation_from_tag(90), Ok(CicsPlanOperation::SendPartnset));
         assert_eq!(operation_tag(CicsPlanOperation::ReceivePartn), 86);
         assert_eq!(operation_from_tag(86), Ok(CicsPlanOperation::ReceivePartn));
+        assert_eq!(operation_tag(CicsPlanOperation::SendControl), 88);
+        assert_eq!(operation_from_tag(88), Ok(CicsPlanOperation::SendControl));
+        assert_eq!(operation_tag(CicsPlanOperation::SendPage), 89);
+        assert_eq!(operation_from_tag(89), Ok(CicsPlanOperation::SendPage));
         assert_eq!(operand_tag(CicsOperandName::Token), 182);
         assert_eq!(operand_from_tag(182), Ok(CicsOperandName::Token));
         assert_eq!(operand_tag(CicsOperandName::Partnset), 192);
@@ -4529,7 +4535,7 @@ mod tests {
         assert_eq!(option_from_tag(124), Ok(CicsPlanOption::AsIs));
         assert_eq!(output_tag(CicsOutputName::Partn), 248);
         assert_eq!(output_from_tag(248), Ok(CicsOutputName::Partn));
-        for tag in (76..=89).filter(|tag| *tag != 86) {
+        for tag in (76..=89).filter(|tag| !matches!(tag, 86 | 88 | 89)) {
             assert_eq!(
                 operation_from_tag(tag),
                 Err(CicsPlanCodecProblem::Malformed)

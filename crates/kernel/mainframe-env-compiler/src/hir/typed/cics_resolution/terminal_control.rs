@@ -5,11 +5,87 @@ use super::super::{
 use super::{Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 
+pub(super) const SEND_CONTROL_OPTIONS: &[&str] = &[
+            "ACCUM",
+            "FORMFEED",
+            "ERASE",
+            "DEFAULT",
+            "ALTERNATE",
+            "ERASEAUP",
+            "PRINT",
+            "FREEKB",
+            "ALARM",
+            "FRSET",
+            "PAGING",
+            "TERMINAL",
+            "WAIT",
+            "LAST",
+            "HONEOM",
+            "L40",
+            "L64",
+            "L80",
+            "CURSOR",
+            "NOHANDLE",
+        ];
+
+pub(super) const SEND_PAGE_OPTIONS: &[&str] = &[
+            "RELEASE",
+            "RETAIN",
+            "AUTOPAGE",
+            "CURRENT",
+            "ALL",
+            "NOAUTOPAGE",
+            "OPERPURGE",
+            "LAST",
+            "NOHANDLE",
+        ];
+
 pub(super) fn validate_constraints(
     clauses: &Clauses,
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::SendControl {
+        let present = |name: &str| options.iter().any(|option| option == name);
+        if present("CURSOR") && !clauses.contains_key("CURSOR")
+            || present("DEFAULT") && present("ALTERNATE")
+            || present("ERASE") && present("ERASEAUP")
+            || [present("L40"), present("L64"), present("L80")]
+                .into_iter()
+                .filter(|value| *value)
+                .count()
+                > 1
+            || [
+                present("TERMINAL"),
+                present("PAGING"),
+                clauses.contains_key("SET"),
+            ]
+            .into_iter()
+            .filter(|value| *value)
+            .count()
+                > 1
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SEND CONTROL has conflicting or unvalued device-control options".into(),
+            ));
+        }
+    }
+    if operation == HirCicsOperation::SendPage {
+        let present = |name: &str| options.iter().any(|option| option == name);
+        if present("RELEASE") && present("RETAIN")
+            || present("AUTOPAGE") && present("NOAUTOPAGE")
+            || clauses.contains_key("TRANSID") && !present("RELEASE")
+            || [present("CURRENT"), present("ALL")]
+                .into_iter()
+                .filter(|value| *value)
+                .count()
+                > 1
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SEND PAGE has conflicting page options or TRANSID without RELEASE".into(),
+            ));
+        }
+    }
     if operation == HirCicsOperation::ReceivePartn {
         if !clauses.contains_key("PARTN")
             || clauses.contains_key("INTO") && clauses.contains_key("SET")
@@ -89,6 +165,77 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if matches!(
+        operation,
+        HirCicsOperation::SendControl | HirCicsOperation::SendPage
+    ) {
+        let specs: &[(&str, HirCicsOperandName, usize, usize)] =
+            if operation == HirCicsOperation::SendControl {
+                &[
+                    ("CURSOR", HirCicsOperandName::ControlCursor, 2, 2),
+                    ("MSR", HirCicsOperandName::Msr, 4, 4),
+                    ("OUTPARTN", HirCicsOperandName::Outpartn, 1, 2),
+                    ("ACTPARTN", HirCicsOperandName::Actpartn, 1, 2),
+                    ("LDC", HirCicsOperandName::Ldc, 2, 2),
+                    ("REQID", HirCicsOperandName::ReqId, 2, 2),
+                ]
+            } else {
+                &[
+                    ("TRANSID", HirCicsOperandName::TransId, 1, 4),
+                    ("TRAILER", HirCicsOperandName::Trailer, 4, 32_767),
+                    ("FMHPARM", HirCicsOperandName::Fmhparm, 1, 8),
+                ]
+            };
+        let mut operands = Vec::new();
+        for (name, identity, minimum, maximum) in specs {
+            let Some(tokens) = clauses.get(*name) else {
+                continue;
+            };
+            let value = if *name == "CURSOR" {
+                cics_integer_value(tokens, semantic)?
+            } else {
+                cics_value(tokens, semantic)?
+            };
+            let valid = match &value {
+                HirCicsValue::Integer(number) => *name == "CURSOR" && (0..=32_766).contains(number),
+                HirCicsValue::Literal(bytes) => {
+                    *name != "TRAILER"
+                        && *name != "CURSOR"
+                        && (*minimum..=*maximum).contains(&bytes.len())
+                        && (*name == "MSR"
+                            || *name == "REQID" && bytes == "**"
+                            || bytes.bytes().all(|byte| byte.is_ascii_alphanumeric()))
+                }
+                HirCicsValue::Data(reference) => {
+                    (*minimum..=*maximum).contains(&reference.length)
+                        && if *name == "CURSOR" {
+                            reference.usage == CobolUsage::Binary && reference.scale == 0
+                        } else if *name == "TRAILER" || *name == "MSR" {
+                            matches!(
+                                reference.category,
+                                DataCategory::Alphabetic | DataCategory::Alphanumeric
+                            )
+                        } else {
+                            matches!(
+                                reference.category,
+                                DataCategory::Alphabetic | DataCategory::Alphanumeric
+                            )
+                        }
+                }
+                HirCicsValue::LengthOf(_) => false,
+            };
+            if !valid {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS {operation:?} {name} has an invalid source value or bound"
+                )));
+            }
+            operands.push(HirCicsNamedOperand {
+                name: *identity,
+                value,
+            });
+        }
+        return Ok(operands);
+    }
     if operation == HirCicsOperation::ReceivePartn {
         let Some(tokens) = clauses.get("LENGTH") else {
             return Ok(Vec::new());

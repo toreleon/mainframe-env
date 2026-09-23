@@ -2483,6 +2483,8 @@ mod tests {
             CicsOperation::Rewrite,
             CicsOperation::SendText,
             CicsOperation::SendMap,
+            CicsOperation::SendControl,
+            CicsOperation::SendPage,
             CicsOperation::SendPartnset,
             CicsOperation::SetAssociationUserCorrData,
             CicsOperation::SetFileStatus,
@@ -2513,7 +2515,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 103);
+        assert_eq!(forms.len(), 105);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

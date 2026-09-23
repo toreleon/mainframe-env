@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `SEND CONTROL` and `SEND PAGE` with durable device control,
+  bounded logical-message accumulation, paging, page completion, SET/RETPAGE,
+  SAF authorization and replay. `PURGE MESSAGE` now discards an active logical
+  message. Sources: IBM CICS TS 6.x application API sources-c rows 0188/0190
+  and sources-b row 0148.
+
 - Added typed CICS `RECEIVE PARTN` with authenticated 8775 partition input,
   AID/partition/cursor and length outputs, first-receive and ASIS handling,
   truncation conditions, durable consumption, and atomic replay. Source:

@@ -40,7 +40,10 @@ pub(super) fn validate_runtime_plan(
             let slot_use = if matches!(operand.value, CicsOperandValue::Storage(_))
                 && matches!(
                     operand.name,
-                    CicsOperandName::Length | CicsOperandName::KeyLength | CicsOperandName::Item
+                    CicsOperandName::Length
+                        | CicsOperandName::ControlCursor
+                        | CicsOperandName::KeyLength
+                        | CicsOperandName::Item
                 ) {
                 if matches!(
                     plan.operation,

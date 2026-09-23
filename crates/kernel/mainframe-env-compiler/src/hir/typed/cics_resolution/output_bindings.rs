@@ -138,6 +138,8 @@ pub(super) fn resolve(
                     | HirCicsOperation::ReadTransientData
                     | HirCicsOperation::ReadTemporaryStorage
                     | HirCicsOperation::ReceivePartn
+                    | HirCicsOperation::SendControl
+                    | HirCicsOperation::SendPage
             )
         {
             continue;

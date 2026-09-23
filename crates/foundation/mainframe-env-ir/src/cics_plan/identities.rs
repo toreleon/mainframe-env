@@ -145,6 +145,10 @@ pub enum CicsPlanOperation {
     SendText,
     /// Associate a registered BMS partition set with the issuing task.
     SendPartnset,
+    /// Send device controls to the terminal or active BMS logical message.
+    SendControl,
+    /// Complete a full-BMS logical message and dispatch its final page.
+    SendPage,
     /// Rewrite the record held by the current update context.
     Rewrite,
     /// Commit or roll back the current unit of work.
@@ -294,6 +298,20 @@ pub enum CicsOperandName {
     Mapset,
     /// `SEND PARTNSET(name)` partition-set resource name.
     Partnset,
+    /// Halfword cursor position for SEND CONTROL.
+    ControlCursor,
+    /// Four-byte 8775 magnetic stripe reader control value.
+    Msr,
+    /// Name of the 8775 output partition.
+    Outpartn,
+    /// Name of the 8775 partition to activate.
+    Actpartn,
+    /// Logical device code mnemonic.
+    Ldc,
+    /// Formatted trailer bytes on the last BMS page.
+    Trailer,
+    /// Outboard 3650 formatting map name.
+    Fmhparm,
     /// `RESOURCE(...)` enqueue identity.
     Resource,
     /// `LENGTH(...)` data length.
@@ -580,6 +598,27 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    Accum,
+    Formfeed,
+    DefaultScreen,
+    AlternateScreen,
+    EraseAup,
+    Print,
+    Alarm,
+    Frset,
+    Paging,
+    Last,
+    Honeom,
+    L40,
+    L64,
+    L80,
+    ReleasePage,
+    RetainPage,
+    Autopage,
+    CurrentPage,
+    AllPages,
+    NoAutopage,
+    OperPurge,
     /// Retain lowercase bytes on a subsequent 8775 partition receive.
     AsIs,
     /// The composite predicate requires all child events.

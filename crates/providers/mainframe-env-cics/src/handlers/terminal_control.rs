@@ -9,7 +9,10 @@ use mainframe_env_host_api::{
 };
 use std::collections::BTreeMap;
 
+mod bms;
 mod partition_set;
+pub use bms::CicsBmsControlSnapshot;
+pub(in crate::service) use bms::release_task as release_bms_message_for_task;
 pub(in crate::service) use partition_set::release_task as release_partition_set_for_task;
 pub use partition_set::{CicsPartitionDefinition, CicsPartitionSetDefinition};
 
@@ -63,33 +66,13 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::SendPartnset => partition_set::invoke(service, run, request),
         CicsOperation::ReceivePartn => partition_set::invoke_receive(service, run, request),
+        CicsOperation::SendControl => bms::invoke_control(service, run, request),
+        CicsOperation::SendPage => bms::invoke_page(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
-        CicsOperation::PurgeMessage => purge_message(service, run, request),
+        CicsOperation::PurgeMessage => bms::purge(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
-}
-
-fn purge_message(
-    service: &CicsService,
-    run: &Run,
-    request: &CicsRequest,
-) -> Result<CicsResponse, HostProblem> {
-    validate_purge_message_request(request)?;
-    validate_purge_message_context(run)?;
-    // The local runtime exposes no ACCUM/page-building route, so its reachable
-    // logical-message state is empty. Purging that state is deliberately
-    // idempotent and must not erase the already displayed terminal image.
-    service.response(
-        run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        Vec::new(),
-    )
 }
 
 fn validate_purge_message_request(request: &CicsRequest) -> Result<(), HostProblem> {

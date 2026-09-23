@@ -673,6 +673,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendPartnset => &["PARTNSET", "RESP", "RESP2"],
         HirCicsOperation::ReceivePartn => &["PARTN", "INTO", "SET", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::SendControl => &[
+            "CURSOR", "MSR", "OUTPARTN", "ACTPARTN", "LDC", "REQID", "SET", "RESP", "RESP2",
+        ],
+        HirCicsOperation::SendPage => &["TRANSID", "TRAILER", "SET", "FMHPARM", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
         HirCicsOperation::Delay => &[
@@ -782,6 +786,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
         HirCicsOperation::SendPartnset => &["NOHANDLE"],
         HirCicsOperation::ReceivePartn => &["ASIS", "NOHANDLE"],
+        HirCicsOperation::SendControl => terminal_control::SEND_CONTROL_OPTIONS,
+        HirCicsOperation::SendPage => terminal_control::SEND_PAGE_OPTIONS,
         HirCicsOperation::StartBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::ResetBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
@@ -892,6 +898,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SendText
         | HirCicsOperation::SendPartnset
         | HirCicsOperation::ReceivePartn
+        | HirCicsOperation::SendControl
+        | HirCicsOperation::SendPage
         | HirCicsOperation::Assign
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
@@ -1132,6 +1140,18 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         .map(|option| {
             counter_control::option(operation, option)
                 .or_else(|| event_control::option(operation, option))
+                .or_else(|| {
+                    matches!(
+                        operation,
+                        HirCicsOperation::SpoolClose
+                            | HirCicsOperation::SpoolOpenInput
+                            | HirCicsOperation::SpoolOpenOutput
+                            | HirCicsOperation::SpoolRead
+                            | HirCicsOperation::SpoolWrite
+                    )
+                    .then(|| spool_control::option(option))
+                    .flatten()
+                })
                 .unwrap_or_else(|| operation::resolve_option(option))
         })
         .collect::<BTreeSet<_>>();

@@ -246,6 +246,8 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
+    ("SendControl", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0188"),
+    ("SendPage", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0190"),
     ("SendPartnset", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0191"),
     ("SendText", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0192"),
     (
@@ -643,6 +645,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "ReceiveMap",
         "ReceivePartn",
         "SendMap",
+        "SendControl",
+        "SendPage",
         "SendPartnset",
         "SendText",
         "Assign",
@@ -991,6 +995,12 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "SendPartnset": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
+    "SendControl": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendPage": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
     "SendText": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
@@ -1284,6 +1294,8 @@ def _load_typed_execution_registrations(
         "Release",
         "RemoveSubevent",
         "ResetBrowse",
+        "SendControl",
+        "SendPage",
         "SendPartnset",
         "SetAssociationUserCorrData",
         "SoapFaultAdd",

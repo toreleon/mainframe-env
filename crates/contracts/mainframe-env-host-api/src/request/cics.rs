@@ -142,6 +142,10 @@ pub enum CicsOperation {
     Rewrite,
     SendText,
     SendMap,
+    /// Send BMS device controls, directly or into a logical message.
+    SendControl,
+    /// Complete and dispatch the active BMS logical message.
+    SendPage,
     /// Associate a registered partition set or return the terminal to base state.
     SendPartnset,
     /// Overwrite the originating task's bounded user correlator data.
@@ -287,6 +291,8 @@ impl CicsOperation {
             Self::Rewrite => "Rewrite",
             Self::SendText => "SendText",
             Self::SendMap => "SendMap",
+            Self::SendControl => "SendControl",
+            Self::SendPage => "SendPage",
             Self::SendPartnset => "SendPartnset",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
             Self::SetFileStatus => "SetFileStatus",
@@ -411,6 +417,8 @@ impl CicsOperation {
                 | Self::RemoveSubevent
                 | Self::PurgeMessage
                 | Self::SendMap
+                | Self::SendControl
+                | Self::SendPage
                 | Self::SendText
                 | Self::SendPartnset
                 | Self::SetAssociationUserCorrData
@@ -529,6 +537,8 @@ impl CicsOperation {
             ("RESETBR", _) => Self::ResetBrowse,
             ("REWRITE", _) => Self::Rewrite,
             ("SEND", Some("MAP")) => Self::SendMap,
+            ("SEND", Some("CONTROL")) => Self::SendControl,
+            ("SEND", Some("PAGE")) => Self::SendPage,
             ("SEND", Some("PARTNSET")) => Self::SendPartnset,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,

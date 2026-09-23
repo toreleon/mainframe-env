@@ -340,6 +340,20 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0171"
     },
     {
+      "operation": "SendControl",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0188"
+    },
+    {
+      "operation": "SendPage",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0190"
+    },
+    {
       "operation": "SendPartnset",
       "interface": "api",
       "family": "terminal-control",

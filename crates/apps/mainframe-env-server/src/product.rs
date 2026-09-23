@@ -20622,4 +20622,125 @@ mod tests {
         );
     }
 
+    #[test]
+    fn compiled_send_control_and_page_complete_a_paging_message() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "BMSPAGE",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. BMSPAGE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CUR-X PIC S9(4) COMP VALUE 9.\n01 RESP-X PIC S9(9) COMP.\n01 PAGE-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS SEND CONTROL ERASE FREEKB END-EXEC.\nEXEC CICS SEND CONTROL ACCUM PAGING REQID('AB') ALARM CURSOR(CUR-X) END-EXEC.\nEXEC CICS SEND PAGE RETAIN NOAUTOPAGE RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO PAGE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "bms-control-class",
+                    "bms-control-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(FACILITY)",
+            )
+            .unwrap();
+        for resource in ["CICS.TERMINAL.CONTROL", "CICS.TERMINAL.PAGE"] {
+            server
+                .racf
+                .define_profile("FACILITY", resource, "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit("FACILITY", resource, "IBMUSER", AccessIntent::Update)
+                .unwrap();
+        }
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "BMSPAGE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("BP00".into(), "BMSPAGE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BMSPAGE".into(),
+                    map: "BMSPAGE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("bms-control-page-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "BP00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "BP00",
+                24,
+                80,
+                "bms-control-page-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "BMSPAGE", 2)
+            .unwrap();
+        let controls = server.cics.terminal_control_snapshot(&session).unwrap();
+        assert_eq!(
+            (controls.cursor, controls.alarm_count, controls.queued_pages),
+            (9, 1, 1)
+        );
+        assert!(controls.keyboard_unlocked);
+        assert!(!controls.pending_logical_message);
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("PAGE-FN").unwrap().bytes(), &[0x18, 0x08]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 3)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendControl)
+                .count(),
+            2
+        );
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendPage)
+                .count(),
+            1
+        );
+    }
+
 }

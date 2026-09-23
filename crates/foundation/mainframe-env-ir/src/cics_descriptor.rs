@@ -679,7 +679,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 108);
+        assert_eq!(typed.len(), 110);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -697,7 +697,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 155);
+        assert_eq!(unready.len(), 153);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -921,6 +921,8 @@ mod tests {
                 CicsPlanOperation::SpoolWrite,
                 CicsPlanOperation::SendPartnset,
                 CicsPlanOperation::ReceivePartn,
+                CicsPlanOperation::SendControl,
+                CicsPlanOperation::SendPage,
                 CicsPlanOperation::DefineCounter,
                 CicsPlanOperation::DefineDCounter,
                 CicsPlanOperation::DeleteCounter,

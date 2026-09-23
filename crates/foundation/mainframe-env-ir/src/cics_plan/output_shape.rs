@@ -88,6 +88,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::SendControl | CicsPlanOperation::SendPage => matches!(
+            output,
+            CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Assign => matches!(
             output,
             CicsOutputName::Assign(_) | CicsOutputName::Resp | CicsOutputName::Resp2

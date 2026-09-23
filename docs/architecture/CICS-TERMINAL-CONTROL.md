@@ -62,3 +62,39 @@ raw HTML SHA-256
 `55f42adddc8b4aba65cd474531ffaca3a51d76716927a5432f9d49505d4a30f3`.
 The committed hash matched its exact raw archive file, and the repository's
 `ibm_docs.py` `PlainText` parser read the local HTML. No refresh was used.
+
+## SEND CONTROL, SEND PAGE, and PURGE MESSAGE
+
+`SEND CONTROL` applies ERASE, ERASEAUP, FRSET, FREEKB, ALARM, cursor,
+partition activation, printer width, print, and form feed controls to the
+durable terminal state. `ACCUM` stages controls in a bounded logical message;
+the terminal screen changes when `SEND PAGE` completes it. REQID must remain
+consistent across accumulated sends. A PAGING message queues its completed
+page in durable temporary output; NOAUTOPAGE keeps the displayed screen.
+`SEND PAGE` validates trailer framing, completes the message, and handles
+RETAIN, RELEASE, and SET. The local SET contract returns a 12-byte prefix and
+the bounded page image with RETPAGE 32. `PURGE MESSAGE` discards the pending
+logical message without erasing the displayed screen. All three use FACILITY
+authorization before durable state mutation and atomic replay receipts.
+Unknown local LDCs return INVLDC 41; 3650-only FMHPARM returns INVREQ 16 for
+the local 3270/8775 terminal model. `CicsService::terminal_control_snapshot`
+exposes the resulting cursor, keyboard, partition, printer, page, and paging
+state. The new MCEP v2 operation tags are 88 and 89. Device-control flag tags
+occupy 125–145; the seven value operands occupy 193–199.
+
+The selected IBM sources are CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`:
+
+| Catalog row | Topic | Raw HTML SHA-256 |
+| --- | --- | --- |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0188` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendcontrol.html` | `4de8c65be1c657057a00898a83816bfb61cdc5bc8113e1b4def1dcc057d3345a` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0190` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendpage.html` | `ea6908816e60520e9de1ced1cd312b4e99745dc4a2592a06468f1b7166a43254` |
+
+The affected existing PURGE MESSAGE source is baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0148`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_purgemessage.html`, raw
+HTML SHA-256
+`5e742d2abc92990142252e6bb6ac5f037252e06f14b769fac0d0aa24c24ba1fa`.
+Each committed SHA matched its exact raw archive file and the repository
+`PlainText` parser read that local HTML. No browser or network refresh occurred.

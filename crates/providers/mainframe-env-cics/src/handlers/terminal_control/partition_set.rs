@@ -215,6 +215,9 @@ pub(super) fn invoke(
         validate_receipt(&receipt, &owner, name.as_deref(), digest)?;
         return normal(service, run);
     }
+    if super::bms::message_active(service, &run.session)? {
+        return Err(invreq(0));
+    }
     let session = service
         .lock()?
         .sessions
@@ -667,6 +670,27 @@ pub(super) fn read_association(
         .transpose()
 }
 
+pub(super) fn partition_exists(
+    service: &CicsService,
+    run: &Run,
+    name: &str,
+) -> Result<bool, HostProblem> {
+    let Some(set_name) = read_association(service, run.invocation.run_unit_id.as_str())?
+        .and_then(|association| association.name)
+    else {
+        return Ok(false);
+    };
+    let row = service
+        .store
+        .get_provider_state(DEFINITION_NAMESPACE, &set_name)
+        .map_err(store_error)?
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok(decode_definition(&row)?
+        .partitions
+        .iter()
+        .any(|partition| partition.name == name))
+}
+
 pub(super) fn require_intervening_send(
     service: &CicsService,
     run: &Run,
@@ -717,6 +741,30 @@ pub(super) fn persist_send(
             }),
         ])
         .map_err(store_error)
+}
+
+pub(super) fn mark_control_send(
+    service: &CicsService,
+    run: &Run,
+) -> Result<Option<ProviderStateMutation>, HostProblem> {
+    let owner = run.invocation.run_unit_id.as_str();
+    let Some(mut association) = read_association(service, owner)? else {
+        return Ok(None);
+    };
+    let old_version = association.version;
+    association.version = old_version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    association.intervening_send = true;
+    Ok(Some(ProviderStateMutation::Put(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: ASSOCIATION_NAMESPACE.into(),
+            key: owner.into(),
+            version: association.version,
+            payload: encode_association(&association)?,
+        },
+        expected_version: Some(old_version),
+    })))
 }
 
 fn normal(service: &CicsService, run: &Run) -> Result<CicsResponse, HostProblem> {
@@ -797,7 +845,7 @@ fn normalized_definition(
     Ok(CicsPartitionSetDefinition { name, partitions })
 }
 
-fn normalized_name(bytes: &[u8], max: usize) -> Result<String, HostProblem> {
+pub(super) fn normalized_name(bytes: &[u8], max: usize) -> Result<String, HostProblem> {
     let text = std::str::from_utf8(bytes).map_err(|_| HostProblem::Malformed)?;
     let text = text.trim_end_matches(' ');
     if text.is_empty() || text.len() > max || !text.bytes().all(|byte| byte.is_ascii_alphanumeric())
@@ -827,7 +875,9 @@ fn encode_definition(definition: &CicsPartitionSetDefinition) -> Result<Vec<u8>,
     Ok(bytes)
 }
 
-fn decode_definition(row: &ProviderStateRecord) -> Result<CicsPartitionSetDefinition, HostProblem> {
+pub(super) fn decode_definition(
+    row: &ProviderStateRecord,
+) -> Result<CicsPartitionSetDefinition, HostProblem> {
     if row.version != 1 {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -951,7 +1001,7 @@ fn read_name(input: &mut &[u8], max: usize) -> Result<String, HostProblem> {
     normalized_name(raw, max).map_err(|_| HostProblem::InfrastructureFailure)
 }
 
-fn read_field<'a>(input: &mut &'a [u8], max: usize) -> Result<&'a [u8], HostProblem> {
+pub(super) fn read_field<'a>(input: &mut &'a [u8], max: usize) -> Result<&'a [u8], HostProblem> {
     let length = u32::from_be_bytes(read_array(input)?) as usize;
     if length > max {
         return Err(HostProblem::InfrastructureFailure);
@@ -959,20 +1009,20 @@ fn read_field<'a>(input: &mut &'a [u8], max: usize) -> Result<&'a [u8], HostProb
     take_bytes(input, length)
 }
 
-fn read_array<const N: usize>(input: &mut &[u8]) -> Result<[u8; N], HostProblem> {
+pub(super) fn read_array<const N: usize>(input: &mut &[u8]) -> Result<[u8; N], HostProblem> {
     take_bytes(input, N)?
         .try_into()
         .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
-fn take(input: &mut &[u8], length: usize, expected: &[u8]) -> Result<(), HostProblem> {
+pub(super) fn take(input: &mut &[u8], length: usize, expected: &[u8]) -> Result<(), HostProblem> {
     if take_bytes(input, length)? != expected {
         return Err(HostProblem::InfrastructureFailure);
     }
     Ok(())
 }
 
-fn take_bytes<'a>(input: &mut &'a [u8], length: usize) -> Result<&'a [u8], HostProblem> {
+pub(super) fn take_bytes<'a>(input: &mut &'a [u8], length: usize) -> Result<&'a [u8], HostProblem> {
     let (head, tail) = input
         .split_at_checked(length)
         .ok_or(HostProblem::InfrastructureFailure)?;
