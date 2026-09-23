@@ -270,6 +270,8 @@ pub enum CicsPlanOperation {
     WebWrite,
     /// Send one checked Web client request or server response.
     WebSend,
+    /// Return the pending server WEB SEND document token.
+    WebRetrieve,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -1101,4 +1103,6 @@ pub enum CicsOutputName {
     WebBrowseName,
     /// Actual WEB READNEXT name length.
     WebBrowseNameLength,
+    /// Document token returned by WEB RETRIEVE.
+    WebRetrieveDocumentToken,
 }

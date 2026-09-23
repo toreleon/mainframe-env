@@ -251,6 +251,8 @@ pub enum CicsOperation {
     WebWrite,
     /// Send a checked HTTP client request or stage a server response.
     WebSend,
+    /// Retrieve the document token from the last pending server WEB SEND.
+    WebRetrieve,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -403,6 +405,7 @@ impl CicsOperation {
             Self::WebEndBrowse => "WebEndBrowse",
             Self::WebWrite => "WebWrite",
             Self::WebSend => "WebSend",
+            Self::WebRetrieve => "WebRetrieve",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -693,6 +696,7 @@ impl CicsOperation {
             ("WEB", Some("ENDBROWSE")) => Self::WebEndBrowse,
             ("WEB", Some("WRITE")) => Self::WebWrite,
             ("WEB", Some("SEND")) => Self::WebSend,
+            ("WEB", Some("RETRIEVE")) => Self::WebRetrieve,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

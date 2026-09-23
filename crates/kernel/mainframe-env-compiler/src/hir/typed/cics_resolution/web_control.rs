@@ -14,6 +14,9 @@ pub(super) fn reviewed_ambiguous_shape(
     name: &str,
     has_value: bool,
 ) -> bool {
+    if has_value && descriptor.label_tokens == ["WEB", "RETRIEVE"] && name == "DOCTOKEN" {
+        return true;
+    }
     if descriptor.label_tokens == ["WEB", "STARTBROWSE"]
         && matches!(name, "FORMFIELD" | "QUERYPARM" | "HTTPHEADER")
     {
@@ -163,6 +166,7 @@ pub(super) const SEND_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const RETRIEVE_CLAUSES: &[&str] = &["DOCTOKEN", "RESP", "RESP2"];
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -184,6 +188,16 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::WebSend {
         return send::validate(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebRetrieve {
+        let target = complete_data_reference(&clauses["DOCTOKEN"], semantic)?;
+        require_writable(&target)?;
+        if target.length != 16 {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB RETRIEVE DOCTOKEN requires writable 16-byte storage".into(),
+            ));
+        }
+        return Ok(());
     }
     if matches!(
         operation,
@@ -534,6 +548,12 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation == HirCicsOperation::WebRetrieve {
+        return Ok(vec![HirCicsOutputBinding {
+            name: HirCicsOutputName::WebRetrieveDocumentToken,
+            target: complete_data_reference(&clauses["DOCTOKEN"], semantic)?,
+        }]);
+    }
     if matches!(
         operation,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb

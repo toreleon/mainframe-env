@@ -551,3 +551,24 @@ pub(super) fn invalid_send_shape(
             })
         })
 }
+
+pub(super) fn invalid_retrieve_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.is_empty()
+        || !plan
+            .options
+            .iter()
+            .all(|option| *option == CicsPlanOption::NoHandle)
+        || !outputs.contains(&CicsOutputName::WebRetrieveDocumentToken)
+        || outputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOutputName::WebRetrieveDocumentToken
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+}

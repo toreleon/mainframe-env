@@ -38,6 +38,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB RETRIEVE` for the task-owned token from the last
+  pending EVENTUAL document send, with documented INVREQ and NOTFND cases.
+  IBM CICS TS 6.x baseline `ibm-cics-ts-6x-2026-08-31:api-commands` row
+  `0249` binds `dfhp4_webretrieve.html` at
+  `sha256:cfc8653835cdc36978993f6b4aeabb2b908267f7a07763b70167a3b95ae32fc7`.
+
 - Added typed CICS `WEB SEND` for durable server response selection and
   checked client request exchange, with staged headers, SAF, replay, and
   explicit post-dispatch uncertainty. IBM CICS TS 6.x baseline

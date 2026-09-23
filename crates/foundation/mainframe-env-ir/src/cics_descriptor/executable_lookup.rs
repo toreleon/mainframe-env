@@ -144,5 +144,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::WebEndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[135],
         CicsPlanOperation::WebWrite => &CICS_EXECUTABLE_DESCRIPTORS[136],
         CicsPlanOperation::WebSend => &CICS_EXECUTABLE_DESCRIPTORS[137],
+        CicsPlanOperation::WebRetrieve => &CICS_EXECUTABLE_DESCRIPTORS[138],
     }
 }

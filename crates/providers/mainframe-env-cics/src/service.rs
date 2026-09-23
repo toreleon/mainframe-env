@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 140);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 141);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8138,6 +8138,120 @@ mod tests {
         drop(service);
         drop(store);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn web_retrieve_selects_only_last_eventual_document_send() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let invocation = invocation_for("web-retrieve", BTreeMap::new());
+        let session = SessionId::new("web-retrieve", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: String::new(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let retrieve = |sequence| {
+            let mut command = request(
+                CicsOperation::WebRetrieve,
+                BTreeMap::from([("DOCTOKEN".into(), argument(b"TOKEN-X"))]),
+                sequence,
+            );
+            command.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            command
+        };
+        let before = retrieve(1);
+        let before = service
+            .invoke(&effect(&invocation.run_unit_id, before.clone(), 1), before)
+            .unwrap();
+        assert_eq!(
+            (before.condition.as_str(), before.response, before.response2),
+            ("INVREQ", 16, 2)
+        );
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(b"BODY")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let created = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 2), create)
+            .unwrap();
+        let token = created.outputs["DOCTOKEN"].bytes().to_vec();
+        let send_document = request(
+            CicsOperation::WebSend,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("ACTION".into(), cics_literal(b"EVENTUAL")),
+            ]),
+            3,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, send_document.clone(), 3),
+                send_document,
+            )
+            .unwrap();
+        let retrieved = retrieve(4);
+        let retrieved = service
+            .invoke(
+                &effect(&invocation.run_unit_id, retrieved.clone(), 4),
+                retrieved,
+            )
+            .unwrap();
+        assert_eq!(retrieved.outputs["DOCTOKEN"].bytes(), token);
+        let send_from = request(
+            CicsOperation::WebSend,
+            BTreeMap::from([
+                ("FROM".into(), cics_literal(b"LATER")),
+                ("FROMLENGTH".into(), cics_decimal(5)),
+            ]),
+            5,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, send_from.clone(), 5),
+                send_from,
+            )
+            .unwrap();
+        let missing = retrieve(6);
+        let missing = service
+            .invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 6),
+                missing,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                missing.condition.as_str(),
+                missing.response,
+                missing.response2
+            ),
+            ("NOTFND", 13, 1)
+        );
     }
 
     #[test]

@@ -531,6 +531,9 @@ impl PlanContext<'_> {
                 HirCicsOutputName::WebValueLength => CicsOutputName::WebValueLength,
                 HirCicsOutputName::WebBrowseName => CicsOutputName::WebBrowseName,
                 HirCicsOutputName::WebBrowseNameLength => CicsOutputName::WebBrowseNameLength,
+                HirCicsOutputName::WebRetrieveDocumentToken => {
+                    CicsOutputName::WebRetrieveDocumentToken
+                }
             },
             target: self.slot(&output.target)?,
         })
@@ -708,6 +711,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WebEndBrowse => CicsPlanOperation::WebEndBrowse,
         HirCicsOperation::WebWrite => CicsPlanOperation::WebWrite,
         HirCicsOperation::WebSend => CicsPlanOperation::WebSend,
+        HirCicsOperation::WebRetrieve => CicsPlanOperation::WebRetrieve,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,

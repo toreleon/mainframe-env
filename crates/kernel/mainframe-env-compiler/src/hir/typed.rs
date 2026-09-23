@@ -7008,6 +7008,31 @@ mod tests {
     }
 
     #[test]
+    fn web_retrieve_binds_writable_document_token_output() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS WEB RETRIEVE DOCTOKEN(TOKEN-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("{:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(command.operation, HirCicsOperation::WebRetrieve);
+        assert_eq!(command.outputs.len(), 1);
+        assert_eq!(
+            command.outputs[0].name,
+            HirCicsOutputName::WebRetrieveDocumentToken
+        );
+        let invalid = analyze(&source.replace("PIC X(16)", "PIC X(8)"));
+        assert!(invalid.hir.is_none());
+    }
+
+    #[test]
     fn web_write_lowers_header_bytes_and_fullword_lengths() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADER-X PIC X(6) VALUE 'X-Test'. 01 VALUE-X PIC X(5) VALUE 'alpha'. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
         for source in [

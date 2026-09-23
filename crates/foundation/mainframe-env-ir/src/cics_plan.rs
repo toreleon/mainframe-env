@@ -663,6 +663,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WebEndBrowse => web_control::invalid_end_browse_shape(plan, inputs, outputs),
         CicsPlanOperation::WebWrite => web_control::invalid_write_shape(plan, inputs, outputs),
         CicsPlanOperation::WebSend => web_control::invalid_send_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebRetrieve => {
+            web_control::invalid_retrieve_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2435,6 +2438,42 @@ mod tests {
         );
         assert_eq!(
             encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_retrieve_codec_requires_document_token_output_in_v2() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebRetrieve), 102);
+        assert_eq!(operation_from_tag(102), Ok(CicsPlanOperation::WebRetrieve));
+        assert_eq!(output_tag(CicsOutputName::WebRetrieveDocumentToken), 337);
+        assert_eq!(
+            output_from_tag(337),
+            Ok(CicsOutputName::WebRetrieveDocumentToken)
+        );
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebRetrieve,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::WebRetrieveDocumentToken,
+                target: slot(0, "TOKEN-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut invalid = plan;
+        invalid.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

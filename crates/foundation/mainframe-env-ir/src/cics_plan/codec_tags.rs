@@ -114,6 +114,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::WebEndBrowse => 99,
         CicsPlanOperation::WebWrite => 100,
         CicsPlanOperation::WebSend => 101,
+        CicsPlanOperation::WebRetrieve => 102,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -257,6 +258,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         99 => Ok(CicsPlanOperation::WebEndBrowse),
         100 => Ok(CicsPlanOperation::WebWrite),
         101 => Ok(CicsPlanOperation::WebSend),
+        102 => Ok(CicsPlanOperation::WebRetrieve),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -1169,6 +1171,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::WebValueLength => 334,
         CicsOutputName::WebBrowseName => 335,
         CicsOutputName::WebBrowseNameLength => 336,
+        CicsOutputName::WebRetrieveDocumentToken => 337,
     }
 }
 
@@ -1250,6 +1253,7 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         334 => Ok(CicsOutputName::WebValueLength),
         335 => Ok(CicsOutputName::WebBrowseName),
         336 => Ok(CicsOutputName::WebBrowseNameLength),
+        337 => Ok(CicsOutputName::WebRetrieveDocumentToken),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

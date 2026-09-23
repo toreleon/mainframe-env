@@ -78,4 +78,5 @@ pub enum HirCicsOutputName {
     WebValueLength,
     WebBrowseName,
     WebBrowseNameLength,
+    WebRetrieveDocumentToken,
 }

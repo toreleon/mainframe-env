@@ -12,6 +12,7 @@ mod open;
 mod parse_url;
 mod read;
 mod read_next;
+mod retrieve;
 mod send;
 mod start_browse;
 mod write;
@@ -385,6 +386,7 @@ pub(in crate::service) fn invoke(
             write::invoke(service, run, request, run.invocation.deadline_tick)
         }
         CicsOperation::WebSend => send::invoke(service, run, request, run.invocation.deadline_tick),
+        CicsOperation::WebRetrieve => retrieve::invoke(service, run, request),
         CicsOperation::WebStartBrowse => {
             start_browse::invoke(service, run, request, run.invocation.deadline_tick)
         }

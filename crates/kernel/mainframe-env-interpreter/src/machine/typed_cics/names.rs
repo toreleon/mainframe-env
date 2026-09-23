@@ -222,6 +222,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::WebRealm
         | CicsOutputName::WebValue => SlotUse::Output,
         CicsOutputName::WebBrowseName => SlotUse::Output,
+        CicsOutputName::WebRetrieveDocumentToken => SlotUse::Output,
         CicsOutputName::WebHostLength
         | CicsOutputName::WebHostType
         | CicsOutputName::WebPortNumber
@@ -379,6 +380,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebEndBrowse => CicsOperation::WebEndBrowse,
         CicsPlanOperation::WebWrite => CicsOperation::WebWrite,
         CicsPlanOperation::WebSend => CicsOperation::WebSend,
+        CicsPlanOperation::WebRetrieve => CicsOperation::WebRetrieve,
     }
 }
 
@@ -744,6 +746,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::WebValueLength => "VALUELENGTH",
         CicsOutputName::WebBrowseName => "BROWSENAME",
         CicsOutputName::WebBrowseNameLength => "NAMELENGTH",
+        CicsOutputName::WebRetrieveDocumentToken => "DOCTOKEN",
     }
 }
 

@@ -1951,6 +1951,7 @@ mod tests {
                 CicsPlanOperation::WebEndBrowse => crate::HirCicsOperation::WebEndBrowse,
                 CicsPlanOperation::WebWrite => crate::HirCicsOperation::WebWrite,
                 CicsPlanOperation::WebSend => crate::HirCicsOperation::WebSend,
+                CicsPlanOperation::WebRetrieve => crate::HirCicsOperation::WebRetrieve,
                 CicsPlanOperation::WaitJournalName => crate::HirCicsOperation::WaitJournalName,
                 CicsPlanOperation::WaitJournalNum => crate::HirCicsOperation::WaitJournalNum,
                 CicsPlanOperation::WriteJournalName => crate::HirCicsOperation::WriteJournalName,

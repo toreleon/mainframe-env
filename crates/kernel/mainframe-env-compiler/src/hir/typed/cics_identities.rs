@@ -136,6 +136,7 @@ pub enum HirCicsOperation {
     WebEndBrowse,
     WebWrite,
     WebSend,
+    WebRetrieve,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

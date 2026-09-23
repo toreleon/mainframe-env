@@ -524,6 +524,7 @@ pub(super) fn execute(
             | CicsOutputName::WebValueLength
             | CicsOutputName::WebBrowseName
             | CicsOutputName::WebBrowseNameLength
+            | CicsOutputName::WebRetrieveDocumentToken
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
