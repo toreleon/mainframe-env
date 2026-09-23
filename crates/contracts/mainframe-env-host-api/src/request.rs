@@ -2515,7 +2515,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 105);
+        assert_eq!(forms.len(), 115);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

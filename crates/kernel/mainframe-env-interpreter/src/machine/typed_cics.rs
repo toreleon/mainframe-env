@@ -183,7 +183,9 @@ pub(super) fn execute(
     }
     if matches!(
         plan.operation,
-        CicsPlanOperation::ReceivePartn | CicsPlanOperation::ReceiveMap
+        CicsPlanOperation::ReceivePartn
+            | CicsPlanOperation::ReceiveMap
+            | CicsPlanOperation::IssueReceive
     ) {
         retrieve::release_partition_receive_set(machine);
     }
@@ -291,6 +293,11 @@ pub(super) fn execute(
                     operand.name,
                     CicsOperandName::Length
                         | CicsOperandName::ControlCursor
+                        | CicsOperandName::DestIdLength
+                        | CicsOperandName::Subaddress
+                        | CicsOperandName::VolumeLength
+                        | CicsOperandName::NumRec
+                        | CicsOperandName::KeyNumber
                         | CicsOperandName::DataLength
                         | CicsOperandName::KeyLength
                         | CicsOperandName::MaxLifetime
@@ -444,6 +451,7 @@ pub(super) fn execute(
                     plan.operation,
                     CicsPlanOperation::ReadTransientData
                         | CicsPlanOperation::ReceivePartn
+                        | CicsPlanOperation::IssueReceive
                         | CicsPlanOperation::DocumentRetrieve
                         | CicsPlanOperation::SpoolRead
                 ) {

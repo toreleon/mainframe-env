@@ -1,7 +1,7 @@
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 110] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 120] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -880,6 +880,86 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 110] = [
         name: "send-page",
         major: 1,
         effects: TERMINAL_SEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueAbort,
+        namespace: "cics.terminal",
+        name: "issue-abort",
+        major: 1,
+        effects: OUTBOARD_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueAdd,
+        namespace: "cics.terminal",
+        name: "issue-add",
+        major: 1,
+        effects: OUTBOARD_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueEnd,
+        namespace: "cics.terminal",
+        name: "issue-end",
+        major: 1,
+        effects: OUTBOARD_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueErase,
+        namespace: "cics.terminal",
+        name: "issue-erase",
+        major: 1,
+        effects: OUTBOARD_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueNote,
+        namespace: "cics.terminal",
+        name: "issue-note",
+        major: 1,
+        effects: OUTBOARD_READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueQuery,
+        namespace: "cics.terminal",
+        name: "issue-query",
+        major: 1,
+        effects: OUTBOARD_READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueReceive,
+        namespace: "cics.terminal",
+        name: "issue-receive",
+        major: 1,
+        effects: TERMINAL_RECEIVE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueReplace,
+        namespace: "cics.terminal",
+        name: "issue-replace",
+        major: 1,
+        effects: OUTBOARD_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueSend,
+        namespace: "cics.terminal",
+        name: "issue-send",
+        major: 1,
+        effects: OUTBOARD_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IssueWait,
+        namespace: "cics.terminal",
+        name: "issue-wait",
+        major: 1,
+        effects: OUTBOARD_WAIT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];

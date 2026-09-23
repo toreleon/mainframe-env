@@ -1490,6 +1490,58 @@ mod tests {
     }
 
     #[test]
+    fn issue_family_compiles_ten_typed_v2_plans_and_rejects_bad_selection() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTBD. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). 01 RID-X PIC S9(9) COMP. 01 LEN-X PIC S9(4) COMP VALUE 4. 01 PTR-X POINTER-32. 01 RC PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ISSUE ADD DESTID('DISK1') FROM(DATA-X) LENGTH(4) RESP(RC) END-EXEC. EXEC CICS ISSUE QUERY DESTID('DISK1') END-EXEC. EXEC CICS ISSUE RECEIVE INTO(DATA-X) LENGTH(LEN-X) END-EXEC. EXEC CICS ISSUE NOTE DESTID('REL1') RIDFLD(RID-X) RRN END-EXEC. EXEC CICS ISSUE ERASE DESTID('REL1') RIDFLD(RID-X) RRN END-EXEC. EXEC CICS ISSUE REPLACE DESTID('REL1') FROM(DATA-X) LENGTH(4) RIDFLD(RID-X) RRN END-EXEC. EXEC CICS ISSUE SEND CONSOLE FROM(DATA-X) LENGTH(4) NOWAIT END-EXEC. EXEC CICS ISSUE WAIT CONSOLE END-EXEC. EXEC CICS ISSUE END DESTID('DISK1') END-EXEC. EXEC CICS ISSUE ABORT DESTID('REL1') END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let hir = analysis.hir.unwrap();
+        let plans = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .filter(|plan| {
+                matches!(
+                    plan.operation,
+                    CicsPlanOperation::IssueAbort
+                        | CicsPlanOperation::IssueAdd
+                        | CicsPlanOperation::IssueEnd
+                        | CicsPlanOperation::IssueErase
+                        | CicsPlanOperation::IssueNote
+                        | CicsPlanOperation::IssueQuery
+                        | CicsPlanOperation::IssueReceive
+                        | CicsPlanOperation::IssueReplace
+                        | CicsPlanOperation::IssueSend
+                        | CicsPlanOperation::IssueWait
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(plans.len(), 10);
+        for plan in plans {
+            let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+            assert_eq!(&encoded[..6], b"MCEP\0\x02");
+        }
+        let bad = "IDENTIFICATION DIVISION. PROGRAM-ID. OUTBD. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). PROCEDURE DIVISION. EXEC CICS ISSUE SEND CONSOLE DESTID('DISK1') FROM(DATA-X) LENGTH(4) END-EXEC.";
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(bad))
+                .diagnostics
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn send_partnset_compiles_named_and_base_forms_through_v2_plan() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. PARTNS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PSET PIC X(5) VALUE 'PSET1'. 01 RC PIC S9(9) COMP. 01 RC2 PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SEND PARTNSET(PSET) RESP(RC) RESP2(RC2) END-EXEC. EXEC CICS SEND PARTNSET END-EXEC.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
@@ -1727,6 +1779,16 @@ mod tests {
                 CicsPlanOperation::HandleCondition => crate::HirCicsOperation::HandleCondition,
                 CicsPlanOperation::IgnoreCondition => crate::HirCicsOperation::IgnoreCondition,
                 CicsPlanOperation::InvokeApplication => crate::HirCicsOperation::InvokeApplication,
+                CicsPlanOperation::IssueAbort => crate::HirCicsOperation::IssueAbort,
+                CicsPlanOperation::IssueAdd => crate::HirCicsOperation::IssueAdd,
+                CicsPlanOperation::IssueEnd => crate::HirCicsOperation::IssueEnd,
+                CicsPlanOperation::IssueErase => crate::HirCicsOperation::IssueErase,
+                CicsPlanOperation::IssueNote => crate::HirCicsOperation::IssueNote,
+                CicsPlanOperation::IssueQuery => crate::HirCicsOperation::IssueQuery,
+                CicsPlanOperation::IssueReceive => crate::HirCicsOperation::IssueReceive,
+                CicsPlanOperation::IssueReplace => crate::HirCicsOperation::IssueReplace,
+                CicsPlanOperation::IssueSend => crate::HirCicsOperation::IssueSend,
+                CicsPlanOperation::IssueWait => crate::HirCicsOperation::IssueWait,
                 CicsPlanOperation::Load => crate::HirCicsOperation::Load,
                 CicsPlanOperation::Release => crate::HirCicsOperation::Release,
                 CicsPlanOperation::Link => crate::HirCicsOperation::Link,

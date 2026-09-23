@@ -1,4 +1,5 @@
 mod directives;
+mod replace_scan;
 
 pub use directives::{
     CompilerDirectingNode, CompilerDirectiveNode, CompilerOption, CompilerOptionSet,
@@ -1271,31 +1272,30 @@ fn find_replace_directive(
     source: &str,
     from: usize,
 ) -> Result<Option<CopyDirective>, SyntaxProblem> {
-    let bytes = source.as_bytes();
-    let mut index = from;
-    while index < bytes.len() {
+    let (mut index, mut in_exec) = (from, false);
+    while index < source.len() {
         if source[index..].starts_with("*>") {
             index = source[index..]
                 .find('\n')
-                .map_or(bytes.len(), |relative| index + relative + 1);
+                .map_or(source.len(), |relative| index + relative + 1);
             continue;
         }
-        if matches!(bytes[index], b'\'' | b'"') {
+        if matches!(source.as_bytes()[index], b'\'' | b'"') {
             index = skip_quoted(source, index)?;
             continue;
         }
         if source[index..].starts_with("==") {
             index = source[index + 2..]
                 .find("==")
-                .map_or(bytes.len(), |relative| index + relative + 4);
+                .map_or(source.len(), |relative| index + relative + 4);
             continue;
         }
-        if is_word_byte(bytes[index]) {
+        if is_word_byte(source.as_bytes()[index]) {
             let start = index;
-            while index < bytes.len() && is_word_byte(bytes[index]) {
+            while index < source.len() && is_word_byte(source.as_bytes()[index]) {
                 index += 1;
             }
-            if source[start..index].eq_ignore_ascii_case("REPLACE") {
+            if replace_scan::is_replace_directive(&source[start..index], &mut in_exec) {
                 return find_copy_end(source, start, index).map(Some);
             }
             continue;

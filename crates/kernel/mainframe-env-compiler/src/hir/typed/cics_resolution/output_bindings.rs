@@ -18,6 +18,7 @@ pub(super) fn inout_length(
             | HirCicsOperation::ReadTransientData
             | HirCicsOperation::ReadTemporaryStorage
             | HirCicsOperation::ReceivePartn
+            | HirCicsOperation::IssueReceive
     )
     .then(|| {
         operands.iter().find_map(|operand| match &operand.value {
@@ -122,7 +123,9 @@ pub(super) fn resolve(
         if name == "RIDFLD"
             && !matches!(
                 operation,
-                HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+                HirCicsOperation::ReadNext
+                    | HirCicsOperation::ReadPrev
+                    | HirCicsOperation::IssueNote
             )
         {
             continue;
@@ -138,6 +141,7 @@ pub(super) fn resolve(
                     | HirCicsOperation::ReadTransientData
                     | HirCicsOperation::ReadTemporaryStorage
                     | HirCicsOperation::ReceivePartn
+                    | HirCicsOperation::IssueReceive
                     | HirCicsOperation::SendControl
                     | HirCicsOperation::SendPage
             )

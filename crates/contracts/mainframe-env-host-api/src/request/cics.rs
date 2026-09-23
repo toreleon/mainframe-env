@@ -144,6 +144,26 @@ pub enum CicsOperation {
     SendMap,
     /// Send BMS device controls, directly or into a logical message.
     SendControl,
+    /// Abort and deselect one outboard stream.
+    IssueAbort,
+    /// Append or place bounded records in an outboard data set.
+    IssueAdd,
+    /// End and deselect one outboard stream.
+    IssueEnd,
+    /// Erase selected records in a direct outboard data set.
+    IssueErase,
+    /// Return the next relative record number.
+    IssueNote,
+    /// Request a sequential outboard input stream.
+    IssueQuery,
+    /// Consume one record from an outboard input stream.
+    IssueReceive,
+    /// Replace selected direct outboard records.
+    IssueReplace,
+    /// Transmit one bounded outboard record or media message.
+    IssueSend,
+    /// Complete one pending outboard send.
+    IssueWait,
     /// Complete and dispatch the active BMS logical message.
     SendPage,
     /// Associate a registered partition set or return the terminal to base state.
@@ -292,6 +312,16 @@ impl CicsOperation {
             Self::SendText => "SendText",
             Self::SendMap => "SendMap",
             Self::SendControl => "SendControl",
+            Self::IssueAbort => "IssueAbort",
+            Self::IssueAdd => "IssueAdd",
+            Self::IssueEnd => "IssueEnd",
+            Self::IssueErase => "IssueErase",
+            Self::IssueNote => "IssueNote",
+            Self::IssueQuery => "IssueQuery",
+            Self::IssueReceive => "IssueReceive",
+            Self::IssueReplace => "IssueReplace",
+            Self::IssueSend => "IssueSend",
+            Self::IssueWait => "IssueWait",
             Self::SendPage => "SendPage",
             Self::SendPartnset => "SendPartnset",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
@@ -418,6 +448,16 @@ impl CicsOperation {
                 | Self::PurgeMessage
                 | Self::SendMap
                 | Self::SendControl
+                | Self::IssueAbort
+                | Self::IssueAdd
+                | Self::IssueEnd
+                | Self::IssueErase
+                | Self::IssueNote
+                | Self::IssueQuery
+                | Self::IssueReceive
+                | Self::IssueReplace
+                | Self::IssueSend
+                | Self::IssueWait
                 | Self::SendPage
                 | Self::SendText
                 | Self::SendPartnset
@@ -538,6 +578,16 @@ impl CicsOperation {
             ("REWRITE", _) => Self::Rewrite,
             ("SEND", Some("MAP")) => Self::SendMap,
             ("SEND", Some("CONTROL")) => Self::SendControl,
+            ("ISSUE", Some("ABORT")) => Self::IssueAbort,
+            ("ISSUE", Some("ADD")) => Self::IssueAdd,
+            ("ISSUE", Some("END")) => Self::IssueEnd,
+            ("ISSUE", Some("ERASE")) => Self::IssueErase,
+            ("ISSUE", Some("NOTE")) => Self::IssueNote,
+            ("ISSUE", Some("QUERY")) => Self::IssueQuery,
+            ("ISSUE", Some("RECEIVE")) => Self::IssueReceive,
+            ("ISSUE", Some("REPLACE")) => Self::IssueReplace,
+            ("ISSUE", Some("SEND")) => Self::IssueSend,
+            ("ISSUE", Some("WAIT")) => Self::IssueWait,
             ("SEND", Some("PAGE")) => Self::SendPage,
             ("SEND", Some("PARTNSET")) => Self::SendPartnset,
             ("SEND", _) => Self::SendText,

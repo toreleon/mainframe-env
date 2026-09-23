@@ -17,6 +17,7 @@ mod identities;
 mod interval_control;
 mod journal_control;
 mod option_shape;
+mod outboard;
 mod output_shape;
 mod program_control;
 mod queue_control;
@@ -608,6 +609,16 @@ fn validate_operation_shape(
         | CicsPlanOperation::SendPartnset
         | CicsPlanOperation::SendControl
         | CicsPlanOperation::SendPage => terminal_control::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::IssueAbort
+        | CicsPlanOperation::IssueAdd
+        | CicsPlanOperation::IssueEnd
+        | CicsPlanOperation::IssueErase
+        | CicsPlanOperation::IssueNote
+        | CicsPlanOperation::IssueQuery
+        | CicsPlanOperation::IssueReceive
+        | CicsPlanOperation::IssueReplace
+        | CicsPlanOperation::IssueSend
+        | CicsPlanOperation::IssueWait => outboard::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::InvokeService
         | CicsPlanOperation::SoapFaultAdd
         | CicsPlanOperation::SoapFaultCreate
@@ -4485,6 +4496,21 @@ mod tests {
         assert_eq!(operation_from_tag(88), Ok(CicsPlanOperation::SendControl));
         assert_eq!(operation_tag(CicsPlanOperation::SendPage), 89);
         assert_eq!(operation_from_tag(89), Ok(CicsPlanOperation::SendPage));
+        for (operation, tag) in [
+            (CicsPlanOperation::IssueAbort, 76),
+            (CicsPlanOperation::IssueAdd, 77),
+            (CicsPlanOperation::IssueEnd, 78),
+            (CicsPlanOperation::IssueErase, 79),
+            (CicsPlanOperation::IssueNote, 80),
+            (CicsPlanOperation::IssueQuery, 81),
+            (CicsPlanOperation::IssueReceive, 82),
+            (CicsPlanOperation::IssueReplace, 83),
+            (CicsPlanOperation::IssueSend, 84),
+            (CicsPlanOperation::IssueWait, 85),
+        ] {
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
         assert_eq!(operand_tag(CicsOperandName::Token), 182);
         assert_eq!(operand_from_tag(182), Ok(CicsOperandName::Token));
         assert_eq!(operand_tag(CicsOperandName::Partnset), 192);
@@ -4535,7 +4561,7 @@ mod tests {
         assert_eq!(option_from_tag(124), Ok(CicsPlanOption::AsIs));
         assert_eq!(output_tag(CicsOutputName::Partn), 248);
         assert_eq!(output_from_tag(248), Ok(CicsOutputName::Partn));
-        for tag in (76..=89).filter(|tag| !matches!(tag, 86 | 88 | 89)) {
+        for tag in [87] {
             assert_eq!(
                 operation_from_tag(tag),
                 Err(CicsPlanCodecProblem::Malformed)

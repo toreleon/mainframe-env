@@ -68,6 +68,11 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::MajorVersion | CicsOperandName::MinorVersion => SlotUse::FullwordInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
+        CicsOperandName::DestIdLength
+        | CicsOperandName::Subaddress
+        | CicsOperandName::VolumeLength
+        | CicsOperandName::NumRec
+        | CicsOperandName::KeyNumber => SlotUse::HalfwordInput,
         CicsOperandName::KeyLength => SlotUse::Input,
         CicsOperandName::Flength
         | CicsOperandName::ElementNameLength
@@ -232,6 +237,16 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
         CicsPlanOperation::InvokeApplication => CicsOperation::InvokeApplication,
+        CicsPlanOperation::IssueAbort => CicsOperation::IssueAbort,
+        CicsPlanOperation::IssueAdd => CicsOperation::IssueAdd,
+        CicsPlanOperation::IssueEnd => CicsOperation::IssueEnd,
+        CicsPlanOperation::IssueErase => CicsOperation::IssueErase,
+        CicsPlanOperation::IssueNote => CicsOperation::IssueNote,
+        CicsPlanOperation::IssueQuery => CicsOperation::IssueQuery,
+        CicsPlanOperation::IssueReceive => CicsOperation::IssueReceive,
+        CicsPlanOperation::IssueReplace => CicsOperation::IssueReplace,
+        CicsPlanOperation::IssueSend => CicsOperation::IssueSend,
+        CicsPlanOperation::IssueWait => CicsOperation::IssueWait,
         CicsPlanOperation::Load => CicsOperation::Load,
         CicsPlanOperation::Release => CicsOperation::Release,
         CicsPlanOperation::Link => CicsOperation::Link,
@@ -350,6 +365,13 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::CommareaPointer => "COMMAREA",
         CicsOperandName::Map => "MAP",
         CicsOperandName::Mapset => "MAPSET",
+        CicsOperandName::DestId => "DESTID",
+        CicsOperandName::DestIdLength => "DESTIDLENG",
+        CicsOperandName::Subaddress => "SUBADDR",
+        CicsOperandName::Volume => "VOLUME",
+        CicsOperandName::VolumeLength => "VOLUMELENG",
+        CicsOperandName::NumRec => "NUMREC",
+        CicsOperandName::KeyNumber => "KEYNUMBER",
         CicsOperandName::Partnset => "PARTNSET",
         CicsOperandName::ControlCursor => "CURSOR",
         CicsOperandName::Msr => "MSR",
@@ -582,6 +604,16 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::DefResp => "DEFRESP",
+        CicsPlanOption::NoWait => "NOWAIT",
+        CicsPlanOption::Rrn => "RRN",
+        CicsPlanOption::Console => "CONSOLE",
+        CicsPlanOption::PrintMedium => "PRINT",
+        CicsPlanOption::Card => "CARD",
+        CicsPlanOption::WpMedia1 => "WPMEDIA1",
+        CicsPlanOption::WpMedia2 => "WPMEDIA2",
+        CicsPlanOption::WpMedia3 => "WPMEDIA3",
+        CicsPlanOption::WpMedia4 => "WPMEDIA4",
         CicsPlanOption::Cancel => "CANCEL",
         CicsPlanOption::NoDump => "NODUMP",
         CicsPlanOption::Reset => "RESET",

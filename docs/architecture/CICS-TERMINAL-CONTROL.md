@@ -98,3 +98,47 @@ HTML SHA-256
 `5e742d2abc92990142252e6bb6ac5f037252e06f14b769fac0d0aa24c24ba1fa`.
 Each committed SHA matched its exact raw archive file and the repository
 `PlainText` parser read that local HTML. No browser or network refresh occurred.
+
+## ISSUE outboard data interchange
+
+`CicsService::register_outboard_destinations` installs immutable local sequential,
+keyed, or relative data-set definitions with bounded records and key geometry.
+`ISSUE ADD`, `ERASE`, `REPLACE`, `NOTE`, `QUERY`, `RECEIVE`, `SEND`,
+`WAIT`, `END`, and `ABORT` use those definitions and a durable per-task
+selection. Virtual CONSOLE, PRINT, CARD, and WPMEDIA1–4 destinations use
+bounded local media records. `QUERY` captures a sequential input snapshot;
+`RECEIVE` consumes it, reports the original LENGTH, truncates INTO with
+LENGERR, or allocates SET storage. `ASSIGN DESTID/DESTIDLENG` returns the
+last received destination. NOWAIT tracks a pending send until ISSUE WAIT.
+FACILITY checks use `CICS.OUTBOARD.<destination>` before writes; task/data
+changes and replay receipts are atomic. The local state survives SQLite
+reopen. Operation tags 76–85, operand tags 200–206, and option tags
+147–156 are MCEP v2 only. MCEP v1 decoding is preserved.
+
+Source review: IBM CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog rows
+`ibm-cics-ts-6x-2026-08-31:api-commands:<row>`:
+
+| Catalog row | Pinned topic | SHA-256 |
+| --- | --- | --- |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0110` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueabort.html` | `ec68732da8fa3c11089f2e956565087e6c5f7ffb772ba97400527b6aeb2cd400` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0111` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueadd.html` | `a5001110b291833185b8ee97fbaf92b57e0efd76d390927e34f1059eaed1992e` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0116` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueend.html` | `83514aab164f60599d3cf58acae481721a7f4e6bb993222da2fd5619fd1391a8` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0120` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueerase.html` | `1e77e836e5403cf303296dca54cc2f54f4a4e2f3ea48f59b72d9c6c1172e3cfa` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0125` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuenote.html` | `3c4617a73c33bf10d6499ffb061343b37d5a6dc540d6972fcf02ebd6559cc35d` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0130` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuequery.html` | `2487b7e13e0eebff4ced7070907862a371c831fdf14b687d36a0fc3902669955` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0131` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereceive.html` | `d6003e65b1c201940e7b93e401ccf4aa7e4189076f60e8ecda5300ed9e8cf279` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0132` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereplace.html` | `0d755ac8a7d3baa54e5f0e7103547fda9503f3afbe07e46718ffc3710ce3b838` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0134` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuesend.html` | `e83080cf9b75d5ec8399feaf4dbed371a2fc293698115ad8fe740cb78bee014f` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0137` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuewait.html` | `a2902eb5fa9b02edfed606d8878f7582daa29b1b837d87fda43413cc91ae974d` |
+
+The related `ASSIGN` source is baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, row 0011,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html`,
+SHA-256 `594c0885848525ccc9c0c1f939a449f0d759f90ada7d29a82ed580342a99bbee`.
+Each exact raw archive file under
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256`
+matched its committed SHA, then the repository `ibm_docs.py` `PlainText`
+parser read it. The selected `ibm_docs.py search` and `read` calls used the
+verified offline cache. Unavailable unrelated scope topics are non-candidate
+infrastructure evidence; no browser or network refresh was used.

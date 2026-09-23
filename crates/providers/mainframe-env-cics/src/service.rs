@@ -6640,7 +6640,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 112);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 122);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -29515,6 +29515,204 @@ mod tests {
         let snapshot = cics.terminal_control_snapshot(&session).unwrap();
         assert!(!snapshot.pending_logical_message);
         assert_eq!((snapshot.alarm_count, snapshot.queued_pages), (1, 1));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn issue_outboard_query_receive_assign_and_media_wait_are_durable() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        cics.register_outboard_destinations(&[CicsOutboardDestinationDefinition {
+            name: "DISK1".into(),
+            volume: Some("VOL1".into()),
+            kind: CicsOutboardKind::Sequential,
+            record_length: 4,
+            indexes: vec![],
+        }])
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let add = request(
+            CicsOperation::IssueAdd,
+            BTreeMap::from([
+                ("DESTID".into(), cics_literal(b"DISK1")),
+                ("FROM".into(), enqueue_value(b"ABCD")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, add.clone(), 1),
+                add.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.response, 0);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, add.clone(), 1), add)
+                .unwrap(),
+            first
+        );
+        assert_eq!(
+            cics.outboard_snapshot("DISK1").unwrap().records[0].data,
+            b"ABCD"
+        );
+        let query = request(
+            CicsOperation::IssueQuery,
+            BTreeMap::from([
+                ("DESTID".into(), cics_literal(b"DISK1")),
+                ("VOLUME".into(), cics_literal(b"VOL1")),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, query.clone(), 2), query)
+            .unwrap();
+        let receive = responding(request(
+            CicsOperation::IssueReceive,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"BUFFER")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("LENGTH".into(), cics_decimal(2)),
+            ]),
+            3,
+        ));
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 3),
+                receive,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("LENGERR", 22)
+        );
+        assert_eq!(response.payload.bytes(), b"AB");
+        assert_eq!(response.outputs["LENGTH"].bytes(), b"4");
+        let assign = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("DESTID".into(), argument(b"DEST")),
+                ("DESTIDLENG".into(), argument(b"DESTLEN")),
+            ]),
+            4,
+        );
+        let assigned = cics
+            .invoke(&effect(&invocation.run_unit_id, assign.clone(), 4), assign)
+            .unwrap();
+        assert_eq!(assigned.outputs["DESTID"].bytes(), b"DISK1   ");
+        assert_eq!(assigned.outputs["DESTIDLENG"].bytes(), b"5");
+        let send = request(
+            CicsOperation::IssueSend,
+            BTreeMap::from([
+                ("OPTION.CONSOLE".into(), cics_option()),
+                ("FROM".into(), enqueue_value(b"HI")),
+                ("LENGTH".into(), cics_decimal(2)),
+                ("OPTION.NOWAIT".into(), cics_option()),
+            ]),
+            5,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 5), send)
+            .unwrap();
+        let wait = request(
+            CicsOperation::IssueWait,
+            BTreeMap::from([("OPTION.CONSOLE".into(), cics_option())]),
+            6,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 6), wait)
+            .unwrap();
+        assert_eq!(
+            cics.outboard_snapshot("MCON00").unwrap().records[0].data,
+            b"HI"
+        );
+    }
+
+    #[test]
+    fn issue_outboard_denial_and_sqlite_reopen_preserve_atomic_state() {
+        let definition = CicsOutboardDestinationDefinition {
+            name: "REL1".into(),
+            volume: None,
+            kind: CicsOutboardKind::Relative,
+            record_length: 4,
+            indexes: vec![],
+        };
+        let (authorities, seen) = command_authorities(true);
+        let denied = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        denied
+            .register_outboard_destinations(&[definition.clone()])
+            .unwrap();
+        let (invocation, _) = registered(&denied);
+        let add = request(
+            CicsOperation::IssueAdd,
+            BTreeMap::from([
+                ("DESTID".into(), cics_literal(b"REL1")),
+                ("FROM".into(), enqueue_value(b"ABCD")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("RIDFLD".into(), enqueue_value(&1_u32.to_be_bytes())),
+                ("OPTION.RRN".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            denied.invoke(
+                &effect(&invocation.run_unit_id, add.clone(), 1),
+                add.clone()
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(denied.outboard_snapshot("REL1").unwrap().records.is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| class == "FACILITY"
+                    && resource == "CICS.OUTBOARD.REL1"
+                    && *intent == AccessIntent::Update)
+        );
+
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-outboard-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let first = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            cics.register_outboard_destinations(&[definition.clone()])
+                .unwrap();
+            let (invocation, _) = registered(&cics);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, add.clone(), 1),
+                    add.clone(),
+                )
+                .unwrap();
+            assert_eq!(cics.outboard_snapshot("REL1").unwrap().records.len(), 1);
+            response
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            let invocation = self::invocation();
+            cics.register_run(
+                invocation.clone(),
+                &SessionId::new("session", 64).unwrap(),
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, add.clone(), 1), add),
+                Ok(first)
+            );
+            assert_eq!(cics.outboard_snapshot("REL1").unwrap().records[0].number, 1);
+        }
         std::fs::remove_dir_all(root).unwrap();
     }
 

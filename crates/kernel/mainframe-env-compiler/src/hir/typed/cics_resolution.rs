@@ -30,6 +30,7 @@ mod journal_control;
 mod legacy_compatibility;
 mod numeric_value;
 mod operation;
+mod outboard;
 mod output_bindings;
 mod program_control;
 mod program_name;
@@ -456,6 +457,15 @@ fn option_value_shape(
     descriptor: &CicsApplicationRegistryDescriptor,
     name: &str,
 ) -> Option<CicsApplicationOptionValueShape> {
+    if matches!(
+        descriptor.label_tokens,
+        ["ISSUE", "ABORT" | "END" | "SEND" | "WAIT"]
+    ) && matches!(name, "WPMEDIA2" | "WPMEDIA3" | "WPMEDIA4")
+    {
+        // The pinned prose explicitly lists all four media; the projected
+        // syntax diagram currently materializes only WPMEDIA1.
+        return Some(CicsApplicationOptionValueShape::Flag);
+    }
     journal_control::option_value_shape(descriptor, name).or_else(|| {
         descriptor
             .options
@@ -679,17 +689,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendPage => &["TRANSID", "TRAILER", "SET", "FMHPARM", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
-        HirCicsOperation::Delay => &[
-            "INTERVAL",
-            "TIME",
-            "HOURS",
-            "MINUTES",
-            "SECONDS",
-            "MILLISECS",
-            "REQID",
-            "RESP",
-            "RESP2",
-        ],
+        HirCicsOperation::Delay => interval_control::DELAY_CLAUSES,
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
@@ -709,6 +709,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if counter_control::is_counter(operation) => {
             counter_control::allowed_clauses(operation)
         }
+        op if outboard::is_issue(op) => outboard::allowed_clauses(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -803,6 +804,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if counter_control::is_counter(operation) => {
             counter_control::allowed_options(operation)
         }
+        op if outboard::is_issue(op) => outboard::allowed_options(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -853,6 +855,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
+    outboard::validate_constraints(&clauses, &raw_options, operation)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
@@ -904,7 +907,17 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend
-        | HirCicsOperation::InvokeApplication => &[][..],
+        | HirCicsOperation::InvokeApplication
+        | HirCicsOperation::IssueAbort
+        | HirCicsOperation::IssueAdd
+        | HirCicsOperation::IssueEnd
+        | HirCicsOperation::IssueErase
+        | HirCicsOperation::IssueNote
+        | HirCicsOperation::IssueQuery
+        | HirCicsOperation::IssueReceive
+        | HirCicsOperation::IssueReplace
+        | HirCicsOperation::IssueSend
+        | HirCicsOperation::IssueWait => &[][..],
         HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
         HirCicsOperation::InvokeService
         | HirCicsOperation::SoapFaultAdd
@@ -1062,6 +1075,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
+    operands.extend(outboard::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
@@ -1152,7 +1166,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                     .then(|| spool_control::option(option))
                     .flatten()
                 })
-                .unwrap_or_else(|| operation::resolve_option(option))
+                .unwrap_or_else(|| operation::resolve_option(option, operation))
         })
         .collect::<BTreeSet<_>>();
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();

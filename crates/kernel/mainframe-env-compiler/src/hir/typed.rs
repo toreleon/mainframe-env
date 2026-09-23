@@ -166,6 +166,16 @@ pub struct HirCicsNamedOperand {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOption {
+    DefResp,
+    NoWait,
+    Rrn,
+    Console,
+    PrintMedium,
+    Card,
+    WpMedia1,
+    WpMedia2,
+    WpMedia3,
+    WpMedia4,
     Accum,
     Formfeed,
     DefaultScreen,

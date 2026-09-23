@@ -618,6 +618,8 @@ pub use executable_lookup::cics_executable_descriptor;
 mod registry_lookup;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
 
+mod terminal_effects;
+use terminal_effects::{OUTBOARD_READ_EFFECTS, OUTBOARD_WAIT_EFFECTS, OUTBOARD_WRITE_EFFECTS};
 mod executable;
 pub use executable::CICS_EXECUTABLE_DESCRIPTORS;
 
@@ -679,7 +681,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 110);
+        assert_eq!(typed.len(), 120);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -697,7 +699,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 153);
+        assert_eq!(unready.len(), 143);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -915,6 +917,7 @@ mod tests {
                 CicsPlanOperation::InvokeApplication,
                 CicsPlanOperation::Load,
                 CicsPlanOperation::Release,
+                CicsPlanOperation::Getmain64,
                 CicsPlanOperation::SpoolOpenInput,
                 CicsPlanOperation::SpoolOpenOutput,
                 CicsPlanOperation::SpoolRead,
@@ -923,6 +926,16 @@ mod tests {
                 CicsPlanOperation::ReceivePartn,
                 CicsPlanOperation::SendControl,
                 CicsPlanOperation::SendPage,
+                CicsPlanOperation::IssueAbort,
+                CicsPlanOperation::IssueAdd,
+                CicsPlanOperation::IssueEnd,
+                CicsPlanOperation::IssueErase,
+                CicsPlanOperation::IssueNote,
+                CicsPlanOperation::IssueQuery,
+                CicsPlanOperation::IssueReceive,
+                CicsPlanOperation::IssueReplace,
+                CicsPlanOperation::IssueSend,
+                CicsPlanOperation::IssueWait,
                 CicsPlanOperation::DefineCounter,
                 CicsPlanOperation::DefineDCounter,
                 CicsPlanOperation::DeleteCounter,

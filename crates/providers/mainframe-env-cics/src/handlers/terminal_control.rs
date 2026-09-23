@@ -10,9 +10,14 @@ use mainframe_env_host_api::{
 use std::collections::BTreeMap;
 
 mod bms;
+mod outboard;
 mod partition_set;
 pub use bms::CicsBmsControlSnapshot;
 pub(in crate::service) use bms::release_task as release_bms_message_for_task;
+pub(in crate::service) use outboard::release_task as release_outboard_task;
+pub use outboard::{
+    CicsOutboardDestinationDefinition, CicsOutboardKind, CicsOutboardRecord, CicsOutboardSnapshot,
+};
 pub(in crate::service) use partition_set::release_task as release_partition_set_for_task;
 pub use partition_set::{CicsPartitionDefinition, CicsPartitionSetDefinition};
 
@@ -68,6 +73,16 @@ pub(in crate::service) fn invoke(
         CicsOperation::ReceivePartn => partition_set::invoke_receive(service, run, request),
         CicsOperation::SendControl => bms::invoke_control(service, run, request),
         CicsOperation::SendPage => bms::invoke_page(service, run, request),
+        CicsOperation::IssueAbort
+        | CicsOperation::IssueAdd
+        | CicsOperation::IssueEnd
+        | CicsOperation::IssueErase
+        | CicsOperation::IssueNote
+        | CicsOperation::IssueQuery
+        | CicsOperation::IssueReceive
+        | CicsOperation::IssueReplace
+        | CicsOperation::IssueSend
+        | CicsOperation::IssueWait => outboard::invoke(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
         CicsOperation::PurgeMessage => bms::purge(service, run, request),

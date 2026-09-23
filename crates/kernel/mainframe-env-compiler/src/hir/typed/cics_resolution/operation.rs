@@ -39,6 +39,16 @@ pub(super) fn resolve(
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
         ["INVOKE", "APPLICATION"] => HirCicsOperation::InvokeApplication,
         ["INVOKE", "SERVICE"] => HirCicsOperation::InvokeService,
+        ["ISSUE", "ABORT"] => HirCicsOperation::IssueAbort,
+        ["ISSUE", "ADD"] => HirCicsOperation::IssueAdd,
+        ["ISSUE", "END"] => HirCicsOperation::IssueEnd,
+        ["ISSUE", "ERASE"] => HirCicsOperation::IssueErase,
+        ["ISSUE", "NOTE"] => HirCicsOperation::IssueNote,
+        ["ISSUE", "QUERY"] => HirCicsOperation::IssueQuery,
+        ["ISSUE", "RECEIVE"] => HirCicsOperation::IssueReceive,
+        ["ISSUE", "REPLACE"] => HirCicsOperation::IssueReplace,
+        ["ISSUE", "SEND"] => HirCicsOperation::IssueSend,
+        ["ISSUE", "WAIT"] => HirCicsOperation::IssueWait,
         ["SOAPFAULT", "ADD"] => HirCicsOperation::SoapFaultAdd,
         ["SOAPFAULT", "CREATE"] => HirCicsOperation::SoapFaultCreate,
         ["SOAPFAULT", "DELETE"] => HirCicsOperation::SoapFaultDelete,
@@ -121,8 +131,28 @@ pub(super) fn resolve(
     })
 }
 
-pub(super) fn resolve_option(option: &str) -> HirCicsOption {
+pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCicsOption {
     match option {
+        "DEFRESP" => HirCicsOption::DefResp,
+        "NOWAIT" => HirCicsOption::NoWait,
+        "RRN" => HirCicsOption::Rrn,
+        "CONSOLE" => HirCicsOption::Console,
+        "PRINT"
+            if matches!(
+                operation,
+                HirCicsOperation::IssueAbort
+                    | HirCicsOperation::IssueEnd
+                    | HirCicsOperation::IssueSend
+                    | HirCicsOperation::IssueWait
+            ) =>
+        {
+            HirCicsOption::PrintMedium
+        }
+        "CARD" => HirCicsOption::Card,
+        "WPMEDIA1" => HirCicsOption::WpMedia1,
+        "WPMEDIA2" => HirCicsOption::WpMedia2,
+        "WPMEDIA3" => HirCicsOption::WpMedia3,
+        "WPMEDIA4" => HirCicsOption::WpMedia4,
         "CANCEL" => HirCicsOption::Cancel,
         "NODUMP" => HirCicsOption::NoDump,
         "RESET" => HirCicsOption::Reset,

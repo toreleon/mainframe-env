@@ -20429,6 +20429,128 @@ mod tests {
     }
 
     #[test]
+    fn compiled_issue_outboard_add_query_receive_and_assign_selected_program() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "OUTBD",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. OUTBD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'ABCD'.\n01 OUT-X PIC X(4).\n01 LEN-X PIC S9(4) COMP VALUE 4.\n01 RC PIC S9(9) COMP.\n01 ISSUE-FN PIC X(2).\n01 DEST-X PIC X(8).\n01 DESTLEN-X PIC S9(4) COMP.\nPROCEDURE DIVISION.\nEXEC CICS ISSUE ADD DESTID('DISK1') FROM(DATA-X) LENGTH(4) RESP(RC) END-EXEC.\nEXEC CICS ISSUE QUERY DESTID('DISK1') RESP(RC) END-EXEC.\nEXEC CICS ISSUE RECEIVE INTO(OUT-X) LENGTH(LEN-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ISSUE-FN.\nEXEC CICS ASSIGN DESTID(DEST-X) DESTIDLENG(DESTLEN-X) RESP(RC) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "outboard-class",
+                    "outboard-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(FACILITY)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.OUTBOARD.DISK1", "IBMUSER", None)
+            .unwrap();
+        for intent in [AccessIntent::Read, AccessIntent::Update] {
+            server
+                .racf
+                .permit("FACILITY", "CICS.OUTBOARD.DISK1", "IBMUSER", intent)
+                .unwrap();
+        }
+        server
+            .cics
+            .register_outboard_destinations(&[
+                mainframe_env_cics::CicsOutboardDestinationDefinition {
+                    name: "DISK1".into(),
+                    volume: None,
+                    kind: mainframe_env_cics::CicsOutboardKind::Sequential,
+                    record_length: 4,
+                    indexes: vec![],
+                },
+            ])
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "OUTBD".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("OB00".into(), "OUTBD".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "OUTBD".into(),
+                    map: "OUTBD".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![],
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("outboard-compiled", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "OB00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "OB00",
+                24,
+                80,
+                "outboard-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "OUTBD", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("OUT-X").unwrap().bytes(), b"ABCD");
+        assert_eq!(
+            restored.variable("ISSUE-FN").unwrap().bytes(),
+            &[0x1e, 0x0e]
+        );
+        assert_eq!(restored.variable("RC").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("DEST-X").unwrap().bytes(), b"DISK1   ");
+        assert_eq!(
+            server
+                .cics
+                .outboard_snapshot("DISK1")
+                .unwrap()
+                .records
+                .len(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_receive_partn_consumes_selected_partition_input_and_sets_eib() {
         use mainframe_env_racf::CommandContext;
 

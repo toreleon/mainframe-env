@@ -147,11 +147,12 @@ pub(super) use task_enqueue::{
     validate_store as validate_enqueue_store,
 };
 pub use terminal_control::{
-    CicsBmsControlSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
+    CicsBmsControlSnapshot, CicsOutboardDestinationDefinition, CicsOutboardKind,
+    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
 };
 pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, release_bms_message_for_task,
-    release_partition_set_for_task, valid_aid as valid_terminal_aid,
+    release_outboard_task, release_partition_set_for_task, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
 pub use web_service_control::CicsWebServiceDefinition;
@@ -219,6 +220,7 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     task_wait::release_task(service, run)?;
     document_control::release_task(service, run)?;
     release_bms_message_for_task(service, run)?;
+    release_outboard_task(service, run)?;
     release_partition_set_for_task(service, run)?;
     interval_control::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)?;

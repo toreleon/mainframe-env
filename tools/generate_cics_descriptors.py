@@ -203,6 +203,16 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0106",
     ),
     ("InvokeService", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0107"),
+    ("IssueAbort", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0110"),
+    ("IssueAdd", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0111"),
+    ("IssueEnd", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0116"),
+    ("IssueErase", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0120"),
+    ("IssueNote", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0125"),
+    ("IssueQuery", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0130"),
+    ("IssueReceive", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0131"),
+    ("IssueReplace", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0132"),
+    ("IssueSend", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0134"),
+    ("IssueWait", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0137"),
     (
         "Inquire",
         "spi-compatibility",
@@ -609,6 +619,16 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "IgnoreCondition",
         "InvokeApplication",
         "InvokeService",
+        "IssueAbort",
+        "IssueAdd",
+        "IssueEnd",
+        "IssueErase",
+        "IssueNote",
+        "IssueQuery",
+        "IssueReceive",
+        "IssueReplace",
+        "IssueSend",
+        "IssueWait",
         "Load",
         "Release",
         "Link",
@@ -808,6 +828,16 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WsaContextDelete": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "WsaContextGet": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "WsaEprCreate": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "IssueAbort": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueAdd": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueEnd": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueErase": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueNote": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-read', 'transaction'}),
+    "IssueQuery": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-read', 'transaction'}),
+    "IssueReceive": frozenset({'condition', 'memory-read', 'memory-write', 'suspension', 'terminal-read', 'transaction'}),
+    "IssueReplace": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueSend": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueWait": frozenset({'condition', 'memory-read', 'memory-write', 'suspension', 'terminal-write', 'transaction'}),
     "Load": frozenset(
         {
             "memory-read",
@@ -1284,6 +1314,16 @@ def _load_typed_execution_registrations(
         "IgnoreCondition",
         "InvokeApplication",
         "InvokeService",
+        "IssueAbort",
+        "IssueAdd",
+        "IssueEnd",
+        "IssueErase",
+        "IssueNote",
+        "IssueQuery",
+        "IssueReceive",
+        "IssueReplace",
+        "IssueSend",
+        "IssueWait",
         "Load",
         "PopHandle",
         "PurgeMessage",
@@ -1659,6 +1699,16 @@ def load_catalog(
                 "HandleAid",
                 "IgnoreCondition",
                 "InvokeApplication",
+                "IssueAbort",
+                "IssueAdd",
+                "IssueEnd",
+                "IssueErase",
+                "IssueNote",
+                "IssueQuery",
+                "IssueReceive",
+                "IssueReplace",
+                "IssueSend",
+                "IssueWait",
                 "Load",
                 "Release",
                 "PopHandle",
@@ -2789,6 +2839,13 @@ def _option_contract(
         # resource name is omitted to restore the base partition state.
         constraints["required"] = [
             name for name in constraints["required"] if name != "PARTNSET"
+        ]
+    if command["official_row"] == f"{OFFICIAL_BASELINE}:api-commands:0125":
+        # ISSUE NOTE's pinned option prose describes VOLUME as the optional
+        # diskette containing the selected destination. The projected single
+        # diagram incorrectly places it in the required path.
+        constraints["required"] = [
+            name for name in constraints["required"] if name != "VOLUME"
         ]
     if _receive_partn_reviewed_grammar(command, grammar):
         constraints["dependencies"] = [

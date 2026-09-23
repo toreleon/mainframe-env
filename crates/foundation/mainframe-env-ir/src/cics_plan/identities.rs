@@ -147,6 +147,26 @@ pub enum CicsPlanOperation {
     SendPartnset,
     /// Send device controls to the terminal or active BMS logical message.
     SendControl,
+    /// Outboard batch data interchange abort operation.
+    IssueAbort,
+    /// Outboard batch data interchange add operation.
+    IssueAdd,
+    /// Outboard batch data interchange end operation.
+    IssueEnd,
+    /// Outboard batch data interchange erase operation.
+    IssueErase,
+    /// Outboard batch data interchange note operation.
+    IssueNote,
+    /// Outboard batch data interchange query operation.
+    IssueQuery,
+    /// Outboard batch data interchange receive operation.
+    IssueReceive,
+    /// Outboard batch data interchange replace operation.
+    IssueReplace,
+    /// Outboard batch data interchange send operation.
+    IssueSend,
+    /// Outboard batch data interchange wait operation.
+    IssueWait,
     /// Complete a full-BMS logical message and dispatch its final page.
     SendPage,
     /// Rewrite the record held by the current update context.
@@ -312,6 +332,20 @@ pub enum CicsOperandName {
     Trailer,
     /// Outboard 3650 formatting map name.
     Fmhparm,
+    /// Outboard DestId input.
+    DestId,
+    /// Outboard DestIdLength input.
+    DestIdLength,
+    /// Outboard Subaddress input.
+    Subaddress,
+    /// Outboard Volume input.
+    Volume,
+    /// Outboard VolumeLength input.
+    VolumeLength,
+    /// Outboard NumRec input.
+    NumRec,
+    /// Outboard KeyNumber input.
+    KeyNumber,
     /// `RESOURCE(...)` enqueue identity.
     Resource,
     /// `LENGTH(...)` data length.
@@ -619,6 +653,16 @@ pub enum CicsPlanOption {
     AllPages,
     NoAutopage,
     OperPurge,
+    DefResp,
+    NoWait,
+    Rrn,
+    Console,
+    PrintMedium,
+    Card,
+    WpMedia1,
+    WpMedia2,
+    WpMedia3,
+    WpMedia4,
     /// Retain lowercase bytes on a subsequent 8775 partition receive.
     AsIs,
     /// The composite predicate requires all child events.

@@ -24,6 +24,7 @@ pub use service::{
     CicsApplicationEntryDefinition, CicsBmsControlSnapshot, CicsContinuation, CicsDocumentTemplateDefinition,
     CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
     CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsPartitionDefinition,
+    CicsOutboardDestinationDefinition, CicsOutboardKind, CicsOutboardRecord, CicsOutboardSnapshot,
     CicsPartitionSetDefinition, CicsProgramDefinition,
     CicsReplayClock, CicsService, CicsSignalCaptureSpec, CicsSignalEmission,
     CicsSpoolReportSnapshot, CicsStartTask, CicsStartTerminal, CicsTerminalExecution,

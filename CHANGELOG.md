@@ -23,6 +23,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added ten typed CICS ISSUE outboard commands with bounded local sequential,
+  keyed, relative, and media destinations; durable record and task state;
+  QUERY/RECEIVE, NOTE, WAIT, END/ABORT, SAF checks, and atomic replay.
+  Source: IBM CICS TS 6.x application API sources-b rows 0110–0137, plus
+  sources-a ASSIGN row 0011.
+
 - Added typed CICS `SEND CONTROL` and `SEND PAGE` with durable device control,
   bounded logical-message accumulation, paging, page completion, SET/RETPAGE,
   SAF authorization and replay. `PURGE MESSAGE` now discards an active logical

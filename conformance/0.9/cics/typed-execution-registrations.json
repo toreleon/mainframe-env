@@ -270,6 +270,76 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0107"
     },
     {
+      "operation": "IssueAbort",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0110"
+    },
+    {
+      "operation": "IssueAdd",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0111"
+    },
+    {
+      "operation": "IssueEnd",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0116"
+    },
+    {
+      "operation": "IssueErase",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0120"
+    },
+    {
+      "operation": "IssueNote",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0125"
+    },
+    {
+      "operation": "IssueQuery",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0130"
+    },
+    {
+      "operation": "IssueReceive",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0131"
+    },
+    {
+      "operation": "IssueReplace",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0132"
+    },
+    {
+      "operation": "IssueSend",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0134"
+    },
+    {
+      "operation": "IssueWait",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0137"
+    },
+    {
       "operation": "Load",
       "interface": "api",
       "family": "program-control",

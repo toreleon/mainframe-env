@@ -6,7 +6,10 @@ pub(super) fn allocation_arguments(
     operation: CicsPlanOperation,
 ) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
     let mut capacity = allocation_capacity(machine, target)?;
-    if operation == CicsPlanOperation::ReceivePartn {
+    if matches!(
+        operation,
+        CicsPlanOperation::ReceivePartn | CicsPlanOperation::IssueReceive
+    ) {
         let live = machine
             .bases
             .iter()
@@ -392,21 +395,23 @@ pub(super) fn write_set_output(
     }
     let capacity = allocation_capacity(machine, target)?;
     if value.bytes().len() > capacity
-        || operation == CicsOperation::ReceivePartn
-            && (value
-                .bytes()
-                .len()
-                .saturating_add(PARTITION_RECEIVE_MARKER.len())
-                > capacity
-                || machine
-                    .bases
-                    .iter()
-                    .enumerate()
-                    .filter(|(base, _)| !machine.freed_allocations.contains(base))
-                    .count()
-                    + machine.storage64.live_allocations()
-                    + 3
-                    > machine.invocation.limits.max_frames as usize)
+        || matches!(
+            operation,
+            CicsOperation::ReceivePartn | CicsOperation::IssueReceive
+        ) && (value
+            .bytes()
+            .len()
+            .saturating_add(PARTITION_RECEIVE_MARKER.len())
+            > capacity
+            || machine
+                .bases
+                .iter()
+                .enumerate()
+                .filter(|(base, _)| !machine.freed_allocations.contains(base))
+                .count()
+                + machine.storage64.live_allocations()
+                + 3
+                > machine.invocation.limits.max_frames as usize)
     {
         return Err(MachineProblem::UnexpectedHostResult);
     }
@@ -419,7 +424,10 @@ pub(super) fn write_set_output(
         machine.bases.extend([Vec::new(), Vec::new()]);
         machine.freed_allocations.extend([marker, marker + 1]);
         marker + 2
-    } else if operation == CicsOperation::ReceivePartn {
+    } else if matches!(
+        operation,
+        CicsOperation::ReceivePartn | CicsOperation::IssueReceive
+    ) {
         let marker = machine.bases.len();
         machine
             .bases
