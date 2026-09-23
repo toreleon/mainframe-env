@@ -290,6 +290,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/delete.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/get.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/query.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/counter_control/rewind.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/insert.rs",

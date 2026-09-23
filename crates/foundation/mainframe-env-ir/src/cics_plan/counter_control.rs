@@ -166,6 +166,51 @@ pub(super) fn invalid_query_shape(
         })
 }
 
+pub(super) fn invalid_rewind_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::CounterName)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::CounterName,
+            CicsOperandName::CounterPool,
+            CicsOperandName::CounterIncrement,
+        ]))
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle | CicsPlanOption::CounterNoSuspend
+            )
+        })
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::CounterName => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_name(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterPool => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_pool(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterIncrement => match &operand.value {
+                CicsOperandValue::Integer(value) => {
+                    *value < 0
+                        || plan.operation == CicsPlanOperation::RewindCounter
+                            && *value > i64::from(i32::MAX)
+                }
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            _ => true,
+        })
+}
+
 pub(super) fn invalid_delete_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,

@@ -26827,4 +26827,67 @@ mod tests {
             before
         );
     }
+
+    #[test]
+    fn named_counter_rewind_requires_limit_and_replays_reset() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineDCounter,
+            BTreeMap::from([
+                ("DCOUNTER".into(), cics_literal(b"CYCLE")),
+                ("VALUE".into(), cics_decimal(1)),
+                ("MAXIMUM".into(), cics_decimal(2)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let rewind = request(
+            CicsOperation::RewindDCounter,
+            BTreeMap::from([("DCOUNTER".into(), cics_literal(b"CYCLE"))]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, rewind.clone(), 2), rewind),
+            Err(HostProblem::Condition {
+                name: "SUPPRESSED".into(),
+                response: 72,
+                response2: 102,
+            })
+        );
+        let forced = request(
+            CicsOperation::RewindDCounter,
+            BTreeMap::from([
+                ("DCOUNTER".into(), cics_literal(b"CYCLE")),
+                ("INCREMENT".into(), cics_decimal(2)),
+            ]),
+            3,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, forced.clone(), 3),
+                forced.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, forced.clone(), 3), forced)
+                .unwrap(),
+            first
+        );
+        let query = CicsRequest {
+            operation: CicsOperation::QueryDCounter,
+            arguments: BTreeMap::from([
+                ("DCOUNTER".into(), cics_literal(b"CYCLE")),
+                ("VALUE".into(), argument(b"")),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        };
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 4), query)
+            .unwrap();
+        assert_eq!(result.outputs["VALUE"].bytes(), b"0");
+    }
 }

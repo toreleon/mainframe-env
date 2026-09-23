@@ -16,6 +16,8 @@ pub(super) const fn is_counter(operation: HirCicsOperation) -> bool {
             | HirCicsOperation::GetDCounter
             | HirCicsOperation::QueryCounter
             | HirCicsOperation::QueryDCounter
+            | HirCicsOperation::RewindCounter
+            | HirCicsOperation::RewindDCounter
     )
 }
 
@@ -55,6 +57,8 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         HirCicsOperation::QueryDCounter => &[
             "DCOUNTER", "POOL", "VALUE", "MINIMUM", "MAXIMUM", "RESP", "RESP2",
         ],
+        HirCicsOperation::RewindCounter => &["COUNTER", "POOL", "INCREMENT", "RESP", "RESP2"],
+        HirCicsOperation::RewindDCounter => &["DCOUNTER", "POOL", "INCREMENT", "RESP", "RESP2"],
         _ => unreachable!("counter clause contract requested for another operation"),
     }
 }
@@ -78,6 +82,8 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::GetDCounter => &["DCOUNTER", "VALUE"],
         HirCicsOperation::QueryCounter => &["COUNTER"],
         HirCicsOperation::QueryDCounter => &["DCOUNTER"],
+        HirCicsOperation::RewindCounter => &["COUNTER"],
+        HirCicsOperation::RewindDCounter => &["DCOUNTER"],
         _ => unreachable!("counter required clause contract requested for another operation"),
     }
 }
@@ -147,6 +153,11 @@ pub(super) fn operands(
             ("COMPAREMIN", HirCicsOperandName::CounterCompareMin),
             ("COMPAREMAX", HirCicsOperandName::CounterCompareMax),
         ]
+    } else if matches!(
+        operation,
+        HirCicsOperation::RewindCounter | HirCicsOperation::RewindDCounter
+    ) {
+        &[("INCREMENT", HirCicsOperandName::CounterIncrement)]
     } else if matches!(
         operation,
         HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter
@@ -263,7 +274,9 @@ fn validate_number(
 ) -> Resolution<()> {
     let doubleword = matches!(
         operation,
-        HirCicsOperation::DefineDCounter | HirCicsOperation::GetDCounter
+        HirCicsOperation::DefineDCounter
+            | HirCicsOperation::GetDCounter
+            | HirCicsOperation::RewindDCounter
     );
     let valid = match value {
         HirCicsValue::Integer(value) => {

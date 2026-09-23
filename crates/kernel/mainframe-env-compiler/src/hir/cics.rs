@@ -463,6 +463,8 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::GetDCounter => CicsPlanOperation::GetDCounter,
         HirCicsOperation::QueryCounter => CicsPlanOperation::QueryCounter,
         HirCicsOperation::QueryDCounter => CicsPlanOperation::QueryDCounter,
+        HirCicsOperation::RewindCounter => CicsPlanOperation::RewindCounter,
+        HirCicsOperation::RewindDCounter => CicsPlanOperation::RewindDCounter,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,

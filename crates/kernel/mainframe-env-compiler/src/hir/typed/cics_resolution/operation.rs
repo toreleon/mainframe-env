@@ -27,6 +27,8 @@ pub(super) fn resolve(
         ["GET", "DCOUNTER"] => HirCicsOperation::GetDCounter,
         ["QUERY", "COUNTER"] => HirCicsOperation::QueryCounter,
         ["QUERY", "DCOUNTER"] => HirCicsOperation::QueryDCounter,
+        ["REWIND", "COUNTER"] => HirCicsOperation::RewindCounter,
+        ["REWIND", "DCOUNTER"] => HirCicsOperation::RewindDCounter,
         ["ENQ"] => HirCicsOperation::Enq,
         ["HANDLE", "ABEND"] => HirCicsOperation::HandleAbend,
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,

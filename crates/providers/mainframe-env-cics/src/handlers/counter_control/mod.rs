@@ -4,6 +4,7 @@ mod define;
 mod delete;
 mod get;
 mod query;
+mod rewind;
 mod state;
 
 use super::super::{CicsService, Run};
@@ -46,6 +47,9 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::QueryCounter | CicsOperation::QueryDCounter => {
             query::invoke(service, run, request)
+        }
+        CicsOperation::RewindCounter | CicsOperation::RewindDCounter => {
+            rewind::invoke(service, run, request)
         }
         _ => Err(HostProblem::InfrastructureFailure),
     }
@@ -117,6 +121,7 @@ fn selector(request: &CicsRequest) -> Result<(String, CounterKey), HostProblem> 
             | CicsOperation::DeleteDCounter
             | CicsOperation::GetDCounter
             | CicsOperation::QueryDCounter
+            | CicsOperation::RewindDCounter
     ) {
         "DCOUNTER"
     } else {
@@ -238,6 +243,7 @@ fn response(
                     | CicsOperation::DeleteCounter
                     | CicsOperation::GetCounter
                     | CicsOperation::QueryCounter
+                    | CicsOperation::RewindCounter
             ) {
                 i128::from(value as u32 as i32)
             } else {

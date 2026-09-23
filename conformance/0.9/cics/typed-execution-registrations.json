@@ -102,6 +102,20 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0154"
     },
     {
+      "operation": "RewindCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0179"
+    },
+    {
+      "operation": "RewindDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0180"
+    },
+    {
       "operation": "DeleteTemporaryStorage",
       "interface": "api",
       "family": "queue-control",

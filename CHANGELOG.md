@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS REWIND COUNTER and REWIND DCOUNTER with conditional
+  at-limit reset, optional increment probe, `SUPPRESSED 102`, durable CAS,
+  SAF, and fenced replay. IBM CICS TS 6.x application API
+  `dfhp4_rewindcounter.html`, rows 0179/0180.
+
 - Added typed CICS QUERY COUNTER and QUERY DCOUNTER for current, minimum,
   and maximum outputs, including normal one-past-maximum reporting and
   source-defined signed fullword LENGERR warnings on wide counters. IBM CICS
