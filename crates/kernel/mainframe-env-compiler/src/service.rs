@@ -420,9 +420,10 @@ mod tests {
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
     use mainframe_env_ir::{
         Attribute, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsOperandName,
-        CicsOperandValue, CicsOutputName, CicsPlanLimits, CicsPlanOperation, CodecLimits,
-        DecimalExecutionPolicy, DecimalPlanLimits, StorageId, cics_executable_descriptor,
-        decode_binary, decode_cics_effect_plan, decode_decimal_assignment_plan, encode_binary,
+        CicsOperandValue, CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits, CicsPlanOperation,
+        CodecLimits, DecimalExecutionPolicy, DecimalPlanLimits, StorageId,
+        cics_executable_descriptor, decode_binary, decode_cics_effect_plan,
+        decode_decimal_assignment_plan, encode_binary, encode_cics_effect_plan,
     };
     use mainframe_env_source::{
         LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
@@ -1883,6 +1884,99 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn readq_td_compiler_plans_require_one_destination_and_matching_length_output() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTDQP. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP VALUE 6. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE('IN01') INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS READQ TD QUEUE('IN01') SET(PTR-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.";
+        let compiler = CobolCompiler::default();
+        let analysis = compiler.analyze(&bundle(source));
+        let hir = analysis
+            .hir
+            .as_ref()
+            .unwrap_or_else(|| panic!("READQ TD plans: {:?}", analysis.diagnostics));
+        let plans = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    let plan = decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap();
+                    (plan.operation == CicsPlanOperation::ReadTransientData).then_some(plan)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(plans.len(), 2);
+
+        for (plan, destination) in [
+            (&plans[0], CicsOutputName::Into),
+            (&plans[1], CicsOutputName::SetPointer),
+        ] {
+            let length_slot = match plan
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Length)
+                .map(|operand| &operand.value)
+            {
+                Some(CicsOperandValue::Storage(slot)) => slot,
+                other => panic!("READQ TD LENGTH storage: {other:?}"),
+            };
+            assert!(plan.outputs.iter().any(|output| output.name == destination));
+            assert_eq!(
+                &plan
+                    .outputs
+                    .iter()
+                    .find(|output| output.name == CicsOutputName::Length)
+                    .expect("READQ TD LENGTH output")
+                    .target,
+                length_slot
+            );
+            assert!(encode_cics_effect_plan(plan, CicsPlanLimits::default()).is_ok());
+        }
+
+        let malformed = |plan: &CicsEffectPlan| {
+            assert_eq!(
+                encode_cics_effect_plan(plan, CicsPlanLimits::default()),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        };
+
+        let mut missing_destination = plans[0].clone();
+        missing_destination
+            .outputs
+            .retain(|output| output.name != CicsOutputName::Into);
+        malformed(&missing_destination);
+
+        let set_pointer = plans[1]
+            .outputs
+            .iter()
+            .find(|output| output.name == CicsOutputName::SetPointer)
+            .expect("READQ TD SET output")
+            .clone();
+        let mut conflicting_destinations = plans[0].clone();
+        conflicting_destinations.outputs.push(set_pointer.clone());
+        malformed(&conflicting_destinations);
+
+        let mut literal_length = plans[0].clone();
+        literal_length
+            .operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::Length)
+            .expect("READQ TD LENGTH operand")
+            .value = CicsOperandValue::Integer(6);
+        malformed(&literal_length);
+
+        let mut mismatched_length_output = plans[0].clone();
+        mismatched_length_output
+            .outputs
+            .iter_mut()
+            .find(|output| output.name == CicsOutputName::Length)
+            .expect("READQ TD LENGTH output")
+            .target = set_pointer.target;
+        malformed(&mismatched_length_output);
     }
 
     fn cics_grammar_tokens() -> [&'static [u8]; 21] {
