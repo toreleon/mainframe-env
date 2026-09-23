@@ -136,6 +136,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::TypeNameLength
         | HirCicsOutputName::TypeNamespace
         | HirCicsOutputName::TypeNamespaceLength
+        | HirCicsOutputName::JournalReqId
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

@@ -333,6 +333,14 @@ SQLite reopen without turning this non-mutating wait into a replayed mutation.
 Typed WAIT JOURNALNUM uses a distinct numeric 1–99 operand and resolves it to
 the corresponding `DFHJnn` journal before applying the same token ownership,
 current-buffer, authorization, and completion rules.
+Typed WRITE JOURNALNAME persists FROM bytes with a two-byte JTYPEID and an
+optional PREFIX. FLENGTH and PFXLENG truncate their respective areas after
+checked fullword and halfword input; invalid lengths leave journal state
+unchanged with LENGERR. Deferred output returns a fullword REQID and waits for
+trusted local output acknowledgement; WAIT hardens synchronously and excludes
+REQID. NOSUSPEND returns NOJBUFSP when both local output buffer slots are
+pending. The version 2 durable record retains data, prefix, token ownership,
+and replay identity while remaining able to read version 1 WAIT records.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

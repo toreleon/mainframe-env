@@ -1,6 +1,6 @@
 //! Durable task-owned journal output authority.
 
-use super::super::{CicsLimits, CicsService, Run, store_error};
+use super::super::{CicsLimits, CicsService, Run, decimal_payload, mutation_problem, store_error};
 #[cfg(test)]
 use mainframe_env_execution_api::RunUnitId;
 use mainframe_env_host_api::{
@@ -10,7 +10,20 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, ProviderS
 use std::collections::{BTreeMap, BTreeSet};
 
 const NAMESPACE: &str = "cics-journal-v1";
-const MAGIC: &[u8; 7] = b"MECJNL1";
+const MAGIC_V1: &[u8; 7] = b"MECJNL1";
+const MAGIC_V2: &[u8; 7] = b"MECJNL2";
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct JournalEntry {
+    effect_key: String,
+    type_id: [u8; 2],
+    prefix: Vec<u8>,
+    data: Vec<u8>,
+    synchronous: bool,
+}
+
+#[cfg(test)]
+type JournalRecordBytes = ([u8; 2], Vec<u8>, Vec<u8>, bool);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum JournalAvailability {
@@ -30,6 +43,7 @@ enum JournalOutputState {
 struct JournalOutput {
     owner_run_unit: String,
     state: JournalOutputState,
+    entry: Option<JournalEntry>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -126,6 +140,79 @@ impl CicsService {
         Ok(())
     }
 
+    /// Record a durable completion from the local journal output worker.
+    pub fn acknowledge_journal_output(
+        &self,
+        name: &str,
+        request_id: i32,
+        io_error: bool,
+    ) -> Result<(), HostProblem> {
+        let name = normalize_name(name)?;
+        let mut state = self.lock()?;
+        let current = state
+            .journals
+            .get(&name)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let mut next = current.clone();
+        let output = next
+            .outputs
+            .get_mut(&request_id)
+            .ok_or(HostProblem::NotFound)?;
+        let completion = if io_error {
+            JournalOutputState::IoError
+        } else {
+            JournalOutputState::Hardened
+        };
+        if output.state == completion {
+            return Ok(());
+        }
+        if output.state != JournalOutputState::Pending {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        output.state = completion;
+        next.version = next
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: NAMESPACE.into(),
+                    key: name.clone(),
+                    version: next.version,
+                    payload: encode(&next, self.limits)?,
+                },
+                Some(current.version),
+            )
+            .map_err(store_error)
+            .map_err(mutation_problem)?;
+        state.journals.insert(name, next);
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn journal_record_bytes(
+        &self,
+        name: &str,
+        request_id: i32,
+    ) -> Result<JournalRecordBytes, HostProblem> {
+        let name = normalize_name(name)?;
+        let state = self.lock()?;
+        let entry = state
+            .journals
+            .get(&name)
+            .and_then(|record| record.outputs.get(&request_id))
+            .and_then(|output| output.entry.as_ref())
+            .ok_or(HostProblem::NotFound)?;
+        Ok((
+            entry.type_id,
+            entry.prefix.clone(),
+            entry.data.clone(),
+            entry.synchronous,
+        ))
+    }
+
     #[cfg(test)]
     pub(crate) fn seed_journal_output(
         &self,
@@ -158,6 +245,7 @@ impl CicsService {
             JournalOutput {
                 owner_run_unit: owner.as_str().into(),
                 state: output_state,
+                entry: None,
             },
         );
         let existing_outputs = state
@@ -234,6 +322,9 @@ pub(in crate::service) fn invoke(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    if request.operation == CicsOperation::WriteJournalName {
+        return write(service, run, request);
+    }
     if !matches!(
         request.operation,
         CicsOperation::WaitJournalName | CicsOperation::WaitJournalNum
@@ -302,6 +393,190 @@ pub(in crate::service) fn invoke(
     }
 }
 
+fn write(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_write_request(request)?;
+    let name = journal_name(request)?;
+    service.authorize(
+        run,
+        "JOURNAL",
+        &format!("CICS.JOURNAL.{name}"),
+        AccessIntent::Update,
+    )?;
+    let type_id: [u8; 2] = request.arguments["JTYPEID"]
+        .bytes()
+        .try_into()
+        .map_err(|_| invreq())?;
+    let mut data = request.arguments["FROM"].bytes().to_vec();
+    if let Some(length) = signed_decimal(request, "FLENGTH")? {
+        let length = usize::try_from(length).map_err(|_| lengerr())?;
+        if length > data.len() {
+            return Err(lengerr());
+        }
+        data.truncate(length);
+    }
+    let mut prefix = request
+        .arguments
+        .get("PREFIX")
+        .map(|value| value.bytes().to_vec())
+        .unwrap_or_default();
+    if let Some(length) = signed_decimal(request, "PFXLENG")? {
+        let length = usize::try_from(length).map_err(|_| lengerr())?;
+        if length > prefix.len() {
+            return Err(lengerr());
+        }
+        prefix.truncate(length);
+    }
+    let aggregate = data
+        .len()
+        .checked_add(prefix.len())
+        .and_then(|value| value.checked_add(402))
+        .ok_or_else(lengerr)?;
+    if aggregate > service.limits.max_queue_bytes {
+        return Err(lengerr());
+    }
+    let synchronous = request.arguments.contains_key("OPTION.WAIT");
+    let entry = JournalEntry {
+        effect_key: request
+            .mutation
+            .as_ref()
+            .ok_or(HostProblem::MissingIdempotency)?
+            .idempotency_key
+            .as_str()
+            .into(),
+        type_id,
+        prefix,
+        data,
+        synchronous,
+    };
+    let mut state = service.lock()?;
+    let current = state.journals.get(&name).cloned().ok_or_else(jiderr)?;
+    if current.availability != JournalAvailability::Open {
+        return Err(notopen());
+    }
+    if let Some((token, output)) = current.outputs.iter().find(|(_, output)| {
+        output
+            .entry
+            .as_ref()
+            .is_some_and(|saved| saved.effect_key == entry.effect_key)
+    }) {
+        if output.owner_run_unit != run.invocation.run_unit_id.as_str()
+            || output.entry.as_ref() != Some(&entry)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        return write_response(service, run, request, *token);
+    }
+    if current
+        .outputs
+        .values()
+        .filter(|output| output.state == JournalOutputState::Pending)
+        .count()
+        >= 2
+    {
+        if request.arguments.contains_key("OPTION.NOSUSPEND") {
+            return Err(nojbufsp());
+        }
+        return service.response(
+            run,
+            CicsDisposition::Suspended,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        );
+    }
+    let existing_outputs = state
+        .journals
+        .values()
+        .try_fold(0usize, |total, journal| {
+            total.checked_add(journal.outputs.len())
+        })
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if existing_outputs >= service.limits.max_queue_records {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let token = current
+        .outputs
+        .keys()
+        .rfind(|token| **token > 0)
+        .copied()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let mut next = current.clone();
+    next.version = next
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    next.current_request = Some(token);
+    next.outputs.insert(
+        token,
+        JournalOutput {
+            owner_run_unit: run.invocation.run_unit_id.as_str().into(),
+            state: if synchronous {
+                JournalOutputState::Hardened
+            } else {
+                JournalOutputState::Pending
+            },
+            entry: Some(entry),
+        },
+    );
+    persist_record(service, &name, &current, &next)?;
+    state.journals.insert(name, next);
+    write_response(service, run, request, token)
+}
+
+fn write_response(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    token: i32,
+) -> Result<CicsResponse, HostProblem> {
+    let mut response = service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    if request.arguments.contains_key("REQID") {
+        response
+            .outputs
+            .insert("REQID".into(), decimal_payload(i64::from(token))?);
+    }
+    Ok(response)
+}
+
+fn persist_record(
+    service: &CicsService,
+    name: &str,
+    current: &JournalRecord,
+    next: &JournalRecord,
+) -> Result<(), HostProblem> {
+    service
+        .store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: NAMESPACE.into(),
+                key: name.into(),
+                version: next.version,
+                payload: encode(next, service.limits)?,
+            },
+            Some(current.version),
+        )
+        .map_err(store_error)
+        .map_err(mutation_problem)
+}
+
 fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request
@@ -330,6 +605,51 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     } else {
         Ok(())
     }
+}
+
+fn validate_write_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "JOURNALNAME" | "JTYPEID" => !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                ),
+                "FROM" | "PREFIX" => value.schema() != "mainframe-env.cics.storage-value@1",
+                "FLENGTH" | "PFXLENG" => value.schema() != "mainframe-env.cics.decimal@1",
+                "REQID" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.WAIT" | "OPTION.NOSUSPEND" | "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+        || !["JOURNALNAME", "JTYPEID", "FROM"]
+            .iter()
+            .all(|name| request.arguments.contains_key(*name))
+    {
+        return Err(HostProblem::Malformed);
+    }
+    if request.arguments.contains_key("OPTION.WAIT") && request.arguments.contains_key("REQID")
+        || request.arguments.contains_key("PFXLENG") && !request.arguments.contains_key("PREFIX")
+    {
+        return Err(invreq());
+    }
+    Ok(())
+}
+
+fn signed_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, HostProblem> {
+    request
+        .arguments
+        .get(name)
+        .map(|value| {
+            std::str::from_utf8(value.bytes())
+                .map_err(|_| HostProblem::Malformed)?
+                .parse::<i64>()
+                .map_err(|_| HostProblem::Malformed)
+        })
+        .transpose()
 }
 
 fn journal_name(request: &CicsRequest) -> Result<String, HostProblem> {
@@ -379,6 +699,30 @@ fn jiderr() -> HostProblem {
     }
 }
 
+fn invreq() -> HostProblem {
+    HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2: 0,
+    }
+}
+
+fn lengerr() -> HostProblem {
+    HostProblem::Condition {
+        name: "LENGERR".into(),
+        response: 22,
+        response2: 0,
+    }
+}
+
+fn nojbufsp() -> HostProblem {
+    HostProblem::Condition {
+        name: "NOJBUFSP".into(),
+        response: 45,
+        response2: 0,
+    }
+}
+
 fn notopen() -> HostProblem {
     HostProblem::Condition {
         name: "NOTOPEN".into(),
@@ -389,7 +733,7 @@ fn notopen() -> HostProblem {
 
 fn encode(record: &JournalRecord, limits: CicsLimits) -> Result<Vec<u8>, HostProblem> {
     let mut out = Vec::new();
-    out.extend_from_slice(MAGIC);
+    out.extend_from_slice(MAGIC_V2);
     out.push(match record.availability {
         JournalAvailability::Open => 1,
         JournalAvailability::Disabled => 2,
@@ -416,6 +760,16 @@ fn encode(record: &JournalRecord, limits: CicsLimits) -> Result<Vec<u8>, HostPro
             JournalOutputState::Hardened => 2,
             JournalOutputState::IoError => 3,
         });
+        if let Some(entry) = &output.entry {
+            out.push(1);
+            write_field(&mut out, entry.effect_key.as_bytes())?;
+            out.extend_from_slice(&entry.type_id);
+            write_field(&mut out, &entry.prefix)?;
+            write_field(&mut out, &entry.data)?;
+            out.push(u8::from(entry.synchronous));
+        } else {
+            out.push(0);
+        }
     }
     if out.len() > limits.max_queue_bytes {
         return Err(HostProblem::ResourceExhausted);
@@ -428,9 +782,14 @@ fn decode(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<JournalRecor
         return Err(HostProblem::ResourceExhausted);
     }
     let mut reader = Reader { bytes };
-    if reader.take(MAGIC.len())? != MAGIC {
+    let magic = reader.take(MAGIC_V2.len())?;
+    let format = if magic == MAGIC_V1 {
+        1
+    } else if magic == MAGIC_V2 {
+        2
+    } else {
         return Err(HostProblem::InfrastructureFailure);
-    }
+    };
     let availability = match reader.byte()? {
         1 => JournalAvailability::Open,
         2 => JournalAvailability::Disabled,
@@ -448,6 +807,7 @@ fn decode(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<JournalRecor
         return Err(HostProblem::ResourceExhausted);
     }
     let mut outputs = BTreeMap::new();
+    let mut effect_keys = BTreeSet::new();
     for _ in 0..count {
         let request_id = reader.i32()?;
         let owner = reader.field(1024)?;
@@ -459,6 +819,45 @@ fn decode(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<JournalRecor
             3 => JournalOutputState::IoError,
             _ => return Err(HostProblem::InfrastructureFailure),
         };
+        let entry = if format == 2 {
+            match reader.byte()? {
+                0 => None,
+                1 => {
+                    let effect_key = String::from_utf8(reader.field(1024)?)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    let type_id: [u8; 2] = reader
+                        .take(2)?
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    let prefix = reader.field(limits.max_queue_bytes)?;
+                    let data = reader.field(limits.max_queue_bytes)?;
+                    let synchronous = match reader.byte()? {
+                        0 => false,
+                        1 => true,
+                        _ => return Err(HostProblem::InfrastructureFailure),
+                    };
+                    if effect_key.is_empty() || synchronous && state != JournalOutputState::Hardened
+                    {
+                        return Err(HostProblem::InfrastructureFailure);
+                    }
+                    Some(JournalEntry {
+                        effect_key,
+                        type_id,
+                        prefix,
+                        data,
+                        synchronous,
+                    })
+                }
+                _ => return Err(HostProblem::InfrastructureFailure),
+            }
+        } else {
+            None
+        };
+        if let Some(entry) = &entry
+            && !effect_keys.insert(entry.effect_key.clone())
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
         if owner_run_unit.is_empty()
             || outputs
                 .insert(
@@ -466,6 +865,7 @@ fn decode(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<JournalRecor
                     JournalOutput {
                         owner_run_unit,
                         state,
+                        entry,
                     },
                 )
                 .is_some()
@@ -485,6 +885,16 @@ fn decode(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<JournalRecor
         outputs,
         version,
     })
+}
+
+fn write_field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
+    out.extend_from_slice(
+        &u32::try_from(value.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    out.extend_from_slice(value);
+    Ok(())
 }
 
 struct Reader<'a> {
@@ -527,5 +937,31 @@ impl Reader<'_> {
             return Err(HostProblem::ResourceExhausted);
         }
         Ok(self.take(length)?.to_vec())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_wait_record_decodes_and_upgrades_without_losing_token() {
+        let mut bytes = MAGIC_V1.to_vec();
+        bytes.push(1);
+        bytes.push(1);
+        bytes.extend_from_slice(&7_i32.to_be_bytes());
+        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        bytes.extend_from_slice(&7_i32.to_be_bytes());
+        bytes.extend_from_slice(&4_u32.to_be_bytes());
+        bytes.extend_from_slice(b"task");
+        bytes.push(2);
+        let limits = CicsLimits::default();
+        let decoded = decode(&bytes, 1, limits).unwrap();
+        assert_eq!(decoded.current_request, Some(7));
+        assert_eq!(decoded.outputs[&7].state, JournalOutputState::Hardened);
+        assert!(decoded.outputs[&7].entry.is_none());
+        let upgraded = encode(&decoded, limits).unwrap();
+        assert!(upgraded.starts_with(MAGIC_V2));
+        assert_eq!(decode(&upgraded, 1, limits).unwrap(), decoded);
     }
 }

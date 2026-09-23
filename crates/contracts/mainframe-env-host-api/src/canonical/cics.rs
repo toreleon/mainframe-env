@@ -70,6 +70,7 @@ impl Canonical for CicsOperation {
             Self::TransformXmlToData => out.variant("CicsOperation", "TransformXmlToData", 0),
             Self::WaitJournalName => out.variant("CicsOperation", "WaitJournalName", 0),
             Self::WaitJournalNum => out.variant("CicsOperation", "WaitJournalNum", 0),
+            Self::WriteJournalName => out.variant("CicsOperation", "WriteJournalName", 0),
             Self::Write => out.variant("CicsOperation", "Write", 0),
             Self::WriteTransientData => out.variant("CicsOperation", "WriteTransientData", 0),
             Self::Xctl => out.variant("CicsOperation", "Xctl", 0),

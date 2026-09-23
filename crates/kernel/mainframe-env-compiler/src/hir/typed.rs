@@ -210,6 +210,7 @@ pub enum HirCicsOperation {
     TransformXmlToData,
     WaitJournalName,
     WaitJournalNum,
+    WriteJournalName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -312,6 +313,11 @@ pub enum HirCicsOperandName {
     JournalName,
     JournalNum,
     JournalReqId,
+    JournalTypeId,
+    JournalFrom,
+    JournalFlength,
+    JournalPrefix,
+    JournalPfxLeng,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -6785,6 +6791,43 @@ mod tests {
                     .public_message()
                     .contains("requires a journal number from 1 to 99")
             }));
+        }
+    }
+
+    #[test]
+    fn cics_write_journalname_binds_record_lengths_and_async_reqid() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEJNL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD '. 01 PREFIX-X PIC X(4) VALUE 'PFX '. 01 LENGTH-X PIC S9(9) COMP VALUE 7. 01 PFXLEN-X PIC S9(4) COMP VALUE 3. 01 REQUEST-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITE JOURNALNAME('ACCOUNTS') JTYPEID('UR') FROM(DATA-X) FLENGTH(LENGTH-X) PREFIX(PREFIX-X) PFXLENG(PFXLEN-X) REQID(REQUEST-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE JOURNALNAME: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WRITE JOURNALNAME");
+        assert_eq!(command.operation, HirCicsOperation::WriteJournalName);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::JournalFrom
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::JournalReqId
+                && output.target.qualified_name == "REQUEST-X"
+        }));
+
+        for command in [
+            "WRITE JOURNALNAME('ACCOUNTS') JTYPEID('UR') FROM(DATA-X) REQID(REQUEST-X) WAIT",
+            "WRITE JOURNALNAME('ACCOUNTS') JTYPEID('X') FROM(DATA-X)",
+            "WRITE JOURNALNAME('ACCOUNTS') JTYPEID('UR') FROM(DATA-X) PFXLENG(2)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 REQUEST-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&source).hir.is_none(), "{command}");
         }
     }
 }

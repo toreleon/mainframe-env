@@ -80,6 +80,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::TransformXmlToData => 71,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
+        CicsPlanOperation::WriteJournalName => 56,
     }
 }
 
@@ -147,6 +148,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         71 => Ok(CicsPlanOperation::TransformXmlToData),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
+        56 => Ok(CicsPlanOperation::WriteJournalName),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -249,6 +251,11 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::JournalName => 96,
         CicsOperandName::JournalReqId => 97,
         CicsOperandName::JournalNum => 98,
+        CicsOperandName::JournalTypeId => 99,
+        CicsOperandName::JournalFrom => 100,
+        CicsOperandName::JournalFlength => 101,
+        CicsOperandName::JournalPrefix => 102,
+        CicsOperandName::JournalPfxLeng => 103,
     }
 }
 
@@ -350,6 +357,11 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         96 => Ok(CicsOperandName::JournalName),
         97 => Ok(CicsOperandName::JournalReqId),
         98 => Ok(CicsOperandName::JournalNum),
+        99 => Ok(CicsOperandName::JournalTypeId),
+        100 => Ok(CicsOperandName::JournalFrom),
+        101 => Ok(CicsOperandName::JournalFlength),
+        102 => Ok(CicsOperandName::JournalPrefix),
+        103 => Ok(CicsOperandName::JournalPfxLeng),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -482,6 +494,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::TypeNameLength => 229,
         CicsOutputName::TypeNamespace => 230,
         CicsOutputName::TypeNamespaceLength => 231,
+        CicsOutputName::JournalReqId => 201,
     }
 }
 
@@ -516,12 +529,13 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         229 => Ok(CicsOutputName::TypeNameLength),
         230 => Ok(CicsOutputName::TypeNamespace),
         231 => Ok(CicsOutputName::TypeNamespaceLength),
+        201 => Ok(CicsOutputName::JournalReqId),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),
         // Reserved non-ASSIGN journal outputs must remain ahead of the
         // open-ended ASSIGN extension decoder.
-        201..=207 => Err(CicsPlanCodecProblem::Malformed),
+        202..=207 => Err(CicsPlanCodecProblem::Malformed),
         96..=200 | 208..=u8::MAX => value
             .checked_sub(ASSIGN_OUTPUT_EXTENSION_TAG_BASE)
             .and_then(|tag| tag.checked_add(ASSIGN_OUTPUT_LEGACY_COUNT))

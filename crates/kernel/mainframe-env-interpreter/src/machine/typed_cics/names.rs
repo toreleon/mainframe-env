@@ -40,6 +40,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::TypeNameLength
         | CicsOperandName::TypeNamespaceLength
         | CicsOperandName::JournalReqId => SlotUse::FullwordInput,
+        CicsOperandName::JournalFlength => SlotUse::FullwordInput,
+        CicsOperandName::JournalPfxLeng => SlotUse::HalfwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataArea => SlotUse::Input,
         CicsOperandName::EventControlAddress => SlotUse::PointerInput,
@@ -91,7 +93,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Resp
         | CicsOutputName::Resp2
         | CicsOutputName::Length
-        | CicsOutputName::NumItems => SlotUse::NumericOutput,
+        | CicsOutputName::NumItems
+        | CicsOutputName::JournalReqId => SlotUse::NumericOutput,
         CicsOutputName::ElementNameLength
         | CicsOutputName::ElementNamespaceLength
         | CicsOutputName::TypeNameLength
@@ -166,6 +169,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::TransformXmlToData => CicsOperation::TransformXmlToData,
         CicsPlanOperation::WaitJournalName => CicsOperation::WaitJournalName,
         CicsPlanOperation::WaitJournalNum => CicsOperation::WaitJournalNum,
+        CicsPlanOperation::WriteJournalName => CicsOperation::WriteJournalName,
     }
 }
 
@@ -267,6 +271,11 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::JournalName => "JOURNALNAME",
         CicsOperandName::JournalNum => "JOURNALNUM",
         CicsOperandName::JournalReqId => "REQID",
+        CicsOperandName::JournalTypeId => "JTYPEID",
+        CicsOperandName::JournalFrom => "FROM",
+        CicsOperandName::JournalFlength => "FLENGTH",
+        CicsOperandName::JournalPrefix => "PREFIX",
+        CicsOperandName::JournalPfxLeng => "PFXLENG",
     }
 }
 
@@ -302,6 +311,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::TypeNameLength => "TYPENAMELEN",
         CicsOutputName::TypeNamespace => "TYPENS",
         CicsOutputName::TypeNamespaceLength => "TYPENSLEN",
+        CicsOutputName::JournalReqId => "REQID",
     }
 }
 

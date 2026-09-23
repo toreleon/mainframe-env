@@ -162,6 +162,7 @@ pub(super) fn suspension(
         CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
+        CicsOperation::WriteJournalName => ("cics-journal", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -373,6 +374,8 @@ pub(super) fn execute(
                         | CicsOperandName::TypeNamespaceLength
                         | CicsOperandName::JournalReqId
                         | CicsOperandName::JournalNum
+                        | CicsOperandName::JournalFlength
+                        | CicsOperandName::JournalPfxLeng
                 ) =>
             {
                 (
@@ -453,6 +456,7 @@ pub(super) fn execute(
             | CicsOutputName::TypeNameLength
             | CicsOutputName::TypeNamespace
             | CicsOutputName::TypeNamespaceLength
+            | CicsOutputName::JournalReqId
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

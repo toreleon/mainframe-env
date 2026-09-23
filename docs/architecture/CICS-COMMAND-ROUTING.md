@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 46 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 47 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 217 `unready` rows that are recognized but fail explicitly as unsupported.
+- 216 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 46 API routes are the only advertised application commands.
+The current 47 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -284,7 +284,7 @@ replaces case-sensitive symbol definitions atomically with the effect replay;
 previously inserted bytes retain their materialized values. The unused
 operand, option and output tags in the reserved ranges remain unassigned.
 Typed `WAIT JOURNALNAME` uses the journal-control family and a single durable
-`cics-journal-v1` authority shared with the later journal writes. A literal or
+`cics-journal-v1` authority shared with journal writes. A literal or
 storage-backed name is normalized to 1–8 uppercase alphanumeric, `$`, `@`, or
 `#` characters and authorized as `JOURNAL/CICS.JOURNAL.<name>`. An explicit
 fullword `REQID` selects only a token created by the issuing task; omission
@@ -300,6 +300,20 @@ numeric values 1–99 to `DFHJ01`–`DFHJ99` before the same SAF check and durab
 wait. The explicit REQID remains task-owned; an omitted REQID uses the selected
 journal's current buffer. Other numeric values and mixed name/number operand
 shapes are rejected before the wait.
+Typed `WRITE JOURNALNAME` requires a known 1–8 character journal, two-byte
+JTYPEID, and FROM area. Optional fullword FLENGTH and halfword PFXLENG select
+bounded data and PREFIX slices; invalid lengths return LENGERR 22 without an
+append. The local durable writer authorizes `JOURNAL/CICS.JOURNAL.<name>` for
+update, retains the exact record bytes and idempotency key, and returns a
+fullword REQID only for deferred output. An explicit WAIT creates a hardened
+record before returning. Deferred output remains pending until the trusted
+local output worker acknowledges it; a numbered or named WAIT then observes
+the same completion state. Two pending buffer slots enforce default suspension
+or NOSUSPEND/NOJBUFSP 45 without appending a rejected record. Unknown,
+disabled, and denied journals map to JIDERR 43, NOTOPEN 19, and NOTAUTH 70.
+The `cics-journal-v1` namespace now writes codec version 2 while reading
+version 1 WAIT state. Native System Logger/SMF transport and JOURNALMODEL
+resolution remain outside this local execution boundary.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
@@ -449,7 +463,7 @@ differentials, or make 0.9.0 release-ready.
 | `storage-control` | bounded task-local virtual storage allocation and release |
 | `journal-control` | durable named-journal output state and task synchronization |
 
-This table describes the ten families present in the 48-operation runtime
+This table describes the ten families present in the 49-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

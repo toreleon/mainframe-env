@@ -278,6 +278,11 @@ impl PlanContext<'_> {
                 HirCicsOperandName::JournalName => CicsOperandName::JournalName,
                 HirCicsOperandName::JournalNum => CicsOperandName::JournalNum,
                 HirCicsOperandName::JournalReqId => CicsOperandName::JournalReqId,
+                HirCicsOperandName::JournalTypeId => CicsOperandName::JournalTypeId,
+                HirCicsOperandName::JournalFrom => CicsOperandName::JournalFrom,
+                HirCicsOperandName::JournalFlength => CicsOperandName::JournalFlength,
+                HirCicsOperandName::JournalPrefix => CicsOperandName::JournalPrefix,
+                HirCicsOperandName::JournalPfxLeng => CicsOperandName::JournalPfxLeng,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -328,6 +333,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::TypeNameLength => CicsOutputName::TypeNameLength,
                 HirCicsOutputName::TypeNamespace => CicsOutputName::TypeNamespace,
                 HirCicsOutputName::TypeNamespaceLength => CicsOutputName::TypeNamespaceLength,
+                HirCicsOutputName::JournalReqId => CicsOutputName::JournalReqId,
             },
             target: self.slot(&output.target)?,
         })
@@ -435,6 +441,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::TransformXmlToData => CicsPlanOperation::TransformXmlToData,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
+        HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,
     }
 }
 

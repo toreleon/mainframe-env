@@ -37,6 +37,17 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
     match operation {
         HirCicsOperation::WaitJournalName => &["JOURNALNAME", "REQID", "RESP", "RESP2"],
         HirCicsOperation::WaitJournalNum => &["JOURNALNUM", "REQID", "RESP", "RESP2"],
+        HirCicsOperation::WriteJournalName => &[
+            "JOURNALNAME",
+            "JTYPEID",
+            "FROM",
+            "FLENGTH",
+            "REQID",
+            "PREFIX",
+            "PFXLENG",
+            "RESP",
+            "RESP2",
+        ],
         _ => unreachable!("only journal operations delegate clause shape"),
     }
 }
@@ -45,6 +56,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
     match operation {
         HirCicsOperation::WaitJournalName => &["NOHANDLE"],
         HirCicsOperation::WaitJournalNum => &["NOHANDLE"],
+        HirCicsOperation::WriteJournalName => &["WAIT", "NOSUSPEND", "NOHANDLE"],
         _ => unreachable!("only journal operations delegate option shape"),
     }
 }
@@ -53,6 +65,7 @@ pub(super) fn required_clauses(operation: HirCicsOperation) -> &'static [&'stati
     match operation {
         HirCicsOperation::WaitJournalName => &["JOURNALNAME"],
         HirCicsOperation::WaitJournalNum => &["JOURNALNUM"],
+        HirCicsOperation::WriteJournalName => &["JOURNALNAME", "JTYPEID", "FROM"],
         _ => unreachable!("only journal operations delegate required clauses"),
     }
 }
@@ -62,6 +75,9 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::WriteJournalName {
+        return write_operands(clauses, semantic);
+    }
     if !matches!(
         operation,
         HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum
@@ -114,6 +130,104 @@ pub(super) fn operands(
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::JournalReqId,
             value: HirCicsValue::Data(reference),
+        });
+    }
+    Ok(operands)
+}
+
+fn write_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let journal_name = cics_value(&clauses["JOURNALNAME"], semantic)?;
+    if let HirCicsValue::Literal(value) = &journal_name
+        && (!(1..=8).contains(&value.len())
+            || !value.bytes().all(|byte| {
+                byte.is_ascii_uppercase()
+                    || byte.is_ascii_digit()
+                    || matches!(byte, b'$' | b'@' | b'#')
+            }))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WRITE JOURNALNAME requires a 1- to 8-character journal name".into(),
+        ));
+    }
+    let type_id = cics_value(&clauses["JTYPEID"], semantic)?;
+    let type_length = match &type_id {
+        HirCicsValue::Literal(value) => value.len(),
+        HirCicsValue::Data(reference) => reference.length,
+        _ => 0,
+    };
+    if type_length != 2 {
+        return Err(ResolutionFailure::Invalid(
+            "CICS WRITE JOURNALNAME JTYPEID requires two characters".into(),
+        ));
+    }
+    let from = complete_data_reference(&clauses["FROM"], semantic)?;
+    let mut operands = vec![
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::JournalName,
+            value: journal_name,
+        },
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::JournalTypeId,
+            value: type_id,
+        },
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::JournalFrom,
+            value: HirCicsValue::Data(from),
+        },
+    ];
+    if let Some(tokens) = clauses.get("FLENGTH") {
+        let value = cics_integer_value(tokens, semantic)?;
+        match &value {
+            HirCicsValue::Integer(value) if *value >= 0 => {}
+            HirCicsValue::Data(reference)
+                if reference.usage == CobolUsage::Binary
+                    && reference.length == 4
+                    && reference.scale == 0 => {}
+            _ => {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS WRITE JOURNALNAME FLENGTH requires nonnegative fullword binary value"
+                        .into(),
+                ));
+            }
+        }
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::JournalFlength,
+            value,
+        });
+    }
+    if let Some(tokens) = clauses.get("PREFIX") {
+        let prefix = complete_data_reference(tokens, semantic)?;
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::JournalPrefix,
+            value: HirCicsValue::Data(prefix),
+        });
+    }
+    if let Some(tokens) = clauses.get("PFXLENG") {
+        if !clauses.contains_key("PREFIX") {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WRITE JOURNALNAME PFXLENG requires PREFIX".into(),
+            ));
+        }
+        let value = cics_integer_value(tokens, semantic)?;
+        match &value {
+            HirCicsValue::Integer(value) if (0..=65_535).contains(value) => {}
+            HirCicsValue::Data(reference)
+                if reference.usage == CobolUsage::Binary
+                    && reference.length == 2
+                    && reference.scale == 0 => {}
+            _ => {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS WRITE JOURNALNAME PFXLENG requires nonnegative halfword binary value"
+                        .into(),
+                ));
+            }
+        }
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::JournalPfxLeng,
+            value,
         });
     }
     Ok(operands)

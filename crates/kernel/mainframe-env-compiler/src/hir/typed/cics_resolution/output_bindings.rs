@@ -120,5 +120,25 @@ pub(super) fn resolve(
     {
         outputs.push(output);
     }
+    if operation == HirCicsOperation::WriteJournalName
+        && let Some(value) = clauses.get("REQID")
+    {
+        if options.iter().any(|option| option == "WAIT") {
+            return Err(super::super::ResolutionFailure::Invalid(
+                "CICS WRITE JOURNALNAME REQID is valid only without WAIT".into(),
+            ));
+        }
+        let target = complete_data_reference(value, semantic)?;
+        require_writable(&target)?;
+        if target.usage != CobolUsage::Binary || target.length != 4 || target.scale != 0 {
+            return Err(super::super::ResolutionFailure::Invalid(
+                "CICS WRITE JOURNALNAME REQID requires writable fullword binary storage".into(),
+            ));
+        }
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::JournalReqId,
+            target,
+        });
+    }
     Ok(outputs)
 }

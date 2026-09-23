@@ -714,9 +714,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Retrieve => &[
             "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
         ],
-        HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum => {
-            journal_control::allowed_clauses(operation)
-        }
+        HirCicsOperation::WaitJournalName
+        | HirCicsOperation::WaitJournalNum
+        | HirCicsOperation::WriteJournalName => journal_control::allowed_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -785,9 +785,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Read => &["EQUAL", "GENERIC", "GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
-        HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum => {
-            journal_control::allowed_options(operation)
-        }
+        HirCicsOperation::WaitJournalName
+        | HirCicsOperation::WaitJournalNum
+        | HirCicsOperation::WriteJournalName => journal_control::allowed_options(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -892,9 +892,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
         HirCicsOperation::Syncpoint => &[][..],
-        HirCicsOperation::WaitJournalName | HirCicsOperation::WaitJournalNum => {
-            journal_control::required_clauses(operation)
-        }
+        HirCicsOperation::WaitJournalName
+        | HirCicsOperation::WaitJournalNum
+        | HirCicsOperation::WriteJournalName => journal_control::required_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()

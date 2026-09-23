@@ -67,6 +67,7 @@ pub(super) fn resolve(
         ["TRANSFORM", "XMLTODATA"] => HirCicsOperation::TransformXmlToData,
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
+        ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,
         _ => return Err(ResolutionFailure::Unsupported),
     })
 }

@@ -127,6 +127,8 @@ pub enum CicsPlanOperation {
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
     WaitJournalNum,
+    /// Create one named journal record for synchronous or deferred output.
+    WriteJournalName,
 }
 
 /// Named input accepted by the typed CICS pilot.
@@ -317,6 +319,16 @@ pub enum CicsOperandName {
     JournalName,
     /// `JOURNALNUM(...)` numeric journal identity from 1 to 99.
     JournalNum,
+    /// `JTYPEID(...)` two-character record origin.
+    JournalTypeId,
+    /// `FROM(...)` journal record data area.
+    JournalFrom,
+    /// `FLENGTH(...)` fullword journal data length.
+    JournalFlength,
+    /// `PREFIX(...)` journal record prefix data area.
+    JournalPrefix,
+    /// `PFXLENG(...)` halfword journal prefix length.
+    JournalPfxLeng,
     /// `REQID(...)` fullword token in the journal-control identity domain.
     JournalReqId,
 }
@@ -463,4 +475,6 @@ pub enum CicsOutputName {
     TypeNamespace,
     /// XML type namespace length.
     TypeNamespaceLength,
+    /// `REQID(...)` fullword token returned by asynchronous journal output.
+    JournalReqId,
 }

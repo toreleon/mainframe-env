@@ -276,6 +276,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
+        "WriteJournalName",
+        "api",
+        "journal-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0254",
+    ),
+    (
         "WriteTransientData",
         "api",
         "queue-control",
@@ -556,6 +563,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "TransformXmlToData",
         "WaitJournalName",
         "WaitJournalNum",
+        "WriteJournalName",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -698,6 +706,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "WaitJournalNum": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WriteJournalName": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "EndBrowse": frozenset(
@@ -1026,6 +1037,7 @@ def _load_typed_execution_registrations(
         "WaitExternal",
         "WaitJournalName",
         "WaitJournalNum",
+        "WriteJournalName",
         "WriteTemporaryStorage",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -1352,6 +1364,7 @@ def load_catalog(
                 "WaitExternal",
                 "WaitJournalName",
                 "WaitJournalNum",
+                "WriteJournalName",
             }
         ]
     )

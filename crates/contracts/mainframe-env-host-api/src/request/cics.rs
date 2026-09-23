@@ -109,6 +109,8 @@ pub enum CicsOperation {
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
     WaitJournalNum,
+    /// Create one named journal record with synchronous or deferred output.
+    WriteJournalName,
     Write,
     WriteTransientData,
     Xctl,
@@ -180,6 +182,7 @@ impl CicsOperation {
             Self::TransformXmlToData => "TransformXmlToData",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
+            Self::WriteJournalName => "WriteJournalName",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -208,6 +211,7 @@ impl CicsOperation {
                 | Self::Getmain
                 | Self::Rewrite
                 | Self::Write
+                | Self::WriteJournalName
                 | Self::WriteTransientData
                 | Self::Link
                 | Self::InvokeApplication
@@ -310,6 +314,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
+            ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,
