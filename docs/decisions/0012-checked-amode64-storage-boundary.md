@@ -72,9 +72,10 @@ while assembler source admission and durable shared storage remain unavailable.
   A host result with mismatched attributes or a snapshot asserting shared
   storage is rejected before the interpreter exposes a pointer.
 - The required `architecture-fast --check` currently lacks a passing receipt
-  because six other pinned CICS source-closure HTML bodies are absent from both
-  permitted offline caches. Their identities are recorded in the v0.9 status.
-  This ADR does not waive that gate or request a network refresh.
+  because unrelated pinned source-closure HTML bodies and a CICS TX DUMP
+  supplement are unavailable in the bounded offline caches. Their identities
+  and cache-specific availability are recorded in the v0.9 status. This ADR
+  does not waive that gate or request a network refresh.
 
 ## Verification
 
