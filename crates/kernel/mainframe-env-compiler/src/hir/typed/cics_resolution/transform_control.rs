@@ -2,16 +2,10 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
     HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
 };
-use super::{Clauses, cics_value, complete_data_reference};
+use super::{Clauses, cics_value, complete_data_reference, shape::CommandShape};
 use crate::{CobolUsage, SemanticModel};
 
-pub(super) struct TransformShape {
-    pub(super) clauses: &'static [&'static str],
-    pub(super) options: &'static [&'static str],
-    pub(super) required: &'static [&'static str],
-}
-
-pub(super) fn shape(operation: HirCicsOperation) -> Option<TransformShape> {
+pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
     let (clauses, required): (&'static [&'static str], &'static [&'static str]) = match operation {
         HirCicsOperation::TransformDataToJson | HirCicsOperation::TransformJsonToData => (
             &[
@@ -65,7 +59,7 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<TransformShape> {
         ),
         _ => return None,
     };
-    Some(TransformShape {
+    Some(CommandShape {
         clauses,
         options: &["NOHANDLE"],
         required,

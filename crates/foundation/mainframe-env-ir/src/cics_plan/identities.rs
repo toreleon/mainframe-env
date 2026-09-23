@@ -95,6 +95,8 @@ pub enum CicsPlanOperation {
     Read,
     /// Delete an explicitly identified or currently held file record.
     Delete,
+    /// Define one input event in the current BTS activity.
+    DefineInputEvent,
     /// Write one explicitly keyed file record.
     Write,
     /// Write one bounded record to a transient data queue.
@@ -194,6 +196,8 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    /// Name of a BTS event or SIGNAL EVENT capture point.
+    Event,
     /// Optional application transaction abend code.
     Abcode,
     /// Source label used by a task-local control transfer.

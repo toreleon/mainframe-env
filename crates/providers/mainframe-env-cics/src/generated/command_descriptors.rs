@@ -24,6 +24,7 @@ pub(crate) enum CicsCommandFamily {
     TransformControl,
     SpoolControl,
     DocumentControl,
+    EventControl,
     JournalControl,
     WebServiceControl,
     CounterControl,
@@ -94,6 +95,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
         family: CicsCommandFamily::TaskControl,
         mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::DefineInputEvent,
+        syntax: "DEFINE INPUT EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0036",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::Delay,

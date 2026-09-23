@@ -2,6 +2,9 @@
 
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
 
+mod executables;
+pub use executables::CICS_EXECUTABLE_DESCRIPTORS;
+
 /// Runtime import required by every executable operation in this dialect.
 pub const CICS_RUNTIME_IMPORT: &str = "host.cics";
 
@@ -237,6 +240,7 @@ const DOCUMENT_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const EVENT_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const TRANSFORM_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const WEB_SERVICE_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const SPOOL_EFFECTS: &[Effect] = &[

@@ -21,6 +21,7 @@ mod clause_parser;
 mod command_recognition;
 mod counter_control;
 mod document_control;
+mod event_control;
 mod file_operands;
 mod format_time;
 mod handle_abend;
@@ -33,6 +34,7 @@ mod output_bindings;
 mod program_control;
 mod program_name;
 mod queue_control;
+mod shape;
 mod spool_control;
 mod storage_control;
 mod task_wait;
@@ -705,7 +707,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolRead
         | HirCicsOperation::SpoolWrite => spool_control::allowed_clauses(operation),
         _ => {
-            transform_shape
+            command_shape
                 .as_ref()
                 .ok_or(ResolutionFailure::Unsupported)?
                 .clauses
@@ -795,7 +797,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolRead
         | HirCicsOperation::SpoolWrite => spool_control::allowed_options(operation),
         _ => {
-            transform_shape
+            command_shape
                 .as_ref()
                 .ok_or(ResolutionFailure::Unsupported)?
                 .options
@@ -920,7 +922,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolRead
         | HirCicsOperation::SpoolWrite => spool_control::required(operation),
         _ => {
-            transform_shape
+            command_shape
                 .as_ref()
                 .ok_or(ResolutionFailure::Unsupported)?
                 .required

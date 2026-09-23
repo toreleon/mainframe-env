@@ -10,6 +10,7 @@ mod browse;
 mod codec_tags;
 mod counter_control;
 mod document_control;
+mod event_control;
 mod file_mutation;
 mod handle_abend;
 mod identities;
@@ -712,6 +713,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DocumentSet => {
             document_control::invalid_set_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DefineInputEvent => {
+            event_control::invalid_define_input_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1291,6 +1295,42 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&outputs[..21], limits),
             Err(CicsPlanCodecProblem::Truncated)
+        );
+    }
+
+    #[test]
+    fn define_input_event_uses_reserved_v2_tags_without_changing_v1() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DefineInputEvent,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Event,
+                value: CicsOperandValue::Literal(b"READY".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        assert_eq!(operation_tag(plan.operation), 108);
+        assert_eq!(operand_tag(CicsOperandName::Event), 320);
+        assert_eq!(operation_from_tag(108), Ok(plan.operation));
+        assert_eq!(operand_from_tag(320), Ok(CicsOperandName::Event));
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[..8], b"MCEP\0\x02\0l");
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        assert_eq!(
+            decode_cics_effect_plan(b"MCEP\0\x01\x02\0\0\0\0\0\0\0\0\0\0\0\0\0", limits),
+            Ok(CicsEffectPlan {
+                operation: CicsPlanOperation::Syncpoint,
+                operands: Vec::new(),
+                options: BTreeSet::new(),
+                outputs: Vec::new(),
+                condition: CicsCondition::Default,
+            })
         );
     }
 

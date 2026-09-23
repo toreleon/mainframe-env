@@ -181,6 +181,7 @@ impl PlanContext<'_> {
         Ok(CicsNamedOperand {
             name: match operand.name {
                 HirCicsOperandName::Abcode => CicsOperandName::Abcode,
+                HirCicsOperandName::Event => CicsOperandName::Event,
                 HirCicsOperandName::Label => CicsOperandName::Label,
                 HirCicsOperandName::Program => CicsOperandName::Program,
                 HirCicsOperandName::Commarea => CicsOperandName::Commarea,
@@ -520,6 +521,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
         HirCicsOperation::DocumentCreate => CicsPlanOperation::DocumentCreate,
+        HirCicsOperation::DefineInputEvent => CicsPlanOperation::DefineInputEvent,
         HirCicsOperation::DocumentDelete => CicsPlanOperation::DocumentDelete,
         HirCicsOperation::DocumentInsert => CicsPlanOperation::DocumentInsert,
         HirCicsOperation::DocumentRetrieve => CicsPlanOperation::DocumentRetrieve,

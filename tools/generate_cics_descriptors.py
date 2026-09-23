@@ -94,6 +94,7 @@ EXPECTED_FAMILIES = {
 }
 TYPED_EXECUTION_FAMILIES = {
     "document-control": "DocumentControl",
+    "event-control": "EventControl",
     "journal-control": "JournalControl",
     "web-service-control": "WebServiceControl",
     "counter-control": "CounterControl",
@@ -107,6 +108,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
+    ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
     ("DefineCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0034"),
     ("DefineDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0035"),
@@ -559,6 +561,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Address",
         "Cancel",
         "ChangeTask",
+        "DefineInputEvent",
         "Delay",
         "DefineCounter",
         "DefineDCounter",
@@ -887,6 +890,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "DocumentSet": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "DefineInputEvent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Getmain": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
@@ -1178,6 +1184,7 @@ def _load_typed_execution_registrations(
         "DeleteTemporaryStorage",
         "DeleteTransientData",
         "Deq",
+        "DefineInputEvent",
         "DocumentCreate",
         "DocumentDelete",
         "DocumentInsert",

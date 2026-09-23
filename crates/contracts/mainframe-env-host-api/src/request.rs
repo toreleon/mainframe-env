@@ -2418,6 +2418,7 @@ mod tests {
             CicsOperation::ChangeTask,
             CicsOperation::Deq,
             CicsOperation::Delete,
+            CicsOperation::DefineInputEvent,
             CicsOperation::DocumentCreate,
             CicsOperation::DocumentDelete,
             CicsOperation::DocumentInsert,

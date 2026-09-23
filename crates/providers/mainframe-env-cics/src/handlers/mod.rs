@@ -2,6 +2,7 @@ mod bms_map;
 mod condition;
 mod counter_control;
 mod document_control;
+mod event_control;
 mod file_control;
 mod file_tokens;
 mod file_unlock;

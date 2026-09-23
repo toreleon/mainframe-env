@@ -1172,6 +1172,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "UPDATE COUNTER",
                 "UPDATE DCOUNTER",
                 "DEQ",
+                "DEFINE INPUT EVENT",
                 "DOCUMENT CREATE",
                 "DOCUMENT DELETE",
                 "DOCUMENT INSERT",

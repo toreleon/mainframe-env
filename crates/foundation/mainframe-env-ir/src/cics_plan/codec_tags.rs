@@ -47,6 +47,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::ReadPrev => 24,
         CicsPlanOperation::EndBrowse => 25,
         CicsPlanOperation::Delete => 26,
+        CicsPlanOperation::DefineInputEvent => 108,
         CicsPlanOperation::Write => 27,
         CicsPlanOperation::WriteTransientData => 28,
         CicsPlanOperation::ReceiveMap => 29,
@@ -145,6 +146,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         24 => Ok(CicsPlanOperation::ReadPrev),
         25 => Ok(CicsPlanOperation::EndBrowse),
         26 => Ok(CicsPlanOperation::Delete),
+        108 => Ok(CicsPlanOperation::DefineInputEvent),
         27 => Ok(CicsPlanOperation::Write),
         28 => Ok(CicsPlanOperation::WriteTransientData),
         29 => Ok(CicsPlanOperation::ReceiveMap),
@@ -215,6 +217,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
+        CicsOperandName::Event => 320,
         CicsOperandName::File => 0,
         CicsOperandName::Dataset => 1,
         CicsOperandName::From => 2,
@@ -383,6 +386,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
+        320 => Ok(CicsOperandName::Event),
         0 => Ok(CicsOperandName::File),
         1 => Ok(CicsOperandName::Dataset),
         2 => Ok(CicsOperandName::From),

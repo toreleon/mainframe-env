@@ -1493,11 +1493,14 @@ mod tests {
     fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 LOCK-X PIC X(4) VALUE 'LOCK'. 01 PTR-X POINTER-32. 01 CORR-X PIC X(80) VALUE ALL 'A'. 01 PRIORITY-X PIC S9(4) COMP VALUE 200. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. 01 TOKEN-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(RECORD-X) END-EXEC. EXEC CICS XCTL PROGRAM('NEXT') COMMAREA(RECORD-X) END-EXEC. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS RESETBR FILE('ACCTDAT') RIDFLD(KEY-X) GTEQ END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') UPDATE TOKEN(TOKEN-X) INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS UNLOCK FILE('ACCTDAT') TOKEN(TOKEN-X) END-EXEC. EXEC CICS ENQ RESOURCE(LOCK-X) LENGTH(4) UOW NOSUSPEND END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-X) LENGTH(4) UOW END-EXEC. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF RECORD-X) END-EXEC. EXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS HANDLE AID ANYKEY(AID-HANDLER) ENTER END-EXEC. EXEC CICS HANDLE ABEND PROGRAM('ABEXIT') END-EXEC. EXEC CICS HANDLE CONDITION ERROR(ERROR-HANDLER) LENGERR END-EXEC. EXEC CICS IGNORE CONDITION PGMIDERR END-EXEC. EXEC CICS PUSH HANDLE END-EXEC. EXEC CICS POP HANDLE RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. EXEC CICS ABEND ABCODE(AB-CODE) NODUMP END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(RECORD-X) END-EXEC.";
         let source = format!(
-            "{source} EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. EXEC CICS WAIT EVENT ECADDR(PTR-X) NAME('WAITONE') END-EXEC. EXEC CICS WAIT EXTERNAL ECBLIST(PTR-X) NUMEVENTS(CODE-A) PURGEABLE END-EXEC. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS READQ TD QUEUE('OUTQ') INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC. EXEC CICS DELETEQ TD QUEUE('OUTQ') END-EXEC. EXEC CICS DELETEQ TS QUEUE('TEMPQ') END-EXEC. EXEC CICS READQ TS QUEUE('TEMPQ') INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC. EXEC CICS WRITEQ TS QUEUE('TEMPQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) END-EXEC. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC. EXEC CICS ASSIGN ABCODE(AB-CODE) END-EXEC. EXEC CICS PURGE MESSAGE END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(RECORD-X) LENGTH(4) INTERVAL(0) END-EXEC. EXEC CICS RETRIEVE INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC. EXEC CICS CANCEL REQID('REQ0001') TRANSID('NEXT') END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS TRANSFORM DATATOJSON CHANNEL('WORK') INCONTAINER('SOURCE') TRANSFORMER('CUSTOMER') END-EXEC. EXEC CICS TRANSFORM DATATOXML CHANNEL('WORK') DATCONTAINER('SOURCE') XMLCONTAINER('XML') XMLTRANSFORM('CUSTOMERXML') END-EXEC. EXEC CICS TRANSFORM JSONTODATA CHANNEL('WORK') INCONTAINER('JSON') TRANSFORMER('CUSTOMER') END-EXEC. EXEC CICS TRANSFORM XMLTODATA CHANNEL('WORK') XMLCONTAINER('XML') END-EXEC."
+            "{source} EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. EXEC CICS WAIT EVENT ECADDR(PTR-X) NAME('WAITONE') END-EXEC. EXEC CICS WAIT EXTERNAL ECBLIST(PTR-X) NUMEVENTS(CODE-A) PURGEABLE END-EXEC. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS READQ TD QUEUE('OUTQ') INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC. EXEC CICS DELETEQ TD QUEUE('OUTQ') END-EXEC. EXEC CICS DELETEQ TS QUEUE('TEMPQ') END-EXEC. EXEC CICS READQ TS QUEUE('TEMPQ') INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC. EXEC CICS WRITEQ TS QUEUE('TEMPQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) END-EXEC. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC. EXEC CICS ASSIGN ABCODE(AB-CODE) END-EXEC. EXEC CICS PURGE MESSAGE END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(RECORD-X) LENGTH(4) INTERVAL(0) END-EXEC. EXEC CICS RETRIEVE INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC. EXEC CICS CANCEL REQID('REQ0001') TRANSID('NEXT') END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS TRANSFORM DATATOJSON CHANNEL('WORK') INCONTAINER('SOURCE') TRANSFORMER('CUSTOMER') END-EXEC. EXEC CICS TRANSFORM DATATOXML CHANNEL('WORK') DATCONTAINER('SOURCE') XMLCONTAINER('XML') XMLTRANSFORM('CUSTOMERXML') END-EXEC. EXEC CICS TRANSFORM JSONTODATA CHANNEL('WORK') INCONTAINER('JSON') TRANSFORMER('CUSTOMER') END-EXEC. EXEC CICS TRANSFORM XMLTODATA CHANNEL('WORK') XMLCONTAINER('XML') END-EXEC. EXEC CICS DEFINE INPUT EVENT('GO') RESP(CODE-A) RESP2(CODE-B) END-EXEC."
         );
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(&source));
-        let hir = analysis.hir.as_ref().expect("typed CICS HIR");
+        let hir = analysis
+            .hir
+            .as_ref()
+            .unwrap_or_else(|| panic!("typed CICS HIR: {:?}", analysis.diagnostics));
         let encoded_hir = encode_binary(&hir.module, CodecLimits::default()).unwrap();
         let hir_module = decode_binary(&encoded_hir, CodecLimits::default()).unwrap();
         let hir_operations = hir_module
@@ -1526,7 +1529,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 54);
+        assert_eq!(typed_hir.len(), 55);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1660,6 +1663,7 @@ mod tests {
                 CicsPlanOperation::Start => crate::HirCicsOperation::Start,
                 CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
                 CicsPlanOperation::DocumentCreate => crate::HirCicsOperation::DocumentCreate,
+                CicsPlanOperation::DefineInputEvent => crate::HirCicsOperation::DefineInputEvent,
                 CicsPlanOperation::DocumentDelete => crate::HirCicsOperation::DocumentDelete,
                 CicsPlanOperation::DocumentInsert => crate::HirCicsOperation::DocumentInsert,
                 CicsPlanOperation::DocumentRetrieve => crate::HirCicsOperation::DocumentRetrieve,
@@ -1762,6 +1766,7 @@ mod tests {
                 CicsPlanOperation::TransformDataToXml,
                 CicsPlanOperation::TransformJsonToData,
                 CicsPlanOperation::TransformXmlToData,
+                CicsPlanOperation::DefineInputEvent,
             ])
         );
         let read = hir_plans
@@ -1791,6 +1796,25 @@ mod tests {
         }));
         assert!(matches!(
             &read.condition,
+            CicsCondition::Respond {
+                response2: Some(_),
+                ..
+            }
+        ));
+        let event = hir_plans
+            .iter()
+            .find(|plan| plan.operation == CicsPlanOperation::DefineInputEvent)
+            .expect("selected DEFINE INPUT EVENT plan");
+        assert!(matches!(
+            event
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Event)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Literal(bytes)) if bytes == b"GO"
+        ));
+        assert!(matches!(
+            event.condition,
             CicsCondition::Respond {
                 response2: Some(_),
                 ..
@@ -1853,6 +1877,7 @@ mod tests {
                 "cics.terminal@1".into(),
                 "cics.time@1".into(),
                 "cics.transform@1".into(),
+                "cics.event@1".into(),
                 "mainframe.core.cobol@1".into(),
             ])
         );
@@ -1875,6 +1900,7 @@ mod tests {
                         | "cics.terminal"
                         | "cics.time"
                         | "cics.transform"
+                        | "cics.event"
                 )
             })
             .collect::<Vec<_>>();

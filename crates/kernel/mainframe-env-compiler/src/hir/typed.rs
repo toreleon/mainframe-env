@@ -10,6 +10,8 @@ mod cics_output_names;
 pub use cics_operand_names::HirCicsOperandName;
 mod cics_resolution;
 mod corresponding_reference;
+pub use cics_operand_names::HirCicsOperandName;
+pub use cics_operation::HirCicsOperation;
 pub use cics_output_names::HirCicsOutputName;
 use corresponding_reference::corresponding_group_reference_at;
 

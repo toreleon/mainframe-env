@@ -50,6 +50,8 @@ pub enum CicsOperation {
     Deq,
     /// Delete the current file record.
     Delete,
+    /// Define one activity-owned BTS input event.
+    DefineInputEvent,
     /// Create one bounded transaction-owned document.
     DocumentCreate,
     /// Delete one transaction-owned document and release its storage.
@@ -204,6 +206,7 @@ impl CicsOperation {
             Self::UpdateDCounter => "UpdateDCounter",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
+            Self::DefineInputEvent => "DefineInputEvent",
             Self::DocumentCreate => "DocumentCreate",
             Self::DocumentDelete => "DocumentDelete",
             Self::DocumentInsert => "DocumentInsert",
@@ -305,6 +308,7 @@ impl CicsOperation {
         matches!(
             self,
             Self::Delete
+                | Self::DefineInputEvent
                 | Self::DocumentCreate
                 | Self::DocumentDelete
                 | Self::DocumentInsert
@@ -414,6 +418,7 @@ impl CicsOperation {
             ("UPDATE", Some("COUNTER")) => Self::UpdateCounter,
             ("UPDATE", Some("DCOUNTER")) => Self::UpdateDCounter,
             ("DELETE", _) => Self::Delete,
+            ("DEFINE", Some("INPUT")) => Self::DefineInputEvent,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,
             ("DOCUMENT", Some("INSERT")) => Self::DocumentInsert,

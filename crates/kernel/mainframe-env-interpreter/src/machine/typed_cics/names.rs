@@ -261,6 +261,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Start => CicsOperation::Start,
         CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
         CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
+        CicsPlanOperation::DefineInputEvent => CicsOperation::DefineInputEvent,
         CicsPlanOperation::DocumentDelete => CicsOperation::DocumentDelete,
         CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
         CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
@@ -287,6 +288,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
         CicsOperandName::Abcode => "ABCODE",
+        CicsOperandName::Event => "EVENT",
         CicsOperandName::Label => "LABEL",
         CicsOperandName::Program => "PROGRAM",
         CicsOperandName::Commarea => "COMMAREA",

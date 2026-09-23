@@ -88,6 +88,7 @@ pub(super) fn resolve(
         ["START"] => HirCicsOperation::Start,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,
+        ["DEFINE", "INPUT", "EVENT"] => HirCicsOperation::DefineInputEvent,
         ["DOCUMENT", "DELETE"] => HirCicsOperation::DocumentDelete,
         ["DOCUMENT", "INSERT"] => HirCicsOperation::DocumentInsert,
         ["DOCUMENT", "RETRIEVE"] => HirCicsOperation::DocumentRetrieve,
