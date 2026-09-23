@@ -195,7 +195,8 @@ pub(super) fn execute(
     ) {
         retrieve::release_partition_receive_set(machine);
     }
-    let host_operation = names::host_operation(plan.operation);
+    let host_operation =
+        names::host_operation(plan.operation).ok_or(MachineProblem::UnsupportedForm)?;
     let address_set = address::action(&plan)?;
     let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
     let mut operand_outputs = BTreeMap::new();
@@ -477,6 +478,18 @@ pub(super) fn execute(
             arguments.insert(name, capacity);
         }
         match output.name {
+            CicsOutputName::ConversationState
+            | CicsOutputName::ConversationConvid
+            | CicsOutputName::ConversationRetcode
+            | CicsOutputName::ConversationPrinConvid
+            | CicsOutputName::ConversationPrinSysid
+            | CicsOutputName::ConversationConvData
+            | CicsOutputName::ConversationInto
+            | CicsOutputName::ConversationSet
+            | CicsOutputName::ConversationToLength
+            | CicsOutputName::ConversationToFullLength => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate

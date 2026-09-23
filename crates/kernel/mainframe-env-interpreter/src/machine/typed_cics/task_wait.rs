@@ -202,7 +202,7 @@ pub(super) fn apply_posted_output(
         .and_then(|pc| machine.operations.get(pc))
         .ok_or(MachineProblem::UnexpectedHostResult)?;
     let plan = plan(ir_operation)?;
-    if names::host_operation(plan.operation) != operation {
+    if names::host_operation(plan.operation) != Some(operation) {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     if operation == CicsOperation::WaitExternal {
