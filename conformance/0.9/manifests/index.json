@@ -71,6 +71,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-misc-tail-cvda",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+      "manifest": "conformance/0.9/manifests/cics-misc-tail-cvda-topics.json",
+      "manifest_sha256": "sha256:526aab2c94e051182a9627123647dd32f03eaad05a5013a3d049a5098a51c152",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:5cb3be0964a59a86cecc72b625ade3ffb508d781665bd67c914684c33d17e11c",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-task-association",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-task-association-2026-09-13",
