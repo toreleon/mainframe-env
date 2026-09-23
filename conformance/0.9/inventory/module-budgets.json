@@ -285,6 +285,8 @@
     "handler_directory": "crates/providers/mainframe-env-cics/src/handlers",
     "handler_modules": [
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/store.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/define.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/delete.rs",

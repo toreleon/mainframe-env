@@ -1,4 +1,5 @@
 mod bms_map;
+pub mod bts_lifecycle;
 mod condition;
 mod counter_control;
 mod diagnostics;

@@ -49,6 +49,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the shared versioned BTS process/activity authority for the pending
+  lifecycle slice, with UOW-scoped acquisition epochs, atomic pending DEFINE
+  publication or rollback, checkpoint references, and durable exact replay.
+  This does not yet register BTS lifecycle commands; the application split
+  remains 151 typed, 0 legacy, and 112 unready.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline
