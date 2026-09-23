@@ -697,7 +697,6 @@ fn observe_racroute_route(
         replay: replay.into(),
     })
 }
-
 fn descriptor_acee(
     request_type: RacrouteRequestType,
     mode: RacrouteCase,
@@ -725,10 +724,11 @@ fn racroute_result_identity(result: Option<&RacrouteResult>) -> &'static str {
         Some(RacrouteResult::TokenExtracted(_)) => "token-extracted",
         Some(RacrouteResult::Verified { .. }) => "verified",
         Some(RacrouteResult::CredentialVerified { .. }) => "credential-verified",
+        Some(RacrouteResult::PassTicketIssued { .. }) => "pass-ticket-issued",
+        Some(RacrouteResult::PassTicketRedeemed { .. }) => "pass-ticket-redeemed",
         None => "none",
     }
 }
-
 fn setup() -> Result<(Arc<RacfService>, CommandContext), String> {
     let setup = setup_recoverable()?;
     Ok((setup.service, setup.context))

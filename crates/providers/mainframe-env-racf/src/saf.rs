@@ -1,5 +1,6 @@
 mod credential;
-pub use credential::{CredentialDetails, CredentialFailure, CredentialKind};
+mod request_shape;
+pub use credential::{CredentialDetails, CredentialFailure, CredentialKind, IssuedPassTicket};
 use credential::{build_mfa_proof, verify_credential};
 
 use crate::RacfService;
@@ -142,6 +143,18 @@ pub enum RacrouteRequest {
         kind: CredentialKind,
         binding_digest: [u8; 32],
     },
+    /// Generate a bounded one-time PassTicket for the issuing principal and application.
+    IssuePassTicket {
+        application: String,
+        binding_digest: [u8; 32],
+    },
+    /// Consume one previously issued ticket for its named user and application.
+    RedeemPassTicket {
+        user: PrincipalId,
+        application: String,
+        ticket_reference: SecretRef,
+        binding_digest: [u8; 32],
+    },
     Audit {
         action: String,
         resource_digest: String,
@@ -238,6 +251,9 @@ impl RacrouteRequest {
             Self::VerifyCredential { .. } | Self::ChangeCredential { .. } => {
                 RacrouteRequestType::Verify
             }
+            Self::IssuePassTicket { .. } | Self::RedeemPassTicket { .. } => {
+                RacrouteRequestType::Verify
+            }
             Self::Verifyx { .. } => RacrouteRequestType::Verifyx,
         }
     }
@@ -311,6 +327,19 @@ pub enum ExtractedSecurityRecord {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "result_kind", content = "result")]
 pub enum RacrouteResult {
+    /// Issuance result; the clear ticket is omitted from durable replay rows.
+    PassTicketIssued {
+        decision: SafDecision,
+        origin_denied: bool,
+        #[serde(skip)]
+        ticket: Option<IssuedPassTicket>,
+    },
+    /// One-use ticket redemption outcome and authenticated user ID.
+    PassTicketRedeemed {
+        decision: SafDecision,
+        failure: Option<CredentialFailure>,
+        user: String,
+    },
     CredentialVerified {
         decision: SafDecision,
         failure: Option<CredentialFailure>,
@@ -442,6 +471,10 @@ pub(crate) fn execute(
                 credential_reference,
                 ..
             }
+            | RacrouteRequest::RedeemPassTicket {
+                ticket_reference: credential_reference,
+                ..
+            }
             | RacrouteRequest::Verifyx {
                 credential_reference,
                 ..
@@ -519,7 +552,7 @@ pub(crate) fn execute(
                 status,
                 &request_digest,
             )?;
-            let mut result = normalized_preflight_result(&request, reason);
+            let mut result = request_shape::normalized_preflight_result(&request, reason);
             if let Some(result) = &mut result {
                 attach_audit(result, audit_id);
             }
@@ -729,7 +762,8 @@ fn reject_unavailable_authentication(
     let status = status_for_reason(DecisionReason::PolicyUnavailable);
     let (result, generation) = service.database.mutate_retry(|snapshot| {
         let audit_id = append_audit(snapshot, context, keyword, status, request_digest)?;
-        let mut result = normalized_preflight_result(request, DecisionReason::PolicyUnavailable);
+        let mut result =
+            request_shape::normalized_preflight_result(request, DecisionReason::PolicyUnavailable);
         if let Some(result) = &mut result {
             attach_audit(result, audit_id);
         }
@@ -889,7 +923,7 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
         } => {
             normalized_class(class)?;
             normalized_profile(resource)?;
-            validate_environment(environment)?;
+            request_shape::validate_environment(environment)?;
         }
         RacrouteRequest::Define {
             class,
@@ -957,6 +991,10 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
             }
         }
         RacrouteRequest::ChangeCredential { .. } => {}
+        RacrouteRequest::IssuePassTicket { application, .. }
+        | RacrouteRequest::RedeemPassTicket { application, .. } => {
+            normalized_profile(application)?;
+        }
         RacrouteRequest::Verifyx {
             acee_id,
             parent_acee,
@@ -966,55 +1004,6 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
                 normalized_id(id.clone(), 246).map_err(DecisionReason::from)?;
             }
         }
-    }
-    Ok(())
-}
-
-fn normalized_preflight_result(
-    request: &RacrouteRequest,
-    reason: DecisionReason,
-) -> Option<RacrouteResult> {
-    if !matches!(
-        reason,
-        DecisionReason::CredentialInvalid | DecisionReason::PolicyUnavailable
-    ) || !matches!(
-        request,
-        RacrouteRequest::Signon { .. }
-            | RacrouteRequest::Verify { .. }
-            | RacrouteRequest::VerifyCredential { .. }
-            | RacrouteRequest::ChangeCredential { .. }
-            | RacrouteRequest::Verifyx { .. }
-    ) {
-        return None;
-    }
-    if matches!(
-        request,
-        RacrouteRequest::VerifyCredential { .. } | RacrouteRequest::ChangeCredential { .. }
-    ) {
-        Some(RacrouteResult::CredentialVerified {
-            decision: decision(reason, AccessLevel::None, None, None),
-            failure: Some(CredentialFailure::PolicyUnavailable),
-            details: None,
-        })
-    } else {
-        Some(RacrouteResult::Verified {
-            decision: decision(reason, AccessLevel::None, None, None),
-            acee: None,
-        })
-    }
-}
-
-fn validate_environment(environment: &AccessEnvironment) -> Result<(), DecisionReason> {
-    for value in [
-        &environment.terminal,
-        &environment.console,
-        &environment.system,
-        &environment.application,
-    ]
-    .into_iter()
-    .flatten()
-    {
-        normalized_text(value, 246)?;
     }
     Ok(())
 }
@@ -1399,6 +1388,12 @@ fn apply_request(
         RacrouteRequest::ChangeCredential { user, kind, .. } => {
             credential::change_cics_request(service, snapshot, context, user, secret, *kind, states)
         }
+        RacrouteRequest::IssuePassTicket { application, .. } => {
+            credential::issue_passticket(snapshot, context, application, states)
+        }
+        RacrouteRequest::RedeemPassTicket {
+            user, application, ..
+        } => credential::redeem_passticket(snapshot, context, user, application, secret, states),
         RacrouteRequest::Verifyx {
             user,
             action,
@@ -1975,7 +1970,9 @@ fn attach_audit(result: &mut RacrouteResult, audit_id: String) {
     match result {
         RacrouteResult::Decision(decision)
         | RacrouteResult::Verified { decision, .. }
-        | RacrouteResult::CredentialVerified { decision, .. } => decision.audit_id = Some(audit_id),
+        | RacrouteResult::CredentialVerified { decision, .. }
+        | RacrouteResult::PassTicketIssued { decision, .. }
+        | RacrouteResult::PassTicketRedeemed { decision, .. } => decision.audit_id = Some(audit_id),
         _ => {}
     }
 }
@@ -2224,7 +2221,10 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
             digest_saf_tag(&mut digest, verify_action_tag(*action));
             digest_saf_optional(&mut digest, acee_id.as_deref());
         }
-        RacrouteRequest::VerifyCredential { .. } | RacrouteRequest::ChangeCredential { .. } => {
+        RacrouteRequest::VerifyCredential { .. }
+        | RacrouteRequest::ChangeCredential { .. }
+        | RacrouteRequest::IssuePassTicket { .. }
+        | RacrouteRequest::RedeemPassTicket { .. } => {
             credential::digest_cics_request(&mut digest, request);
         }
         RacrouteRequest::Verifyx {
@@ -2471,6 +2471,7 @@ mod tests {
     use super::*;
     use crate::{CommandContext, MemorySecretResolver};
     use mainframe_env_execution_api::InvocationLimits;
+    use mainframe_env_host_api::AccessIntent;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::ProviderStateStore;
     use std::sync::Arc;
@@ -2771,6 +2772,187 @@ mod tests {
             )
             .unwrap();
         assert_eq!(verified.status.reason, DecisionReason::Granted);
+    }
+
+    #[test]
+    fn cics_passticket_requires_policy_and_is_one_use_with_redacted_replay() {
+        let (service, resolver, admin) = setup();
+        service
+            .define_profile(
+                "FACILITY",
+                "IRR.RCVTPTGN",
+                "RACFADM",
+                Some(AccessIntent::Read),
+            )
+            .unwrap();
+        service
+            .define_profile("PTKTDATA", "APP1", "RACFADM", Some(AccessIntent::Read))
+            .unwrap();
+        let issue = RacrouteRequest::IssuePassTicket {
+            application: "APP1".into(),
+            binding_digest: [1; 32],
+        };
+        let inactive = service
+            .racroute(
+                &saf_context(&admin, None, "ISSUE-INACTIVE", 3),
+                issue.clone(),
+            )
+            .unwrap();
+        assert_ne!(inactive.status.reason, DecisionReason::Granted);
+        assert!(service.database.read().unwrap().tokens.is_empty());
+        service
+            .execute_command(
+                &command_context(&admin, "ACTIVATE-PTKT", 4),
+                "SETROPTS CLASSACT(PTKTDATA)",
+            )
+            .unwrap();
+        let context = saf_context(&admin, None, "ISSUE-TICKET", 5);
+        let issued = service.racroute(&context, issue.clone()).unwrap();
+        assert_eq!(issued.status.reason, DecisionReason::Granted);
+        let ticket = match issued.result.as_ref() {
+            Some(RacrouteResult::PassTicketIssued {
+                ticket: Some(ticket),
+                ..
+            }) => *ticket.bytes(),
+            other => panic!("expected ticket: {other:?}"),
+        };
+        assert!(ticket.iter().all(u8::is_ascii_alphanumeric));
+        assert_eq!(service.database.read().unwrap().tokens.len(), 1);
+        let before = service.database.read().unwrap().audits.len();
+        let replay = service.racroute(&context, issue.clone()).unwrap();
+        assert!(matches!(
+            replay.result,
+            Some(RacrouteResult::PassTicketIssued { ticket: None, .. })
+        ));
+        assert_eq!(service.database.read().unwrap().audits.len(), before);
+        assert_eq!(service.database.read().unwrap().tokens.len(), 1);
+        assert_eq!(
+            service.racroute(
+                &context,
+                RacrouteRequest::IssuePassTicket {
+                    application: "APP1".into(),
+                    binding_digest: [2; 32],
+                }
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        resolver.insert("secret:ticket", ticket.to_vec());
+        let redeem = RacrouteRequest::RedeemPassTicket {
+            user: admin.clone(),
+            application: "APP1".into(),
+            ticket_reference: SecretRef::new("secret:ticket", Default::default()).unwrap(),
+            binding_digest: [3; 32],
+        };
+        let redeemed = service
+            .racroute(
+                &saf_context(&admin, None, "REDEEM-TICKET", 6),
+                redeem.clone(),
+            )
+            .unwrap();
+        assert_eq!(redeemed.status.reason, DecisionReason::Granted);
+        assert!(matches!(
+            redeemed.result,
+            Some(RacrouteResult::PassTicketRedeemed { failure: None, .. })
+        ));
+        let denied = service
+            .racroute(&saf_context(&admin, None, "REDEEM-AGAIN", 7), redeem)
+            .unwrap();
+        assert_eq!(denied.status.reason, DecisionReason::CredentialInvalid);
+        assert!(matches!(
+            denied.result,
+            Some(RacrouteResult::PassTicketRedeemed {
+                failure: Some(CredentialFailure::InvalidCredential),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_passticket_redemption_without_clear_ticket_row() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-ticket-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("racf.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let issue = RacrouteRequest::IssuePassTicket {
+            application: "APP1".into(),
+            binding_digest: [5; 32],
+        };
+        let context = saf_context(&admin, None, "ISSUE-SQLITE-TICKET", 5);
+        let ticket = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            service
+                .bootstrap_administrator(
+                    "RACFADM",
+                    &SecretRef::new("secret:admin", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service
+                .define_profile(
+                    "FACILITY",
+                    "IRR.RCVTPTGN",
+                    "RACFADM",
+                    Some(AccessIntent::Read),
+                )
+                .unwrap();
+            service
+                .define_profile("PTKTDATA", "APP1", "RACFADM", Some(AccessIntent::Read))
+                .unwrap();
+            service
+                .execute_command(
+                    &command_context(&admin, "ACTIVATE-SQLITE-TICKET", 4),
+                    "SETROPTS CLASSACT(PTKTDATA)",
+                )
+                .unwrap();
+            let result = service.racroute(&context, issue.clone()).unwrap();
+            match result.result {
+                Some(RacrouteResult::PassTicketIssued {
+                    ticket: Some(ticket),
+                    ..
+                }) => *ticket.bytes(),
+                other => panic!("ticket missing: {other:?}"),
+            }
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            let replay = service.racroute(&context, issue).unwrap();
+            assert!(matches!(
+                replay.result,
+                Some(RacrouteResult::PassTicketIssued { ticket: None, .. })
+            ));
+            let serialized =
+                serde_json::to_string(&service.database.read().unwrap().transactions).unwrap();
+            assert!(!serialized.contains(std::str::from_utf8(&ticket).unwrap()));
+            resolver.insert("secret:sqlite-ticket", ticket.to_vec());
+            let redeemed = service
+                .racroute(
+                    &saf_context(&admin, None, "REDEEM-SQLITE-TICKET", 6),
+                    RacrouteRequest::RedeemPassTicket {
+                        user: admin.clone(),
+                        application: "APP1".into(),
+                        ticket_reference: SecretRef::new(
+                            "secret:sqlite-ticket",
+                            Default::default(),
+                        )
+                        .unwrap(),
+                        binding_digest: [6; 32],
+                    },
+                )
+                .unwrap();
+            assert_eq!(redeemed.status.reason, DecisionReason::Granted);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]

@@ -2,6 +2,32 @@
 
 use super::*;
 use crate::authority::CredentialPolicyProblem;
+use ring::hmac;
+use zeroize::Zeroize;
+
+/// Eight-character one-use ticket returned only to the issuing CICS call.
+#[derive(Clone, Eq, PartialEq)]
+pub struct IssuedPassTicket([u8; 8]);
+
+impl IssuedPassTicket {
+    /// Borrow the ticket bytes for the single scoped output assignment.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8; 8] {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for IssuedPassTicket {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("IssuedPassTicket([REDACTED])")
+    }
+}
+
+impl Drop for IssuedPassTicket {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
 use crate::model::{CredentialVerifier, connection_key};
 
 /// Credential field selected for one SAF verification.
@@ -333,6 +359,8 @@ pub(super) fn is_authentication_request(request: &RacrouteRequest) -> bool {
             | RacrouteRequest::Verify { .. }
             | RacrouteRequest::VerifyCredential { .. }
             | RacrouteRequest::ChangeCredential { .. }
+            | RacrouteRequest::IssuePassTicket { .. }
+            | RacrouteRequest::RedeemPassTicket { .. }
             | RacrouteRequest::Verifyx { .. }
     )
 }
@@ -377,8 +405,273 @@ pub(super) fn digest_cics_request(digest: &mut Sha256, request: &RacrouteRequest
             );
             digest_saf_field(digest, binding_digest);
         }
+        RacrouteRequest::IssuePassTicket {
+            application,
+            binding_digest,
+        } => {
+            digest_saf_tag(digest, 0xc3);
+            digest_saf_field(digest, application.as_bytes());
+            digest_saf_field(digest, binding_digest);
+        }
+        RacrouteRequest::RedeemPassTicket {
+            user,
+            application,
+            ticket_reference,
+            binding_digest,
+        } => {
+            digest_saf_tag(digest, 0xc4);
+            digest_saf_field(digest, user.as_str().as_bytes());
+            digest_saf_field(digest, application.as_bytes());
+            digest_saf_field(digest, ticket_reference.as_str().as_bytes());
+            digest_saf_field(digest, binding_digest);
+        }
         _ => unreachable!("only CICS credential requests are delegated"),
     }
+}
+
+pub(super) fn issue_passticket(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &SafRequestContext,
+    application: &str,
+    states: &mut Vec<RacrouteState>,
+) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
+    let actor = context.caller().as_str();
+    let environment = AccessEnvironment {
+        tick: context.tick(),
+        application: Some(application.into()),
+        ..AccessEnvironment::default()
+    };
+    let origin = evaluate_access(
+        snapshot,
+        actor,
+        "FACILITY",
+        "IRR.RCVTPTGN",
+        AccessLevel::Read,
+        &environment,
+        false,
+    );
+    if origin.status.reason != DecisionReason::Granted {
+        states.push(RacrouteState::PolicyResolved);
+        return Ok((
+            origin.status,
+            RacrouteResult::PassTicketIssued {
+                decision: origin,
+                origin_denied: true,
+                ticket: None,
+            },
+        ));
+    }
+    let target = evaluate_access(
+        snapshot,
+        actor,
+        "PTKTDATA",
+        application,
+        AccessLevel::Read,
+        &environment,
+        false,
+    );
+    states.push(RacrouteState::PolicyResolved);
+    if target.status.reason != DecisionReason::Granted {
+        return Ok((
+            target.status,
+            RacrouteResult::PassTicketIssued {
+                decision: target,
+                origin_denied: false,
+                ticket: None,
+            },
+        ));
+    }
+    let principal = snapshot
+        .principals
+        .get(actor)
+        .ok_or(DecisionReason::PrincipalNotFound)?;
+    if principal.state != PrincipalState::Active {
+        let denied = decision(
+            DecisionReason::PrincipalInactive,
+            AccessLevel::None,
+            None,
+            None,
+        );
+        return Ok((
+            denied.status,
+            RacrouteResult::PassTicketIssued {
+                decision: denied,
+                origin_denied: false,
+                ticket: None,
+            },
+        ));
+    }
+    let verifier = principal
+        .credential
+        .as_ref()
+        .or(principal.phrase_credential.as_ref())
+        .ok_or(DecisionReason::CredentialInvalid)?;
+    if snapshot.tokens.len() >= 65_536 {
+        return Err(DecisionReason::ResourceExhausted);
+    }
+    let mut input = Vec::new();
+    input.extend_from_slice(b"mainframe-env.passticket.issue@1\0");
+    input.extend_from_slice(actor.as_bytes());
+    input.extend_from_slice(application.as_bytes());
+    input.extend_from_slice(context.idempotency_key().as_bytes());
+    input.extend_from_slice(&context.tick().to_be_bytes());
+    let key = hmac::Key::new(hmac::HMAC_SHA256, verifier.encoded_verifier.as_bytes());
+    let tag = hmac::sign(&key, &input);
+    const ALPHABET: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let mut ticket = [0; 8];
+    for (position, byte) in ticket.iter_mut().zip(tag.as_ref()) {
+        *position = ALPHABET[usize::from(*byte & 31)];
+    }
+    let digest = passticket_digest(verifier, actor, application, &ticket);
+    if snapshot
+        .tokens
+        .values()
+        .any(|token| token.token_digest == digest)
+    {
+        return Err(DecisionReason::ResourceExhausted);
+    }
+    let id = next_id("TOKEN", snapshot.generation, snapshot.tokens.len());
+    let expires_tick = context
+        .tick()
+        .checked_add(10)
+        .ok_or(DecisionReason::ResourceExhausted)?;
+    snapshot.tokens.insert(
+        id.clone(),
+        SecurityToken {
+            id: id.clone(),
+            kind: TokenKind::PassTicket,
+            owner: actor.into(),
+            issuer: actor.into(),
+            audience: Some(application.into()),
+            token_reference: format!("cics:passticket:{id}"),
+            token_digest: digest,
+            scopes: BTreeSet::new(),
+            issued_tick: context.tick(),
+            expires_tick: Some(expires_tick),
+            state: TokenState::Active,
+            version: 1,
+        },
+    );
+    Ok((
+        target.status,
+        RacrouteResult::PassTicketIssued {
+            decision: target,
+            origin_denied: false,
+            ticket: Some(IssuedPassTicket(ticket)),
+        },
+    ))
+}
+
+pub(super) fn redeem_passticket(
+    snapshot: &mut SecurityDatabaseSnapshot,
+    context: &SafRequestContext,
+    user: &PrincipalId,
+    application: &str,
+    secret: Option<&[u8]>,
+    states: &mut Vec<RacrouteState>,
+) -> Result<(SafStatus, RacrouteResult), DecisionReason> {
+    let denied = |reason, failure| {
+        let decision = decision(reason, AccessLevel::None, None, None);
+        (
+            decision.status,
+            RacrouteResult::PassTicketRedeemed {
+                decision,
+                failure: Some(failure),
+                user: user.as_str().into(),
+            },
+        )
+    };
+    let Some(principal) = snapshot.principals.get(user.as_str()) else {
+        return Ok(denied(
+            DecisionReason::PrincipalNotFound,
+            CredentialFailure::UnknownUser,
+        ));
+    };
+    if principal.state != PrincipalState::Active {
+        return Ok(denied(
+            DecisionReason::PrincipalInactive,
+            CredentialFailure::Revoked,
+        ));
+    }
+    let verifier = principal
+        .credential
+        .as_ref()
+        .or(principal.phrase_credential.as_ref())
+        .ok_or(DecisionReason::CredentialInvalid)?;
+    let Some(secret) = secret else {
+        return Ok(denied(
+            DecisionReason::CredentialInvalid,
+            CredentialFailure::InvalidCredential,
+        ));
+    };
+    let ticket: [u8; 8] = match secret.try_into() {
+        Ok(ticket) => ticket,
+        Err(_) => {
+            return Ok(denied(
+                DecisionReason::CredentialInvalid,
+                CredentialFailure::InvalidCredential,
+            ));
+        }
+    };
+    let digest = passticket_digest(verifier, user.as_str(), application, &ticket);
+    let token_id = snapshot.tokens.values().find(|token| {
+        token.kind == TokenKind::PassTicket
+            && token.owner == user.as_str()
+            && token.audience.as_deref() == Some(application)
+            && token.token_digest == digest
+            && token.state == TokenState::Active
+            && token
+                .expires_tick
+                .is_some_and(|expiry| context.tick() < expiry)
+    });
+    let Some(token_id) = token_id.map(|token| token.id.clone()) else {
+        let principal = snapshot
+            .principals
+            .get_mut(user.as_str())
+            .ok_or(DecisionReason::RecoveryRequired)?;
+        principal.invalid_count = Some(principal.invalid_count.unwrap_or(0).saturating_add(1));
+        return Ok(denied(
+            DecisionReason::CredentialInvalid,
+            CredentialFailure::InvalidCredential,
+        ));
+    };
+    let token = snapshot
+        .tokens
+        .get_mut(&token_id)
+        .ok_or(DecisionReason::RecoveryRequired)?;
+    token.state = TokenState::Revoked;
+    token.version = token
+        .version
+        .checked_add(1)
+        .ok_or(DecisionReason::ResourceExhausted)?;
+    states.push(RacrouteState::PolicyResolved);
+    let decision = decision(DecisionReason::Granted, AccessLevel::None, None, None);
+    Ok((
+        decision.status,
+        RacrouteResult::PassTicketRedeemed {
+            decision,
+            failure: None,
+            user: user.as_str().into(),
+        },
+    ))
+}
+
+fn passticket_digest(
+    verifier: &CredentialVerifier,
+    user: &str,
+    application: &str,
+    ticket: &[u8; 8],
+) -> String {
+    let mut input = Vec::new();
+    input.extend_from_slice(b"mainframe-env.passticket.digest@1\0");
+    input.extend_from_slice(user.as_bytes());
+    input.extend_from_slice(application.as_bytes());
+    input.extend_from_slice(ticket);
+    let key = hmac::Key::new(hmac::HMAC_SHA256, verifier.encoded_verifier.as_bytes());
+    format!(
+        "sha256:{:x}",
+        Sha256::digest(hmac::sign(&key, &input).as_ref())
+    )
 }
 
 pub(super) fn build_mfa_proof(
