@@ -146,6 +146,10 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::MonitorData1 | CicsOperandName::MonitorData2 => SlotUse::MonitorDataInput,
         CicsOperandName::DumpLength => SlotUse::HalfwordInput,
         CicsOperandName::DumpFlength | CicsOperandName::DumpNumSegments => SlotUse::FullwordInput,
+        CicsOperandName::WebUrlLength
+        | CicsOperandName::WebHostLength
+        | CicsOperandName::WebPathLength
+        | CicsOperandName::WebQueryStringLength => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -201,6 +205,15 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::SpoolToken => SlotUse::SpoolTokenOutput,
         CicsOutputName::SpoolToFlength => SlotUse::SpoolToFlengthOutput,
         CicsOutputName::DumpId => SlotUse::DumpIdOutput,
+        CicsOutputName::WebSchemeName
+        | CicsOutputName::WebHost
+        | CicsOutputName::WebPath
+        | CicsOutputName::WebQueryString => SlotUse::Output,
+        CicsOutputName::WebHostLength
+        | CicsOutputName::WebHostType
+        | CicsOutputName::WebPortNumber
+        | CicsOutputName::WebPathLength
+        | CicsOutputName::WebQueryStringLength => SlotUse::FullwordOutput,
     }
 }
 
@@ -333,6 +346,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WaitJournalNum => CicsOperation::WaitJournalNum,
         CicsPlanOperation::WriteJournalName => CicsOperation::WriteJournalName,
         CicsPlanOperation::WriteJournalNum => CicsOperation::WriteJournalNum,
+        CicsPlanOperation::WebParseUrl => CicsOperation::WebParseUrl,
     }
 }
 
@@ -561,6 +575,11 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::TraceIdFrom => "FROM",
         CicsOperandName::TraceIdResource => "RESOURCE",
         CicsOperandName::TraceEntryName => "ENTRYNAME",
+        CicsOperandName::WebUrl => "URL",
+        CicsOperandName::WebUrlLength => "URLLENGTH",
+        CicsOperandName::WebHostLength => "HOSTLENGTH",
+        CicsOperandName::WebPathLength => "PATHLENGTH",
+        CicsOperandName::WebQueryStringLength => "QUERYSTRLEN",
     }
 }
 
@@ -638,6 +657,15 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::SpoolToken => "TOKEN",
         CicsOutputName::SpoolToFlength => "TOFLENGTH",
         CicsOutputName::DumpId => "DUMPID",
+        CicsOutputName::WebSchemeName => "SCHEMENAME",
+        CicsOutputName::WebHost => "HOST",
+        CicsOutputName::WebHostLength => "HOSTLENGTH",
+        CicsOutputName::WebHostType => "HOSTTYPE",
+        CicsOutputName::WebPortNumber => "PORTNUMBER",
+        CicsOutputName::WebPath => "PATH",
+        CicsOutputName::WebPathLength => "PATHLENGTH",
+        CicsOutputName::WebQueryString => "QUERYSTRING",
+        CicsOutputName::WebQueryStringLength => "QUERYSTRLEN",
     }
 }
 

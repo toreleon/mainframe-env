@@ -157,6 +157,15 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::EventType
         | HirCicsOutputName::FireStatus
         | HirCicsOutputName::DumpId
+        | HirCicsOutputName::WebSchemeName
+        | HirCicsOutputName::WebHost
+        | HirCicsOutputName::WebHostLength
+        | HirCicsOutputName::WebHostType
+        | HirCicsOutputName::WebPortNumber
+        | HirCicsOutputName::WebPath
+        | HirCicsOutputName::WebPathLength
+        | HirCicsOutputName::WebQueryString
+        | HirCicsOutputName::WebQueryStringLength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

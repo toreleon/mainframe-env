@@ -87,3 +87,21 @@ pub(super) fn dump_segments(
     }
     Ok(encoded)
 }
+
+pub(super) fn argument_summary(arguments: &BTreeMap<String, BoundedPayload>) -> String {
+    arguments
+        .iter()
+        .map(|(name, value)| {
+            if matches!(name.as_str(), "MAP" | "MAPSET" | "TRANSID" | "PROGRAM") {
+                format!(
+                    "{name}={:?}/{}",
+                    String::from_utf8_lossy(value.bytes()),
+                    value.schema()
+                )
+            } else {
+                format!("{name}=<{} bytes>/{}", value.bytes().len(), value.schema())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}

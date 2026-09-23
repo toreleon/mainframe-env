@@ -24,8 +24,10 @@ use runtime_validation::validate_machine_slot;
 mod spool_control;
 mod storage64;
 mod task_wait;
+mod web_control;
 mod web_service_control;
 pub(super) use address::CicsAddressSet;
+use diagnostics::argument_summary;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 #[cfg(test)]
@@ -362,6 +364,10 @@ pub(super) fn execute(
                         | CicsOperandName::DumpLength
                         | CicsOperandName::DumpFlength
                         | CicsOperandName::DumpNumSegments
+                        | CicsOperandName::WebUrlLength
+                        | CicsOperandName::WebHostLength
+                        | CicsOperandName::WebPathLength
+                        | CicsOperandName::WebQueryStringLength
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -437,6 +443,10 @@ pub(super) fn execute(
         }
         let target = CicsTarget::Resolved(output.target.clone());
         web_service_control::output_arguments(machine, output.name, &target, &mut arguments)?;
+        if let Some((name, capacity)) = web_control::output_capacity(machine, output.name, &target)?
+        {
+            arguments.insert(name, capacity);
+        }
         match output.name {
             CicsOutputName::Abstime
             | CicsOutputName::TimerStatus
@@ -478,6 +488,15 @@ pub(super) fn execute(
             | CicsOutputName::WebEprLength
             | CicsOutputName::Partn
             | CicsOutputName::DumpId
+            | CicsOutputName::WebSchemeName
+            | CicsOutputName::WebHost
+            | CicsOutputName::WebHostLength
+            | CicsOutputName::WebHostType
+            | CicsOutputName::WebPortNumber
+            | CicsOutputName::WebPath
+            | CicsOutputName::WebPathLength
+            | CicsOutputName::WebQueryString
+            | CicsOutputName::WebQueryStringLength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -904,24 +923,6 @@ fn read_integer_slot(
 fn payload(schema: &str, bytes: Vec<u8>) -> Result<BoundedPayload, MachineProblem> {
     BoundedPayload::new(schema, bytes, InvocationLimits::default())
         .map_err(|_| MachineProblem::ResourceExhausted)
-}
-
-fn argument_summary(arguments: &BTreeMap<String, BoundedPayload>) -> String {
-    arguments
-        .iter()
-        .map(|(name, value)| {
-            if matches!(name.as_str(), "MAP" | "MAPSET" | "TRANSID" | "PROGRAM") {
-                format!(
-                    "{name}={:?}/{}",
-                    String::from_utf8_lossy(value.bytes()),
-                    value.schema()
-                )
-            } else {
-                format!("{name}=<{} bytes>/{}", value.bytes().len(), value.schema())
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(",")
 }
 
 fn invalid_plan(detail: &str) -> MachineProblem {

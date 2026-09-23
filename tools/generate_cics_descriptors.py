@@ -99,6 +99,7 @@ TYPED_EXECUTION_FAMILIES = {
     "journal-control": "JournalControl",
     "web-service-control": "WebServiceControl",
     "counter-control": "CounterControl",
+    "web-control": "WebControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -356,6 +357,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         "journal-control",
         False,
         f"{OFFICIAL_BASELINE}:api-commands:0236",
+    ),
+    (
+        "WebParseUrl",
+        "api",
+        "web-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0245",
     ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
@@ -712,6 +720,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "TransformXmlToData",
         "WaitJournalName",
         "WaitJournalNum",
+        "WebParseUrl",
         "WriteJournalName",
         "WriteJournalNum",
         "WsaContextBuild",
@@ -1118,6 +1127,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "TransformXmlToData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "WebParseUrl": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
 }
 
 
@@ -1394,6 +1406,7 @@ def _load_typed_execution_registrations(
         "WaitExternal",
         "WaitJournalName",
         "WaitJournalNum",
+        "WebParseUrl",
         "WriteJournalName",
         "WriteJournalNum",
         "WriteTemporaryStorage",
@@ -1765,6 +1778,7 @@ def load_catalog(
                 "WaitExternal",
                 "WaitJournalName",
                 "WaitJournalNum",
+                "WebParseUrl",
                 "WriteJournalName",
                 "WriteJournalNum",
             }

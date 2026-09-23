@@ -1747,6 +1747,7 @@ impl CicsService {
             CicsCommandFamily::TransformControl
             | CicsCommandFamily::JournalControl
             | CicsCommandFamily::WebServiceControl
+            | CicsCommandFamily::WebControl
             | CicsCommandFamily::EventControl
             | CicsCommandFamily::Diagnostics => handlers::invoke_extended_control(
                 self,
@@ -6663,7 +6664,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 129);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 130);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();

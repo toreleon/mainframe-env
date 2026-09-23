@@ -45,6 +45,7 @@ mod terminal_control;
 mod transaction_name;
 mod transform_control;
 mod value;
+mod web_control;
 mod web_service_control;
 
 use clause_parser::{clauses, matching_close};
@@ -632,6 +633,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentInsert => document_control::INSERT_CLAUSES,
         HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_CLAUSES,
         HirCicsOperation::DocumentSet => document_control::SET_CLAUSES,
+        HirCicsOperation::WebParseUrl => web_control::PARSE_URL_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -735,6 +737,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentCreate => document_control::ALLOWED_OPTIONS,
         HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_OPTIONS,
         HirCicsOperation::DocumentSet => document_control::ALLOWED_OPTIONS,
+        HirCicsOperation::WebParseUrl => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -826,6 +829,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
+    web_control::validate(&clauses, operation, semantic)?;
     let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     transform_control::validate_constraints(&clauses, operation)?;
     event_control::validate_constraints(operation, &raw_options)?;
@@ -902,6 +906,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentInsert => &["DOCTOKEN"][..],
         HirCicsOperation::DocumentRetrieve => &["DOCTOKEN", "INTO", "LENGTH"][..],
         HirCicsOperation::DocumentSet => &["DOCTOKEN", "LENGTH"][..],
+        HirCicsOperation::WebParseUrl => &["URL", "URLLENGTH"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1067,6 +1072,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     )?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
+    operands.extend(web_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -1110,6 +1116,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
+    outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

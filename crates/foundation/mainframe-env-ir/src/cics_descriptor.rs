@@ -280,6 +280,7 @@ const EVENT_TIMER_EFFECTS: &[Effect] = &[
 ];
 const TRANSFORM_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const WEB_SERVICE_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
+const WEB_PARSE_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const SPOOL_EFFECTS: &[Effect] = &[
     Effect::Spool,
     Effect::MemoryRead,
@@ -365,7 +366,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 127);
+        assert_eq!(typed.len(), 128);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -383,7 +384,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 136);
+        assert_eq!(unready.len(), 135);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -606,6 +607,7 @@ mod tests {
                 CicsPlanOperation::SpoolOpenOutput,
                 CicsPlanOperation::SpoolRead,
                 CicsPlanOperation::SpoolWrite,
+                CicsPlanOperation::WebParseUrl,
                 CicsPlanOperation::SendPartnset,
                 CicsPlanOperation::ReceivePartn,
                 CicsPlanOperation::SendControl,

@@ -30,6 +30,7 @@ mod terminal_run;
 mod time;
 mod transform_control;
 pub(in crate::service) mod transient_data;
+mod web_control;
 mod web_service_control;
 
 use super::{CicsService, Run};
@@ -189,6 +190,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::Diagnostics => {
             invoke_diagnostics(service, run, request)
+        }
+        crate::generated::CicsCommandFamily::WebControl => {
+            web_control::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

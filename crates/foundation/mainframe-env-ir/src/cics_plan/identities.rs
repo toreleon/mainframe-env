@@ -248,6 +248,8 @@ pub enum CicsPlanOperation {
     TransformJsonToData,
     /// Query XML metadata or convert XML to BIT-mode application data.
     TransformXmlToData,
+    /// Parse one bounded URL without opening a web session.
+    WebParseUrl,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -667,6 +669,16 @@ pub enum CicsOperandName {
     TraceEntryName,
     /// Optional SPOOLWRITE transfer length.
     SpoolFlength,
+    /// Complete URL supplied to WEB PARSE URL.
+    WebUrl,
+    /// Fullword length of the supplied URL.
+    WebUrlLength,
+    /// Fullword input capacity for the returned host.
+    WebHostLength,
+    /// Fullword input capacity for the returned path.
+    WebPathLength,
+    /// Fullword input capacity for the returned query string.
+    WebQueryStringLength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -953,4 +965,22 @@ pub enum CicsOutputName {
     SpoolToFlength,
     /// Generated identifier of a retained local transaction dump.
     DumpId,
+    /// Uppercase scheme returned by WEB PARSE URL.
+    WebSchemeName,
+    /// Host name or unbracketed IP literal.
+    WebHost,
+    /// Actual host length, including on truncation.
+    WebHostLength,
+    /// HOSTNAME, IPV4, or IPV6 result.
+    WebHostType,
+    /// Explicit or scheme-default port number.
+    WebPortNumber,
+    /// URL path component.
+    WebPath,
+    /// Actual path length, including on truncation.
+    WebPathLength,
+    /// Escaped query string component.
+    WebQueryString,
+    /// Actual query string length, including on truncation.
+    WebQueryStringLength,
 }

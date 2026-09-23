@@ -11180,6 +11180,109 @@ mod tests {
     }
 
     #[test]
+    fn compiled_web_parse_url_returns_components_through_typed_route() {
+        let artifact = published_source_fixture(
+            "WEBPARSE",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. WEBPARSE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 URL-X PIC X(64) VALUE 'http://example.com/a?x=1'.\n01 URL-LEN PIC S9(9) COMP VALUE 24.\n01 SCHEME-X PIC X(16).\n01 HOST-X PIC X(32).\n01 HOST-LEN PIC S9(9) COMP VALUE 32.\n01 PORT-X PIC S9(9) COMP.\n01 PATH-X PIC X(32).\n01 PATH-LEN PIC S9(9) COMP VALUE 32.\n01 QUERY-X PIC X(32).\n01 QUERY-LEN PIC S9(9) COMP VALUE 32.\nPROCEDURE DIVISION.\nEXEC CICS WEB PARSE URL(URL-X) URLLENGTH(URL-LEN) SCHEMENAME(SCHEME-X) HOST(HOST-X) HOSTLENGTH(HOST-LEN) PORTNUMBER(PORT-X) PATH(PATH-X) PATHLENGTH(PATH-LEN) QUERYSTRING(QUERY-X) QUERYSTRLEN(QUERY-LEN) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "WEBPARSE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("WEBP".into(), "WEBPARSE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "WEBPARSE".into(),
+                    map: "WEBPARSE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("web-parse-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "WEBP", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "WEBP",
+                24,
+                80,
+                "web-parse-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "WEBPARSE", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert!(
+            restored
+                .variable("HOST-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"example.com")
+        );
+        assert_eq!(
+            restored.variable("HOST-LEN").unwrap().bytes(),
+            &[0, 0, 0, 11]
+        );
+        assert_eq!(restored.variable("PORT-X").unwrap().bytes(), &[0, 0, 0, 80]);
+        assert!(
+            restored
+                .variable("PATH-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"/a")
+        );
+        assert!(
+            restored
+                .variable("QUERY-X")
+                .unwrap()
+                .bytes()
+                .starts_with(b"x=1")
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::WebParseUrl)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_document_create_selects_the_typed_durable_route() {
         let artifact = published_source_fixture(
             "DOCCREAT",

@@ -29,6 +29,7 @@ pub(crate) enum CicsCommandFamily {
     JournalControl,
     WebServiceControl,
     CounterControl,
+    WebControl,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -903,6 +904,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::WebParseUrl,
+        syntax: "WEB PARSE URL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0245",
+        family: CicsCommandFamily::WebControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Write,
         syntax: "WRITE FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
@@ -1071,11 +1079,12 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::TransformXmlToData => &CICS_COMMAND_DESCRIPTORS[120],
         CicsOperation::WaitJournalName => &CICS_COMMAND_DESCRIPTORS[121],
         CicsOperation::WaitJournalNum => &CICS_COMMAND_DESCRIPTORS[122],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[123],
-        CicsOperation::WriteJournalName => &CICS_COMMAND_DESCRIPTORS[124],
-        CicsOperation::WriteJournalNum => &CICS_COMMAND_DESCRIPTORS[125],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[126],
-        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[127],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[128],
+        CicsOperation::WebParseUrl => &CICS_COMMAND_DESCRIPTORS[123],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[124],
+        CicsOperation::WriteJournalName => &CICS_COMMAND_DESCRIPTORS[125],
+        CicsOperation::WriteJournalNum => &CICS_COMMAND_DESCRIPTORS[126],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[127],
+        CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[128],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[129],
     }
 }

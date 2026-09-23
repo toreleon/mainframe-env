@@ -53,4 +53,13 @@ pub enum HirCicsOutputName {
     TypeNameLength,
     TypeNamespace,
     TypeNamespaceLength,
+    WebSchemeName,
+    WebHost,
+    WebHostLength,
+    WebHostType,
+    WebPortNumber,
+    WebPath,
+    WebPathLength,
+    WebQueryString,
+    WebQueryStringLength,
 }

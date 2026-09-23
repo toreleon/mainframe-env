@@ -229,6 +229,8 @@ pub enum CicsOperation {
     TransformJsonToData,
     /// Query XML metadata or convert an XML container to application data.
     TransformXmlToData,
+    /// Split a bounded URL into its scheme, host, port, path, and query components.
+    WebParseUrl,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -370,6 +372,7 @@ impl CicsOperation {
             Self::TransformDataToXml => "TransformDataToXml",
             Self::TransformJsonToData => "TransformJsonToData",
             Self::TransformXmlToData => "TransformXmlToData",
+            Self::WebParseUrl => "WebParseUrl",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -642,6 +645,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,
             ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
             ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
+            ("WEB", Some("PARSE")) => Self::WebParseUrl,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

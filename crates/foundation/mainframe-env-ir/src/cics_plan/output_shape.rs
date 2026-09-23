@@ -115,6 +115,20 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WebParseUrl => matches!(
+            output,
+            CicsOutputName::WebSchemeName
+                | CicsOutputName::WebHost
+                | CicsOutputName::WebHostLength
+                | CicsOutputName::WebHostType
+                | CicsOutputName::WebPortNumber
+                | CicsOutputName::WebPath
+                | CicsOutputName::WebPathLength
+                | CicsOutputName::WebQueryString
+                | CicsOutputName::WebQueryStringLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::DocumentInsert => matches!(
             output,
             CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2
