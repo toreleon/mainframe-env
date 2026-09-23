@@ -86,4 +86,11 @@ pub enum HirCicsOutputName {
     WebReceiveStatusLength,
     WebReceiveMediaType,
     WebReceiveBodyCharset,
+    WebConverseInto,
+    WebConverseToLength,
+    WebConverseStatusCode,
+    WebConverseStatusText,
+    WebConverseStatusLength,
+    WebConverseMediaType,
+    WebConverseBodyCharset,
 }

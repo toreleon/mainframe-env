@@ -12492,6 +12492,140 @@ mod tests {
     }
 
     #[test]
+    fn compiled_web_converse_dispatches_selected_client_exchange() {
+        struct LocalWebTransport;
+        impl mainframe_env_cics::CicsWebTransport for LocalWebTransport {
+            fn open(
+                &self,
+                endpoint: &mainframe_env_cics::CicsWebEndpoint,
+                _: &mainframe_env_execution_api::Invocation,
+            ) -> Result<mainframe_env_cics::CicsWebVersion, HostProblem> {
+                assert_eq!(
+                    (
+                        endpoint.scheme.as_str(),
+                        endpoint.host.as_str(),
+                        endpoint.port
+                    ),
+                    ("HTTP", "example.com", 80)
+                );
+                Ok(mainframe_env_cics::CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &mainframe_env_cics::CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &mainframe_env_execution_api::Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+            fn exchange(
+                &self,
+                _: &mainframe_env_cics::CicsWebEndpoint,
+                _: [u8; 8],
+                request: &mainframe_env_cics::CicsWebRequest,
+                _: &mainframe_env_execution_api::Invocation,
+            ) -> Result<mainframe_env_cics::CicsWebResponse, HostProblem> {
+                assert_eq!(
+                    (request.method.as_str(), request.path.as_str()),
+                    ("GET", "/ping")
+                );
+                Ok(mainframe_env_cics::CicsWebResponse {
+                    version: mainframe_env_cics::CicsWebVersion { major: 1, minor: 1 },
+                    status: 201,
+                    reason: "Created".into(),
+                    headers: vec![("X-Reply".into(), "yes".into())],
+                    body: b"pong".to_vec(),
+                })
+            }
+        }
+        let artifact = published_source_fixture(
+            "WEBOPEN",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. WEBOPEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 HOST-X PIC X(11) VALUE 'example.com'.\n01 HOST-LEN PIC S9(9) COMP VALUE 11.\n01 TOKEN-X PIC X(8).\n01 BODY-X PIC X(8).\n01 TOLEN-X PIC S9(9) COMP.\n01 STATUS-X PIC S9(4) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WEB OPEN HOST(HOST-X) HOSTLENGTH(HOST-LEN) SCHEME(HTTP) SESSTOKEN(TOKEN-X) END-EXEC.\nEXEC CICS WEB CONVERSE SESSTOKEN(TOKEN-X) METHOD(GET) PATH('/ping') PATHLENGTH(5) INTO(BODY-X) TOLENGTH(TOLEN-X) MAXLENGTH(8) STATUSCODE(STATUS-X) CLIENTCONV(NOCLICONVERT) NOHANDLE END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let path_resource = format!("PATH.{:x}", Sha256::digest(b"example.com/ping"));
+        server
+            .racf
+            .define_profile("WEBPATH", &path_resource, "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("WEBPATH", &path_resource, "IBMUSER", AccessIntent::Read)
+            .unwrap();
+        server
+            .cics
+            .install_web_transport(Arc::new(LocalWebTransport))
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "WEBOPEN".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("WEBO".into(), "WEBOPEN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "WEBOPEN".into(),
+                    map: "WEBOPEN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("web-open-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "WEBO", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "WEBO",
+                24,
+                80,
+                "web-open-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "WEBOPEN", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(&restored.variable("BODY-X").unwrap().bytes()[..4], b"pong");
+        assert_eq!(restored.variable("TOLEN-X").unwrap().bytes(), &[0, 0, 0, 4]);
+        assert_eq!(restored.variable("STATUS-X").unwrap().bytes(), &[0, 201]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        assert_eq!(trace.iter().filter(|entry| entry.operation == CicsOperation::WebConverse && entry.response == 0).count(), 1);
+    }
+
+    #[test]
     fn compiled_document_create_selects_the_typed_durable_route() {
         let artifact = published_source_fixture(
             "DOCCREAT",

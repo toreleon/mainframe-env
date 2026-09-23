@@ -255,6 +255,8 @@ pub enum CicsOperation {
     WebRetrieve,
     /// Consume an inbound request body or a retained client HTTP response body.
     WebReceive,
+    /// Send one HTTP client request and receive its response in one command.
+    WebConverse,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -409,6 +411,7 @@ impl CicsOperation {
             Self::WebSend => "WebSend",
             Self::WebRetrieve => "WebRetrieve",
             Self::WebReceive => "WebReceive",
+            Self::WebConverse => "WebConverse",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -470,6 +473,7 @@ impl CicsOperation {
                 | Self::WebWrite
                 | Self::WebSend
                 | Self::WebReceive
+                | Self::WebConverse
                 | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
@@ -702,6 +706,7 @@ impl CicsOperation {
             ("WEB", Some("SEND")) => Self::WebSend,
             ("WEB", Some("RETRIEVE")) => Self::WebRetrieve,
             ("WEB", Some("RECEIVE")) => Self::WebReceive,
+            ("WEB", Some("CONVERSE")) => Self::WebConverse,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

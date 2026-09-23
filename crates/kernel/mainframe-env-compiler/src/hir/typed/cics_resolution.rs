@@ -669,6 +669,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebSend => web_control::SEND_CLAUSES,
         HirCicsOperation::WebRetrieve => web_control::RETRIEVE_CLAUSES,
         HirCicsOperation::WebReceive => web_control::RECEIVE_CLAUSES,
+        HirCicsOperation::WebConverse => web_control::CONVERSE_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -784,6 +785,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebSend => &["NOHANDLE"],
         HirCicsOperation::WebRetrieve => &["NOHANDLE"],
         HirCicsOperation::WebReceive => &["NOTRUNCATE", "NOHANDLE"],
+        HirCicsOperation::WebConverse => &["NOTRUNCATE", "NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -964,6 +966,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebSend => &[][..],
         HirCicsOperation::WebRetrieve => &["DOCTOKEN"][..],
         HirCicsOperation::WebReceive => &["INTO", "LENGTH", "MAXLENGTH"][..],
+        HirCicsOperation::WebConverse => {
+            &["SESSTOKEN", "METHOD", "INTO", "TOLENGTH", "MAXLENGTH"][..]
+        }
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1216,7 +1221,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 .unwrap_or_else(|| operation::resolve_option(option, operation))
         })
         .collect::<BTreeSet<_>>();
-    if operation == HirCicsOperation::WebReceive {
+    if matches!(
+        operation,
+        HirCicsOperation::WebReceive | HirCicsOperation::WebConverse
+    ) {
         options.extend(web_control::receive_options(&clauses)?);
     }
     if matches!(

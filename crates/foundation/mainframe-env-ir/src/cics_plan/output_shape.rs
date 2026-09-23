@@ -191,6 +191,18 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::WebConverse => matches!(
+            output,
+            CicsOutputName::WebConverseInto
+                | CicsOutputName::WebConverseToLength
+                | CicsOutputName::WebConverseStatusCode
+                | CicsOutputName::WebConverseStatusText
+                | CicsOutputName::WebConverseStatusLength
+                | CicsOutputName::WebConverseMediaType
+                | CicsOutputName::WebConverseBodyCharset
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::DocumentInsert => matches!(
             output,
             CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2

@@ -7081,6 +7081,41 @@ mod tests {
     }
 
     #[test]
+    fn web_converse_lowers_one_checked_client_exchange() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBCONV. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 BODY-X PIC X(8). 01 LEN-X PIC S9(9) COMP. 01 STATUS-X PIC S9(4) COMP. PROCEDURE DIVISION. ";
+        let source = format!(
+            "{declarations}EXEC CICS WEB CONVERSE SESSTOKEN(TOKEN-X) METHOD(GET) PATH('/ping') PATHLENGTH(5) INTO(BODY-X) TOLENGTH(LEN-X) MAXLENGTH(8) STATUSCODE(STATUS-X) NOTRUNCATE CLIENTCONV(NOCLICONVERT) END-EXEC. STOP RUN."
+        );
+        let analysis = analyze(&source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("{:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(command.operation, HirCicsOperation::WebConverse);
+        assert!(
+            command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::WebConverseInto)
+        );
+        assert!(
+            command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::WebConverseToLength)
+        );
+        let invalid = analyze(&source.replace("METHOD(GET)", "METHOD(POST)"));
+        assert!(invalid.hir.is_none());
+    }
+
+    #[test]
     fn web_write_lowers_header_bytes_and_fullword_lengths() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADER-X PIC X(6) VALUE 'X-Test'. 01 VALUE-X PIC X(5) VALUE 'alpha'. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
         for source in [

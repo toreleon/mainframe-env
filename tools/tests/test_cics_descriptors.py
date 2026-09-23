@@ -1284,6 +1284,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "WAIT JOURNALNAME",
                 "WAIT JOURNALNUM",
                 "WEB CLOSE",
+                "WEB CONVERSE",
                 "WEB ENDBROWSE",
                 "EXTRACT WEB",
                 "WEB EXTRACT",

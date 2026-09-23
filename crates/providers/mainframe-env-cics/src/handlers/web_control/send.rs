@@ -47,7 +47,7 @@ pub(super) fn invoke(
     result
 }
 
-fn parse(
+pub(super) fn parse(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,

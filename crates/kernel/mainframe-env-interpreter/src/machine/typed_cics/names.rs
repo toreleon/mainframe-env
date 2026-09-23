@@ -234,6 +234,14 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
             SlotUse::FullwordOutput
         }
         CicsOutputName::WebReceiveStatusCode => SlotUse::HalfwordOutput,
+        CicsOutputName::WebConverseInto
+        | CicsOutputName::WebConverseStatusText
+        | CicsOutputName::WebConverseMediaType
+        | CicsOutputName::WebConverseBodyCharset => SlotUse::Output,
+        CicsOutputName::WebConverseToLength | CicsOutputName::WebConverseStatusLength => {
+            SlotUse::FullwordOutput
+        }
+        CicsOutputName::WebConverseStatusCode => SlotUse::HalfwordOutput,
         CicsOutputName::WebHostLength
         | CicsOutputName::WebHostType
         | CicsOutputName::WebPortNumber
@@ -393,6 +401,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebSend => CicsOperation::WebSend,
         CicsPlanOperation::WebRetrieve => CicsOperation::WebRetrieve,
         CicsPlanOperation::WebReceive => CicsOperation::WebReceive,
+        CicsPlanOperation::WebConverse => CicsOperation::WebConverse,
     }
 }
 
@@ -768,6 +777,13 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::WebReceiveStatusLength => "STATUSLEN",
         CicsOutputName::WebReceiveMediaType => "MEDIATYPE",
         CicsOutputName::WebReceiveBodyCharset => "BODYCHARSET",
+        CicsOutputName::WebConverseInto => "INTO",
+        CicsOutputName::WebConverseToLength => "TOLENGTH",
+        CicsOutputName::WebConverseStatusCode => "STATUSCODE",
+        CicsOutputName::WebConverseStatusText => "STATUSTEXT",
+        CicsOutputName::WebConverseStatusLength => "STATUSLEN",
+        CicsOutputName::WebConverseMediaType => "MEDIATYPE",
+        CicsOutputName::WebConverseBodyCharset => "BODYCHARSET",
     }
 }
 

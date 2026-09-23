@@ -670,6 +670,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WebReceive => {
             web_control::invalid_receive_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::WebConverse => {
+            web_control::invalid_converse_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2504,6 +2507,51 @@ mod tests {
                 CicsOutputBinding {
                     name: CicsOutputName::WebReceiveLength,
                     target: slot(1, "LENGTH-X"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_converse_codec_uses_last_reserved_web_operation_tag() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebConverse), 104);
+        assert_eq!(operation_from_tag(104), Ok(CicsPlanOperation::WebConverse));
+        assert_eq!(output_tag(CicsOutputName::WebConverseInto), 345);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebConverse,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::WebSessionToken,
+                    value: CicsOperandValue::Storage(slot(0, "TOKEN-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebMethod,
+                    value: CicsOperandValue::Literal(b"GET".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebReceiveMaxLength,
+                    value: CicsOperandValue::Integer(8),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::WebNotruncate]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::WebConverseInto,
+                    target: slot(1, "BODY-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::WebConverseToLength,
+                    target: slot(2, "LEN-X"),
                 },
             ],
             condition: CicsCondition::Default,

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 mod close;
+mod converse;
 mod end_browse;
 mod extract;
 mod model;
@@ -410,6 +411,9 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::WebReceive => {
             receive::invoke(service, run, request, run.invocation.deadline_tick)
+        }
+        CicsOperation::WebConverse => {
+            converse::invoke(service, run, request, run.invocation.deadline_tick)
         }
         CicsOperation::WebEndBrowse => {
             end_browse::invoke(service, run, request, run.invocation.deadline_tick)

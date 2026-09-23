@@ -6,6 +6,7 @@ use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 use mainframe_env_ir::CicsApplicationRegistryDescriptor;
 
+mod converse;
 mod receive;
 mod send;
 mod write;
@@ -19,6 +20,12 @@ pub(super) fn reviewed_ambiguous_shape(
         return true;
     }
     if has_value && descriptor.label_tokens == ["WEB", "RECEIVE"] && RECEIVE_CLAUSES.contains(&name)
+    {
+        return true;
+    }
+    if has_value
+        && descriptor.label_tokens == ["WEB", "CONVERSE"]
+        && CONVERSE_CLAUSES.contains(&name)
     {
         return true;
     }
@@ -187,6 +194,30 @@ pub(super) const RECEIVE_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const CONVERSE_CLAUSES: &[&str] = &[
+    "SESSTOKEN",
+    "METHOD",
+    "PATH",
+    "PATHLENGTH",
+    "URIMAP",
+    "QUERYSTRING",
+    "QUERYSTRLEN",
+    "FROM",
+    "FROMLENGTH",
+    "DOCTOKEN",
+    "MEDIATYPE",
+    "CLOSESTATUS",
+    "INTO",
+    "TOLENGTH",
+    "MAXLENGTH",
+    "STATUSCODE",
+    "STATUSTEXT",
+    "STATUSLEN",
+    "BODYCHARSET",
+    "CLIENTCONV",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn receive_options(clauses: &Clauses) -> Resolution<Vec<super::HirCicsOption>> {
     receive::options(clauses)
@@ -225,6 +256,9 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::WebReceive {
         return receive::validate(clauses, options, semantic);
+    }
+    if operation == HirCicsOperation::WebConverse {
+        return converse::validate(clauses, options, semantic);
     }
     if matches!(
         operation,
@@ -489,6 +523,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::WebReceive {
         return receive::operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::WebConverse {
+        return converse::operands(clauses, semantic);
+    }
     if matches!(
         operation,
         HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb
@@ -586,6 +623,9 @@ pub(super) fn outputs(
     }
     if operation == HirCicsOperation::WebReceive {
         return receive::outputs(clauses, semantic);
+    }
+    if operation == HirCicsOperation::WebConverse {
+        return converse::outputs(clauses, semantic);
     }
     if matches!(
         operation,

@@ -415,7 +415,7 @@ fn header(headers: &[(String, String)], name: &str) -> String {
         .map_or_else(String::new, |(_, value)| value.clone())
 }
 
-fn chunk(
+pub(super) fn chunk(
     source: &[u8],
     maximum: usize,
     media_type: &str,

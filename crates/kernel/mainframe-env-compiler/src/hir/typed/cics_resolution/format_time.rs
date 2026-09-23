@@ -190,6 +190,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebReceiveStatusLength
         | HirCicsOutputName::WebReceiveMediaType
         | HirCicsOutputName::WebReceiveBodyCharset
+        | HirCicsOutputName::WebConverseInto
+        | HirCicsOutputName::WebConverseToLength
+        | HirCicsOutputName::WebConverseStatusCode
+        | HirCicsOutputName::WebConverseStatusText
+        | HirCicsOutputName::WebConverseStatusLength
+        | HirCicsOutputName::WebConverseMediaType
+        | HirCicsOutputName::WebConverseBodyCharset
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

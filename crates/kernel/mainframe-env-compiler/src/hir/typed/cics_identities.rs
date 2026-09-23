@@ -138,6 +138,7 @@ pub enum HirCicsOperation {
     WebSend,
     WebRetrieve,
     WebReceive,
+    WebConverse,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

@@ -624,3 +624,70 @@ pub(super) fn invalid_receive_shape(
                 Some(CicsOperandValue::Storage(_))
             )
 }
+
+pub(super) fn invalid_converse_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let body = inputs.contains(&CicsOperandName::WebFrom);
+    let document = inputs.contains(&CicsOperandName::WebDocumentToken);
+    let allowed = BTreeSet::from([
+        CicsOperandName::WebSessionToken,
+        CicsOperandName::WebMethod,
+        CicsOperandName::WebPathInput,
+        CicsOperandName::WebPathLength,
+        CicsOperandName::WebSendUriMap,
+        CicsOperandName::WebQueryInput,
+        CicsOperandName::WebQueryStringLength,
+        CicsOperandName::WebFrom,
+        CicsOperandName::WebFromLength,
+        CicsOperandName::WebDocumentToken,
+        CicsOperandName::WebMediaType,
+        CicsOperandName::WebCloseStatus,
+        CicsOperandName::WebReceiveMaxLength,
+        CicsOperandName::WebReceiveStatusLength,
+    ]);
+    !inputs.is_subset(&allowed)
+        || ![
+            CicsOperandName::WebSessionToken,
+            CicsOperandName::WebMethod,
+            CicsOperandName::WebReceiveMaxLength,
+        ]
+        .into_iter()
+        .all(|name| inputs.contains(&name))
+        || body && document
+        || body != inputs.contains(&CicsOperandName::WebFromLength)
+        || inputs.contains(&CicsOperandName::WebPathInput)
+            != inputs.contains(&CicsOperandName::WebPathLength)
+        || inputs.contains(&CicsOperandName::WebQueryInput)
+            != inputs.contains(&CicsOperandName::WebQueryStringLength)
+        || inputs.contains(&CicsOperandName::WebPathInput)
+            && inputs.contains(&CicsOperandName::WebSendUriMap)
+        || !outputs.contains(&CicsOutputName::WebConverseInto)
+        || !outputs.contains(&CicsOutputName::WebConverseToLength)
+        || outputs.contains(&CicsOutputName::WebConverseStatusText)
+            != inputs.contains(&CicsOperandName::WebReceiveStatusLength)
+        || outputs.contains(&CicsOutputName::WebConverseStatusLength)
+            != inputs.contains(&CicsOperandName::WebReceiveStatusLength)
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::WebNotruncate
+                    | CicsPlanOption::WebNoClientConvert
+            )
+        })
+        || !matches!(
+            operand_value(plan, CicsOperandName::WebMethod),
+            Some(CicsOperandValue::Literal(_))
+        )
+        || !matches!(
+            operand_value(plan, CicsOperandName::WebReceiveMaxLength),
+            Some(
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            )
+        )
+}

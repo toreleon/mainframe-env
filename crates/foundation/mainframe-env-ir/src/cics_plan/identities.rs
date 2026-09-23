@@ -274,6 +274,8 @@ pub enum CicsPlanOperation {
     WebRetrieve,
     /// Consume a bounded HTTP body for a server request or client response.
     WebReceive,
+    /// Dispatch one client request and receive its bounded response.
+    WebConverse,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -1131,4 +1133,18 @@ pub enum CicsOutputName {
     WebReceiveMediaType,
     /// HTTP body charset returned by WEB RECEIVE.
     WebReceiveBodyCharset,
+    /// Response body returned by WEB CONVERSE.
+    WebConverseInto,
+    /// Actual WEB CONVERSE body length.
+    WebConverseToLength,
+    /// Client response status code returned by WEB CONVERSE.
+    WebConverseStatusCode,
+    /// Client response reason returned by WEB CONVERSE.
+    WebConverseStatusText,
+    /// Actual client response reason length.
+    WebConverseStatusLength,
+    /// Client response media type returned by WEB CONVERSE.
+    WebConverseMediaType,
+    /// Client response body charset returned by WEB CONVERSE.
+    WebConverseBodyCharset,
 }

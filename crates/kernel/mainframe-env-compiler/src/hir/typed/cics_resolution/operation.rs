@@ -143,6 +143,7 @@ pub(super) fn resolve(
         ["WEB", "SEND"] => HirCicsOperation::WebSend,
         ["WEB", "RETRIEVE"] => HirCicsOperation::WebRetrieve,
         ["WEB", "RECEIVE"] => HirCicsOperation::WebReceive,
+        ["WEB", "CONVERSE"] => HirCicsOperation::WebConverse,
         ["WAIT", "JOURNALNAME"] => HirCicsOperation::WaitJournalName,
         ["WAIT", "JOURNALNUM"] => HirCicsOperation::WaitJournalNum,
         ["WRITE", "JOURNALNAME"] => HirCicsOperation::WriteJournalName,

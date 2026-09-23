@@ -37,7 +37,7 @@ use registry::{expected_effects, expected_operation};
 pub(super) use registry::{operation_identities, validate_module_operations};
 pub(super) use response::{drive_response, write_response_state, write_runtime_output};
 use runtime_validation::validate_runtime_plan;
-use slot_access::{read_integer_slot, read_slot};
+use slot_access::{plan_slots, read_integer_slot, read_slot};
 pub(super) use storage64::Storage64Intent;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
@@ -534,6 +534,13 @@ pub(super) fn execute(
             | CicsOutputName::WebReceiveStatusLength
             | CicsOutputName::WebReceiveMediaType
             | CicsOutputName::WebReceiveBodyCharset
+            | CicsOutputName::WebConverseInto
+            | CicsOutputName::WebConverseToLength
+            | CicsOutputName::WebConverseStatusCode
+            | CicsOutputName::WebConverseStatusText
+            | CicsOutputName::WebConverseStatusLength
+            | CicsOutputName::WebConverseMediaType
+            | CicsOutputName::WebConverseBodyCharset
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -877,46 +884,6 @@ fn validate_address_set_slots(
                 "ADDRESS COMMAREA output must be a four-byte pointer",
             ));
         }
-    }
-    Ok(())
-}
-
-fn plan_slots(plan: &CicsEffectPlan) -> Result<Vec<CicsStorageSlot>, MachineProblem> {
-    let mut slots = BTreeMap::<StorageId, CicsStorageSlot>::new();
-    for operand in &plan.operands {
-        if let CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) = &operand.value {
-            insert_slot(&mut slots, slot)?;
-        }
-    }
-    for output in &plan.outputs {
-        insert_slot(&mut slots, &output.target)?;
-    }
-    match &plan.condition {
-        CicsCondition::Default | CicsCondition::NoHandle => {}
-        CicsCondition::Respond {
-            response,
-            response2,
-        } => {
-            insert_slot(&mut slots, response)?;
-            if let Some(response2) = response2 {
-                insert_slot(&mut slots, response2)?;
-            }
-        }
-    }
-    Ok(slots.into_values().collect())
-}
-
-fn insert_slot(
-    slots: &mut BTreeMap<StorageId, CicsStorageSlot>,
-    slot: &CicsStorageSlot,
-) -> Result<(), MachineProblem> {
-    if slots
-        .insert(slot.storage, slot.clone())
-        .is_some_and(|existing| existing.qualified_layout_name != slot.qualified_layout_name)
-    {
-        return Err(invalid_plan(
-            "one storage slot names more than one qualified layout",
-        ));
     }
     Ok(())
 }

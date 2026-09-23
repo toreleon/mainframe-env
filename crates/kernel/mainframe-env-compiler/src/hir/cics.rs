@@ -545,6 +545,15 @@ impl PlanContext<'_> {
                 HirCicsOutputName::WebReceiveStatusLength => CicsOutputName::WebReceiveStatusLength,
                 HirCicsOutputName::WebReceiveMediaType => CicsOutputName::WebReceiveMediaType,
                 HirCicsOutputName::WebReceiveBodyCharset => CicsOutputName::WebReceiveBodyCharset,
+                HirCicsOutputName::WebConverseInto => CicsOutputName::WebConverseInto,
+                HirCicsOutputName::WebConverseToLength => CicsOutputName::WebConverseToLength,
+                HirCicsOutputName::WebConverseStatusCode => CicsOutputName::WebConverseStatusCode,
+                HirCicsOutputName::WebConverseStatusText => CicsOutputName::WebConverseStatusText,
+                HirCicsOutputName::WebConverseStatusLength => {
+                    CicsOutputName::WebConverseStatusLength
+                }
+                HirCicsOutputName::WebConverseMediaType => CicsOutputName::WebConverseMediaType,
+                HirCicsOutputName::WebConverseBodyCharset => CicsOutputName::WebConverseBodyCharset,
             },
             target: self.slot(&output.target)?,
         })
@@ -724,6 +733,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WebSend => CicsPlanOperation::WebSend,
         HirCicsOperation::WebRetrieve => CicsPlanOperation::WebRetrieve,
         HirCicsOperation::WebReceive => CicsPlanOperation::WebReceive,
+        HirCicsOperation::WebConverse => CicsPlanOperation::WebConverse,
         HirCicsOperation::WaitJournalName => CicsPlanOperation::WaitJournalName,
         HirCicsOperation::WaitJournalNum => CicsPlanOperation::WaitJournalNum,
         HirCicsOperation::WriteJournalName => CicsPlanOperation::WriteJournalName,

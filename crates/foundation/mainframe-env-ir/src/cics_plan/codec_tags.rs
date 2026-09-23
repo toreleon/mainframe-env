@@ -116,6 +116,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::WebSend => 101,
         CicsPlanOperation::WebRetrieve => 102,
         CicsPlanOperation::WebReceive => 103,
+        CicsPlanOperation::WebConverse => 104,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -261,6 +262,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         101 => Ok(CicsPlanOperation::WebSend),
         102 => Ok(CicsPlanOperation::WebRetrieve),
         103 => Ok(CicsPlanOperation::WebReceive),
+        104 => Ok(CicsPlanOperation::WebConverse),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -1191,6 +1193,13 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::WebReceiveStatusLength => 342,
         CicsOutputName::WebReceiveMediaType => 343,
         CicsOutputName::WebReceiveBodyCharset => 344,
+        CicsOutputName::WebConverseInto => 345,
+        CicsOutputName::WebConverseToLength => 346,
+        CicsOutputName::WebConverseStatusCode => 347,
+        CicsOutputName::WebConverseStatusText => 348,
+        CicsOutputName::WebConverseStatusLength => 349,
+        CicsOutputName::WebConverseMediaType => 350,
+        CicsOutputName::WebConverseBodyCharset => 351,
     }
 }
 
@@ -1280,6 +1289,13 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         342 => Ok(CicsOutputName::WebReceiveStatusLength),
         343 => Ok(CicsOutputName::WebReceiveMediaType),
         344 => Ok(CicsOutputName::WebReceiveBodyCharset),
+        345 => Ok(CicsOutputName::WebConverseInto),
+        346 => Ok(CicsOutputName::WebConverseToLength),
+        347 => Ok(CicsOutputName::WebConverseStatusCode),
+        348 => Ok(CicsOutputName::WebConverseStatusText),
+        349 => Ok(CicsOutputName::WebConverseStatusLength),
+        350 => Ok(CicsOutputName::WebConverseMediaType),
+        351 => Ok(CicsOutputName::WebConverseBodyCharset),
         13..=90 => CicsAssignOutput::from_tag((value - ASSIGN_OUTPUT_TAG_BASE) as u8)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

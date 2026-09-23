@@ -1,7 +1,9 @@
-use super::super::{model, open};
-use super::*;
+use super::super::super::{CicsService, Run, bounded, decimal_payload};
+use super::{model, open, receive, send};
+use mainframe_env_execution_api::AuditDecision;
 use mainframe_env_host_api::{
-    AccessIntent, CicsDisposition, HostRequest, canonical_request_digest,
+    AccessIntent, CicsDisposition, CicsRequest, CicsResponse, HostProblem, HostRequest,
+    canonical_request_digest,
 };
 use mainframe_env_store_api::{ProviderStateMutation, ProviderStateRecord, ProviderStateWrite};
 use sha2::{Digest, Sha256};
@@ -12,8 +14,243 @@ pub(super) fn invoke(
     run: &mut Run,
     request: &CicsRequest,
     retention_tick: u64,
-    input: SendInput,
 ) -> Result<CicsResponse, HostProblem> {
+    let result = invoke_inner(service, run, request, retention_tick);
+    let decision = match &result {
+        Ok(_) => AuditDecision::Success,
+        Err(HostProblem::Unauthorized) => AuditDecision::Deny,
+        Err(HostProblem::Cancelled) => AuditDecision::Cancelled,
+        Err(HostProblem::TimedOut) => AuditDecision::TimedOut,
+        Err(HostProblem::UnknownOutcome) => AuditDecision::UnknownOutcome,
+        Err(HostProblem::InfrastructureFailure) => AuditDecision::InfrastructureFailure,
+        Err(_) => AuditDecision::ProviderFailure,
+    };
+    open::audit_web_decision(service, run, request, decision)?;
+    result
+}
+
+fn parse_request(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<(send::SendInput, usize, Option<usize>), HostProblem> {
+    const SEND: &[&str] = &[
+        "SESSTOKEN",
+        "METHOD",
+        "PATH",
+        "PATHLENGTH",
+        "URIMAP",
+        "QUERYSTRING",
+        "QUERYSTRLEN",
+        "FROM",
+        "FROMLENGTH",
+        "DOCTOKEN",
+        "MEDIATYPE",
+        "CLOSESTATUS",
+        "RESP",
+        "RESP2",
+        "OPTION.NOHANDLE",
+    ];
+    const RESULT: &[&str] = &[
+        "INTO",
+        "INTO.MAXLENGTH",
+        "TOLENGTH",
+        "MAXLENGTH",
+        "STATUSCODE",
+        "STATUSTEXT",
+        "STATUSTEXT.MAXLENGTH",
+        "STATUSLEN",
+        "BODYCHARSET",
+        "OPTION.NOTRUNCATE",
+        "OPTION.NOCLICONVERT",
+    ];
+    if request.mutation.is_none()
+        || request
+            .arguments
+            .keys()
+            .any(|name| !SEND.contains(&name.as_str()) && !RESULT.contains(&name.as_str()))
+        || !["SESSTOKEN", "METHOD", "INTO", "TOLENGTH", "MAXLENGTH"]
+            .iter()
+            .all(|name| request.arguments.contains_key(*name))
+        || request.arguments.contains_key("STATUSTEXT")
+            != request.arguments.contains_key("STATUSLEN")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let maximum = decimal(request, "MAXLENGTH")?;
+    if maximum <= 0 {
+        return Err(condition("LENGERR", 22, 16));
+    }
+    let maximum = usize::try_from(maximum).map_err(|_| HostProblem::ResourceExhausted)?;
+    if maximum > service.limits.max_web_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    if let Some(declared) = request.arguments.get("INTO.MAXLENGTH") {
+        let declared = std::str::from_utf8(declared.bytes())
+            .map_err(|_| HostProblem::Malformed)?
+            .parse::<usize>()
+            .map_err(|_| HostProblem::Malformed)?;
+        if maximum > declared {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    let status_capacity = if request.arguments.contains_key("STATUSLEN") {
+        let value = decimal(request, "STATUSLEN")?;
+        if value <= 0 {
+            return Err(condition("LENGERR", 22, 59));
+        }
+        let capacity = usize::try_from(value).map_err(|_| HostProblem::ResourceExhausted)?;
+        if let Some(declared) = request.arguments.get("STATUSTEXT.MAXLENGTH") {
+            let declared = std::str::from_utf8(declared.bytes())
+                .map_err(|_| HostProblem::Malformed)?
+                .parse::<usize>()
+                .map_err(|_| HostProblem::Malformed)?;
+            if capacity > declared {
+                return Err(HostProblem::Malformed);
+            }
+        }
+        Some(capacity)
+    } else {
+        None
+    };
+    let mut send_request = request.clone();
+    send_request
+        .arguments
+        .retain(|name, _| SEND.contains(&name.as_str()));
+    let input = send::parse(service, run, &send_request)?;
+    if input.token.is_none() {
+        return Err(HostProblem::Malformed);
+    }
+    Ok((input, maximum, status_capacity))
+}
+
+fn result_from_received(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    received: &model::CicsWebResponse,
+    maximum: usize,
+    status_capacity: Option<usize>,
+    code_page: u16,
+) -> Result<(CicsResponse, usize), HostProblem> {
+    let media = received
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("Content-Type"))
+        .map_or("", |(_, value)| value.as_str());
+    let (body, consumed) = receive::chunk(
+        &received.body,
+        maximum,
+        media,
+        Some(code_page),
+        request.arguments.contains_key("OPTION.NOCLICONVERT"),
+        service.limits.max_web_bytes,
+    )?;
+    let remaining = consumed < received.body.len();
+    let keep = request.arguments.contains_key("OPTION.NOTRUNCATE");
+    let cursor = if remaining && !keep {
+        received.body.len()
+    } else {
+        consumed
+    };
+    let mut response = service.response(
+        run,
+        CicsDisposition::Complete,
+        if remaining { "LENGERR" } else { "NORMAL" },
+        if remaining { 22 } else { 0 },
+        if remaining {
+            if keep { 36 } else { 57 }
+        } else {
+            0
+        },
+        None,
+        None,
+        Vec::new(),
+    )?;
+    response
+        .outputs
+        .insert("INTO".into(), bounded(body.clone())?);
+    response
+        .outputs
+        .insert("TOLENGTH".into(), decimal_payload(body.len() as i64)?);
+    if request.arguments.contains_key("STATUSCODE") {
+        response.outputs.insert(
+            "STATUSCODE".into(),
+            decimal_payload(received.status.into())?,
+        );
+    }
+    if let Some(capacity) = status_capacity {
+        let value = received.reason.as_bytes();
+        response.outputs.insert(
+            "STATUSTEXT".into(),
+            bounded(value[..value.len().min(capacity)].to_vec())?,
+        );
+        response
+            .outputs
+            .insert("STATUSLEN".into(), decimal_payload(value.len() as i64)?);
+        if value.len() > capacity && response.response == 0 {
+            response.condition = "LENGERR".into();
+            response.response = 22;
+            response.response2 = 58;
+        }
+    }
+    if request.arguments.contains_key("MEDIATYPE") {
+        response.outputs.insert(
+            "MEDIATYPE".into(),
+            bounded(
+                media
+                    .split(';')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .as_bytes()
+                    .iter()
+                    .take(56)
+                    .copied()
+                    .collect(),
+            )?,
+        );
+    }
+    if request.arguments.contains_key("BODYCHARSET") {
+        let charset = media
+            .split(';')
+            .skip(1)
+            .find_map(|part| part.trim().strip_prefix("charset="))
+            .unwrap_or("");
+        response.outputs.insert(
+            "BODYCHARSET".into(),
+            bounded(charset.as_bytes().iter().take(40).copied().collect())?,
+        );
+    }
+    Ok((response, cursor))
+}
+
+fn decimal(request: &CicsRequest, name: &str) -> Result<i64, HostProblem> {
+    let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(HostProblem::Malformed);
+    }
+    std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .parse()
+        .map_err(|_| HostProblem::Malformed)
+}
+
+fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
+    HostProblem::Condition {
+        name: name.into(),
+        response,
+        response2,
+    }
+}
+
+fn invoke_inner(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+) -> Result<CicsResponse, HostProblem> {
+    let (input, maximum, status_capacity) = parse_request(service, run, request)?;
     let token = input.token.ok_or(HostProblem::InfrastructureFailure)?;
     let session_key = model::token_key(token);
     let stage_key = model::header_stage_key(run.invocation.run_unit_id.as_str(), Some(token));
@@ -100,6 +337,15 @@ pub(super) fn invoke(
     {
         return Err(condition("INVREQ", 16, 76));
     }
+    if !input.body.is_empty()
+        && headers.iter().any(|(name, value)| {
+            name.eq_ignore_ascii_case("Content-Type")
+                && value.to_ascii_lowercase().starts_with("text/")
+        })
+        && !request.arguments.contains_key("OPTION.NOCLICONVERT")
+    {
+        return Err(condition("INVREQ", 16, 46));
+    }
     if input.close {
         headers.push(("Connection".into(), "close".into()));
     }
@@ -168,6 +414,16 @@ pub(super) fn invoke(
     {
         return Err(HostProblem::UnknownOutcome);
     }
+    let (response, cursor) = result_from_received(
+        service,
+        run,
+        request,
+        &received,
+        maximum,
+        status_capacity,
+        session.endpoint.code_page,
+    )
+    .map_err(|_| HostProblem::UnknownOutcome)?;
     let mut state = service.lock()?;
     if state.web.sessions.get(&session_key) != Some(&session)
         || state.web.pending_headers.get(&stage_key) != stage.as_ref()
@@ -181,8 +437,8 @@ pub(super) fn invoke(
         transaction: run.transaction.clone(),
         token,
         response: received,
-        cursor: 0,
-        received: false,
+        cursor,
+        received: true,
         version: previous.as_ref().map_or(1, |prior| prior.version + 1),
     };
     let payload = model::encode_client_response(&client_response)?;
@@ -217,16 +473,6 @@ pub(super) fn invoke(
         next_session.server_closed = true;
         next_session.version += 1;
     }
-    let response = service.response(
-        run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        Vec::new(),
-    )?;
     let mut writes = vec![
         ProviderStateMutation::Put(ProviderStateWrite {
             record: ProviderStateRecord {

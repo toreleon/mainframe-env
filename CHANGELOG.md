@@ -38,6 +38,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB CONVERSE` as one checked client request and bounded
+  response operation, with durable replay, dispatch uncertainty, SAF, and
+  continuation through WEB RECEIVE. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0241` binds
+  `dfhp4_webconverse.html` at
+  `sha256:326c6b1e2859591c8ab86ed252ba01d3ee57f2a109afacdf7bc7468ee1f9e658`.
+
 - Added typed CICS `WEB RECEIVE` for bounded server and client body buffers,
   durable retain or discard cursors, response metadata, and client header
   inspection after receive. IBM CICS TS 6.x baseline

@@ -367,6 +367,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0240",
     ),
     (
+        "WebConverse",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0241",
+    ),
+    (
         "WebEndBrowse",
         "api",
         "web-control",
@@ -800,6 +807,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WaitJournalName",
         "WaitJournalNum",
         "WebClose",
+        "WebConverse",
         "WebEndBrowse",
         "WebExtract",
         "WebOpen",
@@ -1253,6 +1261,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WebReceive": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "WebConverse": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "WebOpen": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
@@ -1534,6 +1545,7 @@ def _load_typed_execution_registrations(
         "WaitJournalName",
         "WaitJournalNum",
         "WebClose",
+        "WebConverse",
         "WebEndBrowse",
         "WebExtract",
         "WebOpen",
@@ -1918,6 +1930,7 @@ def load_catalog(
                 "WaitJournalName",
                 "WaitJournalNum",
                 "WebClose",
+                "WebConverse",
                 "WebEndBrowse",
                 "WebExtract",
                 "WebOpen",
@@ -4304,6 +4317,28 @@ def _registry_row_material(
             f"{command['official_row']} registry options lack shapes {sorted(missing)}"
         )
     recognition = _recognition_contract(command, semantic["grammar"], top_level_names)
+    if command["official_row"] == f"{OFFICIAL_BASELINE}:api-commands:0241":
+        # The bounded syntax projection retains "SESSTOKEN(" in the head and
+        # omits the following WEB CONVERSE options. The exact reviewed 6.x
+        # dfhp4_webconverse.html pin is sha256:326c6b1e2859591c8ab86ed252ba01d3ee57f2a109afacdf7bc7468ee1f9e658.
+        # Bind only the selected buffer form; the semantic source projection
+        # remains bounded and receives no coverage credit from this registry.
+        selected_values = {
+            "SESSTOKEN", "METHOD", "PATH", "PATHLENGTH", "URIMAP",
+            "QUERYSTRING", "QUERYSTRLEN", "FROM", "FROMLENGTH", "DOCTOKEN",
+            "MEDIATYPE", "CLOSESTATUS", "INTO", "TOLENGTH", "MAXLENGTH",
+            "STATUSCODE", "STATUSTEXT", "STATUSLEN", "BODYCHARSET", "CLIENTCONV",
+        }
+        for name in selected_values | {"NOTRUNCATE"}:
+            option_entries.setdefault(name, {
+                "name": name,
+                "value_shape": "flag" if name == "NOTRUNCATE" else "value",
+                "directions": ["none"] if name == "NOTRUNCATE" else ["input", "output"],
+                "direction_status": "bounded-ambiguity",
+                "source_max_value_bytes": None,
+            })
+        top_level_names.update(selected_values | {"NOTRUNCATE"})
+        recognition["recognition_heads"] = [["WEB", "CONVERSE"]]
     if (
         not recognition["recognition_heads"]
         or len({tuple(head) for head in recognition["recognition_heads"]})
