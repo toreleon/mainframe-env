@@ -6,24 +6,24 @@ use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{DataCategory, SemanticModel};
 
 pub(super) const START_CLAUSES: &[&str] = &[
-            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
-            "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
-        ];
+    "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES", "SECONDS",
+    "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
+];
 pub(super) const RETRIEVE_CLAUSES: &[&str] = &[
-            "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
-        ];
+    "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
+];
 
 pub(super) const DELAY_CLAUSES: &[&str] = &[
-            "INTERVAL",
-            "TIME",
-            "HOURS",
-            "MINUTES",
-            "SECONDS",
-            "MILLISECS",
-            "REQID",
-            "RESP",
-            "RESP2",
-        ];
+    "INTERVAL",
+    "TIME",
+    "HOURS",
+    "MINUTES",
+    "SECONDS",
+    "MILLISECS",
+    "REQID",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,

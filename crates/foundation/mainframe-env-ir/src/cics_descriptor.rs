@@ -619,7 +619,9 @@ mod registry_lookup;
 pub use registry_lookup::cics_application_registry_for_runtime_operation;
 
 mod terminal_effects;
-use terminal_effects::{OUTBOARD_READ_EFFECTS, OUTBOARD_WAIT_EFFECTS, OUTBOARD_WRITE_EFFECTS, ROUTE_EFFECTS};
+use terminal_effects::{
+    OUTBOARD_READ_EFFECTS, OUTBOARD_WAIT_EFFECTS, OUTBOARD_WRITE_EFFECTS, ROUTE_EFFECTS,
+};
 mod executable;
 pub use executable::CICS_EXECUTABLE_DESCRIPTORS;
 
