@@ -7,6 +7,7 @@ use crate::retention::{
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
     UowRetentionMetadata,
 };
+use handlers::invoke_program_control as program;
 use handlers::invoke_terminal_control as terminal;
 pub use handlers::*;
 use handlers::{
@@ -1723,7 +1724,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 81);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 82);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -1731,9 +1732,8 @@ impl CicsService {
             }
             CicsCommandFamily::Time => handlers::invoke_time(self, run, &request),
             CicsCommandFamily::OperatorControl => handlers::invoke_operator(self, run, &request),
-            CicsCommandFamily::ProgramControl => {
-                handlers::invoke_program_control(self, run, &request)
-            }
+            CicsCommandFamily::NetworkControl => handlers::invoke_network(self, run, &request),
+            CicsCommandFamily::ProgramControl => program(self, run, &request),
             CicsCommandFamily::TerminalControl => terminal(self, run, &request),
             CicsCommandFamily::FileControl => handlers::invoke_file_control(self, run, &request),
             CicsCommandFamily::QueueControl => handlers::invoke_queue_control(self, run, &request),
@@ -12053,6 +12053,111 @@ mod tests {
         ));
         drop(store);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn extract_certificate_selects_owner_or_issuer_and_rejects_non_tcpip_task() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let args = BTreeMap::from([
+            ("CERTIFICATE".into(), argument(b"CERT-PTR")),
+            ("LENGTH".into(), argument(b"CERT-LEN")),
+            ("SERIALNUM".into(), argument(b"SERIAL-PTR")),
+            ("SERIALNUMLEN".into(), argument(b"SERIAL-LEN")),
+            ("COMMONNAME".into(), argument(b"NAME-PTR")),
+            ("COMMONNAMLEN".into(), argument(b"NAME-LEN")),
+            ("USERID".into(), argument(b"USER-X")),
+        ]);
+        let missing = request(CicsOperation::ExtractCertificate, args.clone(), 1);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 1),
+                missing
+            ),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 5,
+                ..
+            })
+        ));
+        let owner = CicsCertificateName {
+            common_name: b"CLIENT-EXAMPLE".to_vec(),
+            country: b"US".to_vec(),
+            state: Vec::new(),
+            locality: Vec::new(),
+            organization: b"EXAMPLE".to_vec(),
+            organization_unit: b"UNIT".to_vec(),
+        };
+        let mut issuer = owner.clone();
+        issuer.common_name = b"ISSUER-EXAMPLE".to_vec();
+        let der =
+            include_bytes!("../../../../conformance/0.9/cics/fixtures/cics-client-certificate.der")
+                .to_vec();
+        let context = CicsTcpipContext {
+            client_address: Some("192.0.2.10".parse().unwrap()),
+            server_address: Some("192.0.2.1".parse().unwrap()),
+            client_name: None,
+            server_name: None,
+            tcpip_service: "HTTP0001".into(),
+            port: 443,
+            authenticate: CicsTcpipAuthenticate::Certificauth,
+            privacy: CicsTcpipPrivacy::Required,
+            ssl_type: CicsTcpipSslType::Clientauth,
+            max_data_length: 65_536,
+            certificate: Some(CicsClientCertificate {
+                der: der.clone(),
+                serial_number: vec![1],
+                user_id: Some("IBMUSER".into()),
+                owner,
+                issuer,
+            }),
+        };
+        cics.bind_tcpip_context(&invocation, context).unwrap();
+        let mut owner_args = args.clone();
+        owner_args.insert("OPTION.OWNER".into(), cics_option());
+        let owner_request = request(CicsOperation::ExtractCertificate, owner_args, 2);
+        let owner_response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, owner_request.clone(), 2),
+                owner_request,
+            )
+            .unwrap();
+        assert_eq!(owner_response.outputs["CERTIFICATE"].bytes(), der);
+        assert_eq!(
+            owner_response.outputs["LENGTH"].bytes(),
+            der.len().to_string().as_bytes()
+        );
+        assert_eq!(owner_response.outputs["SERIALNUM"].bytes(), &[1]);
+        assert_eq!(owner_response.outputs["SERIALNUMLEN"].bytes(), b"1");
+        assert_eq!(
+            owner_response.outputs["COMMONNAME"].bytes(),
+            b"CLIENT-EXAMPLE"
+        );
+        assert_eq!(owner_response.outputs["USERID"].bytes(), b"IBMUSER ");
+
+        let mut issuer_args = args;
+        issuer_args.insert("OPTION.ISSUER".into(), cics_option());
+        let issuer_request = request(CicsOperation::ExtractCertificate, issuer_args.clone(), 3);
+        let issuer_response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, issuer_request.clone(), 3),
+                issuer_request,
+            )
+            .unwrap();
+        assert_eq!(
+            issuer_response.outputs["COMMONNAME"].bytes(),
+            b"ISSUER-EXAMPLE"
+        );
+        issuer_args.insert("OPTION.OWNER".into(), cics_option());
+        let conflict = request(CicsOperation::ExtractCertificate, issuer_args, 4);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, conflict.clone(), 4),
+                conflict
+            ),
+            Err(HostProblem::Malformed)
+        );
     }
 
     #[test]

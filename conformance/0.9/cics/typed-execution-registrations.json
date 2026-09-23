@@ -130,6 +130,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
     },
     {
+      "operation": "ExtractCertificate",
+      "interface": "api",
+      "family": "network-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0070"
+    },
+    {
       "operation": "Freemain",
       "interface": "api",
       "family": "storage-control",

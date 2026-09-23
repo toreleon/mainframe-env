@@ -23,11 +23,18 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `EXTRACT CERTIFICATE` for row `0070`. It reads the
+  immutable, task-owned TLS client certificate, returns checked virtual
+  pointers and source-defined lengths/USERID, selects owner or issuer fields,
+  rejects non-TCP/IP tasks with INVREQ 16/5, and expires pointer storage at the
+  next CICS command. A compiled COBOL route verifies the selected provider,
+  EIBFN, RESP/RESP2, and pointer lifetime.
+
 - Added a strict task-owned TCP/IP ingress and client-certificate context for
-  the pending `EXTRACT TCPIP` and `EXTRACT CERTIFICATE` routes. Trusted host
+  the `EXTRACT TCPIP` and `EXTRACT CERTIFICATE` routes. Trusted host
   registration is immutable, survives SQLite reopen, rejects malformed
   connection/certificate envelopes, and releases with the CICS task. Both
-  command rows remain unready while typed outputs and their source numeric
+  `EXTRACT TCPIP` remains unready while typed outputs and their source numeric
   CVDA representations are completed.
 
 - Added typed CICS `WRITE OPERATOR` for row `0256`. It persists a bounded

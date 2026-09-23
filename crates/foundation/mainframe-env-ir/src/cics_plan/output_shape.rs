@@ -29,6 +29,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::ExtractCertificate => matches!(
+            output,
+            CicsOutputName::Certificate(_) | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

@@ -97,6 +97,7 @@ TYPED_EXECUTION_FAMILIES = {
     "document-control": "DocumentControl",
     "journal-control": "JournalControl",
     "operator-control": "OperatorControl",
+    "network-control": "NetworkControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -164,6 +165,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
+    ("ExtractCertificate", "api", "network-control", False, f"{OFFICIAL_BASELINE}:api-commands:0070"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("Freemain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0084"),
     ("Freemain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0085"),
@@ -553,6 +555,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "BifDigest",
         "Deq",
         "Enq",
+        "ExtractCertificate",
         "FormatTime",
         "Freemain",
         "Freemain64",
@@ -846,6 +849,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
     "Assign": frozenset({"memory-write", "condition", "transaction"}),
+    "ExtractCertificate": frozenset({"memory-write", "condition", "transaction"}),
     "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
     "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
@@ -1110,6 +1114,7 @@ def _load_typed_execution_registrations(
         "DocumentRetrieve",
         "DocumentSet",
         "Enq",
+        "ExtractCertificate",
         "Freemain",
         "Freemain64",
         "Getmain",

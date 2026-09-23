@@ -1,16 +1,18 @@
 use super::*;
 use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
-    CICS_ASSIGN_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
-    CicsExecutableDescriptor, CicsOperandName, CicsOperandValue, CicsOperationContract,
-    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
-    Module, OperationCatalog, OperationSchema, OperationSemanticContract,
-    cics_executable_descriptor, cics_executable_descriptor_for_identity,
-    cobol_layout_definition_identity, decode_cics_effect_plan, verify_semantic_contracts,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_CERTIFICATE_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS,
+    CicsCertificateOutput, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
+    CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
+    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect, Module, OperationCatalog,
+    OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
+    decode_cics_effect_plan, verify_semantic_contracts,
 };
 
 mod address;
 mod assign;
+mod certificate;
 mod convert_time;
 mod legacy;
 mod names;
@@ -81,7 +83,9 @@ pub(super) fn write_response_state(
     {
         address::apply(machine, action)?;
     }
-    retrieve::prepare_load_allocation(machine, operation, response, outputs)
+    let load_base = retrieve::prepare_load_allocation(machine, operation, response, outputs)?;
+    certificate::apply_outputs(machine, operation, outputs, response)?;
+    Ok(load_base)
 }
 
 pub(super) use runtime_validation::into_payload_schema;
@@ -102,6 +106,11 @@ pub(super) fn write_runtime_output(
         return Ok(true);
     }
     if task_wait::apply_posted_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
+    if operation == CicsOperation::ExtractCertificate
+        && CicsCertificateOutput::from_name(name).is_some_and(CicsCertificateOutput::pointer)
+    {
         return Ok(true);
     }
     if name != "TASK.PRIORITY" {
@@ -269,6 +278,7 @@ pub(super) fn execute(
     let plan = plan(operation)?;
     validate_declared_slots(operation, &plan)?;
     validate_runtime_plan(machine, operation, &plan)?;
+    certificate::release_previous(machine);
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
     }
@@ -514,6 +524,9 @@ pub(super) fn execute(
             | CicsOutputName::SpoolToken
             | CicsOutputName::SpoolToFlength
             | CicsOutputName::Assign(_) => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::Certificate(_) => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => {

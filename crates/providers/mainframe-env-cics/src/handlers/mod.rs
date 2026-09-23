@@ -12,6 +12,7 @@ mod interval_control;
 mod journal_control;
 mod limits;
 mod network_context;
+mod network_control;
 mod operator_control;
 mod program_control;
 mod queue_control;
@@ -92,6 +93,7 @@ pub use network_context::{
     CicsCertificateName, CicsClientCertificate, CicsTcpipAuthenticate, CicsTcpipContext,
     CicsTcpipPrivacy, CicsTcpipSslType,
 };
+pub(super) use network_control::invoke as invoke_network;
 pub use operator_control::CICS_OPERATOR_WORK_GENERATION;
 pub use operator_control::CicsOperatorMessageView;
 pub(super) use operator_control::invoke as invoke_operator;

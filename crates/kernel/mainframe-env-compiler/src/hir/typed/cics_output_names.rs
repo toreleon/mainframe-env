@@ -1,4 +1,4 @@
-use mainframe_env_ir::CicsAssignOutput;
+use mainframe_env_ir::{CicsAssignOutput, CicsCertificateOutput};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
@@ -7,6 +7,7 @@ pub enum HirCicsOutputName {
     DigestResult,
     OperatorReply,
     OperatorReplyLength,
+    Certificate(CicsCertificateOutput),
     Commarea,
     Into,
     SetPointer,

@@ -20,6 +20,12 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
                 | CicsPlanOption::OperatorEventual
                 | CicsPlanOption::OperatorCritical
         ),
+        CicsPlanOperation::ExtractCertificate => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::CertificateOwner
+                | CicsPlanOption::CertificateIssuer
+        ),
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

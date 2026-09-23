@@ -5534,6 +5534,42 @@ mod tests {
     }
 
     #[test]
+    fn cics_extract_certificate_requires_checked_pointer_and_fullword_lengths() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CERTEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 CERT-PTR POINTER-32. 01 CERT-LEN PIC S9(9) COMP. 01 NAME-PTR POINTER-32. 01 NAME-LEN PIC S9(9) COMP. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS EXTRACT CERTIFICATE(CERT-PTR) LENGTH(CERT-LEN) COMMONNAME(NAME-PTR) COMMONNAMLEN(NAME-LEN) USERID(USER-X) OWNER END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("EXTRACT CERTIFICATE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed EXTRACT CERTIFICATE");
+        assert_eq!(command.operation, HirCicsOperation::ExtractCertificate);
+        assert!(command.options.contains(&HirCicsOption::CertificateOwner));
+        assert!(command.outputs.iter().any(|output| {
+            output.name
+                == HirCicsOutputName::Certificate(
+                    mainframe_env_ir::CicsCertificateOutput::Certificate,
+                )
+                && output.target.qualified_name == "CERT-PTR"
+        }));
+        for clause in [
+            "CERTIFICATE(CERT-PTR) OWNER ISSUER",
+            "CERTIFICATE(CERT-LEN)",
+            "CERTIFICATE(CERT-PTR) COMMONNAMLEN(USER-X)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCRT. DATA DIVISION. WORKING-STORAGE SECTION. 01 CERT-PTR POINTER-32. 01 CERT-LEN PIC S9(9) COMP. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS EXTRACT {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
+    #[test]
     fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. 01 MS-X PIC S9(9) COMP VALUE 250. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. EXEC CICS DELAY FOR MILLISECS(MS-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

@@ -1,6 +1,6 @@
 use super::{
-    CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem, CicsPlanOperation,
-    CicsPlanOption,
+    CicsAssignOutput, CicsCertificateOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem,
+    CicsPlanOperation, CicsPlanOption,
 };
 
 const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
@@ -37,6 +37,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::FormatTime => 16,
         CicsPlanOperation::ConvertTime => 154,
         CicsPlanOperation::WriteOperator => 159,
+        CicsPlanOperation::ExtractCertificate => 160,
         CicsPlanOperation::BifDeedit => 155,
         CicsPlanOperation::BifDigest => 156,
         CicsPlanOperation::Post => 158,
@@ -121,6 +122,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         16 => Ok(CicsPlanOperation::FormatTime),
         154 => Ok(CicsPlanOperation::ConvertTime),
         159 => Ok(CicsPlanOperation::WriteOperator),
+        160 => Ok(CicsPlanOperation::ExtractCertificate),
         155 => Ok(CicsPlanOperation::BifDeedit),
         156 => Ok(CicsPlanOperation::BifDigest),
         158 => Ok(CicsPlanOperation::Post),
@@ -462,6 +464,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::OperatorImmediate => 575,
         CicsPlanOption::OperatorEventual => 576,
         CicsPlanOption::OperatorCritical => 577,
+        CicsPlanOption::CertificateOwner => 578,
+        CicsPlanOption::CertificateIssuer => 579,
         CicsPlanOption::Update => 0,
         CicsPlanOption::Rollback => 1,
         CicsPlanOption::NoHandle => 2,
@@ -525,6 +529,8 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         575 => Ok(CicsPlanOption::OperatorImmediate),
         576 => Ok(CicsPlanOption::OperatorEventual),
         577 => Ok(CicsPlanOption::OperatorCritical),
+        578 => Ok(CicsPlanOption::CertificateOwner),
+        579 => Ok(CicsPlanOption::CertificateIssuer),
         0 => Ok(CicsPlanOption::Update),
         1 => Ok(CicsPlanOption::Rollback),
         2 => Ok(CicsPlanOption::NoHandle),
@@ -591,6 +597,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::DigestResult => 697,
         CicsOutputName::OperatorReply => 698,
         CicsOutputName::OperatorReplyLength => 699,
+        CicsOutputName::Certificate(output) => output.tag(),
         CicsOutputName::Milliseconds => 4,
         CicsOutputName::Mmddyy => 5,
         CicsOutputName::Mmddyyyy => 6,
@@ -642,6 +649,9 @@ pub(super) fn output_from_tag(value: u16) -> Result<CicsOutputName, CicsPlanCode
         697 => Ok(CicsOutputName::DigestResult),
         698 => Ok(CicsOutputName::OperatorReply),
         699 => Ok(CicsOutputName::OperatorReplyLength),
+        700..=716 => CicsCertificateOutput::from_tag(value)
+            .map(CicsOutputName::Certificate)
+            .ok_or(CicsPlanCodecProblem::Malformed),
         4 => Ok(CicsOutputName::Milliseconds),
         5 => Ok(CicsOutputName::Mmddyy),
         6 => Ok(CicsOutputName::Mmddyyyy),

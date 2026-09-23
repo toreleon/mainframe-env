@@ -6313,8 +6313,9 @@ mod tests {
     };
     use mainframe_env_cics::{
         CICS_DELAY_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
-        CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition, CicsEventPostMode,
-        CicsJavaStatus, CicsProgramDefinition,
+        CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition, CicsCertificateName,
+        CicsClientCertificate, CicsEventPostMode, CicsJavaStatus, CicsProgramDefinition,
+        CicsTcpipAuthenticate, CicsTcpipContext, CicsTcpipPrivacy, CicsTcpipSslType,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -17659,6 +17660,142 @@ mod tests {
         );
         server
             .run_online_exchange(&session, &principal, "ASSOC", 3)
+            .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
+    fn online_extract_certificate_reads_checked_client_certificate_pointers() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. CERTEXT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CERT-PTR POINTER-32.\n01 CERT-LEN PIC S9(9) COMP.\n01 NAME-PTR POINTER-32.\n01 NAME-LEN PIC S9(9) COMP.\n01 USER-X PIC X(8).\n01 FIRST-X PIC X(4).\n01 NAME-X PIC X(14).\n01 CERT-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 CERT-LINK PIC X(4).\n01 NAME-LINK PIC X(14).\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT CERTIFICATE(CERT-PTR) LENGTH(CERT-LEN) COMMONNAME(NAME-PTR) COMMONNAMLEN(NAME-LEN) USERID(USER-X) OWNER RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSET ADDRESS OF CERT-LINK TO CERT-PTR.\nSET ADDRESS OF NAME-LINK TO NAME-PTR.\nMOVE CERT-LINK TO FIRST-X.\nMOVE NAME-LINK TO NAME-X.\nMOVE EIBFN TO CERT-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let artifact = published_source_fixture("CERTEXT", std::str::from_utf8(source).unwrap());
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CERTEXT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CE00".into(), "CERTEXT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CERTEXT".into(),
+                    map: "CERTEXT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("certificate-extract", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CE00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CE00",
+                24,
+                80,
+                "certificate-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let der =
+            include_bytes!("../../../../conformance/0.9/cics/fixtures/cics-client-certificate.der");
+        let owner = CicsCertificateName {
+            common_name: b"CLIENT-EXAMPLE".to_vec(),
+            country: b"US".to_vec(),
+            state: Vec::new(),
+            locality: Vec::new(),
+            organization: b"EXAMPLE".to_vec(),
+            organization_unit: b"UNIT".to_vec(),
+        };
+        server
+            .cics
+            .bind_tcpip_context(
+                &invocation,
+                CicsTcpipContext {
+                    client_address: Some("192.0.2.10".parse().unwrap()),
+                    server_address: Some("192.0.2.1".parse().unwrap()),
+                    client_name: None,
+                    server_name: None,
+                    tcpip_service: "HTTP0001".into(),
+                    port: 443,
+                    authenticate: CicsTcpipAuthenticate::Certificauth,
+                    privacy: CicsTcpipPrivacy::Required,
+                    ssl_type: CicsTcpipSslType::Clientauth,
+                    max_data_length: 65_536,
+                    certificate: Some(CicsClientCertificate {
+                        der: der.to_vec(),
+                        serial_number: vec![1],
+                        user_id: Some("IBMUSER".into()),
+                        owner: owner.clone(),
+                        issuer: CicsCertificateName {
+                            common_name: b"ISSUER-EXAMPLE".to_vec(),
+                            ..owner
+                        },
+                    }),
+                },
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "CERTEXT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CERTEXT", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("FIRST-X").unwrap().bytes(), &der[..4]);
+        assert_eq!(
+            restored.variable("NAME-X").unwrap().bytes(),
+            b"CLIENT-EXAMPLE"
+        );
+        assert_eq!(
+            restored.variable("CERT-LEN").unwrap().bytes(),
+            &(der.len() as u32).to_be_bytes()
+        );
+        assert_eq!(
+            restored.variable("NAME-LEN").unwrap().bytes(),
+            &14u32.to_be_bytes()
+        );
+        assert_eq!(restored.variable("USER-X").unwrap().bytes(), b"IBMUSER ");
+        assert_eq!(restored.variable("CERT-FN").unwrap().bytes(), &[0x3e, 0x10]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
+        assert!(restored.variable("CERT-LINK").is_none());
+        assert!(restored.variable("NAME-LINK").is_none());
+        server
+            .run_online_exchange(&session, &principal, "CERTEXT", 3)
             .unwrap();
         assert!(server.online_exchange(&session).unwrap().is_none());
     }

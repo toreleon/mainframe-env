@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:669332e6ffbebb7923ec69b32a622130ab99bf259b522e7080c5d0380208155d",
+      "sha256": "sha256:6b00ac2811c79e3f8ebfdaa0a1f9a863bfa70454c048aa3ae24ed7da386c31a4",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -749,8 +749,8 @@
       "path": "docs/decisions/0014-cics-tcpip-ingress-context.md",
       "relative_links": 0,
       "scope": "EXTRACT TCPIP and EXTRACT CERTIFICATE task context",
-      "sha256": "sha256:c97af9811901a24cf9c76322fa08e2e05affa31dfbdc046cac3eba5f77f72461",
-      "status": "Proposed for v0.9 development; executable routes pending",
+      "sha256": "sha256:8deca0145810b67dd7d16fd3273fe491ee98b5c73157e556f654b1801cd2ed66",
+      "status": "Accepted for v0.9 development; EXTRACT CERTIFICATE executable",
       "title": "ADR-0014: Keep CICS TCP/IP and certificate facts in trusted ingress context",
       "xtask_commands": 0
     },
@@ -1098,7 +1098,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:acc88a002868a93fcbe70771d72b794695569585dcb0e91f4109d67081c910a4",
+      "sha256": "sha256:c5f6a695ab23be71c9cac640f4d0f65970b1591e9b3d9eeb3244048e52fe87a1",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

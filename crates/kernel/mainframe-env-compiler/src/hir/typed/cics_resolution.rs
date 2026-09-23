@@ -18,6 +18,7 @@ mod abend;
 mod address;
 mod assign_validation;
 mod builtin_function;
+mod certificate_control;
 mod clause_parser;
 mod command_recognition;
 mod convert_time;
@@ -280,6 +281,9 @@ fn validate_candidate(
             (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
                 if descriptor.runtime_operation == Some("WriteOperator")
                     && matches!(*name, "ACTION" | "REPLY" | "REPLYLENGTH") => {}
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("ExtractCertificate")
+                    && certificate_control::bounded_output_name(name) => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
                 return Err(format!(
                     "CICS {} option {name} has a source-bounded operand shape",
@@ -711,6 +715,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP",
             "RESP2",
         ],
+        HirCicsOperation::ExtractCertificate => certificate_control::ALLOWED_CLAUSES,
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
@@ -793,6 +798,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Post => &["AFTER", "AT", "NOHANDLE"],
         HirCicsOperation::WriteOperator => &["IMMEDIATE", "EVENTUAL", "CRITICAL", "NOHANDLE"],
+        HirCicsOperation::ExtractCertificate => &["OWNER", "ISSUER", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
         HirCicsOperation::ConvertTime => &["NOHANDLE"],
@@ -928,6 +934,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Post => &["SET"][..],
         HirCicsOperation::WriteOperator => &["TEXT"][..],
+        HirCicsOperation::ExtractCertificate => &["CERTIFICATE"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
@@ -1135,6 +1142,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::WriteOperator {
         outputs.extend(operator_control::outputs(&clauses, semantic)?);
     }
+    outputs.extend(certificate_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {

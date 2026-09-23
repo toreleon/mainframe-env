@@ -7,6 +7,7 @@ use std::fmt;
 mod address;
 mod assign;
 mod browse;
+mod certificate;
 mod codec_tags;
 mod document_control;
 mod file_mutation;
@@ -27,6 +28,7 @@ mod transform_control;
 mod write_operator;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
+pub use certificate::{CICS_CERTIFICATE_OUTPUT_NAMES, CicsCertificateOutput};
 pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
 
 use codec_tags::{
@@ -64,7 +66,7 @@ impl Default for CicsPlanLimits {
             max_encoded_bytes: 1024 * 1024,
             max_operands: 32,
             max_options: 16,
-            max_outputs: 16,
+            max_outputs: 32,
             max_literal_bytes: 1024 * 1024,
             max_qualified_name_bytes: 1024,
         }
@@ -505,6 +507,15 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::Post => post::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::WriteOperator => write_operator::invalid_shape(plan, inputs, outputs),
+        CicsPlanOperation::ExtractCertificate => {
+            !inputs.is_empty()
+                || !outputs.contains(&CicsOutputName::Certificate(
+                    CicsCertificateOutput::Certificate,
+                ))
+                || plan.options.contains(&CicsPlanOption::CertificateOwner)
+                    && plan.options.contains(&CicsPlanOption::CertificateIssuer)
+                || scheduling_options
+        }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -3685,6 +3696,60 @@ mod tests {
         });
         assert_eq!(
             encode_cics_effect_plan(&conflicting_action, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn extract_certificate_uses_v2_output_tags_and_owner_issuer_exclusion() {
+        let limits = CicsPlanLimits::default();
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::ExtractCertificate,
+            operands: Vec::new(),
+            options: BTreeSet::from([CicsPlanOption::CertificateOwner]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Certificate(CicsCertificateOutput::Certificate),
+                    target: slot(1, "CERT-PTR"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Certificate(CicsCertificateOutput::Length),
+                    target: slot(2, "CERT-LEN"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&bytes[4..8], &[0, 2, 0, 160]);
+        assert_eq!(
+            output_tag(CicsOutputName::Certificate(
+                CicsCertificateOutput::Certificate
+            )),
+            700
+        );
+        assert_eq!(option_tag(CicsPlanOption::CertificateOwner), 578);
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(encode_cics_effect_plan(&plan, limits), Ok(bytes.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut malformed = plan.clone();
+        malformed.options.insert(CicsPlanOption::CertificateIssuer);
+        assert_eq!(
+            encode_cics_effect_plan(&malformed, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        malformed = plan;
+        malformed.outputs.remove(0);
+        assert_eq!(
+            encode_cics_effect_plan(&malformed, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut unknown = bytes;
+        unknown[6..8].copy_from_slice(&165u16.to_be_bytes());
+        assert_eq!(
+            decode_cics_effect_plan(&unknown, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

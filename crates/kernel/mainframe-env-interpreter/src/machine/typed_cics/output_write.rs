@@ -34,6 +34,12 @@ pub(in crate::machine) fn write_output(
             | "TYPENAMELEN"
             | "TYPENSLEN"
     ) && value.schema() != "mainframe-env.cics.decimal@1"
+        || operation == CicsOperation::ExtractCertificate
+            && CicsCertificateOutput::from_name(name).is_some_and(CicsCertificateOutput::length)
+            && value.schema() != "mainframe-env.cics.decimal@1"
+        || operation == CicsOperation::ExtractCertificate
+            && name == "USERID"
+            && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && operation == CicsOperation::Read
             && value.schema() != "mainframe-env.cics.decimal@1"

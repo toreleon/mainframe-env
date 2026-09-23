@@ -85,5 +85,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::WaitCics => &CICS_EXECUTABLE_DESCRIPTORS[76],
         CicsPlanOperation::Post => &CICS_EXECUTABLE_DESCRIPTORS[77],
         CicsPlanOperation::WriteOperator => &CICS_EXECUTABLE_DESCRIPTORS[78],
+        CicsPlanOperation::ExtractCertificate => &CICS_EXECUTABLE_DESCRIPTORS[79],
     }
 }

@@ -30,6 +30,8 @@ pub enum CicsOperation {
     Post,
     /// Write one system-console message and optionally await its reply.
     WriteOperator,
+    /// Return fields from the accepted client certificate of this TCP/IP task.
+    ExtractCertificate,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -166,6 +168,7 @@ impl CicsOperation {
             Self::Delay => "Delay",
             Self::Post => "Post",
             Self::WriteOperator => "WriteOperator",
+            Self::ExtractCertificate => "ExtractCertificate",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -328,6 +331,7 @@ impl CicsOperation {
             ("DELAY", _) => Self::Delay,
             ("POST", _) => Self::Post,
             ("WRITE", Some("OPERATOR")) => Self::WriteOperator,
+            ("EXTRACT", Some("CERTIFICATE")) => Self::ExtractCertificate,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
