@@ -375,6 +375,16 @@ fn compiled_freemain64_pointer_and_bound_data_release_checkpointed_storage() {
             restored.snapshot().storage64_area_bindings.len(),
             usize::from(data_form)
         );
+        if data_form {
+            let mut forged = machine.snapshot();
+            forged
+                .storage64_area_bindings
+                .insert("AREA-X".into(), address + 1);
+            let mut rejected =
+                ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default())
+                    .unwrap();
+            assert!(rejected.restore(forged).is_err());
+        }
 
         let release = loop {
             match restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
