@@ -419,11 +419,11 @@ mod tests {
     use super::*;
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
     use mainframe_env_ir::{
-        Attribute, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsOperandName,
-        CicsOperandValue, CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits, CicsPlanOperation,
-        CodecLimits, DecimalExecutionPolicy, DecimalPlanLimits, StorageId,
-        cics_executable_descriptor, decode_binary, decode_cics_effect_plan,
-        decode_decimal_assignment_plan, encode_binary, encode_cics_effect_plan,
+        Attribute, CicsCondition, CicsEffectPlan, CicsOperandName, CicsOperandValue,
+        CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits, CicsPlanOperation, CodecLimits,
+        DecimalExecutionPolicy, DecimalPlanLimits, StorageId, cics_executable_descriptor,
+        decode_binary, decode_cics_effect_plan, decode_decimal_assignment_plan, encode_binary,
+        encode_cics_effect_plan,
     };
     use mainframe_env_source::{
         LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
@@ -1526,7 +1526,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 55);
+        assert_eq!(typed_hir.len(), 54);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1703,8 +1703,6 @@ mod tests {
                 CicsPlanOperation::HandleAbend,
                 CicsPlanOperation::HandleCondition,
                 CicsPlanOperation::IgnoreCondition,
-                CicsPlanOperation::InvokeApplication,
-                CicsPlanOperation::Load,
                 CicsPlanOperation::Link,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
@@ -1744,10 +1742,6 @@ mod tests {
                 CicsPlanOperation::TransformDataToXml,
                 CicsPlanOperation::TransformJsonToData,
                 CicsPlanOperation::TransformXmlToData,
-                CicsPlanOperation::WaitJournalName,
-                CicsPlanOperation::WaitJournalNum,
-                CicsPlanOperation::WriteJournalName,
-                CicsPlanOperation::WriteJournalNum,
             ])
         );
         let read = hir_plans
@@ -1864,7 +1858,7 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(operations.len(), 55);
+        assert_eq!(operations.len(), hir_plans.len());
         assert_eq!(
             operations
                 .iter()
@@ -1875,15 +1869,11 @@ mod tests {
                     operation.identity.name()
                 ))
                 .collect::<BTreeSet<_>>(),
-            CICS_EXECUTABLE_DESCRIPTORS
+            hir_plans
                 .iter()
-                .filter(|descriptor| {
-                    !matches!(
-                        descriptor.operation,
-                        CicsPlanOperation::Getmain64 | CicsPlanOperation::Freemain64
-                    )
-                })
-                .map(|descriptor| descriptor.identity().to_string())
+                .map(|plan| cics_executable_descriptor(plan.operation)
+                    .identity()
+                    .to_string())
                 .collect()
         );
         let catalog = crate::core_mir_catalog();

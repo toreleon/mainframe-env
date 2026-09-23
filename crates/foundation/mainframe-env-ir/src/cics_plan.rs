@@ -4332,6 +4332,16 @@ mod tests {
             decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
             Ok(plan.clone())
         );
+        let legacy =
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION)
+                .unwrap();
+        assert_eq!(legacy[6], 75);
+        let migrated = decode_cics_effect_plan(&legacy, CicsPlanLimits::default()).unwrap();
+        assert_eq!(migrated, plan);
+        assert_eq!(
+            encode_cics_effect_plan(&migrated, CicsPlanLimits::default()),
+            Ok(bytes)
+        );
         let mut read = read_plan();
         read.outputs.push(CicsOutputBinding {
             name: CicsOutputName::Token,
@@ -4342,6 +4352,15 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan(&decoded, CicsPlanLimits::default()),
             Ok(read_bytes)
+        );
+        let legacy_read =
+            encode_cics_effect_plan_version(&read, CicsPlanLimits::default(), LEGACY_VERSION)
+                .unwrap();
+        let migrated_read =
+            decode_cics_effect_plan(&legacy_read, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            encode_cics_effect_plan(&migrated_read, CicsPlanLimits::default()),
+            encode_cics_effect_plan(&read, CicsPlanLimits::default())
         );
         let mut forged = plan;
         forged.operands[1].value = CicsOperandValue::Integer(1);

@@ -3374,7 +3374,7 @@ mod tests {
             ("WRITE FILE('ACCTDAT') RIDFLD(KEY-X)", "requires FROM"),
             (
                 "DELETE FILE('ACCTDAT') RIDFLD(KEY-X) TOKEN(KEY-X)",
-                "unready for TOKEN",
+                "TOKEN and RIDFLD are mutually exclusive",
             ),
         ] {
             let analysis = analyze(&format!(
