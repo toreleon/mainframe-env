@@ -127,5 +127,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::RetrieveSubevent => &CICS_EXECUTABLE_DESCRIPTORS[103],
         CicsPlanOperation::TestEvent => &CICS_EXECUTABLE_DESCRIPTORS[104],
         CicsPlanOperation::SignalEvent => &CICS_EXECUTABLE_DESCRIPTORS[105],
+        CicsPlanOperation::EnterTraceNum => &CICS_EXECUTABLE_DESCRIPTORS[106],
     }
 }

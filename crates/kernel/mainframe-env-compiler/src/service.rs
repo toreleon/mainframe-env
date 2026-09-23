@@ -1886,6 +1886,7 @@ mod tests {
                 CicsPlanOperation::SpoolOpenOutput => crate::HirCicsOperation::SpoolOpenOutput,
                 CicsPlanOperation::SpoolRead => crate::HirCicsOperation::SpoolRead,
                 CicsPlanOperation::SpoolWrite => crate::HirCicsOperation::SpoolWrite,
+                CicsPlanOperation::EnterTraceNum => crate::HirCicsOperation::EnterTraceNum,
                 CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
                 CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
                 CicsPlanOperation::WaitEvent => crate::HirCicsOperation::WaitEvent,

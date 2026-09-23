@@ -139,6 +139,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::RewindDCounter => 127,
         CicsPlanOperation::UpdateCounter => 128,
         CicsPlanOperation::UpdateDCounter => 129,
+        CicsPlanOperation::EnterTraceNum => 151,
     }
 }
 
@@ -265,6 +266,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         127 => Ok(CicsPlanOperation::RewindDCounter),
         128 => Ok(CicsPlanOperation::UpdateCounter),
         129 => Ok(CicsPlanOperation::UpdateDCounter),
+        151 => Ok(CicsPlanOperation::EnterTraceNum),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -475,6 +477,10 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::CounterIncrement => 389,
         CicsOperandName::CounterCompareMin => 390,
         CicsOperandName::CounterCompareMax => 391,
+        CicsOperandName::TraceNum => 576,
+        CicsOperandName::TraceFrom => 577,
+        CicsOperandName::TraceFromLength => 578,
+        CicsOperandName::TraceResource => 579,
     }
 }
 
@@ -684,6 +690,10 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         389 => Ok(CicsOperandName::CounterIncrement),
         390 => Ok(CicsOperandName::CounterCompareMin),
         391 => Ok(CicsOperandName::CounterCompareMax),
+        576 => Ok(CicsOperandName::TraceNum),
+        577 => Ok(CicsOperandName::TraceFrom),
+        578 => Ok(CicsOperandName::TraceFromLength),
+        579 => Ok(CicsOperandName::TraceResource),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -785,6 +795,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::CounterNoSuspend => 316,
         CicsPlanOption::CounterReduce => 317,
         CicsPlanOption::CounterWrap => 318,
+        CicsPlanOption::TraceException => 508,
     }
 }
 
@@ -885,6 +896,7 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         316 => Ok(CicsPlanOption::CounterNoSuspend),
         317 => Ok(CicsPlanOption::CounterReduce),
         318 => Ok(CicsPlanOption::CounterWrap),
+        508 => Ok(CicsPlanOption::TraceException),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

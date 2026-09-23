@@ -1,5 +1,7 @@
 use super::*;
 
+const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
+
 /// Static executable facts owned by the typed CICS dialect.
 ///
 /// Option direction and operation-specific plan shape remain owned by the
@@ -338,7 +340,7 @@ pub fn cics_application_registry_for_tokens(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 121] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 122] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1081,6 +1083,11 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 121] = [
         name: "update-dcounter",
         major: 1,
         effects: COUNTER_EFFECTS,
+        operation: CicsPlanOperation::EnterTraceNum,
+        namespace: "cics.diagnostics",
+        name: "enter-tracenum",
+        major: 1,
+        effects: DIAGNOSTIC_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
     CicsExecutableDescriptor {

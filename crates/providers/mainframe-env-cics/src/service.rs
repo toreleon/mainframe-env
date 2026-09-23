@@ -1748,7 +1748,8 @@ impl CicsService {
             CicsCommandFamily::TransformControl
             | CicsCommandFamily::JournalControl
             | CicsCommandFamily::WebServiceControl
-            | CicsCommandFamily::EventControl => handlers::invoke_extended_control(
+            | CicsCommandFamily::EventControl
+            | CicsCommandFamily::Diagnostics => handlers::invoke_extended_control(
                 self,
                 run,
                 &request,
@@ -3868,6 +3869,7 @@ mod tests {
         deny_journal: bool,
         deny_event: bool,
         deny_counter: bool,
+        deny_diagnostic: bool,
         deny_dataset: bool,
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
@@ -4007,6 +4009,7 @@ mod tests {
                             || self.deny_journal && class == "JOURNAL"
                             || self.deny_event && matches!(class.as_str(), "BTSEVENT" | "EVENT")
                             || self.deny_counter && class == "COUNTER"
+                            || self.deny_diagnostic && class == "CICSDIAG"
                             || self.deny_dataset && class == "DATASET"
                             || self.deny_surrogate && class == "SURROGAT"
                         {
@@ -4314,6 +4317,7 @@ mod tests {
 
             deny_event: false,
             deny_counter: false,
+            deny_diagnostic: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4342,6 +4346,7 @@ mod tests {
 
             deny_event: false,
             deny_counter: false,
+            deny_diagnostic: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4392,6 +4397,7 @@ mod tests {
             deny_journal: false,
             deny_event,
             deny_counter: false,
+            deny_diagnostic: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4409,6 +4415,17 @@ mod tests {
     }
 
     fn counter_authorities(deny_counter: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        counter_and_diagnostic_authorities(deny_counter, false)
+    }
+
+    fn diagnostic_authorities(deny_diagnostic: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        counter_and_diagnostic_authorities(false, deny_diagnostic)
+    }
+
+    fn counter_and_diagnostic_authorities(
+        deny_counter: bool,
+        deny_diagnostic: bool,
+    ) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let provider = Arc::new(CommandSecurityAuthority {
             descriptor: descriptor("host.security.authorize"),
@@ -4418,6 +4435,7 @@ mod tests {
 
             deny_event: false,
             deny_counter,
+            deny_diagnostic,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4446,6 +4464,7 @@ mod tests {
 
             deny_event: false,
             deny_counter: false,
+            deny_diagnostic: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4478,6 +4497,7 @@ mod tests {
 
                 deny_event: false,
                 deny_counter: false,
+                deny_diagnostic: false,
                 deny_dataset: false,
                 deny_surrogate,
                 principal_decision,
@@ -4533,6 +4553,7 @@ mod tests {
 
             deny_event: false,
             deny_counter: false,
+            deny_diagnostic: false,
             deny_dataset: true,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -15127,6 +15148,107 @@ mod tests {
             assert_eq!(service.diagnostic_snapshot().unwrap().version, 2);
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn enter_tracenum_validates_flags_bounds_and_replays_retained_bytes() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        let (invocation, _) = registered(&service);
+        let arguments = BTreeMap::from([
+            ("TRACENUM".into(), cics_decimal(123)),
+            ("FROM".into(), enqueue_value(b"EXAMPLE!")),
+            ("FROMLENGTH".into(), cics_decimal(4)),
+            ("RESOURCE".into(), cics_literal(b"PROGRAM1")),
+        ]);
+        let mut disabled = request(CicsOperation::EnterTraceNum, arguments.clone(), 1);
+        disabled.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, disabled.clone(), 1),
+                disabled,
+            )
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response, result.response2),
+            ("INVREQ", 16, 3)
+        );
+        assert!(service.diagnostic_snapshot().unwrap().traces.is_empty());
+
+        let mut exception_arguments = arguments.clone();
+        exception_arguments.insert("OPTION.EXCEPTION".into(), cics_option());
+        let exception = request(CicsOperation::EnterTraceNum, exception_arguments, 2);
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, exception.clone(), 2),
+                exception.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.traces.len(), 1);
+        assert_eq!(snapshot.traces[0].data, b"EXAM");
+        assert_eq!(snapshot.traces[0].kind, "TRACENUM:INTERNAL");
+        assert!(snapshot.traces[0].exception);
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-2", 1)
+            .unwrap();
+        let replayed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, exception.clone(), 2),
+                exception,
+            )
+            .unwrap();
+        assert_eq!(replayed, first);
+        assert_eq!(service.diagnostic_snapshot().unwrap().traces.len(), 1);
+
+        let mut bad = request(CicsOperation::EnterTraceNum, arguments, 3);
+        bad.arguments.insert("TRACENUM".into(), cics_decimal(200));
+        bad.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, bad.clone(), 3), bad)
+            .unwrap();
+        assert_eq!((result.response, result.response2), (16, 1));
+    }
+
+    #[test]
+    fn enter_tracenum_denial_precedes_durable_mutation() {
+        let (authorities, seen) = diagnostic_authorities(true);
+        let service = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut denied = request(
+            CicsOperation::EnterTraceNum,
+            BTreeMap::from([
+                ("TRACENUM".into(), cics_decimal(12)),
+                ("OPTION.EXCEPTION".into(), cics_option()),
+            ]),
+            1,
+        );
+        denied.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied)
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response),
+            ("NOTAUTH", 70)
+        );
+        assert!(service.diagnostic_snapshot().unwrap().traces.is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "CICSDIAG"
+                        && resource == "CICS.DIAG.TRACE"
+                        && *intent == AccessIntent::Update
+                })
+        );
     }
 
     fn open_staged_spool_report(

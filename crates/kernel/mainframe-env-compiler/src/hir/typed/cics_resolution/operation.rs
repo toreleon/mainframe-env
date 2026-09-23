@@ -98,6 +98,7 @@ pub(super) fn resolve(
         ["SPOOLOPEN", "OUTPUT"] => HirCicsOperation::SpoolOpenOutput,
         ["SPOOLREAD"] => HirCicsOperation::SpoolRead,
         ["SPOOLWRITE"] => HirCicsOperation::SpoolWrite,
+        ["ENTER", "TRACENUM"] => HirCicsOperation::EnterTraceNum,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,
@@ -217,6 +218,7 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "EXACTMATCH" => HirCicsOption::ExactMatch,
         "MINIMUM" => HirCicsOption::Minimum,
         "HOLD" => HirCicsOption::Hold,
+        "EXCEPTION" => HirCicsOption::TraceException,
         _ => super::spool_control::option(option).expect("allowed CICS option"),
     }
 }

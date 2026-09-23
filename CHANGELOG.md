@@ -101,8 +101,10 @@ All notable changes to mainframe-env are documented here.
   `dfhp4_definecounter.html`, catalog rows 0034 and 0035.
 - Added a bounded durable CICS diagnostics authority with a versioned state
   codec, trace-destination configuration, retained diagnostic snapshots, and
-  strict malformed/capacity checks. Command registration follows in separate
-  diagnostics slices.
+  strict malformed/capacity checks. ENTER TRACENUM now writes bounded, durable
+  numeric user trace entries with the IBM exception override and exact
+  INVREQ/LENGERR response codes. Source: CICS TS 6.x application API sources-a,
+  `dfhp4_entertracenum.html`, catalog row 0066.
 
 - Added typed CICS `DEFINE COMPOSITE EVENT` with exclusive AND/OR predicates,
   up to eight initial atomic children, durable child ownership and reevaluation,

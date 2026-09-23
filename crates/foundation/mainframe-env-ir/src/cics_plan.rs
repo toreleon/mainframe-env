@@ -9,6 +9,7 @@ mod assign;
 mod browse;
 mod codec_tags;
 mod counter_control;
+mod diagnostics;
 mod document_control;
 mod event_control;
 mod file_mutation;
@@ -676,6 +677,7 @@ fn validate_operation_shape(
         CicsPlanOperation::UpdateCounter | CicsPlanOperation::UpdateDCounter => {
             counter_control::invalid_update_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::EnterTraceNum => diagnostics::invalid_trace_num_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2499,6 +2501,38 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
             Ok(output)
+        );
+    }
+
+    #[test]
+    fn enter_tracenum_uses_reserved_v2_tags_and_checked_shape() {
+        assert_eq!(operation_tag(CicsPlanOperation::EnterTraceNum), 151);
+        assert_eq!(operand_tag(CicsOperandName::TraceNum), 576);
+        assert_eq!(operand_tag(CicsOperandName::TraceFrom), 577);
+        assert_eq!(operand_tag(CicsOperandName::TraceFromLength), 578);
+        assert_eq!(operand_tag(CicsOperandName::TraceResource), 579);
+        assert_eq!(option_tag(CicsPlanOption::TraceException), 508);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::EnterTraceNum,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::TraceNum,
+                value: CicsOperandValue::Integer(123),
+            }],
+            options: BTreeSet::from([CicsPlanOption::TraceException]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(&encoded[..6], b"MCEP\0\x02");
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut invalid = plan;
+        invalid.operands[0].name = CicsOperandName::TraceResource;
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

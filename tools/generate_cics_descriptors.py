@@ -93,6 +93,7 @@ EXPECTED_FAMILIES = {
     "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "diagnostics": "Diagnostics",
     "document-control": "DocumentControl",
     "event-control": "EventControl",
     "journal-control": "JournalControl",
@@ -289,6 +290,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("SpoolRead", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0203"),
     ("SpoolWrite", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0204"),
     ("RemoveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0166"),
+    ("EnterTraceNum", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0066"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -686,6 +688,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SpoolOpenOutput",
         "SpoolRead",
         "SpoolWrite",
+        "EnterTraceNum",
         "Suspend",
         "WaitEvent",
         "WaitExternal",
@@ -1068,6 +1071,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "SpoolWrite": frozenset(
         {"spool", "memory-read", "memory-write", "condition", "transaction"}
     ),
+    "EnterTraceNum": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1309,6 +1315,7 @@ def _load_typed_execution_registrations(
         "DocumentRetrieve",
         "DocumentSet",
         "Enq",
+        "EnterTraceNum",
         "Freemain",
         "Freemain64",
         "Getmain",

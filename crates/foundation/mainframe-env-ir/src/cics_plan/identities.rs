@@ -188,6 +188,8 @@ pub enum CicsPlanOperation {
     SpoolRead,
     /// Append one record to an output spool report.
     SpoolWrite,
+    /// Write one numeric user trace entry to the active local destinations.
+    EnterTraceNum,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -634,6 +636,10 @@ pub enum CicsOperandName {
     SpoolMaxFlength,
     /// SPOOLWRITE record source.
     SpoolFrom,
+    TraceNum,
+    TraceFrom,
+    TraceFromLength,
+    TraceResource,
     /// Optional SPOOLWRITE transfer length.
     SpoolFlength,
 }
@@ -790,6 +796,7 @@ pub enum CicsPlanOption {
     SpoolLine,
     /// Write a page-mode spool record.
     SpoolPage,
+    TraceException,
 }
 
 /// Named result binding written after the host result arrives.

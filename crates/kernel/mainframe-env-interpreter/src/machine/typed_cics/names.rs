@@ -139,6 +139,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::CounterIncrement
         | CicsOperandName::CounterCompareMin
         | CicsOperandName::CounterCompareMax => SlotUse::CounterNumber,
+        CicsOperandName::TraceNum | CicsOperandName::TraceFromLength => SlotUse::HalfwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -288,6 +289,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SpoolOpenOutput => CicsOperation::SpoolOpenOutput,
         CicsPlanOperation::SpoolRead => CicsOperation::SpoolRead,
         CicsPlanOperation::SpoolWrite => CicsOperation::SpoolWrite,
+        CicsPlanOperation::EnterTraceNum => CicsOperation::EnterTraceNum,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -528,6 +530,10 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::CounterIncrement => "INCREMENT",
         CicsOperandName::CounterCompareMin => "COMPAREMIN",
         CicsOperandName::CounterCompareMax => "COMPAREMAX",
+        CicsOperandName::TraceNum => "TRACENUM",
+        CicsOperandName::TraceFrom => "FROM",
+        CicsOperandName::TraceFromLength => "FROMLENGTH",
+        CicsOperandName::TraceResource => "RESOURCE",
     }
 }
 
@@ -704,5 +710,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::TimerOn => "ON",
         CicsPlanOption::AcqActivity => "ACQACTIVITY",
         CicsPlanOption::AcqProcess => "ACQPROCESS",
+        CicsPlanOption::TraceException => "EXCEPTION",
     }
 }

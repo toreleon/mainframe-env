@@ -20,6 +20,7 @@ mod assign_validation;
 mod clause_parser;
 mod command_recognition;
 mod counter_control;
+mod diagnostics;
 mod document_control;
 mod event_control;
 mod file_operands;
@@ -712,6 +713,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolOpenOutput
         | HirCicsOperation::SpoolRead
         | HirCicsOperation::SpoolWrite => spool_control::allowed_clauses(operation),
+        HirCicsOperation::EnterTraceNum => diagnostics::allowed_clauses(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -808,6 +810,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolOpenOutput
         | HirCicsOperation::SpoolRead
         | HirCicsOperation::SpoolWrite => spool_control::allowed_options(operation),
+        HirCicsOperation::EnterTraceNum => diagnostics::allowed_options(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -951,6 +954,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SpoolOpenOutput
         | HirCicsOperation::SpoolRead
         | HirCicsOperation::SpoolWrite => spool_control::required(operation),
+        HirCicsOperation::EnterTraceNum => diagnostics::required(operation),
         _ => {
             command_shape
                 .as_ref()
@@ -970,6 +974,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation,
         semantic,
     )?);
+    operands.extend(diagnostics::operands(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Abend
         && let Some(operand) = abend::operand(&clauses, semantic)?
     {

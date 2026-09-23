@@ -346,6 +346,12 @@ aggregate encoded bytes, replay keys, and each captured payload. Command
 handlers use this state through versioned compare-and-swap writes, so later
 diagnostic commands can retain exact results across SQLite reopen and a
 post-dispatch retry without adding state to the frozen CICS service root.
+`ENTER TRACENUM` requires a halfword numeric identifier in 0–199 and accepts
+an optional eight-character resource, source bytes, and halfword length in
+0–4000. A normal entry needs the user flag and an active destination;
+`EXCEPTION` always records to the internal destination even when it is off.
+The retained entry records its selected destination set, exact bytes, run,
+and principal. A `CICSDIAG` SAF update check precedes durable mutation.
 
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or

@@ -183,6 +183,8 @@ pub enum CicsOperation {
     SpoolRead,
     /// Append one record to an open output spool report.
     SpoolWrite,
+    /// Write a bounded user trace entry by numeric trace identifier.
+    EnterTraceNum,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -334,6 +336,7 @@ impl CicsOperation {
             Self::SpoolOpenOutput => "SpoolOpenOutput",
             Self::SpoolRead => "SpoolRead",
             Self::SpoolWrite => "SpoolWrite",
+            Self::EnterTraceNum => "EnterTraceNum",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -481,6 +484,7 @@ impl CicsOperation {
                 | Self::SpoolOpenOutput
                 | Self::SpoolRead
                 | Self::SpoolWrite
+                | Self::EnterTraceNum
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -602,6 +606,7 @@ impl CicsOperation {
             ("SPOOLOPEN", Some("OUTPUT")) => Self::SpoolOpenOutput,
             ("SPOOLREAD", _) => Self::SpoolRead,
             ("SPOOLWRITE", _) => Self::SpoolWrite,
+            ("ENTER", Some("TRACENUM")) => Self::EnterTraceNum,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

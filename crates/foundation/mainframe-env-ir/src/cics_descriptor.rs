@@ -601,6 +601,7 @@ mod tests {
                 CicsPlanOperation::DefineDCounter,
                 CicsPlanOperation::DeleteCounter,
                 CicsPlanOperation::DeleteDCounter,
+                CicsPlanOperation::EnterTraceNum,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
                 CicsPlanOperation::StartBrowse,

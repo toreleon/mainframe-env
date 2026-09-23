@@ -71,6 +71,10 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
                 | CicsPlanOption::CounterReduce
                 | CicsPlanOption::CounterWrap
         ),
+        CicsPlanOperation::EnterTraceNum => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::TraceException
+        ),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

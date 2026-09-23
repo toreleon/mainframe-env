@@ -106,6 +106,7 @@ impl Canonical for CicsOperation {
             Self::SpoolOpenOutput => out.variant("CicsOperation", "SpoolOpenOutput", 0),
             Self::SpoolRead => out.variant("CicsOperation", "SpoolRead", 0),
             Self::SpoolWrite => out.variant("CicsOperation", "SpoolWrite", 0),
+            Self::EnterTraceNum => out.variant("CicsOperation", "EnterTraceNum", 0),
             Self::Start => out.variant("CicsOperation", "Start", 0),
             Self::StartBrowse => out.variant("CicsOperation", "StartBrowse", 0),
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),

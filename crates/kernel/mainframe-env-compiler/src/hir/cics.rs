@@ -381,6 +381,10 @@ impl PlanContext<'_> {
                 HirCicsOperandName::SpoolMaxFlength => CicsOperandName::SpoolMaxFlength,
                 HirCicsOperandName::SpoolFrom => CicsOperandName::SpoolFrom,
                 HirCicsOperandName::SpoolFlength => CicsOperandName::SpoolFlength,
+                HirCicsOperandName::TraceNum => CicsOperandName::TraceNum,
+                HirCicsOperandName::TraceFrom => CicsOperandName::TraceFrom,
+                HirCicsOperandName::TraceFromLength => CicsOperandName::TraceFromLength,
+                HirCicsOperandName::TraceResource => CicsOperandName::TraceResource,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -525,6 +529,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SpoolOpenOutput => CicsPlanOperation::SpoolOpenOutput,
         HirCicsOperation::SpoolRead => CicsPlanOperation::SpoolRead,
         HirCicsOperation::SpoolWrite => CicsPlanOperation::SpoolWrite,
+        HirCicsOperation::EnterTraceNum => CicsPlanOperation::EnterTraceNum,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -710,5 +715,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::TimerOn => CicsPlanOption::TimerOn,
         HirCicsOption::AcqActivity => CicsPlanOption::AcqActivity,
         HirCicsOption::AcqProcess => CicsPlanOption::AcqProcess,
+        HirCicsOption::TraceException => CicsPlanOption::TraceException,
     }
 }

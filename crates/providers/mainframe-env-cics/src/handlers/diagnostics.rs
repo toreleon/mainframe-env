@@ -1,14 +1,17 @@
 //! Bounded durable diagnostic records and command control.
 
 mod state;
+mod trace_number;
 
 pub use state::{
     CicsDiagnosticDumpRecord, CicsDiagnosticSnapshot, CicsDiagnosticTraceRecord,
     CicsDumpCodeDefinition, CicsMonitorAction, CicsMonitorPointDefinition, CicsTraceConfiguration,
 };
 
-use crate::service::CicsService;
-use mainframe_env_host_api::HostProblem;
+use crate::service::{CicsService, Run, bounded};
+use mainframe_env_host_api::{
+    CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+};
 use state::{load, persist};
 use std::collections::BTreeMap;
 
@@ -129,4 +132,36 @@ fn diagnostic_name(value: &str, maximum: usize) -> Result<String, HostProblem> {
         return Err(HostProblem::Malformed);
     }
     Ok(value)
+}
+
+pub(in crate::service) fn invoke(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    match request.operation {
+        CicsOperation::EnterTraceNum => trace_number::invoke(service, run, request),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn response(
+    service: &CicsService,
+    run: &Run,
+    reply: state::DiagnosticReply,
+) -> Result<CicsResponse, HostProblem> {
+    let mut result = service.response(
+        run,
+        CicsDisposition::Complete,
+        &reply.condition,
+        reply.response,
+        reply.response2,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    for (name, value) in reply.outputs {
+        result.outputs.insert(name, bounded(value)?);
+    }
+    Ok(result)
 }

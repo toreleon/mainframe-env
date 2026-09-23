@@ -343,6 +343,8 @@ pub(super) fn execute(
                         | CicsOperandName::CounterValue
                         | CicsOperandName::CounterMinimum
                         | CicsOperandName::CounterMaximum
+                        | CicsOperandName::TraceNum
+                        | CicsOperandName::TraceFromLength
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (

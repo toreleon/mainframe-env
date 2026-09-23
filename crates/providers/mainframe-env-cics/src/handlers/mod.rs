@@ -105,6 +105,7 @@ pub(super) use bms_map::{
 };
 pub(super) use condition::respond as condition;
 pub(super) use counter_control::invoke as invoke_counter;
+pub(super) use diagnostics::invoke as invoke_diagnostics;
 pub use diagnostics::{
     CicsDiagnosticDumpRecord, CicsDiagnosticSnapshot, CicsDiagnosticTraceRecord,
     CicsDumpCodeDefinition, CicsMonitorAction, CicsMonitorPointDefinition, CicsTraceConfiguration,
@@ -185,6 +186,9 @@ pub(super) fn invoke_extended_control(
             } else {
                 event_control::invoke(service, run, request)
             }
+        }
+        crate::generated::CicsCommandFamily::Diagnostics => {
+            invoke_diagnostics(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

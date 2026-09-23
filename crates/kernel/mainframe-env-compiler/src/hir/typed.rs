@@ -4049,6 +4049,57 @@ mod tests {
     }
 
     #[test]
+    fn cics_enter_tracenum_resolves_halfwords_and_exception() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TRACENUM. DATA DIVISION. WORKING-STORAGE SECTION. 01 NUM-X PIC S9(4) COMP VALUE 123. 01 FROM-X PIC X(16). 01 LENGTH-X PIC S9(4) COMP VALUE 4. 01 RESOURCE-X PIC X(8). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ENTER TRACENUM(NUM-X) FROM(FROM-X) FROMLENGTH(LENGTH-X) RESOURCE(RESOURCE-X) EXCEPTION RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("ENTER TRACENUM: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed ENTER TRACENUM");
+        assert_eq!(command.operation, HirCicsOperation::EnterTraceNum);
+        assert!(command.options.contains(&HirCicsOption::TraceException));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::TraceNum
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "NUM-X")
+        }));
+        for (command, expected) in [
+            (
+                "ENTER FROM(FROM-X) NOHANDLE",
+                "required command discriminator",
+            ),
+            ("ENTER TRACENUM(BAD-NUM-X) NOHANDLE", "halfword binary"),
+            (
+                "ENTER TRACENUM(NUM-X) FROMLENGTH(BAD-NUM-X) NOHANDLE",
+                "halfword binary",
+            ),
+            (
+                "ENTER TRACENUM(NUM-X) RESOURCE(BAD-RESOURCE-X) NOHANDLE",
+                "eight characters",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTRC. DATA DIVISION. WORKING-STORAGE SECTION. 01 NUM-X PIC S9(4) COMP. 01 BAD-NUM-X PIC S9(9) COMP. 01 FROM-X PIC X(16). 01 BAD-RESOURCE-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

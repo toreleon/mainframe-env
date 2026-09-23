@@ -12576,6 +12576,97 @@ mod tests {
     }
 
     #[test]
+    fn compiled_enter_tracenum_retains_exception_bytes_with_4802() {
+        let artifact = published_source_fixture(
+            "TRACENUM",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. TRACENUM.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 FROM-X PIC X(8) VALUE 'TRACE123'.\n01 LENGTH-X PIC S9(4) COMP VALUE 5.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\n01 TRACE-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS ENTER TRACENUM(123) FROM(FROM-X) FROMLENGTH(LENGTH-X) RESOURCE('PROGRAM1') EXCEPTION RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO TRACE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CICSDIAG", "CICS.DIAG.TRACE", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CICSDIAG",
+                "CICS.DIAG.TRACE",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "TRACENUM".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("TRCN".into(), "TRACENUM".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "TRACENUM".into(),
+                    map: "TRACENUM".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("tracenum-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "TRCN", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "TRCN",
+                24,
+                80,
+                "tracenum-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "TRACENUM", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("TRACE-FN").unwrap().bytes(),
+            &[0x48, 0x02]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let snapshot = server.cics.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.traces.len(), 1);
+        assert_eq!(snapshot.traces[0].data, b"TRACE");
+        assert_eq!(snapshot.traces[0].identifier, "123");
+    }
+
+    #[test]
     fn compiled_readq_td_set_allocates_checkpointed_record_storage() {
         let artifact = published_source_fixture(
             "READQSET",

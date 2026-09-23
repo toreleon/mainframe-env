@@ -23,6 +23,7 @@ pub(crate) enum CicsCommandFamily {
     StorageControl,
     TransformControl,
     SpoolControl,
+    Diagnostics,
     DocumentControl,
     EventControl,
     JournalControl,

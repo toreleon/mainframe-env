@@ -1197,6 +1197,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "DOCUMENT RETRIEVE",
                 "DOCUMENT SET",
                 "ENQ",
+                "ENTER TRACENUM",
                 "FORMATTIME",
                 "HANDLE ABEND",
                 "HANDLE AID",
