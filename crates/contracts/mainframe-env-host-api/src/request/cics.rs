@@ -4,6 +4,7 @@ use super::Mutation;
 use mainframe_env_execution_api::BoundedPayload;
 use std::collections::BTreeMap;
 
+/// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
@@ -23,6 +24,7 @@ pub enum CicsOperation {
     Delay,
     /// Release one matching task enqueue ownership level.
     Deq,
+    /// Delete the current file record.
     Delete,
     /// Create one bounded transaction-owned document.
     DocumentCreate,
@@ -166,6 +168,7 @@ impl CicsOperation {
         }
     }
 
+    /// Whether the operation may change durable or task-local state.
     #[must_use]
     pub const fn is_mutating(self) -> bool {
         matches!(

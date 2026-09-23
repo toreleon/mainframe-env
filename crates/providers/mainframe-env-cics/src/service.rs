@@ -8,7 +8,7 @@ use crate::retention::{
     UowRetentionMetadata,
 };
 pub use handlers::*;
-use handlers::{argument_bytes, argument_optional, argument_text};
+use handlers::{DurableFileStatus, argument_bytes, argument_optional, argument_text};
 use handlers::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
@@ -37,37 +37,46 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-pub(crate) use crate::limits::CicsLimits;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BmsFieldDefinition {
-    pub name: String,
-    pub row: u16,
-    pub column: u16,
-    pub length: u16,
-    pub initial: Vec<u8>,
-    pub color: Option<String>,
-    pub highlight: Option<String>,
-    pub protected: bool,
-    pub secret: bool,
-    pub fset: bool,
-    pub justify_right: bool,
-    pub fill_zero: bool,
-    pub output_offset: Option<u32>,
-    pub attribute_offset: Option<u32>,
+/// Resource limits for the protocol-neutral CICS authority.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsLimits {
+    pub max_sessions: usize,
+    pub max_runs: usize,
+    pub max_maps: usize,
+    pub max_programs: usize,
+    pub max_file_aliases: usize,
+    pub max_enqueue_models: usize,
+    pub max_fields: usize,
+    pub max_screen_bytes: usize,
+    pub max_queue_records: usize,
+    pub max_queue_bytes: usize,
+    pub max_documents: usize,
+    pub max_document_templates: usize,
+    pub max_document_bytes: usize,
+    pub max_document_symbols: usize,
+    pub max_document_bookmarks: usize,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BmsMapDefinition {
-    pub mapset: String,
-    pub map: String,
-    /// One-based terminal line at which the map is positioned.
-    pub line: u16,
-    /// One-based terminal column at which the map is positioned.
-    pub column: u16,
-    pub rows: u16,
-    pub columns: u16,
-    pub fields: Vec<BmsFieldDefinition>,
+impl Default for CicsLimits {
+    fn default() -> Self {
+        Self {
+            max_sessions: 4096,
+            max_runs: 4096,
+            max_maps: 1024,
+            max_programs: 4096,
+            max_file_aliases: 1024,
+            max_enqueue_models: 1024,
+            max_fields: 512,
+            max_screen_bytes: 4 * 1024 * 1024,
+            max_queue_records: 65536,
+            max_queue_bytes: 64 * 1024 * 1024,
+            max_documents: 4096,
+            max_document_templates: 1024,
+            max_document_bytes: 64 * 1024 * 1024,
+            max_document_symbols: 4096,
+            max_document_bookmarks: 4096,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -98,12 +107,6 @@ pub enum CicsFileStatus {
     Closed,
     /// The file is disabled; this is distinct from the CLOSED + UNENABLED state.
     Disabled,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct DurableFileStatus {
-    status: CicsFileStatus,
-    version: u64,
 }
 
 pub(crate) struct CicsEffectReplay {
@@ -245,12 +248,14 @@ pub(in crate::service) struct TransientQueue {
     pub version: u64,
 }
 
+type ProgramCatalog = BTreeMap<String, BTreeMap<u64, CicsProgramDefinition>>;
+type DocumentTemplates = BTreeMap<String, CicsDocumentTemplateDefinition>;
 struct State {
     sessions: BTreeMap<String, Session>,
     runs: BTreeMap<RunUnitId, Run>,
     maps: BTreeMap<(String, String), BmsMapDefinition>,
     programs: BTreeSet<String>,
-    program_definitions: BTreeMap<String, BTreeMap<u64, CicsProgramDefinition>>,
+    program_definitions: ProgramCatalog,
     application_entries: Vec<CicsApplicationEntryDefinition>,
     program_loads: BTreeMap<String, handlers::ProgramLoadState>,
     file_aliases: BTreeMap<String, CicsFileDefinition>,
@@ -259,7 +264,7 @@ struct State {
     continuations: BTreeMap<String, DurableContinuation>,
     transient: handlers::TransientDataState,
     documents: BTreeMap<String, handlers::DocumentRecord>,
-    document_templates: BTreeMap<String, CicsDocumentTemplateDefinition>,
+    document_templates: DocumentTemplates,
     document_bytes: usize,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.

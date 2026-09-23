@@ -61,6 +61,7 @@ pub(crate) fn store_error(error: StoreError) -> HostProblem {
     }
 }
 
+pub use bms_map::{BmsFieldDefinition, BmsMapDefinition};
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
@@ -68,7 +69,7 @@ pub(super) use condition::respond as condition;
 pub(super) use document_control::{
     DocumentRecord, invoke as invoke_document_control, load_authority as load_document_authority,
 };
-pub(super) use file_control::invoke as invoke_file_control;
+pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };

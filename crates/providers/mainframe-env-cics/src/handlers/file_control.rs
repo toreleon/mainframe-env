@@ -1,9 +1,15 @@
+#[derive(Clone, Copy, Debug)]
+pub(in crate::service) struct DurableFileStatus {
+    pub(in crate::service) status: CicsFileStatus,
+    pub(in crate::service) version: u64,
+}
+
 #[cfg(feature = "fault-injection")]
 use super::super::CicsFileFaultPoint;
 use super::super::{
-    CicsFileStatus, CicsService, DatasetUndo, DurableFileStatus, Run, access_for, argument_bytes,
-    argument_optional, argument_text, bounded, decode_dataset_bytes, encode_dataset_bytes,
-    encode_file_status, nested_mutation, normalize_terminal_name, store_error,
+    CicsFileStatus, CicsService, DatasetUndo, Run, access_for, argument_bytes, argument_optional,
+    argument_text, bounded, decode_dataset_bytes, encode_dataset_bytes, encode_file_status,
+    nested_mutation, normalize_terminal_name, store_error,
 };
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName, DatasetRequest,

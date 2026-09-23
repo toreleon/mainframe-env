@@ -5,13 +5,11 @@
 mod abi;
 mod event_wait;
 mod generated;
-mod limits;
 mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
-pub use limits::CicsLimits;
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -23,12 +21,12 @@ pub use retention::{
 };
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsApplicationEntryDefinition, CicsContinuation, CicsDocumentTemplateDefinition, CicsEnqueueModelDefinition,
-    CicsFileDefinition, CicsFileStatus, CicsIntervalError, CicsIntervalMode, CicsIntervalTime,
-    CicsJavaStatus, CicsProgramDefinition, CicsReplayClock, CicsService, CicsStartTask,
-    CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
-    CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
-    cics_provider,
+    CicsApplicationEntryDefinition, CicsContinuation, CicsDocumentTemplateDefinition,
+    CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
+    CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsProgramDefinition,
+    CicsReplayClock, CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution,
+    CicsTerminalSnapshot, CicsTraceEntry, CicsTransientDataQueueDefinition,
+    CicsTransientDataQueueKind, CicsTransientDataQueueOpen, cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]
