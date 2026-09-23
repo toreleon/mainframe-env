@@ -7005,16 +7005,16 @@ mod tests {
             limits,
         )
         .unwrap();
-        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+        let result = CobolCompiler::default()
             .compile(CompilerRequest {
                 source: bundle,
                 mode: CompilationMode::Executable,
                 target: CompileTarget::new("reference").unwrap(),
                 options: CompileOptions::new(BTreeMap::new()).unwrap(),
             })
-            .unwrap()
-        else {
-            panic!("fixture did not publish");
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("fixture did not publish: {result:?}");
         };
         artifact
     }
@@ -20076,5 +20076,222 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn compiled_counter_family_uses_typed_route_and_eib_outputs() {
+        let artifact = published_source_fixture(
+            "CNTFLOW",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CNTFLOW.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 NAME-X PIC X(16) VALUE 'TICKET'.\n01 VALUE-X PIC S9(9) COMP VALUE 1.\n01 MAX-X PIC S9(9) COMP VALUE 2.\n01 OUT-X PIC S9(9) COMP.\n01 MIN-X PIC S9(9) COMP.\n01 QUERY-X PIC S9(9) COMP.\n01 GET-FN PIC X(2).\n01 DELETE-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DEFINE COUNTER(NAME-X) VALUE(VALUE-X) MAXIMUM(MAX-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS GET COUNTER(NAME-X) VALUE(OUT-X) INCREMENT(2) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO GET-FN.\nEXEC CICS QUERY COUNTER(NAME-X) VALUE(OUT-X) MINIMUM(MIN-X) MAXIMUM(MAX-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE OUT-X TO QUERY-X.\nEXEC CICS REWIND COUNTER(NAME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS UPDATE COUNTER(NAME-X) VALUE(VALUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS DELETE COUNTER(NAME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO DELETE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("COUNTER", "CICS.COUNTER.DEFAULT.TICKET", "IBMUSER", None)
+            .unwrap();
+        for intent in [AccessIntent::Read, AccessIntent::Update] {
+            server
+                .racf
+                .permit("COUNTER", "CICS.COUNTER.DEFAULT.TICKET", "IBMUSER", intent)
+                .unwrap();
+        }
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CNTFLOW".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CNTF".into(), "CNTFLOW".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CNTFLOW".into(),
+                    map: "CNTFLOW".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("counter-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CNTF", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CNTF",
+                24,
+                80,
+                "counter-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CNTFLOW", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("GET-FN").unwrap().bytes(), &[0x20, 0x06]);
+        assert_eq!(
+            restored.variable("DELETE-FN").unwrap().bytes(),
+            &[0x20, 0x0A]
+        );
+        assert_eq!(restored.variable("QUERY-X").unwrap().bytes(), &[0, 0, 0, 3]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        for operation in [
+            CicsOperation::DefineCounter,
+            CicsOperation::GetCounter,
+            CicsOperation::QueryCounter,
+            CicsOperation::RewindCounter,
+            CicsOperation::UpdateCounter,
+            CicsOperation::DeleteCounter,
+        ] {
+            assert_eq!(
+                trace
+                    .iter()
+                    .filter(|entry| entry.operation == operation)
+                    .count(),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn compiled_dcounter_family_uses_unsigned_doubleword_route() {
+        let artifact = published_source_fixture(
+            "DCTFLOW",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DCTFLOW.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 NAME-X PIC X(16) VALUE 'TICKET'.\n01 VALUE-X PIC 9(18) COMP VALUE 1.\n01 MAX-X PIC 9(18) COMP VALUE 2.\n01 OUT-X PIC 9(18) COMP.\n01 MIN-X PIC 9(18) COMP.\n01 QUERY-X PIC 9(18) COMP.\n01 GET-FN PIC X(2).\n01 DELETE-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DEFINE DCOUNTER(NAME-X) VALUE(VALUE-X) MAXIMUM(MAX-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS GET DCOUNTER(NAME-X) VALUE(OUT-X) INCREMENT(2) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO GET-FN.\nEXEC CICS QUERY DCOUNTER(NAME-X) VALUE(OUT-X) MINIMUM(MIN-X) MAXIMUM(MAX-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE OUT-X TO QUERY-X.\nEXEC CICS REWIND DCOUNTER(NAME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS UPDATE DCOUNTER(NAME-X) VALUE(VALUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS DELETE DCOUNTER(NAME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO DELETE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("COUNTER", "CICS.COUNTER.DEFAULT.TICKET", "IBMUSER", None)
+            .unwrap();
+        for intent in [AccessIntent::Read, AccessIntent::Update] {
+            server
+                .racf
+                .permit("COUNTER", "CICS.COUNTER.DEFAULT.TICKET", "IBMUSER", intent)
+                .unwrap();
+        }
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DCTFLOW".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DCTF".into(), "DCTFLOW".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DCTFLOW".into(),
+                    map: "DCTFLOW".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("dcounter-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DCTF", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DCTF",
+                24,
+                80,
+                "dcounter-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DCTFLOW", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("GET-FN").unwrap().bytes(), &[0x20, 0x16]);
+        assert_eq!(
+            restored.variable("DELETE-FN").unwrap().bytes(),
+            &[0x20, 0x1A]
+        );
+        assert_eq!(
+            restored.variable("QUERY-X").unwrap().bytes(),
+            &[0, 0, 0, 0, 0, 0, 0, 3]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        for operation in [
+            CicsOperation::DefineDCounter,
+            CicsOperation::GetDCounter,
+            CicsOperation::QueryDCounter,
+            CicsOperation::RewindDCounter,
+            CicsOperation::UpdateDCounter,
+            CicsOperation::DeleteDCounter,
+        ] {
+            assert_eq!(
+                trace
+                    .iter()
+                    .filter(|entry| entry.operation == operation)
+                    .count(),
+                1
+            );
+        }
     }
 }

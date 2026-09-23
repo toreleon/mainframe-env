@@ -7107,4 +7107,29 @@ mod tests {
             assert!(analyze(&source).hir.is_none(), "{number}");
         }
     }
+
+    #[test]
+    fn counter_commands_reject_illegal_options_and_wrong_binary_widths() {
+        let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. BADCNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 NAME-X PIC X(16) VALUE 'TICKET'. 01 S-X PIC S9(9) COMP. 01 D-X PIC 9(18) COMP. PROCEDURE DIVISION. ";
+        for command in [
+            "DEFINE COUNTER(NAME-X) MINIMUM(S-X)",
+            "GET COUNTER(NAME-X) REDUCE",
+            "QUERY COUNTER(NAME-X) INCREMENT(1)",
+            "REWIND COUNTER(NAME-X) WRAP",
+            "UPDATE COUNTER(NAME-X)",
+            "DEFINE DCOUNTER(NAME-X) VALUE(S-X)",
+            "GET DCOUNTER(NAME-X) VALUE(S-X)",
+            "UPDATE COUNTER(NAME-X) VALUE(D-X)",
+            "GET COUNTER('BAD-NAME') VALUE(S-X)",
+            "UPDATE DCOUNTER(NAME-X) VALUE(D-X) RESP2(S-X)",
+        ] {
+            let source = format!("{prefix} EXEC CICS {command} END-EXEC. STOP RUN.");
+            let analysis = analyze(&source);
+            assert!(
+                analysis.hir.is_none(),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
 }

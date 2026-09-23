@@ -159,6 +159,18 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         CicsPlanOperation::SpoolWrite => {
             matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2)
         }
+        CicsPlanOperation::GetCounter | CicsPlanOperation::GetDCounter => matches!(
+            output,
+            CicsOutputName::CounterValue | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::QueryCounter | CicsPlanOperation::QueryDCounter => matches!(
+            output,
+            CicsOutputName::CounterValue
+                | CicsOutputName::CounterMinimum
+                | CicsOutputName::CounterMaximum
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

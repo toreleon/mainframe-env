@@ -155,12 +155,21 @@ fn authorize(
     key: &CounterKey,
     intent: AccessIntent,
 ) -> Result<(), HostProblem> {
-    service.authorize(
-        run,
-        "COUNTER",
-        &format!("CICS.COUNTER.{}", key.as_str().replace('/', ".")),
-        intent,
-    )
+    service
+        .authorize(
+            run,
+            "COUNTER",
+            &format!("CICS.COUNTER.{}", key.as_str().replace('/', ".")),
+            intent,
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized => HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 0,
+            },
+            other => other,
+        })
 }
 
 fn unavailable(

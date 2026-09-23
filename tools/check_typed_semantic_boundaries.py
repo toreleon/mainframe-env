@@ -178,9 +178,9 @@ def check(root: Path) -> None:
         "typed decimal condition runtime",
     )
 
-    cics_runtime = production(
-        read(root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics.rs")
-    )
+    cics_runtime = read(
+        root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics.rs"
+    ).split("#[cfg(test)]\nmod tests", 1)[0]
     typed_execute = between(
         cics_runtime,
         "pub(super) fn execute(\n",
@@ -204,6 +204,9 @@ def check(root: Path) -> None:
         ["CicsOperation::from_tokens", "legacy_arguments(", "legacy_destination("],
         "typed CICS validation",
     )
+    cics_runtime_registry = production(
+        read(root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics/registry.rs")
+    )
     for required in [
         "decode_cics_effect_plan",
         "CICS_EXECUTABLE_DESCRIPTORS",
@@ -211,7 +214,10 @@ def check(root: Path) -> None:
         "cics_executable_descriptor",
         ".runtime_import",
     ]:
-        require(required in cics_runtime, f"typed CICS runtime omits {required}")
+        require(
+            required in cics_runtime or required in cics_runtime_registry,
+            f"typed CICS runtime omits {required}",
+        )
     reject(
         cics_runtime,
         ['"cics.file"', '"cics.recovery"', "Effect::DatasetRead", "Effect::DatasetWrite"],

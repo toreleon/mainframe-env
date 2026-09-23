@@ -4536,4 +4536,64 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
     }
+
+    #[test]
+    fn counter_v2_tags_round_trip_without_changing_v1() {
+        for (operand, tag) in [
+            (CicsOperandName::CounterName, 384),
+            (CicsOperandName::CounterPool, 385),
+            (CicsOperandName::CounterValue, 386),
+            (CicsOperandName::CounterMinimum, 387),
+            (CicsOperandName::CounterMaximum, 388),
+            (CicsOperandName::CounterIncrement, 389),
+            (CicsOperandName::CounterCompareMin, 390),
+            (CicsOperandName::CounterCompareMax, 391),
+        ] {
+            assert_eq!(operand_tag(operand), tag);
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        for (option, tag) in [
+            (CicsPlanOption::CounterNoSuspend, 316),
+            (CicsPlanOption::CounterReduce, 317),
+            (CicsPlanOption::CounterWrap, 318),
+        ] {
+            assert_eq!(option_tag(option), tag);
+            assert_eq!(option_from_tag(tag), Ok(option));
+        }
+        for (output, tag) in [
+            (CicsOutputName::CounterValue, 440),
+            (CicsOutputName::CounterMinimum, 441),
+            (CicsOutputName::CounterMaximum, 442),
+        ] {
+            assert_eq!(output_tag(output), tag);
+            assert_eq!(output_from_tag(tag), Ok(output));
+        }
+        for tag in 392..=447 {
+            assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 319..=379 {
+            assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 443..=503 {
+            assert_eq!(output_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DefineCounter,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::CounterName,
+                value: CicsOperandValue::Literal(b"TICKET".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&encoded[..6], b"MCEP\0\x02");
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
 }

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 189,
+    "markdown_documents": 190,
     "navigation_groups": 5,
-    "normative_documents": 41,
+    "normative_documents": 42,
     "xtask_commands": 167
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:00554297b781cac318cbe0390ac2cd79e40a868a00e2e6972dac6ebc491f4998",
+      "sha256": "sha256:b7aab930dc65ce24e4bab4732da67bae836d16cb5cbb117e6a91525cfd91a4d2",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 76,
-      "sha256": "sha256:7bcd6ef6223c6710d302f44b76919a6dfa012566f37183a789130508f0190636",
+      "relative_links": 77,
+      "sha256": "sha256:53c99598b0cd6d8bae15bf793d4bd60bc7a1383446d8343a8614afe42d1e7082",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -343,9 +343,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 23,
+      "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:6ae4f8e38f7e8e0a5b64b1030720de32cc8c9b81c316885d9fda3ebeca238d59",
+      "sha256": "sha256:1ab9319133ae777c5a01820a7c4d1a676609047616f645f6d8ee2c27558e664d",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -743,10 +743,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0014-named-counter-authority.md",
+      "relative_links": 1,
+      "scope": "twelve COUNTER and DCOUNTER application rows, typed plans, and durable replay",
+      "sha256": "sha256:0854c20ca051f133f68de15f55f98941dfcbe60b42b00a4400094af76edce4f8",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0014: Keep named counters in one versioned pool authority",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 13,
-      "sha256": "sha256:26e1a5d6476c6638ce7602a5a51c50adcca883cefa6e208486a3038beefa6087",
+      "relative_links": 14,
+      "sha256": "sha256:b10f4a91e91ff530fcf7fa95f643bbe2327a80f43920d8713c6ea0191f383778",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1086,7 +1098,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:a7d78b91520c15cbf5970d40e15e304ee1b132f464a4051bc5ea7210df0a12e3",
+      "sha256": "sha256:8c0ac0a8f7154b4455fdb6984b2e2c1e120ee23c67490e9553dd9f3c15a98f0b",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1836,6 +1848,10 @@
           "path": "docs/decisions/0013-cics-web-service-control-boundary.md"
         },
         {
+          "label": "ADR-0014: Named-counter pool authority",
+          "path": "docs/decisions/0014-named-counter-authority.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -1999,7 +2015,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:2ef813f5fb831e925b9bfaee6faa06abc820103c112d221eb9ff15b5c3a7bbd1",
+  "registry_sha256": "sha256:1dfaf2ef3c46569ce3b224a6fbf8a61d47f7f5588aa647d91b565279154dd573",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

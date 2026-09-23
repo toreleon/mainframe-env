@@ -57,8 +57,8 @@ coverage, semantic and differential credit.
 
 The contract also binds one 121-name EIBRESP authority for dynamic
 `HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
-records 42 known mutating rows, 199 bounded-effect rows, one explicit UOW
-boundary and 240 bounded-UOW rows. Those values describe current contract
+records 61 known mutating rows, 178 bounded-effect rows, one explicit UOW
+boundary and 238 bounded-UOW rows. Those values describe current contract
 certainty; they are not execution or conformance counts.
 
 The same generator emits the compact
@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 48 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 85 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 215 `unready` rows that are recognized but fail explicitly as unsupported.
+- 178 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,11 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 48 API routes are the only advertised application commands.
+The current 85 API routes are the only advertised application commands.
+The twelve COUNTER and DCOUNTER routes share a versioned local pool authority
+and bounded descriptor, compiler, interpreter, and provider children. See
+[ADR-0014](../decisions/0014-named-counter-authority.md) for the atomic
+state, tag, replay, and pool-rebuild boundaries.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both

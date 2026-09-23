@@ -3866,6 +3866,7 @@ mod tests {
         deny_command: bool,
         deny_transform: bool,
         deny_journal: bool,
+        deny_counter: bool,
         deny_dataset: bool,
         deny_surrogate: bool,
         principal_decision: SecurityDecision,
@@ -4003,6 +4004,7 @@ mod tests {
                         if self.deny_command && class == "FACILITY"
                             || self.deny_transform && class == "TRANSFORM"
                             || self.deny_journal && class == "JOURNAL"
+                            || self.deny_counter && class == "COUNTER"
                             || self.deny_dataset && class == "DATASET"
                             || self.deny_surrogate && class == "SURROGAT"
                         {
@@ -4307,6 +4309,7 @@ mod tests {
             deny_command,
             deny_transform: false,
             deny_journal: false,
+            deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4332,6 +4335,7 @@ mod tests {
             deny_command: false,
             deny_transform,
             deny_journal: false,
+            deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4355,6 +4359,31 @@ mod tests {
             deny_command: false,
             deny_transform: false,
             deny_journal,
+            deny_counter: false,
+            deny_dataset: false,
+            deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
+    }
+
+    fn counter_authorities(deny_counter: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(CommandSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+            deny_command: false,
+            deny_transform: false,
+            deny_journal: false,
+            deny_counter,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4380,6 +4409,7 @@ mod tests {
             deny_command,
             deny_transform: false,
             deny_journal: false,
+            deny_counter: false,
             deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4409,6 +4439,7 @@ mod tests {
                 deny_command: false,
                 deny_transform: false,
                 deny_journal: false,
+                deny_counter: false,
                 deny_dataset: false,
                 deny_surrogate,
                 principal_decision,
@@ -4461,6 +4492,7 @@ mod tests {
             deny_command: false,
             deny_transform: false,
             deny_journal: false,
+            deny_counter: false,
             deny_dataset: true,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -4614,6 +4646,16 @@ mod tests {
             .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
             .unwrap();
         (invocation, session)
+    }
+
+    fn registered_counter_run(service: &CicsService, name: &str) -> Invocation {
+        let invocation = invocation_for(name, BTreeMap::new());
+        let session = SessionId::new(format!("{name}-session"), 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        invocation
     }
 
     fn registered_amode64(service: &CicsService) -> (Invocation, SessionId) {
@@ -26998,5 +27040,317 @@ mod tests {
             .unwrap();
         assert_eq!(result.condition, "NORMAL");
         assert_eq!(result.outputs["VALUE"].bytes(), b"-2147483648");
+    }
+
+    #[test]
+    fn named_counter_saf_audit_precedes_create_and_denial() {
+        let (host, seen) = counter_authorities(false);
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([("COUNTER".into(), cics_literal(b"SECURE"))]),
+            1,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, define.clone(), 1),
+            define.clone(),
+        )
+        .unwrap();
+        assert!(seen.lock().unwrap().iter().any(|entry| {
+            entry
+                == &(
+                    "COUNTER".into(),
+                    "CICS.COUNTER.DEFAULT.SECURE".into(),
+                    AccessIntent::Update,
+                )
+        }));
+        assert!(
+            !store
+                .audit_records(&invocation.execution_id, 0, 64)
+                .unwrap()
+                .is_empty()
+        );
+
+        let (denied_host, denied_seen) = counter_authorities(true);
+        let denied_store = Arc::new(MemoryStore::new(Default::default()));
+        let denied =
+            CicsService::open(denied_host, denied_store.clone(), CicsLimits::default()).unwrap();
+        let (denied_invocation, _) = registered(&denied);
+        assert_eq!(
+            denied.invoke(
+                &effect(&denied_invocation.run_unit_id, define.clone(), 1),
+                define,
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 0,
+            })
+        );
+        assert!(
+            denied_seen
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|entry| entry.0 == "COUNTER")
+        );
+        assert!(
+            denied_store
+                .get_provider_state("cics-counter-control-v1", "state")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            !denied_store
+                .audit_records(&denied_invocation.execution_id, 0, 64)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn named_counter_pool_rebuild_is_busy_or_suspended_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.set_counter_pool_rebuilding("DEFAULT", true).unwrap();
+        let blocked = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"REBUILD")),
+                ("OPTION.NOSUSPEND".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, blocked.clone(), 1),
+                blocked
+            ),
+            Err(HostProblem::Condition {
+                name: "BUSY".into(),
+                response: 128,
+                response2: 500,
+            })
+        );
+        let waiting = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([("COUNTER".into(), cics_literal(b"REBUILD"))]),
+            2,
+        );
+        let suspended = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, waiting.clone(), 2),
+                waiting.clone(),
+            )
+            .unwrap();
+        assert_eq!(suspended.disposition, CicsDisposition::Suspended);
+        let row = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert!(state["records"].as_object().unwrap().is_empty());
+        cics.set_counter_pool_rebuilding("DEFAULT", false).unwrap();
+        let completed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, waiting.clone(), 2),
+                waiting,
+            )
+            .unwrap();
+        assert_eq!(completed.condition, "NORMAL");
+    }
+
+    #[test]
+    fn named_counter_reconciles_unknown_outcome_after_outer_receipt_failure() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([("COUNTER".into(), cics_literal(b"ONCE"))]),
+            1,
+        );
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, define.clone(), 1),
+                define.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let row = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert!(state["records"].get("DEFAULT/ONCE").is_some());
+        let replayed = cics
+            .invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        let row = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["records"].as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn named_counter_rejects_invalid_identity_bounds_and_options() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&cics);
+        for (sequence, arguments, expected) in [
+            (
+                1,
+                BTreeMap::from([("COUNTER".into(), cics_literal(b"BAD-NAME"))]),
+                HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 404,
+                },
+            ),
+            (
+                2,
+                BTreeMap::from([
+                    ("COUNTER".into(), cics_literal(b"VALID")),
+                    ("POOL".into(), cics_literal(b"BAD-POOL")),
+                ]),
+                HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 403,
+                },
+            ),
+            (
+                3,
+                BTreeMap::from([
+                    ("COUNTER".into(), cics_literal(b"VALID")),
+                    ("MINIMUM".into(), cics_decimal(2)),
+                ]),
+                HostProblem::Malformed,
+            ),
+            (
+                4,
+                BTreeMap::from([
+                    ("COUNTER".into(), cics_literal(b"VALID")),
+                    ("VALUE".into(), cics_decimal(2)),
+                    ("MINIMUM".into(), cics_decimal(2)),
+                    ("MAXIMUM".into(), cics_decimal(1)),
+                ]),
+                HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 407,
+                },
+            ),
+            (
+                5,
+                BTreeMap::from([
+                    ("COUNTER".into(), cics_literal(b"VALID")),
+                    ("OPTION.WRAP".into(), cics_option()),
+                ]),
+                HostProblem::Malformed,
+            ),
+        ] {
+            let define = request(CicsOperation::DefineCounter, arguments, sequence);
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, define.clone(), sequence),
+                    define
+                ),
+                Err(expected),
+            );
+        }
+    }
+
+    fn concurrent_counter_get(store: Arc<dyn ProviderStateStore>) {
+        let first_service = service(store.clone());
+        let second_service = service(store.clone());
+        let first_run = registered_counter_run(&first_service, "counter-first");
+        let second_run = registered_counter_run(&second_service, "counter-second");
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([("COUNTER".into(), cics_literal(b"SHARED"))]),
+            1,
+        );
+        first_service
+            .invoke(&effect(&first_run.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let arguments = BTreeMap::from([
+            ("COUNTER".into(), cics_literal(b"SHARED")),
+            ("VALUE".into(), argument(b"")),
+        ]);
+        let mut threads = Vec::new();
+        for (cics, invocation, sequence) in [
+            (first_service, first_run, 2),
+            (second_service, second_run, 3),
+        ] {
+            let barrier = barrier.clone();
+            let arguments = arguments.clone();
+            threads.push(std::thread::spawn(move || {
+                let get = request(CicsOperation::GetCounter, arguments, sequence);
+                barrier.wait();
+                cics.invoke(&effect(&invocation.run_unit_id, get.clone(), sequence), get)
+                    .unwrap()
+                    .outputs["VALUE"]
+                    .bytes()
+                    .to_vec()
+            }));
+        }
+        let values = threads
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(values, BTreeSet::from([b"0".to_vec(), b"1".to_vec()]));
+        let row = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["records"]["DEFAULT/SHARED"]["current"], 2);
+    }
+
+    #[test]
+    fn named_counter_cas_is_atomic_across_memory_workers() {
+        concurrent_counter_get(Arc::new(MemoryStore::new(Default::default())));
+    }
+
+    #[test]
+    fn named_counter_cas_and_recovery_match_sqlite_workers() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-counter-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            concurrent_counter_get(store);
+        }
+        {
+            let reopened = SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+            let row = reopened
+                .get_provider_state("cics-counter-control-v1", "state")
+                .unwrap()
+                .unwrap();
+            let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+            assert_eq!(state["records"]["DEFAULT/SHARED"]["current"], 2);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn named_counter_cas_matches_postgres_workers() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("isolated PostgreSQL 18 test URL");
+        let store = Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        concurrent_counter_get(store);
     }
 }
