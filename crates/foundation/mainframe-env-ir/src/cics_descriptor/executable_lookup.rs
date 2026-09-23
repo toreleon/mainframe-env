@@ -135,5 +135,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::EnterTraceId => &CICS_EXECUTABLE_DESCRIPTORS[126],
         CicsPlanOperation::WebParseUrl => &CICS_EXECUTABLE_DESCRIPTORS[127],
         CicsPlanOperation::WebOpen => &CICS_EXECUTABLE_DESCRIPTORS[128],
+        CicsPlanOperation::WebClose => &CICS_EXECUTABLE_DESCRIPTORS[129],
     }
 }

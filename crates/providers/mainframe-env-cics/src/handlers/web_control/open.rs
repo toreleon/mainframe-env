@@ -333,14 +333,17 @@ pub(super) fn replay_write(
     })
 }
 
-fn expired_after_dispatch(service: &CicsService, run: &Run) -> Result<bool, HostProblem> {
+pub(super) fn expired_after_dispatch(
+    service: &CicsService,
+    run: &Run,
+) -> Result<bool, HostProblem> {
     match service.replay_clock.as_ref() {
         Some(clock) => Ok(clock.now_tick()? >= run.invocation.deadline_tick),
         None => Ok(false),
     }
 }
 
-fn transport_problem(problem: HostProblem) -> HostProblem {
+pub(super) fn transport_problem(problem: HostProblem) -> HostProblem {
     match problem {
         HostProblem::TimedOut => condition("TIMEDOUT", 124, 62),
         HostProblem::Unauthorized => condition("NOTAUTH", 70, 100),
@@ -367,7 +370,7 @@ fn audit_transport(
     audit_web_decision(service, run, request, decision)
 }
 
-fn audit_web_decision(
+pub(super) fn audit_web_decision(
     service: &CicsService,
     run: &mut Run,
     request: &CicsRequest,

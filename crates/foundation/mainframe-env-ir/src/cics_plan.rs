@@ -639,6 +639,7 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::WebParseUrl => web_control::invalid_parse_url_shape(plan, inputs, outputs),
         CicsPlanOperation::WebOpen => web_control::invalid_open_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebClose => web_control::invalid_close_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -1972,6 +1973,10 @@ mod tests {
     fn web_open_uses_reserved_v2_tags_and_rejects_legacy_encoding() {
         assert_eq!(operation_tag(CicsPlanOperation::WebOpen), 92);
         assert_eq!(operation_from_tag(92), Ok(CicsPlanOperation::WebOpen));
+        assert_eq!(operation_tag(CicsPlanOperation::WebClose), 93);
+        assert_eq!(operation_from_tag(93), Ok(CicsPlanOperation::WebClose));
+        assert_eq!(operand_tag(CicsOperandName::WebSessionToken), 267);
+        assert_eq!(operand_from_tag(267), Ok(CicsOperandName::WebSessionToken));
         for (name, tag) in [
             (CicsOperandName::WebHost, 261),
             (CicsOperandName::WebPortNumber, 262),

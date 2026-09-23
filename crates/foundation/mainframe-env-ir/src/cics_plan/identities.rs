@@ -252,6 +252,8 @@ pub enum CicsPlanOperation {
     WebParseUrl,
     /// Open one bounded task-owned HTTP client connection.
     WebOpen,
+    /// Close one task-owned HTTP client session.
+    WebClose,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -693,6 +695,8 @@ pub enum CicsOperandName {
     WebCertificate,
     /// Host-side connection code page.
     WebCodePage,
+    /// Eight-byte client session token supplied to WEB CLOSE.
+    WebSessionToken,
 }
 
 /// Flag option accepted by the typed CICS pilot.

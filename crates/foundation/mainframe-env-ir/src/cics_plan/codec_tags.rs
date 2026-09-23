@@ -105,6 +105,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::TransformXmlToData => 71,
         CicsPlanOperation::WebParseUrl => 91,
         CicsPlanOperation::WebOpen => 92,
+        CicsPlanOperation::WebClose => 93,
         CicsPlanOperation::WaitJournalName => 54,
         CicsPlanOperation::WaitJournalNum => 55,
         CicsPlanOperation::WriteJournalName => 56,
@@ -239,6 +240,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         71 => Ok(CicsPlanOperation::TransformXmlToData),
         91 => Ok(CicsPlanOperation::WebParseUrl),
         92 => Ok(CicsPlanOperation::WebOpen),
+        93 => Ok(CicsPlanOperation::WebClose),
         54 => Ok(CicsPlanOperation::WaitJournalName),
         55 => Ok(CicsPlanOperation::WaitJournalNum),
         56 => Ok(CicsPlanOperation::WriteJournalName),
@@ -521,6 +523,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebUriMap => 264,
         CicsOperandName::WebCertificate => 265,
         CicsOperandName::WebCodePage => 266,
+        CicsOperandName::WebSessionToken => 267,
     }
 }
 
@@ -760,6 +763,7 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         264 => Ok(CicsOperandName::WebUriMap),
         265 => Ok(CicsOperandName::WebCertificate),
         266 => Ok(CicsOperandName::WebCodePage),
+        267 => Ok(CicsOperandName::WebSessionToken),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -47,12 +47,27 @@ pub(super) const OPEN_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const CLOSE_CLAUSES: &[&str] = &["SESSTOKEN", "RESP", "RESP2"];
 
 pub(super) fn validate(
     clauses: &Clauses,
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::WebClose {
+        let tokens = clauses.get("SESSTOKEN").ok_or_else(|| {
+            ResolutionFailure::Invalid("CICS WEB CLOSE requires SESSTOKEN".into())
+        })?;
+        let value = cics_value(tokens, semantic)?;
+        if let HirCicsValue::Data(reference) = &value
+            && reference.length != 8
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS WEB CLOSE SESSTOKEN requires eight bytes".into(),
+            ));
+        }
+        return Ok(());
+    }
     if operation == HirCicsOperation::WebOpen {
         return validate_open(clauses, semantic);
     }
@@ -275,6 +290,12 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::WebClose {
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::WebSessionToken,
+            value: cics_value(&clauses["SESSTOKEN"], semantic)?,
+        }]);
+    }
     if operation == HirCicsOperation::WebOpen {
         return open_operands(clauses, semantic);
     }

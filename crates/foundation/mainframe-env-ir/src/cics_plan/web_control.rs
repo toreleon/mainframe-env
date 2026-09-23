@@ -117,3 +117,18 @@ pub(super) fn invalid_open_shape(
         || operand_value(plan, CicsOperandName::WebPortNumber)
             .is_some_and(|value| matches!(value, CicsOperandValue::Integer(number) if !(1..=65535).contains(number)))
 }
+
+pub(super) fn invalid_close_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    inputs != &BTreeSet::from([CicsOperandName::WebSessionToken])
+        || !matches!(
+            operand_value(plan, CicsOperandName::WebSessionToken),
+            Some(CicsOperandValue::Storage(_) | CicsOperandValue::Literal(_))
+        )
+        || outputs
+            .iter()
+            .any(|name| !matches!(name, CicsOutputName::Resp | CicsOutputName::Resp2))
+}

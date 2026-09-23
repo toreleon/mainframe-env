@@ -233,6 +233,8 @@ pub enum CicsOperation {
     WebParseUrl,
     /// Establish one task-owned HTTP client session and return its token.
     WebOpen,
+    /// Release one task-owned client connection and invalidate its token.
+    WebClose,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -376,6 +378,7 @@ impl CicsOperation {
             Self::TransformXmlToData => "TransformXmlToData",
             Self::WebParseUrl => "WebParseUrl",
             Self::WebOpen => "WebOpen",
+            Self::WebClose => "WebClose",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -430,6 +433,7 @@ impl CicsOperation {
                 | Self::DocumentInsert
                 | Self::DocumentSet
                 | Self::WebOpen
+                | Self::WebClose
                 | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
@@ -651,6 +655,7 @@ impl CicsOperation {
             ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
             ("WEB", Some("PARSE")) => Self::WebParseUrl,
             ("WEB", Some("OPEN")) => Self::WebOpen,
+            ("WEB", Some("CLOSE")) => Self::WebClose,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

@@ -351,6 +351,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WriteJournalNum => CicsOperation::WriteJournalNum,
         CicsPlanOperation::WebParseUrl => CicsOperation::WebParseUrl,
         CicsPlanOperation::WebOpen => CicsOperation::WebOpen,
+        CicsPlanOperation::WebClose => CicsOperation::WebClose,
     }
 }
 
@@ -585,6 +586,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebPathLength => "PATHLENGTH",
         CicsOperandName::WebQueryStringLength => "QUERYSTRLEN",
         CicsOperandName::WebHost => "HOST",
+        CicsOperandName::WebSessionToken => "SESSTOKEN",
         CicsOperandName::WebPortNumber => "PORTNUMBER",
         CicsOperandName::WebScheme => "SCHEME",
         CicsOperandName::WebUriMap => "URIMAP",

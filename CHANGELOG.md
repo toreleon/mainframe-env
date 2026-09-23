@@ -38,6 +38,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB CLOSE` with task-owned token validation, selected
+  transport release, durable session removal and replay, and source NOTOPEN
+  conditions. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0240` binds
+  `dfhp4_webclose.html` at
+  `sha256:141f05170b7d4fc11e9f59b74b1504e89ff814e9006b5a95f0f8a2851d3341cd`.
+
 - Added typed CICS `WEB OPEN` with source-fenced direct-host or installed
   client URIMAP selection, an eight-byte task-owned session token,
   transport-confirmed HTTP version, bounded durable state and replay, and a

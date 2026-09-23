@@ -4,6 +4,7 @@ use mainframe_env_store_api::{ProviderStateMutation, ProviderStateRecord, Provid
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+mod close;
 mod model;
 mod open;
 mod parse_url;
@@ -172,6 +173,9 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::WebParseUrl => parse_url::invoke(service, run, request),
         CicsOperation::WebOpen => open::invoke(service, run, request, run.invocation.deadline_tick),
+        CicsOperation::WebClose => {
+            close::invoke(service, run, request, run.invocation.deadline_tick)
+        }
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
