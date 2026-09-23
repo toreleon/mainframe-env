@@ -24,6 +24,7 @@ mod output_shape;
 mod program_control;
 mod queue_control;
 mod route;
+mod security_control;
 mod spool_control;
 mod storage_control;
 mod task_wait;
@@ -162,7 +163,10 @@ fn encode_cics_effect_plan_version(
     version: u16,
 ) -> Result<Vec<u8>, CicsPlanCodecProblem> {
     validate_plan(plan, limits)?;
-    if version == LEGACY_VERSION && (91..=104).contains(&operation_tag(plan.operation)) {
+    if version == LEGACY_VERSION
+        && ((91..=104).contains(&operation_tag(plan.operation))
+            || (130..=139).contains(&operation_tag(plan.operation)))
+    {
         return Err(CicsPlanCodecProblem::Malformed);
     }
     let mut writer = Writer::new(limits.max_encoded_bytes);
@@ -232,7 +236,9 @@ pub fn decode_cics_effect_plan(
         return Err(CicsPlanCodecProblem::UnsupportedVersion);
     }
     let operation_tag = reader.tag(version)?;
-    if version == LEGACY_VERSION && (91..=104).contains(&operation_tag) {
+    if version == LEGACY_VERSION
+        && ((91..=104).contains(&operation_tag) || (130..=139).contains(&operation_tag))
+    {
         return Err(CicsPlanCodecProblem::Malformed);
     }
     let operation = operation_from_tag(operation_tag)?;
@@ -725,6 +731,9 @@ fn validate_operation_shape(
         CicsPlanOperation::Trace => diagnostics::invalid_trace_shape(plan, inputs, outputs),
         CicsPlanOperation::EnterTraceId => {
             diagnostics::invalid_trace_id_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::QuerySecurity => {
+            security_control::invalid_query_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::VerifyPassword => {
             security_control::invalid_verify_password_shape(plan, inputs, outputs)

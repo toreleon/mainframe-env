@@ -687,10 +687,10 @@
     "id": "INT-1601.cics-participant",
     "status": "bounded-ambiguity",
     "owner": "shared-execution-coordinator-and-cics-provider",
-    "mutating_rows": 111,
-    "bounded_effect_rows": 122,
+    "mutating_rows": 120,
+    "bounded_effect_rows": 112,
     "explicit_uow_boundary_rows": 1,
-    "bounded_uow_rows": 232,
+    "bounded_uow_rows": 231,
     "execution_credit": 0,
     "prepare_before_dispatch": {
       "durable_effect_intent": true,
@@ -758,10 +758,10 @@
   },
   "registry": {
     "shape_commands": 263,
-    "typed_handlers": 141,
+    "typed_handlers": 151,
     "legacy_compatibility_handlers": 0,
-    "advertised_commands": 141,
-    "unready_handlers": 122,
+    "advertised_commands": 151,
+    "unready_handlers": 112,
     "automatic_registration": false,
     "default_handler": null,
     "unready_result": "explicit-unsupported",
@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:5b4f407a98f494b00107020f1ab6a81e40ca1ff8d6557600461cbb16b64443a2"
+    "registry_sha256": "sha256:a4478fb183bc170bef216e554bfa537cbaf9039a83123aa82b2834c38cb65a75"
   },
   "counts": {
     "batches": 3,
@@ -806,11 +806,11 @@
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
-    "runtime_backed_commands": 141,
-    "typed_runtime_commands": 141,
+    "runtime_backed_commands": 151,
+    "typed_runtime_commands": 151,
     "legacy_compatibility_commands": 0,
-    "advertised_commands": 141,
-    "unready_commands": 122
+    "advertised_commands": 151,
+    "unready_commands": 112
   },
   "batches": [
     {
@@ -447134,5 +447134,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:e95507c5ef5738e1749a99d38787ae70833884067dc2af8a080891f29d2ef28e"
+  "contract_sha256": "sha256:d2a31f8a099124724e242bccfc89baf3fc1c234c548970827dc77343a9c7175b"
 }

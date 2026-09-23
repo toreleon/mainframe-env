@@ -14645,12 +14645,25 @@ mod tests {
     #[test]
     fn current_cics_application_contract_satisfies_its_schema() {
         let root = repository_root().expect("repository root");
-        let catalog =
-            root.join("conformance/0.9/generated/cics-application-command-contracts.json");
-        let schema =
-            root.join("conformance/0.9/schemas/cics-application-command-contracts.schema.json");
-        validate_schema_instance(&json(&schema).unwrap(), &json(&catalog).unwrap(), &catalog)
-            .unwrap();
+        for (catalog, schema) in [
+            (
+                "conformance/0.9/generated/cics-application-command-contracts.json",
+                "conformance/0.9/schemas/cics-application-command-contracts.schema.json",
+            ),
+            (
+                "conformance/0.9/cics/command-descriptors.json",
+                "conformance/0.9/schemas/cics-command-descriptors.schema.json",
+            ),
+            (
+                "conformance/0.9/cics/typed-execution-registrations.json",
+                "conformance/0.9/schemas/cics-typed-execution-registrations.schema.json",
+            ),
+        ] {
+            let catalog = root.join(catalog);
+            let schema = root.join(schema);
+            validate_schema_instance(&json(&schema).unwrap(), &json(&catalog).unwrap(), &catalog)
+                .unwrap();
+        }
     }
 
     #[test]

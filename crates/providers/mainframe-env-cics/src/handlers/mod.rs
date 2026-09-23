@@ -16,6 +16,18 @@ mod limits;
 mod program_control;
 mod queue_control;
 mod recovery;
+mod security_control;
+pub use security_control::{
+    CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
+    CicsCredentialRequest, CicsCredentialVerification, CicsPassTicketFailure,
+    CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess, CicsSecurityAccessReason,
+    CicsSecurityAuthority, CicsSecurityTokenKind, CicsTokenFailure, CicsTokenVerification,
+    CicsTokenVerificationRequest,
+};
+pub(in crate::service) use security_control::{
+    TerminalIdentity, decode_terminal_identity, encode_terminal_identity,
+    validate_terminal_identity,
+};
 mod signal_event;
 mod spool_control;
 mod start_task;
@@ -200,6 +212,9 @@ pub(super) fn invoke_extended_control(
         crate::generated::CicsCommandFamily::WebControl => {
             web_control::invoke(service, run, request)
         }
+        crate::generated::CicsCommandFamily::SecurityControl => {
+            security_control::invoke(service, run, request, retention_tick)
+        }
         _ => unreachable!("only extended control families delegate here"),
     }
 }
@@ -245,6 +260,7 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     web_control::release_task(service, run)?;
     interval_control::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)?;
+    security_control::release_task_token_key(service, run)?;
     web_service_control::release_task(service, run)
 }
 

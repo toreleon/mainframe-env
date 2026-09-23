@@ -478,6 +478,24 @@ pub(super) fn execute(
         }
         match output.name {
             CicsOutputName::Abstime
+            | CicsOutputName::SecurityRead
+            | CicsOutputName::SecurityUpdate
+            | CicsOutputName::SecurityControl
+            | CicsOutputName::SecurityAlter
+            | CicsOutputName::SecurityChangeTime
+            | CicsOutputName::SecurityDaysLeft
+            | CicsOutputName::SecurityEsmReason
+            | CicsOutputName::SecurityEsmResp
+            | CicsOutputName::SecurityExpiryTime
+            | CicsOutputName::SecurityInvalidCount
+            | CicsOutputName::SecurityLastUseTime
+            | CicsOutputName::SecurityPassTicket
+            | CicsOutputName::SecurityIsUserId
+            | CicsOutputName::SecurityEncryptKey
+            | CicsOutputName::SecurityOutTokenLength
+            | CicsOutputName::SecurityEncryptLength
+            | CicsOutputName::SecurityLangInUse
+            | CicsOutputName::SecurityNatLangInUse
             | CicsOutputName::TimerStatus
             | CicsOutputName::EventName
             | CicsOutputName::SubEventName

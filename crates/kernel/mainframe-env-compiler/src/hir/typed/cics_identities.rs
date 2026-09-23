@@ -1,5 +1,15 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    ChangePassword,
+    ChangePhrase,
+    QuerySecurity,
+    RequestPassTicket,
+    RequestEncryptPassTicket,
+    Signoff,
+    Signon,
+    VerifyPassword,
+    VerifyPhrase,
+    VerifyToken,
     Abend,
     Address,
     AddressSet,
@@ -143,6 +153,26 @@ pub enum HirCicsOperation {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
+    ResClass,
+    ResId,
+    ResIdLength,
+    ResType,
+    LogMessage,
+    SecurityUserId,
+    SecurityGroupId,
+    SecurityPassword,
+    SecurityNewPassword,
+    SecurityNewPhrase,
+    SecurityNewPhraseLen,
+    SecurityEsmAppName,
+    SecurityTokenData,
+    SecurityTokenLength,
+    SecurityEncryptKey,
+    SecurityLanguageCode,
+    SecurityNatLang,
+    SecurityOidCard,
+    SecurityPhrase,
+    SecurityPhraseLen,
     Event,
     SubEvent,
     SubEvent1,
@@ -404,6 +434,11 @@ pub enum HirCicsOperandName {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOption {
+    SecurityBasicAuth,
+    SecurityJwt,
+    SecurityKerberos,
+    SecurityBit,
+    SecurityBase64,
     Cancel,
     NoDump,
     Reset,

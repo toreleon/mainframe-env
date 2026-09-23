@@ -424,6 +424,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0149"
     },
     {
+      "operation": "QuerySecurity",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0155"
+    },
+    {
       "operation": "ReadTemporaryStorage",
       "interface": "api",
       "family": "queue-control",
@@ -513,6 +520,20 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0193"
+    },
+    {
+      "operation": "Signoff",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0195"
+    },
+    {
+      "operation": "Signon",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0196"
     },
     {
       "operation": "SoapFaultAdd",

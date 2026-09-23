@@ -478,7 +478,16 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::Delete
+            Self::ChangePassword
+                | Self::ChangePhrase
+                | Self::RequestPassTicket
+                | Self::RequestEncryptPassTicket
+                | Self::Signoff
+                | Self::Signon
+                | Self::VerifyPassword
+                | Self::VerifyPhrase
+                | Self::VerifyToken
+                | Self::Delete
                 | Self::AddSubevent
                 | Self::DefineInputEvent
                 | Self::DefineCompositeEvent
@@ -574,8 +583,6 @@ impl CicsOperation {
                 | Self::TransformJsonToData
                 | Self::TransformXmlToData
                 | Self::Unlock
-                | Self::VerifyPassword
-                | Self::VerifyPhrase
                 | Self::SetFileStatus
                 | Self::SpoolClose
                 | Self::SpoolOpenInput

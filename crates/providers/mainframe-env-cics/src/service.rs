@@ -1764,7 +1764,8 @@ impl CicsService {
             | CicsCommandFamily::WebServiceControl
             | CicsCommandFamily::WebControl
             | CicsCommandFamily::EventControl
-            | CicsCommandFamily::Diagnostics => handlers::invoke_extended_control(
+            | CicsCommandFamily::Diagnostics
+            | CicsCommandFamily::SecurityControl => handlers::invoke_extended_control(
                 self,
                 run,
                 &request,
@@ -31508,37 +31509,6 @@ mod tests {
                 })
             );
         }
-
-        fn verify_credential(
-            &self,
-            _: crate::CicsCredentialRequest<'_>,
-        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
-            Err(HostProblem::Unsupported)
-        }
-
-        fn change_credential(
-            &self,
-            _: crate::CicsCredentialChangeRequest<'_>,
-        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
-            Err(HostProblem::Unsupported)
-        }
-        fn issue_passticket(
-            &self,
-            _: crate::CicsPassTicketRequest<'_>,
-        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
-            Err(HostProblem::Unsupported)
-        }
-        fn audit_signoff(
-            &self,
-            _: &PrincipalId,
-            _: &str,
-            _: [u8; 32],
-            _: &str,
-            _: u64,
-            _: bool,
-        ) -> Result<(), HostProblem> {
-            Err(HostProblem::Unsupported)
-        }
     }
 
     #[test]
@@ -34011,6 +33981,992 @@ mod tests {
             assert_eq!(cics.pending_route_count().unwrap(), 0);
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    struct FixedQueryAuthority {
+        calls: Arc<Mutex<Vec<(String, String)>>>,
+    }
+
+    impl crate::CicsSecurityAuthority for FixedQueryAuthority {
+        fn query_access(
+            &self,
+            actor: &PrincipalId,
+            target: &PrincipalId,
+            class: &str,
+            resource: &str,
+            _: u64,
+            _: &str,
+        ) -> Result<crate::CicsSecurityAccess, HostProblem> {
+            assert_eq!(actor.as_str(), "IBMUSER");
+            assert_eq!(target.as_str(), "IBMUSER");
+            self.calls
+                .lock()
+                .unwrap()
+                .push((class.into(), resource.into()));
+            Ok(crate::CicsSecurityAccess {
+                granted_rank: 3,
+                reason: crate::CicsSecurityAccessReason::Granted,
+            })
+        }
+
+        fn verify_credential(
+            &self,
+            _: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn change_credential(
+            &self,
+            _: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+        fn issue_passticket(
+            &self,
+            _: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            _: bool,
+        ) -> Result<(), HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+    }
+
+    #[test]
+    fn query_security_checks_shape_and_returns_exact_saf_access_levels() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        service
+            .bind_security_authority(Arc::new(FixedQueryAuthority {
+                calls: calls.clone(),
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let arguments = BTreeMap::from([
+            ("RESCLASS".into(), cics_literal(b"FACILITY")),
+            ("RESID".into(), cics_literal(b"ITEM")),
+            ("RESIDLENGTH".into(), cics_decimal(4)),
+            ("READ".into(), argument(b"READ-X")),
+            ("UPDATE".into(), argument(b"UPDATE-X")),
+            ("CONTROL".into(), argument(b"CONTROL-X")),
+            ("ALTER".into(), argument(b"ALTER-X")),
+        ]);
+        let mut query = request(CicsOperation::QuerySecurity, arguments, 1);
+        query.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, query.clone(), 1),
+                query.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response, result.response2),
+            ("NORMAL", 0, 0)
+        );
+        for (name, value) in [
+            ("READ", b"2801".as_slice()),
+            ("UPDATE", b"2803"),
+            ("CONTROL", b"2806"),
+            ("ALTER", b"2808"),
+        ] {
+            assert_eq!(result.outputs[name].bytes(), value);
+        }
+        assert_eq!(
+            calls.lock().unwrap().as_slice(),
+            &[("FACILITY".into(), "ITEM".into())]
+        );
+
+        query
+            .arguments
+            .insert("RESTYPE".into(), cics_literal(b"FILE"));
+        let rejected = service
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 2), query)
+            .unwrap();
+        assert_eq!(
+            (rejected.condition.as_str(), rejected.response),
+            ("INVREQ", 16)
+        );
+        assert_eq!(calls.lock().unwrap().len(), 1);
+
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "PAYFILE".into(),
+                DatasetName::new("PAY.DATA", 128).unwrap(),
+            )]))
+            .unwrap();
+        let mut file_query = request(
+            CicsOperation::QuerySecurity,
+            BTreeMap::from([
+                ("RESTYPE".into(), cics_literal(b"FILE")),
+                ("RESID".into(), cics_literal(b"PAYFILE")),
+                ("READ".into(), argument(b"READ-X")),
+            ]),
+            3,
+        );
+        file_query.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, file_query.clone(), 3),
+                file_query,
+            )
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        assert_eq!(
+            calls.lock().unwrap()[1],
+            ("DATASET".into(), "PAY.DATA".into())
+        );
+    }
+
+    struct FixedVerifyAuthority {
+        calls: Arc<AtomicUsize>,
+        failure: Option<crate::CicsCredentialFailure>,
+        cancel: Option<mainframe_env_execution_api::CancellationProbe>,
+    }
+
+    impl crate::CicsSecurityAuthority for FixedVerifyAuthority {
+        fn query_access(
+            &self,
+            _: &PrincipalId,
+            _: &PrincipalId,
+            _: &str,
+            _: &str,
+            _: u64,
+            _: &str,
+        ) -> Result<crate::CicsSecurityAccess, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn verify_credential(
+            &self,
+            request: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            assert_eq!(request.actor.as_str(), "IBMUSER");
+            assert_eq!(request.user.as_str(), "IBMUSER");
+            assert_eq!(request.credential, b"PASSWORD");
+            assert_eq!(request.kind, crate::CicsCredentialKind::Password);
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(cancel) = &self.cancel {
+                cancel.request();
+            }
+            Ok(crate::CicsCredentialVerification {
+                failure: self.failure,
+                details: self
+                    .failure
+                    .is_none()
+                    .then_some(crate::CicsCredentialDetails {
+                        changed_tick: 12,
+                        days_left: -1,
+                        expiry_tick: -1,
+                        invalid_count: 2,
+                        last_use_tick: 11,
+                    }),
+                esm_response: if self.failure.is_none() { 0 } else { 8 },
+                esm_reason: 0,
+            })
+        }
+
+        fn change_credential(
+            &self,
+            _: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+        fn issue_passticket(
+            &self,
+            _: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            _: bool,
+        ) -> Result<(), HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+    }
+
+    fn verify_password_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::VerifyPassword,
+            BTreeMap::from([
+                (
+                    "PASSWORD".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"PASSWORD".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("USERID".into(), cics_literal(b"IBMUSER")),
+                ("DAYSLEFT".into(), argument(b"DAYS-X")),
+                ("ESMRESP".into(), argument(b"ESM-X")),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    fn signon_password_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::Signon,
+            BTreeMap::from([
+                ("USERID".into(), cics_literal(b"IBMUSER")),
+                (
+                    "PASSWORD".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"PASSWORD".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("LANGINUSE".into(), argument(b"LANG-X")),
+                ("ESMRESP".into(), argument(b"ESM-X")),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    #[test]
+    fn signon_persists_terminal_user_and_replays_without_reauthenticating() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let invocation = invocation();
+        let session = SessionId::new("signon-terminal", 64).unwrap();
+        service
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "signon-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        let request = signon_password_request(23);
+        let bound_effect = effect(&invocation.run_unit_id, request.clone(), 23);
+        let first = service.invoke(&bound_effect, request.clone()).unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(first.outputs["LANGINUSE"].bytes(), b"ENU");
+        assert_eq!(service.invoke(&bound_effect, request).unwrap(), first);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let snapshot = service
+            .terminal_snapshot(&session, invocation.principal.id(), 2)
+            .unwrap();
+        assert_eq!(snapshot.signed_on_user.as_deref(), Some("IBMUSER"));
+        let repeated = signon_password_request(24);
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, repeated.clone(), 24),
+                repeated,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response2),
+            ("INVREQ", 9)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn signon_new_password_uses_atomic_saf_change_before_terminal_binding() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedChangeAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let invocation = invocation();
+        let session = SessionId::new("signon-new-password", 64).unwrap();
+        service
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "signon-new-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        let mut request = signon_password_request(27);
+        request.arguments.insert(
+            "NEWPASSWORD".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.secret@1",
+                b"NEWPASS1".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 27),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            service
+                .terminal_snapshot(&session, invocation.principal.id(), 2)
+                .unwrap()
+                .signed_on_user
+                .as_deref(),
+            Some("IBMUSER")
+        );
+    }
+
+    struct FixedSignoffAuthority {
+        seen: Arc<Mutex<Vec<bool>>>,
+        cancel: Option<mainframe_env_execution_api::CancellationProbe>,
+        fail: bool,
+    }
+
+    impl crate::CicsSecurityAuthority for FixedSignoffAuthority {
+        fn query_access(
+            &self,
+            _: &PrincipalId,
+            _: &PrincipalId,
+            _: &str,
+            _: &str,
+            _: u64,
+            _: &str,
+        ) -> Result<crate::CicsSecurityAccess, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn verify_credential(
+            &self,
+            _: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn change_credential(
+            &self,
+            _: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn issue_passticket(
+            &self,
+            _: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            allowed: bool,
+        ) -> Result<(), HostProblem> {
+            self.seen.lock().unwrap().push(allowed);
+            if let Some(cancel) = &self.cancel {
+                cancel.request();
+            }
+            if self.fail {
+                Err(HostProblem::ProviderFailure)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    fn signoff_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::Signoff,
+            BTreeMap::from([("RESP".into(), argument(b"RESP-X"))]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    fn install_test_terminal_identity(service: &CicsService, session: &SessionId) {
+        let mut state = service.lock().unwrap();
+        let current = state.sessions[session.as_str()].clone();
+        let mut next = current.clone();
+        next.version += 1;
+        next.terminal_identity.user = Some("IBMUSER".into());
+        next.terminal_identity.language = Some("ENU".into());
+        service
+            .persist_session(session.as_str(), &next, Some(current.version))
+            .unwrap();
+        state.sessions.insert(session.as_str().into(), next);
+    }
+
+    #[test]
+    fn signoff_audits_before_clearing_identity_and_replays_once() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        service
+            .bind_security_authority(Arc::new(FixedSignoffAuthority {
+                seen: seen.clone(),
+                cancel: None,
+                fail: false,
+            }))
+            .unwrap();
+        let invocation = invocation();
+        let session = SessionId::new("signoff-terminal", 64).unwrap();
+        service
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "signoff-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        install_test_terminal_identity(&service, &session);
+        let request = signoff_request(28);
+        let bound_effect = effect(&invocation.run_unit_id, request.clone(), 28);
+        let first = service.invoke(&bound_effect, request.clone()).unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(service.invoke(&bound_effect, request).unwrap(), first);
+        assert_eq!(&*seen.lock().unwrap(), &[true]);
+        assert_eq!(
+            service
+                .terminal_snapshot(&session, invocation.principal.id(), 2)
+                .unwrap()
+                .signed_on_user,
+            None
+        );
+        let repeated = signoff_request(29);
+        let denied = service
+            .invoke(
+                &effect(&invocation.run_unit_id, repeated.clone(), 29),
+                repeated,
+            )
+            .unwrap();
+        assert_eq!((denied.condition.as_str(), denied.response2), ("INVREQ", 1));
+        assert_eq!(&*seen.lock().unwrap(), &[true, false]);
+    }
+
+    #[test]
+    fn signoff_post_audit_cancellation_keeps_terminal_identity() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let cancel = mainframe_env_execution_api::CancellationProbe::new();
+        service
+            .bind_security_authority(Arc::new(FixedSignoffAuthority {
+                seen: seen.clone(),
+                cancel: Some(cancel.clone()),
+                fail: false,
+            }))
+            .unwrap();
+        let invocation = invocation().with_cancellation_probe(cancel);
+        let session = SessionId::new("signoff-cancel", 64).unwrap();
+        service
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "signoff-cancel-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        install_test_terminal_identity(&service, &session);
+        let request = signoff_request(30);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 30),
+                request
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(&*seen.lock().unwrap(), &[true]);
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()]
+                .terminal_identity
+                .user
+                .as_deref(),
+            Some("IBMUSER")
+        );
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_signoff_and_replays_without_audit_redispatch() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-signoff-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let invocation = invocation_for("signoff-restart", BTreeMap::new());
+        let session = SessionId::new("signoff-restart", 64).unwrap();
+        let request = signoff_request(31);
+        let first = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .bind_security_authority(Arc::new(FixedSignoffAuthority {
+                    seen: Arc::new(Mutex::new(Vec::new())),
+                    cancel: None,
+                    fail: false,
+                }))
+                .unwrap();
+            service
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "MENU",
+                    24,
+                    80,
+                    "signoff-restart-csrf",
+                    1,
+                    100,
+                )
+                .unwrap();
+            install_test_terminal_identity(&service, &session);
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 31),
+                    request.clone(),
+                )
+                .unwrap()
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            assert_eq!(
+                service
+                    .terminal_snapshot(&session, invocation.principal.id(), 2)
+                    .unwrap()
+                    .signed_on_user,
+                None
+            );
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, request.clone(), 31),
+                        request
+                    )
+                    .unwrap(),
+                first
+            );
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn signon_rejects_facilityless_task_and_postdispatch_cancellation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let facilityless_service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        facilityless_service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (facilityless_invocation, _) = registered(&facilityless_service);
+        let request = signon_password_request(25);
+        let response = facilityless_service
+            .invoke(
+                &effect(&facilityless_invocation.run_unit_id, request.clone(), 25),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response2),
+            ("INVREQ", 10)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        let other: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(other);
+        let cancel = mainframe_env_execution_api::CancellationProbe::new();
+        service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: Arc::new(AtomicUsize::new(0)),
+                failure: None,
+                cancel: Some(cancel.clone()),
+            }))
+            .unwrap();
+        let invocation = invocation().with_cancellation_probe(cancel);
+        let session = SessionId::new("signon-cancel", 64).unwrap();
+        service
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "signon-cancel-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        let request = signon_password_request(26);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 26),
+                request
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(
+            service.lock().unwrap().sessions[session.as_str()]
+                .terminal_identity
+                .user
+                .is_none()
+        );
+    }
+
+    struct FixedChangeAuthority {
+        calls: Arc<AtomicUsize>,
+        failure: Option<crate::CicsCredentialFailure>,
+        cancel: Option<mainframe_env_execution_api::CancellationProbe>,
+    }
+
+    impl crate::CicsSecurityAuthority for FixedChangeAuthority {
+        fn query_access(
+            &self,
+            _: &PrincipalId,
+            _: &PrincipalId,
+            _: &str,
+            _: &str,
+            _: u64,
+            _: &str,
+        ) -> Result<crate::CicsSecurityAccess, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn verify_credential(
+            &self,
+            _: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn change_credential(
+            &self,
+            request: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            assert_eq!(request.actor.as_str(), "IBMUSER");
+            assert_eq!(request.user.as_str(), "IBMUSER");
+            assert_eq!(request.current, b"PASSWORD");
+            assert_eq!(request.proposed, b"NEWPASS1");
+            assert_eq!(request.kind, crate::CicsCredentialKind::Password);
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(cancel) = &self.cancel {
+                cancel.request();
+            }
+            Ok(crate::CicsCredentialVerification {
+                failure: self.failure,
+                details: self
+                    .failure
+                    .is_none()
+                    .then_some(crate::CicsCredentialDetails {
+                        changed_tick: 12,
+                        days_left: -1,
+                        expiry_tick: -1,
+                        invalid_count: 0,
+                        last_use_tick: 11,
+                    }),
+                esm_response: if self.failure.is_none() { 0 } else { 8 },
+                esm_reason: 0,
+            })
+        }
+        fn issue_passticket(
+            &self,
+            _: crate::CicsPassTicketRequest<'_>,
+        ) -> Result<crate::CicsPassTicketOutcome, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+        fn audit_signoff(
+            &self,
+            _: &PrincipalId,
+            _: &str,
+            _: [u8; 32],
+            _: &str,
+            _: u64,
+            _: bool,
+        ) -> Result<(), HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+    }
+
+    fn change_password_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::ChangePassword,
+            BTreeMap::from([
+                (
+                    "PASSWORD".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"PASSWORD".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "NEWPASSWORD".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"NEWPASS1".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("USERID".into(), cics_literal(b"IBMUSER")),
+                ("ESMRESP".into(), argument(b"ESM-X")),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    #[test]
+    fn change_password_replays_and_rejects_malformed_secret_before_saf() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedChangeAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = change_password_request(11);
+        let bound_effect = effect(&invocation.run_unit_id, request.clone(), 11);
+        let response = service.invoke(&bound_effect, request.clone()).unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(response.outputs["ESMRESP"].bytes(), b"0");
+        assert_eq!(service.invoke(&bound_effect, request).unwrap(), response);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let mut malformed = change_password_request(12);
+        malformed
+            .arguments
+            .insert("NEWPASSWORD".into(), cics_literal(b"NEWPASS1"));
+        let rejected = service
+            .invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 12),
+                malformed,
+            )
+            .unwrap();
+        assert_eq!(
+            (rejected.condition.as_str(), rejected.response),
+            ("ERROR", 1)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn change_password_postdispatch_cancellation_is_unknown_outcome() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let cancel = mainframe_env_execution_api::CancellationProbe::new();
+        service
+            .bind_security_authority(Arc::new(FixedChangeAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: Some(cancel.clone()),
+            }))
+            .unwrap();
+        let invocation = invocation().with_cancellation_probe(cancel);
+        let session = SessionId::new("change-cancel", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let request = change_password_request(13);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 13),
+                request
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn verify_password_maps_status_and_replays_without_redispatch() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = verify_password_request(7);
+        let effect = effect(&invocation.run_unit_id, request.clone(), 7);
+        let first = service.invoke(&effect, request.clone()).unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(first.outputs["DAYSLEFT"].bytes(), b"-1");
+        assert_eq!(first.outputs["ESMRESP"].bytes(), b"0");
+        assert_eq!(service.invoke(&effect, request).unwrap(), first);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn verify_password_denial_returns_source_condition_and_esm_codes() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: calls.clone(),
+                failure: Some(crate::CicsCredentialFailure::InvalidCredential),
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = verify_password_request(9);
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 9),
+                request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("NOTAUTH", 70, 2)
+        );
+        assert_eq!(response.outputs["ESMRESP"].bytes(), b"8");
+        assert!(!response.outputs.contains_key("DAYSLEFT"));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn verify_password_postdispatch_cancellation_is_unknown_outcome() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let cancel = mainframe_env_execution_api::CancellationProbe::new();
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: Some(cancel.clone()),
+            }))
+            .unwrap();
+        let invocation = invocation().with_cancellation_probe(cancel);
+        let session = SessionId::new("verify-cancel", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let request = verify_password_request(8);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 8),
+                request
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let retry = verify_password_request(10);
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, retry.clone(), 10), retry),
+            Err(HostProblem::Cancelled)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn verify_password_deadline_expires_before_saf_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store,
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(100)),
+        )
+        .unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedVerifyAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = verify_password_request(11);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 11),
+                request
+            ),
+            Err(HostProblem::TimedOut)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 
     struct PhraseVerifyAuthority(Arc<AtomicUsize>);

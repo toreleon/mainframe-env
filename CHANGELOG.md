@@ -17,6 +17,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Rebased the ten CICS security-control commands onto the local v0.9
+  integration head. Shared command registrations, generated descriptors,
+  codec-v2 tags, compiler/interpreter routes, and recovery tests now retain
+  all integrated families at 151 typed, 0 legacy, and 112 unready rows. The
+  generated descriptor lookup and executable security entries use bounded
+  child modules without raising protected module budgets.
+
 - Rebased the six CICS diagnostics commands onto terminal control and updated
   the shared descriptor, compiler, and generated contract boundaries to 127
   typed, 0 legacy, and 136 unready application rows. Existing terminal and

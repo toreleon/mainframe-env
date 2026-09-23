@@ -7,12 +7,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TAGS = (ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/codec_tags.rs").read_text()
+OUTPUT_TAGS = (
+    ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/codec_tags/output.rs"
+).read_text()
 ASSIGN = (ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/assign.rs").read_text()
 
 
 def body(name):
-    start = TAGS.index(f"fn {name}(")
-    return TAGS[start : TAGS.index("\n}", start)]
+    source = OUTPUT_TAGS if name.startswith("output") else TAGS
+    start = source.index(f"fn {name}(")
+    return source[start : source.index("\n}", start)]
 
 
 def mappings(kind, rust_type):

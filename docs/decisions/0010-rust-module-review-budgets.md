@@ -118,6 +118,17 @@ or credential store. The descriptor generator admits `security-control` only
 for individually registered rows, and the exact protected service root ceiling
 is unchanged. Both handler modules retain the ordinary 1,200-line limit.
 
+### Amendment: integrated security registry split (2026-09-24)
+
+After rebasing the ten security rows onto the 141-route integration head, the
+generated CICS provider descriptor exceeds the ordinary module limit if its
+lookup remains inline. The generator now emits that lookup as a bounded child
+of the descriptor module. The executable security descriptor entries and CICS
+output identities also occupy bounded children. These are ownership-preserving
+module splits: the existing generators, codec tags, runtime imports, and
+single CICS provider remain authoritative. No protected root or ordinary
+module ceiling changes.
+
 ## Consequences
 
 - `architecture-fast` now fails on a new oversized module, an expanded legacy

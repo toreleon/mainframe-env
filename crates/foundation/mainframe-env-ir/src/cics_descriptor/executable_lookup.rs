@@ -147,5 +147,15 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::WebRetrieve => &CICS_EXECUTABLE_DESCRIPTORS[138],
         CicsPlanOperation::WebReceive => &CICS_EXECUTABLE_DESCRIPTORS[139],
         CicsPlanOperation::WebConverse => &CICS_EXECUTABLE_DESCRIPTORS[140],
+        CicsPlanOperation::QuerySecurity => &CICS_EXECUTABLE_DESCRIPTORS[141],
+        CicsPlanOperation::VerifyPassword => &CICS_EXECUTABLE_DESCRIPTORS[142],
+        CicsPlanOperation::VerifyPhrase => &CICS_EXECUTABLE_DESCRIPTORS[143],
+        CicsPlanOperation::ChangePassword => &CICS_EXECUTABLE_DESCRIPTORS[144],
+        CicsPlanOperation::ChangePhrase => &CICS_EXECUTABLE_DESCRIPTORS[145],
+        CicsPlanOperation::RequestPassTicket => &CICS_EXECUTABLE_DESCRIPTORS[146],
+        CicsPlanOperation::RequestEncryptPassTicket => &CICS_EXECUTABLE_DESCRIPTORS[147],
+        CicsPlanOperation::Signon => &CICS_EXECUTABLE_DESCRIPTORS[148],
+        CicsPlanOperation::Signoff => &CICS_EXECUTABLE_DESCRIPTORS[149],
+        CicsPlanOperation::VerifyToken => &CICS_EXECUTABLE_DESCRIPTORS[150],
     }
 }

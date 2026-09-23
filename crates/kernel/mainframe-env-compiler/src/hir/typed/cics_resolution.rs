@@ -38,6 +38,7 @@ mod program_control;
 mod program_name;
 mod queue_control;
 mod route;
+mod security_control;
 mod shape;
 mod spool_control;
 mod storage_control;
@@ -633,6 +634,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     route::validate_constraints(&clauses, &raw_options, operation)?;
+    security_control::validate(&clauses, operation, semantic)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
@@ -909,6 +911,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
+    operands.extend(security_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -953,6 +956,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;
@@ -1013,6 +1017,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
         if clauses.contains_key("QUERYPARM") {
             options.insert(HirCicsOption::WebBrowseQueryParm);
+        }
+    }
+    if operation == HirCicsOperation::VerifyToken {
+        let token_type = security_control::token_cvda(&clauses, "TOKENTYPE")?;
+        options.insert(operation::resolve_option(&token_type, operation));
+        if clauses.contains_key("DATATYPE") {
+            let datatype = security_control::token_cvda(&clauses, "DATATYPE")?;
+            options.insert(operation::resolve_option(&datatype, operation));
         }
     }
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();

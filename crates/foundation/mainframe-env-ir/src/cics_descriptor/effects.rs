@@ -299,22 +299,3 @@ pub(super) const WEB_OPEN_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
-
-pub(super) const CHANGE_TASK_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-];
-
-pub(super) const WAIT_EVENT_EFFECTS: &[Effect] = &[
-    Effect::MemoryRead,
-    Effect::MemoryWrite,
-    Effect::Security,
-    Effect::Audit,
-    Effect::Suspension,
-    Effect::Condition,
-    Effect::Transaction,
-];

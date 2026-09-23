@@ -164,6 +164,11 @@ pub(super) fn resolve(
 
 pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCicsOption {
     match option {
+        "BASICAUTH" => HirCicsOption::SecurityBasicAuth,
+        "JWT" => HirCicsOption::SecurityJwt,
+        "KERBEROS" => HirCicsOption::SecurityKerberos,
+        "BIT" => HirCicsOption::SecurityBit,
+        "BASE64" => HirCicsOption::SecurityBase64,
         "DEFRESP" => HirCicsOption::DefResp,
         "NOWAIT" => HirCicsOption::NoWait,
         "RRN" => HirCicsOption::Rrn,

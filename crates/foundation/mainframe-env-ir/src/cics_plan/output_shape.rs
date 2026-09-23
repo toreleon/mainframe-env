@@ -310,6 +310,72 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::DumpId | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::VerifyToken => matches!(
+            output,
+            CicsOutputName::SecurityIsUserId
+                | CicsOutputName::SecurityEncryptKey
+                | CicsOutputName::SecurityOutToken
+                | CicsOutputName::SecurityOutTokenLength
+                | CicsOutputName::SecurityEsmResp
+                | CicsOutputName::SecurityEsmReason
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::RequestEncryptPassTicket => matches!(
+            output,
+            CicsOutputName::SecurityEncryptPassTicket
+                | CicsOutputName::SecurityEncryptLength
+                | CicsOutputName::SecurityEsmResp
+                | CicsOutputName::SecurityEsmReason
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::QuerySecurity => matches!(
+            output,
+            CicsOutputName::SecurityRead
+                | CicsOutputName::SecurityUpdate
+                | CicsOutputName::SecurityControl
+                | CicsOutputName::SecurityAlter
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::VerifyPassword
+        | CicsPlanOperation::VerifyPhrase
+        | CicsPlanOperation::ChangePassword
+        | CicsPlanOperation::ChangePhrase => matches!(
+            output,
+            CicsOutputName::SecurityChangeTime
+                | CicsOutputName::SecurityDaysLeft
+                | CicsOutputName::SecurityEsmReason
+                | CicsOutputName::SecurityEsmResp
+                | CicsOutputName::SecurityExpiryTime
+                | CicsOutputName::SecurityInvalidCount
+                | CicsOutputName::SecurityLastUseTime
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::RequestPassTicket => matches!(
+            output,
+            CicsOutputName::SecurityPassTicket
+                | CicsOutputName::SecurityEsmResp
+                | CicsOutputName::SecurityEsmReason
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::Signon => matches!(
+            output,
+            CicsOutputName::SecurityChangeTime
+                | CicsOutputName::SecurityDaysLeft
+                | CicsOutputName::SecurityEsmReason
+                | CicsOutputName::SecurityEsmResp
+                | CicsOutputName::SecurityExpiryTime
+                | CicsOutputName::SecurityInvalidCount
+                | CicsOutputName::SecurityLastUseTime
+                | CicsOutputName::SecurityLangInUse
+                | CicsOutputName::SecurityNatLangInUse
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

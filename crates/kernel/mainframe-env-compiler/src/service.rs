@@ -1790,6 +1790,18 @@ mod tests {
             }
             let source_operation = match plan.operation {
                 CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
+                CicsPlanOperation::QuerySecurity => crate::HirCicsOperation::QuerySecurity,
+                CicsPlanOperation::VerifyPassword => crate::HirCicsOperation::VerifyPassword,
+                CicsPlanOperation::ChangePassword => crate::HirCicsOperation::ChangePassword,
+                CicsPlanOperation::ChangePhrase => crate::HirCicsOperation::ChangePhrase,
+                CicsPlanOperation::RequestPassTicket => crate::HirCicsOperation::RequestPassTicket,
+                CicsPlanOperation::RequestEncryptPassTicket => {
+                    crate::HirCicsOperation::RequestEncryptPassTicket
+                }
+                CicsPlanOperation::Signon => crate::HirCicsOperation::Signon,
+                CicsPlanOperation::Signoff => crate::HirCicsOperation::Signoff,
+                CicsPlanOperation::VerifyPhrase => crate::HirCicsOperation::VerifyPhrase,
+                CicsPlanOperation::VerifyToken => crate::HirCicsOperation::VerifyToken,
                 CicsPlanOperation::Address => crate::HirCicsOperation::Address,
                 CicsPlanOperation::AddressSet => crate::HirCicsOperation::AddressSet,
                 CicsPlanOperation::Asktime => crate::HirCicsOperation::Asktime,

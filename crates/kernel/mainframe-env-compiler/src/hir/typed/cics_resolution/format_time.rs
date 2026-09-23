@@ -197,6 +197,26 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebConverseStatusLength
         | HirCicsOutputName::WebConverseMediaType
         | HirCicsOutputName::WebConverseBodyCharset
+        | HirCicsOutputName::SecurityRead
+        | HirCicsOutputName::SecurityUpdate
+        | HirCicsOutputName::SecurityControl
+        | HirCicsOutputName::SecurityAlter
+        | HirCicsOutputName::SecurityChangeTime
+        | HirCicsOutputName::SecurityDaysLeft
+        | HirCicsOutputName::SecurityEsmReason
+        | HirCicsOutputName::SecurityEsmResp
+        | HirCicsOutputName::SecurityExpiryTime
+        | HirCicsOutputName::SecurityInvalidCount
+        | HirCicsOutputName::SecurityLastUseTime
+        | HirCicsOutputName::SecurityPassTicket
+        | HirCicsOutputName::SecurityIsUserId
+        | HirCicsOutputName::SecurityEncryptKey
+        | HirCicsOutputName::SecurityOutToken
+        | HirCicsOutputName::SecurityOutTokenLength
+        | HirCicsOutputName::SecurityEncryptPassTicket
+        | HirCicsOutputName::SecurityEncryptLength
+        | HirCicsOutputName::SecurityLangInUse
+        | HirCicsOutputName::SecurityNatLangInUse
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

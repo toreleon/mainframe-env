@@ -1,11 +1,6 @@
 //! Executable descriptors for the bounded typed CICS dialect.
 
-mod effects;
 use crate::{CicsPlanOperation, Effect, OperationIdentity};
-use effects::{
-    ADDRESS_SET_EFFECTS, CHANGE_TASK_EFFECTS, DEQ_EFFECTS, ENQ_EFFECTS, HANDLE_STACK_EFFECTS,
-    SPOOL_EFFECTS, STORAGE_EFFECTS, SUSPEND_EFFECTS, SYNCPOINT_EFFECTS, WAIT_EVENT_EFFECTS,
-};
 
 mod effects;
 mod executable_entries;
@@ -83,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 141);
+        assert_eq!(typed.len(), 151);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -101,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 122);
+        assert_eq!(unready.len(), 112);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -302,6 +297,16 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::ChangePassword,
+                CicsPlanOperation::ChangePhrase,
+                CicsPlanOperation::QuerySecurity,
+                CicsPlanOperation::RequestPassTicket,
+                CicsPlanOperation::RequestEncryptPassTicket,
+                CicsPlanOperation::Signoff,
+                CicsPlanOperation::Signon,
+                CicsPlanOperation::VerifyPassword,
+                CicsPlanOperation::VerifyPhrase,
+                CicsPlanOperation::VerifyToken,
                 CicsPlanOperation::Abend,
                 CicsPlanOperation::AddressSet,
                 CicsPlanOperation::Address,
