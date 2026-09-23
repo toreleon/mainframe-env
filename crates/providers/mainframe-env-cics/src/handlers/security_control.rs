@@ -29,6 +29,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::ChangePassword => change::password(service, run, request, tick),
+        CicsOperation::ChangePhrase => change::phrase(service, run, request, tick),
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
         CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
         CicsOperation::VerifyPhrase => verify::phrase(service, run, request, tick),

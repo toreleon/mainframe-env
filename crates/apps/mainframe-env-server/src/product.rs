@@ -23290,4 +23290,124 @@ mod tests {
         assert_eq!(restored.variable("ESM-X").unwrap().bytes(), &[0, 0, 0, 0]);
         assert_eq!(restored.variable("DAYS-X").unwrap().bytes(), &[0xff, 0xff]);
     }
+
+    #[test]
+    fn compiled_change_phrase_updates_distinct_phrase_verifier_with_740c() {
+        let artifact = published_source_fixture(
+            "CPHRASE",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 OLD-X PIC X(20) VALUE 'LONG-PHRASE-1234'. 01 NEW-X PIC X(24) VALUE 'NEW-LONG-PHRASE-5678'. 01 RESP-X PIC S9(9) COMP. 01 ESM-X PIC S9(9) COMP. 01 CHANGE-FN PIC X(2). PROCEDURE DIVISION. EXEC CICS CHANGE PHRASE(OLD-X) PHRASELEN(16) NEWPHRASE(NEW-X) NEWPHRASELEN(20) USERID('PHUSER') ESMRESP(ESM-X) RESP(RESP-X) END-EXEC. MOVE EIBFN TO CHANGE-FN. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let admin = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        server
+            .racf
+            .execute_command(
+                &mainframe_env_racf::CommandContext::new(
+                    admin.clone(),
+                    "ADD-PHUSER-CHANGE",
+                    "CHANGE-PHRASE-TEST",
+                    1,
+                )
+                .unwrap(),
+                "ADDUSER PHUSER PHRASE('LONG-PHRASE-1234')",
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CPHRASE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CPH".into(), "CPHRASE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CPHRASE".into(),
+                    map: "CPHRASE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("change-phrase-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CPH", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CPH",
+                24,
+                80,
+                "change-phrase-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &admin, "CPHRASE", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("CHANGE-FN").unwrap().bytes(),
+            &[0x74, 0x0c]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("ESM-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        server
+            .secrets
+            .insert("secret:changed-phrase", b"NEW-LONG-PHRASE-5678".to_vec());
+        let verified = server
+            .racf
+            .racroute(
+                &mainframe_env_racf::SafRequestContext::new(
+                    admin,
+                    None,
+                    None,
+                    "CHECK-CHANGED-PHRASE",
+                    "CHECK-CHANGED-PHRASE",
+                    3,
+                )
+                .unwrap(),
+                mainframe_env_racf::RacrouteRequest::VerifyCredential {
+                    user: PrincipalId::new("PHUSER", InvocationLimits::default()).unwrap(),
+                    credential_reference: SecretRef::new(
+                        "secret:changed-phrase",
+                        HostLimits::default(),
+                    )
+                    .unwrap(),
+                    kind: mainframe_env_racf::CredentialKind::Phrase,
+                    group: None,
+                    binding_digest: [3; 32],
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            verified.status.reason,
+            mainframe_env_racf::DecisionReason::Granted
+        );
+    }
 }

@@ -91,6 +91,7 @@ pub(super) fn resolve(
         ["QUERY", "SECURITY"] => HirCicsOperation::QuerySecurity,
         ["VERIFY", "PASSWORD"] => HirCicsOperation::VerifyPassword,
         ["CHANGE", "PASSWORD"] => HirCicsOperation::ChangePassword,
+        ["CHANGE", "PHRASE"] => HirCicsOperation::ChangePhrase,
         ["VERIFY", "PHRASE"] => HirCicsOperation::VerifyPhrase,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,

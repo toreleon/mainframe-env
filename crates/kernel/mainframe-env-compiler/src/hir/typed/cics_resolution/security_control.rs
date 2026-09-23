@@ -48,6 +48,22 @@ pub(super) const CHANGE_PASSWORD_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const CHANGE_PHRASE_CLAUSES: &[&str] = &[
+    "PHRASE",
+    "PHRASELEN",
+    "NEWPHRASE",
+    "NEWPHRASELEN",
+    "USERID",
+    "CHANGETIME",
+    "DAYSLEFT",
+    "ESMREASON",
+    "ESMRESP",
+    "EXPIRYTIME",
+    "INVALIDCOUNT",
+    "LASTUSETIME",
+    "RESP",
+    "RESP2",
+];
 pub(super) const VERIFY_PHRASE_CLAUSES: &[&str] = &[
     "PHRASE",
     "PHRASELEN",
@@ -74,6 +90,9 @@ pub(super) fn validate(
     }
     if operation == HirCicsOperation::ChangePassword {
         return validate_change_password(clauses, semantic);
+    }
+    if operation == HirCicsOperation::ChangePhrase {
+        return validate_change_phrase(clauses, semantic);
     }
     if operation == HirCicsOperation::VerifyPhrase {
         return validate_verify_phrase(clauses, semantic);
@@ -133,6 +152,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::ChangePassword {
         return change_password_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::ChangePhrase {
+        return change_phrase_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::VerifyPhrase {
         return verify_phrase_operands(clauses, semantic);
     }
@@ -177,6 +199,7 @@ pub(super) fn outputs(
         HirCicsOperation::VerifyPassword
             | HirCicsOperation::VerifyPhrase
             | HirCicsOperation::ChangePassword
+            | HirCicsOperation::ChangePhrase
     ) {
         return verify_credential_outputs(clauses, semantic, operation);
     }
@@ -314,6 +337,7 @@ fn verify_credential_outputs(
     let label = match operation {
         HirCicsOperation::VerifyPhrase => "VERIFY PHRASE",
         HirCicsOperation::ChangePassword => "CHANGE PASSWORD",
+        HirCicsOperation::ChangePhrase => "CHANGE PHRASE",
         _ => "VERIFY PASSWORD",
     };
     let mut out = Vec::new();
@@ -432,5 +456,57 @@ fn verify_phrase_operands(
             });
         }
     }
+    Ok(out)
+}
+
+fn validate_change_phrase(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    if !clauses.contains_key("NEWPHRASE") || !clauses.contains_key("NEWPHRASELEN") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS CHANGE PHRASE requires NEWPHRASE and NEWPHRASELEN".into(),
+        ));
+    }
+    validate_verify_phrase(clauses, semantic)?;
+    let new_phrase = complete_data_reference(&clauses["NEWPHRASE"], semantic).map_err(|_| {
+        ResolutionFailure::Invalid("CICS CHANGE PHRASE requires resolved new phrase storage".into())
+    })?;
+    if !(1..=100).contains(&new_phrase.length)
+        || !matches!(
+            new_phrase.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS CHANGE PHRASE requires a 1- to 100-character new phrase data area".into(),
+        ));
+    }
+    let length = cics_integer_value(&clauses["NEWPHRASELEN"], semantic)?;
+    match length {
+        HirCicsValue::Integer(value)
+            if !(1..=100).contains(&value) || value as usize > new_phrase.length =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS CHANGE PHRASE NEWPHRASELEN must fit the data area and be 1 through 100"
+                    .into(),
+            ));
+        }
+        HirCicsValue::Data(ref reference) => fullword(reference, "NEWPHRASELEN")?,
+        _ => {}
+    }
+    Ok(())
+}
+
+fn change_phrase_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut out = verify_phrase_operands(clauses, semantic)?;
+    out.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::SecurityNewPhrase,
+        value: HirCicsValue::Data(complete_data_reference(&clauses["NEWPHRASE"], semantic)?),
+    });
+    out.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::SecurityNewPhraseLen,
+        value: cics_integer_value(&clauses["NEWPHRASELEN"], semantic)?,
+    });
     Ok(out)
 }

@@ -9,6 +9,8 @@ pub enum HirCicsOperandName {
     SecurityGroupId,
     SecurityPassword,
     SecurityNewPassword,
+    SecurityNewPhrase,
+    SecurityNewPhraseLen,
     SecurityPhrase,
     SecurityPhraseLen,
     Abcode,

@@ -33966,10 +33966,112 @@ mod tests {
 
         fn change_credential(
             &self,
-            _: crate::CicsCredentialChangeRequest<'_>,
+            request: crate::CicsCredentialChangeRequest<'_>,
         ) -> Result<crate::CicsCredentialVerification, HostProblem> {
-            Err(HostProblem::Unsupported)
+            assert_eq!(request.kind, crate::CicsCredentialKind::Phrase);
+            assert_eq!(request.current, b"LONG-PHRASE-1234");
+            self.0.fetch_add(1, Ordering::SeqCst);
+            let failure = (request.proposed.len() <= 8)
+                .then_some(crate::CicsCredentialFailure::MismatchedCredentialKind);
+            Ok(crate::CicsCredentialVerification {
+                failure,
+                details: None,
+                esm_response: if failure.is_some() { 8 } else { 0 },
+                esm_reason: 0,
+            })
         }
+    }
+
+    fn change_phrase_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::ChangePhrase,
+            BTreeMap::from([
+                (
+                    "PHRASE".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"LONG-PHRASE-1234    ".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("PHRASELEN".into(), cics_decimal(16)),
+                (
+                    "NEWPHRASE".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"NEW-LONG-PHRASE-5678    ".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("NEWPHRASELEN".into(), cics_decimal(20)),
+                ("USERID".into(), cics_literal(b"IBMUSER")),
+                ("ESMRESP".into(), argument(b"ESM-X")),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    #[test]
+    fn change_phrase_enforces_both_lengths_and_maps_cross_kind_denial() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(PhraseVerifyAuthority(calls.clone())))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let valid = change_phrase_request(15);
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, valid.clone(), 15), valid)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        for (sequence, field, expected_response2) in [(16, "PHRASELEN", 1), (17, "NEWPHRASELEN", 2)]
+        {
+            let mut malformed = change_phrase_request(sequence);
+            malformed.arguments.insert(field.into(), cics_decimal(101));
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, malformed.clone(), sequence),
+                    malformed,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("LENGERR", 22, expected_response2)
+            );
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let mut mismatch = change_phrase_request(18);
+        mismatch
+            .arguments
+            .insert("NEWPHRASELEN".into(), cics_decimal(8));
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, mismatch.clone(), 18),
+                mismatch,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("INVREQ", 16, 2)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
     }
 
     #[test]

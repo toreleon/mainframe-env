@@ -22,6 +22,8 @@ pub enum CicsOperation {
     Cancel,
     /// Change a standard RACF password after verifying its current value.
     ChangePassword,
+    /// Change a length-selected RACF password or phrase after verification.
+    ChangePhrase,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
     /// Complete the source-defined zero-delay interval-control boundary.
@@ -294,6 +296,7 @@ impl CicsOperation {
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
             Self::ChangePassword => "ChangePassword",
+            Self::ChangePhrase => "ChangePhrase",
             Self::ChangeTask => "ChangeTask",
             Self::Delay => "Delay",
             Self::DefineCounter => "DefineCounter",
@@ -616,6 +619,7 @@ impl CicsOperation {
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("CHANGE", Some("PASSWORD")) => Self::ChangePassword,
+            ("CHANGE", Some("PHRASE")) => Self::ChangePhrase,
             ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
             ("DEFINE", Some("COUNTER")) => Self::DefineCounter,

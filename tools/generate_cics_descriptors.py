@@ -802,6 +802,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Unlock",
         "VerifyPassword",
         "ChangePassword",
+        "ChangePhrase",
         "VerifyPhrase",
         "Start",
         "Retrieve",
@@ -1173,6 +1174,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "ChangePassword": frozenset(
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
+    "ChangePhrase": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
     "VerifyPhrase": frozenset(
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
@@ -1478,6 +1482,7 @@ def _load_typed_execution_registrations(
         "AsktimeEib",
         "Cancel",
         "ChangePassword",
+        "ChangePhrase",
         "ChangeTask",
         "Delay",
         "DefineCounter",

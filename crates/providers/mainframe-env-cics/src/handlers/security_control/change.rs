@@ -24,6 +24,21 @@ pub(super) fn password(
     )
 }
 
+pub(super) fn phrase(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+) -> Result<CicsResponse, HostProblem> {
+    change(
+        service,
+        run,
+        request,
+        retention_tick,
+        CicsCredentialKind::Phrase,
+    )
+}
+
 fn change(
     service: &CicsService,
     run: &mut Run,

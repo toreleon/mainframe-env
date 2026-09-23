@@ -46,6 +46,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0020"
     },
     {
+      "operation": "ChangePhrase",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0021"
+    },
+    {
       "operation": "ChangeTask",
       "interface": "api",
       "family": "task-control",
