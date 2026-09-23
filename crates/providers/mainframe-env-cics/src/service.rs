@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 67);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 68);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4332,6 +4332,7 @@ mod tests {
             deny_command: false,
             deny_transform,
             deny_journal: false,
+            deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
@@ -4354,6 +4355,7 @@ mod tests {
             deny_command: false,
             deny_transform: false,
             deny_journal,
+            deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
@@ -4378,6 +4380,7 @@ mod tests {
             deny_command,
             deny_transform: false,
             deny_journal: false,
+            deny_dataset: false,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
             seen: Arc::new(Mutex::new(Vec::new())),
@@ -4456,6 +4459,8 @@ mod tests {
         let mut providers = vec![Arc::new(CommandSecurityAuthority {
             descriptor: descriptor("host.security.authorize"),
             deny_command: false,
+            deny_transform: false,
+            deny_journal: false,
             deny_dataset: true,
             deny_surrogate: false,
             principal_decision: SecurityDecision::Allow,
@@ -6514,7 +6519,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 68);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 68);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();

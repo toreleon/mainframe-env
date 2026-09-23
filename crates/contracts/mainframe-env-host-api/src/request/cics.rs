@@ -362,7 +362,10 @@ pub struct CicsRequest {
 }
 
 impl CicsRequest {
-    pub(super) fn validate_mutation(&self, limits: HostLimits) -> Result<(), HostProblem> {
+    pub(super) fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.arguments.len() > limits.max_fields {
+            return Err(HostProblem::ResourceExhausted);
+        }
         if self.is_mutating() {
             self.mutation
                 .as_ref()

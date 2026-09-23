@@ -16,17 +16,6 @@ pub(super) fn validate(request: &DatasetRequest, limits: HostLimits) -> Result<(
         {
             Err(HostProblem::Malformed)
         }
-        DatasetRequest::Close {
-            cursor, control, ..
-        } if cursor
-            .as_ref()
-            .is_some_and(|cursor| cursor.is_empty() || cursor.len() > limits.max_name_bytes)
-            || (control.lock
-                && (control.reel_or_unit.is_some() || control.no_rewind || control.removal))
-            || (control.removal && control.reel_or_unit.is_none()) =>
-        {
-            Err(HostProblem::Malformed)
-        }
         _ => Ok(()),
     }
 }

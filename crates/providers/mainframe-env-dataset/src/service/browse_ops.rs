@@ -1,9 +1,9 @@
 //! Position and replace dataset browse cursors without changing their identity.
 
-use super::{BrowseIdentity, Cursor, DatasetLimits, State, browse_identities, condition};
+use super::{BrowseIdentity, DatasetLimits, State, browse_identities, condition};
 use mainframe_env_host_api::{DatasetName, DatasetResult, HostProblem, KeyRelation};
 
-fn position(
+pub(super) fn position(
     state: &State,
     dataset: &DatasetName,
     key: &[u8],
@@ -28,60 +28,11 @@ fn position(
     Ok((identities, index))
 }
 
-fn identity_bytes(identities: &[BrowseIdentity]) -> usize {
+pub(super) fn identity_bytes(identities: &[BrowseIdentity]) -> usize {
     identities
         .iter()
         .map(|(logical, identity)| logical.len() + identity.len())
         .sum()
-}
-
-pub(super) fn start(
-    state: &mut State,
-    dataset: &DatasetName,
-    key: &[u8],
-    relation: KeyRelation,
-    limits: DatasetLimits,
-) -> Result<DatasetResult, HostProblem> {
-    let (identities, index) = position(state, dataset, key, relation)?;
-    let active_identities = state
-        .cursors
-        .values()
-        .map(|cursor| cursor.identities.len())
-        .sum::<usize>();
-    let active_bytes = state
-        .cursors
-        .values()
-        .map(|cursor| identity_bytes(&cursor.identities))
-        .sum::<usize>();
-    if state.cursors.len() >= limits.max_cursors
-        || active_identities
-            .checked_add(identities.len())
-            .is_none_or(|total| total > limits.max_records)
-        || active_bytes
-            .checked_add(identity_bytes(&identities))
-            .is_none_or(|total| total > limits.max_total_bytes)
-    {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let cursor = format!("cursor-{}", state.next_cursor);
-    state.next_cursor = state
-        .next_cursor
-        .checked_add(1)
-        .ok_or(HostProblem::ResourceExhausted)?;
-    state.cursors.insert(
-        cursor.clone(),
-        Cursor {
-            dataset: dataset.as_str().into(),
-            identities,
-            index: index as isize,
-        },
-    );
-    Ok(DatasetResult::Browse {
-        cursor,
-        record: None,
-        identity: None,
-        key: None,
-    })
 }
 
 pub(super) fn reset(

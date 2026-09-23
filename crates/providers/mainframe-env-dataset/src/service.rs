@@ -4547,7 +4547,52 @@ impl DatasetService {
                 dataset,
                 key,
                 relation,
-            } => browse_ops::start(state, dataset, key, *relation, self.limits),
+            } => {
+                let (identities, index) = browse_ops::position(state, dataset, key, *relation)?;
+                let active_identities = state
+                    .cursors
+                    .values()
+                    .map(|cursor| cursor.identities.len())
+                    .sum::<usize>();
+                let active_bytes = state
+                    .cursors
+                    .values()
+                    .map(|cursor| browse_ops::identity_bytes(&cursor.identities))
+                    .sum::<usize>();
+                let added_bytes = identities
+                    .iter()
+                    .map(|(logical, identity)| logical.len() + identity.len())
+                    .sum::<usize>();
+                if state.cursors.len() >= self.limits.max_cursors
+                    || active_identities
+                        .checked_add(identities.len())
+                        .is_none_or(|total| total > self.limits.max_records)
+                    || active_bytes
+                        .checked_add(added_bytes)
+                        .is_none_or(|total| total > self.limits.max_total_bytes)
+                {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let cursor = format!("cursor-{}", state.next_cursor);
+                state.next_cursor = state
+                    .next_cursor
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                state.cursors.insert(
+                    cursor.clone(),
+                    Cursor {
+                        dataset: dataset.as_str().into(),
+                        identities,
+                        index: index as isize,
+                    },
+                );
+                Ok(DatasetResult::Browse {
+                    cursor,
+                    record: None,
+                    identity: None,
+                    key: None,
+                })
+            }
             DatasetRequest::ResetBrowse {
                 dataset,
                 cursor,

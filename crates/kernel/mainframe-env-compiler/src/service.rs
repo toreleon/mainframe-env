@@ -1526,7 +1526,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-assert_eq!(typed_hir.len(), 54);
+        assert_eq!(typed_hir.len(), 54);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1853,7 +1853,7 @@ assert_eq!(typed_hir.len(), 54);
                 )
             })
             .collect::<Vec<_>>();
-assert_eq!(operations.len(), 54);
+        assert_eq!(operations.len(), 54);
         assert_eq!(
             operations
                 .iter()

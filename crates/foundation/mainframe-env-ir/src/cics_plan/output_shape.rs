@@ -8,16 +8,19 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
-            output,
-            CicsOutputName::Into
-                | CicsOutputName::SetPointer
-                | CicsOutputName::Resp
-                | CicsOutputName::Resp2
-                | CicsOutputName::Length
-                | CicsOutputName::ReturnTransId
-                | CicsOutputName::ReturnTermId
-                | CicsOutputName::Queue
-            ) || matches!((operation, output), (CicsPlanOperation::Read, CicsOutputName::Token))
+                output,
+                CicsOutputName::Into
+                    | CicsOutputName::SetPointer
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+                    | CicsOutputName::Length
+                    | CicsOutputName::ReturnTransId
+                    | CicsOutputName::ReturnTermId
+                    | CicsOutputName::Queue
+            ) || matches!(
+                (operation, output),
+                (CicsPlanOperation::Read, CicsOutputName::Token)
+            )
         }
         CicsPlanOperation::ReadTemporaryStorage => matches!(
             output,

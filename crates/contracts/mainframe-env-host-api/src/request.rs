@@ -488,10 +488,15 @@ pub enum DatasetRequest {
         key: Vec<u8>,
         relation: KeyRelation,
     },
+    /// Reposition an existing browse cursor for one dataset.
     ResetBrowse {
+        /// Dataset owning the cursor.
         dataset: DatasetName,
+        /// Cursor identity returned by STARTBR.
         cursor: String,
+        /// Target record key for the new browse position.
         key: Vec<u8>,
+        /// Comparison used to select the new position.
         relation: KeyRelation,
     },
     ReadNext {
@@ -932,6 +937,8 @@ pub enum HostRequest {
     Security(SecurityRequest),
     Clock(ClockRequest),
     State(StateRequest),
+    /// Typed CICS command with its command-owned validation and replay identity.
+    /// Mutation identity is checked before provider dispatch.
     Cics(CicsRequest),
     Db2(Db2Request),
     Ims(ImsRequest),
@@ -1160,14 +1167,7 @@ impl HostRequest {
                 mutation.validate(limits)
             }
             Self::State(StateRequest::Delete { mutation, .. }) => mutation.validate(limits),
-            Self::Cics(request) => {
-                if request.arguments.len() > limits.max_fields {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-                // The CICS request owns its replay validation rule.
-                request.validate_mutation(limits)?;
-                Ok(())
-            }
+            Self::Cics(request) => request.validate(limits),
             Self::Db2(request) => {
                 if request.statement.len() > limits.max_state_bytes
                     || request.cursor.as_ref().is_some_and(|cursor| {
@@ -1996,11 +1996,22 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
+        // Browse key and cursor bounds share one validator.
         DatasetRequest::StartBrowse { .. }
         | DatasetRequest::ResetBrowse { .. }
         | DatasetRequest::ReadNext { .. }
-        | DatasetRequest::EndBrowse { .. }
-        | DatasetRequest::Close { .. } => browse::validate(request, limits),
+        | DatasetRequest::EndBrowse { .. } => browse::validate(request, limits),
+        DatasetRequest::Close {
+            cursor, control, ..
+        } if cursor
+            .as_ref()
+            .is_some_and(|cursor| cursor.is_empty() || cursor.len() > limits.max_name_bytes)
+            || (control.lock
+                && (control.reel_or_unit.is_some() || control.no_rewind || control.removal))
+            || (control.removal && control.reel_or_unit.is_none()) =>
+        {
+            Err(HostProblem::Malformed)
+        }
         _ => Ok(()),
     }
 }
@@ -2460,7 +2471,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-assert_eq!(forms.len(), 55);
+        assert_eq!(forms.len(), 61);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())
