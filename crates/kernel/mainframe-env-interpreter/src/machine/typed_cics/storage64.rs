@@ -1,43 +1,155 @@
 use super::*;
-use crate::storage64::Storage64Problem;
+use crate::storage64::{Storage64Key, Storage64Problem};
 
-pub(super) fn pending_release_pointer(
-    operation: CicsOperation,
-    arguments: &BTreeMap<String, BoundedPayload>,
-) -> Result<Option<[u8; 8]>, MachineProblem> {
-    if operation != CicsOperation::Freemain64 {
-        return Ok(None);
-    }
-    let pointer = arguments
-        .get("DATA")
-        .or_else(|| arguments.get("DATAPOINTER"))
-        .ok_or(MachineProblem::UnexpectedHostResult)?;
-    Ok(Some(
-        pointer
-            .bytes()
-            .try_into()
-            .map_err(|_| MachineProblem::UnexpectedHostResult)?,
-    ))
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Storage64Intent {
+    Getmain(Option<[u8; 8]>),
+    Freemain([u8; 8]),
 }
 
-pub(super) fn validate_release_response(
+pub(super) fn pending_intent(
+    machine: &ReferenceMachine,
     operation: CicsOperation,
-    release64: Option<[u8; 8]>,
+    arguments: &BTreeMap<String, BoundedPayload>,
+) -> Result<Option<Storage64Intent>, MachineProblem> {
+    match operation {
+        CicsOperation::Getmain64 => {
+            let length = arguments
+                .get("FLENGTH")
+                .and_then(|value| std::str::from_utf8(value.bytes()).ok())
+                .and_then(|value| value.parse::<i64>().ok())
+                .filter(|value| (1..=2_146_435_056).contains(value))
+                .and_then(|value| u32::try_from(value).ok());
+            let location = match arguments.get("LOCATION").map(BoundedPayload::bytes) {
+                None => Some(0),
+                Some(b"LOC24") => Some(1),
+                Some(b"LOC31") => Some(2),
+                Some(_) => None,
+            };
+            let key = match machine
+                .storage64_caller_key()
+                .map_err(|_| invalid_plan("GETMAIN64 requires the checked caller ABI"))?
+            {
+                Storage64Key::User => 0,
+                Storage64Key::Cics => 1,
+            };
+            let key = if arguments.contains_key("OPTION.CICSDATAKEY") {
+                1
+            } else if arguments.contains_key("OPTION.USERDATAKEY") {
+                0
+            } else {
+                key
+            };
+            let expected = if arguments.contains_key("OPTION.SHARED")
+                || arguments.contains_key("OPTION.CICSDATAKEY")
+                    && arguments.contains_key("OPTION.USERDATAKEY")
+            {
+                None
+            } else {
+                length.zip(location).map(|(length, location)| {
+                    let mut specification = [
+                        location,
+                        key,
+                        0,
+                        u8::from(arguments.contains_key("OPTION.EXECUTABLE")),
+                        0,
+                        0,
+                        0,
+                        0,
+                    ];
+                    specification[4..].copy_from_slice(&length.to_be_bytes());
+                    specification
+                })
+            };
+            Ok(Some(Storage64Intent::Getmain(expected)))
+        }
+        CicsOperation::Freemain64 => {
+            let pointer = arguments
+                .get("DATA")
+                .or_else(|| arguments.get("DATAPOINTER"))
+                .ok_or(MachineProblem::UnexpectedHostResult)?;
+            Ok(Some(Storage64Intent::Freemain(
+                pointer
+                    .bytes()
+                    .try_into()
+                    .map_err(|_| MachineProblem::UnexpectedHostResult)?,
+            )))
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(super) fn validate_response(
+    operation: CicsOperation,
+    intent: Option<Storage64Intent>,
     response: &CicsResponse,
 ) -> Result<(), MachineProblem> {
-    if operation != CicsOperation::Freemain64 {
-        return if response.outputs.contains_key("FREEMAIN64.POINTER") {
+    match (operation, intent) {
+        (CicsOperation::Getmain64, Some(Storage64Intent::Getmain(expected))) => {
+            validate_getmain_response(expected, response)
+        }
+        (CicsOperation::Freemain64, Some(Storage64Intent::Freemain(pointer))) => {
+            validate_freemain_response(pointer, response)
+        }
+        (CicsOperation::Getmain64 | CicsOperation::Freemain64, _) => {
             Err(MachineProblem::UnexpectedHostResult)
-        } else {
+        }
+        (_, None)
+            if !response.outputs.contains_key("SET64")
+                && !response.outputs.contains_key("FREEMAIN64.POINTER") =>
+        {
             Ok(())
-        };
+        }
+        _ => Err(MachineProblem::UnexpectedHostResult),
     }
+}
+
+fn validate_getmain_response(
+    expected: Option<[u8; 8]>,
+    response: &CicsResponse,
+) -> Result<(), MachineProblem> {
+    let output = response.outputs.get("SET64");
+    if response.disposition == CicsDisposition::Complete
+        && response.condition == "NORMAL"
+        && response.response == 0
+        && response.response2 == 0
+    {
+        let allocation = output.ok_or(MachineProblem::UnexpectedHostResult)?;
+        if response.outputs.len() != 1
+            || allocation.schema() != "mainframe-env.cics.storage64-allocation@1"
+            || Some(allocation.bytes()) != expected.as_ref().map(|bytes| bytes.as_slice())
+        {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+    } else if response.condition == "LENGERR" && response.response == 22 && response.response2 == 1
+    {
+        let null = output.ok_or(MachineProblem::UnexpectedHostResult)?;
+        if response.outputs.len() != 1
+            || null.schema() != "mainframe-env.cics.pointer64-null@1"
+            || !null.bytes().is_empty()
+        {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+    } else if !response.outputs.is_empty() {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    Ok(())
+}
+
+fn validate_freemain_response(
+    expected: [u8; 8],
+    response: &CicsResponse,
+) -> Result<(), MachineProblem> {
     let returned = response.outputs.get("FREEMAIN64.POINTER");
-    if response.disposition == CicsDisposition::Complete && response.response == 0 {
+    if response.disposition == CicsDisposition::Complete
+        && response.condition == "NORMAL"
+        && response.response == 0
+        && response.response2 == 0
+    {
         let pointer = returned.ok_or(MachineProblem::UnexpectedHostResult)?;
         if response.outputs.len() != 1
             || pointer.schema() != "mainframe-env.cics.allocated-pointer64@1"
-            || Some(pointer.bytes()) != release64.as_ref().map(|bytes| bytes.as_slice())
+            || pointer.bytes() != expected.as_slice()
         {
             return Err(MachineProblem::UnexpectedHostResult);
         }

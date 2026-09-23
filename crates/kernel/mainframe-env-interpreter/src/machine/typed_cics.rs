@@ -23,6 +23,7 @@ pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 pub(super) use response::drive_response;
 use runtime_validation::validate_runtime_plan;
+pub(super) use storage64::Storage64Intent;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
@@ -46,14 +47,14 @@ pub(super) fn is_typed(operation: &Operation) -> bool {
 pub(super) fn write_response_state(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
-    release64: Option<[u8; 8]>,
+    storage64_intent: Option<Storage64Intent>,
     response_target: Option<&CicsTarget>,
     response2_target: Option<&CicsTarget>,
     address_set: Option<&CicsAddressSet>,
     outputs: &BTreeMap<String, CicsTarget>,
     response: &CicsResponse,
 ) -> Result<Option<usize>, MachineProblem> {
-    storage64::validate_release_response(operation, release64, response)?;
+    storage64::validate_response(operation, storage64_intent, response)?;
     for (target, value) in [
         (response_target, response.response),
         (response2_target, response.response2),
@@ -589,7 +590,7 @@ pub(super) fn execute(
         );
     }
     let argument_summary = argument_summary(&arguments);
-    let release64 = storage64::pending_release_pointer(host_operation, &arguments)?;
+    let storage64_intent = storage64::pending_intent(machine, host_operation, &arguments)?;
     machine.effect(
         HostRequest::Cics(CicsRequest {
             operation: host_operation,
@@ -599,7 +600,7 @@ pub(super) fn execute(
         }),
         PendingKind::Cics {
             operation: host_operation,
-            release64,
+            storage64_intent,
             argument_summary,
             into,
             outputs,

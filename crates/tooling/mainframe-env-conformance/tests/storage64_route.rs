@@ -261,36 +261,55 @@ fn compiled_selected_route_writes_only_a_checked_64_bit_address() {
         )]),
         unit_of_work: None,
     };
-    let mut forged =
-        ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default()).unwrap();
-    let forged_effect = loop {
-        match forged.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
-            MachineDrive::Continue => continue,
-            MachineDrive::HostCall(effect) => break effect,
-            other => panic!("forged GETMAIN64 did not select a host call: {other:?}"),
+    for (field, specification) in [
+        ("location", [1, 0, 0, 0, 0, 0, 0, 17]),
+        ("key", [0, 1, 0, 0, 0, 0, 0, 17]),
+        ("shared", [0, 0, 1, 0, 0, 0, 0, 17]),
+        ("executable", [0, 0, 0, 1, 0, 0, 0, 17]),
+        ("length", [0, 0, 0, 0, 0, 0, 0, 18]),
+        ("condition", [0, 0, 0, 0, 0, 0, 0, 17]),
+    ] {
+        let mut forged =
+            ReferenceMachine::from_binary(&binary, invocation.clone(), CodecLimits::default())
+                .unwrap();
+        let forged_effect = loop {
+            match forged.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
+                MachineDrive::Continue => continue,
+                MachineDrive::HostCall(effect) => break effect,
+                other => panic!("{field}: forged GETMAIN64 did not select a host call: {other:?}"),
+            }
+        };
+        let mut forged_response = response.clone();
+        if field == "condition" {
+            forged_response.condition = "INVREQ".into();
         }
-    };
-    let mut shared_response = response.clone();
-    shared_response.outputs.insert(
-        "SET64".into(),
-        BoundedPayload::new(
-            "mainframe-env.cics.storage64-allocation@1",
-            vec![0, 0, 1, 0, 0, 0, 0, 17],
-            InvocationLimits::default(),
-        )
-        .unwrap(),
-    );
-    assert!(matches!(
-        forged.drive(
-            MachineResume::HostResult(mainframe_env_host_api::EffectResult {
-                sequence: forged_effect.sequence,
-                outcome: Ok(HostResult::Cics(shared_response)),
-            }),
-            Quantum::new(1, 1024).unwrap(),
-        ),
-        MachineDrive::Failed(_)
-    ));
-    assert!(forged.snapshot().storage64.allocations.is_empty());
+        forged_response.outputs.insert(
+            "SET64".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.storage64-allocation@1",
+                specification.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert!(
+            matches!(
+                forged.drive(
+                    MachineResume::HostResult(mainframe_env_host_api::EffectResult {
+                        sequence: forged_effect.sequence,
+                        outcome: Ok(HostResult::Cics(forged_response)),
+                    }),
+                    Quantum::new(1, 1024).unwrap(),
+                ),
+                MachineDrive::Failed(_)
+            ),
+            "{field}"
+        );
+        assert!(
+            forged.snapshot().storage64.allocations.is_empty(),
+            "{field}"
+        );
+    }
     let result = mainframe_env_host_api::EffectResult {
         sequence: effect.sequence,
         outcome: Ok(HostResult::Cics(response)),
