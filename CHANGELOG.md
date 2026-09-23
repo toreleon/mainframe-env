@@ -129,6 +129,12 @@ All notable changes to mainframe-env are documented here.
   6.x application API sources-a, `dfhp4_dumptransaction.html`, catalog row
   0057.
 
+- Added a bounded local DUMP form with selected provider-owned sections and
+  DCT capture through the same durable diagnostic row. Its catalog identity is
+  CICS TS 6.x application API row 0056; the committed CICS TX 11.1
+  compatibility topic is unavailable locally, so the implementation does not
+  claim target-product dump-dataset or system-dump behavior.
+
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse
   across restart; UNLOCK consumes only the matching task and file token, and a

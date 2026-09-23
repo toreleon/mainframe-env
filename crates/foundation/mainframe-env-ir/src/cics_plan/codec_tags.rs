@@ -142,6 +142,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::EnterTraceNum => 151,
         CicsPlanOperation::Monitor => 152,
         CicsPlanOperation::DumpTransaction => 149,
+        CicsPlanOperation::Dump => 148,
     }
 }
 
@@ -271,6 +272,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         151 => Ok(CicsPlanOperation::EnterTraceNum),
         152 => Ok(CicsPlanOperation::Monitor),
         149 => Ok(CicsPlanOperation::DumpTransaction),
+        148 => Ok(CicsPlanOperation::Dump),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -834,6 +836,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::DumpSit => 518,
         CicsPlanOption::DumpTct => 519,
         CicsPlanOption::DumpTrt => 520,
+        CicsPlanOption::DumpDct => 521,
     }
 }
 
@@ -947,6 +950,7 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         518 => Ok(CicsPlanOption::DumpSit),
         519 => Ok(CicsPlanOption::DumpTct),
         520 => Ok(CicsPlanOption::DumpTrt),
+        521 => Ok(CicsPlanOption::DumpDct),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -15726,6 +15726,90 @@ mod tests {
         assert!(service.diagnostic_snapshot().unwrap().dumps.is_empty());
     }
 
+    #[test]
+    fn dump_captures_local_dct_and_replays_without_a_code() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        service
+            .register_diagnostic_resources(
+                &[CicsDumpCodeDefinition {
+                    code: "ABCD".into(),
+                    suppress: false,
+                    maximum: 2,
+                    system_dump: false,
+                }],
+                &[],
+            )
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let dump = request(
+            CicsOperation::Dump,
+            BTreeMap::from([("OPTION.DCT".into(), cics_option())]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, dump.clone(), 1),
+                dump.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        let snapshot = service.diagnostic_snapshot().unwrap();
+        assert_eq!(snapshot.dumps.len(), 1);
+        assert_eq!(snapshot.dumps[0].scope, "DUMP");
+        assert_eq!(snapshot.dumps[0].sections, ["DCT"]);
+        assert!(
+            snapshot.dumps[0]
+                .data
+                .windows(4)
+                .any(|bytes| bytes == b"ABCD")
+        );
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+            .unwrap();
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, dump.clone(), 1), dump)
+                .unwrap(),
+            first
+        );
+        assert_eq!(service.diagnostic_snapshot().unwrap().dumps.len(), 1);
+    }
+
+    #[test]
+    fn dump_without_code_requires_generic_diagnostic_authorization() {
+        let (authorities, seen) = diagnostic_authorities(true);
+        let service = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut denied = request(
+            CicsOperation::Dump,
+            BTreeMap::from([("OPTION.DCT".into(), cics_option())]),
+            1,
+        );
+        denied.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied)
+            .unwrap();
+        assert_eq!(result.condition, "NOTAUTH");
+        assert!(service.diagnostic_snapshot().unwrap().dumps.is_empty());
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "CICSDIAG"
+                        && resource == "CICS.DIAG.DUMP"
+                        && *intent == AccessIntent::Update
+                })
+        );
+    }
+
     fn open_staged_spool_report(
         service: &CicsService,
         invocation: &Invocation,

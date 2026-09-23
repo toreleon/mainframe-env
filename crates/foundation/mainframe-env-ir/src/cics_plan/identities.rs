@@ -194,6 +194,8 @@ pub enum CicsPlanOperation {
     Monitor,
     /// Capture selected local transaction data and diagnostic table content.
     DumpTransaction,
+    /// Capture selected local diagnostic state through the DUMP form.
+    Dump,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -824,6 +826,7 @@ pub enum CicsPlanOption {
     DumpSit,
     DumpTct,
     DumpTrt,
+    DumpDct,
 }
 
 /// Named result binding written after the host result arrives.

@@ -54,6 +54,7 @@ pub enum HirCicsOperation {
     EnterTraceNum,
     Monitor,
     DumpTransaction,
+    Dump,
     Syncpoint,
     Unlock,
     Suspend,
@@ -449,4 +450,5 @@ pub enum HirCicsOption {
     DumpSit,
     DumpTct,
     DumpTrt,
+    DumpDct,
 }

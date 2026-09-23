@@ -109,6 +109,7 @@ impl Canonical for CicsOperation {
             Self::EnterTraceNum => out.variant("CicsOperation", "EnterTraceNum", 0),
             Self::Monitor => out.variant("CicsOperation", "Monitor", 0),
             Self::DumpTransaction => out.variant("CicsOperation", "DumpTransaction", 0),
+            Self::Dump => out.variant("CicsOperation", "Dump", 0),
             Self::Start => out.variant("CicsOperation", "Start", 0),
             Self::StartBrowse => out.variant("CicsOperation", "StartBrowse", 0),
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),

@@ -544,6 +544,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::EnterTraceNum => CicsPlanOperation::EnterTraceNum,
         HirCicsOperation::Monitor => CicsPlanOperation::Monitor,
         HirCicsOperation::DumpTransaction => CicsPlanOperation::DumpTransaction,
+        HirCicsOperation::Dump => CicsPlanOperation::Dump,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -742,5 +743,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::DumpSit => CicsPlanOption::DumpSit,
         HirCicsOption::DumpTct => CicsPlanOption::DumpTct,
         HirCicsOption::DumpTrt => CicsPlanOption::DumpTrt,
+        HirCicsOption::DumpDct => CicsPlanOption::DumpDct,
     }
 }

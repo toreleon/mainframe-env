@@ -1,7 +1,8 @@
 use super::{response, state};
 use crate::service::{CicsService, Run, field};
 use mainframe_env_host_api::{
-    AccessIntent, CicsRequest, CicsResponse, HostProblem, HostRequest, canonical_request_digest,
+    AccessIntent, CicsOperation, CicsRequest, CicsResponse, HostProblem, HostRequest,
+    canonical_request_digest,
 };
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
@@ -9,7 +10,7 @@ use std::sync::atomic::Ordering;
 const MAGIC: &[u8; 8] = b"MECDMP01";
 const FLAGS: &[&str] = &[
     "COMPLETE", "TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES", "FCT", "PCT", "PPT", "SIT",
-    "TCT", "TRT",
+    "TCT", "TRT", "DCT",
 ];
 
 pub(super) fn invoke(
@@ -18,17 +19,19 @@ pub(super) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate(request)?;
+    let is_dump = request.operation == CicsOperation::Dump;
     let raw_code = request
         .arguments
         .get("DUMPCODE")
-        .ok_or(HostProblem::Malformed)?
-        .bytes();
+        .map(|value| value.bytes())
+        .unwrap_or_default();
     let code_bytes = raw_code.strip_suffix(b" ").unwrap_or(raw_code);
     let code_bytes = code_bytes.strip_suffix(b" ").unwrap_or(code_bytes);
     let code_bytes = code_bytes.strip_suffix(b" ").unwrap_or(code_bytes);
-    let valid_code = !code_bytes.is_empty()
-        && code_bytes.len() <= 4
-        && code_bytes.iter().all(|byte| (0x21..=0x7e).contains(byte));
+    let valid_code = code_bytes.is_empty() && is_dump
+        || !code_bytes.is_empty()
+            && code_bytes.len() <= 4
+            && code_bytes.iter().all(|byte| (0x21..=0x7e).contains(byte));
     let code = String::from_utf8_lossy(code_bytes).to_ascii_uppercase();
     let length = if request.arguments.contains_key("FLENGTH") {
         Some(decimal(request, "FLENGTH")?)
@@ -58,7 +61,7 @@ pub(super) fn invoke(
     service.authorize(
         run,
         "CICSDIAG",
-        &if valid_code {
+        &if valid_code && !code.is_empty() {
             format!("CICS.DIAG.DUMP.{code}")
         } else {
             "CICS.DIAG.DUMP".into()
@@ -108,7 +111,9 @@ pub(super) fn invoke(
     let dump_id = format!("{run_number}/{:04}", (dump_count - 1) % 9999 + 1);
     let selected = selected_sections(request);
     let mut sections = Vec::<(String, Vec<u8>)>::new();
-    sections.push(("DUMPCODE".into(), raw_code.to_vec()));
+    if !raw_code.is_empty() {
+        sections.push(("DUMPCODE".into(), raw_code.to_vec()));
+    }
     if selected.contains("TASK") {
         let mut data = Vec::new();
         for (name, value) in [
@@ -178,6 +183,24 @@ pub(super) fn invoke(
                 .into_bytes(),
         ));
     }
+    if selected.contains("DCT") {
+        let mut data = Vec::new();
+        for (code, definition) in &current.dump_definitions {
+            field(&mut data, code.as_bytes())?;
+            field(
+                &mut data,
+                format!(
+                    "suppress={} maximum={} count={} system={}",
+                    definition.suppress,
+                    definition.maximum,
+                    current.dump_counts.get(code).copied().unwrap_or(0),
+                    definition.system_dump
+                )
+                .as_bytes(),
+            )?;
+        }
+        sections.push(("DCT".into(), data));
+    }
     if selected.contains("PCT") {
         sections.push((
             "PCT".into(),
@@ -226,14 +249,14 @@ pub(super) fn invoke(
     next.next_dump_count = dump_count
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
-    if valid_code {
+    if valid_code && !code.is_empty() {
         let count = next.dump_counts.entry(code.clone()).or_default();
         *count = count.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
     }
     next.dumps.push(state::CicsDiagnosticDumpRecord {
         sequence,
         dump_id: dump_id.clone(),
-        scope: "TRANSACTION".into(),
+        scope: if is_dump { "DUMP" } else { "TRANSACTION" }.into(),
         code,
         sections: sections.iter().map(|(name, _)| name.clone()).collect(),
         data,
@@ -276,10 +299,16 @@ fn selected_sections(request: &CicsRequest) -> BTreeSet<&'static str> {
         selected.insert("TASK");
     }
     if selected.remove("COMPLETE") {
-        selected.extend(["TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES", "TRT"]);
+        selected.extend(["TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES"]);
+        if request.operation == CicsOperation::DumpTransaction {
+            selected.insert("TRT");
+        }
     }
     if selected.remove("TABLES") {
         selected.extend(["FCT", "PCT", "PPT", "SIT", "TCT"]);
+        if request.operation == CicsOperation::Dump {
+            selected.insert("DCT");
+        }
     }
     selected
 }
@@ -369,19 +398,23 @@ fn encode_sections(sections: &[(String, Vec<u8>)], maximum: usize) -> Result<Vec
 }
 
 fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
+    let is_dump = request.operation == CicsOperation::Dump;
     if request
         .arguments
         .iter()
         .any(|(name, value)| match name.as_str() {
-            "DUMPCODE" | "FROM" | "SEGMENTLIST" | "LENGTHLIST" => !matches!(
+            "DUMPCODE" | "FROM" => !matches!(
                 value.schema(),
                 "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
             ),
-            "LENGTH" | "FLENGTH" | "NUMSEGMENTS" => {
-                value.schema() != "mainframe-env.cics.decimal@1"
+            "SEGMENTLIST" | "LENGTHLIST" => {
+                is_dump || !matches!(value.schema(), "mainframe-env.cics.storage-value@1")
             }
-            "SEGMENTS" => value.schema() != "mainframe-env.cics.dump-segments@1",
-            "DUMPID" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+            "LENGTH" | "FLENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+            "NUMSEGMENTS" => is_dump || value.schema() != "mainframe-env.cics.decimal@1",
+            "SEGMENTS" => is_dump || value.schema() != "mainframe-env.cics.dump-segments@1",
+            "DUMPID" => is_dump || value.schema() != "mainframe-env.cics.argument@1",
+            "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
             name if name.starts_with("OPTION.") => {
                 !matches!(
                     name.strip_prefix("OPTION."),
@@ -398,8 +431,11 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
                         | Some("SIT")
                         | Some("TCT")
                         | Some("TRT")
+                        | Some("DCT")
                 ) || value.schema() != "mainframe-env.cics.option@1"
                     || !value.bytes().is_empty()
+                    || is_dump && name == "OPTION.TRT"
+                    || !is_dump && name == "OPTION.DCT"
             }
             _ => true,
         })
@@ -407,6 +443,11 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
             .arguments
             .get("DUMPCODE")
             .is_none_or(|value| !(1..=4).contains(&value.bytes().len()))
+            && !is_dump
+        || request
+            .arguments
+            .get("DUMPCODE")
+            .is_some_and(|value| !(1..=4).contains(&value.bytes().len()))
         || request.arguments.contains_key("LENGTH") && request.arguments.contains_key("FLENGTH")
         || (request.arguments.contains_key("LENGTH") || request.arguments.contains_key("FLENGTH"))
             && !request.arguments.contains_key("FROM")

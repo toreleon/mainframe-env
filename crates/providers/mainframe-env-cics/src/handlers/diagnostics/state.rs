@@ -51,7 +51,7 @@ pub struct CicsDiagnosticDumpRecord {
     pub sequence: u64,
     /// Local run/count identifier, formatted as `xxxx/yyyy`.
     pub dump_id: String,
-    /// `TRANSACTION` for an application transaction dump.
+    /// `TRANSACTION` or `DUMP`, identifying the captured local command form.
     pub scope: String,
     /// Requested dump code, including invalid source text when INVREQ/13 followed capture.
     pub code: String,

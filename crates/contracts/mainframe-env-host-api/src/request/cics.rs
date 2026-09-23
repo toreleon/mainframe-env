@@ -189,6 +189,8 @@ pub enum CicsOperation {
     Monitor,
     /// Capture a bounded local transaction diagnostic dump.
     DumpTransaction,
+    /// Capture a bounded local CICS diagnostic dump.
+    Dump,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -343,6 +345,7 @@ impl CicsOperation {
             Self::EnterTraceNum => "EnterTraceNum",
             Self::Monitor => "Monitor",
             Self::DumpTransaction => "DumpTransaction",
+            Self::Dump => "Dump",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -493,6 +496,7 @@ impl CicsOperation {
                 | Self::EnterTraceNum
                 | Self::Monitor
                 | Self::DumpTransaction
+                | Self::Dump
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -617,6 +621,7 @@ impl CicsOperation {
             ("ENTER", Some("TRACENUM")) => Self::EnterTraceNum,
             ("MONITOR", _) => Self::Monitor,
             ("DUMP", Some("TRANSACTION")) => Self::DumpTransaction,
+            ("DUMP", _) => Self::Dump,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

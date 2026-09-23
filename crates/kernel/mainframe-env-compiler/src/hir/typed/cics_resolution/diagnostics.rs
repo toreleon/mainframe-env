@@ -28,6 +28,7 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
             "RESP",
             "RESP2",
         ],
+        HirCicsOperation::Dump => &["DUMPCODE", "FROM", "LENGTH", "FLENGTH", "RESP", "RESP2"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -40,6 +41,10 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
             "COMPLETE", "TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES", "FCT", "PCT", "PPT",
             "SIT", "TCT", "TRT", "NOHANDLE",
         ],
+        HirCicsOperation::Dump => &[
+            "COMPLETE", "TASK", "STORAGE", "PROGRAM", "TERMINAL", "TABLES", "DCT", "FCT", "PCT",
+            "PPT", "SIT", "TCT", "NOHANDLE",
+        ],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -49,6 +54,7 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::EnterTraceNum => &["TRACENUM"],
         HirCicsOperation::Monitor => &["POINT"],
         HirCicsOperation::DumpTransaction => &["DUMPCODE"],
+        HirCicsOperation::Dump => &[],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -61,8 +67,11 @@ pub(super) fn operands(
     if operation == HirCicsOperation::Monitor {
         return monitor_operands(clauses, semantic);
     }
-    if operation == HirCicsOperation::DumpTransaction {
-        return dump_transaction_operands(clauses, semantic);
+    if matches!(
+        operation,
+        HirCicsOperation::Dump | HirCicsOperation::DumpTransaction
+    ) {
+        return dump_transaction_operands(clauses, operation, semantic);
     }
     if operation != HirCicsOperation::EnterTraceNum {
         return Ok(Vec::new());
@@ -171,7 +180,10 @@ fn monitor_operands(
 }
 
 pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsOption> {
-    if operation != HirCicsOperation::DumpTransaction {
+    if !matches!(
+        operation,
+        HirCicsOperation::Dump | HirCicsOperation::DumpTransaction
+    ) {
         return None;
     }
     Some(match name {
@@ -187,6 +199,7 @@ pub(super) fn option(operation: HirCicsOperation, name: &str) -> Option<HirCicsO
         "SIT" => HirCicsOption::DumpSit,
         "TCT" => HirCicsOption::DumpTct,
         "TRT" => HirCicsOption::DumpTrt,
+        "DCT" => HirCicsOption::DumpDct,
         _ => return None,
     })
 }
@@ -222,10 +235,14 @@ pub(super) fn outputs(
 
 fn dump_transaction_operands(
     clauses: &Clauses,
+    operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    let code = cics_value(&clauses["DUMPCODE"], semantic)?;
-    let valid_code = match &code {
+    let code = clauses
+        .get("DUMPCODE")
+        .map(|tokens| cics_value(tokens, semantic))
+        .transpose()?;
+    let valid_code = code.as_ref().is_none_or(|code| match code {
         HirCicsValue::Literal(text) => (1..=4).contains(&text.len()),
         HirCicsValue::Data(reference) => {
             (1..=4).contains(&reference.length)
@@ -235,7 +252,7 @@ fn dump_transaction_operands(
                 )
         }
         _ => false,
-    };
+    });
     if !valid_code {
         return Err(ResolutionFailure::Invalid(
             "CICS DUMP TRANSACTION DUMPCODE requires one to four characters".into(),
@@ -263,10 +280,13 @@ fn dump_transaction_operands(
                 .into(),
         ));
     }
-    let mut result = vec![HirCicsNamedOperand {
-        name: HirCicsOperandName::DumpCode,
-        value: code,
-    }];
+    let mut result = Vec::new();
+    if let Some(code) = code {
+        result.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::DumpCode,
+            value: code,
+        });
+    }
     if let Some(tokens) = clauses.get("FROM") {
         result.push(HirCicsNamedOperand {
             name: HirCicsOperandName::DumpFrom,
@@ -288,7 +308,7 @@ fn dump_transaction_operands(
             });
         }
     }
-    if segment_count == 3 {
+    if segment_count == 3 && operation == HirCicsOperation::DumpTransaction {
         for (name, identity) in [
             ("SEGMENTLIST", HirCicsOperandName::DumpSegmentList),
             ("LENGTHLIST", HirCicsOperandName::DumpLengthList),

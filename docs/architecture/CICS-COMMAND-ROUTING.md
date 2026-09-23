@@ -367,6 +367,11 @@ capture, and `CICSDIAG` authorization precedes every write. DUMPID uses a
 durable run/count counter; a fresh provider instance advances the run number
 on its first successful dump. System dump requests fail explicitly because
 this provider has no SDUMP backend.
+The standalone `DUMP` form uses the same bounded section codec and SAF check.
+It can include the local dump-code table (`DCT`) and accepts an omitted code,
+using the generic diagnostic resource in that case. Its exact CICS TS 6.x
+behavior is source-gapped; this route promises only the documented local
+capture and never claims a CICS dump dataset or system dump.
 
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or

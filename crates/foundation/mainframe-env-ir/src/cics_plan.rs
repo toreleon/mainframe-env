@@ -682,6 +682,7 @@ fn validate_operation_shape(
         CicsPlanOperation::DumpTransaction => {
             diagnostics::invalid_dump_transaction_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::Dump => diagnostics::invalid_dump_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2605,6 +2606,24 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn dump_uses_reserved_operation_and_dct_tags() {
+        assert_eq!(operation_tag(CicsPlanOperation::Dump), 148);
+        assert_eq!(option_tag(CicsPlanOption::DumpDct), 521);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Dump,
+            operands: Vec::new(),
+            options: BTreeSet::from([CicsPlanOption::DumpDct]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan)
         );
     }
 

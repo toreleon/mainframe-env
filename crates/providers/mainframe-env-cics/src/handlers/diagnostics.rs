@@ -145,6 +145,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::EnterTraceNum => trace_number::invoke(service, run, request),
         CicsOperation::Monitor => monitor::invoke(service, run, request),
         CicsOperation::DumpTransaction => dump_transaction::invoke(service, run, request),
+        CicsOperation::Dump => dump_transaction::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

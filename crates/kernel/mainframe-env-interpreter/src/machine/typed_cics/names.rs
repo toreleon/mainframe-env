@@ -299,6 +299,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::EnterTraceNum => CicsOperation::EnterTraceNum,
         CicsPlanOperation::Monitor => CicsOperation::Monitor,
         CicsPlanOperation::DumpTransaction => CicsOperation::DumpTransaction,
+        CicsPlanOperation::Dump => CicsOperation::Dump,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -744,5 +745,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::DumpSit => "SIT",
         CicsPlanOption::DumpTct => "TCT",
         CicsPlanOption::DumpTrt => "TRT",
+        CicsPlanOption::DumpDct => "DCT",
     }
 }

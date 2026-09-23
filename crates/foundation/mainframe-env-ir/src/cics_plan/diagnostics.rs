@@ -127,3 +127,36 @@ pub(super) fn invalid_dump_transaction_shape(
         })
         || super::option_shape::has_unsupported(plan)
 }
+
+pub(super) fn invalid_dump_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.is_subset(&BTreeSet::from([
+        CicsOperandName::DumpCode,
+        CicsOperandName::DumpFrom,
+        CicsOperandName::DumpLength,
+        CicsOperandName::DumpFlength,
+    ])) || inputs.contains(&CicsOperandName::DumpLength)
+        && inputs.contains(&CicsOperandName::DumpFlength)
+        || (inputs.contains(&CicsOperandName::DumpLength)
+            || inputs.contains(&CicsOperandName::DumpFlength))
+            && !inputs.contains(&CicsOperandName::DumpFrom)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::DumpCode => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::DumpFrom => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::DumpLength | CicsOperandName::DumpFlength => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+            ),
+            _ => true,
+        })
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || super::option_shape::has_unsupported(plan)
+}
