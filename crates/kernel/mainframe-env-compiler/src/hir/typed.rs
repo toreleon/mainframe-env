@@ -200,6 +200,7 @@ pub enum HirCicsOperation {
     Retrieve,
     DocumentCreate,
     DocumentDelete,
+    DocumentInsert,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -6395,6 +6396,64 @@ mod tests {
                     .iter()
                     .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
                 "{source}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn document_insert_lowers_sources_bookmarks_and_size() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DOCINSRT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 TEXT-X PIC X(8) VALUE 'DOCUMENT'. 01 LENGTH-X PIC S9(9) COMP VALUE 4. 01 SIZE-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DOCUMENT INSERT DOCTOKEN(TOKEN-X) TEXT(TEXT-X) LENGTH(LENGTH-X) BOOKMARK('MARK') DOCSIZE(SIZE-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DOCUMENT INSERT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DOCUMENT INSERT");
+        assert_eq!(command.operation, HirCicsOperation::DocumentInsert);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DocumentToken
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "TOKEN-X")
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Bookmark
+                && matches!(operand.value, HirCicsValue::Literal(ref value) if value == "MARK")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::DocumentSize
+                && output.target.qualified_name == "SIZE-X"
+        }));
+        for (command, expected) in [
+            (
+                "DOCUMENT INSERT DOCTOKEN(TOKEN-X)",
+                "content source or BOOKMARK",
+            ),
+            (
+                "DOCUMENT INSERT DOCTOKEN(TOKEN-X) TEXT(TEXT-X)",
+                "requires LENGTH",
+            ),
+            (
+                "DOCUMENT INSERT DOCTOKEN(TOKEN-X) TEXT(TEXT-X) LENGTH(4) BINARY(TEXT-X)",
+                "content source or BOOKMARK",
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDOC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(16). 01 TEXT-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
                 analysis.diagnostics
             );
         }

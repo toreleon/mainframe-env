@@ -129,6 +129,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0052",
     ),
+    (
+        "DocumentInsert",
+        "api",
+        "document-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0053",
+    ),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
@@ -464,6 +471,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WriteTemporaryStorage",
         "DocumentCreate",
         "DocumentDelete",
+        "DocumentInsert",
         "ReceiveMap",
         "SendMap",
         "SendText",
@@ -646,6 +654,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "DocumentDelete": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DocumentInsert": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "Getmain": frozenset(
@@ -896,6 +907,7 @@ def _load_typed_execution_registrations(
         "Deq",
         "DocumentCreate",
         "DocumentDelete",
+        "DocumentInsert",
         "Enq",
         "Freemain",
         "Getmain",
@@ -1217,6 +1229,7 @@ def load_catalog(
                 "WriteTemporaryStorage",
                 "DocumentCreate",
                 "DocumentDelete",
+                "DocumentInsert",
                 "Enq",
                 "Freemain",
                 "Getmain",

@@ -300,6 +300,14 @@ only common condition options. The interpreter captures its token bytes before
 dispatch; the provider checks document ownership, releases the durable record
 and aggregate capacity, and records the replay result in the same mutation.
 
+`DOCUMENT INSERT` requires a 16-byte token and one content source or a
+bookmark, with fullword LENGTH for buffer sources. The interpreter snapshots
+all operands and writes optional DOCSIZE. The provider performs bounded
+bookmark positioning and AT/TO overlay, template READ authorization, symbol
+substitution, and atomic versioned persistence with replay. Its internal
+tagged buffer preserves conversion blocks and bookmarks when a document from
+this runtime is supplied through FROM.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

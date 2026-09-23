@@ -1678,7 +1678,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 55);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 56);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4995,6 +4995,7 @@ mod tests {
             ("DELETE", CicsOperation::Delete),
             ("DOCUMENT CREATE", CicsOperation::DocumentCreate),
             ("DOCUMENT DELETE", CicsOperation::DocumentDelete),
+            ("DOCUMENT INSERT", CicsOperation::DocumentInsert),
             ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
@@ -6263,7 +6264,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 55);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 56);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6299,6 +6300,12 @@ mod tests {
         assert_eq!(
             document_delete.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0052"
+        );
+        let document_insert = command_descriptor(CicsOperation::DocumentInsert);
+        assert_eq!(document_insert.syntax, "DOCUMENT INSERT");
+        assert_eq!(
+            document_insert.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0053"
         );
     }
 
@@ -6374,6 +6381,348 @@ mod tests {
                 response: 13,
                 response2: 1,
             })
+        );
+    }
+
+    #[test]
+    fn document_insert_updates_size_bookmarks_and_replay_atomically() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-insert", BTreeMap::new());
+        let session = SessionId::new("document-insert", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(b"ABCD")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let created = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        let token = created.outputs["DOCTOKEN"].bytes().to_vec();
+        let insert = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("TEXT".into(), task_value(b"EF")),
+                ("LENGTH".into(), cics_decimal(2)),
+                ("BOOKMARK".into(), cics_literal(b"TAIL")),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            2,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, insert.clone(), 2),
+                insert.clone(),
+            )
+            .unwrap();
+        assert!(
+            std::str::from_utf8(first.outputs["DOCSIZE"].bytes())
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+                >= 6
+        );
+        assert_eq!(service.lock().unwrap().document_bytes, 6);
+        assert_eq!(
+            store.list_provider_state("cics-document-v1", 8).unwrap()[0].version,
+            2
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, insert.clone(), 2), insert,)
+                .unwrap(),
+            first
+        );
+        let top = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("BINARY".into(), task_value(b"XY")),
+                ("LENGTH".into(), cics_decimal(2)),
+                ("AT".into(), cics_literal(b"TOP")),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            3,
+        );
+        let inserted_top = service
+            .invoke(&effect(&invocation.run_unit_id, top.clone(), 3), top)
+            .unwrap();
+        assert!(
+            std::str::from_utf8(inserted_top.outputs["DOCSIZE"].bytes())
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+                >= 8
+        );
+        let after_tail = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("TEXT".into(), task_value(b"Z")),
+                ("LENGTH".into(), cics_decimal(1)),
+                ("AT".into(), cics_literal(b"TAIL")),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            4,
+        );
+        let at_tail = service
+            .invoke(
+                &effect(&invocation.run_unit_id, after_tail.clone(), 4),
+                after_tail,
+            )
+            .unwrap();
+        assert!(
+            std::str::from_utf8(at_tail.outputs["DOCSIZE"].bytes())
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+                >= 9
+        );
+        assert_eq!(service.lock().unwrap().document_bytes, 9);
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .documents
+                .values()
+                .next()
+                .unwrap()
+                .content_bytes(),
+            b"XYABCDEFZ"
+        );
+        let overlay = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("BINARY".into(), task_value(b"Q")),
+                ("LENGTH".into(), cics_decimal(1)),
+                ("AT".into(), cics_literal(b"TOP")),
+                ("TO".into(), cics_literal(b"TAIL")),
+                ("DOCSIZE".into(), argument(b"SIZE-X")),
+            ]),
+            5,
+        );
+        let overlaid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, overlay.clone(), 5),
+                overlay,
+            )
+            .unwrap();
+        assert!(
+            std::str::from_utf8(overlaid.outputs["DOCSIZE"].bytes())
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+                >= 2
+        );
+        assert_eq!(service.lock().unwrap().document_bytes, 2);
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .documents
+                .values()
+                .next()
+                .unwrap()
+                .content_bytes(),
+            b"QZ"
+        );
+        let duplicate = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), task_value(&token)),
+                ("BOOKMARK".into(), cics_literal(b"TAIL")),
+            ]),
+            6,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, duplicate.clone(), 6),
+                duplicate
+            ),
+            Err(HostProblem::Condition {
+                name: "DUPREC".into(),
+                response: 14,
+                response2: 0,
+            })
+        );
+        assert_eq!(service.lock().unwrap().document_bytes, 2);
+    }
+
+    #[test]
+    fn document_create_from_tagged_content_restores_bookmarks_for_insert() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let invocation = invocation_for("document-tagged-from", BTreeMap::new());
+        let session = SessionId::new("document-tagged-from", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let create = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-X")),
+                ("TEXT".into(), task_value(b"AB")),
+                ("LENGTH".into(), cics_decimal(2)),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(&effect(&invocation.run_unit_id, create.clone(), 1), create)
+            .unwrap();
+        let bookmark = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                (
+                    "DOCTOKEN".into(),
+                    task_value(first.outputs["DOCTOKEN"].bytes()),
+                ),
+                ("BOOKMARK".into(), cics_literal(b"Mark")),
+            ]),
+            2,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, bookmark.clone(), 2),
+                bookmark,
+            )
+            .unwrap();
+        let tagged = service
+            .lock()
+            .unwrap()
+            .documents
+            .values()
+            .next()
+            .unwrap()
+            .tagged_bytes(CicsLimits::default())
+            .unwrap();
+        let from = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-Y")),
+                ("FROM".into(), task_value(&tagged)),
+                ("LENGTH".into(), cics_decimal(tagged.len() as i64)),
+            ]),
+            3,
+        );
+        let copied = service
+            .invoke(&effect(&invocation.run_unit_id, from.clone(), 3), from)
+            .unwrap();
+        let insert = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                (
+                    "DOCTOKEN".into(),
+                    task_value(copied.outputs["DOCTOKEN"].bytes()),
+                ),
+                ("TEXT".into(), task_value(b"C")),
+                ("LENGTH".into(), cics_decimal(1)),
+                ("AT".into(), cics_literal(b"Mark")),
+            ]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, insert.clone(), 4), insert)
+            .unwrap();
+        assert!(
+            service
+                .lock()
+                .unwrap()
+                .documents
+                .values()
+                .any(|document| { document.content_bytes() == b"ABC" })
+        );
+        let mut malformed = tagged.clone();
+        malformed.pop();
+        let invalid = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([
+                ("DOCTOKEN".into(), argument(b"TOKEN-Z")),
+                ("FROM".into(), task_value(&malformed)),
+                ("LENGTH".into(), cics_decimal(malformed.len() as i64)),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 5),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1
+            })
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-document-v1", 8)
+                .unwrap()
+                .len(),
+            2
+        );
+        let empty = request(
+            CicsOperation::DocumentCreate,
+            BTreeMap::from([("DOCTOKEN".into(), argument(b"TOKEN-Z"))]),
+            6,
+        );
+        let target = service
+            .invoke(&effect(&invocation.run_unit_id, empty.clone(), 6), empty)
+            .unwrap();
+        let from_insert = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                (
+                    "DOCTOKEN".into(),
+                    task_value(target.outputs["DOCTOKEN"].bytes()),
+                ),
+                ("FROM".into(), task_value(&tagged)),
+                ("LENGTH".into(), cics_decimal(tagged.len() as i64)),
+            ]),
+            7,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, from_insert.clone(), 7),
+                from_insert,
+            )
+            .unwrap();
+        let at_mark = request(
+            CicsOperation::DocumentInsert,
+            BTreeMap::from([
+                (
+                    "DOCTOKEN".into(),
+                    task_value(target.outputs["DOCTOKEN"].bytes()),
+                ),
+                ("TEXT".into(), task_value(b"D")),
+                ("LENGTH".into(), cics_decimal(1)),
+                ("AT".into(), cics_literal(b"Mark")),
+            ]),
+            8,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, at_mark.clone(), 8),
+                at_mark,
+            )
+            .unwrap();
+        assert!(
+            service
+                .lock()
+                .unwrap()
+                .documents
+                .values()
+                .any(|document| document.content_bytes() == b"ABD")
         );
     }
 

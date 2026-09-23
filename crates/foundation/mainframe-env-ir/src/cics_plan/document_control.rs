@@ -97,3 +97,87 @@ pub(super) fn invalid_delete_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_insert_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed = BTreeSet::from([
+        CicsOperandName::DocumentToken,
+        CicsOperandName::From,
+        CicsOperandName::Text,
+        CicsOperandName::Binary,
+        CicsOperandName::FromDocument,
+        CicsOperandName::Template,
+        CicsOperandName::Symbol,
+        CicsOperandName::Length,
+        CicsOperandName::Bookmark,
+        CicsOperandName::AtBookmark,
+        CicsOperandName::ToBookmark,
+        CicsOperandName::HostCodePage,
+    ]);
+    let sources = [
+        CicsOperandName::From,
+        CicsOperandName::Text,
+        CicsOperandName::Binary,
+        CicsOperandName::FromDocument,
+        CicsOperandName::Template,
+        CicsOperandName::Symbol,
+    ]
+    .into_iter()
+    .filter(|name| inputs.contains(name))
+    .count();
+    let buffered = [
+        CicsOperandName::From,
+        CicsOperandName::Text,
+        CicsOperandName::Binary,
+    ]
+    .into_iter()
+    .any(|name| inputs.contains(&name));
+    !inputs.is_subset(&allowed)
+        || !inputs.contains(&CicsOperandName::DocumentToken)
+        || sources > 1
+        || (sources == 0 && !inputs.contains(&CicsOperandName::Bookmark))
+        || inputs.contains(&CicsOperandName::Length) != buffered
+        || (inputs.contains(&CicsOperandName::HostCodePage)
+            && ![
+                CicsOperandName::Text,
+                CicsOperandName::Symbol,
+                CicsOperandName::Template,
+            ]
+            .into_iter()
+            .any(|name| inputs.contains(&name)))
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::DocumentToken | CicsOperandName::FromDocument => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::From | CicsOperandName::Text | CicsOperandName::Binary => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::Template
+            | CicsOperandName::Symbol
+            | CicsOperandName::Bookmark
+            | CicsOperandName::AtBookmark
+            | CicsOperandName::ToBookmark
+            | CicsOperandName::HostCodePage => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::Length => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            ),
+            _ => true,
+        })
+        || operand_value(plan, CicsOperandName::Length)
+            .is_some_and(|value| matches!(value, CicsOperandValue::Integer(value) if *value < 0))
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::DocumentSize | CicsOutputName::Resp | CicsOutputName::Resp2
+            )
+        })
+}

@@ -287,6 +287,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/document_control/insert.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/document_control/transport.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval.rs",

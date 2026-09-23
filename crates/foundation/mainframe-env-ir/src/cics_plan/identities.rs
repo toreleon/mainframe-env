@@ -109,6 +109,8 @@ pub enum CicsPlanOperation {
     DocumentCreate,
     /// Delete one transaction-owned document and release its storage.
     DocumentDelete,
+    /// Insert content or bookmarks into one transaction-owned document.
+    DocumentInsert,
 }
 
 /// Named input accepted by the typed CICS pilot.

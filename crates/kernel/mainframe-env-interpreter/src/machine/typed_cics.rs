@@ -220,7 +220,10 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
                             | CicsOperandName::KeyLength
                             | CicsOperandName::Item
                     ) {
-                    if plan.operation == CicsPlanOperation::DocumentCreate {
+                    if matches!(
+                        plan.operation,
+                        CicsPlanOperation::DocumentCreate | CicsPlanOperation::DocumentInsert
+                    ) {
                         SlotUse::FullwordInput
                     } else {
                         SlotUse::HalfwordInput
@@ -797,7 +800,10 @@ fn validate_runtime_plan(
                     operand.name,
                     CicsOperandName::Length | CicsOperandName::KeyLength | CicsOperandName::Item
                 ) {
-                if plan.operation == CicsPlanOperation::DocumentCreate {
+                if matches!(
+                    plan.operation,
+                    CicsPlanOperation::DocumentCreate | CicsPlanOperation::DocumentInsert
+                ) {
                     SlotUse::FullwordInput
                 } else {
                     SlotUse::HalfwordInput

@@ -18,6 +18,7 @@ impl Canonical for CicsOperation {
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DocumentCreate => out.variant("CicsOperation", "DocumentCreate", 0),
             Self::DocumentDelete => out.variant("CicsOperation", "DocumentDelete", 0),
+            Self::DocumentInsert => out.variant("CicsOperation", "DocumentInsert", 0),
             Self::DeleteTransientData => out.variant("CicsOperation", "DeleteTransientData", 0),
             Self::DeleteTemporaryStorage => {
                 out.variant("CicsOperation", "DeleteTemporaryStorage", 0)

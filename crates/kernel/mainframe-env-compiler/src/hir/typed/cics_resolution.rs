@@ -750,6 +750,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ],
         HirCicsOperation::DocumentCreate => document_control::ALLOWED_CLAUSES,
         HirCicsOperation::DocumentDelete => document_control::DELETE_CLAUSES,
+        HirCicsOperation::DocumentInsert => document_control::INSERT_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -821,6 +822,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::DeleteTransientData
         | HirCicsOperation::DeleteTemporaryStorage
         | HirCicsOperation::DocumentDelete
+        | HirCicsOperation::DocumentInsert
         | HirCicsOperation::Freemain
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
@@ -939,6 +941,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Release => &["PROGRAM"][..],
         HirCicsOperation::DocumentCreate => &["DOCTOKEN"][..],
         HirCicsOperation::DocumentDelete => &["DOCTOKEN"][..],
+        HirCicsOperation::DocumentInsert => &["DOCTOKEN"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],

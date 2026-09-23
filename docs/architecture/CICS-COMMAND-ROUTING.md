@@ -268,8 +268,14 @@ reload from SQLite and are deleted when their owning task ends. Operation tag
 append-only. `DOCUMENT DELETE` uses tag 64 and a storage-backed 16-byte
 DOCTOKEN input. It verifies task/transaction ownership and atomically deletes
 the durable row with its replay record, freeing aggregate capacity immediately;
-a missing token returns NOTFND 13/1. The rest of the reserved ranges remain
-available to rows 0053–0055.
+a missing token returns NOTFND 13/1. `DOCUMENT INSERT` uses operation tag 65 and the
+shared document operands to append, insert after a bookmark, or replace a
+bookmark interval. It applies source-specific conversion marks, copies
+FROMDOC bookmarks, and keeps a bounded internal tagged retrieval form for
+FROM round trips. Each insert updates the versioned document and effect replay
+atomically. Document symbol names preserve case, and template expansion is
+bounded before persistence.
+The rest of the reserved ranges remain available to rows 0054–0055.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

@@ -13,6 +13,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `DOCUMENT INSERT` for text, binary, template, symbol,
+  `FROMDOC`, and retrieved-buffer content. Bounded bookmark insertion and
+  AT/TO overlay preserve conversion blocks; the document and replay update
+  atomically, with DOCSIZE and the documented failure conditions.
+
 - Added typed CICS `DOCUMENT DELETE` for transaction-owned 16-byte tokens.
   Deletion frees durable document storage immediately, records the delete and
   effect replay atomically, and returns the documented NOTFND 13/1 on a new

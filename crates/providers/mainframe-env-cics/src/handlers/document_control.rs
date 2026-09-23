@@ -19,6 +19,9 @@ const TEMPLATE_NAMESPACE: &str = "cics-document-template-v1";
 const DOCUMENT_MAGIC: &[u8; 8] = b"MECDOC01";
 const TEMPLATE_MAGIC: &[u8; 8] = b"MECTPL01";
 
+mod insert;
+mod transport;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::service) struct DocumentRecord {
     token: [u8; 16],
@@ -53,6 +56,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::DocumentCreate => create(service, run, request, retention_tick),
         CicsOperation::DocumentDelete => delete(service, run, request, retention_tick),
+        CicsOperation::DocumentInsert => insert::invoke(service, run, request, retention_tick),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -255,19 +259,26 @@ fn create(
     if state.documents.contains_key(&key) {
         return Err(HostProblem::IdempotencyConflict);
     }
-    let segments = if let Some(value) = request.arguments.get("FROMDOC") {
+    let (segments, bookmarks) = if let Some(value) = request.arguments.get("FROMDOC") {
         let source = document_for_token(&state.documents, run, value.bytes(), 2)?;
-        source.segments.clone()
+        (source.segments.clone(), source.bookmarks.clone())
     } else if let Some(template) = template {
-        vec![DocumentSegment {
-            bytes: substitute_symbols(&template.content, &symbols),
-            binary: false,
-            host_code_page: if request.arguments.contains_key("HOSTCODEPAGE") {
-                host_code_page
-            } else {
-                template.host_code_page
-            },
-        }]
+        (
+            vec![DocumentSegment {
+                bytes: substitute_symbols(
+                    &template.content,
+                    &symbols,
+                    service.limits.max_screen_bytes,
+                )?,
+                binary: false,
+                host_code_page: if request.arguments.contains_key("HOSTCODEPAGE") {
+                    host_code_page
+                } else {
+                    template.host_code_page
+                },
+            }],
+            BTreeMap::new(),
+        )
     } else if let Some((name, binary)) = [("FROM", false), ("TEXT", false), ("BINARY", true)]
         .into_iter()
         .find(|(name, _)| request.arguments.contains_key(*name))
@@ -282,13 +293,37 @@ fn create(
             });
         }
         bytes.truncate(length);
-        vec![DocumentSegment {
-            bytes,
-            binary,
-            host_code_page,
-        }]
+        if name == "FROM" {
+            if let Some((segments, bookmarks)) =
+                transport::decode_from_buffer(&bytes, service.limits)?
+            {
+                (segments, bookmarks)
+            } else {
+                (
+                    vec![DocumentSegment {
+                        bytes: substitute_symbols(
+                            &bytes,
+                            &symbols,
+                            service.limits.max_screen_bytes,
+                        )?,
+                        binary: false,
+                        host_code_page,
+                    }],
+                    BTreeMap::new(),
+                )
+            }
+        } else {
+            (
+                vec![DocumentSegment {
+                    bytes,
+                    binary,
+                    host_code_page,
+                }],
+                BTreeMap::new(),
+            )
+        }
     } else {
-        Vec::new()
+        (Vec::new(), BTreeMap::new())
     };
     let document = DocumentRecord {
         token,
@@ -297,10 +332,10 @@ fn create(
         transaction: run.transaction.clone(),
         segments,
         symbols,
-        bookmarks: BTreeMap::new(),
+        bookmarks,
         version: 1,
     };
-    let document_size = document.retrieval_size();
+    let document_size = transport::encode_retrieved(&document, service.limits)?.len();
     let usage = document.usage_bytes();
     if usage > service.limits.max_screen_bytes
         || state
@@ -503,11 +538,7 @@ fn symbol_definitions(
         let decoded = if request.arguments.contains_key("OPTION.UNESCAPED") {
             raw.to_vec()
         } else {
-            unescape_symbol(raw).ok_or_else(|| HostProblem::Condition {
-                name: "SYMBOLERR".into(),
-                response: 116,
-                response2: i32::try_from(offset).unwrap_or(i32::MAX),
-            })?
+            unescape_symbol(raw)
         };
         if symbols.insert(name, decoded).is_some()
             || symbols.len() > service.limits.max_document_symbols
@@ -617,6 +648,22 @@ fn replay_write(
 }
 
 impl DocumentRecord {
+    #[cfg(test)]
+    pub(in crate::service) fn content_bytes(&self) -> Vec<u8> {
+        self.segments
+            .iter()
+            .flat_map(|segment| segment.bytes.iter().copied())
+            .collect()
+    }
+
+    #[cfg(test)]
+    pub(in crate::service) fn tagged_bytes(
+        &self,
+        limits: CicsLimits,
+    ) -> Result<Vec<u8>, HostProblem> {
+        transport::encode_retrieved(self, limits)
+    }
+
     fn usage_bytes(&self) -> usize {
         self.segments
             .iter()
@@ -888,12 +935,12 @@ fn normalize_symbol(name: &[u8]) -> Result<String, HostProblem> {
     let name = std::str::from_utf8(name)
         .map_err(|_| HostProblem::InfrastructureFailure)?
         .trim()
-        .to_ascii_uppercase();
+        .to_string();
     if name.is_empty()
         || name.len() > 32
-        || !name
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        || !name.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'_' | b'-' | b'#' | b'.' | b'@')
+        })
     {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -901,9 +948,10 @@ fn normalize_symbol(name: &[u8]) -> Result<String, HostProblem> {
 }
 
 fn invalid_delimiter(value: u8) -> bool {
-    value.is_ascii_alphanumeric()
-        || value.is_ascii_whitespace()
-        || matches!(value, b'=' | b'%' | b'+')
+    matches!(
+        value,
+        0 | 0x0E | 0x0F | b' ' | b'+' | b':' | b'=' | b'%' | b'\\'
+    )
 }
 
 fn symbol_error<T>(offset: usize) -> Result<T, HostProblem> {
@@ -914,7 +962,7 @@ fn symbol_error<T>(offset: usize) -> Result<T, HostProblem> {
     })
 }
 
-fn unescape_symbol(value: &[u8]) -> Option<Vec<u8>> {
+fn unescape_symbol(value: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(value.len());
     let mut at = 0usize;
     while at < value.len() {
@@ -923,18 +971,22 @@ fn unescape_symbol(value: &[u8]) -> Option<Vec<u8>> {
                 out.push(b' ');
                 at += 1;
             }
-            b'%' if at + 2 < value.len() => {
-                out.push((hex_digit(value[at + 1])? << 4) | hex_digit(value[at + 2])?);
+            b'%' if at + 2 < value.len()
+                && hex_digit(value[at + 1]).is_some()
+                && hex_digit(value[at + 2]).is_some() =>
+            {
+                out.push(
+                    (hex_digit(value[at + 1]).unwrap() << 4) | hex_digit(value[at + 2]).unwrap(),
+                );
                 at += 3;
             }
-            b'%' => return None,
             byte => {
                 out.push(byte);
                 at += 1;
             }
         }
     }
-    Some(out)
+    out
 }
 
 fn hex_digit(value: u8) -> Option<u8> {
@@ -946,7 +998,11 @@ fn hex_digit(value: u8) -> Option<u8> {
     }
 }
 
-fn substitute_symbols(template: &[u8], symbols: &BTreeMap<String, Vec<u8>>) -> Vec<u8> {
+fn substitute_symbols(
+    template: &[u8],
+    symbols: &BTreeMap<String, Vec<u8>>,
+    maximum: usize,
+) -> Result<Vec<u8>, HostProblem> {
     let mut out = Vec::with_capacity(template.len());
     let mut at = 0usize;
     while at < template.len() {
@@ -957,13 +1013,52 @@ fn substitute_symbols(template: &[u8], symbols: &BTreeMap<String, Vec<u8>>) -> V
             if let Ok(name) = normalize_symbol(&template[at + 1..end])
                 && let Some(value) = symbols.get(&name)
             {
-                out.extend_from_slice(value);
+                append_bounded(&mut out, value, maximum)?;
                 at = end + 1;
                 continue;
             }
         }
-        out.push(template[at]);
+        append_bounded(&mut out, &template[at..at + 1], maximum)?;
         at += 1;
     }
-    out
+    Ok(out)
+}
+
+fn append_bounded(out: &mut Vec<u8>, bytes: &[u8], maximum: usize) -> Result<(), HostProblem> {
+    if out
+        .len()
+        .checked_add(bytes.len())
+        .is_none_or(|length| length > maximum)
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn symbol_substitution_stops_at_document_limit() {
+        let symbols = BTreeMap::from([("A".into(), b"XXX".to_vec())]);
+        assert_eq!(
+            substitute_symbols(b"&A;&A;", &symbols, 5),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            substitute_symbols(b"&A;&A;", &symbols, 6).unwrap(),
+            b"XXXXXX"
+        );
+    }
+
+    #[test]
+    fn symbols_preserve_case_and_unrecognized_percent_sequences() {
+        assert_eq!(normalize_symbol(b"my$Title").unwrap(), "my$Title");
+        assert_ne!(normalize_symbol(b"my$Title").unwrap(), "MY$TITLE");
+        assert_eq!(unescape_symbol(b"A%QQ+B%2B"), b"A%QQ B+");
+        assert!(!invalid_delimiter(b'!'));
+        assert!(invalid_delimiter(b'%'));
+    }
 }

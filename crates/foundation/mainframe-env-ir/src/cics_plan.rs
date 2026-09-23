@@ -628,6 +628,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DocumentDelete => {
             document_control::invalid_delete_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DocumentInsert => {
+            document_control::invalid_insert_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -1624,6 +1627,51 @@ mod tests {
         missing.operands.clear();
         assert_eq!(
             encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn document_insert_tag_and_shape_round_trip() {
+        assert_eq!(operation_tag(CicsPlanOperation::DocumentInsert), 65);
+        assert_eq!(
+            operation_from_tag(65),
+            Ok(CicsPlanOperation::DocumentInsert)
+        );
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::DocumentInsert,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(4),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::DocumentToken,
+                    value: CicsOperandValue::Storage(slot(1, "DOCUMENT.TOKEN")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Text,
+                    value: CicsOperandValue::Storage(slot(2, "DOCUMENT.TEXT")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::DocumentSize,
+                target: slot(3, "DOCUMENT.SIZE"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut missing_length = plan;
+        missing_length
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::Length);
+        assert_eq!(
+            encode_cics_effect_plan(&missing_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }
