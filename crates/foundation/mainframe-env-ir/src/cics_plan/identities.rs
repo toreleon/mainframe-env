@@ -85,6 +85,8 @@ pub enum CicsPlanOperation {
     Suspend,
     /// Wait for one timer-event control area to be posted.
     WaitEvent,
+    /// Wait for standard MVS posting of one ECB in a bounded external list.
+    WaitExternal,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
     /// Discard the current full-BMS logical message, if one is being built.
@@ -189,6 +191,12 @@ pub enum CicsOperandName {
     EventControlAddress,
     /// Optional `NAME(...)` reason associated with an event wait.
     WaitName,
+    /// `ECBLIST(...)` pointer to a list of 31-bit ECB addresses.
+    EcbList,
+    /// `NUMEVENTS(...)` fullword number of ECB addresses.
+    NumEvents,
+    /// `PURGEABILITY(...)` CVDA value.
+    Purgeability,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -246,6 +254,10 @@ pub enum CicsPlanOption {
     Equal,
     /// Receive mapped input from the terminal that originated the transaction.
     Terminal,
+    /// Allow deadlock timeout or ordinary purge to abend this wait.
+    Purgeable,
+    /// Ignore deadlock timeout or ordinary purge while this wait is active.
+    NotPurgeable,
 }
 
 /// Named result binding written after the host result arrives.

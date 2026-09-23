@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 46);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 47);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -3713,7 +3713,7 @@ impl<'a> Reader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CicsEventPostMode;
+    use crate::{CicsEventPostMode, CicsEventPurgeMode};
     use mainframe_env_execution_api::{
         ArtifactRef, ExecutionId, Principal, RequestId, ResourceLimits, Selector, ServiceClass,
         TraceId,
@@ -4599,6 +4599,51 @@ mod tests {
         arguments
     }
 
+    fn wait_external_arguments(
+        events: &[(u32, [u8; 4])],
+        selected: Option<u32>,
+        count: i64,
+        purgeable: bool,
+    ) -> BTreeMap<String, BoundedPayload> {
+        let mut list = Vec::with_capacity(events.len() * 8);
+        for (index, address) in events {
+            list.extend_from_slice(&index.to_be_bytes());
+            list.extend_from_slice(address);
+        }
+        BTreeMap::from([
+            (
+                "ECBLIST".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.external-event-list@1",
+                    list,
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            (
+                "EVENT.POSTED".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.event-posted-index@1",
+                    selected
+                        .map(|index| index.to_be_bytes().to_vec())
+                        .unwrap_or_default(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            ("NUMEVENTS".into(), cics_decimal(count)),
+            (
+                if purgeable {
+                    "OPTION.PURGEABLE"
+                } else {
+                    "OPTION.NOTPURGEABLE"
+                }
+                .into(),
+                cics_option(),
+            ),
+        ])
+    }
+
     fn storage_target(value: &[u8]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.storage-target@1",
@@ -4761,7 +4806,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 46);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 47);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -12490,6 +12535,139 @@ mod tests {
             .unwrap();
         assert_eq!(response.disposition, CicsDisposition::Complete);
         assert_eq!(response.outputs["EVENT.POSTED"].bytes(), b"0");
+    }
+
+    #[test]
+    fn wait_external_restarts_selects_one_event_and_honors_purgeability() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-wait-external-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("wait-external-reopen", BTreeMap::new());
+        let session = SessionId::new("wait-external-reopen", 64).unwrap();
+        let events = [(0, [0, 0x10, 0, 4]), (1, [0, 0x10, 0, 8])];
+
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = self::service(store.clone());
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let wait = request(
+                CicsOperation::WaitExternal,
+                wait_external_arguments(&events, None, 2, false),
+                410,
+            );
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, wait.clone(), 410), wait)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+            assert!(
+                !service
+                    .purge_task_event(
+                        &session,
+                        invocation.principal.id(),
+                        2,
+                        CicsEventPurgeMode::DeadlockTimeout,
+                    )
+                    .unwrap()
+            );
+            assert_eq!(
+                service.post_task_event(
+                    &session,
+                    invocation.principal.id(),
+                    2,
+                    1,
+                    CicsEventPostMode::Hand,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service = self::service(store.clone());
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .post_task_event(
+                &session,
+                invocation.principal.id(),
+                3,
+                1,
+                CicsEventPostMode::Standard,
+            )
+            .unwrap();
+        let resumed = request(
+            CicsOperation::WaitExternal,
+            wait_external_arguments(&events, None, 2, false),
+            411,
+        );
+        let complete = service
+            .invoke(
+                &effect(&invocation.run_unit_id, resumed.clone(), 411),
+                resumed,
+            )
+            .unwrap();
+        assert_eq!(complete.disposition, CicsDisposition::Complete);
+        assert_eq!(complete.outputs["EVENT.POSTED"].bytes(), b"1");
+
+        let run = service
+            .lock()
+            .unwrap()
+            .runs
+            .get(&invocation.run_unit_id)
+            .unwrap()
+            .clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        let wait = request(
+            CicsOperation::WaitExternal,
+            wait_external_arguments(&events, None, 2, false),
+            412,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, wait.clone(), 412), wait)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        assert!(
+            service
+                .purge_task_event(
+                    &session,
+                    invocation.principal.id(),
+                    4,
+                    CicsEventPurgeMode::ForcePurge,
+                )
+                .unwrap()
+        );
+        let purged = request(
+            CicsOperation::WaitExternal,
+            wait_external_arguments(&events, None, 2, false),
+            413,
+        );
+        let purged = service
+            .invoke(
+                &effect(&invocation.run_unit_id, purged.clone(), 413),
+                purged,
+            )
+            .unwrap();
+        assert_eq!(purged.disposition, CicsDisposition::Abended);
+        assert_eq!(purged.condition, "AEXY");
+        handlers::release_task_state(&service, &run).unwrap();
+        drop(service);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

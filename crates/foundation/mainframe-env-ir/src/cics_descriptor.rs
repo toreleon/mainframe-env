@@ -565,7 +565,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 45] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 46] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -926,6 +926,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 45] = [
         effects: WAIT_EVENT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitExternal,
+        namespace: "cics.task",
+        name: "wait-external",
+        major: 1,
+        effects: WAIT_EVENT_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -979,6 +987,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Address => &CICS_EXECUTABLE_DESCRIPTORS[42],
         CicsPlanOperation::ReadTransientData => &CICS_EXECUTABLE_DESCRIPTORS[43],
         CicsPlanOperation::WaitEvent => &CICS_EXECUTABLE_DESCRIPTORS[44],
+        CicsPlanOperation::WaitExternal => &CICS_EXECUTABLE_DESCRIPTORS[45],
     }
 }
 
@@ -1040,7 +1049,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 45);
+        assert_eq!(typed.len(), 46);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1058,7 +1067,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 218);
+        assert_eq!(unready.len(), 217);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1300,6 +1309,7 @@ mod tests {
                 CicsPlanOperation::SetAssociationUserCorrData,
                 CicsPlanOperation::Suspend,
                 CicsPlanOperation::WaitEvent,
+                CicsPlanOperation::WaitExternal,
                 CicsPlanOperation::Start,
                 CicsPlanOperation::Retrieve,
                 CicsPlanOperation::Cancel,

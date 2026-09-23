@@ -772,6 +772,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
         HirCicsOperation::WaitEvent => &["ECADDR", "NAME", "RESP", "RESP2"],
+        HirCicsOperation::WaitExternal => &[
+            "ECBLIST",
+            "NAME",
+            "NUMEVENTS",
+            "PURGEABILITY",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::Start => &[
             "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
             "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
@@ -811,6 +819,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
         HirCicsOperation::WaitEvent => &["NOHANDLE"],
+        HirCicsOperation::WaitExternal => &["PURGEABLE", "NOTPURGEABLE", "NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -869,6 +878,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
+    task_wait::validate_constraints(&clauses, &raw_options, operation)?;
     for required in match operation {
         HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
@@ -906,6 +916,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::WaitEvent => &["ECADDR"][..],
+        HirCicsOperation::WaitExternal => &["ECBLIST", "NUMEVENTS"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1118,6 +1129,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "NOCHECK" => HirCicsOption::NoCheck,
             "MAPONLY" => HirCicsOption::MapOnly,
             "DATAONLY" => HirCicsOption::DataOnly,
+            "PURGEABLE" => HirCicsOption::Purgeable,
+            "NOTPURGEABLE" => HirCicsOption::NotPurgeable,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

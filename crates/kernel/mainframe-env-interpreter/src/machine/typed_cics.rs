@@ -153,7 +153,7 @@ pub(super) fn suspension(
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
-        CicsOperation::WaitEvent => ("cics-event", true),
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -242,7 +242,10 @@ pub(super) fn execute(
     let address_set = address::action(&plan)?;
     let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
     for operand in &plan.operands {
-        if matches!(operand.name, CicsOperandName::EventControlAddress) {
+        if matches!(
+            operand.name,
+            CicsOperandName::EventControlAddress | CicsOperandName::EcbList
+        ) {
             continue;
         }
         let (schema, bytes) = match &operand.value {
@@ -309,6 +312,8 @@ pub(super) fn execute(
                         | CicsOperandName::Seconds
                         | CicsOperandName::Milliseconds
                         | CicsOperandName::Flength
+                        | CicsOperandName::NumEvents
+                        | CicsOperandName::Purgeability
                 ) =>
             {
                 (

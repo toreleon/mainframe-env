@@ -24,6 +24,13 @@ All notable changes to mainframe-env are documented here.
   reads. Missing and empty queues return exact QIDERR 44/0 and QZERO 23/0;
   SET, SYSID, NOSUSPEND, and TDQUEUE definition modes remain fail-closed.
 
+- Added typed CICS `WAIT EXTERNAL` over a bounded list of checked 31-bit ECB
+  addresses. Append-only operation tag 44, operand tags 48–50, and option tags
+  28–29 preserve existing plans; NUMEVENTS, null/invalid list entries,
+  PURGEABILITY, standard-versus-hand posting, selected-event completion, AEXY
+  purge behavior, task cleanup, replay, and SQLite reopen are covered through
+  the compiled EIBFN `5E22` route.
+
 - Added typed CICS `WAIT EVENT` over checked POINTER-32 event control areas.
   Append-only operation tag 43 and operand tags 46–47 preserve existing plans;
   zero-valued events suspend and reissue through the durable coordinator, a

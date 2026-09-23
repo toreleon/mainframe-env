@@ -174,6 +174,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
+    ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
@@ -430,6 +431,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SetAssociationUserCorrData",
         "Suspend",
         "WaitEvent",
+        "WaitExternal",
         "Syncpoint",
         "Start",
         "Retrieve",
@@ -440,6 +442,9 @@ ENQUEUE_COMMAND_ROWS = frozenset(
         f"{OFFICIAL_BASELINE}:api-commands:0050",
         f"{OFFICIAL_BASELINE}:api-commands:0064",
     }
+)
+WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
+    {f"{OFFICIAL_BASELINE}:api-commands:0234"}
 )
 # Each profile is a reviewed compiler-only route to a pre-existing runtime
 # operation. It does not change application-registry readiness or counts.
@@ -599,6 +604,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WaitExternal": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "Start": frozenset(
@@ -815,6 +823,7 @@ def _load_typed_execution_registrations(
         "Start",
         "Suspend",
         "WaitEvent",
+        "WaitExternal",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -1126,6 +1135,7 @@ def load_catalog(
                 "Start",
                 "Suspend",
                 "WaitEvent",
+                "WaitExternal",
             }
         ]
     )
@@ -1625,6 +1635,8 @@ def _top_level_source_option_names(
         and dimension["source_projection_state"] == "projected"
     ):
         names.update({"TASK", "UOW"})
+    if command["official_row"] in WAIT_EXTERNAL_COMMAND_ROWS:
+        names.update({"PURGEABLE", "NOTPURGEABLE"})
     return sorted(names)
 
 
@@ -1961,6 +1973,24 @@ def _option_contract(
         entry["authorities"].add("command-source")
         entry["markers"].add(marker)
         entry["directions"].add(direction)
+
+    if command["official_row"] in WAIT_EXTERNAL_COMMAND_ROWS:
+        for name in ("PURGEABLE", "NOTPURGEABLE"):
+            entry = options.setdefault(
+                name,
+                {
+                    "markers": set(),
+                    "directions": set(),
+                    "stacks": set(),
+                    "authorities": set(),
+                    "source_bounds": set(),
+                    "legalities": set(),
+                },
+            )
+            entry["markers"].add("none")
+            entry["directions"].add("none")
+            entry["authorities"].add("command-source")
+            entry["legalities"].add("structural")
 
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():
@@ -3429,8 +3459,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 45:
-        raise DescriptorError("CICS application runtime set must remain exactly 45 rows")
+    if len(existing_runtime) != 46:
+        raise DescriptorError("CICS application runtime set must remain exactly 46 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3684,12 +3714,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 45
+        or len(typed_rows) != 46
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 45
-        or len(unready_rows) != 218
+        or len(advertised_rows) != 46
+        or len(unready_rows) != 217
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

@@ -52,6 +52,7 @@ impl Canonical for CicsOperation {
             Self::StartBrowse => out.variant("CicsOperation", "StartBrowse", 0),
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),
             Self::WaitEvent => out.variant("CicsOperation", "WaitEvent", 0),
+            Self::WaitExternal => out.variant("CicsOperation", "WaitExternal", 0),
             Self::Syncpoint => out.variant("CicsOperation", "Syncpoint", 0),
             Self::Write => out.variant("CicsOperation", "Write", 0),
             Self::WriteTransientData => out.variant("CicsOperation", "WriteTransientData", 0),

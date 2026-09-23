@@ -72,6 +72,8 @@ pub enum CicsOperation {
     Suspend,
     /// Wait for one timer-event control area to be posted.
     WaitEvent,
+    /// Wait for standard MVS posting of one ECB in a bounded external list.
+    WaitExternal,
     Syncpoint,
     Write,
     WriteTransientData,
@@ -126,6 +128,7 @@ impl CicsOperation {
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
+            Self::WaitExternal => "WaitExternal",
             Self::Syncpoint => "Syncpoint",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
@@ -164,6 +167,7 @@ impl CicsOperation {
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
+                | Self::WaitExternal
         )
     }
 
@@ -224,6 +228,7 @@ impl CicsOperation {
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,
             ("WAIT", Some("EVENT")) => Self::WaitEvent,
+            ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,

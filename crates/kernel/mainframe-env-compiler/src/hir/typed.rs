@@ -190,6 +190,7 @@ pub enum HirCicsOperation {
     Syncpoint,
     Suspend,
     WaitEvent,
+    WaitExternal,
     Start,
     Retrieve,
 }
@@ -246,6 +247,9 @@ pub enum HirCicsOperandName {
     DataArea,
     EventControlAddress,
     WaitName,
+    EcbList,
+    NumEvents,
+    Purgeability,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -292,6 +296,8 @@ pub enum HirCicsOption {
     DataOnly,
     Equal,
     Terminal,
+    Purgeable,
+    NotPurgeable,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -2025,6 +2031,76 @@ mod tests {
         ] {
             let invalid = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADWAIT. DATA DIVISION. WORKING-STORAGE SECTION. {declaration} PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_wait_external_resolves_list_count_name_and_purgeability() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-LIST-PTR POINTER-32. 01 EVENT-COUNT PIC S9(9) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT) PURGEABILITY(DFHVALUE(NOTPURGEABLE)) NAME('EXTERNAL') END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed WAIT EXTERNAL HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::WaitExternal =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .expect("typed WAIT EXTERNAL command");
+        assert_eq!(
+            command
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::EcbList,
+                HirCicsOperandName::NumEvents,
+                HirCicsOperandName::Purgeability,
+                HirCicsOperandName::WaitName,
+            ])
+        );
+        assert!(matches!(
+            command
+                .operands
+                .iter()
+                .find(|operand| operand.name == HirCicsOperandName::Purgeability)
+                .map(|operand| &operand.value),
+            Some(HirCicsValue::Literal(value)) if value == "NOTPURGEABLE"
+        ));
+
+        for (declarations, command, expected) in [
+            (
+                "01 ECB-LIST-PTR POINTER. 01 EVENT-COUNT PIC S9(9) COMP.",
+                "WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT)",
+                "four-byte POINTER-32",
+            ),
+            (
+                "01 ECB-LIST-PTR POINTER-32. 01 EVENT-COUNT PIC S9(4) COMP.",
+                "WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT)",
+                "fullword binary",
+            ),
+            (
+                "01 ECB-LIST-PTR POINTER-32. 01 EVENT-COUNT PIC S9(9) COMP.",
+                "WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT) PURGEABLE NOTPURGEABLE",
+                "accepts one",
+            ),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADWAIT. DATA DIVISION. WORKING-STORAGE SECTION. {declarations} PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(invalid.hir.is_none(), "{command}");
             assert!(

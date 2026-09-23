@@ -215,6 +215,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::DataArea => CicsOperandName::DataArea,
                 HirCicsOperandName::EventControlAddress => CicsOperandName::EventControlAddress,
                 HirCicsOperandName::WaitName => CicsOperandName::WaitName,
+                HirCicsOperandName::EcbList => CicsOperandName::EcbList,
+                HirCicsOperandName::NumEvents => CicsOperandName::NumEvents,
+                HirCicsOperandName::Purgeability => CicsOperandName::Purgeability,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -314,6 +317,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
+        HirCicsOperation::WaitExternal => CicsPlanOperation::WaitExternal,
         HirCicsOperation::Deq => CicsPlanOperation::Deq,
         HirCicsOperation::Enq => CicsPlanOperation::Enq,
         HirCicsOperation::HandleAid => CicsPlanOperation::HandleAid,
@@ -377,5 +381,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::MapOnly => CicsPlanOption::MapOnly,
         HirCicsOption::DataOnly => CicsPlanOption::DataOnly,
         HirCicsOption::Terminal => CicsPlanOption::Terminal,
+        HirCicsOption::Purgeable => CicsPlanOption::Purgeable,
+        HirCicsOption::NotPurgeable => CicsPlanOption::NotPurgeable,
     }
 }

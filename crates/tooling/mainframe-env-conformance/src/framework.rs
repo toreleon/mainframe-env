@@ -4337,6 +4337,86 @@ mod tests {
     }
 
     #[test]
+    fn cics_wait_external_posts_the_selected_ecb_from_a_typed_list() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-ONE PIC S9(9) COMP VALUE 0. 01 ECB-TWO PIC S9(9) COMP VALUE 0. 01 ECB-LIST. 05 ECB-PTR-ONE POINTER-32. 05 ECB-PTR-TWO POINTER-32. 01 ECB-LIST-PTR POINTER-32. 01 DONE-X PIC X VALUE '0'. PROCEDURE DIVISION. SET ECB-PTR-ONE TO ADDRESS OF ECB-ONE. SET ECB-PTR-TWO TO ADDRESS OF ECB-TWO. SET ECB-LIST-PTR TO ADDRESS OF ECB-LIST. EXEC CICS WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(2) NOTPURGEABLE NAME('EXTERNAL') END-EXEC. MOVE '1' TO DONE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(wait) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WAIT EXTERNAL did not call host");
+        };
+        assert!(matches!(
+            &wait.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WaitExternal,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["ECBLIST"].schema()
+                    == "mainframe-env.cics.external-event-list@1"
+                && arguments["ECBLIST"].bytes().len() == 16
+                && arguments["EVENT.POSTED"].bytes().is_empty()
+                && arguments["NUMEVENTS"].bytes() == b"2"
+                && arguments.contains_key("OPTION.NOTPURGEABLE")
+                && arguments["NAME"].bytes() == b"EXTERNAL"
+        ));
+        let posted = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.event-index@1",
+            b"1".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([("EVENT.POSTED".into(), posted)]),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: wait.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("ECB-ONE").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            machine.variable("ECB-TWO").unwrap().bytes(),
+            &[0x40, 0, 0, 0]
+        );
+        assert_eq!(machine.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x5e, 0x22]);
+    }
+
+    #[test]
     fn cics_local_handler_and_entry_commarea_preserve_control_and_bytes() {
         use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
 

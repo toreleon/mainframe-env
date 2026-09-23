@@ -54,6 +54,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Address => 42,
         CicsPlanOperation::ReadTransientData => 51,
         CicsPlanOperation::WaitEvent => 43,
+        CicsPlanOperation::WaitExternal => 44,
     }
 }
 
@@ -104,6 +105,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         42 => Ok(CicsPlanOperation::Address),
         51 => Ok(CicsPlanOperation::ReadTransientData),
         43 => Ok(CicsPlanOperation::WaitEvent),
+        44 => Ok(CicsPlanOperation::WaitExternal),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -158,6 +160,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::CommareaPointer => 45,
         CicsOperandName::EventControlAddress => 46,
         CicsOperandName::WaitName => 47,
+        CicsOperandName::EcbList => 48,
+        CicsOperandName::NumEvents => 49,
+        CicsOperandName::Purgeability => 50,
     }
 }
 
@@ -211,6 +216,9 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         45 => Ok(CicsOperandName::CommareaPointer),
         46 => Ok(CicsOperandName::EventControlAddress),
         47 => Ok(CicsOperandName::WaitName),
+        48 => Ok(CicsOperandName::EcbList),
+        49 => Ok(CicsOperandName::NumEvents),
+        50 => Ok(CicsOperandName::Purgeability),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -245,6 +253,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Generic => 25,
         CicsPlanOption::Equal => 26,
         CicsPlanOption::Terminal => 27,
+        CicsPlanOption::Purgeable => 28,
+        CicsPlanOption::NotPurgeable => 29,
     }
 }
 
@@ -278,6 +288,8 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         25 => Ok(CicsPlanOption::Generic),
         26 => Ok(CicsPlanOption::Equal),
         27 => Ok(CicsPlanOption::Terminal),
+        28 => Ok(CicsPlanOption::Purgeable),
+        29 => Ok(CicsPlanOption::NotPurgeable),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

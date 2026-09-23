@@ -48,6 +48,7 @@ pub(super) fn resolve(
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,
+        ["WAIT", "EXTERNAL"] => HirCicsOperation::WaitExternal,
         ["START"] => HirCicsOperation::Start,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         _ => return Err(ResolutionFailure::Unsupported),

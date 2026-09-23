@@ -35,6 +35,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataArea => SlotUse::Input,
         CicsOperandName::EventControlAddress => SlotUse::PointerInput,
+        CicsOperandName::EcbList => SlotUse::PointerInput,
+        CicsOperandName::NumEvents | CicsOperandName::Purgeability => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -105,6 +107,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
+        CicsPlanOperation::WaitExternal => CicsOperation::WaitExternal,
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
         CicsPlanOperation::Start => CicsOperation::Start,
@@ -162,6 +165,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::DataArea => "DATA",
         CicsOperandName::EventControlAddress => "ECADDR",
         CicsOperandName::WaitName => "NAME",
+        CicsOperandName::EcbList => "ECBLIST",
+        CicsOperandName::NumEvents => "NUMEVENTS",
+        CicsOperandName::Purgeability => "PURGEABILITY",
     }
 }
 
@@ -219,5 +225,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Generic => "GENERIC",
         CicsPlanOption::Equal => "EQUAL",
         CicsPlanOption::Terminal => "TERMINAL",
+        CicsPlanOption::Purgeable => "PURGEABLE",
+        CicsPlanOption::NotPurgeable => "NOTPURGEABLE",
     }
 }

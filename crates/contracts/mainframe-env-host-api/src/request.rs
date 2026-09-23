@@ -2454,12 +2454,13 @@ mod tests {
             CicsOperation::StartBrowse,
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,
+            CicsOperation::WaitExternal,
             CicsOperation::Syncpoint,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 43);
+        assert_eq!(forms.len(), 44);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

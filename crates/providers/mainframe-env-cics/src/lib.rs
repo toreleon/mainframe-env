@@ -9,7 +9,7 @@ mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
-pub use event_wait::CicsEventPostMode;
+pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

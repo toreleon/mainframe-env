@@ -579,6 +579,9 @@ fn validate_operation_shape(
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::WaitEvent => task_wait::invalid_wait_event_shape(plan, inputs, outputs),
+        CicsPlanOperation::WaitExternal => {
+            task_wait::invalid_wait_external_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Assign => {
             !inputs.is_empty()
                 || scheduling_options
@@ -2232,6 +2235,48 @@ mod tests {
         );
         let mut malformed = plan;
         malformed.operands[0].value = CicsOperandValue::Integer(1);
+        assert_eq!(
+            encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn wait_external_plan_freezes_reserved_tags_and_purgeability_shape() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WaitExternal,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::EcbList,
+                    value: CicsOperandValue::Storage(slot(1, "WAIT.ECB-LIST-POINTER")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::NumEvents,
+                    value: CicsOperandValue::Integer(2),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Purgeability,
+                    value: CicsOperandValue::Literal(b"NOTPURGEABLE".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        assert_eq!(operation_tag(CicsPlanOperation::WaitExternal), 44);
+        assert_eq!(operand_tag(CicsOperandName::EcbList), 48);
+        assert_eq!(operand_tag(CicsOperandName::NumEvents), 49);
+        assert_eq!(operand_tag(CicsOperandName::Purgeability), 50);
+        assert_eq!(option_tag(CicsPlanOption::Purgeable), 28);
+        assert_eq!(option_tag(CicsPlanOption::NotPurgeable), 29);
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(encoded[6], 44);
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut malformed = plan;
+        malformed.options = BTreeSet::from([CicsPlanOption::Purgeable]);
         assert_eq!(
             encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
