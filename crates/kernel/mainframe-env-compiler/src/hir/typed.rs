@@ -313,6 +313,11 @@ pub enum HirCicsOption {
     SpoolPage,
     EventAnd,
     EventOr,
+    TimerAfter,
+    TimerAt,
+    TimerOn,
+    AcqActivity,
+    AcqProcess,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

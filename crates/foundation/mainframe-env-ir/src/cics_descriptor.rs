@@ -241,6 +241,15 @@ const DOCUMENT_EFFECTS: &[Effect] = &[
     Effect::Transaction,
 ];
 const EVENT_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
+const EVENT_TIMER_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Clock,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 const TRANSFORM_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const WEB_SERVICE_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 const SPOOL_EFFECTS: &[Effect] = &[

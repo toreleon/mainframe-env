@@ -58,6 +58,14 @@ pub enum CicsOperation {
     DefineCompositeEvent,
     /// Delete one input or composite event from the current activity.
     DeleteEvent,
+    /// BTS timer state command.
+    CheckTimer,
+    /// BTS timer state command.
+    DefineTimer,
+    /// BTS timer state command.
+    DeleteTimer,
+    /// BTS timer state command.
+    ForceTimer,
     /// Create one bounded transaction-owned document.
     DocumentCreate,
     /// Delete one transaction-owned document and release its storage.
@@ -218,6 +226,10 @@ impl CicsOperation {
             Self::DefineInputEvent => "DefineInputEvent",
             Self::DefineCompositeEvent => "DefineCompositeEvent",
             Self::DeleteEvent => "DeleteEvent",
+            Self::CheckTimer => "CheckTimer",
+            Self::DefineTimer => "DefineTimer",
+            Self::DeleteTimer => "DeleteTimer",
+            Self::ForceTimer => "ForceTimer",
             Self::DocumentCreate => "DocumentCreate",
             Self::DocumentDelete => "DocumentDelete",
             Self::DocumentInsert => "DocumentInsert",
@@ -324,6 +336,10 @@ impl CicsOperation {
                 | Self::DefineInputEvent
                 | Self::DefineCompositeEvent
                 | Self::DeleteEvent
+                | Self::CheckTimer
+                | Self::DefineTimer
+                | Self::DeleteTimer
+                | Self::ForceTimer
                 | Self::DocumentCreate
                 | Self::DocumentDelete
                 | Self::DocumentInsert

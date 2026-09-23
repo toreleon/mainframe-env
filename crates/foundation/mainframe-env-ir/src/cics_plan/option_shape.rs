@@ -93,6 +93,17 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::EventAnd | CicsPlanOption::EventOr
         ),
+        CicsPlanOperation::DefineTimer => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::TimerAfter
+                | CicsPlanOption::TimerAt
+                | CicsPlanOption::TimerOn
+        ),
+        CicsPlanOperation::ForceTimer => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::AcqActivity | CicsPlanOption::AcqProcess
+        ),
         CicsPlanOperation::TransformDataToJson
         | CicsPlanOperation::TransformDataToXml
         | CicsPlanOperation::TransformJsonToData

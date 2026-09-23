@@ -109,6 +109,10 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
+    ("CheckTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0026"),
+    ("DefineTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0038"),
+    ("DeleteTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0047"),
+    ("ForceTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0079"),
     ("DefineCompositeEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0033"),
     ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
@@ -610,6 +614,10 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "EndBrowse",
         "Delete",
         "DeleteEvent",
+        "CheckTimer",
+        "DefineTimer",
+        "DeleteTimer",
+        "ForceTimer",
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
@@ -672,6 +680,7 @@ WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
 )
 COMPOSITE_SUBEVENT_ROW = f"{OFFICIAL_BASELINE}:api-commands:0033"
 COMPOSITE_SUBEVENT_OPTIONS = tuple(f"SUBEVENT{index}" for index in range(1, 9))
+CHECK_TIMER_ROW = f"{OFFICIAL_BASELINE}:api-commands:0026"
 # Each profile is a reviewed compiler-only route to a pre-existing runtime
 # operation. It does not change application-registry readiness or counts.
 COMPILER_SPI_COMPATIBILITY = {
@@ -708,6 +717,10 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "CheckTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "DefineTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "DeleteTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "ForceTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "DeleteEvent": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
@@ -2509,6 +2522,19 @@ def _option_contract(
                 "source_bounds": set(),
                 "legalities": {"structural"},
             }
+
+    if command["official_row"] == CHECK_TIMER_ROW:
+        # The pinned CHECK TIMER topic explicitly defines STATUS(cvda) as an
+        # output. The projected diagram retained an ambiguous marker. Catalog
+        # 0026, SHA-256 5b886a524054e10063175d128fe4b41b420fdc2485fdb8d79feb3a3b7957f188.
+        options["STATUS"] = {
+            "markers": {"cvda"},
+            "directions": {"output"},
+            "stacks": {("STATUS",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
 
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():

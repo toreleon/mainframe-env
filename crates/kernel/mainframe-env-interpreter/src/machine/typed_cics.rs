@@ -357,6 +357,14 @@ pub(super) fn execute(
                         | CicsOperandName::Hours
                         | CicsOperandName::Minutes
                         | CicsOperandName::Seconds
+                        | CicsOperandName::TimerDays
+                        | CicsOperandName::TimerHours
+                        | CicsOperandName::TimerMinutes
+                        | CicsOperandName::TimerSeconds
+                        | CicsOperandName::TimerYear
+                        | CicsOperandName::TimerMonth
+                        | CicsOperandName::TimerDayOfMonth
+                        | CicsOperandName::TimerDayOfYear
                         | CicsOperandName::Milliseconds
                         | CicsOperandName::Flength
                         | CicsOperandName::Flength64
@@ -445,6 +453,7 @@ pub(super) fn execute(
         web_service_control::output_arguments(machine, output.name, &target, &mut arguments)?;
         match output.name {
             CicsOutputName::Abstime
+            | CicsOutputName::TimerStatus
             | CicsOutputName::Commarea
             | CicsOutputName::Milliseconds
             | CicsOutputName::Mmddyy

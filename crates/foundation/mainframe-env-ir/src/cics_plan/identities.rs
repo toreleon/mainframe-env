@@ -103,6 +103,14 @@ pub enum CicsPlanOperation {
     DefineCompositeEvent,
     /// Delete one BTS input or composite event.
     DeleteEvent,
+    /// BTS timer state command.
+    CheckTimer,
+    /// BTS timer state command.
+    DefineTimer,
+    /// BTS timer state command.
+    DeleteTimer,
+    /// BTS timer state command.
+    ForceTimer,
     /// Write one explicitly keyed file record.
     Write,
     /// Write one bounded record to a transient data queue.
@@ -217,6 +225,15 @@ pub enum CicsOperandName {
     SubEvent6,
     SubEvent7,
     SubEvent8,
+    Timer,
+    TimerDays,
+    TimerHours,
+    TimerMinutes,
+    TimerSeconds,
+    TimerYear,
+    TimerMonth,
+    TimerDayOfMonth,
+    TimerDayOfYear,
     /// Optional application transaction abend code.
     Abcode,
     /// Source label used by a task-local control transfer.
@@ -547,6 +564,11 @@ pub enum CicsPlanOption {
     EventAnd,
     /// The composite predicate requires any child event.
     EventOr,
+    TimerAfter,
+    TimerAt,
+    TimerOn,
+    AcqActivity,
+    AcqProcess,
     /// Ignore and clear active abnormal-termination exits.
     Cancel,
     /// Suppress transaction-dump creation.

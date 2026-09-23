@@ -36,6 +36,19 @@ pub(super) fn resolve(
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
     let mut outputs = Vec::new();
+    if operation == HirCicsOperation::CheckTimer {
+        let target = complete_data_reference(&clauses["STATUS"], semantic)?;
+        require_writable(&target)?;
+        if target.category != DataCategory::Binary || target.length != 4 || target.scale != 0 {
+            return Err(super::super::ResolutionFailure::Invalid(
+                "CICS CHECK TIMER STATUS requires writable fullword binary storage".into(),
+            ));
+        }
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::TimerStatus,
+            target,
+        });
+    }
     for (name, identity) in [
         ("ABSTIME", HirCicsOutputName::Abstime),
         ("INTO", HirCicsOutputName::Into),

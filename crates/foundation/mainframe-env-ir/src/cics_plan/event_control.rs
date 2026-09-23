@@ -84,3 +84,63 @@ pub(super) fn invalid_membership_shape(
             .iter()
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
+
+pub(super) fn invalid_timer_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    if !inputs.contains(&CicsOperandName::Timer)
+        || !matches!(
+            plan.operands.iter().find(|operand| operand.name == CicsOperandName::Timer),
+            Some(operand) if matches!(operand.value, CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_))
+        )
+    {
+        return true;
+    }
+    match plan.operation {
+        super::CicsPlanOperation::DefineTimer => {
+            let after = plan.options.contains(&CicsPlanOption::TimerAfter);
+            let at = plan.options.contains(&CicsPlanOption::TimerAt);
+            after == at
+                || plan.options.contains(&CicsPlanOption::TimerOn) && !at
+                || ![
+                    CicsOperandName::TimerDays,
+                    CicsOperandName::TimerHours,
+                    CicsOperandName::TimerMinutes,
+                    CicsOperandName::TimerSeconds,
+                ]
+                .iter()
+                .any(|name| inputs.contains(name))
+                || at && inputs.contains(&CicsOperandName::TimerDays)
+                || inputs.iter().any(|name| {
+                    !matches!(
+                        name,
+                        CicsOperandName::Timer
+                            | CicsOperandName::Event
+                            | CicsOperandName::TimerDays
+                            | CicsOperandName::TimerHours
+                            | CicsOperandName::TimerMinutes
+                            | CicsOperandName::TimerSeconds
+                            | CicsOperandName::TimerYear
+                            | CicsOperandName::TimerMonth
+                            | CicsOperandName::TimerDayOfMonth
+                            | CicsOperandName::TimerDayOfYear
+                    )
+                })
+                || outputs
+                    .iter()
+                    .any(|name| !matches!(name, CicsOutputName::Resp | CicsOutputName::Resp2))
+        }
+        super::CicsPlanOperation::CheckTimer => {
+            inputs.len() != 1 || !outputs.contains(&CicsOutputName::TimerStatus)
+        }
+        super::CicsPlanOperation::DeleteTimer => inputs.len() != 1,
+        super::CicsPlanOperation::ForceTimer => {
+            inputs.len() != 1
+                || plan.options.contains(&CicsPlanOption::AcqActivity)
+                    && plan.options.contains(&CicsPlanOption::AcqProcess)
+        }
+        _ => true,
+    }
+}

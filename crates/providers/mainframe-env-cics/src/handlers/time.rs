@@ -173,17 +173,17 @@ fn invalid_absolute_time() -> HostProblem {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct ClockInstant {
-    year: i64,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-    millisecond: u32,
+pub(super) struct ClockInstant {
+    pub(super) year: i64,
+    pub(super) month: u32,
+    pub(super) day: u32,
+    pub(super) hour: u32,
+    pub(super) minute: u32,
+    pub(super) second: u32,
+    pub(super) millisecond: u32,
 }
 
-fn parse_clock_timestamp(value: &str) -> Result<ClockInstant, HostProblem> {
+pub(super) fn parse_clock_timestamp(value: &str) -> Result<ClockInstant, HostProblem> {
     if value.len() != 17 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(HostProblem::ProviderFailure);
     }
@@ -221,7 +221,7 @@ fn validate_instant(instant: ClockInstant) -> Result<(), HostProblem> {
     }
 }
 
-fn absolute_milliseconds(instant: ClockInstant) -> Result<i64, HostProblem> {
+pub(super) fn absolute_milliseconds(instant: ClockInstant) -> Result<i64, HostProblem> {
     let epoch = days_from_civil(1900, 1, 1).ok_or(HostProblem::ProviderFailure)?;
     let days = days_from_civil(instant.year, instant.month, instant.day)
         .ok_or(HostProblem::ProviderFailure)?
@@ -256,7 +256,7 @@ fn eib_date_time(instant: ClockInstant) -> Result<(i64, i64), HostProblem> {
     Ok((date, time))
 }
 
-fn instant_from_absolute(value: i64) -> Result<ClockInstant, HostProblem> {
+pub(super) fn instant_from_absolute(value: i64) -> Result<ClockInstant, HostProblem> {
     if value < 0 {
         return Err(HostProblem::Malformed);
     }
@@ -279,7 +279,7 @@ fn instant_from_absolute(value: i64) -> Result<ClockInstant, HostProblem> {
     })
 }
 
-fn days_from_civil(year: i64, month: u32, day: u32) -> Option<i64> {
+pub(super) fn days_from_civil(year: i64, month: u32, day: u32) -> Option<i64> {
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
@@ -296,7 +296,7 @@ fn days_from_civil(year: i64, month: u32, day: u32) -> Option<i64> {
     Some(era * 146_097 + day_of_era - 719_468)
 }
 
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+pub(super) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let shifted = days + 719_468;
     let era = if shifted >= 0 {
         shifted

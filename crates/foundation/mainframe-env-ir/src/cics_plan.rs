@@ -722,6 +722,12 @@ fn validate_operation_shape(
         CicsPlanOperation::AddSubevent | CicsPlanOperation::RemoveSubevent => {
             event_control::invalid_membership_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DefineTimer
+        | CicsPlanOperation::CheckTimer
+        | CicsPlanOperation::DeleteTimer
+        | CicsPlanOperation::ForceTimer => {
+            event_control::invalid_timer_shape(plan, inputs, outputs)
+        }
     };
     if unexpected_output
         || malformed
@@ -4463,6 +4469,21 @@ mod tests {
         assert_eq!(operand_from_tag(182), Ok(CicsOperandName::Token));
         assert_eq!(output_tag(CicsOutputName::Token), 240);
         assert_eq!(output_from_tag(240), Ok(CicsOutputName::Token));
+        for (operation, tag) in [
+            (CicsPlanOperation::CheckTimer, 106),
+            (CicsPlanOperation::DefineTimer, 109),
+            (CicsPlanOperation::DeleteTimer, 111),
+            (CicsPlanOperation::ForceTimer, 112),
+        ] {
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        assert_eq!(operand_tag(CicsOperandName::Timer), 330);
+        assert_eq!(operand_from_tag(330), Ok(CicsOperandName::Timer));
+        assert_eq!(option_tag(CicsPlanOption::TimerAfter), 254);
+        assert_eq!(option_from_tag(254), Ok(CicsPlanOption::TimerAfter));
+        assert_eq!(output_tag(CicsOutputName::TimerStatus), 376);
+        assert_eq!(output_from_tag(376), Ok(CicsOutputName::TimerStatus));
         assert_eq!(operations.len(), crate::CICS_EXECUTABLE_DESCRIPTORS.len());
         for tag in 183..=191 {
             assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));

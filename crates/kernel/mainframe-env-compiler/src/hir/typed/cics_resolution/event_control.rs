@@ -1,7 +1,7 @@
 use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, Resolution, ResolutionFailure,
 };
-use super::{Clauses, cics_value, shape::CommandShape};
+use super::{Clauses, cics_integer_value, cics_value, shape::CommandShape};
 use crate::SemanticModel;
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
@@ -33,6 +33,39 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             options: &["NOHANDLE"],
             required: &["EVENT", "SUBEVENT"],
         }),
+        HirCicsOperation::DefineTimer => Some(CommandShape {
+            clauses: &[
+                "TIMER",
+                "EVENT",
+                "DAYS",
+                "HOURS",
+                "MINUTES",
+                "SECONDS",
+                "YEAR",
+                "MONTH",
+                "DAYOFMONTH",
+                "DAYOFYEAR",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["AFTER", "AT", "ON", "NOHANDLE"],
+            required: &["TIMER"],
+        }),
+        HirCicsOperation::ForceTimer => Some(CommandShape {
+            clauses: &["TIMER", "RESP", "RESP2"],
+            options: &["ACQACTIVITY", "ACQPROCESS", "NOHANDLE"],
+            required: &["TIMER"],
+        }),
+        HirCicsOperation::CheckTimer => Some(CommandShape {
+            clauses: &["TIMER", "STATUS", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["TIMER", "STATUS"],
+        }),
+        HirCicsOperation::DeleteTimer => Some(CommandShape {
+            clauses: &["TIMER", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["TIMER"],
+        }),
         _ => None,
     }
 }
@@ -50,6 +83,24 @@ pub(super) fn validate_constraints(
             ));
         }
     }
+    if operation == HirCicsOperation::DefineTimer {
+        let after = raw_options.iter().any(|option| option == "AFTER");
+        let at = raw_options.iter().any(|option| option == "AT");
+        let on = raw_options.iter().any(|option| option == "ON");
+        if after == at || on && !at {
+            return Err(ResolutionFailure::Invalid(
+                "CICS DEFINE TIMER requires AFTER or AT; ON requires AT".into(),
+            ));
+        }
+    }
+    if operation == HirCicsOperation::ForceTimer
+        && raw_options.iter().any(|option| option == "ACQACTIVITY")
+        && raw_options.iter().any(|option| option == "ACQPROCESS")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS FORCE TIMER accepts only one acquired scope".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -65,13 +116,55 @@ pub(super) fn operands(
             | HirCicsOperation::DefineCompositeEvent
             | HirCicsOperation::AddSubevent
             | HirCicsOperation::RemoveSubevent
+            | HirCicsOperation::DefineTimer
+            | HirCicsOperation::CheckTimer
+            | HirCicsOperation::DeleteTimer
+            | HirCicsOperation::ForceTimer
     ) {
         return Ok(Vec::new());
     }
-    let mut operands = vec![HirCicsNamedOperand {
-        name: HirCicsOperandName::Event,
-        value: cics_value(&clauses["EVENT"], semantic)?,
-    }];
+    let mut operands = if matches!(
+        operation,
+        HirCicsOperation::DefineTimer
+            | HirCicsOperation::CheckTimer
+            | HirCicsOperation::DeleteTimer
+            | HirCicsOperation::ForceTimer
+    ) {
+        vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::Timer,
+            value: cics_value(&clauses["TIMER"], semantic)?,
+        }]
+    } else {
+        vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::Event,
+            value: cics_value(&clauses["EVENT"], semantic)?,
+        }]
+    };
+    if operation == HirCicsOperation::DefineTimer {
+        if let Some(value) = clauses.get("EVENT") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::Event,
+                value: cics_value(value, semantic)?,
+            });
+        }
+        for (key, name) in [
+            ("DAYS", HirCicsOperandName::TimerDays),
+            ("HOURS", HirCicsOperandName::TimerHours),
+            ("MINUTES", HirCicsOperandName::TimerMinutes),
+            ("SECONDS", HirCicsOperandName::TimerSeconds),
+            ("YEAR", HirCicsOperandName::TimerYear),
+            ("MONTH", HirCicsOperandName::TimerMonth),
+            ("DAYOFMONTH", HirCicsOperandName::TimerDayOfMonth),
+            ("DAYOFYEAR", HirCicsOperandName::TimerDayOfYear),
+        ] {
+            if let Some(value) = clauses.get(key) {
+                operands.push(HirCicsNamedOperand {
+                    name,
+                    value: cics_integer_value(value, semantic)?,
+                });
+            }
+        }
+    }
     if operation == HirCicsOperation::DefineCompositeEvent {
         for (clause, name) in [
             ("SUBEVENT1", HirCicsOperandName::SubEvent1),

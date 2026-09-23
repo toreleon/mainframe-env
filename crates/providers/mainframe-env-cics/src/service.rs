@@ -27694,4 +27694,102 @@ mod tests {
         let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         assert!(state["events"].as_object().unwrap().is_empty());
     }
+
+    #[test]
+    fn bts_timer_expiry_force_check_and_delete_are_durable() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.bind_event_activity(&invocation.run_unit_id, "CURRENT", None, None)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"CLOCK")),
+                ("EVENT".into(), argument(b"BELL")),
+                ("OPTION.AFTER".into(), cics_option()),
+                ("SECONDS".into(), decimal_payload(0).unwrap()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let check = request(
+            CicsOperation::CheckTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"CLOCK")),
+                ("STATUS".into(), argument(b"STATUS")),
+            ]),
+            2,
+        );
+        let expired = cics
+            .invoke(&effect(&invocation.run_unit_id, check.clone(), 2), check)
+            .unwrap();
+        assert_eq!(expired.outputs["STATUS"].bytes(), b"EXPIRED");
+        let snapshot = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&snapshot.payload).unwrap();
+        assert!(state["events"].get("BELL").is_none());
+        assert_eq!(state["timers"]["CLOCK"]["acknowledged"], true);
+
+        let define = request(
+            CicsOperation::DefineTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"LATER")),
+                ("OPTION.AFTER".into(), cics_option()),
+                ("SECONDS".into(), decimal_payload(5).unwrap()),
+            ]),
+            3,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 3), define)
+            .unwrap();
+        let force = request(
+            CicsOperation::ForceTimer,
+            BTreeMap::from([("TIMER".into(), argument(b"LATER"))]),
+            4,
+        );
+        let forced = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, force.clone(), 4),
+                force.clone(),
+            )
+            .unwrap();
+        assert_eq!(forced.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, force.clone(), 4), force)
+                .unwrap(),
+            forced
+        );
+        let check = request(
+            CicsOperation::CheckTimer,
+            BTreeMap::from([
+                ("TIMER".into(), argument(b"LATER")),
+                ("STATUS".into(), argument(b"STATUS")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, check.clone(), 5), check)
+                .unwrap()
+                .outputs["STATUS"]
+                .bytes(),
+            b"FORCED"
+        );
+        let delete = request(
+            CicsOperation::DeleteTimer,
+            BTreeMap::from([("TIMER".into(), argument(b"LATER"))]),
+            6,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, delete.clone(), 6), delete)
+            .unwrap();
+        let snapshot = store
+            .get_provider_state("cics-event-activity-v1", "CURRENT")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&snapshot.payload).unwrap();
+        assert!(state["timers"].get("LATER").is_none());
+        assert!(state["events"].get("LATER").is_none());
+    }
 }
