@@ -371,6 +371,15 @@ record length are applied before the bounded durable CAS. Invalid destination
 pairing, length, or OUTDESCR returns the documented condition before report
 creation. The command records EIBFN `5602` and survives SQLite reopen.
 
+`EXEC CICS SPOOLREAD` reads one record from a task-owned input token. The
+compiler requires fullword MAXFLENGTH and optional writable fullword TOFLENGTH;
+the interpreter sends the actual INTO capacity to the provider. On LENGERR,
+the prefix is written to INTO, TOFLENGTH receives the original length, RESP2
+counts the omitted bytes, and the cursor stays on that record. A corrected
+retry returns the full record and advances. ENDFILE is emitted once and then
+INVREQ 16/12 is returned for read-after-EOF. The cursor and exact reply are
+durable and replay-safe. The command records EIBFN `5604`.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

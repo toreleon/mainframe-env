@@ -357,6 +357,17 @@ share one durable replay CAS; the compiled route uses EIBFN `5602`. Dynamic JES
 allocation, macro return codes, and implicit end-of-task close are outside the
 local spool boundary.
 
+Typed `SPOOLREAD` requires the task-owned eight-character TOKEN, a writable
+INTO area, fullword-binary MAXFLENGTH, and RESP or NOHANDLE. Optional writable
+fullword TOFLENGTH receives the actual record length. A short transfer writes
+the available prefix, returns LENGERR 22 with the omitted byte count in RESP2,
+and retains the same record for retry. MAXFLENGTH above 32,760 returns LENGERR
+22/0 without advancing. Successful reads advance the durable cursor; the first
+read beyond the final record returns ENDFILE 20 and marks EOF, and subsequent
+reads return INVREQ 16/12. Wrong ownership returns NOTOPEN 19/8, while a
+task-owned output report returns NOTOPEN 19/12. The reply and cursor/EOF state
+share one replay CAS. The selected compiled route uses EIBFN `5604`.
+
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

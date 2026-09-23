@@ -618,6 +618,7 @@ fn validate_operation_shape(
         CicsPlanOperation::SpoolOpenOutput => {
             spool_control::invalid_open_output_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::SpoolRead => spool_control::invalid_read_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2032,6 +2033,7 @@ mod tests {
             (CicsPlanOperation::SpoolClose, 58),
             (CicsPlanOperation::SpoolOpenInput, 59),
             (CicsPlanOperation::SpoolOpenOutput, 60),
+            (CicsPlanOperation::SpoolRead, 61),
         ];
         let operands = [
             (CicsOperandName::SpoolToken, 112),
@@ -2040,6 +2042,7 @@ mod tests {
             (CicsOperandName::SpoolNode, 115),
             (CicsOperandName::SpoolRecordLength, 116),
             (CicsOperandName::SpoolOutDescr, 117),
+            (CicsOperandName::SpoolMaxFlength, 118),
         ];
         let options = [
             (CicsPlanOption::SpoolKeep, 72),
@@ -2074,7 +2077,10 @@ mod tests {
                 .len(),
             options.len()
         );
-        let outputs = [(CicsOutputName::SpoolToken, 208)];
+        let outputs = [
+            (CicsOutputName::SpoolToken, 208),
+            (CicsOutputName::SpoolToFlength, 209),
+        ];
         assert_eq!(
             outputs
                 .iter()

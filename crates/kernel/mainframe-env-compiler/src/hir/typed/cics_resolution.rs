@@ -685,7 +685,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
-        | HirCicsOperation::SpoolOpenOutput => spool_control::allowed_clauses(operation),
+        | HirCicsOperation::SpoolOpenOutput
+        | HirCicsOperation::SpoolRead => spool_control::allowed_clauses(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -762,7 +763,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
-        | HirCicsOperation::SpoolOpenOutput => spool_control::allowed_options(operation),
+        | HirCicsOperation::SpoolOpenOutput
+        | HirCicsOperation::SpoolRead => spool_control::allowed_options(operation),
         _ => {
             transform_shape
                 .as_ref()
@@ -875,7 +877,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
-        | HirCicsOperation::SpoolOpenOutput => spool_control::required(operation),
+        | HirCicsOperation::SpoolOpenOutput
+        | HirCicsOperation::SpoolRead => spool_control::required(operation),
         _ => {
             transform_shape
                 .as_ref()

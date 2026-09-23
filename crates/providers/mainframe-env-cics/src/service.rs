@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 73);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 74);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5309,6 +5309,7 @@ mod tests {
             ("SPOOLCLOSE", CicsOperation::SpoolClose),
             ("SPOOLOPEN INPUT", CicsOperation::SpoolOpenInput),
             ("SPOOLOPEN OUTPUT", CicsOperation::SpoolOpenOutput),
+            ("SPOOLREAD", CicsOperation::SpoolRead),
             ("START", CicsOperation::Start),
             ("STARTBR", CicsOperation::StartBrowse),
             ("SUSPEND", CicsOperation::Suspend),
@@ -6556,7 +6557,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 73);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 74);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -15448,6 +15449,193 @@ mod tests {
             assert_eq!(report.state, "open-output");
             assert_eq!(report.owner_run_unit.is_some(), true);
             assert_eq!(report.record_length, 80);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn spoolread_truncates_without_advancing_then_reports_eof_once() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-spoolread-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let token;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider: Arc<dyn ProviderStateStore> = store.clone();
+            let service = service(provider);
+            let (invocation, _) = registered(&service);
+            token = service
+                .stage_spool_input("MEAPUSER", b'A', &[b"ABCDEFG".to_vec(), b"XY".to_vec()])
+                .unwrap();
+            open_staged_spool_report(
+                &service,
+                &invocation,
+                &token,
+                handlers::SpoolReportState::OpenInput,
+            );
+            let read = |sequence, max, capacity| {
+                let mut read = request(
+                    CicsOperation::SpoolRead,
+                    BTreeMap::from([
+                        ("TOKEN".into(), enqueue_value(token.as_bytes())),
+                        ("INTO".into(), argument(b"INTO-X")),
+                        ("INTO.MAXLENGTH".into(), cics_decimal(capacity)),
+                        ("MAXFLENGTH".into(), cics_decimal(max)),
+                        ("TOFLENGTH".into(), argument(b"TOFLENGTH-X")),
+                        ("OPTION.NOHANDLE".into(), cics_option()),
+                    ]),
+                    sequence,
+                );
+                read.condition_policy = CicsConditionPolicy::NoHandle;
+                read
+            };
+            let oversized = read(1, 32_761, 32_761);
+            let oversized = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, oversized.clone(), 1),
+                    oversized,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    oversized.condition.as_str(),
+                    oversized.response,
+                    oversized.response2
+                ),
+                ("LENGERR", 22, 0)
+            );
+            let short = read(2, 3, 3);
+            let truncated = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, short.clone(), 2),
+                    short.clone(),
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    truncated.condition.as_str(),
+                    truncated.response,
+                    truncated.response2
+                ),
+                ("LENGERR", 22, 4)
+            );
+            assert_eq!(truncated.payload.bytes(), b"ABC");
+            assert_eq!(truncated.outputs["TOFLENGTH"].bytes(), b"7");
+            assert_eq!(
+                service.spool_report_snapshot(&token).unwrap().next_record,
+                0
+            );
+            store
+                .delete_provider_state("cics-effect-replay-v1", "outer-2", 1)
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, short.clone(), 2), short)
+                    .unwrap(),
+                truncated
+            );
+
+            let first = read(3, 7, 7);
+            let first = service
+                .invoke(&effect(&invocation.run_unit_id, first.clone(), 3), first)
+                .unwrap();
+            assert_eq!(first.payload.bytes(), b"ABCDEFG");
+            assert_eq!(first.outputs["TOFLENGTH"].bytes(), b"7");
+            assert_eq!(
+                service.spool_report_snapshot(&token).unwrap().next_record,
+                1
+            );
+            let second = read(4, 7, 7);
+            let second = service
+                .invoke(&effect(&invocation.run_unit_id, second.clone(), 4), second)
+                .unwrap();
+            assert_eq!(second.payload.bytes(), b"XY");
+            assert_eq!(second.outputs["TOFLENGTH"].bytes(), b"2");
+            let eof = read(5, 7, 7);
+            let eof = service
+                .invoke(&effect(&invocation.run_unit_id, eof.clone(), 5), eof)
+                .unwrap();
+            assert_eq!((eof.condition.as_str(), eof.response), ("ENDFILE", 20));
+            let after_eof = read(6, 7, 7);
+            let after_eof = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, after_eof.clone(), 6),
+                    after_eof,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    after_eof.condition.as_str(),
+                    after_eof.response,
+                    after_eof.response2
+                ),
+                ("INVREQ", 16, 12)
+            );
+
+            let other = invocation_for("spoolread-other", BTreeMap::new());
+            let other_session = SessionId::new("spoolread-other", 64).unwrap();
+            service.create_session(&other_session, 24, 80).unwrap();
+            service
+                .register_run(other.clone(), &other_session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let foreign = read(20, 7, 7);
+            let foreign = service
+                .invoke(&effect(&other.run_unit_id, foreign.clone(), 20), foreign)
+                .unwrap();
+            assert_eq!(
+                (
+                    foreign.condition.as_str(),
+                    foreign.response,
+                    foreign.response2
+                ),
+                ("NOTOPEN", 19, 8)
+            );
+
+            let output_token = service
+                .stage_spool_input("MEAPUSER", b'A', &[b"OUTPUT".to_vec()])
+                .unwrap();
+            open_staged_spool_report(
+                &service,
+                &invocation,
+                &output_token,
+                handlers::SpoolReportState::OpenOutput,
+            );
+            let mut wrong_direction = request(
+                CicsOperation::SpoolRead,
+                BTreeMap::from([
+                    ("TOKEN".into(), enqueue_value(output_token.as_bytes())),
+                    ("INTO".into(), argument(b"INTO-X")),
+                    ("MAXFLENGTH".into(), cics_decimal(7)),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                21,
+            );
+            wrong_direction.condition_policy = CicsConditionPolicy::NoHandle;
+            let wrong_direction = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, wrong_direction.clone(), 21),
+                    wrong_direction,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    wrong_direction.condition.as_str(),
+                    wrong_direction.response,
+                    wrong_direction.response2
+                ),
+                ("NOTOPEN", 19, 12)
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let report = service.spool_report_snapshot(&token).unwrap();
+            assert_eq!(report.state, "open-input");
+            assert_eq!(report.next_record, 2);
         }
         std::fs::remove_dir_all(root).unwrap();
     }

@@ -139,6 +139,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::TypeNamespaceLength
         | HirCicsOutputName::JournalReqId
         | HirCicsOutputName::SpoolToken
+        | HirCicsOutputName::SpoolToFlength
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

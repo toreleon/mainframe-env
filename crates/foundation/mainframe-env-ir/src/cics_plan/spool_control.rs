@@ -120,3 +120,40 @@ pub(super) fn invalid_open_output_shape(
             && plan.options.contains(&CicsPlanOption::SpoolPunch)
         || matches!(plan.condition, CicsCondition::Default)
 }
+
+pub(super) fn invalid_read_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    inputs
+        != &BTreeSet::from([
+            CicsOperandName::SpoolToken,
+            CicsOperandName::SpoolMaxFlength,
+        ])
+        || plan.operands.iter().any(|operand| {
+            !matches!(
+                (operand.name, &operand.value),
+                (CicsOperandName::SpoolToken, CicsOperandValue::Storage(_))
+                    | (
+                        CicsOperandName::SpoolMaxFlength,
+                        CicsOperandValue::Storage(_)
+                    )
+            )
+        })
+        || !outputs.contains(&CicsOutputName::Into)
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::Into
+                    | CicsOutputName::SpoolToFlength
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+        || matches!(plan.condition, CicsCondition::Default)
+}

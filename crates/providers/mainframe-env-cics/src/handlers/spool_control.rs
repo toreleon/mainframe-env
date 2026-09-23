@@ -1,9 +1,11 @@
 //! Shared bounded durable state for CICS JES spool-control commands.
 
 mod ingress;
+mod read;
 
 use super::{field, store_error};
 use crate::service::{CicsLimits, CicsService, Run, bounded};
+use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
     HostRequest, canonical_request_digest,
@@ -38,6 +40,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::SpoolClose => close(service, run, request),
         CicsOperation::SpoolOpenInput => open_input(service, run, request),
         CicsOperation::SpoolOpenOutput => open_output(service, run, request),
+        CicsOperation::SpoolRead => read::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -572,6 +575,17 @@ fn response(
     )?;
     if let Some(token) = reply.token {
         response.outputs.insert("TOKEN".into(), bounded(token)?);
+    }
+    if let Some(length) = reply.toflength {
+        response.outputs.insert(
+            "TOFLENGTH".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.decimal@1",
+                length.to_string().into_bytes(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
     }
     Ok(response)
 }

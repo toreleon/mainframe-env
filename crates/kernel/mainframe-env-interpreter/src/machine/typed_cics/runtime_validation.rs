@@ -69,3 +69,16 @@ pub(super) fn validate_runtime_plan(
     }
     Ok(())
 }
+
+pub(in crate::machine) fn into_payload_schema(
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Option<&str> {
+    (!matches!(
+        operation,
+        CicsOperation::ReadTransientData
+            | CicsOperation::DocumentRetrieve
+            | CicsOperation::SpoolRead
+    ) || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
+    .then(|| response.payload.schema())
+}

@@ -34,6 +34,8 @@ pub(super) enum SlotUse {
     SpoolNodeInput,
     SpoolRecordLengthInput,
     SpoolOutDescrInput,
+    SpoolMaxFlengthInput,
+    SpoolToFlengthOutput,
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -86,6 +88,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::SpoolNode => SlotUse::SpoolNodeInput,
         CicsOperandName::SpoolRecordLength => SlotUse::SpoolRecordLengthInput,
         CicsOperandName::SpoolOutDescr => SlotUse::SpoolOutDescrInput,
+        CicsOperandName::SpoolMaxFlength => SlotUse::SpoolMaxFlengthInput,
         _ => SlotUse::Input,
     }
 }
@@ -125,6 +128,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::DocumentToken => SlotUse::Output,
         CicsOutputName::DocumentSize => SlotUse::NumericOutput,
         CicsOutputName::SpoolToken => SlotUse::SpoolTokenOutput,
+        CicsOutputName::SpoolToFlength => SlotUse::SpoolToFlengthOutput,
     }
 }
 
@@ -180,6 +184,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SpoolClose => CicsOperation::SpoolClose,
         CicsPlanOperation::SpoolOpenInput => CicsOperation::SpoolOpenInput,
         CicsPlanOperation::SpoolOpenOutput => CicsOperation::SpoolOpenOutput,
+        CicsPlanOperation::SpoolRead => CicsOperation::SpoolRead,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -319,6 +324,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::SpoolNode => "NODE",
         CicsOperandName::SpoolRecordLength => "RECORDLENGTH",
         CicsOperandName::SpoolOutDescr => "OUTDESCR",
+        CicsOperandName::SpoolMaxFlength => "MAXFLENGTH",
     }
 }
 
@@ -358,6 +364,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::TypeNamespaceLength => "TYPENSLEN",
         CicsOutputName::JournalReqId => "REQID",
         CicsOutputName::SpoolToken => "TOKEN",
+        CicsOutputName::SpoolToFlength => "TOFLENGTH",
     }
 }
 

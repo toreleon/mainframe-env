@@ -197,6 +197,7 @@ pub enum HirCicsOperation {
     SpoolClose,
     SpoolOpenInput,
     SpoolOpenOutput,
+    SpoolRead,
     Syncpoint,
     Unlock,
     Suspend,
@@ -331,6 +332,7 @@ pub enum HirCicsOperandName {
     SpoolNode,
     SpoolRecordLength,
     SpoolOutDescr,
+    SpoolMaxFlength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -4147,6 +4149,71 @@ mod tests {
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPOT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 USER-X PIC X(8). 01 NODE-X PIC X(8). 01 BAD-RECORD-X PIC X(2). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_spoolread_resolves_input_token_and_length_outputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SPREAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 INTO-X PIC X(8). 01 MAX-X PIC S9(9) COMP VALUE 3. 01 TO-X PIC S9(9) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) MAXFLENGTH(MAX-X) TOFLENGTH(TO-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SPOOLREAD: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SPOOLREAD");
+        assert_eq!(command.operation, HirCicsOperation::SpoolRead);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolMaxFlength
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "MAX-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Into && output.target.qualified_name == "INTO-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SpoolToFlength
+                && output.target.qualified_name == "TO-X"
+        }));
+
+        for (command, expected) in [
+            (
+                "SPOOLREAD TOKEN(TOKEN-X) MAXFLENGTH(MAX-X) NOHANDLE",
+                "requires INTO",
+            ),
+            (
+                "SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) NOHANDLE",
+                "requires MAXFLENGTH",
+            ),
+            (
+                "SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) MAXFLENGTH(MAX-X)",
+                "requires RESP or NOHANDLE",
+            ),
+            (
+                "SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) MAXFLENGTH(BAD-MAX-X) NOHANDLE",
+                "fullword binary",
+            ),
+            (
+                "SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) MAXFLENGTH(MAX-X) TOFLENGTH(BAD-TO-X) NOHANDLE",
+                "fullword binary",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 INTO-X PIC X(8). 01 MAX-X PIC S9(9) COMP. 01 BAD-MAX-X PIC S9(4) COMP. 01 BAD-TO-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{command}");
             assert!(

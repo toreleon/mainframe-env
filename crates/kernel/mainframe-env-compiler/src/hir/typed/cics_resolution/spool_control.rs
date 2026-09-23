@@ -19,6 +19,9 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
             "RESP",
             "RESP2",
         ],
+        HirCicsOperation::SpoolRead => {
+            &["TOKEN", "INTO", "MAXFLENGTH", "TOFLENGTH", "RESP", "RESP2"]
+        }
         _ => panic!("non-spool CICS operation reached spool clause validation"),
     }
 }
@@ -28,6 +31,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
         HirCicsOperation::SpoolClose => &["DELETE", "KEEP", "NOHANDLE"],
         HirCicsOperation::SpoolOpenInput => &["NOHANDLE"],
         HirCicsOperation::SpoolOpenOutput => &["NOHANDLE", "NOCC", "ASA", "MCC", "PRINT", "PUNCH"],
+        HirCicsOperation::SpoolRead => &["NOHANDLE"],
         _ => panic!("non-spool CICS operation reached spool option validation"),
     }
 }
@@ -37,6 +41,7 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::SpoolClose => &["TOKEN"],
         HirCicsOperation::SpoolOpenInput => &["TOKEN", "USERID"],
         HirCicsOperation::SpoolOpenOutput => &["TOKEN", "USERID", "NODE"],
+        HirCicsOperation::SpoolRead => &["TOKEN", "INTO", "MAXFLENGTH"],
         _ => panic!("non-spool CICS operation reached spool required validation"),
     }
 }
@@ -65,6 +70,7 @@ pub(super) fn operands(
         HirCicsOperation::SpoolClose
             | HirCicsOperation::SpoolOpenInput
             | HirCicsOperation::SpoolOpenOutput
+            | HirCicsOperation::SpoolRead
     ) {
         return Ok(Vec::new());
     }
@@ -72,6 +78,35 @@ pub(super) fn operands(
         return Err(ResolutionFailure::Invalid(format!(
             "CICS {operation:?} requires RESP or NOHANDLE"
         )));
+    }
+    if operation == HirCicsOperation::SpoolRead {
+        let token = complete_data_reference(&clauses["TOKEN"], semantic)?;
+        if token.length != 8
+            || !matches!(
+                token.category,
+                DataCategory::Alphabetic | DataCategory::Alphanumeric
+            )
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SPOOLREAD TOKEN requires an 8-character data area".into(),
+            ));
+        }
+        let maxflength = complete_data_reference(&clauses["MAXFLENGTH"], semantic)?;
+        if maxflength.category != DataCategory::Binary || maxflength.length != 4 {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SPOOLREAD MAXFLENGTH requires fullword binary storage".into(),
+            ));
+        }
+        return Ok(vec![
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::SpoolToken,
+                value: HirCicsValue::Data(token),
+            },
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::SpoolMaxFlength,
+                value: HirCicsValue::Data(maxflength),
+            },
+        ]);
     }
     if matches!(
         operation,

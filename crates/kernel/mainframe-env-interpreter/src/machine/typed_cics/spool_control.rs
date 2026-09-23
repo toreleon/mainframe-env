@@ -55,6 +55,15 @@ pub(super) fn validate_slot(
             "CICS spool RECORDLENGTH input must be halfword binary",
         ));
     }
+    if matches!(
+        slot_use,
+        SlotUse::SpoolMaxFlengthInput | SlotUse::SpoolToFlengthOutput
+    ) && (layout.length != 4 || layout.category != LayoutCategory::Binary || layout.scale != 0)
+    {
+        return Err(invalid_plan(
+            "CICS spool length must be fullword binary storage",
+        ));
+    }
     if matches!(slot_use, SlotUse::SpoolOutDescrInput)
         && !matches!(
             layout.category,

@@ -105,6 +105,8 @@ pub enum CicsPlanOperation {
     SpoolOpenInput,
     /// Create one spool report for output.
     SpoolOpenOutput,
+    /// Read the next record of an input spool report.
+    SpoolRead,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -371,6 +373,8 @@ pub enum CicsOperandName {
     SpoolRecordLength,
     /// Double-indirect OUTPUT descriptor pointer.
     SpoolOutDescr,
+    /// Maximum SPOOLREAD transfer length.
+    SpoolMaxFlength,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -545,4 +549,6 @@ pub enum CicsOutputName {
     JournalReqId,
     /// Eight-byte token returned by SPOOLOPEN.
     SpoolToken,
+    /// Actual length of the SPOOLREAD record.
+    SpoolToFlength,
 }

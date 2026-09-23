@@ -12347,6 +12347,144 @@ mod tests {
     }
 
     #[test]
+    fn compiled_spoolread_retries_truncated_record_and_sets_5604() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "SPREAD",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SPREAD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(8).\n01 INTO-X PIC X(8) VALUE ALL 'Z'.\n01 FIRST-INTO PIC X(8).\n01 MAX-X PIC S9(9) COMP VALUE 3.\n01 TO-X PIC S9(9) COMP.\n01 FIRST-TO PIC S9(9) COMP.\n01 RESP-X PIC S9(9) COMP.\n01 FIRST-RESP PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\n01 READ-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS SPOOLOPEN INPUT TOKEN(TOKEN-X) USERID('ME01USER') RESP(RESP-X) END-EXEC.\nEXEC CICS SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) MAXFLENGTH(MAX-X) TOFLENGTH(TO-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE INTO-X TO FIRST-INTO.\nMOVE TO-X TO FIRST-TO.\nMOVE RESP-X TO FIRST-RESP.\nMOVE 8 TO MAX-X.\nEXEC CICS SPOOLREAD TOKEN(TOKEN-X) INTO(INTO-X) MAXFLENGTH(MAX-X) TOFLENGTH(TO-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO READ-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "spoolread-class",
+                    "spoolread-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(JESSPOOL)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("JESSPOOL", "CICS.SPOOL.INPUT.ME01USER.*", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "JESSPOOL",
+                "CICS.SPOOL.INPUT.ME01USER.*",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        let token = server
+            .cics
+            .stage_spool_input("ME01USER", b'A', &[b"ABCDEFG".to_vec()])
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SPREAD".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SPRD".into(), "SPREAD".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SPREAD".into(),
+                    map: "SPREAD".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("spoolread-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SPRD", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SPRD",
+                24,
+                80,
+                "spoolread-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SPREAD", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("TOKEN-X").unwrap().bytes(),
+            token.as_bytes()
+        );
+        assert_eq!(
+            restored.variable("FIRST-INTO").unwrap().bytes(),
+            b"ABC     "
+        );
+        assert_eq!(
+            restored.variable("FIRST-TO").unwrap().bytes(),
+            &[0, 0, 0, 7]
+        );
+        assert_eq!(
+            restored.variable("FIRST-RESP").unwrap().bytes(),
+            &[0, 0, 0, 22]
+        );
+        assert_eq!(restored.variable("INTO-X").unwrap().bytes(), b"ABCDEFG ");
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("READ-FN").unwrap().bytes(), &[0x56, 0x04]);
+        assert_eq!(
+            server
+                .cics
+                .spool_report_snapshot(&token)
+                .unwrap()
+                .next_record,
+            1
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SpoolRead)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_set_allocates_checkpointed_record_storage() {
         let artifact = published_source_fixture(
             "READQSET",

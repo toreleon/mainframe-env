@@ -80,16 +80,7 @@ pub(super) fn write_response_state(
     retrieve::prepare_load_allocation(machine, operation, response, outputs)
 }
 
-pub(super) fn into_payload_schema(
-    operation: CicsOperation,
-    response: &CicsResponse,
-) -> Option<&str> {
-    (!matches!(
-        operation,
-        CicsOperation::ReadTransientData | CicsOperation::DocumentRetrieve
-    ) || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
-    .then(|| response.payload.schema())
-}
+pub(super) use runtime_validation::into_payload_schema;
 
 pub(super) fn write_runtime_output(
     machine: &mut ReferenceMachine,
@@ -401,6 +392,7 @@ pub(super) fn execute(
                         | CicsOperandName::JournalPfxLeng
                         | CicsOperandName::Token
                         | CicsOperandName::SpoolRecordLength
+                        | CicsOperandName::SpoolMaxFlength
                 ) =>
             {
                 (
@@ -484,13 +476,16 @@ pub(super) fn execute(
             | CicsOutputName::JournalReqId
             | CicsOutputName::Token
             | CicsOutputName::SpoolToken
+            | CicsOutputName::SpoolToFlength
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => {
                 if matches!(
                     plan.operation,
-                    CicsPlanOperation::ReadTransientData | CicsPlanOperation::DocumentRetrieve
+                    CicsPlanOperation::ReadTransientData
+                        | CicsPlanOperation::DocumentRetrieve
+                        | CicsPlanOperation::SpoolRead
                 ) {
                     let CicsTarget::Resolved(slot) = &target else {
                         return Err(MachineProblem::UnexpectedHostResult);
@@ -686,6 +681,7 @@ pub(super) fn write_output(
             | "LENGTH"
             | "FLENGTH"
             | "NUMITEMS"
+            | "TOFLENGTH"
             | "ELEMNAMELEN"
             | "ELEMNSLEN"
             | "TYPENAMELEN"
@@ -946,6 +942,7 @@ fn validate_machine_slot(
             | SlotUse::AddressOutput
             | SlotUse::AssignOutput(_)
             | SlotUse::SpoolTokenOutput
+            | SlotUse::SpoolToFlengthOutput
     ) && matches!(
         layout.category,
         LayoutCategory::Condition | LayoutCategory::Rename

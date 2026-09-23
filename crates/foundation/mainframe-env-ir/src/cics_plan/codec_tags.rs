@@ -89,6 +89,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::SpoolClose => 58,
         CicsPlanOperation::SpoolOpenInput => 59,
         CicsPlanOperation::SpoolOpenOutput => 60,
+        CicsPlanOperation::SpoolRead => 61,
     }
 }
 
@@ -165,6 +166,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         58 => Ok(CicsPlanOperation::SpoolClose),
         59 => Ok(CicsPlanOperation::SpoolOpenInput),
         60 => Ok(CicsPlanOperation::SpoolOpenOutput),
+        61 => Ok(CicsPlanOperation::SpoolRead),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -284,6 +286,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::SpoolNode => 115,
         CicsOperandName::SpoolRecordLength => 116,
         CicsOperandName::SpoolOutDescr => 117,
+        CicsOperandName::SpoolMaxFlength => 118,
     }
 }
 
@@ -402,6 +405,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         115 => Ok(CicsOperandName::SpoolNode),
         116 => Ok(CicsOperandName::SpoolRecordLength),
         117 => Ok(CicsOperandName::SpoolOutDescr),
+        118 => Ok(CicsOperandName::SpoolMaxFlength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -560,6 +564,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::JournalReqId => 201,
         CicsOutputName::SetPointer64 => 232,
         CicsOutputName::SpoolToken => 208,
+        CicsOutputName::SpoolToFlength => 209,
     }
 }
 
@@ -598,6 +603,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         201 => Ok(CicsOutputName::JournalReqId),
         232 => Ok(CicsOutputName::SetPointer64),
         208 => Ok(CicsOutputName::SpoolToken),
+        209 => Ok(CicsOutputName::SpoolToFlength),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

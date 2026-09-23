@@ -290,6 +290,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::SpoolNode => CicsOperandName::SpoolNode,
                 HirCicsOperandName::SpoolRecordLength => CicsOperandName::SpoolRecordLength,
                 HirCicsOperandName::SpoolOutDescr => CicsOperandName::SpoolOutDescr,
+                HirCicsOperandName::SpoolMaxFlength => CicsOperandName::SpoolMaxFlength,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -343,6 +344,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::TypeNamespaceLength => CicsOutputName::TypeNamespaceLength,
                 HirCicsOutputName::JournalReqId => CicsOutputName::JournalReqId,
                 HirCicsOutputName::SpoolToken => CicsOutputName::SpoolToken,
+                HirCicsOutputName::SpoolToFlength => CicsOutputName::SpoolToFlength,
             },
             target: self.slot(&output.target)?,
         })
@@ -403,6 +405,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SpoolClose => CicsPlanOperation::SpoolClose,
         HirCicsOperation::SpoolOpenInput => CicsPlanOperation::SpoolOpenInput,
         HirCicsOperation::SpoolOpenOutput => CicsPlanOperation::SpoolOpenOutput,
+        HirCicsOperation::SpoolRead => CicsPlanOperation::SpoolRead,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,

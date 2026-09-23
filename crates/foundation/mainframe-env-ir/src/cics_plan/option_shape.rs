@@ -46,6 +46,7 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
                 | CicsPlanOption::SpoolPrint
                 | CicsPlanOption::SpoolPunch
         ),
+        CicsPlanOperation::SpoolRead => !matches!(option, CicsPlanOption::NoHandle),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

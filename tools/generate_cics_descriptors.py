@@ -238,6 +238,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0202",
     ),
+    ("SpoolRead", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0203"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -584,6 +585,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SpoolClose",
         "SpoolOpenInput",
         "SpoolOpenOutput",
+        "SpoolRead",
         "Suspend",
         "WaitEvent",
         "WaitExternal",
@@ -847,6 +849,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "SpoolOpenOutput": frozenset(
         {"spool", "memory-read", "memory-write", "condition", "transaction"}
     ),
+    "SpoolRead": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1092,6 +1097,7 @@ def _load_typed_execution_registrations(
         "SpoolClose",
         "SpoolOpenInput",
         "SpoolOpenOutput",
+        "SpoolRead",
         "Start",
         "Suspend",
         "TransformDataToJson",
@@ -1430,6 +1436,7 @@ def load_catalog(
                 "SpoolClose",
                 "SpoolOpenInput",
                 "SpoolOpenOutput",
+                "SpoolRead",
                 "Start",
                 "Suspend",
                 "WaitEvent",

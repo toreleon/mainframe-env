@@ -51,6 +51,7 @@ pub(super) fn resolve(
         ("RTERMID", HirCicsOutputName::ReturnTermId),
         ("QUEUE", HirCicsOutputName::Queue),
         ("TOKEN", HirCicsOutputName::SpoolToken),
+        ("TOFLENGTH", HirCicsOutputName::SpoolToFlength),
         ("TIME", HirCicsOutputName::Time),
         ("YYDDD", HirCicsOutputName::Yyddd),
         ("YYMMDD", HirCicsOutputName::Yymmdd),
@@ -97,6 +98,9 @@ pub(super) fn resolve(
         {
             continue;
         }
+        if name == "TOFLENGTH" && operation != HirCicsOperation::SpoolRead {
+            continue;
+        }
         if let Some(value) = clauses.get(name) {
             let target = complete_data_reference(value, semantic)?;
             require_writable(&target)?;
@@ -107,6 +111,13 @@ pub(super) fn resolve(
             {
                 return Err(super::super::ResolutionFailure::Invalid(
                     "CICS TOKEN requires a fullword binary data area".into(),
+                ));
+            }
+            if name == "TOFLENGTH"
+                && (target.category != DataCategory::Binary || target.length != 4)
+            {
+                return Err(super::super::ResolutionFailure::Invalid(
+                    "CICS SPOOLREAD TOFLENGTH requires writable fullword binary storage".into(),
                 ));
             }
             if name == "SET" && !matches!(target.usage, CobolUsage::Pointer | CobolUsage::Pointer32)
