@@ -34,6 +34,11 @@ All notable changes to mainframe-env are documented here.
 - WSACONTEXT now resolves ADDRESS, METADATA, and REFPARMS from a complete
   endpoint reference and rebuilds ALL after a partial field replacement.
 
+- Added typed CICS DELETE COUNTER and DELETE DCOUNTER with durable atomic
+  removal, missing-counter `INVREQ 201`, update SAF, and owner-fenced replay.
+  IBM CICS TS 6.x application API `dfhp4_deletecounter.html`, catalog rows
+  0044 and 0045.
+
 - Added typed CICS DEFINE COUNTER and DEFINE DCOUNTER over a durable,
   versioned named-counter pool authority with source-defined bounds,
   duplicate and pool-rebuild conditions, SAF authorization, fenced replay,

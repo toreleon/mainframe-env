@@ -101,6 +101,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::SpoolWrite => 62,
         CicsPlanOperation::DefineCounter => 118,
         CicsPlanOperation::DefineDCounter => 119,
+        CicsPlanOperation::DeleteCounter => 120,
+        CicsPlanOperation::DeleteDCounter => 121,
     }
 }
 
@@ -189,6 +191,8 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         62 => Ok(CicsPlanOperation::SpoolWrite),
         118 => Ok(CicsPlanOperation::DefineCounter),
         119 => Ok(CicsPlanOperation::DefineDCounter),
+        120 => Ok(CicsPlanOperation::DeleteCounter),
+        121 => Ok(CicsPlanOperation::DeleteDCounter),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

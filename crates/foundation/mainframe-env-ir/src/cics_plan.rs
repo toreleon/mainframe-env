@@ -643,6 +643,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DefineCounter | CicsPlanOperation::DefineDCounter => {
             counter_control::invalid_define_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DeleteCounter | CicsPlanOperation::DeleteDCounter => {
+            counter_control::invalid_delete_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }

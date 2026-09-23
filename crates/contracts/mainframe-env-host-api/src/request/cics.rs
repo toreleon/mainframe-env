@@ -26,6 +26,10 @@ pub enum CicsOperation {
     DefineCounter,
     /// Define a named unsigned doubleword counter in a selected pool.
     DefineDCounter,
+    /// Execute IBM DELETE against a signed fullword named counter.
+    DeleteCounter,
+    /// Execute IBM DELETE against an unsigned doubleword named counter.
+    DeleteDCounter,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -172,6 +176,8 @@ impl CicsOperation {
             Self::Delay => "Delay",
             Self::DefineCounter => "DefineCounter",
             Self::DefineDCounter => "DefineDCounter",
+            Self::DeleteCounter => "DeleteCounter",
+            Self::DeleteDCounter => "DeleteDCounter",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -252,7 +258,10 @@ impl CicsOperation {
     /// Whether this operation belongs to the named-counter family.
     #[must_use]
     pub const fn is_counter(self) -> bool {
-        matches!(self, Self::DefineCounter | Self::DefineDCounter)
+        matches!(
+            self,
+            Self::DefineCounter | Self::DefineDCounter | Self::DeleteCounter | Self::DeleteDCounter
+        )
     }
 
     /// Whether the operation may change durable or task-local state.
@@ -274,6 +283,8 @@ impl CicsOperation {
                 | Self::Delay
                 | Self::DefineCounter
                 | Self::DefineDCounter
+                | Self::DeleteCounter
+                | Self::DeleteDCounter
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -351,6 +362,8 @@ impl CicsOperation {
             ("DEQ", _) => Self::Deq,
             ("DEFINE", Some("COUNTER")) => Self::DefineCounter,
             ("DEFINE", Some("DCOUNTER")) => Self::DefineDCounter,
+            ("DELETE", Some("COUNTER")) => Self::DeleteCounter,
+            ("DELETE", Some("DCOUNTER")) => Self::DeleteDCounter,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,

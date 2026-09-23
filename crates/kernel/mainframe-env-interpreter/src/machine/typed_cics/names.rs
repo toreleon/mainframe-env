@@ -3,6 +3,18 @@ use mainframe_env_ir::{
     CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption,
 };
 
+pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Option<(usize, bool)> {
+    match operation {
+        Some(CicsPlanOperation::DefineCounter | CicsPlanOperation::DeleteCounter) => {
+            Some((4, true))
+        }
+        Some(CicsPlanOperation::DefineDCounter | CicsPlanOperation::DeleteDCounter) => {
+            Some((8, false))
+        }
+        _ => None,
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(super) enum SlotUse {
     Input,
@@ -170,6 +182,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Delay => CicsOperation::Delay,
         CicsPlanOperation::DefineCounter => CicsOperation::DefineCounter,
         CicsPlanOperation::DefineDCounter => CicsOperation::DefineDCounter,
+        CicsPlanOperation::DeleteCounter => CicsOperation::DeleteCounter,
+        CicsPlanOperation::DeleteDCounter => CicsOperation::DeleteDCounter,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -415,8 +429,10 @@ pub(super) const fn operand_for(
     operation: CicsPlanOperation,
     name: CicsOperandName,
 ) -> &'static str {
-    if matches!(operation, CicsPlanOperation::DefineDCounter)
-        && matches!(name, CicsOperandName::CounterName)
+    if matches!(
+        operation,
+        CicsPlanOperation::DefineDCounter | CicsPlanOperation::DeleteDCounter
+    ) && matches!(name, CicsOperandName::CounterName)
     {
         "DCOUNTER"
     } else {

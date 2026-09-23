@@ -33,6 +33,10 @@ pub enum CicsPlanOperation {
     DefineCounter,
     /// Define one unsigned doubleword named counter.
     DefineDCounter,
+    /// IBM DELETE named-counter command.
+    DeleteCounter,
+    /// IBM DELETE named-counter command.
+    DeleteDCounter,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.

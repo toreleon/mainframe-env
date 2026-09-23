@@ -162,6 +162,8 @@ pub enum HirCicsOperation {
     Delay,
     DefineCounter,
     DefineDCounter,
+    DeleteCounter,
+    DeleteDCounter,
     ChangeTask,
     Deq,
     Enq,

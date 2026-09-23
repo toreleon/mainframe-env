@@ -100,6 +100,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
                     | "RESP"
                     | "RESP2"
                     | "OPTION.NOSUSPEND"
+                    | "OPTION.NOHANDLE"
             ) || name
                 == if selector == "COUNTER" {
                     "DCOUNTER"

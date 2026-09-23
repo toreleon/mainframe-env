@@ -26603,4 +26603,46 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn named_counter_delete_is_atomic_and_replays() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let args = BTreeMap::from([("DCOUNTER".into(), cics_literal(b"SEQUENCE"))]);
+        let define = request(CicsOperation::DefineDCounter, args.clone(), 1);
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let delete = request(CicsOperation::DeleteDCounter, args, 2);
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, delete.clone(), 2),
+                delete.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, delete.clone(), 2),
+                delete.clone()
+            )
+            .unwrap(),
+            first
+        );
+        let absent = request(CicsOperation::DeleteDCounter, delete.arguments.clone(), 3);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, absent.clone(), 3), absent),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 201,
+            })
+        );
+        let row = store
+            .get_provider_state("cics-counter-control-v1", "state")
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert!(state["records"].as_object().unwrap().is_empty());
+    }
 }

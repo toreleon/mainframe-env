@@ -451,6 +451,8 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Delay => CicsPlanOperation::Delay,
         HirCicsOperation::DefineCounter => CicsPlanOperation::DefineCounter,
         HirCicsOperation::DefineDCounter => CicsPlanOperation::DefineDCounter,
+        HirCicsOperation::DeleteCounter => CicsPlanOperation::DeleteCounter,
+        HirCicsOperation::DeleteDCounter => CicsPlanOperation::DeleteDCounter,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,

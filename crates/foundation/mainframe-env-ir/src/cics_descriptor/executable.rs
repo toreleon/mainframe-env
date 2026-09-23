@@ -1,7 +1,7 @@
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 83] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 85] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -662,6 +662,22 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 83] = [
         operation: CicsPlanOperation::DefineDCounter,
         namespace: "cics.counter",
         name: "define-dcounter",
+        major: 1,
+        effects: COUNTER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::DeleteCounter,
+        namespace: "cics.counter",
+        name: "delete-counter",
+        major: 1,
+        effects: COUNTER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::DeleteDCounter,
+        namespace: "cics.counter",
+        name: "delete-dcounter",
         major: 1,
         effects: COUNTER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

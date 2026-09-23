@@ -89,5 +89,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::WsaEprCreate => &CICS_EXECUTABLE_DESCRIPTORS[80],
         CicsPlanOperation::DefineCounter => &CICS_EXECUTABLE_DESCRIPTORS[81],
         CicsPlanOperation::DefineDCounter => &CICS_EXECUTABLE_DESCRIPTORS[82],
+        CicsPlanOperation::DeleteCounter => &CICS_EXECUTABLE_DESCRIPTORS[83],
+        CicsPlanOperation::DeleteDCounter => &CICS_EXECUTABLE_DESCRIPTORS[84],
     }
 }

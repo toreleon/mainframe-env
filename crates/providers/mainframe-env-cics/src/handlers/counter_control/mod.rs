@@ -1,6 +1,7 @@
 //! Durable local authority for IBM CICS named-counter command shapes.
 
 mod define;
+mod delete;
 mod state;
 
 use super::super::{CicsService, Run};
@@ -34,6 +35,9 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::DefineCounter | CicsOperation::DefineDCounter => {
             define::invoke(service, run, request)
+        }
+        CicsOperation::DeleteCounter | CicsOperation::DeleteDCounter => {
+            delete::invoke(service, run, request)
         }
         _ => Err(HostProblem::InfrastructureFailure),
     }
@@ -99,7 +103,10 @@ fn normalize_pool(bytes: &[u8]) -> Result<String, HostProblem> {
 }
 
 fn selector(request: &CicsRequest) -> Result<(String, CounterKey), HostProblem> {
-    let field = if matches!(request.operation, CicsOperation::DefineDCounter) {
+    let field = if matches!(
+        request.operation,
+        CicsOperation::DefineDCounter | CicsOperation::DeleteDCounter
+    ) {
         "DCOUNTER"
     } else {
         "COUNTER"
@@ -214,7 +221,10 @@ fn response(
         if request.arguments.contains_key(name)
             && let Some(value) = value
         {
-            let signed = if matches!(request.operation, CicsOperation::DefineCounter) {
+            let signed = if matches!(
+                request.operation,
+                CicsOperation::DefineCounter | CicsOperation::DeleteCounter
+            ) {
                 i128::from(value as u32 as i32)
             } else {
                 i128::from(value)

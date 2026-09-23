@@ -886,11 +886,8 @@ fn validate_machine_slot(
         return Err(invalid_plan("fullword CICS input must be fullword binary"));
     }
     if matches!(slot_use, SlotUse::CounterNumber) {
-        let (length, signed) = match expected_operation(&operation.identity) {
-            Some(CicsPlanOperation::DefineCounter) => (4, true),
-            Some(CicsPlanOperation::DefineDCounter) => (8, false),
-            _ => return Err(invalid_plan("counter number belongs to another operation")),
-        };
+        let (length, signed) = names::counter_shape(expected_operation(&operation.identity))
+            .ok_or_else(|| invalid_plan("counter number belongs to another operation"))?;
         if layout.category != LayoutCategory::Binary
             || layout.length != length
             || layout.scale != 0

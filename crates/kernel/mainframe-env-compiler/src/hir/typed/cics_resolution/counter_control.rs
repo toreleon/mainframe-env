@@ -8,7 +8,10 @@ use crate::{CobolUsage, DataCategory, SemanticModel};
 pub(super) const fn is_counter(operation: HirCicsOperation) -> bool {
     matches!(
         operation,
-        HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter
+        HirCicsOperation::DefineCounter
+            | HirCicsOperation::DefineDCounter
+            | HirCicsOperation::DeleteCounter
+            | HirCicsOperation::DeleteDCounter
     )
 }
 
@@ -20,6 +23,8 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         HirCicsOperation::DefineDCounter => &[
             "DCOUNTER", "POOL", "VALUE", "MINIMUM", "MAXIMUM", "RESP", "RESP2",
         ],
+        HirCicsOperation::DeleteCounter => &["COUNTER", "POOL", "RESP", "RESP2"],
+        HirCicsOperation::DeleteDCounter => &["DCOUNTER", "POOL", "RESP", "RESP2"],
         _ => unreachable!("counter clause contract requested for another operation"),
     }
 }
@@ -30,8 +35,8 @@ pub(super) fn allowed_options() -> &'static [&'static str] {
 
 pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
-        HirCicsOperation::DefineCounter => &["COUNTER"],
-        HirCicsOperation::DefineDCounter => &["DCOUNTER"],
+        HirCicsOperation::DefineCounter | HirCicsOperation::DeleteCounter => &["COUNTER"],
+        HirCicsOperation::DefineDCounter | HirCicsOperation::DeleteDCounter => &["DCOUNTER"],
         _ => unreachable!("counter required clause contract requested for another operation"),
     }
 }
@@ -48,7 +53,12 @@ pub(super) fn operands(
     if !is_counter(operation) {
         return Ok(Vec::new());
     }
-    if clauses.contains_key("MINIMUM") && !clauses.contains_key("VALUE") {
+    if matches!(
+        operation,
+        HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter
+    ) && clauses.contains_key("MINIMUM")
+        && !clauses.contains_key("VALUE")
+    {
         return Err(ResolutionFailure::Invalid(
             "CICS DEFINE COUNTER MINIMUM requires VALUE".into(),
         ));
