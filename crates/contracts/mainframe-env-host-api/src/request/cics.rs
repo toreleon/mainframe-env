@@ -97,6 +97,8 @@ pub enum CicsOperation {
     SpoolClose,
     /// Open one matching CICS spool report for input.
     SpoolOpenInput,
+    /// Create one CICS spool report for output.
+    SpoolOpenOutput,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -189,6 +191,7 @@ impl CicsOperation {
             Self::SetFileStatus => "SetFileStatus",
             Self::SpoolClose => "SpoolClose",
             Self::SpoolOpenInput => "SpoolOpenInput",
+            Self::SpoolOpenOutput => "SpoolOpenOutput",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -260,6 +263,7 @@ impl CicsOperation {
                 | Self::SetFileStatus
                 | Self::SpoolClose
                 | Self::SpoolOpenInput
+                | Self::SpoolOpenOutput
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -335,6 +339,7 @@ impl CicsOperation {
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
             ("SPOOLCLOSE", _) => Self::SpoolClose,
             ("SPOOLOPEN", Some("INPUT")) => Self::SpoolOpenInput,
+            ("SPOOLOPEN", Some("OUTPUT")) => Self::SpoolOpenOutput,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

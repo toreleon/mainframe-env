@@ -59,3 +59,64 @@ pub(super) fn invalid_open_input_shape(
         })
         || matches!(plan.condition, CicsCondition::Default)
 }
+
+pub(super) fn invalid_open_output_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::SpoolUserId)
+        || !inputs.contains(&CicsOperandName::SpoolNode)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::SpoolUserId,
+            CicsOperandName::SpoolNode,
+            CicsOperandName::SpoolClass,
+            CicsOperandName::SpoolRecordLength,
+            CicsOperandName::SpoolOutDescr,
+        ]))
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::SpoolUserId
+            | CicsOperandName::SpoolNode
+            | CicsOperandName::SpoolClass => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::SpoolRecordLength => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::SpoolOutDescr => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            _ => true,
+        })
+        || !outputs.contains(&CicsOutputName::SpoolToken)
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::SpoolToken | CicsOutputName::Resp | CicsOutputName::Resp2
+            )
+        })
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::SpoolNoCc
+                    | CicsPlanOption::SpoolAsa
+                    | CicsPlanOption::SpoolMcc
+                    | CicsPlanOption::SpoolPrint
+                    | CicsPlanOption::SpoolPunch
+            )
+        })
+        || [
+            CicsPlanOption::SpoolNoCc,
+            CicsPlanOption::SpoolAsa,
+            CicsPlanOption::SpoolMcc,
+        ]
+        .iter()
+        .filter(|option| plan.options.contains(option))
+        .count()
+            > 1
+        || plan.options.contains(&CicsPlanOption::SpoolPrint)
+            && plan.options.contains(&CicsPlanOption::SpoolPunch)
+        || matches!(plan.condition, CicsCondition::Default)
+}

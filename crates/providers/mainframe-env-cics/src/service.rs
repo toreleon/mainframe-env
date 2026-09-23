@@ -1722,7 +1722,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 72);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 73);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5308,6 +5308,7 @@ mod tests {
             ),
             ("SPOOLCLOSE", CicsOperation::SpoolClose),
             ("SPOOLOPEN INPUT", CicsOperation::SpoolOpenInput),
+            ("SPOOLOPEN OUTPUT", CicsOperation::SpoolOpenOutput),
             ("START", CicsOperation::Start),
             ("STARTBR", CicsOperation::StartBrowse),
             ("SUSPEND", CicsOperation::Suspend),
@@ -6555,7 +6556,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 72);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 73);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -15221,6 +15222,232 @@ mod tests {
             assert_eq!(report.state, "open-input");
             assert!(report.owner_run_unit.is_some());
             assert_eq!(report.records, [b"INPUT".to_vec()]);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn spoolopen_output_is_multithreaded_replay_safe_and_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-spoolopen-output-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let token;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider: Arc<dyn ProviderStateStore> = store.clone();
+            let service = service(provider);
+            let (invocation, _) = registered(&service);
+            let open = request(
+                CicsOperation::SpoolOpenOutput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-X")),
+                    ("USERID".into(), cics_literal(b"DESTUSER")),
+                    ("NODE".into(), cics_literal(b"LOCAL")),
+                    ("CLASS".into(), cics_literal(b"B")),
+                    ("RECORDLENGTH".into(), cics_decimal(80)),
+                    ("OPTION.ASA".into(), cics_option()),
+                    ("OPTION.PUNCH".into(), cics_option()),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                1,
+            );
+            let opened = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, open.clone(), 1),
+                    open.clone(),
+                )
+                .unwrap();
+            token = String::from_utf8(opened.outputs["TOKEN"].bytes().to_vec()).unwrap();
+            let report = service.spool_report_snapshot(&token).unwrap();
+            assert_eq!(report.state, "open-output");
+            assert_eq!(
+                (report.user_id.as_str(), report.node.as_str()),
+                ("DESTUSER", "LOCAL")
+            );
+            assert_eq!((report.class, report.record_length), (b'B', 80));
+            {
+                let state = service.lock().unwrap();
+                let report = &state.spool.reports[&token];
+                assert_eq!((report.carriage_control, report.punch), (1, true));
+            }
+            store
+                .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+                    .unwrap(),
+                opened
+            );
+            let second = request(
+                CicsOperation::SpoolOpenOutput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-Y")),
+                    ("USERID".into(), cics_literal(b"*")),
+                    ("NODE".into(), cics_literal(b"*")),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                2,
+            );
+            let second = service
+                .invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second)
+                .unwrap();
+            assert_ne!(second.outputs["TOKEN"].bytes(), token.as_bytes());
+            assert_eq!(
+                service.spool_report_snapshot(&token).unwrap().state,
+                "open-output"
+            );
+
+            let mut bad_length = request(
+                CicsOperation::SpoolOpenOutput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-Z")),
+                    ("USERID".into(), cics_literal(b"DESTUSER")),
+                    ("NODE".into(), cics_literal(b"LOCAL")),
+                    ("RECORDLENGTH".into(), cics_decimal(32_761)),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                3,
+            );
+            bad_length.condition_policy = CicsConditionPolicy::NoHandle;
+            let bad_length = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, bad_length.clone(), 3),
+                    bad_length,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    bad_length.condition.as_str(),
+                    bad_length.response,
+                    bad_length.response2
+                ),
+                ("LENGERR", 22, 32_761)
+            );
+
+            let descriptor = request(
+                CicsOperation::SpoolOpenOutput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-D")),
+                    ("USERID".into(), cics_literal(b"*")),
+                    ("NODE".into(), cics_literal(b"*")),
+                    (
+                        "OUTDESCR".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.outdescr@1",
+                            b"NODE(REMOTE) USERID(WRITER)".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                4,
+            );
+            let descriptor = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, descriptor.clone(), 4),
+                    descriptor,
+                )
+                .unwrap();
+            let descriptor_token =
+                String::from_utf8(descriptor.outputs["TOKEN"].bytes().to_vec()).unwrap();
+            let selected = service.spool_report_snapshot(&descriptor_token).unwrap();
+            assert_eq!(
+                (selected.node.as_str(), selected.user_id.as_str()),
+                ("REMOTE", "WRITER")
+            );
+
+            let mut invalid_pointer = request(
+                CicsOperation::SpoolOpenOutput,
+                BTreeMap::from([
+                    ("TOKEN".into(), argument(b"TOKEN-E")),
+                    ("USERID".into(), cics_literal(b"*")),
+                    ("NODE".into(), cics_literal(b"*")),
+                    (
+                        "OUTDESCR".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.outdescr-invalid@1",
+                            vec![52],
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                    ("OPTION.NOHANDLE".into(), cics_option()),
+                ]),
+                5,
+            );
+            invalid_pointer.condition_policy = CicsConditionPolicy::NoHandle;
+            let invalid_pointer = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, invalid_pointer.clone(), 5),
+                    invalid_pointer,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    invalid_pointer.condition.as_str(),
+                    invalid_pointer.response,
+                    invalid_pointer.response2
+                ),
+                ("INVREQ", 16, 52)
+            );
+
+            for (sequence, user, node, class, expected) in [
+                (
+                    6,
+                    b"*".as_slice(),
+                    b"LOCAL".as_slice(),
+                    b"A".as_slice(),
+                    ("NODEIDERR", 90, 0),
+                ),
+                (
+                    7,
+                    b"DESTUSER".as_slice(),
+                    b"LOCAL".as_slice(),
+                    b"!".as_slice(),
+                    ("ILLOGIC", 21, 3),
+                ),
+            ] {
+                let mut invalid = request(
+                    CicsOperation::SpoolOpenOutput,
+                    BTreeMap::from([
+                        ("TOKEN".into(), argument(b"TOKEN-F")),
+                        ("USERID".into(), cics_literal(user)),
+                        ("NODE".into(), cics_literal(node)),
+                        ("CLASS".into(), cics_literal(class)),
+                        ("OPTION.NOHANDLE".into(), cics_option()),
+                    ]),
+                    sequence,
+                );
+                invalid.condition_policy = CicsConditionPolicy::NoHandle;
+                let invalid = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                        invalid,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    (
+                        invalid.condition.as_str(),
+                        invalid.response,
+                        invalid.response2
+                    ),
+                    expected
+                );
+            }
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let report = service.spool_report_snapshot(&token).unwrap();
+            assert_eq!(report.state, "open-output");
+            assert_eq!(report.owner_run_unit.is_some(), true);
+            assert_eq!(report.record_length, 80);
         }
         std::fs::remove_dir_all(root).unwrap();
     }

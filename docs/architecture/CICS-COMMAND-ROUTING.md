@@ -342,6 +342,21 @@ principal. Only one input report can be open: another task receives SPOLBUSY
 88/4 and the current owner receives 88/8. A missing or held-equivalent report
 returns NOTFND 13/4 without mutation. The returned TOKEN is non-ASSIGN output
 tag 208, and the selected route uses EIBFN `5602`.
+
+Typed `SPOOLOPEN OUTPUT` requires writable TOKEN, destination USERID and NODE,
+and RESP or NOHANDLE. Output creation is multi-threaded and allocates one
+task-owned report with default class A, NOCC, PRINT, and maximum record length
+32,760. CLASS and halfword RECORDLENGTH override the defaults; NOCC, ASA, and
+MCC are exclusive, as are PRINT and PUNCH. NODE and USERID must both be `*`
+for the local OUTDESCR override. A POINTER or POINTER-32 OUTDESCR is followed
+through its address field to a bounded length-prefixed OUTPUT parameter string;
+invalid pointers and malformed strings return INVREQ 16/52 and 16/44. A bad
+NODE/USERID combination returns NODEIDERR 90/0, and RECORDLENGTH outside
+0–32,760 returns LENGERR 22 with the supplied value. State and returned token
+share one durable replay CAS; the compiled route uses EIBFN `5602`. Dynamic JES
+allocation, macro return codes, and implicit end-of-task close are outside the
+local spool boundary.
+
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined

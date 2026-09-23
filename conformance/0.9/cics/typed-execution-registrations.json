@@ -235,6 +235,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0201"
     },
     {
+      "operation": "SpoolOpenOutput",
+      "interface": "api",
+      "family": "spool-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0202"
+    },
+    {
       "operation": "Start",
       "interface": "api",
       "family": "interval-control",

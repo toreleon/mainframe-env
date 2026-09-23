@@ -88,6 +88,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WriteJournalNum => 57,
         CicsPlanOperation::SpoolClose => 58,
         CicsPlanOperation::SpoolOpenInput => 59,
+        CicsPlanOperation::SpoolOpenOutput => 60,
     }
 }
 
@@ -163,6 +164,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         57 => Ok(CicsPlanOperation::WriteJournalNum),
         58 => Ok(CicsPlanOperation::SpoolClose),
         59 => Ok(CicsPlanOperation::SpoolOpenInput),
+        60 => Ok(CicsPlanOperation::SpoolOpenOutput),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -279,6 +281,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::SpoolToken => 112,
         CicsOperandName::SpoolUserId => 113,
         CicsOperandName::SpoolClass => 114,
+        CicsOperandName::SpoolNode => 115,
+        CicsOperandName::SpoolRecordLength => 116,
+        CicsOperandName::SpoolOutDescr => 117,
     }
 }
 
@@ -394,6 +399,9 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         112 => Ok(CicsOperandName::SpoolToken),
         113 => Ok(CicsOperandName::SpoolUserId),
         114 => Ok(CicsOperandName::SpoolClass),
+        115 => Ok(CicsOperandName::SpoolNode),
+        116 => Ok(CicsOperandName::SpoolRecordLength),
+        117 => Ok(CicsOperandName::SpoolOutDescr),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -445,6 +453,11 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Executable64 => 111,
         CicsPlanOption::SpoolKeep => 72,
         CicsPlanOption::SpoolDelete => 73,
+        CicsPlanOption::SpoolNoCc => 74,
+        CicsPlanOption::SpoolAsa => 75,
+        CicsPlanOption::SpoolMcc => 76,
+        CicsPlanOption::SpoolPrint => 77,
+        CicsPlanOption::SpoolPunch => 78,
     }
 }
 
@@ -495,6 +508,11 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         111 => Ok(CicsPlanOption::Executable64),
         72 => Ok(CicsPlanOption::SpoolKeep),
         73 => Ok(CicsPlanOption::SpoolDelete),
+        74 => Ok(CicsPlanOption::SpoolNoCc),
+        75 => Ok(CicsPlanOption::SpoolAsa),
+        76 => Ok(CicsPlanOption::SpoolMcc),
+        77 => Ok(CicsPlanOption::SpoolPrint),
+        78 => Ok(CicsPlanOption::SpoolPunch),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

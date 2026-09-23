@@ -3,12 +3,22 @@ use super::super::{
     Resolution, ResolutionFailure, require_writable,
 };
 use super::{Clauses, complete_data_reference};
-use crate::{DataCategory, SemanticModel};
+use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::SpoolClose => &["TOKEN", "RESP", "RESP2"],
         HirCicsOperation::SpoolOpenInput => &["TOKEN", "USERID", "CLASS", "RESP", "RESP2"],
+        HirCicsOperation::SpoolOpenOutput => &[
+            "TOKEN",
+            "USERID",
+            "NODE",
+            "CLASS",
+            "RECORDLENGTH",
+            "OUTDESCR",
+            "RESP",
+            "RESP2",
+        ],
         _ => panic!("non-spool CICS operation reached spool clause validation"),
     }
 }
@@ -17,6 +27,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
     match operation {
         HirCicsOperation::SpoolClose => &["DELETE", "KEEP", "NOHANDLE"],
         HirCicsOperation::SpoolOpenInput => &["NOHANDLE"],
+        HirCicsOperation::SpoolOpenOutput => &["NOHANDLE", "NOCC", "ASA", "MCC", "PRINT", "PUNCH"],
         _ => panic!("non-spool CICS operation reached spool option validation"),
     }
 }
@@ -25,6 +36,7 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::SpoolClose => &["TOKEN"],
         HirCicsOperation::SpoolOpenInput => &["TOKEN", "USERID"],
+        HirCicsOperation::SpoolOpenOutput => &["TOKEN", "USERID", "NODE"],
         _ => panic!("non-spool CICS operation reached spool required validation"),
     }
 }
@@ -33,6 +45,11 @@ pub(super) fn option(name: &str) -> Option<HirCicsOption> {
     match name {
         "KEEP" => Some(HirCicsOption::SpoolKeep),
         "DELETE" => Some(HirCicsOption::SpoolDelete),
+        "NOCC" => Some(HirCicsOption::SpoolNoCc),
+        "ASA" => Some(HirCicsOption::SpoolAsa),
+        "MCC" => Some(HirCicsOption::SpoolMcc),
+        "PRINT" => Some(HirCicsOption::SpoolPrint),
+        "PUNCH" => Some(HirCicsOption::SpoolPunch),
         _ => None,
     }
 }
@@ -45,7 +62,9 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     if !matches!(
         operation,
-        HirCicsOperation::SpoolClose | HirCicsOperation::SpoolOpenInput
+        HirCicsOperation::SpoolClose
+            | HirCicsOperation::SpoolOpenInput
+            | HirCicsOperation::SpoolOpenOutput
     ) {
         return Ok(Vec::new());
     }
@@ -54,7 +73,10 @@ pub(super) fn operands(
             "CICS {operation:?} requires RESP or NOHANDLE"
         )));
     }
-    if operation == HirCicsOperation::SpoolOpenInput {
+    if matches!(
+        operation,
+        HirCicsOperation::SpoolOpenInput | HirCicsOperation::SpoolOpenOutput
+    ) {
         let token = complete_data_reference(&clauses["TOKEN"], semantic)?;
         require_writable(&token)?;
         if token.length != 8
@@ -64,7 +86,7 @@ pub(super) fn operands(
             )
         {
             return Err(ResolutionFailure::Invalid(
-                "CICS SPOOLOPEN INPUT TOKEN requires a writable 8-character data area".into(),
+                "CICS SPOOLOPEN TOKEN requires a writable 8-character data area".into(),
             ));
         }
         let mut operands = vec![text_operand(
@@ -73,7 +95,55 @@ pub(super) fn operands(
             8,
             &clauses["USERID"],
             semantic,
+            operation == HirCicsOperation::SpoolOpenOutput,
         )?];
+        if operation == HirCicsOperation::SpoolOpenOutput {
+            operands.push(text_operand(
+                "NODE",
+                HirCicsOperandName::SpoolNode,
+                8,
+                &clauses["NODE"],
+                semantic,
+                true,
+            )?);
+            let carriage = options
+                .iter()
+                .filter(|option| matches!(option.as_str(), "NOCC" | "ASA" | "MCC"))
+                .count();
+            if carriage > 1
+                || options.iter().any(|option| option == "PRINT")
+                    && options.iter().any(|option| option == "PUNCH")
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS SPOOLOPEN OUTPUT format options conflict".into(),
+                ));
+            }
+            if let Some(length) = clauses.get("RECORDLENGTH") {
+                let length = complete_data_reference(length, semantic)?;
+                if length.category != DataCategory::Binary || length.length != 2 {
+                    return Err(ResolutionFailure::Invalid(
+                        "CICS SPOOLOPEN OUTPUT RECORDLENGTH requires halfword binary storage"
+                            .into(),
+                    ));
+                }
+                operands.push(HirCicsNamedOperand {
+                    name: HirCicsOperandName::SpoolRecordLength,
+                    value: HirCicsValue::Data(length),
+                });
+            }
+            if let Some(pointer) = clauses.get("OUTDESCR") {
+                let pointer = complete_data_reference(pointer, semantic)?;
+                if !matches!(pointer.usage, CobolUsage::Pointer | CobolUsage::Pointer32) {
+                    return Err(ResolutionFailure::Invalid(
+                        "CICS SPOOLOPEN OUTPUT OUTDESCR requires POINTER storage".into(),
+                    ));
+                }
+                operands.push(HirCicsNamedOperand {
+                    name: HirCicsOperandName::SpoolOutDescr,
+                    value: HirCicsValue::Data(pointer),
+                });
+            }
+        }
         if let Some(class) = clauses.get("CLASS") {
             operands.push(text_operand(
                 "CLASS",
@@ -81,6 +151,7 @@ pub(super) fn operands(
                 1,
                 class,
                 semantic,
+                false,
             )?);
         }
         return Ok(operands);
@@ -118,6 +189,7 @@ fn text_operand(
     width: usize,
     tokens: &[String],
     semantic: &SemanticModel,
+    allow_star: bool,
 ) -> Resolution<HirCicsNamedOperand> {
     let value = if let [value] = tokens
         && value.len() >= 2
@@ -131,7 +203,9 @@ fn text_operand(
     let valid = match &value {
         HirCicsValue::Literal(value) => {
             (1..=width).contains(&value.len())
-                && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || allow_star && byte == b'*')
         }
         HirCicsValue::Data(reference) => {
             reference.length == width
@@ -144,7 +218,7 @@ fn text_operand(
     };
     if !valid {
         return Err(ResolutionFailure::Invalid(format!(
-            "CICS SPOOLOPEN INPUT {source_name} requires a {width}-character value"
+            "CICS SPOOLOPEN {source_name} requires a {width}-character value"
         )));
     }
     Ok(HirCicsNamedOperand { name, value })

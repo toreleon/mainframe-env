@@ -196,6 +196,7 @@ pub enum HirCicsOperation {
     SetAssociationUserCorrData,
     SpoolClose,
     SpoolOpenInput,
+    SpoolOpenOutput,
     Syncpoint,
     Unlock,
     Suspend,
@@ -327,6 +328,9 @@ pub enum HirCicsOperandName {
     SpoolToken,
     SpoolUserId,
     SpoolClass,
+    SpoolNode,
+    SpoolRecordLength,
+    SpoolOutDescr,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -385,6 +389,11 @@ pub enum HirCicsOption {
     Unescaped,
     SpoolKeep,
     SpoolDelete,
+    SpoolNoCc,
+    SpoolAsa,
+    SpoolMcc,
+    SpoolPrint,
+    SpoolPunch,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -4062,6 +4071,82 @@ mod tests {
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPIN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 BAD-TOKEN-X PIC X(7). 01 USER-X PIC X(8). 01 BAD-USER-X PIC X(7). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_spoolopen_output_resolves_destination_format_and_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SPOUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 USER-X PIC X(8) VALUE 'DESTUSER'. 01 NODE-X PIC X(8) VALUE 'LOCAL'. 01 RECORD-X PIC S9(4) COMP VALUE 80. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID(USER-X) NODE(NODE-X) CLASS('B') RECORDLENGTH(RECORD-X) ASA PUNCH RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SPOOLOPEN OUTPUT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SPOOLOPEN OUTPUT");
+        assert_eq!(command.operation, HirCicsOperation::SpoolOpenOutput);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SpoolRecordLength
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "RECORD-X")
+        }));
+        assert!(command.options.contains(&HirCicsOption::SpoolAsa));
+        assert!(command.options.contains(&HirCicsOption::SpoolPunch));
+        assert!(
+            command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::SpoolToken)
+        );
+
+        let descriptor = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SPDESC. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 OUT-PTR POINTER. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID('*') NODE('*') OUTDESCR(OUT-PTR) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let descriptor = descriptor
+            .hir
+            .unwrap_or_else(|| panic!("SPOOLOPEN OUTDESCR: {:?}", descriptor.diagnostics));
+        assert!(descriptor.statements.iter().any(|statement| {
+            matches!(
+                statement.resolved.as_ref(),
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operands.iter().any(|operand| operand.name == HirCicsOperandName::SpoolOutDescr)
+            )
+        }));
+
+        for (command, expected) in [
+            (
+                "SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID(USER-X) NOHANDLE",
+                "requires NODE",
+            ),
+            (
+                "SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID(USER-X) NODE(NODE-X)",
+                "requires RESP or NOHANDLE",
+            ),
+            (
+                "SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID(USER-X) NODE(NODE-X) NOCC ASA NOHANDLE",
+                "format options conflict",
+            ),
+            (
+                "SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID(USER-X) NODE(NODE-X) RECORDLENGTH(BAD-RECORD-X) NOHANDLE",
+                "halfword binary",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSPOT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 USER-X PIC X(8). 01 NODE-X PIC X(8). 01 BAD-RECORD-X PIC X(2). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{command}");
             assert!(

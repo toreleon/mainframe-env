@@ -31,6 +31,9 @@ pub(super) enum SlotUse {
     SpoolTokenOutput,
     SpoolUserIdInput,
     SpoolClassInput,
+    SpoolNodeInput,
+    SpoolRecordLengthInput,
+    SpoolOutDescrInput,
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -80,6 +83,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::SpoolToken => SlotUse::SpoolTokenInput,
         CicsOperandName::SpoolUserId => SlotUse::SpoolUserIdInput,
         CicsOperandName::SpoolClass => SlotUse::SpoolClassInput,
+        CicsOperandName::SpoolNode => SlotUse::SpoolNodeInput,
+        CicsOperandName::SpoolRecordLength => SlotUse::SpoolRecordLengthInput,
+        CicsOperandName::SpoolOutDescr => SlotUse::SpoolOutDescrInput,
         _ => SlotUse::Input,
     }
 }
@@ -173,6 +179,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
         CicsPlanOperation::SpoolClose => CicsOperation::SpoolClose,
         CicsPlanOperation::SpoolOpenInput => CicsOperation::SpoolOpenInput,
+        CicsPlanOperation::SpoolOpenOutput => CicsOperation::SpoolOpenOutput,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -309,6 +316,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::SpoolToken => "TOKEN",
         CicsOperandName::SpoolUserId => "USERID",
         CicsOperandName::SpoolClass => "CLASS",
+        CicsOperandName::SpoolNode => "NODE",
+        CicsOperandName::SpoolRecordLength => "RECORDLENGTH",
+        CicsOperandName::SpoolOutDescr => "OUTDESCR",
     }
 }
 
@@ -398,5 +408,10 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Executable64 => "EXECUTABLE",
         CicsPlanOption::SpoolKeep => "KEEP",
         CicsPlanOption::SpoolDelete => "DELETE",
+        CicsPlanOption::SpoolNoCc => "NOCC",
+        CicsPlanOption::SpoolAsa => "ASA",
+        CicsPlanOption::SpoolMcc => "MCC",
+        CicsPlanOption::SpoolPrint => "PRINT",
+        CicsPlanOption::SpoolPunch => "PUNCH",
     }
 }

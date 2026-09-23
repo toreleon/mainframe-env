@@ -149,6 +149,13 @@ All notable changes to mainframe-env are documented here.
   user-key task returns INVREQ 16/2. Checkpoint v12 preserves area bindings and
   restored stale-pointer rejection. The route uses the existing authorization,
   audit, cancellation, deadline, and Memory/SQLite replay boundary.
+- Added typed CICS `SPOOLOPEN OUTPUT` with operation tag 60, NODE,
+  RECORDLENGTH, and OUTDESCR operand tags 115–117, output-format option tags
+  74–78, and the returned TOKEN output tag 208. The bounded provider supports
+  concurrent report creation, default class A/NOCC/PRINT and 32,760-byte
+  record length, double-indirect OUTDESCR parameters, exact replay and SQLite
+  reopen. The compiled route proves EIBFN `5602` and both token outputs.
+
 - Added typed CICS `SPOOLOPEN INPUT` with operation tag 59, USERID/CLASS
   operand tags 113–114, and non-ASSIGN TOKEN output tag 208. The provider
   enforces APPLID-prefix authorization, JESSPOOL SAF/audit, the JES input
@@ -162,7 +169,7 @@ All notable changes to mainframe-env are documented here.
   DELETE, explicit output close defaults to KEEP, ownership and `JESSPOOL`
   authorization precede mutation, and the state/replay CAS survives the exact
   crash gap before outer effect journaling. The compiled route proves EIBFN
-  `5610`; SPOOLOPEN, SPOOLREAD, and SPOOLWRITE remain subsequent slices.
+  `5610`; report transfer and implicit-close handling remain subsequent slices.
 
 - Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
   TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal

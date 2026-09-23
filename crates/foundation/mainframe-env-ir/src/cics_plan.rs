@@ -615,6 +615,9 @@ fn validate_operation_shape(
         CicsPlanOperation::SpoolOpenInput => {
             spool_control::invalid_open_input_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::SpoolOpenOutput => {
+            spool_control::invalid_open_output_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2028,15 +2031,24 @@ mod tests {
         let operations = [
             (CicsPlanOperation::SpoolClose, 58),
             (CicsPlanOperation::SpoolOpenInput, 59),
+            (CicsPlanOperation::SpoolOpenOutput, 60),
         ];
         let operands = [
             (CicsOperandName::SpoolToken, 112),
             (CicsOperandName::SpoolUserId, 113),
             (CicsOperandName::SpoolClass, 114),
+            (CicsOperandName::SpoolNode, 115),
+            (CicsOperandName::SpoolRecordLength, 116),
+            (CicsOperandName::SpoolOutDescr, 117),
         ];
         let options = [
             (CicsPlanOption::SpoolKeep, 72),
             (CicsPlanOption::SpoolDelete, 73),
+            (CicsPlanOption::SpoolNoCc, 74),
+            (CicsPlanOption::SpoolAsa, 75),
+            (CicsPlanOption::SpoolMcc, 76),
+            (CicsPlanOption::SpoolPrint, 77),
+            (CicsPlanOption::SpoolPunch, 78),
         ];
         assert_eq!(
             operations
@@ -2110,6 +2122,47 @@ mod tests {
         assert_eq!(
             decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
             Ok(plan)
+        );
+        let output = CicsEffectPlan {
+            operation: CicsPlanOperation::SpoolOpenOutput,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::SpoolUserId,
+                    value: CicsOperandValue::Literal(b"DESTUSER".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SpoolNode,
+                    value: CicsOperandValue::Literal(b"LOCAL".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SpoolRecordLength,
+                    value: CicsOperandValue::Storage(slot(1, "RECORD-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SpoolOutDescr,
+                    value: CicsOperandValue::Storage(slot(2, "DESC-PTR")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::SpoolAsa, CicsPlanOption::SpoolPunch]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Resp,
+                    target: slot(3, "RESP-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::SpoolToken,
+                    target: slot(0, "TOKEN-X"),
+                },
+            ],
+            condition: CicsCondition::Respond {
+                response: slot(3, "RESP-X"),
+                response2: None,
+            },
+        };
+        let encoded = encode_cics_effect_plan(&output, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(output)
         );
     }
 

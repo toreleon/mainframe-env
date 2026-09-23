@@ -125,6 +125,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::SpoolToken | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::SpoolOpenOutput => matches!(
+            output,
+            CicsOutputName::SpoolToken | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

@@ -103,6 +103,8 @@ pub enum CicsPlanOperation {
     SpoolClose,
     /// Open one matching spool report for input.
     SpoolOpenInput,
+    /// Create one spool report for output.
+    SpoolOpenOutput,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -363,6 +365,12 @@ pub enum CicsOperandName {
     SpoolUserId,
     /// One-character spool class.
     SpoolClass,
+    /// Destination node for a spool output report.
+    SpoolNode,
+    /// Maximum output record length.
+    SpoolRecordLength,
+    /// Double-indirect OUTPUT descriptor pointer.
+    SpoolOutDescr,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -454,6 +462,16 @@ pub enum CicsPlanOption {
     SpoolKeep,
     /// Delete a closed spool report.
     SpoolDelete,
+    /// Emit output without carriage-control bytes.
+    SpoolNoCc,
+    /// Use ASA carriage control.
+    SpoolAsa,
+    /// Use machine carriage control.
+    SpoolMcc,
+    /// Create a print report.
+    SpoolPrint,
+    /// Create a punch report.
+    SpoolPunch,
 }
 
 /// Named result binding written after the host result arrives.

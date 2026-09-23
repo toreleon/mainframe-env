@@ -2461,6 +2461,7 @@ mod tests {
             CicsOperation::SetFileStatus,
             CicsOperation::SpoolClose,
             CicsOperation::SpoolOpenInput,
+            CicsOperation::SpoolOpenOutput,
             CicsOperation::StartBrowse,
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,

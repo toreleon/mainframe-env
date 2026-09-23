@@ -90,7 +90,10 @@ pub(super) fn resolve(
             continue;
         }
         if identity == HirCicsOutputName::SpoolToken
-            && operation != HirCicsOperation::SpoolOpenInput
+            && !matches!(
+                operation,
+                HirCicsOperation::SpoolOpenInput | HirCicsOperation::SpoolOpenOutput
+            )
         {
             continue;
         }

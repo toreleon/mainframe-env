@@ -287,6 +287,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::SpoolToken => CicsOperandName::SpoolToken,
                 HirCicsOperandName::SpoolUserId => CicsOperandName::SpoolUserId,
                 HirCicsOperandName::SpoolClass => CicsOperandName::SpoolClass,
+                HirCicsOperandName::SpoolNode => CicsOperandName::SpoolNode,
+                HirCicsOperandName::SpoolRecordLength => CicsOperandName::SpoolRecordLength,
+                HirCicsOperandName::SpoolOutDescr => CicsOperandName::SpoolOutDescr,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -399,6 +402,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         }
         HirCicsOperation::SpoolClose => CicsPlanOperation::SpoolClose,
         HirCicsOperation::SpoolOpenInput => CicsPlanOperation::SpoolOpenInput,
+        HirCicsOperation::SpoolOpenOutput => CicsPlanOperation::SpoolOpenOutput,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
@@ -498,5 +502,10 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Unescaped => CicsPlanOption::Unescaped,
         HirCicsOption::SpoolKeep => CicsPlanOption::SpoolKeep,
         HirCicsOption::SpoolDelete => CicsPlanOption::SpoolDelete,
+        HirCicsOption::SpoolNoCc => CicsPlanOption::SpoolNoCc,
+        HirCicsOption::SpoolAsa => CicsPlanOption::SpoolAsa,
+        HirCicsOption::SpoolMcc => CicsPlanOption::SpoolMcc,
+        HirCicsOption::SpoolPrint => CicsPlanOption::SpoolPrint,
+        HirCicsOption::SpoolPunch => CicsPlanOption::SpoolPunch,
     }
 }

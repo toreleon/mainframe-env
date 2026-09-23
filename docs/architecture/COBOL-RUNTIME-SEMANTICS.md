@@ -363,6 +363,14 @@ The input interface is single-threaded across tasks and distinguishes current-
 owner from other-owner SPOLBUSY. Replay returns the same token without a second
 claim, including after SQLite reopen. The command records EIBFN `5602`.
 
+`EXEC CICS SPOOLOPEN OUTPUT` resolves USERID, NODE, optional CLASS, halfword
+RECORDLENGTH, output format flags, and optional double-indirect OUTDESCR. The
+provider allocates a task-owned report without taking the input single thread,
+then returns an eight-byte TOKEN. Default class A, NOCC, PRINT, and 32,760-byte
+record length are applied before the bounded durable CAS. Invalid destination
+pairing, length, or OUTDESCR returns the documented condition before report
+creation. The command records EIBFN `5602` and survives SQLite reopen.
+
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
 LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and

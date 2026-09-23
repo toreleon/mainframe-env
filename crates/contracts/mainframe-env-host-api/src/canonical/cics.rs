@@ -63,6 +63,7 @@ impl Canonical for CicsOperation {
             Self::SetFileStatus => out.variant("CicsOperation", "SetFileStatus", 0),
             Self::SpoolClose => out.variant("CicsOperation", "SpoolClose", 0),
             Self::SpoolOpenInput => out.variant("CicsOperation", "SpoolOpenInput", 0),
+            Self::SpoolOpenOutput => out.variant("CicsOperation", "SpoolOpenOutput", 0),
             Self::Start => out.variant("CicsOperation", "Start", 0),
             Self::StartBrowse => out.variant("CicsOperation", "StartBrowse", 0),
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),

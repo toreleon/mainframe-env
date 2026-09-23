@@ -37,6 +37,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::SpoolClose => close(service, run, request),
         CicsOperation::SpoolOpenInput => open_input(service, run, request),
+        CicsOperation::SpoolOpenOutput => open_output(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -120,6 +121,129 @@ fn open_input(
     report.owner_principal = Some(run.invocation.principal.id().as_str().into());
     report.next_record = 0;
     report.eof_seen = false;
+    let mut reply = SpoolReply::normal();
+    reply.token = Some(token.as_bytes().to_vec());
+    next.record_replay(
+        mutation.idempotency_key.as_str(),
+        request_digest,
+        reply.clone(),
+        service.limits,
+    )?;
+    persist_spool_state(service, current_version, &mut next)?;
+    state.spool = next;
+    response(service, run, reply)
+}
+
+fn open_output(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_open_output_request(request)?;
+    let mut user_id = spool_destination(request, "USERID")?;
+    let mut node = spool_destination(request, "NODE")?;
+    if (user_id == "*") != (node == "*") {
+        return Err(HostProblem::Condition {
+            name: "NODEIDERR".into(),
+            response: 90,
+            response2: 0,
+        });
+    }
+    let out_descriptor = match request.arguments.get("OUTDESCR") {
+        Some(value) if value.schema() == "mainframe-env.cics.outdescr-invalid@1" => {
+            return Err(invalid_out_descriptor(
+                value.bytes().first().copied().map_or(52, i32::from),
+            ));
+        }
+        Some(value) => {
+            let text = value.bytes();
+            if text.len() > service.limits.max_spool_outdescr_bytes {
+                return Err(invalid_out_descriptor(44));
+            }
+            let attributes = parse_out_descriptor(text)?;
+            if user_id == "*" && node == "*" {
+                if let Some(value) = attributes.get("USERID") {
+                    user_id =
+                        spool_destination_text(value).map_err(|_| invalid_out_descriptor(44))?;
+                }
+                if let Some(value) = attributes.get("NODE") {
+                    node = spool_destination_text(value).map_err(|_| invalid_out_descriptor(44))?;
+                }
+            } else if attributes.contains_key("USERID") || attributes.contains_key("NODE") {
+                return Err(invalid_out_descriptor(44));
+            }
+            text.to_vec()
+        }
+        None => Vec::new(),
+    };
+    let class = request
+        .arguments
+        .get("CLASS")
+        .map(|_| spool_text(request, "CLASS", 1))
+        .transpose()?
+        .map_or(b'A', |value| value.as_bytes()[0]);
+    let record_length = request
+        .arguments
+        .get("RECORDLENGTH")
+        .map(|value| {
+            std::str::from_utf8(value.bytes())
+                .map_err(|_| HostProblem::Malformed)?
+                .parse::<i32>()
+                .map_err(|_| HostProblem::Malformed)
+        })
+        .transpose()?
+        .unwrap_or(32_760);
+    if !(0..=32_760).contains(&record_length) {
+        return Err(HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: record_length,
+        });
+    }
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    let mut state = service.lock()?;
+    if let Some(reply) = state
+        .spool
+        .replay(mutation.idempotency_key.as_str(), request_digest)?
+    {
+        return response(service, run, reply);
+    }
+    if state.spool.reports.len() >= service.limits.max_spool_reports {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let current_version = state.spool.version;
+    let mut next = state.spool.clone();
+    let token = next.allocate_token()?;
+    next.reports.insert(
+        token.clone(),
+        SpoolReport {
+            token: token.clone(),
+            state: SpoolReportState::OpenOutput,
+            user_id,
+            node,
+            class,
+            record_length: record_length as u32,
+            owner_run_unit: Some(run.invocation.run_unit_id.as_str().into()),
+            owner_principal: Some(run.invocation.principal.id().as_str().into()),
+            records: Vec::new(),
+            next_record: 0,
+            eof_seen: false,
+            carriage_control: if request.arguments.contains_key("OPTION.ASA") {
+                1
+            } else if request.arguments.contains_key("OPTION.MCC") {
+                2
+            } else {
+                0
+            },
+            punch: request.arguments.contains_key("OPTION.PUNCH"),
+            out_descriptor,
+        },
+    );
     let mut reply = SpoolReply::normal();
     reply.token = Some(token.as_bytes().to_vec());
     next.record_replay(
@@ -257,6 +381,121 @@ fn validate_open_input_request(request: &CicsRequest) -> Result<(), HostProblem>
         return Err(HostProblem::Malformed);
     }
     Ok(())
+}
+
+fn validate_open_output_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    let carriage = ["NOCC", "ASA", "MCC"]
+        .iter()
+        .filter(|name| request.arguments.contains_key(&format!("OPTION.{name}")))
+        .count();
+    if !request.arguments.contains_key("TOKEN")
+        || !request.arguments.contains_key("USERID")
+        || !request.arguments.contains_key("NODE")
+        || (!request.arguments.contains_key("RESP")
+            && !request.arguments.contains_key("OPTION.NOHANDLE"))
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || carriage > 1
+        || request.arguments.contains_key("OPTION.PRINT")
+            && request.arguments.contains_key("OPTION.PUNCH")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "USERID" | "NODE" | "CLASS" => !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                ),
+                "RECORDLENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                "OUTDESCR" => !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.outdescr@1" | "mainframe-env.cics.outdescr-invalid@1"
+                ),
+                "TOKEN" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.NOHANDLE" | "OPTION.NOCC" | "OPTION.ASA" | "OPTION.MCC"
+                | "OPTION.PRINT" | "OPTION.PUNCH" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(())
+}
+
+fn spool_destination(request: &CicsRequest, name: &str) -> Result<String, HostProblem> {
+    let value = request
+        .arguments
+        .get(name)
+        .ok_or(HostProblem::Malformed)?
+        .bytes();
+    let value = std::str::from_utf8(value).map_err(|_| HostProblem::Malformed)?;
+    spool_destination_text(value)
+}
+
+fn spool_destination_text(value: &str) -> Result<String, HostProblem> {
+    let value = value.trim().to_ascii_uppercase();
+    if value.is_empty()
+        || value.len() > 8
+        || value != "*" && !value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return Err(HostProblem::Condition {
+            name: "NODEIDERR".into(),
+            response: 90,
+            response2: 0,
+        });
+    }
+    Ok(value)
+}
+
+fn invalid_out_descriptor(response2: i32) -> HostProblem {
+    HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2,
+    }
+}
+
+fn parse_out_descriptor(bytes: &[u8]) -> Result<BTreeMap<String, String>, HostProblem> {
+    let text = std::str::from_utf8(bytes).map_err(|_| invalid_out_descriptor(44))?;
+    let mut attributes = BTreeMap::new();
+    let mut rest = text.trim();
+    if rest.is_empty() {
+        return Err(invalid_out_descriptor(44));
+    }
+    while !rest.is_empty() {
+        let open = rest.find('(').ok_or_else(|| invalid_out_descriptor(44))?;
+        let keyword = &rest[..open];
+        if keyword.is_empty()
+            || !keyword.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            || keyword.len() > 8
+        {
+            return Err(invalid_out_descriptor(44));
+        }
+        let tail = &rest[open + 1..];
+        let close = tail.find(')').ok_or_else(|| invalid_out_descriptor(44))?;
+        let value = &tail[..close];
+        if value.is_empty()
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_graphic() && byte != b'(')
+        {
+            return Err(invalid_out_descriptor(44));
+        }
+        let keyword = keyword.to_ascii_uppercase();
+        if attributes
+            .insert(keyword, value.to_ascii_uppercase())
+            .is_some()
+        {
+            return Err(invalid_out_descriptor(44));
+        }
+        rest = &tail[close + 1..];
+        if !rest.is_empty() && !rest.starts_with(char::is_whitespace) {
+            return Err(invalid_out_descriptor(44));
+        }
+        rest = rest.trim_start();
+    }
+    Ok(attributes)
 }
 
 fn spool_text(request: &CicsRequest, name: &str, maximum: usize) -> Result<String, HostProblem> {
@@ -677,6 +916,7 @@ fn validate_spool_state(state: &SpoolState, limits: CicsLimits) -> Result<(), Ho
             || report.node.len() > 8
             || !report.class.is_ascii_alphanumeric()
             || report.record_length > 32_760
+            || report.carriage_control > 2
             || report.next_record > report.records.len()
             || report.out_descriptor.len() > limits.max_spool_outdescr_bytes
             || report

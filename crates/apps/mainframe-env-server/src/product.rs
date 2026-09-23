@@ -12244,6 +12244,109 @@ mod tests {
     }
 
     #[test]
+    fn compiled_spoolopen_output_creates_report_and_returns_token() {
+        let artifact = published_source_fixture(
+            "SPOPENO",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SPOPENO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TOKEN-X PIC X(8) VALUE SPACES.\n01 TOKEN-Y PIC X(8) VALUE SPACES.\n01 OPEN-FN PIC X(2).\n01 RECORD-X PIC S9(4) COMP VALUE 80.\n01 RESP-X PIC S9(9) COMP.\n01 DESC-PTR POINTER.\n01 TEXT-PTR POINTER.\n01 DESC-BLOB.\n  05 DESC-LEN PIC S9(9) COMP VALUE 27.\n  05 DESC-TEXT PIC X(27) VALUE 'NODE(REMOTE) USERID(WRITER)'.\nPROCEDURE DIVISION.\nEXEC CICS SPOOLOPEN OUTPUT TOKEN(TOKEN-X) USERID('ME01USER') NODE('LOCAL') CLASS('B') RECORDLENGTH(RECORD-X) ASA RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO OPEN-FN.\nEXEC CICS ADDRESS SET(TEXT-PTR) USING(ADDRESS OF DESC-BLOB) END-EXEC.\nEXEC CICS ADDRESS SET(DESC-PTR) USING(ADDRESS OF TEXT-PTR) END-EXEC.\nEXEC CICS SPOOLOPEN OUTPUT TOKEN(TOKEN-Y) USERID('*') NODE('*') OUTDESCR(DESC-PTR) RESP(RESP-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SPOPENO".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SPOU".into(), "SPOPENO".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SPOPENO".into(),
+                    map: "SPOPENO".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("spoolopen-output-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SPOU", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SPOU",
+                24,
+                80,
+                "spoolopen-output-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SPOPENO", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("OPEN-FN").unwrap().bytes(), &[0x56, 0x02]);
+        let token =
+            String::from_utf8(restored.variable("TOKEN-X").unwrap().bytes().to_vec()).unwrap();
+        let report = server.cics.spool_report_snapshot(&token).unwrap();
+        assert_eq!(report.state, "open-output");
+        assert_eq!(
+            (report.user_id.as_str(), report.node.as_str()),
+            ("ME01USER", "LOCAL")
+        );
+        assert_eq!((report.class, report.record_length), (b'B', 80));
+        let descriptor_token =
+            String::from_utf8(restored.variable("TOKEN-Y").unwrap().bytes().to_vec()).unwrap();
+        let descriptor_report = server
+            .cics
+            .spool_report_snapshot(&descriptor_token)
+            .unwrap();
+        assert_eq!(
+            (
+                descriptor_report.node.as_str(),
+                descriptor_report.user_id.as_str()
+            ),
+            ("REMOTE", "WRITER")
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SpoolOpenOutput)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn compiled_readq_td_set_allocates_checkpointed_record_storage() {
         let artifact = published_source_fixture(
             "READQSET",

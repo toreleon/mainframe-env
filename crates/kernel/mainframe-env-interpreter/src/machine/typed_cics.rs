@@ -354,6 +354,9 @@ pub(super) fn execute(
                     slot.qualified_layout_name.as_bytes().to_vec(),
                 )
             }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::SpoolOutDescr => {
+                spool_control::out_descriptor_argument(machine, slot)
+            }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
                 "mainframe-env.cics.storage-identity@1",
                 format!(
@@ -397,6 +400,7 @@ pub(super) fn execute(
                         | CicsOperandName::JournalFlength
                         | CicsOperandName::JournalPfxLeng
                         | CicsOperandName::Token
+                        | CicsOperandName::SpoolRecordLength
                 ) =>
             {
                 (
@@ -695,7 +699,10 @@ pub(super) fn write_output(
             "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
-            && operation == CicsOperation::SpoolOpenInput
+            && matches!(
+                operation,
+                CicsOperation::SpoolOpenInput | CicsOperation::SpoolOpenOutput
+            )
             && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(name, "ELEMNAME" | "ELEMNS" | "TYPENAME" | "TYPENS")
             && value.schema() != "mainframe-env.cics.payload@1"
