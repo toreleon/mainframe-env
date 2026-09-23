@@ -41,6 +41,7 @@ pub enum HirCicsOperandName {
     Item,
     CommareaPointer,
     Map,
+    Partnset,
     Mapset,
     Resource,
     Length,

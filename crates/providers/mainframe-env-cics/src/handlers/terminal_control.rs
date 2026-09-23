@@ -9,6 +9,10 @@ use mainframe_env_host_api::{
 };
 use std::collections::BTreeMap;
 
+mod partition_set;
+pub(in crate::service) use partition_set::release_task as release_partition_set_for_task;
+pub use partition_set::{CicsPartitionDefinition, CicsPartitionSetDefinition};
+
 #[derive(Clone, Debug, Default)]
 pub(in crate::service) struct TerminalInput {
     pub(in crate::service) payload: Option<Vec<u8>>,
@@ -53,10 +57,11 @@ pub(in crate::service) const fn valid_aid(aid: u8) -> bool {
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::SendPartnset => partition_set::invoke(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
         CicsOperation::PurgeMessage => purge_message(service, run, request),
@@ -378,6 +383,7 @@ fn receive(
         .get(&run.session)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
+    partition_set::require_intervening_send(service, run, current.version)?;
     let requested_names = if request.arguments.contains_key("MAP") {
         Some(map_names(request)?)
     } else {

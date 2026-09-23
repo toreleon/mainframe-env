@@ -141,6 +141,8 @@ pub enum CicsPlanOperation {
     SendMap,
     /// Send one unmapped terminal text message.
     SendText,
+    /// Associate a registered BMS partition set with the issuing task.
+    SendPartnset,
     /// Rewrite the record held by the current update context.
     Rewrite,
     /// Commit or roll back the current unit of work.
@@ -288,6 +290,8 @@ pub enum CicsOperandName {
     Map,
     /// `MAPSET(...)` BMS mapset name.
     Mapset,
+    /// `SEND PARTNSET(name)` partition-set resource name.
+    Partnset,
     /// `RESOURCE(...)` enqueue identity.
     Resource,
     /// `LENGTH(...)` data length.

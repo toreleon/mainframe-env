@@ -6313,7 +6313,8 @@ mod tests {
     };
     use mainframe_env_cics::{
         CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
-        CicsEventPostMode, CicsJavaStatus, CicsProgramDefinition,
+        CicsEventPostMode, CicsJavaStatus, CicsPartitionDefinition, CicsPartitionSetDefinition,
+        CicsProgramDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -20294,4 +20295,137 @@ mod tests {
             );
         }
     }
+    #[test]
+    fn compiled_send_partnset_selects_registered_8775_set_and_sets_1810() {
+        use mainframe_env_racf::CommandContext;
+
+        let artifact = published_source_fixture(
+            "PARTNS",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. PARTNS.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PARTN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SEND PARTNSET('PSET1') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO PARTN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "partition-set-class",
+                    "partition-set-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(FACILITY)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.TERMINAL.PARTNSET.PSET1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.TERMINAL.PARTNSET.PSET1",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .cics
+            .register_partition_sets(&[CicsPartitionSetDefinition {
+                name: "PSET1".into(),
+                partitions: vec![CicsPartitionDefinition {
+                    name: "A".into(),
+                    top: 0,
+                    left: 0,
+                    rows: 24,
+                    columns: 80,
+                }],
+            }])
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "PARTNS".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("PS00".into(), "PARTNS".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "PARTNS".into(),
+                    map: "PARTNS".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("partition-set-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "PS00",
+                24,
+                80,
+                "partition-set-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "PARTNS", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .cics
+                .partition_set_for_run(&invocation.run_unit_id)
+                .unwrap(),
+            Some("PSET1".into())
+        );
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("PARTN-FN").unwrap().bytes(),
+            &[0x18, 0x10]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 3)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendPartnset)
+                .count(),
+            1
+        );
+    }
+
 }

@@ -9,6 +9,23 @@ pub(super) fn invalid_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
+    if plan.operation == CicsPlanOperation::SendPartnset {
+        return !inputs.is_subset(&BTreeSet::from([CicsOperandName::Partnset]))
+            || plan.operands.iter().any(|operand| {
+                operand.name != CicsOperandName::Partnset
+                    || !matches!(
+                        operand.value,
+                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                    )
+            })
+            || plan
+                .options
+                .iter()
+                .any(|option| *option != CicsPlanOption::NoHandle)
+            || outputs
+                .iter()
+                .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2));
+    }
     let allowed_inputs = BTreeSet::from([
         CicsOperandName::Map,
         CicsOperandName::Mapset,

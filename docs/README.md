@@ -50,6 +50,7 @@ explicitly names that authority as superseded.
 - [Application packages](architecture/APPLICATION-PACKAGES.md)
 - [Batch controller registry](architecture/BATCH-CONTROLLER-REGISTRY.md)
 - [CICS command routing](architecture/CICS-COMMAND-ROUTING.md)
+- [CICS terminal control](architecture/CICS-TERMINAL-CONTROL.md)
 - [Db2 application catalog](architecture/DB2-APPLICATION-CATALOG.md)
 - [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)

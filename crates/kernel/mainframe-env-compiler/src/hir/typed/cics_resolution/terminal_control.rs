@@ -78,6 +78,34 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::SendPartnset {
+        let Some(tokens) = clauses.get("PARTNSET") else {
+            return Ok(Vec::new());
+        };
+        let value = cics_value(tokens, semantic)?;
+        let valid = match &value {
+            HirCicsValue::Literal(value) => {
+                matches!(value.len(), 1..=8)
+                    && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            }
+            HirCicsValue::Data(reference) => {
+                matches!(
+                    reference.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                ) && matches!(reference.length, 1..=8)
+            }
+            HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
+        };
+        if !valid {
+            return Err(ResolutionFailure::Invalid(
+                "CICS SEND PARTNSET requires a 1-8 character partition-set name".into(),
+            ));
+        }
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::Partnset,
+            value,
+        }]);
+    }
     if !matches!(
         operation,
         HirCicsOperation::ReceiveMap | HirCicsOperation::SendMap | HirCicsOperation::SendText

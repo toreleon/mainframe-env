@@ -69,6 +69,7 @@ pub(super) fn resolve(
         ["RECEIVE", "MAP"] => HirCicsOperation::ReceiveMap,
         ["SEND", "MAP"] => HirCicsOperation::SendMap,
         ["SEND", "TEXT"] => HirCicsOperation::SendText,
+        ["SEND", "PARTNSET"] => HirCicsOperation::SendPartnset,
         ["ASSIGN"] => HirCicsOperation::Assign,
         ["CANCEL"] => HirCicsOperation::Cancel,
         ["DELAY"] => HirCicsOperation::Delay,

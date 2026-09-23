@@ -603,7 +603,8 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
-        | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
+        | CicsPlanOperation::SendText
+        | CicsPlanOperation::SendPartnset => terminal_control::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::InvokeService
         | CicsPlanOperation::SoapFaultAdd
         | CicsPlanOperation::SoapFaultCreate
@@ -4473,8 +4474,12 @@ mod tests {
         assert_eq!(operation_from_tag(74), Ok(CicsPlanOperation::ResetBrowse));
         assert_eq!(operation_tag(CicsPlanOperation::Unlock), 75);
         assert_eq!(operation_from_tag(75), Ok(CicsPlanOperation::Unlock));
+        assert_eq!(operation_tag(CicsPlanOperation::SendPartnset), 90);
+        assert_eq!(operation_from_tag(90), Ok(CicsPlanOperation::SendPartnset));
         assert_eq!(operand_tag(CicsOperandName::Token), 182);
         assert_eq!(operand_from_tag(182), Ok(CicsOperandName::Token));
+        assert_eq!(operand_tag(CicsOperandName::Partnset), 192);
+        assert_eq!(operand_from_tag(192), Ok(CicsOperandName::Partnset));
         assert_eq!(output_tag(CicsOutputName::Token), 240);
         assert_eq!(output_from_tag(240), Ok(CicsOutputName::Token));
         for (operation, tag) in [
@@ -4516,6 +4521,12 @@ mod tests {
         assert_eq!(operations.len(), crate::CICS_EXECUTABLE_DESCRIPTORS.len());
         for tag in 183..=191 {
             assert_eq!(operand_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
+        }
+        for tag in 76..=89 {
+            assert_eq!(
+                operation_from_tag(tag),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
         }
         for tag in 116..=123 {
             assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));

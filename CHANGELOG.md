@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `SEND PARTNSET` with durable task selection, base reset,
+  registered partition geometry, SAF checks, immediate receive sequencing,
+  and atomic replay receipts. Source: IBM CICS TS 6.x application API
+  sources-c, `dfhp4_sendpartnset.html`, catalog row 0191.
+
 - Completed thirteen typed CICS event-control rows, including input and
   composite events, timer definition/check/force/delete, reattachment and
   subevent retrieval, TEST EVENT, and SIGNAL EVENT capture specifications.

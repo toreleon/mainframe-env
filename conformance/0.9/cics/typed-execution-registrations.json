@@ -333,6 +333,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0171"
     },
     {
+      "operation": "SendPartnset",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0191"
+    },
+    {
       "operation": "SetAssociationUserCorrData",
       "interface": "api",
       "family": "task-control",

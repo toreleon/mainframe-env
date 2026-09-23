@@ -245,6 +245,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
+    ("SendPartnset", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0191"),
     ("SendText", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0192"),
     (
         "SetAssociationUserCorrData",
@@ -640,6 +641,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DocumentSet",
         "ReceiveMap",
         "SendMap",
+        "SendPartnset",
         "SendText",
         "Assign",
         "PurgeMessage",
@@ -685,6 +687,10 @@ ENQUEUE_COMMAND_ROWS = frozenset(
 )
 WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
     {f"{OFFICIAL_BASELINE}:api-commands:0234"}
+)
+SEND_PARTNSET_ROW = f"{OFFICIAL_BASELINE}:api-commands:0191"
+SEND_PARTNSET_STRUCTURE_SHA256 = (
+    "sha256:2830db8cb3ee405ffbac97f1b5b5d6572ab46b52c5b89b9f004c676b0f0689e9"
 )
 COMPOSITE_SUBEVENT_ROW = f"{OFFICIAL_BASELINE}:api-commands:0033"
 COMPOSITE_SUBEVENT_OPTIONS = tuple(f"SUBEVENT{index}" for index in range(1, 9))
@@ -968,6 +974,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "SendMap": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendPartnset": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
     "SendText": frozenset(
@@ -1262,6 +1271,7 @@ def _load_typed_execution_registrations(
         "Release",
         "RemoveSubevent",
         "ResetBrowse",
+        "SendPartnset",
         "SetAssociationUserCorrData",
         "SoapFaultAdd",
         "SoapFaultCreate",
@@ -2177,7 +2187,31 @@ def _top_level_source_option_names(
         names.update(COMPOSITE_SUBEVENT_OPTIONS)
     if _spoolwrite_page_choice(command, dimensions):
         names.add("PAGE")
+    if _send_partnset_heading_operand(command, dimensions):
+        names.add("PARTNSET")
     return sorted(names)
+
+
+def _send_partnset_heading_operand(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> bool:
+    """Keep the optional operand attached to the reviewed SEND PARTNSET head."""
+    if command["official_row"] != SEND_PARTNSET_ROW:
+        return False
+    grammar = _grammar_contract(dimensions)
+    variants = grammar["variants"]
+    return (
+        len(variants) == 1
+        and variants[0].get("syntax_head") == "SEND PARTNSET"
+        and variants[0].get("structure_sha256") == SEND_PARTNSET_STRUCTURE_SHA256
+        and [(token.get("kind"), token.get("value")) for token in variants[0]["tokens"]]
+        == [
+            ("keyword", "SEND PARTNSET"),
+            ("delimiter", "("),
+            ("variable", "name"),
+            ("delimiter", ")"),
+        ]
+    )
 
 
 def _host_option_value_limit(markers: set[str]) -> int:
@@ -2575,6 +2609,18 @@ def _option_contract(
             "legalities": {"structural"},
         }
 
+    if _send_partnset_heading_operand(command, dimensions):
+        if "PARTNSET" in options:
+            raise DescriptorError("SEND PARTNSET heading operand duplicates source option")
+        options["PARTNSET"] = {
+            "markers": {"name"},
+            "directions": {"input"},
+            "stacks": {("PARTNSET",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
+
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():
             entry = options.setdefault(
@@ -2694,6 +2740,12 @@ def _option_contract(
         raise DescriptorError("dynamic condition clause facts conflict")
     condition_clauses = next(iter(condition_clause_material.values()), None)
     constraints = _option_constraints(grammar, top_level_options, applicable, option_status)
+    if _send_partnset_heading_operand(command, dimensions):
+        # PARTNSET identifies the command head even when its parenthesized
+        # resource name is omitted to restore the base partition state.
+        constraints["required"] = [
+            name for name in constraints["required"] if name != "PARTNSET"
+        ]
     if _spoolwrite_page_choice(command, dimensions):
         choice = {"members": ["LINE", "PAGE"], "required": False}
         constraints["alternatives"] = [*constraints["alternatives"], choice]
@@ -3896,6 +3948,10 @@ def _recognition_contract(
         discriminators.update(catalog_discriminators)
     if command["label"] == "HANDLE AID":
         heads = {("HANDLE", "AID")}
+    if command["official_row"] == SEND_PARTNSET_ROW:
+        heads = {("SEND", "PARTNSET")}
+        discriminators.clear()
+        required_discriminators.clear()
     if grammar["status"] == "pending":
         status = "pending"
     elif grammar["status"] == "not-applicable":

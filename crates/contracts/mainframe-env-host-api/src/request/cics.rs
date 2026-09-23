@@ -140,6 +140,8 @@ pub enum CicsOperation {
     Rewrite,
     SendText,
     SendMap,
+    /// Associate a registered partition set or return the terminal to base state.
+    SendPartnset,
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
     SetFileStatus,
@@ -282,6 +284,7 @@ impl CicsOperation {
             Self::Rewrite => "Rewrite",
             Self::SendText => "SendText",
             Self::SendMap => "SendMap",
+            Self::SendPartnset => "SendPartnset",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
             Self::SetFileStatus => "SetFileStatus",
             Self::SpoolClose => "SpoolClose",
@@ -405,6 +408,7 @@ impl CicsOperation {
                 | Self::PurgeMessage
                 | Self::SendMap
                 | Self::SendText
+                | Self::SendPartnset
                 | Self::SetAssociationUserCorrData
                 | Self::Xctl
                 | Self::Return
@@ -520,6 +524,7 @@ impl CicsOperation {
             ("RESETBR", _) => Self::ResetBrowse,
             ("REWRITE", _) => Self::Rewrite,
             ("SEND", Some("MAP")) => Self::SendMap,
+            ("SEND", Some("PARTNSET")) => Self::SendPartnset,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
             ("SPOOLCLOSE", _) => Self::SpoolClose,

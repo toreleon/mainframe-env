@@ -6640,7 +6640,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 108);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 109);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -28714,4 +28714,216 @@ mod tests {
         let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         assert_eq!(state["timers"].as_object().unwrap().len(), 1);
     }
+    #[test]
+    fn send_partnset_registers_replays_resets_and_rejects_unknown_or_dpl() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let definition = CicsPartitionSetDefinition {
+            name: "PSET1".into(),
+            partitions: vec![
+                CicsPartitionDefinition {
+                    name: "A".into(),
+                    top: 0,
+                    left: 0,
+                    rows: 12,
+                    columns: 80,
+                },
+                CicsPartitionDefinition {
+                    name: "B".into(),
+                    top: 12,
+                    left: 0,
+                    rows: 12,
+                    columns: 80,
+                },
+            ],
+        };
+        cics.register_partition_sets(&[definition.clone()]).unwrap();
+        cics.register_partition_sets(&[definition.clone()]).unwrap();
+        assert_eq!(
+            cics.register_partition_sets(&[CicsPartitionSetDefinition {
+                partitions: vec![definition.partitions[0].clone()],
+                ..definition.clone()
+            }]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let (invocation, _) = registered(&cics);
+        let set = request(
+            CicsOperation::SendPartnset,
+            BTreeMap::from([("PARTNSET".into(), cics_literal(b"PSET1"))]),
+            1,
+        );
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, set.clone(), 1),
+                set.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(
+            cics.partition_set_for_run(&invocation.run_unit_id).unwrap(),
+            Some("PSET1".into())
+        );
+        let immediate_receive = request(CicsOperation::ReceiveMap, BTreeMap::new(), 5);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, immediate_receive.clone(), 5),
+                immediate_receive,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, set.clone(), 1), set)
+                .unwrap(),
+            response
+        );
+        let unknown = request(
+            CicsOperation::SendPartnset,
+            BTreeMap::from([("PARTNSET".into(), cics_literal(b"MISSING"))]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, unknown.clone(), 2),
+                unknown
+            ),
+            Err(HostProblem::Condition {
+                name: "INVPARTNSET".into(),
+                response: 64,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            cics.partition_set_for_run(&invocation.run_unit_id).unwrap(),
+            Some("PSET1".into())
+        );
+        let reset = request(CicsOperation::SendPartnset, BTreeMap::new(), 3);
+        cics.invoke(&effect(&invocation.run_unit_id, reset.clone(), 3), reset)
+            .unwrap();
+        assert_eq!(
+            cics.partition_set_for_run(&invocation.run_unit_id).unwrap(),
+            None
+        );
+
+        let dpl = invocation_for(
+            "partition-dpl",
+            BTreeMap::from([(
+                "cics.execution-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.execution-context@1",
+                    b"dpl-without-synconreturn".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let dpl_session = SessionId::new("partition-dpl-session", 64).unwrap();
+        cics.create_session(&dpl_session, 24, 80).unwrap();
+        cics.register_run(dpl.clone(), &dpl_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let dpl_set = request(CicsOperation::SendPartnset, BTreeMap::new(), 4);
+        assert_eq!(
+            cics.invoke(&effect(&dpl.run_unit_id, dpl_set.clone(), 4), dpl_set),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        );
+    }
+
+    #[test]
+    fn send_partnset_denial_keeps_state_and_sqlite_reopen_recovers_association() {
+        let (authorities, seen) = command_authorities(true);
+        let denied = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        denied
+            .register_partition_sets(&[CicsPartitionSetDefinition {
+                name: "PSET1".into(),
+                partitions: vec![CicsPartitionDefinition {
+                    name: "A".into(),
+                    top: 0,
+                    left: 0,
+                    rows: 24,
+                    columns: 80,
+                }],
+            }])
+            .unwrap();
+        let (invocation, _) = registered(&denied);
+        let set = request(
+            CicsOperation::SendPartnset,
+            BTreeMap::from([("PARTNSET".into(), cics_literal(b"PSET1"))]),
+            1,
+        );
+        assert_eq!(
+            denied.invoke(&effect(&invocation.run_unit_id, set.clone(), 1), set),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            denied
+                .partition_set_for_run(&invocation.run_unit_id)
+                .unwrap(),
+            None
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.TERMINAL.PARTNSET.PSET1"
+                        && *intent == AccessIntent::Update
+                })
+        );
+
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-send-partnset-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let run_unit = {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            cics.register_partition_sets(&[CicsPartitionSetDefinition {
+                name: "PSET1".into(),
+                partitions: vec![CicsPartitionDefinition {
+                    name: "A".into(),
+                    top: 0,
+                    left: 0,
+                    rows: 24,
+                    columns: 80,
+                }],
+            }])
+            .unwrap();
+            let (invocation, _) = registered(&cics);
+            let set = request(
+                CicsOperation::SendPartnset,
+                BTreeMap::from([("PARTNSET".into(), cics_literal(b"PSET1"))]),
+                11,
+            );
+            cics.invoke(&effect(&invocation.run_unit_id, set.clone(), 11), set)
+                .unwrap();
+            invocation.run_unit_id
+        };
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let reopened = service(store);
+        assert_eq!(
+            reopened.partition_set_for_run(&run_unit).unwrap(),
+            Some("PSET1".into())
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
 }
