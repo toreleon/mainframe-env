@@ -1686,7 +1686,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 52);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 53);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -5767,11 +5767,47 @@ mod tests {
         {
             let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let cics = service(store.clone());
-            cics.bind_artifact_store(store).unwrap();
-            let state = cics.lock().unwrap();
-            assert_eq!(state.program_loads["SQLLOAD"].events.len(), 1);
-            assert_eq!(state.program_loads["SQLLOAD"].events[0].generation, 9);
-            assert!(state.program_loads["SQLLOAD"].events[0].hold);
+            cics.bind_artifact_store(store.clone()).unwrap();
+            {
+                let state = cics.lock().unwrap();
+                assert_eq!(state.program_loads["SQLLOAD"].events.len(), 1);
+                assert_eq!(state.program_loads["SQLLOAD"].events[0].generation, 9);
+                assert!(state.program_loads["SQLLOAD"].events[0].hold);
+            }
+            let release_invocation = invocation_for("sqlite-release", BTreeMap::new());
+            let session = SessionId::new("sqlite-release-session", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(
+                release_invocation.clone(),
+                &session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+            let release = request(
+                CicsOperation::Release,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"SQLLOAD"))]),
+                2,
+            );
+            cics.invoke(
+                &effect(&release_invocation.run_unit_id, release.clone(), 2),
+                release,
+            )
+            .unwrap();
+            assert!(!cics.lock().unwrap().program_loads.contains_key("SQLLOAD"));
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            assert!(!cics.lock().unwrap().program_loads.contains_key("SQLLOAD"));
+            assert_eq!(
+                store
+                    .list_provider_state("cics-program-release-v1", 10)
+                    .unwrap()
+                    .len(),
+                1
+            );
         }
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -5906,8 +5942,331 @@ mod tests {
     }
 
     #[test]
+    fn release_consumes_one_held_load_across_task_boundary_and_replays() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.bind_artifact_store(store.clone()).unwrap();
+        let old = register_load_program(&cics, store.as_ref(), "RELPGM", 1, b"OLD", 0);
+        let owner = invocation_for("release-owner", BTreeMap::new());
+        let owner_session = SessionId::new("release-owner-session", 64).unwrap();
+        cics.create_session(&owner_session, 24, 80).unwrap();
+        cics.register_run(owner.clone(), &owner_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let first = request(CicsOperation::Load, load_arguments("RELPGM", true, true), 1);
+        cics.invoke(&effect(&owner.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        let latest = register_load_program(&cics, store.as_ref(), "RELPGM", 2, b"NEW", 0);
+        let second = request(CicsOperation::Load, load_arguments("RELPGM", true, true), 2);
+        cics.invoke(&effect(&owner.run_unit_id, second.clone(), 2), second)
+            .unwrap();
+        assert_eq!(cics.lock().unwrap().program_loads["RELPGM"].events.len(), 2);
+        assert_eq!(
+            cics.lock().unwrap().program_loads["RELPGM"].events[1].artifact,
+            latest
+        );
+        let run = cics.lock().unwrap().runs[&owner.run_unit_id].clone();
+        handlers::release_task_state(&cics, &run).unwrap();
+        assert_eq!(cics.lock().unwrap().program_loads["RELPGM"].events.len(), 2);
+
+        let releaser = invocation_for("release-releaser", BTreeMap::new());
+        let releaser_session = SessionId::new("release-releaser-session", 64).unwrap();
+        cics.create_session(&releaser_session, 24, 80).unwrap();
+        cics.register_run(
+            releaser.clone(),
+            &releaser_session,
+            "MENU",
+            "MEAPPL",
+            "MESYS",
+        )
+        .unwrap();
+        let arguments = BTreeMap::from([("PROGRAM".into(), cics_literal(b"RELPGM"))]);
+        let release = request(CicsOperation::Release, arguments.clone(), 3);
+        let response = cics
+            .invoke(
+                &effect(&releaser.run_unit_id, release.clone(), 3),
+                release.clone(),
+            )
+            .unwrap();
+        assert_eq!(response.target.as_deref(), Some("RELPGM"));
+        assert_eq!(response.response, 0);
+        assert_eq!(cics.lock().unwrap().program_loads["RELPGM"].events.len(), 1);
+        assert_eq!(
+            cics.lock().unwrap().program_loads["RELPGM"].events[0].artifact,
+            old
+        );
+        assert_eq!(
+            cics.invoke(&effect(&releaser.run_unit_id, release.clone(), 3), release)
+                .unwrap(),
+            response
+        );
+        let final_release = request(CicsOperation::Release, arguments.clone(), 4);
+        cics.invoke(
+            &effect(&releaser.run_unit_id, final_release.clone(), 4),
+            final_release,
+        )
+        .unwrap();
+        assert!(!cics.lock().unwrap().program_loads.contains_key("RELPGM"));
+        let empty = request(CicsOperation::Release, arguments, 5);
+        assert_eq!(
+            cics.invoke(&effect(&releaser.run_unit_id, empty.clone(), 5), empty),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 6,
+            })
+        );
+        assert!(
+            store
+                .get_provider_state("cics-program-load-v1", "RELPGM")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn release_recovers_when_outer_receipt_insert_fails() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let cics = service(store.clone());
+        cics.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "RELFAIL", 1, b"CONTENT", 0);
+        let (invocation, _) = registered(&cics);
+        let load = request(
+            CicsOperation::Load,
+            load_arguments("RELFAIL", true, true),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, load.clone(), 1), load)
+            .unwrap();
+        let release = request(
+            CicsOperation::Release,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"RELFAIL"))]),
+            2,
+        );
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, release.clone(), 2),
+                release.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(!cics.lock().unwrap().program_loads.contains_key("RELFAIL"));
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, release.clone(), 2),
+                release,
+            )
+            .unwrap();
+        assert_eq!(response.target.as_deref(), Some("RELFAIL"));
+        assert_eq!(response.response, 0);
+        assert!(!cics.lock().unwrap().program_loads.contains_key("RELFAIL"));
+    }
+
+    #[test]
+    fn release_uses_pinned_invreq_conditions_without_consuming_other_task_loads() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.bind_artifact_store(store.clone()).unwrap();
+        for name in ["UNLOADED", "SELF", "OTHER"] {
+            register_load_program(&cics, store.as_ref(), name, 1, name.as_bytes(), 0);
+        }
+        let (artifact, semantic_identity) = install_program_artifact(store.as_ref(), b"RELOAD");
+        cics.register_program_definitions(&[CicsProgramDefinition {
+            name: "RELOAD".into(),
+            generation: 1,
+            artifact,
+            semantic_identity,
+            entry_offset: 0,
+            enabled: true,
+            remote: false,
+            reload: true,
+            java_status: CicsJavaStatus::NotJava,
+        }])
+        .unwrap();
+
+        let other = invocation_for("release-other-owner", BTreeMap::new());
+        let other_session = SessionId::new("release-other-owner-session", 64).unwrap();
+        cics.create_session(&other_session, 24, 80).unwrap();
+        cics.register_run(other.clone(), &other_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let load = request(
+            CicsOperation::Load,
+            load_arguments("OTHER", false, true),
+            21,
+        );
+        cics.invoke(&effect(&other.run_unit_id, load.clone(), 21), load)
+            .unwrap();
+
+        let issuer = invocation_for("release-condition-issuer", BTreeMap::new());
+        let issuer_session = SessionId::new("release-condition-session", 64).unwrap();
+        cics.create_session(&issuer_session, 24, 80).unwrap();
+        cics.register_run(issuer.clone(), &issuer_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        for (program, sequence, response2) in [("UNLOADED", 22, 6), ("OTHER", 23, 7)] {
+            let release = request(
+                CicsOperation::Release,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(program.as_bytes()))]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&issuer.run_unit_id, release.clone(), sequence),
+                    release,
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2,
+                })
+            );
+        }
+        assert_eq!(cics.lock().unwrap().program_loads["OTHER"].events.len(), 1);
+
+        cics.lock()
+            .unwrap()
+            .runs
+            .get_mut(&issuer.run_unit_id)
+            .unwrap()
+            .current_program
+            .current = Some("SELF".into());
+        let self_release = request(
+            CicsOperation::Release,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"SELF"))]),
+            24,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&issuer.run_unit_id, self_release.clone(), 24),
+                self_release,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 5,
+            })
+        );
+        let self_load = request(CicsOperation::Load, load_arguments("SELF", true, true), 25);
+        cics.invoke(
+            &effect(&issuer.run_unit_id, self_load.clone(), 25),
+            self_load,
+        )
+        .unwrap();
+        let self_release = request(
+            CicsOperation::Release,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"SELF"))]),
+            26,
+        );
+        cics.invoke(
+            &effect(&issuer.run_unit_id, self_release.clone(), 26),
+            self_release,
+        )
+        .unwrap();
+        assert!(!cics.lock().unwrap().program_loads.contains_key("SELF"));
+
+        let reload = request(
+            CicsOperation::Release,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"RELOAD"))]),
+            27,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&issuer.run_unit_id, reload.clone(), 27), reload),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 17,
+            })
+        );
+
+        let unbound = service(store);
+        let no_manager = invocation_for("release-no-manager", BTreeMap::new());
+        let no_manager_session = SessionId::new("release-no-manager-session", 64).unwrap();
+        unbound.create_session(&no_manager_session, 24, 80).unwrap();
+        unbound
+            .register_run(
+                no_manager.clone(),
+                &no_manager_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let release = request(
+            CicsOperation::Release,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"UNLOADED"))]),
+            28,
+        );
+        assert_eq!(
+            unbound.invoke(
+                &effect(&no_manager.run_unit_id, release.clone(), 28),
+                release
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 30,
+            })
+        );
+    }
+
+    #[test]
+    fn release_denial_preserves_load_ownership() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let allowed = service(store.clone());
+        allowed.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&allowed, store.as_ref(), "RELDENY", 1, b"CONTENT", 0);
+        let (owner, _) = registered(&allowed);
+        let load = request(
+            CicsOperation::Load,
+            load_arguments("RELDENY", true, true),
+            1,
+        );
+        allowed
+            .invoke(&effect(&owner.run_unit_id, load.clone(), 1), load)
+            .unwrap();
+        let (host, seen) = command_authorities(true);
+        let denied = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        denied.bind_artifact_store(store.clone()).unwrap();
+        let invocation = invocation_for("release-denied", BTreeMap::new());
+        let session = SessionId::new("release-denied-session", 64).unwrap();
+        denied.create_session(&session, 24, 80).unwrap();
+        denied
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let release = request(
+            CicsOperation::Release,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"RELDENY"))]),
+            2,
+        );
+        assert_eq!(
+            denied.invoke(
+                &effect(&invocation.run_unit_id, release.clone(), 2),
+                release,
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            denied.lock().unwrap().program_loads["RELDENY"].events.len(),
+            1
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.PROGRAM.RELDENY"
+                        && *intent == AccessIntent::Execute
+                })
+        );
+    }
+
+    #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 52);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 53);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();

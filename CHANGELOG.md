@@ -74,6 +74,16 @@ All notable changes to mainframe-env are documented here.
   durable coordinator, a standard post survives SQLite reopen, completion marks
   the ECB and advances with exact EIBFN `1202`, and task cleanup removes the
   retained wait row.
+- Added typed CICS `RELEASE` for row 0165 with append-only operation tag 48.
+  It consumes one durable LOAD ownership level, permits a retained HOLD to be
+  released by a later task, checks the program security resource before
+  mutation, and records an atomic replay receipt with the ownership change.
+  Its pinned condition matrix distinguishes self-release (INVREQ 16/5), an
+  unloaded program (16/6), another task's non-HOLD load (16/7), RELOAD=YES
+  (16/17), and an uninitialized program manager (16/30); program security
+  denial returns NOTAUTH 70.
+  Memory, SQLite reopen, receipt-failure recovery, denial, and compiled EIBFN
+  `0E0A` regressions cover the selected route.
 
 - Added typed CICS `LOAD` with append-only operation tag 47, operand tags
   62–65, and `HOLD` option tag 38. The compiled route returns bounded `SET`,
@@ -92,8 +102,7 @@ All notable changes to mainframe-env are documented here.
   and multi-generation regressions plus the documented RESP/RESP2 failure matrix prevent
   program dispatch on rejected requests. For a missing current platform, the
   implementation follows the command's Conditions table (`INVREQ` 16/1), not
-  the conflicting description text (`APPNOTFOUND`). RELEASE remains fail-closed
-  pending its own program-control slice.
+  the conflicting description text (`APPNOTFOUND`).
 
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact

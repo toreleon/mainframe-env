@@ -11,7 +11,7 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore};
 use std::collections::{BTreeMap, BTreeSet};
 
-const PROGRAM_LOAD_NAMESPACE: &str = "cics-program-load-v1";
+pub(super) const PROGRAM_LOAD_NAMESPACE: &str = "cics-program-load-v1";
 const PROGRAM_LOAD_MAGIC: &[u8; 7] = b"MECPLD1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -388,7 +388,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     }
 }
 
-fn encode_state(state: &ProgramLoadState) -> Result<Vec<u8>, HostProblem> {
+pub(super) fn encode_state(state: &ProgramLoadState) -> Result<Vec<u8>, HostProblem> {
     let mut out = PROGRAM_LOAD_MAGIC.to_vec();
     out.extend_from_slice(
         &u32::try_from(state.events.len())

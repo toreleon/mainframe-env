@@ -43,6 +43,8 @@ pub enum CicsPlanOperation {
     InvokeApplication,
     /// Make one immutable installed program generation available to the issuing task.
     Load,
+    /// Release one prior program LOAD ownership level.
+    Release,
     /// Transfer to one installed program at the same logical level without returning.
     Xctl,
     /// Return from the current top-level task and optionally schedule its next transaction.

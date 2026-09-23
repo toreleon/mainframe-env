@@ -692,6 +692,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
         HirCicsOperation::InvokeApplication => program_control::INVOKE_CLAUSES,
         HirCicsOperation::Load => program_control::LOAD_CLAUSES,
+        HirCicsOperation::Release => program_control::RELEASE_CLAUSES,
         HirCicsOperation::Link | HirCicsOperation::Xctl => &[
             "PROGRAM",
             "COMMAREA",
@@ -795,6 +796,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
         HirCicsOperation::InvokeApplication => &["EXACTMATCH", "MINIMUM", "NOHANDLE"],
         HirCicsOperation::Load => &["HOLD", "NOHANDLE"],
+        HirCicsOperation::Release => &["NOHANDLE"],
         HirCicsOperation::Address
         | HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
@@ -928,6 +930,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::InvokeApplication => &[][..],
         HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
         HirCicsOperation::Load => &["PROGRAM"][..],
+        HirCicsOperation::Release => &["PROGRAM"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],

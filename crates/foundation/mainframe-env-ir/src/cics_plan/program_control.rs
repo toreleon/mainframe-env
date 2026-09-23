@@ -133,6 +133,29 @@ pub(super) fn invalid_load_shape(
             .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
 }
 
+pub(super) fn invalid_release_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let program = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::Program);
+    inputs != &BTreeSet::from([CicsOperandName::Program])
+        || program.is_none_or(|operand| {
+            !matches!(&operand.value, CicsOperandValue::Literal(bytes) if valid_program_name(bytes))
+                && !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+}
+
 pub(super) fn invalid_xctl_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,

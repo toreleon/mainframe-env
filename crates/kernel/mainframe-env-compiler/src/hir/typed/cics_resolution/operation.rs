@@ -22,6 +22,7 @@ pub(super) fn resolve(
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
         ["INVOKE", "APPLICATION"] => HirCicsOperation::InvokeApplication,
         ["LOAD"] => HirCicsOperation::Load,
+        ["RELEASE"] => HirCicsOperation::Release,
         ["LINK"] => HirCicsOperation::Link,
         ["XCTL"] => HirCicsOperation::Xctl,
         ["RETURN"] => HirCicsOperation::Return,

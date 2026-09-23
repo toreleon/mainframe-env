@@ -21,6 +21,7 @@ const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 
 mod invoke_application;
 mod load;
+mod release;
 pub(in crate::service) use load::{
     ProgramLoadState, load_program_loads, release_task_program_loads,
 };
@@ -155,6 +156,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::Inquire => inquire(service, run, request),
         CicsOperation::InvokeApplication => invoke_application::invoke(service, run, request),
         CicsOperation::Load => load::invoke(service, run, request),
+        CicsOperation::Release => release::invoke(service, run, request),
         CicsOperation::Link | CicsOperation::Xctl => transfer(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }

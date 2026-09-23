@@ -91,6 +91,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
         CicsPlanOperation::InvokeApplication => CicsOperation::InvokeApplication,
         CicsPlanOperation::Load => CicsOperation::Load,
+        CicsPlanOperation::Release => CicsOperation::Release,
         CicsPlanOperation::Link => CicsOperation::Link,
         CicsPlanOperation::Xctl => CicsOperation::Xctl,
         CicsPlanOperation::Return => CicsOperation::Return,

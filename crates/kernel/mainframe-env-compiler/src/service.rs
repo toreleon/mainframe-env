@@ -1588,6 +1588,7 @@ mod tests {
                 CicsPlanOperation::IgnoreCondition => crate::HirCicsOperation::IgnoreCondition,
                 CicsPlanOperation::InvokeApplication => crate::HirCicsOperation::InvokeApplication,
                 CicsPlanOperation::Load => crate::HirCicsOperation::Load,
+                CicsPlanOperation::Release => crate::HirCicsOperation::Release,
                 CicsPlanOperation::Link => crate::HirCicsOperation::Link,
                 CicsPlanOperation::Xctl => crate::HirCicsOperation::Xctl,
                 CicsPlanOperation::Return => crate::HirCicsOperation::Return,

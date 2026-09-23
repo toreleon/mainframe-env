@@ -166,6 +166,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0160",
     ),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
+    ("Release", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0165"),
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
@@ -430,6 +431,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "IgnoreCondition",
         "InvokeApplication",
         "Load",
+        "Release",
         "Link",
         "Xctl",
         "Return",
@@ -543,6 +545,15 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "Load": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "Release": frozenset(
         {
             "memory-read",
             "memory-write",
@@ -872,6 +883,7 @@ def _load_typed_execution_registrations(
         "PushHandle",
         "ReadTransientData",
         "ReadTemporaryStorage",
+        "Release",
         "SetAssociationUserCorrData",
         "Start",
         "Suspend",
@@ -1185,6 +1197,7 @@ def load_catalog(
                 "IgnoreCondition",
                 "InvokeApplication",
                 "Load",
+                "Release",
                 "PopHandle",
                 "PurgeMessage",
                 "PushHandle",

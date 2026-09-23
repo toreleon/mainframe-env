@@ -1265,6 +1265,7 @@ mod tests {
             "SET",
             &CicsTarget::Resolved(slot.clone()),
             &payload("mainframe-env.cics.payload@1", b"ITEM".to_vec()).unwrap(),
+            None,
         )
         .unwrap();
         let pointer = machine

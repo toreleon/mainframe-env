@@ -475,6 +475,9 @@ fn validate_operation_shape(
             program_control::invalid_invoke_application_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Load => program_control::invalid_load_shape(plan, inputs, outputs),
+        CicsPlanOperation::Release => {
+            program_control::invalid_release_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Xctl => program_control::invalid_xctl_shape(plan, inputs, outputs),
         CicsPlanOperation::Return => program_control::invalid_return_shape(plan, inputs, outputs),
         CicsPlanOperation::StartBrowse
@@ -1263,6 +1266,8 @@ mod tests {
         assert_eq!(option_from_tag(37), Ok(CicsPlanOption::Minimum));
         assert_eq!(operation_tag(CicsPlanOperation::Load), 47);
         assert_eq!(operation_from_tag(47), Ok(CicsPlanOperation::Load));
+        assert_eq!(operation_tag(CicsPlanOperation::Release), 48);
+        assert_eq!(operation_from_tag(48), Ok(CicsPlanOperation::Release));
         for (operand, tag) in [
             (CicsOperandName::LoadSet, 62),
             (CicsOperandName::Entry, 63),

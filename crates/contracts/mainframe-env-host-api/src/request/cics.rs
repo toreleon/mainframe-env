@@ -52,6 +52,8 @@ pub enum CicsOperation {
     InvokeApplication,
     /// Load one immutable installed program generation for the issuing task.
     Load,
+    /// Release one prior program LOAD ownership level.
+    Release,
     Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
@@ -120,6 +122,7 @@ impl CicsOperation {
             Self::Inquire => "Inquire",
             Self::InvokeApplication => "InvokeApplication",
             Self::Load => "Load",
+            Self::Release => "Release",
             Self::Link => "Link",
             Self::PopHandle => "PopHandle",
             Self::PushHandle => "PushHandle",
@@ -169,6 +172,7 @@ impl CicsOperation {
                 | Self::Link
                 | Self::InvokeApplication
                 | Self::Load
+                | Self::Release
                 | Self::ReceiveMap
                 | Self::ReadTransientData
                 | Self::PurgeMessage
@@ -229,6 +233,7 @@ impl CicsOperation {
             ("INQUIRE", _) => Self::Inquire,
             ("INVOKE", Some("APPLICATION")) => Self::InvokeApplication,
             ("LOAD", _) => Self::Load,
+            ("RELEASE", _) => Self::Release,
             ("LINK", _) => Self::Link,
             ("POP", Some("HANDLE")) => Self::PopHandle,
             ("PUSH", Some("HANDLE")) => Self::PushHandle,

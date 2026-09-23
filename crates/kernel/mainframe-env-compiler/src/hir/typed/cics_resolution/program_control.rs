@@ -23,6 +23,7 @@ pub(super) const INVOKE_CLAUSES: &[&str] = &[
 pub(super) const LOAD_CLAUSES: &[&str] = &[
     "PROGRAM", "SET", "ENTRY", "LENGTH", "FLENGTH", "RESP", "RESP2",
 ];
+pub(super) const RELEASE_CLAUSES: &[&str] = &["PROGRAM", "RESP", "RESP2"];
 
 pub(super) fn validate(
     operation: HirCicsOperation,
@@ -104,6 +105,10 @@ pub(super) fn operands(
     match operation {
         HirCicsOperation::InvokeApplication => invoke_operands(clauses, semantic),
         HirCicsOperation::Load => load_operands(clauses, semantic),
+        HirCicsOperation::Release => Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::Program,
+            value: program_name::value(&clauses["PROGRAM"], semantic, "RELEASE")?,
+        }]),
         HirCicsOperation::Link => transfer_operands(clauses, semantic, "LINK"),
         HirCicsOperation::Xctl => transfer_operands(clauses, semantic, "XCTL"),
         HirCicsOperation::Return => return_operands(clauses, semantic),

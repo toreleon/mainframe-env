@@ -166,6 +166,7 @@ pub enum HirCicsOperation {
     IgnoreCondition,
     InvokeApplication,
     Load,
+    Release,
     Link,
     Xctl,
     Return,
@@ -2635,6 +2636,36 @@ mod tests {
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADLOAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 SET-X POINTER. 01 TEXT-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP. 01 FLENGTH-X PIC S9(9) COMP. PROCEDURE DIVISION. {invalid}. STOP RUN."
+            );
+            assert!(analyze(&source).hir.is_none(), "accepted {invalid}");
+        }
+    }
+
+    #[test]
+    fn cics_release_requires_one_program_and_rejects_load_only_options() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRELS. PROCEDURE DIVISION. EXEC CICS RELEASE PROGRAM('PAYLOAD') END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RELEASE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved RELEASE command");
+        assert_eq!(command.operation, HirCicsOperation::Release);
+        assert_eq!(command.operands.len(), 1);
+        assert_eq!(command.operands[0].name, HirCicsOperandName::Program);
+        for invalid in [
+            "EXEC CICS RELEASE END-EXEC",
+            "EXEC CICS RELEASE PROGRAM('PAYLOAD') HOLD END-EXEC",
+            "EXEC CICS RELEASE PROGRAM('PAYLOAD') LENGTH(4) END-EXEC",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRELS. PROCEDURE DIVISION. {invalid}. STOP RUN."
             );
             assert!(analyze(&source).hir.is_none(), "accepted {invalid}");
         }

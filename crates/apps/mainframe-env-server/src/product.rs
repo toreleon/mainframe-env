@@ -15180,9 +15180,9 @@ mod tests {
     }
 
     #[test]
-    fn online_load_crosses_compiled_selected_provider_route() {
+    fn online_load_and_release_cross_compiled_selected_provider_route() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LOADROUT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SET-PTR-X POINTER.\n01 ENTRY-PTR-X POINTER.\n01 LENGTH-X PIC S9(4) COMP.\n01 SET-BYTES-X PIC X(4).\n01 ENTRY-BYTES-X PIC X(4).\n01 LOAD-FN PIC X(2).\nLINKAGE SECTION.\n01 SET-LINK-X PIC X(4).\n01 ENTRY-LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS LOAD PROGRAM('LOADPGM') SET(SET-PTR-X) ENTRY(ENTRY-PTR-X) LENGTH(LENGTH-X) HOLD END-EXEC.\nSET ADDRESS OF SET-LINK-X TO SET-PTR-X.\nSET ADDRESS OF ENTRY-LINK-X TO ENTRY-PTR-X.\nMOVE SET-LINK-X TO SET-BYTES-X.\nMOVE ENTRY-LINK-X TO ENTRY-BYTES-X.\nMOVE EIBFN TO LOAD-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LOADROUT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SET-PTR-X POINTER.\n01 ENTRY-PTR-X POINTER.\n01 LENGTH-X PIC S9(4) COMP.\n01 SET-BYTES-X PIC X(4).\n01 ENTRY-BYTES-X PIC X(4).\n01 LOAD-FN PIC X(2).\n01 RELEASE-FN PIC X(2).\nLINKAGE SECTION.\n01 SET-LINK-X PIC X(4).\n01 ENTRY-LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS LOAD PROGRAM('LOADPGM') SET(SET-PTR-X) ENTRY(ENTRY-PTR-X) LENGTH(LENGTH-X) HOLD END-EXEC.\nSET ADDRESS OF SET-LINK-X TO SET-PTR-X.\nSET ADDRESS OF ENTRY-LINK-X TO ENTRY-PTR-X.\nMOVE SET-LINK-X TO SET-BYTES-X.\nMOVE ENTRY-LINK-X TO ENTRY-BYTES-X.\nMOVE EIBFN TO LOAD-FN.\nEXEC CICS RELEASE PROGRAM('LOADPGM') END-EXEC.\nMOVE EIBFN TO RELEASE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("LOADROUT.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -15312,6 +15312,10 @@ mod tests {
             .unwrap();
         assert_eq!(restored.variable("LOAD-FN").unwrap().bytes(), &[0x0e, 0x06]);
         assert_eq!(
+            restored.variable("RELEASE-FN").unwrap().bytes(),
+            &[0x0e, 0x0a]
+        );
+        assert_eq!(
             restored.variable("LENGTH-X").unwrap().bytes(),
             &(artifact.payload().len() as i16).to_be_bytes()
         );
@@ -15347,6 +15351,13 @@ mod tests {
                 .unwrap()
                 .state,
             ExecutionState::Suspended
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state("cics-program-load-v1", "LOADPGM")
+                .unwrap()
+                .is_none()
         );
     }
 

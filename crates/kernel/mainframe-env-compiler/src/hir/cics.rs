@@ -338,6 +338,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
         HirCicsOperation::InvokeApplication => CicsPlanOperation::InvokeApplication,
         HirCicsOperation::Load => CicsPlanOperation::Load,
+        HirCicsOperation::Release => CicsPlanOperation::Release,
         HirCicsOperation::Link => CicsPlanOperation::Link,
         HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
         HirCicsOperation::Return => CicsPlanOperation::Return,

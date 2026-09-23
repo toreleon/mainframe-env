@@ -2406,6 +2406,7 @@ mod tests {
             CicsOperation::Inquire,
             CicsOperation::InvokeApplication,
             CicsOperation::Load,
+            CicsOperation::Release,
             CicsOperation::Link,
             CicsOperation::PopHandle,
             CicsOperation::PushHandle,

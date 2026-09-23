@@ -59,6 +59,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WriteTemporaryStorage => 50,
         CicsPlanOperation::InvokeApplication => 46,
         CicsPlanOperation::Load => 47,
+        CicsPlanOperation::Release => 48,
     }
 }
 
@@ -114,6 +115,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         50 => Ok(CicsPlanOperation::WriteTemporaryStorage),
         46 => Ok(CicsPlanOperation::InvokeApplication),
         47 => Ok(CicsPlanOperation::Load),
+        48 => Ok(CicsPlanOperation::Release),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
