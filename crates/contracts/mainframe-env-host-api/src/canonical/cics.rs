@@ -13,6 +13,7 @@ impl Canonical for CicsOperation {
             Self::AsktimeEib => out.variant("CicsOperation", "AsktimeEib", 0),
             Self::Assign => out.variant("CicsOperation", "Assign", 0),
             Self::Cancel => out.variant("CicsOperation", "Cancel", 0),
+            Self::ChangePassword => out.variant("CicsOperation", "ChangePassword", 0),
             Self::ChangeTask => out.variant("CicsOperation", "ChangeTask", 0),
             Self::Delay => out.variant("CicsOperation", "Delay", 0),
             Self::DefineCounter => out.variant("CicsOperation", "DefineCounter", 0),

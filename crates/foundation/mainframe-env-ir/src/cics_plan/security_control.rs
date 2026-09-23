@@ -130,3 +130,45 @@ pub(super) fn invalid_verify_phrase_shape(
             ),
         })
 }
+
+pub(super) fn invalid_change_password_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::SecurityUserId)
+        || !inputs.contains(&CicsOperandName::SecurityPassword)
+        || !inputs.contains(&CicsOperandName::SecurityNewPassword)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::SecurityUserId,
+            CicsOperandName::SecurityPassword,
+            CicsOperandName::SecurityNewPassword,
+        ]))
+        || outputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOutputName::SecurityChangeTime
+                    | CicsOutputName::SecurityDaysLeft
+                    | CicsOutputName::SecurityEsmReason
+                    | CicsOutputName::SecurityEsmResp
+                    | CicsOutputName::SecurityExpiryTime
+                    | CicsOutputName::SecurityInvalidCount
+                    | CicsOutputName::SecurityLastUseTime
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::SecurityPassword | CicsOperandName::SecurityNewPassword => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            _ => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+        })
+}

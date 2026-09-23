@@ -732,6 +732,9 @@ fn validate_operation_shape(
         CicsPlanOperation::VerifyPhrase => {
             security_control::invalid_verify_phrase_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::ChangePassword => {
+            security_control::invalid_change_password_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -5267,11 +5270,13 @@ mod tests {
         assert_eq!(operation_tag(CicsPlanOperation::Unlock), 75);
         assert_eq!(operation_tag(CicsPlanOperation::QuerySecurity), 132);
         assert_eq!(operation_tag(CicsPlanOperation::VerifyPassword), 137);
+        assert_eq!(operation_tag(CicsPlanOperation::ChangePassword), 130);
         assert_eq!(operation_tag(CicsPlanOperation::VerifyPhrase), 138);
         assert_eq!(operand_tag(CicsOperandName::ResClass), 448);
         assert_eq!(operand_tag(CicsOperandName::LogMessage), 452);
         assert_eq!(operand_tag(CicsOperandName::SecurityUserId), 453);
         assert_eq!(operand_tag(CicsOperandName::SecurityPassword), 455);
+        assert_eq!(operand_tag(CicsOperandName::SecurityNewPassword), 458);
         assert_eq!(operand_tag(CicsOperandName::SecurityPhrase), 456);
         assert_eq!(operand_tag(CicsOperandName::SecurityPhraseLen), 457);
         assert_eq!(output_tag(CicsOutputName::SecurityRead), 504);
@@ -5395,6 +5400,45 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
         plan.operands[1].value = CicsOperandValue::Literal(b"PASSWORD".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn change_password_plan_keeps_both_secrets_in_storage_and_requires_v2() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::ChangePassword,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::SecurityUserId,
+                    value: CicsOperandValue::Literal(b"IBMUSER".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SecurityPassword,
+                    value: CicsOperandValue::Storage(slot(48, "OLD-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::SecurityNewPassword,
+                    value: CicsOperandValue::Storage(slot(49, "NEW-X")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SecurityEsmResp,
+                target: slot(50, "ESM-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.operands[2].value = CicsOperandValue::Literal(b"NEWPASS1".to_vec());
         assert_eq!(
             encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)

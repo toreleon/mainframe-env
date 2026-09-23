@@ -34,6 +34,20 @@ pub(super) const VERIFY_PASSWORD_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const CHANGE_PASSWORD_CLAUSES: &[&str] = &[
+    "PASSWORD",
+    "NEWPASSWORD",
+    "USERID",
+    "CHANGETIME",
+    "DAYSLEFT",
+    "ESMREASON",
+    "ESMRESP",
+    "EXPIRYTIME",
+    "INVALIDCOUNT",
+    "LASTUSETIME",
+    "RESP",
+    "RESP2",
+];
 pub(super) const VERIFY_PHRASE_CLAUSES: &[&str] = &[
     "PHRASE",
     "PHRASELEN",
@@ -57,6 +71,9 @@ pub(super) fn validate(
 ) -> Resolution<()> {
     if operation == HirCicsOperation::VerifyPassword {
         return validate_verify_password(clauses, semantic);
+    }
+    if operation == HirCicsOperation::ChangePassword {
+        return validate_change_password(clauses, semantic);
     }
     if operation == HirCicsOperation::VerifyPhrase {
         return validate_verify_phrase(clauses, semantic);
@@ -113,6 +130,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::VerifyPassword {
         return verify_password_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::ChangePassword {
+        return change_password_operands(clauses, semantic);
+    }
     if operation == HirCicsOperation::VerifyPhrase {
         return verify_phrase_operands(clauses, semantic);
     }
@@ -154,7 +174,9 @@ pub(super) fn outputs(
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
     if matches!(
         operation,
-        HirCicsOperation::VerifyPassword | HirCicsOperation::VerifyPhrase
+        HirCicsOperation::VerifyPassword
+            | HirCicsOperation::VerifyPhrase
+            | HirCicsOperation::ChangePassword
     ) {
         return verify_credential_outputs(clauses, semantic, operation);
     }
@@ -246,15 +268,53 @@ fn verify_password_operands(
     Ok(out)
 }
 
+fn validate_change_password(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    if !clauses.contains_key("NEWPASSWORD") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS CHANGE PASSWORD requires NEWPASSWORD".into(),
+        ));
+    }
+    validate_verify_password(clauses, semantic)?;
+    let new_password =
+        complete_data_reference(&clauses["NEWPASSWORD"], semantic).map_err(|_| {
+            ResolutionFailure::Invalid(
+                "CICS CHANGE PASSWORD requires resolved new password storage".into(),
+            )
+        })?;
+    if new_password.length != 8
+        || !matches!(
+            new_password.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS CHANGE PASSWORD requires an 8-character new password data area".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn change_password_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut out = verify_password_operands(clauses, semantic)?;
+    out.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::SecurityNewPassword,
+        value: HirCicsValue::Data(complete_data_reference(&clauses["NEWPASSWORD"], semantic)?),
+    });
+    Ok(out)
+}
+
 fn verify_credential_outputs(
     clauses: &Clauses,
     semantic: &SemanticModel,
     operation: HirCicsOperation,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
-    let label = if operation == HirCicsOperation::VerifyPhrase {
-        "VERIFY PHRASE"
-    } else {
-        "VERIFY PASSWORD"
+    let label = match operation {
+        HirCicsOperation::VerifyPhrase => "VERIFY PHRASE",
+        HirCicsOperation::ChangePassword => "CHANGE PASSWORD",
+        _ => "VERIFY PASSWORD",
     };
     let mut out = Vec::new();
     for (name, identity, width) in [

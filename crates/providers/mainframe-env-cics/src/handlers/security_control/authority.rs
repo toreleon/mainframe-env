@@ -64,6 +64,28 @@ pub struct CicsCredentialRequest<'a> {
     pub tick: u64,
 }
 
+/// Borrowed old and new credentials for one atomic SAF change transition.
+pub struct CicsCredentialChangeRequest<'a> {
+    /// Immutable task principal recorded in the SAF audit.
+    pub actor: &'a PrincipalId,
+    /// User whose credential changes after old-secret verification.
+    pub user: &'a PrincipalId,
+    /// Current clear credential, held only for this call.
+    pub current: &'a [u8],
+    /// Proposed clear credential, held only for this call.
+    pub proposed: &'a [u8],
+    /// Standard password or length-selected phrase mode.
+    pub kind: CicsCredentialKind,
+    /// Digest of the complete canonical CICS request.
+    pub binding_digest: [u8; 32],
+    /// Durable replay identity.
+    pub idempotency_key: &'a str,
+    /// Redacted SAF audit correlation.
+    pub correlation: &'a str,
+    /// Observed finite logical time.
+    pub tick: u64,
+}
+
 /// Source-distinct SAF credential failures used for CICS condition translation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsCredentialFailure {
@@ -134,6 +156,12 @@ pub trait CicsSecurityAuthority: Send + Sync {
     fn verify_credential(
         &self,
         request: CicsCredentialRequest<'_>,
+    ) -> Result<CicsCredentialVerification, HostProblem>;
+
+    /// Verify the old credential and apply the proposed verifier atomically.
+    fn change_credential(
+        &self,
+        request: CicsCredentialChangeRequest<'_>,
     ) -> Result<CicsCredentialVerification, HostProblem>;
 }
 

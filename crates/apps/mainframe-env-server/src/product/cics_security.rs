@@ -2,9 +2,9 @@
 
 use super::*;
 use mainframe_env_cics::{
-    CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind, CicsCredentialRequest,
-    CicsCredentialVerification, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority,
+    CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
+    CicsCredentialRequest, CicsCredentialVerification, CicsSecurityAccess,
+    CicsSecurityAccessReason, CicsSecurityAuthority,
 };
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::HostProblem;
@@ -115,42 +115,91 @@ impl CicsSecurityAuthority for RacfCicsSecurityAuthority {
                 binding_digest: request.binding_digest,
             },
         )?;
-        let (failure, details) = match outcome.result {
-            Some(RacrouteResult::CredentialVerified {
-                failure, details, ..
-            }) => (failure, details),
-            _ => return Err(HostProblem::ProviderFailure),
-        };
-        Ok(CicsCredentialVerification {
-            failure: failure.map(|failure| match failure {
-                CredentialFailure::UnknownUser => CicsCredentialFailure::UnknownUser,
-                CredentialFailure::Revoked => CicsCredentialFailure::Revoked,
-                CredentialFailure::NewCredentialRequired => {
-                    CicsCredentialFailure::NewCredentialRequired
-                }
-                CredentialFailure::InvalidCredential => CicsCredentialFailure::InvalidCredential,
-                CredentialFailure::UnacceptableNewCredential => {
-                    CicsCredentialFailure::UnacceptableNewCredential
-                }
-                CredentialFailure::MismatchedCredentialKind => {
-                    CicsCredentialFailure::MismatchedCredentialKind
-                }
-                CredentialFailure::UnknownGroup => CicsCredentialFailure::UnknownGroup,
-                CredentialFailure::GroupNotConnected => CicsCredentialFailure::GroupNotConnected,
-                CredentialFailure::GroupRevoked => CicsCredentialFailure::GroupRevoked,
-                CredentialFailure::PolicyUnavailable => CicsCredentialFailure::PolicyUnavailable,
-            }),
-            details: details.map(|value| CicsCredentialDetails {
-                changed_tick: value.changed_tick,
-                days_left: value.days_left,
-                expiry_tick: value.expiry_tick,
-                invalid_count: value.invalid_count,
-                last_use_tick: value.last_use_tick,
-            }),
-            esm_response: i64::from(outcome.status.racf_return_code),
-            esm_reason: i64::from(outcome.status.racf_reason_code),
-        })
+        map_credential_outcome(outcome)
     }
+
+    fn change_credential(
+        &self,
+        request: CicsCredentialChangeRequest<'_>,
+    ) -> Result<CicsCredentialVerification, HostProblem> {
+        let mut identity = Sha256::new();
+        identity.update(b"mainframe-env.cics-credential-change-ref@1\0");
+        identity.update(request.idempotency_key.as_bytes());
+        identity.update(request.actor.as_str().as_bytes());
+        let reference = SecretRef::new(
+            format!("cics:change:{:x}", identity.finalize()),
+            HostLimits::default(),
+        )?;
+        let old_len = u16::try_from(request.current.len()).map_err(|_| HostProblem::Malformed)?;
+        let new_len = u16::try_from(request.proposed.len()).map_err(|_| HostProblem::Malformed)?;
+        let mut packet = Vec::with_capacity(4 + usize::from(old_len) + usize::from(new_len));
+        packet.extend_from_slice(&old_len.to_be_bytes());
+        packet.extend_from_slice(&new_len.to_be_bytes());
+        packet.extend_from_slice(request.current);
+        packet.extend_from_slice(request.proposed);
+        let _scope = self.secrets.scoped(&reference, packet)?;
+        let context = SafRequestContext::new(
+            request.actor.clone(),
+            None,
+            None,
+            request.idempotency_key,
+            request.correlation,
+            request.tick,
+        )?;
+        let outcome = self.racf.racroute(
+            &context,
+            RacrouteRequest::ChangeCredential {
+                user: request.user.clone(),
+                credential_reference: reference,
+                kind: match request.kind {
+                    CicsCredentialKind::Password => CredentialKind::Password,
+                    CicsCredentialKind::Phrase => CredentialKind::Phrase,
+                },
+                binding_digest: request.binding_digest,
+            },
+        )?;
+        map_credential_outcome(outcome)
+    }
+}
+
+fn map_credential_outcome(
+    outcome: mainframe_env_racf::RacrouteOutcome,
+) -> Result<CicsCredentialVerification, HostProblem> {
+    let (failure, details) = match outcome.result {
+        Some(RacrouteResult::CredentialVerified {
+            failure, details, ..
+        }) => (failure, details),
+        _ => return Err(HostProblem::ProviderFailure),
+    };
+    Ok(CicsCredentialVerification {
+        failure: failure.map(|failure| match failure {
+            CredentialFailure::UnknownUser => CicsCredentialFailure::UnknownUser,
+            CredentialFailure::Revoked => CicsCredentialFailure::Revoked,
+            CredentialFailure::NewCredentialRequired => {
+                CicsCredentialFailure::NewCredentialRequired
+            }
+            CredentialFailure::InvalidCredential => CicsCredentialFailure::InvalidCredential,
+            CredentialFailure::UnacceptableNewCredential => {
+                CicsCredentialFailure::UnacceptableNewCredential
+            }
+            CredentialFailure::MismatchedCredentialKind => {
+                CicsCredentialFailure::MismatchedCredentialKind
+            }
+            CredentialFailure::UnknownGroup => CicsCredentialFailure::UnknownGroup,
+            CredentialFailure::GroupNotConnected => CicsCredentialFailure::GroupNotConnected,
+            CredentialFailure::GroupRevoked => CicsCredentialFailure::GroupRevoked,
+            CredentialFailure::PolicyUnavailable => CicsCredentialFailure::PolicyUnavailable,
+        }),
+        details: details.map(|value| CicsCredentialDetails {
+            changed_tick: value.changed_tick,
+            days_left: value.days_left,
+            expiry_tick: value.expiry_tick,
+            invalid_count: value.invalid_count,
+            last_use_tick: value.last_use_tick,
+        }),
+        esm_response: i64::from(outcome.status.racf_return_code),
+        esm_reason: i64::from(outcome.status.racf_reason_code),
+    })
 }
 
 pub(super) fn terminal_principal(value: &str) -> Result<PrincipalId, GatewayProblem> {

@@ -20,6 +20,8 @@ pub enum CicsOperation {
     Assign,
     /// Cancel one unhonored local interval-control START request.
     Cancel,
+    /// Change a standard RACF password after verifying its current value.
+    ChangePassword,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
     /// Complete the source-defined zero-delay interval-control boundary.
@@ -291,6 +293,7 @@ impl CicsOperation {
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
+            Self::ChangePassword => "ChangePassword",
             Self::ChangeTask => "ChangeTask",
             Self::Delay => "Delay",
             Self::DefineCounter => "DefineCounter",
@@ -612,6 +615,7 @@ impl CicsOperation {
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
+            ("CHANGE", Some("PASSWORD")) => Self::ChangePassword,
             ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
             ("DEFINE", Some("COUNTER")) => Self::DefineCounter,

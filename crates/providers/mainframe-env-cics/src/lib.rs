@@ -38,9 +38,9 @@ pub use service::{
     CicsXmlTransformMetadata, cics_provider,
 };
 pub use service::{
-    CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind, CicsCredentialRequest,
-    CicsCredentialVerification, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority,
+    CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
+    CicsCredentialRequest, CicsCredentialVerification, CicsSecurityAccess,
+    CicsSecurityAccessReason, CicsSecurityAuthority,
 };
 
 #[cfg(feature = "fault-injection")]

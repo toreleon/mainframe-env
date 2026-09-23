@@ -31447,6 +31447,13 @@ mod tests {
         ) -> Result<crate::CicsCredentialVerification, HostProblem> {
             Err(HostProblem::Unsupported)
         }
+
+        fn change_credential(
+            &self,
+            _: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
     }
 
     #[test]
@@ -33955,6 +33962,13 @@ mod tests {
                 esm_response: 0,
                 esm_reason: 0,
             })
+        }
+
+        fn change_credential(
+            &self,
+            _: crate::CicsCredentialChangeRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            Err(HostProblem::Unsupported)
         }
     }
 

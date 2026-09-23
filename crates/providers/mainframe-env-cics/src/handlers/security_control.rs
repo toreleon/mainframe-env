@@ -2,11 +2,12 @@
 
 use super::super::{CicsService, Run, decimal_payload};
 mod authority;
+mod change;
 mod verify;
 pub use authority::{
-    CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind, CicsCredentialRequest,
-    CicsCredentialVerification, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority,
+    CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
+    CicsCredentialRequest, CicsCredentialVerification, CicsSecurityAccess,
+    CicsSecurityAccessReason, CicsSecurityAuthority,
 };
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{
@@ -27,6 +28,7 @@ pub(in crate::service) fn invoke(
     tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::ChangePassword => change::password(service, run, request, tick),
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
         CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
         CicsOperation::VerifyPhrase => verify::phrase(service, run, request, tick),

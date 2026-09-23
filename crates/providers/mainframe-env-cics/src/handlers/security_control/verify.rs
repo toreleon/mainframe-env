@@ -128,7 +128,7 @@ fn verify(
     respond(service, run, request, verified)
 }
 
-fn respond(
+pub(super) fn respond(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
@@ -227,7 +227,7 @@ fn validate_shape(request: &CicsRequest, kind: CicsCredentialKind) -> Result<(),
     Ok(())
 }
 
-fn live_tick(service: &CicsService, fallback: u64) -> Result<u64, HostProblem> {
+pub(super) fn live_tick(service: &CicsService, fallback: u64) -> Result<u64, HostProblem> {
     match &service.replay_clock {
         Some(clock) => match clock.now_tick()? {
             0 => Err(HostProblem::InfrastructureFailure),
@@ -237,7 +237,7 @@ fn live_tick(service: &CicsService, fallback: u64) -> Result<u64, HostProblem> {
     }
 }
 
-fn text(request: &CicsRequest, name: &str) -> Result<Option<String>, HostProblem> {
+pub(super) fn text(request: &CicsRequest, name: &str) -> Result<Option<String>, HostProblem> {
     request
         .arguments
         .get(name)
@@ -245,7 +245,7 @@ fn text(request: &CicsRequest, name: &str) -> Result<Option<String>, HostProblem
         .transpose()
 }
 
-fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
+pub(super) fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
     HostProblem::Condition {
         name: name.into(),
         response,

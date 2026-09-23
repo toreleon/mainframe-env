@@ -222,7 +222,9 @@ pub(super) fn execute(
             CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
-                    CicsOperandName::SecurityPassword | CicsOperandName::SecurityPhrase
+                    CicsOperandName::SecurityPassword
+                        | CicsOperandName::SecurityNewPassword
+                        | CicsOperandName::SecurityPhrase
                 ) =>
             {
                 ("mainframe-env.cics.secret@1", read_slot(machine, slot)?)
