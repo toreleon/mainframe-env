@@ -1,6 +1,6 @@
 //! Source-specific GDS ISSUE return codes over the shared APPC basic ledger.
 
-use super::GdsReturnCode;
+use super::{ConversationKind, ConversationProblem, GdsReturnCode};
 
 /// The five APPC basic ISSUE controls share the six-byte GDS result area.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,6 +23,33 @@ pub enum GdsIssueFailure {
 }
 
 impl GdsIssueFailure {
+    /// Only source-defined protocol failures become GDS return codes.
+    /// Corrupt rows and resource failures remain infrastructure outcomes.
+    #[must_use]
+    pub const fn from_problem(
+        problem: ConversationProblem,
+        kind: ConversationKind,
+    ) -> Option<Self> {
+        match problem {
+            ConversationProblem::WrongKind
+                if matches!(kind, ConversationKind::Mro | ConversationKind::LuType61) =>
+            {
+                Some(Self::NotAppc)
+            }
+            ConversationProblem::WrongKind if matches!(kind, ConversationKind::AppcMapped) => {
+                Some(Self::NotBasic)
+            }
+            ConversationProblem::WrongState => Some(Self::StateCheck),
+            ConversationProblem::NotOwned
+            | ConversationProblem::StaleOwner
+            | ConversationProblem::DplPrincipal => Some(Self::NotOwned),
+            ConversationProblem::Malformed
+            | ConversationProblem::WrongKind
+            | ConversationProblem::Length
+            | ConversationProblem::Exhausted => None,
+        }
+    }
+
     #[must_use]
     pub const fn retcode(self, flow: GdsIssueFlow) -> GdsReturnCode {
         GdsReturnCode(match self {
@@ -85,6 +112,24 @@ mod tests {
         assert_eq!(
             GdsIssueFailure::StateCheck.retcode(GdsIssueFlow::Signal).0,
             [3, 8, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            GdsIssueFailure::from_problem(ConversationProblem::WrongKind, ConversationKind::Mro),
+            Some(GdsIssueFailure::NotAppc)
+        );
+        assert_eq!(
+            GdsIssueFailure::from_problem(
+                ConversationProblem::WrongKind,
+                ConversationKind::AppcMapped,
+            ),
+            Some(GdsIssueFailure::NotBasic)
+        );
+        assert_eq!(
+            GdsIssueFailure::from_problem(
+                ConversationProblem::Malformed,
+                ConversationKind::AppcBasic,
+            ),
+            None
         );
     }
 }
