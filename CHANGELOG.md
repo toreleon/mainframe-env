@@ -55,6 +55,9 @@ All notable changes to mainframe-env are documented here.
   EODS/LOAD ISSUE commands. Device state and an exact owner-bound replay
   receipt commit atomically after SAF, with bounded receipt retention.
 
+- Verified that an ENDFILE effect with an unknown post-commit outcome replays
+  after SQLite service restart without advancing the physical device twice.
+
 - Added source-bounded ISSUE PASS staging with 255-byte user data, halfword
   LENGTH, explicit/default/saved logon mode selection, and NOQUIESCE state.
   PASS delivery remains tied to task completion.
