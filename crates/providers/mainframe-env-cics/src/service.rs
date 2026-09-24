@@ -7341,13 +7341,36 @@ mod tests {
             handlers::invoke_terminal_control(&service, &mut run, &ccc),
             Err(HostProblem::Unsupported)
         );
+        for (sequence, arguments) in [
+            (
+                4,
+                BTreeMap::from([("TERMID".into(), cics_literal(b"T0000"))]),
+            ),
+            (
+                5,
+                BTreeMap::from([
+                    ("TERMID".into(), cics_literal(b"T005")),
+                    ("CTLCHAR".into(), enqueue_value(&[1, 2])),
+                ]),
+            ),
+        ] {
+            let invalid = request(CicsOperation::IssueCopy, arguments, sequence);
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &invalid),
+                Err(HostProblem::Condition {
+                    name: "LENGERR".into(),
+                    response: 22,
+                    response2: 0,
+                })
+            );
+        }
         let missing_source = request(
             CicsOperation::IssueCopy,
             BTreeMap::from([
                 ("TERMID".into(), cics_literal(b"T999")),
                 ("OPTION.WAIT".into(), cics_option()),
             ]),
-            4,
+            6,
         );
         assert_eq!(
             handlers::invoke_terminal_control(&service, &mut run, &missing_source),
@@ -7363,7 +7386,7 @@ mod tests {
                 ("TERMID".into(), cics_literal(b"T005")),
                 ("OPTION.WAIT".into(), cics_option()),
             ]),
-            5,
+            7,
         );
         service.inject_replay_unknown_after_persist_once();
         assert_eq!(

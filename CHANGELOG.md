@@ -78,6 +78,9 @@ All notable changes to mainframe-env are documented here.
   boundary. Both forms return NORMAL after the atomic local effect; WAIT
   retains the same completed result.
 
+- ISSUE COPY now reports source-defined LENGERR for TERMID outside one to
+  four bytes and CTLCHAR values outside one byte before any terminal mutation.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

@@ -149,15 +149,20 @@ pub(in crate::service::handlers::terminal_control) fn copy(
     if request.arguments.contains_key("CTLCHAR") {
         return Err(HostProblem::Unsupported);
     }
-    let source_id = std::str::from_utf8(request.arguments["TERMID"].bytes())
+    let source_bytes = request.arguments["TERMID"].bytes();
+    if !(1..=4).contains(&source_bytes.len()) {
+        return Err(condition("LENGERR", 22));
+    }
+    let source_id = std::str::from_utf8(source_bytes)
         .map_err(|_| HostProblem::Malformed)?
         .trim_end()
         .to_ascii_uppercase();
-    if source_id.is_empty()
-        || source_id.len() > 4
-        || !source_id.bytes().all(|byte| {
-            byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
-        })
+    if source_id.is_empty() {
+        return Err(condition("LENGERR", 22));
+    }
+    if !source_id
+        .bytes()
+        .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte))
     {
         return Err(HostProblem::Malformed);
     }
@@ -296,10 +301,7 @@ fn validate_copy(request: &CicsRequest) -> Result<(), HostProblem> {
                     value.schema(),
                     "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
                 ),
-                "CTLCHAR" => {
-                    value.schema() != "mainframe-env.cics.storage-value@1"
-                        || value.bytes().len() != 1
-                }
+                "CTLCHAR" => value.schema() != "mainframe-env.cics.storage-value@1",
                 "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
                 "OPTION.WAIT" | "OPTION.NOHANDLE" => {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
@@ -309,7 +311,15 @@ fn validate_copy(request: &CicsRequest) -> Result<(), HostProblem> {
     {
         Err(HostProblem::Malformed)
     } else {
-        Ok(())
+        if request
+            .arguments
+            .get("CTLCHAR")
+            .is_some_and(|value| value.bytes().len() != 1)
+        {
+            Err(condition("LENGERR", 22))
+        } else {
+            Ok(())
+        }
     }
 }
 
