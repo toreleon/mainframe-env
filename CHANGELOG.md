@@ -55,11 +55,13 @@ All notable changes to mainframe-env are documented here.
   ledger from source commit `3944e66c`, binds typed MCEP v2 tags `231`–`238`,
   and persists task extraction facts and POINT selection separately from
   protocol state. Selected SQLite execution, bounds, GDS return codes, and
-  one-time LOGONMSG extraction have focused coverage. The numeric CVDA table
-  linked by pinned `dfha80x.html` (`sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25`)
-  is not committed or retained; EXTRACT ATTRIBUTES and GDS STATE output remain
-  explicitly unsupported, so the generated 159/104 registry is unsealed and
-  claims no completed eight-row slice or licensed credit.
+  one-time LOGONMSG extraction have focused coverage. The retained numeric
+  CVDA table `dfha80c.html` is now pinned at
+  `sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`;
+  normal and GDS ATTRIBUTES return the source's 82–94 STATE values. All eight
+  isolated routes execute at the generated 159/104 split. Conversation-open
+  v2 integration and applicable gates remain pending; no licensed credit is
+  claimed.
 
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and

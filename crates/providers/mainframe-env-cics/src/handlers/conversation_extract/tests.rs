@@ -124,6 +124,17 @@ fn conversation_extract_reads_shared_ledger_and_positions_owned_lu() {
         ]), 3,
     );
     assert_eq!(tct.outputs["TERMID"].bytes(), b"T001");
+    let mro_state = extract_call(
+        &cics,
+        &invocation.run_unit_id,
+        CicsOperation::ExtractAttributes,
+        BTreeMap::from([
+            ("SESSION".into(), cics_literal(b"M1")),
+            ("STATE".into(), argument(b"STATE-X")),
+        ]),
+        3,
+    );
+    assert_eq!(mro_state.outputs["STATE"].bytes(), b"82");
     let point = extract_call(
         &cics, &invocation.run_unit_id, CicsOperation::Point,
         BTreeMap::from([("SESSION".into(), cics_literal(b"L1"))]), 4,
@@ -177,10 +188,13 @@ fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
         response_field: "RESP-X".into(),
         response2_field: Some("RESP2-X".into()),
     };
-    assert_eq!(
-        cics.invoke(&effect(&invocation.run_unit_id, mapped_state.clone(), 1), mapped_state),
-        Err(HostProblem::Unsupported),
-    );
+    let mapped_state = cics
+        .invoke(
+            &effect(&invocation.run_unit_id, mapped_state.clone(), 1),
+            mapped_state,
+        )
+        .unwrap();
+    assert_eq!(mapped_state.outputs["STATE"].bytes(), b"91");
     let mut too_short = request(CicsOperation::ExtractProcess, BTreeMap::from([
         ("PROCNAME".into(), argument(b"NAME-X")),
         ("PROCNAME.MAXLENGTH".into(), cics_decimal(4)),
@@ -239,7 +253,7 @@ fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
     );
     assert_eq!(indicators.outputs["RETCODE"].bytes(), [0; 6]);
     assert_eq!(indicators.outputs["CONVDATA"].bytes(), [0; 24]);
-    let mut indicators_unready = request(
+    let mut indicators_with_state = request(
         CicsOperation::GdsExtractAttributes,
         BTreeMap::from([
             ("CONVID".into(), cics_literal(&basic)),
@@ -249,17 +263,19 @@ fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
         ]),
         4,
     );
-    indicators_unready.condition_policy = CicsConditionPolicy::Respond {
+    indicators_with_state.condition_policy = CicsConditionPolicy::Respond {
         response_field: "RESP-X".into(),
         response2_field: Some("RESP2-X".into()),
     };
-    assert_eq!(
-        cics.invoke(
-            &effect(&invocation.run_unit_id, indicators_unready.clone(), 4),
-            indicators_unready,
-        ),
-        Err(HostProblem::Unsupported),
-    );
+    let with_state = cics
+        .invoke(
+            &effect(&invocation.run_unit_id, indicators_with_state.clone(), 4),
+            indicators_with_state,
+        )
+        .unwrap();
+    assert_eq!(with_state.outputs["STATE"].bytes(), b"91");
+    assert_eq!(with_state.outputs["CONVDATA"].bytes(), [0; 24]);
+    assert_eq!(with_state.outputs["RETCODE"].bytes(), [0; 6]);
     let bad_kind = extract_call(
         &cics, &invocation.run_unit_id, CicsOperation::GdsExtractAttributes,
         BTreeMap::from([

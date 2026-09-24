@@ -4,7 +4,8 @@ use super::{
     text,
 };
 use crate::conversation_protocol::{
-    ConversationContext, ConversationProblem, GdsExtractAttributesFailure as GdsFailure,
+    ConversationContext, ConversationProblem, ConversationState,
+    GdsExtractAttributesFailure as GdsFailure,
 };
 use mainframe_env_host_api::{CicsOperation, CicsRequest, CicsResponse, HostProblem};
 
@@ -98,10 +99,12 @@ pub(super) fn attributes(
         if code != [0; 6] {
             return gds_response(service, run, request, code);
         }
-        if request.arguments.contains_key("STATE") {
-            return Err(HostProblem::Unsupported);
-        }
         let mut response = gds_response(service, run, request, [0; 6])?;
+        if request.arguments.contains_key("STATE") {
+            response
+                .outputs
+                .insert("STATE".into(), number(state_cvda(facility.state))?);
+        }
         response.outputs.insert(
             "CONVDATA".into(),
             bytes(facility.indicators.convdata().to_vec())?,
@@ -114,9 +117,46 @@ pub(super) fn attributes(
     ) {
         return Err(condition("INVREQ", 16, 0));
     }
-    // The pinned CVDA explanation identifies the fullword shape but the
-    // numeric value table dfha80c.html is not in the committed source corpus.
-    Err(HostProblem::Unsupported)
+    if facility.kind == ConversationKind::Mro
+        && !matches!(
+            facility.state,
+            ConversationState::Allocated
+                | ConversationState::Free
+                | ConversationState::PendFree
+                | ConversationState::Receive
+                | ConversationState::Rollback
+                | ConversationState::Send
+                | ConversationState::SyncFree
+                | ConversationState::SyncReceive
+                | ConversationState::SyncSend
+        )
+    {
+        return Err(condition("INVREQ", 16, 0));
+    }
+    let mut response = normal(service, run)?;
+    response
+        .outputs
+        .insert("STATE".into(), number(state_cvda(facility.state))?);
+    Ok(response)
+}
+
+/// Pinned `dfha80c.html` CVDAs for EXTRACT ATTRIBUTES and GDS STATE.
+fn state_cvda(state: ConversationState) -> i64 {
+    match state {
+        ConversationState::Allocated => 82,
+        ConversationState::ConfFree => 83,
+        ConversationState::ConfReceive => 84,
+        ConversationState::ConfSend => 85,
+        ConversationState::Free => 86,
+        ConversationState::PendFree => 87,
+        ConversationState::PendReceive => 88,
+        ConversationState::Receive => 89,
+        ConversationState::Rollback => 90,
+        ConversationState::Send => 91,
+        ConversationState::SyncFree => 92,
+        ConversationState::SyncReceive => 93,
+        ConversationState::SyncSend => 94,
+    }
 }
 
 pub(super) fn logon(
@@ -217,4 +257,30 @@ pub(super) fn point(
         return Err(condition("NOTALLOC", 61, 0));
     }
     normal(service, run)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ConversationState as S, state_cvda};
+
+    #[test]
+    fn attributes_state_values_match_pinned_cics_cvda_table() {
+        for (state, expected) in [
+            (S::Allocated, 82),
+            (S::ConfFree, 83),
+            (S::ConfReceive, 84),
+            (S::ConfSend, 85),
+            (S::Free, 86),
+            (S::PendFree, 87),
+            (S::PendReceive, 88),
+            (S::Receive, 89),
+            (S::Rollback, 90),
+            (S::Send, 91),
+            (S::SyncFree, 92),
+            (S::SyncReceive, 93),
+            (S::SyncSend, 94),
+        ] {
+            assert_eq!(state_cvda(state), expected);
+        }
+    }
 }

@@ -47,6 +47,7 @@ pub enum ConversationState {
     Receive,
     Free,
     PendFree,
+    PendReceive,
     ConfFree,
     ConfReceive,
     ConfSend,
@@ -191,6 +192,14 @@ impl ConversationRecord {
             ) && self.state != ConversationState::Allocated
                 && self.process.is_none()
                 && self.state != ConversationState::Free)
+            || (self.kind == ConversationKind::Mro
+                && matches!(
+                    self.state,
+                    ConversationState::ConfFree
+                        | ConversationState::ConfReceive
+                        | ConversationState::ConfSend
+                        | ConversationState::PendReceive
+                ))
         {
             return Err(ConversationProblem::Malformed);
         }
@@ -280,9 +289,15 @@ impl ConversationRecord {
                 | ConversationState::Receive
                 | ConversationState::Free
                 | ConversationState::PendFree
+                | ConversationState::PendReceive
                 | ConversationState::ConfReceive
                 | ConversationState::SyncReceive
-        ) {
+        ) || self.kind == ConversationKind::Mro
+            && matches!(
+                next,
+                ConversationState::PendReceive | ConversationState::ConfReceive
+            )
+        {
             return Err(ConversationProblem::WrongState);
         }
         self.next_sequence()?;
@@ -428,6 +443,55 @@ mod tests {
             reopened.release(&owner(3), ConversationContext::Local, false),
             Err(ConversationProblem::WrongState)
         );
+    }
+
+    #[test]
+    fn mapped_pendreceive_persists_and_mro_rejects_appc_only_states() {
+        let mut mapped = ConversationRecord::allocate(
+            *b"C010",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        mapped
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                b"TRAN".to_vec(),
+                Vec::new(),
+                1,
+            )
+            .unwrap();
+        mapped
+            .complete_converse(
+                &owner(3),
+                ConversationContext::Local,
+                ConversationState::PendReceive,
+            )
+            .unwrap();
+        assert_eq!(
+            ConversationRecord::decode(&mapped.encode().unwrap())
+                .unwrap()
+                .state,
+            ConversationState::PendReceive
+        );
+
+        let mut mro =
+            ConversationRecord::allocate(*b"C011", "SYS1", ConversationKind::Mro, owner(3), false)
+                .unwrap();
+        assert_eq!(
+            mro.complete_converse(
+                &owner(3),
+                ConversationContext::Local,
+                ConversationState::PendReceive,
+            ),
+            Err(ConversationProblem::WrongState)
+        );
+        mro.state = ConversationState::ConfReceive;
+        assert_eq!(mro.encode(), Err(ConversationProblem::Malformed));
     }
 
     #[test]

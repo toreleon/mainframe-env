@@ -23983,7 +23983,7 @@ mod tests {
     fn compiled_conversation_extract_process_uses_sqlite_selected_route_and_reopens() {
         let artifact = published_source_fixture(
             "CEXTR",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PROC-X PIC X(32).\n01 PROC-LEN PIC S9(4) COMP.\n01 SYNC-X PIC S9(4) COMP.\n01 PROC-FN PIC X(2).\n01 POINT-FN PIC X(2).\n01 ATTACH-FN PIC X(2).\n01 TCT-FN PIC X(2).\n01 LOGON-FN PIC X(2).\n01 ATTACH-X PIC X(64).\n01 TERM-X PIC X(4).\n01 LOGON-X PIC X(256).\n01 LOGON-LEN PIC S9(4) COMP.\n01 RC PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) SYNCLEVEL(SYNC-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO PROC-FN.\nEXEC CICS POINT SESSION('L1') RESP(RC) END-EXEC.\nMOVE EIBFN TO POINT-FN.\nEXEC CICS EXTRACT ATTACH ATTACHID('HDR1') PROCESS(ATTACH-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTACH-FN.\nEXEC CICS EXTRACT TCT NETNAME('LUNAME01') TERMID(TERM-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO TCT-FN.\nEXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO LOGON-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PROC-X PIC X(32).\n01 PROC-LEN PIC S9(4) COMP.\n01 SYNC-X PIC S9(4) COMP.\n01 PROC-FN PIC X(2).\n01 STATE-X PIC S9(8) COMP.\n01 ATTR-FN PIC X(2).\n01 POINT-FN PIC X(2).\n01 ATTACH-FN PIC X(2).\n01 TCT-FN PIC X(2).\n01 LOGON-FN PIC X(2).\n01 ATTACH-X PIC X(64).\n01 TERM-X PIC X(4).\n01 LOGON-X PIC X(256).\n01 LOGON-LEN PIC S9(4) COMP.\n01 RC PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) SYNCLEVEL(SYNC-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO PROC-FN.\nEXEC CICS EXTRACT ATTRIBUTES STATE(STATE-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTR-FN.\nEXEC CICS POINT SESSION('L1') RESP(RC) END-EXEC.\nMOVE EIBFN TO POINT-FN.\nEXEC CICS EXTRACT ATTACH ATTACHID('HDR1') PROCESS(ATTACH-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTACH-FN.\nEXEC CICS EXTRACT TCT NETNAME('LUNAME01') TERMID(TERM-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO TCT-FN.\nEXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO LOGON-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -24153,6 +24153,11 @@ mod tests {
         assert_eq!(restored.variable("SYNC-X").unwrap().bytes(), &[0, 2]);
         assert_eq!(restored.variable("PROC-FN").unwrap().bytes(), &[0x04, 0x2e]);
         assert_eq!(
+            restored.variable("STATE-X").unwrap().bytes(),
+            &[0, 0, 0, 91]
+        );
+        assert_eq!(restored.variable("ATTR-FN").unwrap().bytes(), &[0x04, 0x3e]);
+        assert_eq!(
             restored.variable("POINT-FN").unwrap().bytes(),
             &[0x04, 0x24]
         );
@@ -24182,6 +24187,7 @@ mod tests {
             .unwrap();
         for operation in [
             CicsOperation::ExtractProcess,
+            CicsOperation::ExtractAttributes,
             CicsOperation::Point,
             CicsOperation::ExtractAttach,
             CicsOperation::ExtractTct,
