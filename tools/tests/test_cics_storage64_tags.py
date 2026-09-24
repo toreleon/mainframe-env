@@ -10,11 +10,20 @@ TAGS = (ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/codec_tags.rs")
 OUTPUT_TAGS = (
     ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/codec_tags/output.rs"
 ).read_text()
+OPTION_TAGS = (
+    ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/codec_tags/options.rs"
+).read_text()
 ASSIGN = (ROOT / "crates/foundation/mainframe-env-ir/src/cics_plan/assign.rs").read_text()
 
 
 def body(name):
-    source = OUTPUT_TAGS if name.startswith("output") else TAGS
+    source = (
+        OUTPUT_TAGS
+        if name.startswith("output")
+        else OPTION_TAGS
+        if name.startswith("option")
+        else TAGS
+    )
     start = source.index(f"fn {name}(")
     return source[start : source.index("\n}", start)]
 

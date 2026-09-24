@@ -1,23 +1,27 @@
 use super::*;
 use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
-    CICS_ASSIGN_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
-    CicsExecutableDescriptor, CicsOperandName, CicsOperandValue, CicsOperationContract,
-    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
-    Module, OperationCatalog, OperationSchema, OperationSemanticContract,
-    cics_executable_descriptor, cics_executable_descriptor_for_identity,
-    cobol_layout_definition_identity, decode_cics_effect_plan, verify_semantic_contracts,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_CERTIFICATE_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS,
+    CicsCertificateOutput, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
+    CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
+    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, CicsTcpipOutput, Effect, Module,
+    OperationCatalog, OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
+    decode_cics_effect_plan, verify_semantic_contracts,
 };
 
 mod address;
 mod assign;
+mod certificate;
+mod convert_time;
 mod diagnostics;
 mod legacy;
 mod names;
+mod output_write;
+mod post;
 mod registry;
 mod response;
-mod response_output;
-pub(super) use response_output::write_output;
+pub(super) use output_write::write_output;
 mod retrieve;
 mod runtime_validation;
 mod slot_access;
@@ -25,6 +29,7 @@ use runtime_validation::validate_machine_slot;
 mod spool_control;
 mod storage64;
 mod task_wait;
+mod tcpip;
 mod web_control;
 mod web_service_control;
 pub(super) use address::CicsAddressSet;
@@ -105,12 +110,15 @@ pub(super) fn suspension(
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
+            ("cics-event", true)
+        }
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         operation if operation.is_counter() => ("cics-counter", true),
         CicsOperation::WriteJournalName => ("cics-journal", true),
         CicsOperation::WriteJournalNum => ("cics-journal", true),
+        CicsOperation::WriteOperator => ("cics-operator", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -184,6 +192,7 @@ pub(super) fn execute(
     if plan.operation == CicsPlanOperation::WsaContextGet {
         web_service_control::release_previous_set(machine);
     }
+    certificate::release_previous(machine);
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
     }
@@ -476,6 +485,29 @@ pub(super) fn execute(
         {
             arguments.insert(name, capacity);
         }
+        if matches!(
+            output.name,
+            CicsOutputName::DigestResult | CicsOutputName::OperatorReply
+        ) {
+            let name = if output.name == CicsOutputName::DigestResult {
+                "RESULT.MAXLENGTH"
+            } else {
+                "REPLY.MAXLENGTH"
+            };
+            arguments.insert(
+                name.into(),
+                payload(
+                    "mainframe-env.cics.decimal@1",
+                    resolved_slot(machine, &output.target)?
+                        .length
+                        .to_string()
+                        .into_bytes(),
+                )?,
+            );
+        }
+        if let CicsOutputName::Tcpip(identity) = output.name {
+            tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
+        }
         match output.name {
             CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
@@ -578,6 +610,12 @@ pub(super) fn execute(
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
+            CicsOutputName::Certificate(_) => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::Tcpip(_) => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Into => {
                 if matches!(
                     plan.operation,
@@ -627,7 +665,11 @@ pub(super) fn execute(
                 )?);
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::Ridfld => {
+            CicsOutputName::DigestResult
+            | CicsOutputName::Field
+            | CicsOutputName::Ridfld
+            | CicsOutputName::OperatorReply
+            | CicsOutputName::OperatorReplyLength => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Resp => response = Some(target),
@@ -670,6 +712,15 @@ pub(super) fn execute(
             "DELAY.ID".into(),
             payload(
                 "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if plan.operation == CicsPlanOperation::WriteOperator {
+        arguments.insert(
+            "OPERATOR.ID".into(),
+            payload(
+                "mainframe-env.cics.operator-id@1",
                 format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
             )?,
         );

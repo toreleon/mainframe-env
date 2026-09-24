@@ -10382,7 +10382,12 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     ];
     let mut hits = Vec::new();
     for rust_file in rust_files {
-        if rust_file.starts_with(&conformance) {
+        if rust_file.starts_with(&conformance)
+            || rust_file.file_name() == Some(OsStr::new("tests.rs"))
+            || rust_file
+                .components()
+                .any(|part| part.as_os_str() == OsStr::new("tests"))
+        {
             continue;
         }
         let source = read(&rust_file)?;

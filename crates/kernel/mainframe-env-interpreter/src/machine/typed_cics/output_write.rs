@@ -10,6 +10,9 @@ pub(in crate::machine) fn write_output(
     value: &BoundedPayload,
     load_base: Option<usize>,
 ) -> Result<(), MachineProblem> {
+    if web_service_control::write_output(machine, operation, name, target, value)? {
+        return Ok(());
+    }
     if matches!(name, "SET" | "ENTRY")
         && let Some(load_base) = load_base
     {
@@ -76,12 +79,35 @@ pub(in crate::machine) fn write_output(
             | "TYPENAMELEN"
             | "TYPENSLEN"
     ) && value.schema() != "mainframe-env.cics.decimal@1"
+        || operation == CicsOperation::ExtractCertificate
+            && CicsCertificateOutput::from_name(name).is_some_and(CicsCertificateOutput::length)
+            && value.schema() != "mainframe-env.cics.decimal@1"
+        || operation == CicsOperation::ExtractCertificate
+            && name == "USERID"
+            && value.schema() != "mainframe-env.cics.payload@1"
+        || operation == CicsOperation::ExtractTcpip
+            && CicsTcpipOutput::from_name(name)
+                .is_some_and(|output| output.fullword() || output.buffer_length())
+            && value.schema() != "mainframe-env.cics.decimal@1"
+        || operation == CicsOperation::ExtractTcpip
+            && CicsTcpipOutput::from_name(name)
+                .is_some_and(|output| !output.fullword() && !output.buffer_length())
+            && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && operation == CicsOperation::Read
             && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
-            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE" | "EVENT" | "SUBEVENT"
+            "COMMAREA"
+                | "FIELD"
+                | "RESULT"
+                | "RIDFLD"
+                | "RTRANSID"
+                | "RTERMID"
+                | "QUEUE"
+                | "PARTN"
+                | "EVENT"
+                | "SUBEVENT"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && matches!(
@@ -100,7 +126,7 @@ pub(in crate::machine) fn write_output(
     }
     if matches!(
         name,
-        "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"
+        "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD" | "RESULT"
     ) && let CicsTarget::Resolved(slot) = target
         && value.bytes().len() < resolved_slot(machine, slot)?.length
     {
@@ -121,4 +147,14 @@ pub(in crate::machine) fn write_output(
     } else {
         write_target(machine, target, &CobolValue::Bytes(value.bytes().to_vec()))
     }
+}
+
+fn write_resolved_prefix(
+    machine: &mut ReferenceMachine,
+    slot: &CicsStorageSlot,
+    value: &[u8],
+) -> Result<(), MachineProblem> {
+    let mut reference = resolved_slot(machine, slot)?;
+    reference.length = value.len();
+    machine.write_reference(&reference, value)
 }

@@ -45,6 +45,22 @@ pub(super) fn allocation_arguments(
             )?,
         );
     }
+    if operation == CicsPlanOperation::Post {
+        let CicsTarget::Resolved(slot) = target else {
+            return Err(MachineProblem::UnexpectedHostResult);
+        };
+        let pointer = resolved_slot(machine, slot)?;
+        if pointer.length != 4 {
+            return Err(invalid_plan("POST SET requires a four-byte pointer"));
+        }
+        arguments.insert(
+            "POST.SET.ADDRESS".into(),
+            payload(
+                "mainframe-env.cics.virtual-address@1",
+                machine.address_bytes_for(machine.bases.len(), 0, pointer.length)?,
+            )?,
+        );
+    }
     Ok(arguments)
 }
 

@@ -32,6 +32,20 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
     },
     {
+      "operation": "BifDeedit",
+      "interface": "api",
+      "family": "builtin-function-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0013"
+    },
+    {
+      "operation": "BifDigest",
+      "interface": "api",
+      "family": "builtin-function-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014"
+    },
+    {
       "operation": "Cancel",
       "interface": "api",
       "family": "interval-control",
@@ -58,6 +72,13 @@
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0022"
+    },
+    {
+      "operation": "ConvertTime",
+      "interface": "api",
+      "family": "time",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0031"
     },
     {
       "operation": "Delay",
@@ -263,6 +284,20 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0076"
     },
     {
+      "operation": "ExtractCertificate",
+      "interface": "api",
+      "family": "network-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0070"
+    },
+    {
+      "operation": "ExtractTcpip",
+      "interface": "api",
+      "family": "network-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0074"
+    },
+    {
       "operation": "Freemain",
       "interface": "api",
       "family": "storage-control",
@@ -408,6 +443,13 @@
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0146"
+    },
+    {
+      "operation": "Post",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0147"
     },
     {
       "operation": "PurgeMessage",
@@ -599,6 +641,20 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0205"
     },
     {
+      "operation": "StartAttach",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0206"
+    },
+    {
+      "operation": "StartBrexit",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0207"
+    },
+    {
       "operation": "Suspend",
       "interface": "api",
       "family": "task-control",
@@ -788,6 +844,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0252"
     },
     {
+      "operation": "WaitCics",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0239"
+    },
+    {
       "operation": "WriteJournalName",
       "interface": "api",
       "family": "journal-control",
@@ -800,6 +863,13 @@
       "family": "journal-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0255"
+    },
+    {
+      "operation": "WriteOperator",
+      "interface": "api",
+      "family": "operator-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0256"
     },
     {
       "operation": "WriteTemporaryStorage",

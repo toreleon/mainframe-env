@@ -145,6 +145,7 @@ pub(super) fn resolve(
             && !matches!(
                 operation,
                 HirCicsOperation::Retrieve
+                    | HirCicsOperation::Post
                     | HirCicsOperation::Getmain
                     | HirCicsOperation::ReadTransientData
                     | HirCicsOperation::ReadTemporaryStorage

@@ -38,10 +38,15 @@ pub use service::{
     CicsXmlTransformMetadata, cics_provider,
 };
 pub use service::{
+    BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply,
+    CICS_BRIDGE_START_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
+    CicsBridgeAbiProfile, CicsBridgeAbiSelection, CicsBridgeExitDefault, CicsBridgeExitSelection,
+    CicsBridgeRuntime, CicsBridgeStartIntent, CicsCertificateName, CicsClientCertificate,
     CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
-    CicsCredentialRequest, CicsCredentialVerification, CicsPassTicketFailure,
-    CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess, CicsSecurityAccessReason,
-    CicsSecurityAuthority, CicsSecurityTokenKind, CicsTokenFailure, CicsTokenVerification,
+    CicsCredentialRequest, CicsCredentialVerification, CicsOperatorMessageView,
+    CicsPassTicketFailure, CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess,
+    CicsSecurityAccessReason, CicsSecurityAuthority, CicsSecurityTokenKind, CicsTcpipAuthenticate,
+    CicsTcpipContext, CicsTcpipPrivacy, CicsTcpipSslType, CicsTokenFailure, CicsTokenVerification,
     CicsTokenVerificationRequest,
 };
 

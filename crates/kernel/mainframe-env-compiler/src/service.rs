@@ -1807,6 +1807,9 @@ mod tests {
                 CicsPlanOperation::Asktime => crate::HirCicsOperation::Asktime,
                 CicsPlanOperation::AsktimeEib => crate::HirCicsOperation::AsktimeEib,
                 CicsPlanOperation::FormatTime => crate::HirCicsOperation::FormatTime,
+                CicsPlanOperation::ConvertTime => crate::HirCicsOperation::ConvertTime,
+                CicsPlanOperation::BifDeedit => crate::HirCicsOperation::BifDeedit,
+                CicsPlanOperation::BifDigest => crate::HirCicsOperation::BifDigest,
                 CicsPlanOperation::Cancel => crate::HirCicsOperation::Cancel,
                 CicsPlanOperation::Delay => crate::HirCicsOperation::Delay,
                 CicsPlanOperation::DefineCounter => crate::HirCicsOperation::DefineCounter,
@@ -1821,6 +1824,12 @@ mod tests {
                 CicsPlanOperation::RewindDCounter => crate::HirCicsOperation::RewindDCounter,
                 CicsPlanOperation::UpdateCounter => crate::HirCicsOperation::UpdateCounter,
                 CicsPlanOperation::UpdateDCounter => crate::HirCicsOperation::UpdateDCounter,
+                CicsPlanOperation::Post => crate::HirCicsOperation::Post,
+                CicsPlanOperation::WriteOperator => crate::HirCicsOperation::WriteOperator,
+                CicsPlanOperation::ExtractCertificate => {
+                    crate::HirCicsOperation::ExtractCertificate
+                }
+                CicsPlanOperation::ExtractTcpip => crate::HirCicsOperation::ExtractTcpip,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
                 CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
                 CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,
@@ -1908,7 +1917,10 @@ mod tests {
                 CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
                 CicsPlanOperation::WaitEvent => crate::HirCicsOperation::WaitEvent,
                 CicsPlanOperation::WaitExternal => crate::HirCicsOperation::WaitExternal,
+                CicsPlanOperation::WaitCics => crate::HirCicsOperation::WaitCics,
                 CicsPlanOperation::Start => crate::HirCicsOperation::Start,
+                CicsPlanOperation::StartAttach => crate::HirCicsOperation::StartAttach,
+                CicsPlanOperation::StartBrexit => crate::HirCicsOperation::StartBrexit,
                 CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
                 CicsPlanOperation::DocumentCreate => crate::HirCicsOperation::DocumentCreate,
                 CicsPlanOperation::DefineInputEvent => crate::HirCicsOperation::DefineInputEvent,

@@ -120,6 +120,18 @@ pub(super) const FORMAT_TIME_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
+pub(super) const BUILTIN_EFFECTS: &[Effect] = FORMAT_TIME_EFFECTS;
+pub(super) const OPERATOR_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalWrite,
+    Effect::Clock,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 pub(super) const ABEND_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,

@@ -15,6 +15,10 @@ pub enum CicsOperation {
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
+    /// Remove editing characters from one numeric field in place.
+    BifDeedit,
+    /// Calculate a bounded SHA-1 digest of caller supplied data.
+    BifDigest,
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
@@ -52,6 +56,14 @@ pub enum CicsOperation {
     UpdateCounter,
     /// Execute IBM UPDATE against an unsigned doubleword named counter.
     UpdateDCounter,
+    /// Arm one task-owned timer-event control area.
+    Post,
+    /// Write one system-console message and optionally await its reply.
+    WriteOperator,
+    /// Return fields from the accepted client certificate of this TCP/IP task.
+    ExtractCertificate,
+    /// Return selected fields of the accepted TCP/IP connection.
+    ExtractTcpip,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -100,6 +112,8 @@ pub enum CicsOperation {
     Enq,
     EndBrowse,
     FormatTime,
+    /// Convert a 64-byte architected date-time string to packed absolute time.
+    ConvertTime,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -211,6 +225,10 @@ pub enum CicsOperation {
     EnterTraceId,
     /// Schedule one interval-control START record.
     Start,
+    /// Start one noncancelable local task immediately without copied data.
+    StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
@@ -218,6 +236,8 @@ pub enum CicsOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
     Syncpoint,
     /// Typed CICS web-service-control command InvokeService.
     InvokeService,
@@ -302,6 +322,8 @@ impl CicsOperation {
             Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
+            Self::BifDeedit => "BifDeedit",
+            Self::BifDigest => "BifDigest",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
@@ -321,6 +343,10 @@ impl CicsOperation {
             Self::RewindDCounter => "RewindDCounter",
             Self::UpdateCounter => "UpdateCounter",
             Self::UpdateDCounter => "UpdateDCounter",
+            Self::Post => "Post",
+            Self::WriteOperator => "WriteOperator",
+            Self::ExtractCertificate => "ExtractCertificate",
+            Self::ExtractTcpip => "ExtractTcpip",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DefineInputEvent => "DefineInputEvent",
@@ -346,6 +372,7 @@ impl CicsOperation {
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::ConvertTime => "ConvertTime",
             Self::Freemain => "Freemain",
             Self::Freemain64 => "Freemain64",
             Self::Getmain => "Getmain",
@@ -408,10 +435,13 @@ impl CicsOperation {
             Self::Trace => "Trace",
             Self::EnterTraceId => "EnterTraceId",
             Self::Start => "Start",
+            Self::StartAttach => "StartAttach",
+            Self::StartBrexit => "StartBrexit",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
             Self::WaitExternal => "WaitExternal",
+            Self::WaitCics => "WaitCics",
             Self::Syncpoint => "Syncpoint",
             Self::InvokeService => "InvokeService",
             Self::SoapFaultAdd => "SoapFaultAdd",
@@ -530,6 +560,8 @@ impl CicsOperation {
                 | Self::RewindDCounter
                 | Self::UpdateCounter
                 | Self::UpdateDCounter
+                | Self::Post
+                | Self::WriteOperator
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -596,9 +628,12 @@ impl CicsOperation {
                 | Self::Trace
                 | Self::EnterTraceId
                 | Self::Start
+                | Self::StartAttach
+                | Self::StartBrexit
                 | Self::Retrieve
                 | Self::WaitEvent
                 | Self::WaitExternal
+                | Self::WaitCics
         )
     }
 
@@ -624,7 +659,10 @@ impl CicsOperation {
             .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
             .collect();
         let first = words.first()?.as_str();
-        Some(match (first, words.get(1).map(String::as_str)) {
+        let second = words
+            .get(1)
+            .map(|word| word.split('(').next().unwrap_or(word));
+        Some(match (first, second) {
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
@@ -637,12 +675,18 @@ impl CicsOperation {
                 Self::Asktime
             }
             ("ASKTIME", _) => Self::AsktimeEib,
+            ("BIF", Some("DEEDIT")) => Self::BifDeedit,
+            ("BIF", Some("DIGEST")) => Self::BifDigest,
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("CHANGE", Some("PASSWORD")) => Self::ChangePassword,
             ("CHANGE", Some("PHRASE")) => Self::ChangePhrase,
             ("DELAY", _) => Self::Delay,
+            ("POST", _) => Self::Post,
+            ("WRITE", Some("OPERATOR")) => Self::WriteOperator,
+            ("EXTRACT", Some("CERTIFICATE")) => Self::ExtractCertificate,
+            ("EXTRACT", Some("TCPIP")) => Self::ExtractTcpip,
             ("DEQ", _) => Self::Deq,
             ("DEFINE", Some("COUNTER")) => Self::DefineCounter,
             ("DEFINE", Some("DCOUNTER")) => Self::DefineDCounter,
@@ -671,6 +715,7 @@ impl CicsOperation {
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("CONVERTTIME", _) => Self::ConvertTime,
             ("FREEMAIN", _) => Self::Freemain,
             ("FREEMAIN64", _) => Self::Freemain64,
             ("GETMAIN", _) => Self::Getmain,
@@ -743,11 +788,14 @@ impl CicsOperation {
             ("DUMP", _) => Self::Dump,
             ("TRACE", _) => Self::Trace,
             ("ENTER", Some("TRACEID")) => Self::EnterTraceId,
+            ("START", Some("ATTACH")) => Self::StartAttach,
+            ("START", Some("BREXIT")) => Self::StartBrexit,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,
             ("WAIT", Some("EVENT")) => Self::WaitEvent,
             ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
+            ("WAITCICS", _) => Self::WaitCics,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,

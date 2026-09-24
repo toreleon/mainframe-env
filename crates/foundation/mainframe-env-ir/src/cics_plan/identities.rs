@@ -22,6 +22,18 @@ pub enum CicsPlanOperation {
     AsktimeEib,
     /// Transform one absolute-time value into selected display/binary fields.
     FormatTime,
+    /// Convert one architected date-time string into CICS absolute time.
+    ConvertTime,
+    /// Write one operator console message and optionally await its reply.
+    WriteOperator,
+    /// Extract selected fields of the accepted TCP/IP client certificate.
+    ExtractCertificate,
+    /// Extract source-bounded accepted TCP/IP connection fields.
+    ExtractTcpip,
+    /// Remove editing characters from one EBCDIC numeric field in place.
+    BifDeedit,
+    /// Compute a source-bounded SHA-1 digest in one of three representations.
+    BifDigest,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -60,6 +72,8 @@ pub enum CicsPlanOperation {
     UpdateCounter,
     /// IBM UPDATE named-counter command.
     UpdateDCounter,
+    /// Arm one task-owned timer-event control area for later posting.
+    Post,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -211,6 +225,8 @@ pub enum CicsPlanOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
     /// Query source-defined SAF access levels for a CICS or named resource.
@@ -233,6 +249,10 @@ pub enum CicsPlanOperation {
     PurgeMessage,
     /// Schedule one local interval-control START data record.
     Start,
+    /// Start one noncancelable facility-less local task immediately.
+    StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     /// Consume one expired interval-control START data record.
     Retrieve,
     /// Typed CICS web-service-control operation InvokeService.
@@ -387,6 +407,12 @@ pub enum CicsOperandName {
     Commarea,
     /// `TRANSID(...)` next-transaction name.
     TransId,
+    /// `BREXIT(...)` override for a transaction's bridge exit default.
+    BrExit,
+    /// `BRDATA(...)` initial data passed to the bridge exit.
+    BrData,
+    /// `BRDATALENGTH(...)` selected initial data length.
+    BrDataLength,
     /// `TERMID(...)` principal facility for a started task.
     TermId,
     /// `RTRANSID(...)` metadata passed to a started task.
@@ -481,6 +507,32 @@ pub enum CicsOperandName {
     Aids,
     /// `ABSTIME(...)` packed-decimal input.
     Abstime,
+    /// `DATESTRING(...)` architected date-time input.
+    DateString,
+    /// `FIELD(...)` in-place built-in DEEDIT source.
+    Field,
+    /// `RECORD(...)` source for BIF DIGEST.
+    Record,
+    /// `RECORDLEN(...)` source byte count for BIF DIGEST.
+    RecordLength,
+    /// `DIGESTTYPE(...)` named CVDA selector for BIF DIGEST.
+    DigestType,
+    /// `TEXT(...)` bytes sent to the system console.
+    OperatorText,
+    /// `TEXTLENGTH(...)` selected text byte count.
+    OperatorTextLength,
+    /// `ROUTECODES(...)` one-byte console route codes.
+    OperatorRouteCodes,
+    /// `NUMROUTES(...)` selected route count.
+    OperatorNumRoutes,
+    /// `CONSNAME(...)` specific system console name.
+    OperatorConsName,
+    /// `ACTION(...)` retained descriptor code.
+    OperatorAction,
+    /// `MAXLENGTH(...)` reply area capacity.
+    OperatorMaxLength,
+    /// `TIMEOUT(...)` reply deadline in seconds.
+    OperatorTimeout,
     /// Optional one-byte date separator.
     DateSep,
     /// Optional one-byte time separator.
@@ -887,6 +939,22 @@ pub enum CicsPlanOption {
     TimerOn,
     AcqActivity,
     AcqProcess,
+    /// Return a 40-byte uppercase hexadecimal SHA-1 digest.
+    DigestHex,
+    /// Return a 20-byte binary SHA-1 digest.
+    DigestBinary,
+    /// Return a 28-byte base64 SHA-1 digest.
+    DigestBase64,
+    /// Retain an operator message for immediate action (descriptor 2).
+    OperatorImmediate,
+    /// Retain an operator message for eventual action (descriptor 3).
+    OperatorEventual,
+    /// Retain an operator message for critical eventual action (descriptor 11).
+    OperatorCritical,
+    /// Select subject fields from the client certificate.
+    CertificateOwner,
+    /// Select issuer fields from the client certificate.
+    CertificateIssuer,
     /// Ignore and clear active abnormal-termination exits.
     Cancel,
     /// Suppress transaction-dump creation.

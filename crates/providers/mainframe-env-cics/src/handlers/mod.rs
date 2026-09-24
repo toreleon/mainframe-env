@@ -1,4 +1,11 @@
 mod bms_map;
+mod bridge_abi;
+mod bridge_definition;
+mod bridge_profile;
+mod bridge_runtime;
+mod bridge_start;
+mod bridge_terminal;
+mod builtin_function;
 mod condition;
 mod counter_control;
 mod diagnostics;
@@ -13,6 +20,9 @@ mod interval;
 mod interval_control;
 mod journal_control;
 mod limits;
+mod network_context;
+mod network_control;
+mod operator_control;
 mod program_control;
 mod queue_control;
 mod recovery;
@@ -30,6 +40,7 @@ pub(in crate::service) use security_control::{
 };
 mod signal_event;
 mod spool_control;
+mod start_brexit;
 mod start_task;
 mod storage_control;
 mod task_context;
@@ -38,8 +49,10 @@ mod task_enqueue;
 mod task_return;
 mod task_wait;
 mod terminal_control;
+mod terminal_lifecycle;
 mod terminal_run;
 mod time;
+mod transaction_definition;
 mod transform_control;
 pub(in crate::service) mod transient_data;
 mod web_control;
@@ -116,6 +129,11 @@ pub use bms_map::{BmsFieldDefinition, BmsMapDefinition};
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
+pub use bridge_abi::{BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply};
+pub use bridge_definition::{CicsBridgeExitDefault, CicsBridgeExitSelection};
+pub use bridge_profile::{CicsBridgeAbiProfile, CicsBridgeAbiSelection};
+pub use bridge_runtime::CicsBridgeRuntime;
+pub use bridge_start::{CICS_BRIDGE_START_WORK_GENERATION, CicsBridgeStartIntent};
 pub(super) use condition::respond as condition;
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
@@ -129,6 +147,29 @@ pub(super) use document_control::{
 pub use file_control::CicsFileDefinition;
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use file_tokens::FileUpdateState;
+pub use network_context::{
+    CicsCertificateName, CicsClientCertificate, CicsTcpipAuthenticate, CicsTcpipContext,
+    CicsTcpipPrivacy, CicsTcpipSslType,
+};
+pub(super) use network_control::invoke as invoke_network;
+pub use operator_control::CICS_OPERATOR_WORK_GENERATION;
+pub use operator_control::CicsOperatorMessageView;
+pub(super) use operator_control::invoke as invoke_operator;
+pub(super) use time::invoke as invoke_time;
+pub(super) fn validate_owned_stores(
+    store: &dyn mainframe_env_store_api::ProviderStateStore,
+    limits: super::CicsLimits,
+) -> Result<(), HostProblem> {
+    task_enqueue::validate_store(store, limits)?;
+    operator_control::load_operator_messages(store, limits)?;
+    operator_control::validate_active_operator_commands(store, limits)?;
+    network_context::validate_store(store, limits)?;
+    bridge_definition::validate_store(store, limits)?;
+    bridge_profile::validate_store(store, limits)?;
+    bridge_runtime::validate_store(store, limits)?;
+    bridge_start::validate_store(store, limits)?;
+    Ok(())
+}
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };
@@ -136,7 +177,26 @@ pub use interval::{CicsIntervalError, CicsIntervalMode, CicsIntervalTime};
 #[cfg(test)]
 pub(super) use interval_control::IntervalStartState;
 pub(super) use interval_control::load as load_interval_records;
-pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
+pub use interval_control::{
+    CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION,
+};
+pub(super) fn post_event_outputs(
+    service: &CicsService,
+    run: &Run,
+) -> Result<BTreeMap<String, mainframe_env_execution_api::BoundedPayload>, HostProblem> {
+    let Some(event) = interval_control::post_ready_event(service, run)? else {
+        return Ok(BTreeMap::new());
+    };
+    Ok(BTreeMap::from([(
+        "POST.EVENT".into(),
+        mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.post-event@1",
+            event,
+            mainframe_env_execution_api::InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    )]))
+}
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use journal_control::{JournalRecord, load as load_journals};
 pub(super) use program_control::invoke as invoke_program_control;
@@ -162,10 +222,7 @@ pub(super) use task_control::{
     new_run_with_state,
 };
 pub use task_enqueue::CicsEnqueueModelDefinition;
-pub(super) use task_enqueue::{
-    load_enqueue_models, release_uow as release_uow_enqueues,
-    validate_store as validate_enqueue_store,
-};
+pub(super) use task_enqueue::{load_enqueue_models, release_uow as release_uow_enqueues};
 pub use terminal_control::{
     CicsBmsControlSnapshot, CicsOutboardDestinationDefinition, CicsOutboardKind,
     CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
@@ -175,7 +232,6 @@ pub(super) use terminal_control::{
     release_outboard_task, release_partition_set_for_task, valid_aid as valid_terminal_aid,
 };
 pub(in crate::service) use terminal_run::terminal_secret_digest;
-pub(super) use time::invoke as invoke_time;
 pub use web_control::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
     CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
@@ -214,6 +270,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::SecurityControl => {
             security_control::invoke(service, run, request, retention_tick)
+        }
+        crate::generated::CicsCommandFamily::BuiltinFunctionControl => {
+            builtin_function::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }
@@ -261,10 +320,11 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     interval_control::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)?;
     security_control::release_task_token_key(service, run)?;
+    network_context::release_task(service, run)?;
     web_service_control::release_task(service, run)
 }
 
-pub(super) fn rollback_task(
+pub(super) fn discard_task_starts(
     service: &CicsService,
     records: &mut BTreeMap<String, IntervalStartRecord>,
     run: &Run,
@@ -273,6 +333,5 @@ pub(super) fn rollback_task(
         service.store.as_ref(),
         records,
         run.invocation.run_unit_id.as_str(),
-    )?;
-    release_task_state(service, run)
+    )
 }

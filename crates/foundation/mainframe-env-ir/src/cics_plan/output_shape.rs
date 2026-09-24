@@ -6,6 +6,37 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::ConvertTime => matches!(
+            output,
+            CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::BifDeedit => matches!(
+            output,
+            CicsOutputName::Field | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::BifDigest => matches!(
+            output,
+            CicsOutputName::DigestResult | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::Post => matches!(
+            output,
+            CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::WriteOperator => matches!(
+            output,
+            CicsOutputName::OperatorReply
+                | CicsOutputName::OperatorReplyLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::ExtractCertificate => matches!(
+            output,
+            CicsOutputName::Certificate(_) | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::ExtractTcpip => matches!(
+            output,
+            CicsOutputName::Tcpip(_) | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(
                 output,

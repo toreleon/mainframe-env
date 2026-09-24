@@ -157,5 +157,15 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Signon => &CICS_EXECUTABLE_DESCRIPTORS[148],
         CicsPlanOperation::Signoff => &CICS_EXECUTABLE_DESCRIPTORS[149],
         CicsPlanOperation::VerifyToken => &CICS_EXECUTABLE_DESCRIPTORS[150],
+        CicsPlanOperation::ConvertTime => &CICS_EXECUTABLE_DESCRIPTORS[151],
+        CicsPlanOperation::BifDeedit => &CICS_EXECUTABLE_DESCRIPTORS[152],
+        CicsPlanOperation::BifDigest => &CICS_EXECUTABLE_DESCRIPTORS[153],
+        CicsPlanOperation::WaitCics => &CICS_EXECUTABLE_DESCRIPTORS[154],
+        CicsPlanOperation::Post => &CICS_EXECUTABLE_DESCRIPTORS[155],
+        CicsPlanOperation::WriteOperator => &CICS_EXECUTABLE_DESCRIPTORS[156],
+        CicsPlanOperation::ExtractCertificate => &CICS_EXECUTABLE_DESCRIPTORS[157],
+        CicsPlanOperation::ExtractTcpip => &CICS_EXECUTABLE_DESCRIPTORS[158],
+        CicsPlanOperation::StartAttach => &CICS_EXECUTABLE_DESCRIPTORS[159],
+        CicsPlanOperation::StartBrexit => &CICS_EXECUTABLE_DESCRIPTORS[160],
     }
 }

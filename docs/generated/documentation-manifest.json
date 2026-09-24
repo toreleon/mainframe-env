@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 191,
+    "markdown_documents": 195,
     "navigation_groups": 5,
-    "normative_documents": 43,
+    "normative_documents": 47,
     "xtask_commands": 168
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:14a00e3f048cd40f411a5759a1085f158ae5ff7e74717e46816a530f3ed08182",
+      "sha256": "sha256:d57860c72a3b2e397a463a42c2c8e18f34fb0c566d14331bdb046b2fbdbb8f26",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 78,
-      "sha256": "sha256:89257d074f62db70a5fcdeda28565fa48eef85b0957c13b6d63e7ce76031f4df",
+      "relative_links": 82,
+      "sha256": "sha256:0e5abcc453cffdbab1f7fa9c24ea2afd3adc74994f3b9e9a7f15d06bfc042901",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -767,10 +767,58 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and console maintainers",
+      "path": "docs/decisions/0015-cics-operator-reply-boundary.md",
+      "relative_links": 0,
+      "scope": "WRITE OPERATOR, virtual console ingress, and suspended COBOL tasks",
+      "sha256": "sha256:ab1a3863502974bc0ad8920ebff9740d12dd628750ed0de8a1cc3f4e76cf5e76",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0015: Bind CICS operator replies to durable command positions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and network maintainers",
+      "path": "docs/decisions/0016-cics-tcpip-ingress-context.md",
+      "relative_links": 0,
+      "scope": "EXTRACT TCPIP and EXTRACT CERTIFICATE task context",
+      "sha256": "sha256:f6190a6b17425744c4339a929d7cbaf8290c0501b2061de9894cda13ca411cc9",
+      "status": "Accepted for v0.9 development; typed EXTRACT routes executable",
+      "title": "ADR-0016: Keep CICS TCP/IP and certificate facts in trusted ingress context",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and server maintainers",
+      "path": "docs/decisions/0017-cics-immediate-start-target-authority.md",
+      "relative_links": 0,
+      "scope": "START ATTACH and START BREXIT transaction admission",
+      "sha256": "sha256:88a5fd527dc84e2a69ad2bc503d0a6a54d1e70c796ffe55b8ad606d2e1884448",
+      "status": "Proposed for v0.9 development; command rows pending",
+      "title": "ADR-0017: Resolve immediate START targets from installed durable definitions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS, compiler, and runtime maintainers",
+      "path": "docs/decisions/0018-cics-start-attach-lifetime.md",
+      "relative_links": 0,
+      "scope": "START ATTACH row 0206",
+      "sha256": "sha256:6db692e85b6fe38fb46241ece31f47eb391810a5af2715040352a4866f20e5cf",
+      "status": "Proposed for v0.9 development; FROM route pending",
+      "title": "ADR-0018: Keep START ATTACH work noncancelable and address-bearing",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 14,
-      "sha256": "sha256:b10f4a91e91ff530fcf7fa95f643bbe2327a80f43920d8713c6ea0191f383778",
+      "relative_links": 18,
+      "sha256": "sha256:576008fc4cac435990267642c404b58df241d8df6f9cc4e43ff0732cab02cdb2",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1110,7 +1158,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 84,
-      "sha256": "sha256:d1445076ce618603ef43501184e62a9eb043f95caabc712a63fcae635dbb28ef",
+      "sha256": "sha256:523a0c907871895bebcad661cfdf837e3e3792fd826942b0b3d1dd16ca419ddb",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 1
     },
@@ -1868,6 +1916,22 @@
           "path": "docs/decisions/0014-named-counter-authority.md"
         },
         {
+          "label": "ADR-0015: CICS operator reply boundary",
+          "path": "docs/decisions/0015-cics-operator-reply-boundary.md"
+        },
+        {
+          "label": "ADR-0016: CICS TCP/IP ingress context",
+          "path": "docs/decisions/0016-cics-tcpip-ingress-context.md"
+        },
+        {
+          "label": "ADR-0017: CICS immediate START target authority",
+          "path": "docs/decisions/0017-cics-immediate-start-target-authority.md"
+        },
+        {
+          "label": "ADR-0018: CICS START ATTACH lifetime",
+          "path": "docs/decisions/0018-cics-start-attach-lifetime.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2031,7 +2095,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:3c0763d98da8b80a1d29982fa7f66f2eb22a0929d05bc1f963d549dc07606eec",
+  "registry_sha256": "sha256:9afb90234857db3e6bc418cca492ede69749f40cd3b5c22982b9dab242cd649e",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

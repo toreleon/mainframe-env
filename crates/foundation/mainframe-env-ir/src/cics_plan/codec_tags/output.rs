@@ -14,6 +14,12 @@ pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::Resp => 1,
         CicsOutputName::Resp2 => 2,
         CicsOutputName::Abstime => 3,
+        CicsOutputName::Field => 696,
+        CicsOutputName::DigestResult => 697,
+        CicsOutputName::OperatorReply => 698,
+        CicsOutputName::OperatorReplyLength => 699,
+        CicsOutputName::Certificate(output) => output.tag(),
+        CicsOutputName::Tcpip(output) => output.tag(),
         CicsOutputName::Milliseconds => 4,
         CicsOutputName::Mmddyy => 5,
         CicsOutputName::Mmddyyyy => 6,
@@ -140,6 +146,16 @@ pub(in crate::cics_plan) fn output_from_tag(
         1 => Ok(CicsOutputName::Resp),
         2 => Ok(CicsOutputName::Resp2),
         3 => Ok(CicsOutputName::Abstime),
+        696 => Ok(CicsOutputName::Field),
+        697 => Ok(CicsOutputName::DigestResult),
+        698 => Ok(CicsOutputName::OperatorReply),
+        699 => Ok(CicsOutputName::OperatorReplyLength),
+        700..=716 => CicsCertificateOutput::from_tag(value)
+            .map(CicsOutputName::Certificate)
+            .ok_or(CicsPlanCodecProblem::Malformed),
+        717..=737 => CicsTcpipOutput::from_tag(value)
+            .map(CicsOutputName::Tcpip)
+            .ok_or(CicsPlanCodecProblem::Malformed),
         4 => Ok(CicsOutputName::Milliseconds),
         5 => Ok(CicsOutputName::Mmddyy),
         6 => Ok(CicsOutputName::Mmddyyyy),

@@ -6,10 +6,14 @@
 
 mod cancel;
 mod delay;
+mod post;
 mod protect;
 mod retrieve;
+mod start_attach;
 
 pub use delay::CICS_DELAY_WORK_GENERATION;
+pub use post::CICS_POST_WORK_GENERATION;
+pub(super) use post::ready_event as post_ready_event;
 pub(super) use protect::discard_records as discard_protected_start_records;
 pub(super) use protect::discard_run as discard_protected_starts;
 pub(super) use protect::finish_syncpoint as finish_protected_starts;
@@ -48,6 +52,7 @@ impl CicsService {
         replay_clock: Arc<dyn CicsReplayClock>,
     ) -> Result<Arc<Self>, HostProblem> {
         delay::validate_store(store.as_ref(), limits)?;
+        post::validate_store(store.as_ref(), limits)?;
         Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))
     }
 
@@ -187,27 +192,37 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::Cancel => cancel::invoke(service, run, request),
         CicsOperation::Delay => delay::invoke(service, run, request),
-        CicsOperation::Start => start(service, run, request),
+        CicsOperation::Post => post::invoke(service, run, request),
+        CicsOperation::Start => start(service, run, request, false),
+        CicsOperation::StartAttach => start_attach::invoke(service, run, request),
+        CicsOperation::StartBrexit => super::start_brexit::invoke(service, run, request),
         CicsOperation::Retrieve => retrieve::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
 
 pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
-    delay::release_task(service, run)
+    delay::release_task(service, run)?;
+    post::release_task(service, run)
 }
 
 fn start(
     service: &CicsService,
     run: &mut Run,
     request: &CicsRequest,
+    attached: bool,
 ) -> Result<CicsResponse, HostProblem> {
-    validate_start_request(request)?;
+    if !attached {
+        validate_start_request(request)?;
+    }
     let mutation = request
         .mutation
         .as_ref()
         .ok_or(HostProblem::MissingIdempotency)?;
     let transaction = name_argument(request, "TRANSID", 4)?;
+    if attached {
+        service.local_transaction_program(&transaction)?;
+    }
     let producer_request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
         .map_err(|_| HostProblem::ResourceExhausted)?;
     let supplied_request_id = request
@@ -333,7 +348,9 @@ fn start(
         return_terminal,
         queue,
         fmh: request.arguments.contains_key("OPTION.FMH"),
-        state: if request.arguments.contains_key("OPTION.PROTECT") {
+        state: if attached {
+            IntervalStartState::AttachedPending
+        } else if request.arguments.contains_key("OPTION.PROTECT") {
             IntervalStartState::ProtectedPending
         } else {
             IntervalStartState::Pending
@@ -360,9 +377,13 @@ fn start(
             response2: 0,
         });
     }
-    if record.state == IntervalStartState::Pending {
+    if matches!(
+        record.state,
+        IntervalStartState::Pending | IntervalStartState::AttachedPending
+    ) {
         service.enqueue_interval_work(&record, run.invocation.priority)?;
     }
+    post::supersede_for_run(service, run)?;
     let mut response = service.response(
         run,
         CicsDisposition::Complete,
@@ -373,7 +394,7 @@ fn start(
         None,
         Vec::new(),
     )?;
-    if request_id_was_generated && !request.arguments.contains_key("OPTION.NOCHECK") {
+    if !attached && request_id_was_generated && !request.arguments.contains_key("OPTION.NOCHECK") {
         response.outputs.insert(
             "EIBREQID".into(),
             BoundedPayload::new(
@@ -387,7 +408,7 @@ fn start(
     Ok(response)
 }
 
-fn validate_start_principal(
+pub(in crate::service::handlers) fn validate_start_principal(
     service: &CicsService,
     run: &mut Run,
     user: &str,
@@ -512,7 +533,11 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
     }
 }
 
-fn name_argument(request: &CicsRequest, name: &str, max: usize) -> Result<String, HostProblem> {
+pub(in crate::service::handlers) fn name_argument(
+    request: &CicsRequest,
+    name: &str,
+    max: usize,
+) -> Result<String, HostProblem> {
     let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
     let text = std::str::from_utf8(value.bytes())
         .map_err(|_| HostProblem::Malformed)?
@@ -525,7 +550,7 @@ fn name_argument(request: &CicsRequest, name: &str, max: usize) -> Result<String
     }
 }
 
-fn optional_name_argument(
+pub(in crate::service::handlers) fn optional_name_argument(
     request: &CicsRequest,
     name: &str,
     max: usize,
@@ -537,7 +562,10 @@ fn optional_name_argument(
         .transpose()
 }
 
-fn optional_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, HostProblem> {
+pub(in crate::service::handlers) fn optional_decimal(
+    request: &CicsRequest,
+    name: &str,
+) -> Result<Option<i64>, HostProblem> {
     request
         .arguments
         .get(name)
@@ -582,6 +610,8 @@ pub(in crate::service) enum IntervalStartState {
     Ready,
     Consumed,
     Cancelled,
+    AttachedPending,
+    AttachedReady,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -705,7 +735,10 @@ pub(in crate::service) fn promote_due(
     let selected = records
         .values()
         .filter(|record| {
-            record.state == IntervalStartState::Pending && record.expiration_tick <= now_tick
+            matches!(
+                record.state,
+                IntervalStartState::Pending | IntervalStartState::AttachedPending
+            ) && record.expiration_tick <= now_tick
         })
         .map(|record| (record.expiration_tick, record.request_id.clone()))
         .collect::<std::collections::BTreeSet<_>>()
@@ -714,15 +747,12 @@ pub(in crate::service) fn promote_due(
         .map(|(_, request_id)| request_id)
         .collect::<Vec<_>>();
     for request_id in &selected {
-        replace_state(
-            store,
-            records,
-            request_id,
-            IntervalStartState::Ready,
-            None,
-            None,
-            limits,
-        )?;
+        let next_state = if records[request_id].state == IntervalStartState::AttachedPending {
+            IntervalStartState::AttachedReady
+        } else {
+            IntervalStartState::Ready
+        };
+        replace_state(store, records, request_id, next_state, None, None, limits)?;
     }
     Ok(selected.len())
 }
@@ -737,23 +767,26 @@ pub(in crate::service) fn promote_request(
     let current = records.get(request_id).ok_or(HostProblem::NotFound)?;
     if matches!(
         current.state,
-        IntervalStartState::Ready | IntervalStartState::Consumed
+        IntervalStartState::Ready
+            | IntervalStartState::Consumed
+            | IntervalStartState::AttachedReady
     ) && current.expiration_tick <= now_tick
     {
         return Ok(());
     }
-    if current.state != IntervalStartState::Pending || current.expiration_tick > now_tick {
+    if !matches!(
+        current.state,
+        IntervalStartState::Pending | IntervalStartState::AttachedPending
+    ) || current.expiration_tick > now_tick
+    {
         return Err(HostProblem::InfrastructureFailure);
     }
-    replace_state(
-        store,
-        records,
-        request_id,
-        IntervalStartState::Ready,
-        None,
-        None,
-        limits,
-    )
+    let next_state = if current.state == IntervalStartState::AttachedPending {
+        IntervalStartState::AttachedReady
+    } else {
+        IntervalStartState::Ready
+    };
+    replace_state(store, records, request_id, next_state, None, None, limits)
 }
 
 pub(in crate::service) fn consume_next(
@@ -911,6 +944,15 @@ fn validate(record: &IntervalStartRecord, limits: CicsLimits) -> Result<(), Host
         || record.expiration_tick == 0
         || record.version == 0
         || record.data.len() > limits.max_queue_bytes
+        || matches!(
+            record.state,
+            IntervalStartState::AttachedPending | IntervalStartState::AttachedReady
+        ) && (!record.data.is_empty()
+            || record.terminal.is_some()
+            || record.return_transaction.is_some()
+            || record.return_terminal.is_some()
+            || record.queue.is_some()
+            || record.fmh)
     {
         return Err(HostProblem::Malformed);
     }
@@ -984,6 +1026,8 @@ fn encode(record: &IntervalStartRecord, limits: CicsLimits) -> Result<Vec<u8>, H
         IntervalStartState::Ready => 3,
         IntervalStartState::Consumed => 4,
         IntervalStartState::Cancelled => 5,
+        IntervalStartState::AttachedPending => 6,
+        IntervalStartState::AttachedReady => 7,
     });
     field(&mut out, record.producer_effect_key.as_bytes())?;
     out.extend_from_slice(&record.producer_request_digest);
@@ -1025,6 +1069,8 @@ fn decode(
             3 => IntervalStartState::Ready,
             4 => IntervalStartState::Consumed,
             5 => IntervalStartState::Cancelled,
+            6 => IntervalStartState::AttachedPending,
+            7 => IntervalStartState::AttachedReady,
             _ => return Err(HostProblem::InfrastructureFailure),
         },
         producer_effect_key: reader.text(InvocationLimits::default().max_binding_bytes)?,
@@ -1160,6 +1206,70 @@ mod tests {
             consumer_request_digest: None,
             version: 1,
         }
+    }
+
+    #[test]
+    fn attached_state_tags_append_without_changing_legacy_rows() {
+        let limits = CicsLimits::default();
+        let ordinary = record("ORDINARY", 100, "ordinary-producer");
+        let legacy = encode(&ordinary, limits).unwrap();
+        assert_eq!(decode(&legacy, 1, limits), Ok(ordinary.clone()));
+        let mut attached = ordinary;
+        attached.request_id = "ATTACHED".into();
+        attached.data.clear();
+        attached.return_transaction = None;
+        attached.return_terminal = None;
+        attached.queue = None;
+        attached.state = IntervalStartState::AttachedPending;
+        let encoded = encode(&attached, limits).unwrap();
+        assert_eq!(decode(&encoded, 1, limits), Ok(attached.clone()));
+        let mut records = BTreeMap::from([(attached.request_id.clone(), attached.clone())]);
+        let store = MemoryStore::new(Default::default());
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: NAMESPACE.into(),
+                    key: attached.request_id.clone(),
+                    version: 1,
+                    payload: encoded.clone(),
+                },
+                None,
+            )
+            .unwrap();
+        promote_request(&store, &mut records, "ATTACHED", 100, limits).unwrap();
+        assert_eq!(records["ATTACHED"].state, IntervalStartState::AttachedReady);
+        let promoted = store
+            .get_provider_state(NAMESPACE, "ATTACHED")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            decode(&promoted.payload, promoted.version, limits),
+            Ok(records["ATTACHED"].clone())
+        );
+
+        let mut reader = RecordReader::new(&encoded);
+        reader.take(MAGIC.len()).unwrap();
+        reader.text(8).unwrap();
+        reader.text(4).unwrap();
+        reader.text(256).unwrap();
+        reader.text(256).unwrap();
+        reader.u64().unwrap();
+        reader.optional_text(4).unwrap();
+        reader.field(limits.max_queue_bytes).unwrap();
+        reader.optional_text(4).unwrap();
+        reader.optional_text(4).unwrap();
+        reader.optional_text(8).unwrap();
+        reader.boolean().unwrap();
+        let state_at = reader.at;
+        drop(reader);
+        let mut unknown = encoded;
+        unknown[state_at] = 8;
+        assert_eq!(
+            decode(&unknown, 1, limits),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        attached.data = b"copied".to_vec();
+        assert_eq!(encode(&attached, limits), Err(HostProblem::Malformed));
     }
 
     #[test]

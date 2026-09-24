@@ -25,12 +25,15 @@ pub(crate) enum CicsCommandFamily {
     SpoolControl,
     SecurityControl,
     Diagnostics,
+    BuiltinFunctionControl,
     DocumentControl,
     EventControl,
     JournalControl,
     WebServiceControl,
     CounterControl,
     WebControl,
+    OperatorControl,
+    NetworkControl,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -83,6 +86,20 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "ASKTIME ABSTIME",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
         family: CicsCommandFamily::Time,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BifDeedit,
+        syntax: "BIF DEEDIT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0013",
+        family: CicsCommandFamily::BuiltinFunctionControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BifDigest,
+        syntax: "BIF DIGEST",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0014",
+        family: CicsCommandFamily::BuiltinFunctionControl,
         mutating: false,
     },
     CicsCommandDescriptor {
@@ -175,6 +192,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0036",
         family: CicsCommandFamily::EventControl,
         mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::ConvertTime,
+        syntax: "CONVERTTIME",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0031",
+        family: CicsCommandFamily::Time,
+        mutating: false,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::Delay,
@@ -359,6 +383,20 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::ExtractCertificate,
+        syntax: "EXTRACT CERTIFICATE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0070",
+        family: CicsCommandFamily::NetworkControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::ExtractTcpip,
+        syntax: "EXTRACT TCPIP",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0074",
+        family: CicsCommandFamily::NetworkControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::FormatTime,
         syntax: "FORMATTIME",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
@@ -532,6 +570,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0146",
         family: CicsCommandFamily::TaskControl,
         mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::Post,
+        syntax: "POST",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0147",
+        family: CicsCommandFamily::IntervalControl,
+        mutating: true,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::PurgeMessage,
@@ -807,6 +852,20 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::StartAttach,
+        syntax: "START ATTACH",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0206",
+        family: CicsCommandFamily::IntervalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::StartBrexit,
+        syntax: "START BREXIT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0207",
+        family: CicsCommandFamily::IntervalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::StartBrowse,
         syntax: "STARTBR",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
@@ -930,6 +989,20 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "WAIT EXTERNAL",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0234",
         family: CicsCommandFamily::TaskControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WaitCics,
+        syntax: "WAITCICS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0239",
+        family: CicsCommandFamily::TaskControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WriteOperator,
+        syntax: "WRITE OPERATOR",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0256",
+        family: CicsCommandFamily::OperatorControl,
         mutating: true,
     },
     CicsCommandDescriptor {

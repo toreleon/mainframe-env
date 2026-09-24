@@ -119,6 +119,12 @@ pub(super) fn require_output_shape(
         }
         HirCicsOutputName::Commarea
         | HirCicsOutputName::Partn
+        | HirCicsOutputName::Field
+        | HirCicsOutputName::DigestResult
+        | HirCicsOutputName::OperatorReply
+        | HirCicsOutputName::OperatorReplyLength
+        | HirCicsOutputName::Certificate(_)
+        | HirCicsOutputName::Tcpip(_)
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer
         | HirCicsOutputName::Ridfld
