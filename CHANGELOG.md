@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added a PostgreSQL 18.6 restart regression for the ISSUE ENDFILE/ENDOUTPUT
+  device and replay receipt transaction, with exact post-commit unknown-outcome
+  recovery. The row remains unregistered pending selected execution and the
+  remaining slice gates.
+
 - Reserved typed MCEP v2 plan identities and source-shaped operand/output
   bindings for the ten APPC mapped and GDS ISSUE control forms. These remain
   internal until selected provider and host routes are sealed; MCEP v1 rejects
