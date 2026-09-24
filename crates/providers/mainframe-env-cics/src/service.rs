@@ -8746,6 +8746,182 @@ mod tests {
     }
 
     #[test]
+    fn mapped_issue_signal_is_confirmed_only_after_partner_ledger_accepts_it() {
+        use std::sync::atomic::AtomicUsize;
+
+        struct PeerCarrier {
+            target: Arc<CicsService>,
+            target_run_unit: RunUnitId,
+            target_token: [u8; 4],
+            sent: Arc<AtomicUsize>,
+        }
+
+        impl CicsConversationTransport for PeerCarrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                control_id: u64,
+                flow: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                assert_eq!(flow, GdsIssueFlow::Signal);
+                self.target.offer_conversation_peer_frame(
+                    &self.target_run_unit,
+                    self.target_token,
+                    ConversationPeerFrame {
+                        data: Vec::new(),
+                        next_state: ConversationState::Send,
+                        end_of_chain: false,
+                        inbound_fmh: false,
+                        signal: true,
+                    },
+                    &format!("issue-signal-{control_id}"),
+                )?;
+                self.sent.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        let source_store = Arc::new(MemoryStore::new(Default::default()));
+        let source = service(source_store.clone());
+        let target_store = Arc::new(MemoryStore::new(Default::default()));
+        let target = service(target_store.clone());
+        for service in [&source, target.as_ref()] {
+            service
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 2,
+                    enabled: true,
+                })
+                .unwrap();
+        }
+        let (source_invocation, _) = registered(&source);
+        let (target_invocation, _) = registered(target.as_ref());
+        let source_token = source
+            .install_conversation_principal_for_run(
+                &source_invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        let target_token = target
+            .install_conversation_principal_for_run(
+                &target_invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        for (store, invocation, token, receiving) in [
+            (&source_store, &source_invocation, source_token, true),
+            (&target_store, &target_invocation, target_token, false),
+        ] {
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let current = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = current.clone();
+            let record = next.conversation_mut(token).unwrap();
+            record
+                .connect(
+                    &owner,
+                    ConversationContext::Local,
+                    false,
+                    b"PROC".to_vec(),
+                    vec![],
+                    0,
+                )
+                .unwrap();
+            if receiving {
+                record
+                    .peer_offered_data(&owner, ConversationContext::Local)
+                    .unwrap();
+            }
+            assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        }
+        let sent = Arc::new(AtomicUsize::new(0));
+        source
+            .install_conversation_transport(Arc::new(PeerCarrier {
+                target: target.clone(),
+                target_run_unit: target_invocation.run_unit_id.clone(),
+                target_token,
+                sent: sent.clone(),
+            }))
+            .unwrap();
+        let mut run = source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
+        let command = request(
+            CicsOperation::IssueSignal,
+            BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
+            1,
+        );
+        assert_eq!(
+            handlers::invoke_extended_control(
+                &source,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap()
+            .disposition,
+            CicsDisposition::Suspended
+        );
+        let control_id = ConversationLedger::load(source_store.as_ref())
+            .unwrap()
+            .conversation(source_token)
+            .unwrap()
+            .pending_issue
+            .as_ref()
+            .unwrap()
+            .id;
+        assert_eq!(
+            source
+                .flush_issue_control(&mut run, source_token, "outer-1", control_id)
+                .unwrap(),
+            ConversationTransmitOutcome::Confirmed
+        );
+        assert_eq!(sent.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            ConversationLedger::load(source_store.as_ref())
+                .unwrap()
+                .conversation(source_token)
+                .unwrap()
+                .state,
+            ConversationState::Receive
+        );
+        let mut partner = ConversationLedger::load(target_store.as_ref()).unwrap();
+        let owner = ConversationOwner {
+            execution: target_invocation.execution_id.as_str().into(),
+            run_unit: target_invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(target_invocation.attempt),
+        };
+        assert!(
+            partner
+                .consume_mapped_signal(target_token, &owner, ConversationContext::Local)
+                .unwrap()
+        );
+        assert!(
+            !partner
+                .consume_mapped_signal(target_token, &owner, ConversationContext::Local)
+                .unwrap()
+        );
+    }
+
+    #[test]
     fn mapped_issue_route_restarts_with_pending_and_final_receipt_on_sqlite() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-issue-route-{}-{:?}",
