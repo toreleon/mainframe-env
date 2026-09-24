@@ -32,6 +32,15 @@ pub enum CicsOutputName {
     PipLength,
     TctSysId,
     TctTermId,
+    ConversationConvid,
+    ConversationRetcode,
+    ConversationPrinConvid,
+    ConversationPrinSysid,
+    ConversationConvData,
+    ConversationInto,
+    ConversationSet,
+    ConversationToLength,
+    ConversationToFullLength,
     /// Verified eight-character user identity.
     SecurityIsUserId,
     /// Four-byte token encryption-key handle.

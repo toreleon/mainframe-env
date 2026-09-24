@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::*;
 
 fn bytes<T: Canonical + ?Sized>(value: &T, domain: &[u8]) -> Vec<u8> {

@@ -13,6 +13,17 @@ impl Canonical for CicsOperation {
             Self::GdsExtractProcess => out.variant("CicsOperation", "GdsExtractProcess", 0),
             Self::ExtractTct => out.variant("CicsOperation", "ExtractTct", 0),
             Self::Point => out.variant("CicsOperation", "Point", 0),
+            Self::AllocateConversation => out.variant("CicsOperation", "AllocateConversation", 0),
+            Self::GdsAllocateConversation => {
+                out.variant("CicsOperation", "GdsAllocateConversation", 0)
+            }
+            Self::GdsAssignConversation => out.variant("CicsOperation", "GdsAssignConversation", 0),
+            Self::BuildAttach => out.variant("CicsOperation", "BuildAttach", 0),
+            Self::ConnectProcess => out.variant("CicsOperation", "ConnectProcess", 0),
+            Self::GdsConnectProcess => out.variant("CicsOperation", "GdsConnectProcess", 0),
+            Self::FreeConversation => out.variant("CicsOperation", "FreeConversation", 0),
+            Self::GdsFreeConversation => out.variant("CicsOperation", "GdsFreeConversation", 0),
+            Self::Converse => out.variant("CicsOperation", "Converse", 0),
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
             Self::FetchAny => out.variant("CicsOperation", "FetchAny", 0),
             Self::FetchChild => out.variant("CicsOperation", "FetchChild", 0),

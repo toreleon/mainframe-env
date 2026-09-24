@@ -15,8 +15,10 @@ mod assign;
 mod certificate;
 mod convert_time;
 mod diagnostics;
+mod host_operation;
 mod legacy;
 mod names;
+mod output_capacity;
 mod output_write;
 mod post;
 mod registry;
@@ -30,7 +32,6 @@ mod spool_control;
 mod storage64;
 mod task_wait;
 mod tcpip;
-mod web_control;
 mod web_service_control;
 pub(super) use address::CicsAddressSet;
 use diagnostics::{argument_summary, invalid_plan};
@@ -108,6 +109,7 @@ pub(super) fn suspension(
 ) -> MachineDrive<EffectRequest> {
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::Converse => ("cics-converse", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
@@ -207,7 +209,8 @@ pub(super) fn execute(
     ) {
         retrieve::release_partition_receive_set(machine);
     }
-    let host_operation = names::host_operation(plan.operation);
+    let host_operation =
+        names::host_operation(plan.operation).ok_or(MachineProblem::UnsupportedForm)?;
     let address_set = address::action(&plan)?;
     let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
     let mut operand_outputs = BTreeMap::new();
@@ -485,7 +488,7 @@ pub(super) fn execute(
         }
         let target = CicsTarget::Resolved(output.target.clone());
         web_service_control::output_arguments(machine, output.name, &target, &mut arguments)?;
-        if let Some((name, capacity)) = web_control::output_capacity(machine, output.name, &target)?
+        if let Some((name, capacity)) = output_capacity::for_binding(machine, output.name, &target)?
         {
             arguments.insert(name, capacity);
         }
@@ -587,7 +590,16 @@ pub(super) fn execute(
             | CicsOutputName::SyncLevel
             | CicsOutputName::PipLength
             | CicsOutputName::TctSysId
-            | CicsOutputName::TctTermId => {
+            | CicsOutputName::TctTermId
+            | CicsOutputName::ConversationConvid
+            | CicsOutputName::ConversationRetcode
+            | CicsOutputName::ConversationPrinConvid
+            | CicsOutputName::ConversationPrinSysid
+            | CicsOutputName::ConversationConvData
+            | CicsOutputName::ConversationInto
+            | CicsOutputName::ConversationSet
+            | CicsOutputName::ConversationToLength
+            | CicsOutputName::ConversationToFullLength => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Abstime

@@ -6321,7 +6321,8 @@ mod tests {
         CicsMonitorAction, CicsMonitorPointDefinition, CicsPartitionDefinition,
         CicsPartitionSetDefinition, CicsProgramDefinition, CicsTcpipAuthenticate, CicsTcpipContext,
         CicsTcpipPrivacy, CicsTcpipSslType, ConversationContext, ConversationKind,
-        ConversationLedger, ConversationOwner, ConversationSystemDefinition,
+        ConversationLedger, ConversationOwner, ConversationPeerFrame, ConversationState,
+        ConversationSystemDefinition, load_conversation_replay,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -25514,6 +25515,758 @@ mod tests {
         );
     }
 
+    #[test]
+    fn compiled_conversation_allocate_selects_durable_provider_and_eibrsrce() {
+        let artifact = published_source_fixture(
+            "CONVALLO",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CONVALLO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SYS-X PIC X(4) VALUE 'SYS1'.\n01 CONVID-X PIC X(8).\n01 ALLOC-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS ALLOCATE SYSID(SYS-X) NOQUEUE RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBRSRCE TO CONVID-X.\nMOVE EIBFN TO ALLOC-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CONNECTION", "CICS.CONNECTION.SYS1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CONNECTION",
+                "CICS.CONNECTION.SYS1",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        server
+            .cics
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CONVALLO".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CVAL".into(), "CONVALLO".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CONVALLO".into(),
+                    map: "CONVALLO".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("conversation-allocate-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CVAL", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CVAL",
+                24,
+                80,
+                "conversation-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CONVALLO", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("CONVID-X").unwrap().bytes(),
+            &[0, 0, 0, 1, b' ', b' ', b' ', b' ']
+        );
+        assert_eq!(
+            restored.variable("ALLOC-FN").unwrap().bytes(),
+            &[0x04, 0x20]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::AllocateConversation)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn compiled_build_attach_persists_task_owned_mro_header() {
+        let artifact = published_source_fixture(
+            "CVATTACH",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVATTACH.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 BUILD-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS BUILD ATTACH ATTACHID('HEADER1') PROCESS('TRN1') IUTYPE(17) DATASTR(208) RECFM(1) END-EXEC.\nMOVE EIBFN TO BUILD-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("ATTACH", "CICS.ATTACH.HEADER1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "ATTACH",
+                "CICS.ATTACH.HEADER1",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CVATTACH".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CVAT".into(), "CVATTACH".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CVATTACH".into(),
+                    map: "CVATTACH".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("build-attach-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CVAT", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CVAT",
+                24,
+                80,
+                "attach-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CVATTACH", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("BUILD-FN").unwrap().bytes(),
+            &[0x04, 0x26]
+        );
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let ledger = ConversationLedger::load(server.store.as_ref()).unwrap();
+        let header = ledger.attach(&owner, "HEADER1").unwrap();
+        assert_eq!(&header.process, b"TRN1");
+        assert_eq!(
+            (header.iu_type, header.data_stream, header.record_format),
+            (17, 208, 1)
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::BuildAttach)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn compiled_connect_process_advances_allocated_appc_conversation() {
+        let artifact = published_source_fixture(
+            "CVCONNECT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVCONNECT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CONVID-X PIC X(4).\n01 CONNECT-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS ALLOCATE SYSID('SYS1') NOQUEUE RESP(RESP-X) END-EXEC.\nMOVE EIBRSRCE TO CONVID-X.\nEXEC CICS CONNECT PROCESS CONVID(CONVID-X) PROCNAME('TRN1') PROCLENGTH(4) SYNCLEVEL(0) RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO CONNECT-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CONNECTION", "CICS.CONNECTION.SYS1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CONNECTION",
+                "CICS.CONNECTION.SYS1",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        server
+            .cics
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CVCONNECT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CVCO".into(), "CVCONNECT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CVCONNECT".into(),
+                    map: "CVCONNECT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("connect-process-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CVCO", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CVCO",
+                24,
+                80,
+                "connect-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CVCONNECT", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("CONNECT-FN").unwrap().bytes(),
+            &[0x04, 0x32]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let token: [u8; 4] = restored
+            .variable("CONVID-X")
+            .unwrap()
+            .bytes()
+            .try_into()
+            .unwrap();
+        let record = ConversationLedger::load(server.store.as_ref())
+            .unwrap()
+            .conversation(token)
+            .unwrap()
+            .clone();
+        assert_eq!(record.state, mainframe_env_cics::ConversationState::Send);
+        assert_eq!(record.process.as_deref(), Some(b"TRN1".as_slice()));
+        assert_eq!(record.sync_level, Some(0));
+    }
+
+    #[test]
+    fn compiled_free_releases_allocated_session_and_writes_zero_state() {
+        let artifact = published_source_fixture(
+            "CVFREE",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVFREE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CONVID-X PIC X(4).\n01 FREE-FN PIC X(2).\n01 STATE-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS ALLOCATE SYSID('SYS1') NOQUEUE END-EXEC.\nMOVE EIBRSRCE TO CONVID-X.\nEXEC CICS FREE CONVID(CONVID-X) STATE(STATE-X) END-EXEC.\nMOVE EIBFN TO FREE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CONNECTION", "CICS.CONNECTION.SYS1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CONNECTION",
+                "CICS.CONNECTION.SYS1",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        server
+            .cics
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CVFREE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CVFR".into(), "CVFREE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CVFREE".into(),
+                    map: "CVFREE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("free-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CVFR", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CVFR",
+                24,
+                80,
+                "free-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CVFREE", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("FREE-FN").unwrap().bytes(), &[0x04, 0x22]);
+        assert_eq!(restored.variable("STATE-X").unwrap().bytes(), &[0; 4]);
+        let token: [u8; 4] = restored
+            .variable("CONVID-X")
+            .unwrap()
+            .bytes()
+            .try_into()
+            .unwrap();
+        let record = ConversationLedger::load(server.store.as_ref())
+            .unwrap()
+            .conversation(token)
+            .unwrap()
+            .clone();
+        assert!(record.released);
+        assert_eq!(record.state, mainframe_env_cics::ConversationState::Free);
+    }
+
+    #[test]
+    fn compiled_converse_consumes_explicit_mro_peer_frame_and_sets_eib_flags() {
+        let artifact = published_source_fixture(
+            "CVCONV",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVCONV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SET-PTR POINTER.\n01 OBSERVED-X PIC X(8).\n01 TO-LEN PIC S9(4) COMP VALUE 16.\n01 STATE-X PIC S9(9) COMP.\n01 CONV-FN PIC X(2).\n01 EOC-X PIC X.\n01 RESP-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(8).\nPROCEDURE DIVISION.\nEXEC CICS CONVERSE FROM('REQUEST') FROMLENGTH(7) SET(SET-PTR) TOLENGTH(TO-LEN) STATE(STATE-X) RESP(RESP-X) END-EXEC.\nSET ADDRESS OF LINK-X TO SET-PTR.\nMOVE LINK-X TO OBSERVED-X.\nMOVE EIBFN TO CONV-FN.\nMOVE EIBEOC TO EOC-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CONNECTION", "CICS.CONNECTION.MRO1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CONNECTION",
+                "CICS.CONNECTION.MRO1",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        server
+            .cics
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "MRO1".into(),
+                kind: ConversationKind::Mro,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CVCONV".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CVCV".into(), "CVCONV".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CVCONV".into(),
+                    map: "CVCONV".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("converse-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CVCV", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CVCV",
+                24,
+                80,
+                "converse-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let token = server
+            .cics
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "MRO1",
+                ConversationKind::Mro,
+            )
+            .unwrap();
+        server
+            .cics
+            .offer_conversation_peer_frame(
+                &invocation.run_unit_id,
+                token,
+                ConversationPeerFrame {
+                    data: b"RESPONSE".to_vec(),
+                    next_state: ConversationState::Receive,
+                    end_of_chain: true,
+                    inbound_fmh: false,
+                    signal: false,
+                },
+                "selected-converse-1",
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CVCONV", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("OBSERVED-X").unwrap().bytes(),
+            b"RESPONSE"
+        );
+        assert_eq!(restored.variable("TO-LEN").unwrap().bytes(), &[0, 8]);
+        assert_eq!(
+            restored.variable("STATE-X").unwrap().bytes(),
+            &89_i32.to_be_bytes()
+        );
+        assert_eq!(restored.variable("CONV-FN").unwrap().bytes(), &[0x04, 0x06]);
+        assert_eq!(restored.variable("EOC-X").unwrap().bytes(), &[0xff]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 6]);
+        let ledger = ConversationLedger::load(server.store.as_ref()).unwrap();
+        assert_eq!(
+            ledger.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+        let key = u32::from_be_bytes(token).to_string();
+        assert_eq!(ledger.exchanges[&key].outbound[0].data, b"REQUEST");
+    }
+
+    #[test]
+    fn compiled_converse_sqlite_reopen_preserves_exchange() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-converse-selected-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!(
+            "sqlite://{}?mode=rwc",
+            directory.join("product.db").display()
+        );
+        let mut settings = config();
+        settings.store_profile = crate::StoreProfile::Sqlite;
+        settings.sqlite_url = url.clone();
+        let artifact = published_source_fixture(
+            "CVSQL",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVSQL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 INTO-X PIC X(8).\n01 TO-LEN PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS CONVERSE FROM('PING') INTO(INTO-X) TOLENGTH(TO-LEN) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let token;
+        let first_effect_key;
+        {
+            let store: Arc<dyn PlatformStore> =
+                Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 262_144).unwrap());
+            let server = ProductServer::open(
+                settings,
+                store,
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap();
+            server
+                .bootstrap_administrator("IBMUSER", b"TESTPASS")
+                .unwrap();
+            server
+                .racf
+                .define_profile("CONNECTION", "CICS.CONNECTION.MRO1", "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit(
+                    "CONNECTION",
+                    "CICS.CONNECTION.MRO1",
+                    "IBMUSER",
+                    AccessIntent::Execute,
+                )
+                .unwrap();
+            server
+                .cics
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "MRO1".into(),
+                    kind: ConversationKind::Mro,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            server
+                .install_online_application(OnlineApplicationDefinition {
+                    programs: vec![OnlineProgramDefinition {
+                        name: "CVSQL".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
+                    }],
+                    transactions: BTreeMap::from([("CVSQ".into(), "CVSQL".into())]),
+                    maps: vec![BmsMapDefinition {
+                        mapset: "CVSQL".into(),
+                        map: "CVSQL".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    }],
+                })
+                .unwrap();
+            let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+            let session = SessionId::new("converse-sqlite-selected", 64).unwrap();
+            let invocation = server
+                .cics_invocation("IBMUSER", "CVSQ", Some(artifact_ref))
+                .unwrap();
+            server
+                .cics
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "CVSQ",
+                    24,
+                    80,
+                    "converse-sqlite-csrf",
+                    1,
+                    10_000,
+                )
+                .unwrap();
+            token = server
+                .cics
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "MRO1",
+                    ConversationKind::Mro,
+                )
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CVSQL", 2)
+                .unwrap();
+            let staged = ConversationLedger::load(server.store.as_ref()).unwrap();
+            let key = u32::from_be_bytes(token).to_string();
+            assert_eq!(
+                staged.exchanges[&key]
+                    .pending_converse
+                    .as_ref()
+                    .unwrap()
+                    .outbound
+                    .data,
+                b"PING"
+            );
+            first_effect_key = staged.exchanges[&key]
+                .pending_converse
+                .as_ref()
+                .unwrap()
+                .attempts[0]
+                .effect_key
+                .clone();
+            assert!(staged.exchanges[&key].outbound.is_empty());
+            server
+                .cics
+                .offer_conversation_peer_frame(
+                    &invocation.run_unit_id,
+                    token,
+                    ConversationPeerFrame {
+                        data: b"PONG".to_vec(),
+                        next_state: ConversationState::Receive,
+                        end_of_chain: false,
+                        inbound_fmh: false,
+                        signal: false,
+                    },
+                    "sqlite-converse-1",
+                )
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CVSQL", 3)
+                .unwrap();
+            let continuation = server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .unwrap();
+            let mut restored = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation,
+                CodecLimits::default(),
+            )
+            .unwrap();
+            restored
+                .restore_checkpoint(&continuation.checkpoint)
+                .unwrap();
+            assert_eq!(&restored.variable("INTO-X").unwrap().bytes()[..4], b"PONG");
+            assert_eq!(restored.variable("TO-LEN").unwrap().bytes(), &[0, 4]);
+        }
+        let reopened = SqliteStateStore::open(&url, 8 * 1024 * 1024, 262_144).unwrap();
+        let ledger = ConversationLedger::load(&reopened).unwrap();
+        assert_eq!(
+            ledger.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+        let key = u32::from_be_bytes(token).to_string();
+        assert_eq!(ledger.exchanges[&key].outbound[0].data, b"PING");
+        assert!(ledger.exchanges[&key].inbound.is_empty());
+        assert!(ledger.exchanges[&key].pending_converse.is_none());
+        assert!(
+            load_conversation_replay(&reopened, &first_effect_key)
+                .unwrap()
+                .is_some()
+        );
+        drop(reopened);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
     #[test]
     fn compiled_conversation_extract_process_uses_sqlite_selected_route_and_reopens() {
         let artifact = published_source_fixture(

@@ -22,6 +22,17 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         operation if super::conversation_control::is_operation(operation) => {
             super::conversation_control::allowed_output(operation, output)
         }
+        CicsPlanOperation::AllocateConversation
+        | CicsPlanOperation::GdsAllocateConversation
+        | CicsPlanOperation::GdsAssignConversation
+        | CicsPlanOperation::BuildAttach
+        | CicsPlanOperation::ConnectProcess
+        | CicsPlanOperation::GdsConnectProcess
+        | CicsPlanOperation::Converse
+        | CicsPlanOperation::FreeConversation
+        | CicsPlanOperation::GdsFreeConversation => {
+            super::conversation_open::output_allowed(operation, output)
+        }
         CicsPlanOperation::Asktime => matches!(
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2

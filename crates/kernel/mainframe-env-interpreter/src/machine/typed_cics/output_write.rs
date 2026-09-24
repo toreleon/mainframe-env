@@ -13,6 +13,20 @@ pub(in crate::machine) fn write_output(
     if web_service_control::write_output(machine, operation, name, target, value)? {
         return Ok(());
     }
+    if name == "STATE" && value.schema() == "mainframe-env.cics.cvda@1" {
+        let bytes: [u8; 4] = value
+            .bytes()
+            .try_into()
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+        return write_target(
+            machine,
+            target,
+            &CobolValue::Decimal(Decimal {
+                coefficient: i128::from(i32::from_be_bytes(bytes)),
+                scale: 0,
+            }),
+        );
+    }
     if name == "COMPSTATUS"
         && matches!(
             operation,

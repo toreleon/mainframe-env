@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 157 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 184 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 106 `unready` rows that are recognized but fail explicitly as unsupported.
+- 79 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,13 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 157 API routes are the only advertised application commands.
+The current 184 API routes are the only advertised application commands.
+The nine conversation-open routes share the `cics-conversation-v1` ledger with
+the eight EXTRACT and POINT routes. Version 1 records remain readable; version
+2 adds bounded peer frames and staged CONVERSE sends. EXTRACT keeps only task
+presentation, POINT position, and mutation-reply metadata outside that ledger.
+The selected compiler and interpreter route mapped APPC and MRO forms; GDS
+basic forms remain assembler/C-only at the COBOL source boundary.
 The six BTS child/link routes use append-only MCEP v2 tags. FETCH/FREE own
 bounded parent child-token data; LINK reads the shared BTS lifecycle process
 tree, activity index, and UOW acquisition and records activation intent and

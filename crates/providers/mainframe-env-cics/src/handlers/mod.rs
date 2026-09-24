@@ -13,6 +13,7 @@ mod condition;
 mod conversation_extract;
 #[cfg(test)]
 pub(in crate::service) use conversation_extract::{ExtractMetadata, LuName, publish_metadata};
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -66,9 +67,32 @@ mod web_service_control;
 
 use super::{CicsService, Run};
 use crate::generated::CicsCommandFamily;
-use mainframe_env_host_api::{AccessIntent, CicsRequest, CicsResponse, HostProblem};
+use mainframe_env_host_api::{
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+    HostResult, canonical_result_digest,
+};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
+
+pub(super) fn deferred_converse(operation: CicsOperation, response: &CicsResponse) -> bool {
+    operation == CicsOperation::Converse && response.disposition == CicsDisposition::Suspended
+}
+
+pub(super) fn cics_result_digest(response: &CicsResponse) -> Result<[u8; 32], HostProblem> {
+    canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
+        .map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+pub(super) fn originating_task_for(
+    session: &super::Session,
+    invocation: &mainframe_env_execution_api::Invocation,
+) -> String {
+    if session.run_unit.is_empty() {
+        invocation.run_unit_id.as_str().to_string()
+    } else {
+        session.run_unit.clone()
+    }
+}
 
 pub(super) fn assert_descriptor(
     descriptor: &crate::generated::CicsCommandDescriptor,
@@ -179,6 +203,32 @@ pub(super) fn condition_for_request(
         return Err(problem);
     }
     condition::respond(service, run, &request.condition_policy, problem)
+}
+pub use conversation_control::{
+    CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
+    ConversationAttachHeader, ConversationContext, ConversationExchangeState, ConversationKind,
+    ConversationLedger, ConversationOutboundFrame, ConversationOwner,
+    ConversationPartnerDefinition, ConversationPartnerProcessDefinition, ConversationPeerFrame,
+    ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
+    ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
+    GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode, MAX_BASIC_PIP_BYTES,
+    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+    MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay, prune_conversation_replays,
+};
+pub(super) use conversation_control::{
+    context as conversation_context, deadline as conversation_deadline,
+};
+
+pub(super) fn preflight_conversation(
+    service: &CicsService,
+    run: &Run,
+    family: CicsCommandFamily,
+) -> Result<(), HostProblem> {
+    if family == CicsCommandFamily::ConversationControl {
+        conversation_context(run)?;
+        conversation_deadline(service, run)?;
+    }
+    Ok(())
 }
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
@@ -291,6 +341,23 @@ pub(super) fn invoke_extended_control(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match family {
+        crate::generated::CicsCommandFamily::ConversationControl => {
+            if matches!(
+                request.operation,
+                CicsOperation::ExtractAttach
+                    | CicsOperation::ExtractAttributes
+                    | CicsOperation::GdsExtractAttributes
+                    | CicsOperation::ExtractLogonMsg
+                    | CicsOperation::ExtractProcess
+                    | CicsOperation::GdsExtractProcess
+                    | CicsOperation::ExtractTct
+                    | CicsOperation::Point
+            ) {
+                conversation_extract::invoke(service, run, request)
+            } else {
+                conversation_control::invoke(service, run, request, retention_tick)
+            }
+        }
         crate::generated::CicsCommandFamily::TransformControl => {
             transform_control::invoke(service, run, request)
         }
@@ -326,9 +393,6 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::BuiltinFunctionControl => {
             builtin_function::invoke(service, run, request)
-        }
-        crate::generated::CicsCommandFamily::ConversationControl => {
-            conversation_extract::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

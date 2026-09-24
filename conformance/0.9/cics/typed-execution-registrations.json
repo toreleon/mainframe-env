@@ -25,6 +25,69 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0006"
     },
     {
+      "operation": "AllocateConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0007"
+    },
+    {
+      "operation": "GdsAllocateConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0008"
+    },
+    {
+      "operation": "GdsAssignConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012"
+    },
+    {
+      "operation": "BuildAttach",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0015"
+    },
+    {
+      "operation": "ConnectProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0028"
+    },
+    {
+      "operation": "GdsConnectProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0029"
+    },
+    {
+      "operation": "FreeConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0081"
+    },
+    {
+      "operation": "GdsFreeConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0082"
+    },
+    {
+      "operation": "Converse",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0030"
+    },
+    {
       "operation": "AsktimeEib",
       "interface": "api",
       "family": "time",

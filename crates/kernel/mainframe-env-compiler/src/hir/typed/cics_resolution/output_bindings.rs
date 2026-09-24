@@ -123,6 +123,7 @@ pub(super) fn resolve(
                 HirCicsOperation::WebReceive
                     | HirCicsOperation::WebConverse
                     | HirCicsOperation::ExtractLogonMsg
+                    | HirCicsOperation::Converse
             )
         {
             continue;

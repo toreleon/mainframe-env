@@ -32,6 +32,24 @@ pub enum CicsPlanOperation {
     ExtractTct,
     /// Position on one owned conversation facility.
     Point,
+    /// Allocate a mapped APPC or MRO task-owned conversation.
+    AllocateConversation,
+    /// Allocate an APPC basic conversation and return a GDS code.
+    GdsAllocateConversation,
+    /// Return the principal APPC basic conversation identity.
+    GdsAssignConversation,
+    /// Construct one task-local MRO or LU6.1 attach header.
+    BuildAttach,
+    /// Connect an allocated APPC mapped conversation to a process.
+    ConnectProcess,
+    /// Connect an allocated APPC basic conversation to a process.
+    GdsConnectProcess,
+    /// Send and receive through one mapped APPC or MRO conversation.
+    Converse,
+    /// Return one mapped APPC or MRO session to CICS.
+    FreeConversation,
+    /// Return an APPC basic session after the peer reaches FREE.
+    GdsFreeConversation,
     /// Change a standard RACF password under one SAF effect.
     ChangePassword,
     /// Change a length-selected password or phrase under one SAF effect.
@@ -376,6 +394,30 @@ pub enum CicsOperandName {
     ConversationMaxProcLen,
     /// Eight-character SNA network name.
     ConversationNetName,
+    ConversationSysid,
+    ConversationPartner,
+    ConversationProfile,
+    ConversationModeName,
+    ConversationProcess,
+    ConversationResource,
+    ConversationReturnProcess,
+    ConversationReturnResource,
+    ConversationQueue,
+    ConversationIuType,
+    ConversationDataStream,
+    ConversationRecordFormat,
+    ConversationProcName,
+    ConversationProcLength,
+    ConversationPipList,
+    ConversationPipLength,
+    ConversationSyncLevel,
+    ConversationFrom,
+    ConversationFromLength,
+    ConversationFromFullLength,
+    ConversationMaxLength,
+    ConversationMaxFullLength,
+    ConversationToLength,
+    ConversationToFullLength,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
@@ -938,6 +980,10 @@ pub enum CicsPlanOption {
     BtsAcqActivity,
     /// Select the process acquired by this unit of work.
     BtsAcqProcess,
+    ConversationNoQueue,
+    ConversationNotruncate,
+    ConversationDefresp,
+    ConversationFmh,
     /// BasicAuth token syntax.
     SecurityBasicAuth,
     /// JSON Web Token syntax.

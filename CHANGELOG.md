@@ -6,17 +6,22 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Integrated nine CIC-905 conversation-open routes with the existing EXTRACT,
+  miscellaneous, BTS, and CIC-906 slices. The registry derives 184 typed and
+  79 unready API rows. One versioned APPC/MRO ledger now owns allocations,
+  EXTRACT-visible indicators, and explicit peer frames; CONVERSE retains its
+  staged send and exact replay across SQLite and PostgreSQL recovery.
 - Extended the R-24 assurance inventory with bounded CICS source and MCEP
   v1/v2 fuzz targets, parser/decoder properties, and owner-fenced syncpoint
   Loom models. Recorded the CIC-906 scope and open matrix cells without
-  changing command behavior or the 175/0/88 registry.
+  changing command behavior or the then-current 175/0/88 registry.
 
 - Integrated the eight CIC-905 conversation EXTRACT and POINT routes with the
   sealed miscellaneous and BTS aggregate. The application registry now has
   175 typed, 0 legacy compatibility, and 88 unready rows. The existing
   `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` numeric CVDA pin is reused.
-  The conversation-open peer-frame ledger on the active branch remains a
-  later reconciliation dependency.
+  The conversation-open peer-frame ledger was reconciled in the subsequent
+  integration above.
 - Added focused CIC-906 PostgreSQL durable-profile validation for separate
   CICS artifact/state adapters, artifact read versions, and checkpoint-protected
   CICS replay retention across Memory, SQLite, and PostgreSQL. No command routes

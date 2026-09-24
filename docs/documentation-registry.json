@@ -51,6 +51,7 @@
     "docs/decisions/0017-cics-immediate-start-target-authority.md",
     "docs/decisions/0018-cics-start-attach-lifetime.md",
     "docs/decisions/0019-bts-lifecycle-authority.md",
+    "docs/decisions/0020-conversation-peer-exchange-ledger.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -109,6 +110,7 @@
         {"label": "ADR-0017: CICS immediate START target authority", "path": "docs/decisions/0017-cics-immediate-start-target-authority.md"},
         {"label": "ADR-0018: CICS START ATTACH lifetime", "path": "docs/decisions/0018-cics-start-attach-lifetime.md"},
         {"label": "ADR-0019: BTS lifecycle authority", "path": "docs/decisions/0019-bts-lifecycle-authority.md"},
+        {"label": "ADR-0020: Conversation peer exchange ledger", "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

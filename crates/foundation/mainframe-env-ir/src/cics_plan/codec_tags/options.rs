@@ -5,6 +5,10 @@ pub(in crate::cics_plan) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::BtsNoSuspend => 1020,
         CicsPlanOption::BtsAcqActivity => 1021,
         CicsPlanOption::BtsAcqProcess => 1022,
+        CicsPlanOption::ConversationNoQueue => 1148,
+        CicsPlanOption::ConversationNotruncate => 1149,
+        CicsPlanOption::ConversationDefresp => 1150,
+        CicsPlanOption::ConversationFmh => 1151,
         CicsPlanOption::SecurityBasicAuth => 380,
         CicsPlanOption::SecurityJwt => 381,
         CicsPlanOption::SecurityKerberos => 382,
@@ -289,6 +293,10 @@ pub(in crate::cics_plan) fn option_from_tag(
         191 => Ok(CicsPlanOption::WebNotruncate),
         192 => Ok(CicsPlanOption::WebNoClientConvert),
         193 => Ok(CicsPlanOption::WebNoServerConvert),
+        1148 => Ok(CicsPlanOption::ConversationNoQueue),
+        1149 => Ok(CicsPlanOption::ConversationNotruncate),
+        1150 => Ok(CicsPlanOption::ConversationDefresp),
+        1151 => Ok(CicsPlanOption::ConversationFmh),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

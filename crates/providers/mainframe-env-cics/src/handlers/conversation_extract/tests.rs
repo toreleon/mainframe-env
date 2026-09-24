@@ -1,7 +1,5 @@
-use crate::conversation_protocol::{
-    ConversationAttachHeader, ConversationKind, ConversationLedger, ConversationOwner,
-    ConversationSystemDefinition,
-};
+use crate::conversation_protocol::{ConversationKind, ConversationLedger, ConversationOwner};
+use crate::{ConversationAttachHeader, ConversationSystemDefinition};
 
 fn install_extract_fixture(
     cics: &CicsService,
@@ -579,7 +577,29 @@ fn conversation_extract_ambiguous_principal_fails_closed_without_positioning() {
     let before = ConversationLedger::load(store.as_ref()).unwrap();
     let mut ambiguous = before.clone();
     ambiguous.conversation_mut(basic).unwrap().principal_facility = true;
-    assert!(before.persist(&mut ambiguous, store.as_ref()).unwrap());
+    // A v2 write rejects duplicate principals. A retained canonical v1 row
+    // can still contain them; EXTRACT must fail closed on that legacy input.
+    assert!(before.persist(&mut ambiguous.clone(), store.as_ref()).is_err());
+    ambiguous.version += 1;
+    for record in ambiguous.conversations.values_mut() {
+        record.version = 1;
+        record.processing_profile = None;
+    }
+    let legacy = String::from_utf8(serde_json::to_vec(&ambiguous).unwrap()).unwrap();
+    assert!(legacy.contains("\"schema_version\":2"));
+    let legacy = legacy.replacen("\"schema_version\":2", "\"schema_version\":1", 1);
+    store
+        .put_provider_state(
+            mainframe_env_store_api::ProviderStateRecord {
+                namespace: CONVERSATION_STATE_NAMESPACE.into(),
+                key: "state".into(),
+                version: ambiguous.version,
+                payload: legacy.into_bytes(),
+            },
+            Some(before.version),
+        )
+        .unwrap();
+    assert!(ConversationLedger::load(store.as_ref()).is_ok());
     let sidecar_before = store
         .get_provider_state(
             "cics-conversation-extract-v1",

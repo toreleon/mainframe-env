@@ -2,7 +2,70 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 24] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 33] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::WriteOperator,
+        syntax: "WRITE OPERATOR",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0256",
+        family: CicsCommandFamily::OperatorControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::Syncpoint,
+        syntax: "SYNCPOINT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+        family: CicsCommandFamily::Recovery,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::TransformDataToJson,
+        syntax: "TRANSFORM DATATOJSON",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0221",
+        family: CicsCommandFamily::TransformControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::TransformDataToXml,
+        syntax: "TRANSFORM DATATOXML",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0222",
+        family: CicsCommandFamily::TransformControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::TransformJsonToData,
+        syntax: "TRANSFORM JSONTODATA",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0223",
+        family: CicsCommandFamily::TransformControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::TransformXmlToData,
+        syntax: "TRANSFORM XMLTODATA",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0224",
+        family: CicsCommandFamily::TransformControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WaitJournalName,
+        syntax: "WAIT JOURNALNAME",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0235",
+        family: CicsCommandFamily::JournalControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WaitJournalNum,
+        syntax: "WAIT JOURNALNUM",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0236",
+        family: CicsCommandFamily::JournalControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebClose,
+        syntax: "WEB CLOSE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0240",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::WebConverse,
         syntax: "WEB CONVERSE",

@@ -12,6 +12,7 @@ mod certificate;
 mod codec_tags;
 mod condition_handlers;
 mod conversation_control;
+mod conversation_open;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -46,8 +47,8 @@ pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPla
 pub use tcpip::{CICS_TCPIP_OUTPUT_NAMES, CicsTcpipOutput};
 
 use codec_tags::{
-    operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
-    output_from_tag, output_tag,
+    bounded_count, operand_from_tag, operand_tag, operation_from_tag, operation_tag,
+    option_from_tag, option_tag, output_from_tag, output_tag, require_order,
 };
 use condition_handlers::{valid_aid_handlers, valid_condition_handlers, valid_condition_list};
 
@@ -175,7 +176,8 @@ fn encode_cics_effect_plan_version(
         && ((91..=104).contains(&operation_tag(plan.operation))
             || (130..=139).contains(&operation_tag(plan.operation))
             || (154..=164).contains(&operation_tag(plan.operation))
-            || (231..=238).contains(&operation_tag(plan.operation)))
+            || (231..=238).contains(&operation_tag(plan.operation))
+            || (222..=230).contains(&operation_tag(plan.operation)))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -250,7 +252,8 @@ pub fn decode_cics_effect_plan(
         && ((91..=104).contains(&operation_tag)
             || (130..=139).contains(&operation_tag)
             || (154..=164).contains(&operation_tag)
-            || (231..=238).contains(&operation_tag))
+            || (231..=238).contains(&operation_tag)
+            || (222..=230).contains(&operation_tag))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -450,6 +453,17 @@ fn validate_operation_shape(
         | CicsPlanOperation::ExtractTct
         | CicsPlanOperation::Point => {
             conversation_control::invalid_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::AllocateConversation
+        | CicsPlanOperation::GdsAllocateConversation
+        | CicsPlanOperation::GdsAssignConversation
+        | CicsPlanOperation::BuildAttach
+        | CicsPlanOperation::ConnectProcess
+        | CicsPlanOperation::GdsConnectProcess
+        | CicsPlanOperation::Converse
+        | CicsPlanOperation::FreeConversation
+        | CicsPlanOperation::GdsFreeConversation => {
+            conversation_open::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::Address => address::invalid_shape(plan, inputs, outputs),
@@ -932,14 +946,6 @@ fn validate_slot(
     Ok(())
 }
 
-fn bounded_count(value: usize, maximum: usize) -> Result<(), CicsPlanCodecProblem> {
-    if value > maximum || u32::try_from(value).is_err() {
-        Err(CicsPlanCodecProblem::LimitExceeded)
-    } else {
-        Ok(())
-    }
-}
-
 fn encode_slot(
     writer: &mut Writer,
     slot: &CicsStorageSlot,
@@ -1008,17 +1014,6 @@ fn decode_condition(
         }
         _ => return Err(CicsPlanCodecProblem::Malformed),
     })
-}
-
-fn require_order<T: Copy + Ord>(
-    previous: Option<T>,
-    current: T,
-) -> Result<(), CicsPlanCodecProblem> {
-    match previous {
-        Some(previous) if previous == current => Err(CicsPlanCodecProblem::Malformed),
-        Some(previous) if previous > current => Err(CicsPlanCodecProblem::NonCanonical),
-        _ => Ok(()),
-    }
 }
 
 struct Writer {

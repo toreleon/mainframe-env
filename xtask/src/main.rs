@@ -10391,7 +10391,12 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
             continue;
         }
         let source = read(&rust_file)?;
-        let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
+        let production_end = ["#[cfg(test)]", "#![cfg(test)]"]
+            .iter()
+            .filter_map(|marker| source.find(marker))
+            .min()
+            .unwrap_or(source.len());
+        let production = &source[..production_end];
         let upper = production.to_ascii_uppercase();
         for identity in forbidden_application_identities {
             if upper.contains(identity) {

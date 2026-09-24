@@ -249,5 +249,14 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::BtsCompStatus
         | HirCicsOutputName::BtsChannel
         | HirCicsOutputName::BtsAbcode => Ok(()),
+        HirCicsOutputName::ConversationConvid
+        | HirCicsOutputName::ConversationRetcode
+        | HirCicsOutputName::ConversationPrinConvid
+        | HirCicsOutputName::ConversationPrinSysid
+        | HirCicsOutputName::ConversationConvData
+        | HirCicsOutputName::ConversationInto
+        | HirCicsOutputName::ConversationSet
+        | HirCicsOutputName::ConversationToLength
+        | HirCicsOutputName::ConversationToFullLength => Ok(()),
     }
 }

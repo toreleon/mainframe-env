@@ -7,6 +7,24 @@ use std::collections::BTreeMap;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    /// Allocate one task-owned mapped APPC or MRO conversation.
+    AllocateConversation,
+    /// Allocate one task-owned APPC basic conversation with GDS return codes.
+    GdsAllocateConversation,
+    /// Read this task's principal APPC basic facility with GDS return codes.
+    GdsAssignConversation,
+    /// Build one task-owned MRO attach control block for a later send.
+    BuildAttach,
+    /// Initiate one task-owned mapped APPC process conversation.
+    ConnectProcess,
+    /// Initiate one APPC basic process conversation with GDS return codes.
+    GdsConnectProcess,
+    /// Return one mapped APPC or MRO facility to the session group.
+    FreeConversation,
+    /// Return one completed APPC basic facility with GDS return codes.
+    GdsFreeConversation,
+    /// Send and receive one explicit mapped APPC or MRO peer frame.
+    Converse,
     Abend,
     /// Fetch the next completed child token owned by this parent task.
     FetchAny,
@@ -345,6 +363,15 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::AllocateConversation => "AllocateConversation",
+            Self::GdsAllocateConversation => "GdsAllocateConversation",
+            Self::GdsAssignConversation => "GdsAssignConversation",
+            Self::BuildAttach => "BuildAttach",
+            Self::ConnectProcess => "ConnectProcess",
+            Self::GdsConnectProcess => "GdsConnectProcess",
+            Self::FreeConversation => "FreeConversation",
+            Self::GdsFreeConversation => "GdsFreeConversation",
+            Self::Converse => "Converse",
             Self::Abend => "Abend",
             Self::FetchAny => "FetchAny",
             Self::FetchChild => "FetchChild",
@@ -558,6 +585,14 @@ impl CicsOperation {
                 | Self::LinkActivity
                 | Self::ExtractLogonMsg
                 | Self::Point
+                | Self::AllocateConversation
+                | Self::GdsAllocateConversation
+                | Self::BuildAttach
+                | Self::ConnectProcess
+                | Self::GdsConnectProcess
+                | Self::FreeConversation
+                | Self::GdsFreeConversation
+                | Self::Converse
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -713,6 +748,16 @@ impl CicsOperation {
             .get(1)
             .map(|word| word.split('(').next().unwrap_or(word));
         Some(match (first, second) {
+            ("ALLOCATE", _) => Self::AllocateConversation,
+            ("GDS", Some("ALLOCATE")) => Self::GdsAllocateConversation,
+            ("GDS", Some("ASSIGN")) => Self::GdsAssignConversation,
+            ("BUILD", Some("ATTACH")) => Self::BuildAttach,
+            ("CONNECT", Some("PROCESS")) => Self::ConnectProcess,
+            ("GDS", Some("CONNECT")) => Self::GdsConnectProcess,
+            ("FREE", Some("CHILD")) => Self::FreeChild,
+            ("FREE", _) => Self::FreeConversation,
+            ("GDS", Some("FREE")) => Self::GdsFreeConversation,
+            ("CONVERSE", _) => Self::Converse,
             ("ABEND", _) => Self::Abend,
             ("EXTRACT", Some("ATTACH")) => Self::ExtractAttach,
             ("EXTRACT", Some("ATTRIBUTES")) => Self::ExtractAttributes,
@@ -743,7 +788,6 @@ impl CicsOperation {
             ("CANCEL", _) => Self::Cancel,
             ("FETCH", Some("ANY")) => Self::FetchAny,
             ("FETCH", Some("CHILD")) => Self::FetchChild,
-            ("FREE", Some("CHILD")) => Self::FreeChild,
             ("LINK", Some("ACQACTIVITY")) => Self::LinkAcqActivity,
             ("LINK", Some("ACQPROCESS")) => Self::LinkAcqProcess,
             ("LINK", Some("ACTIVITY")) => Self::LinkActivity,

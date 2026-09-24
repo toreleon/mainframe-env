@@ -1,3 +1,4 @@
+#[cfg(test)]
 use mainframe_env_host_api::CicsOperation;
 use mainframe_env_ir::{
     CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption,
@@ -72,6 +73,18 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::ConversationConvid
         | CicsOperandName::ConversationSession
         | CicsOperandName::ConversationNetName => SlotUse::Input,
+        CicsOperandName::ConversationIuType
+        | CicsOperandName::ConversationDataStream
+        | CicsOperandName::ConversationRecordFormat
+        | CicsOperandName::ConversationProcLength
+        | CicsOperandName::ConversationPipLength
+        | CicsOperandName::ConversationSyncLevel
+        | CicsOperandName::ConversationFromLength
+        | CicsOperandName::ConversationMaxLength
+        | CicsOperandName::ConversationToLength => SlotUse::HalfwordInput,
+        CicsOperandName::ConversationFromFullLength
+        | CicsOperandName::ConversationMaxFullLength
+        | CicsOperandName::ConversationToFullLength => SlotUse::FullwordInput,
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
@@ -210,6 +223,15 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::ProcessName
         | CicsOutputName::TctSysId
         | CicsOutputName::TctTermId => SlotUse::Output,
+        CicsOutputName::ConversationToLength => SlotUse::HalfwordOutput,
+        CicsOutputName::ConversationToFullLength => SlotUse::FullwordOutput,
+        CicsOutputName::ConversationSet => SlotUse::PointerOutput,
+        CicsOutputName::ConversationConvid
+        | CicsOutputName::ConversationRetcode
+        | CicsOutputName::ConversationPrinConvid
+        | CicsOutputName::ConversationPrinSysid
+        | CicsOutputName::ConversationConvData
+        | CicsOutputName::ConversationInto => SlotUse::Output,
         CicsOutputName::CounterValue
         | CicsOutputName::CounterMinimum
         | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
@@ -335,185 +357,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     }
 }
 
-pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
-    match operation {
-        CicsPlanOperation::FetchAny => CicsOperation::FetchAny,
-        CicsPlanOperation::FetchChild => CicsOperation::FetchChild,
-        CicsPlanOperation::FreeChild => CicsOperation::FreeChild,
-        CicsPlanOperation::LinkAcqActivity => CicsOperation::LinkAcqActivity,
-        CicsPlanOperation::LinkAcqProcess => CicsOperation::LinkAcqProcess,
-        CicsPlanOperation::LinkActivity => CicsOperation::LinkActivity,
-        CicsPlanOperation::ExtractAttach => CicsOperation::ExtractAttach,
-        CicsPlanOperation::ExtractAttributes => CicsOperation::ExtractAttributes,
-        CicsPlanOperation::GdsExtractAttributes => CicsOperation::GdsExtractAttributes,
-        CicsPlanOperation::ExtractLogonMsg => CicsOperation::ExtractLogonMsg,
-        CicsPlanOperation::ExtractProcess => CicsOperation::ExtractProcess,
-        CicsPlanOperation::GdsExtractProcess => CicsOperation::GdsExtractProcess,
-        CicsPlanOperation::ExtractTct => CicsOperation::ExtractTct,
-        CicsPlanOperation::Point => CicsOperation::Point,
-        CicsPlanOperation::Abend => CicsOperation::Abend,
-        CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
-        CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
-        CicsPlanOperation::DeleteEvent => CicsOperation::DeleteEvent,
-        CicsPlanOperation::CheckTimer => CicsOperation::CheckTimer,
-        CicsPlanOperation::DefineTimer => CicsOperation::DefineTimer,
-        CicsPlanOperation::DeleteTimer => CicsOperation::DeleteTimer,
-        CicsPlanOperation::RetrieveReattachEvent => CicsOperation::RetrieveReattachEvent,
-        CicsPlanOperation::RetrieveSubevent => CicsOperation::RetrieveSubevent,
-        CicsPlanOperation::TestEvent => CicsOperation::TestEvent,
-        CicsPlanOperation::SignalEvent => CicsOperation::SignalEvent,
-        CicsPlanOperation::ForceTimer => CicsOperation::ForceTimer,
-        CicsPlanOperation::Address => CicsOperation::Address,
-        CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
-        CicsPlanOperation::Asktime => CicsOperation::Asktime,
-        CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
-        CicsPlanOperation::FormatTime => CicsOperation::FormatTime,
-        CicsPlanOperation::ConvertTime => CicsOperation::ConvertTime,
-        CicsPlanOperation::BifDeedit => CicsOperation::BifDeedit,
-        CicsPlanOperation::BifDigest => CicsOperation::BifDigest,
-        CicsPlanOperation::Cancel => CicsOperation::Cancel,
-        CicsPlanOperation::Delay => CicsOperation::Delay,
-        CicsPlanOperation::DefineCounter => CicsOperation::DefineCounter,
-        CicsPlanOperation::DefineDCounter => CicsOperation::DefineDCounter,
-        CicsPlanOperation::DeleteCounter => CicsOperation::DeleteCounter,
-        CicsPlanOperation::DeleteDCounter => CicsOperation::DeleteDCounter,
-        CicsPlanOperation::GetCounter => CicsOperation::GetCounter,
-        CicsPlanOperation::GetDCounter => CicsOperation::GetDCounter,
-        CicsPlanOperation::QueryCounter => CicsOperation::QueryCounter,
-        CicsPlanOperation::QueryDCounter => CicsOperation::QueryDCounter,
-        CicsPlanOperation::RewindCounter => CicsOperation::RewindCounter,
-        CicsPlanOperation::RewindDCounter => CicsOperation::RewindDCounter,
-        CicsPlanOperation::UpdateCounter => CicsOperation::UpdateCounter,
-        CicsPlanOperation::UpdateDCounter => CicsOperation::UpdateDCounter,
-        CicsPlanOperation::Post => CicsOperation::Post,
-        CicsPlanOperation::WriteOperator => CicsOperation::WriteOperator,
-        CicsPlanOperation::ExtractCertificate => CicsOperation::ExtractCertificate,
-        CicsPlanOperation::ExtractTcpip => CicsOperation::ExtractTcpip,
-        CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
-        CicsPlanOperation::Deq => CicsOperation::Deq,
-        CicsPlanOperation::Enq => CicsOperation::Enq,
-        CicsPlanOperation::HandleAid => CicsOperation::HandleAid,
-        CicsPlanOperation::HandleAbend => CicsOperation::HandleAbend,
-        CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
-        CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
-        CicsPlanOperation::InvokeApplication => CicsOperation::InvokeApplication,
-        CicsPlanOperation::IssueAbort => CicsOperation::IssueAbort,
-        CicsPlanOperation::IssueAdd => CicsOperation::IssueAdd,
-        CicsPlanOperation::IssueEnd => CicsOperation::IssueEnd,
-        CicsPlanOperation::IssueErase => CicsOperation::IssueErase,
-        CicsPlanOperation::IssueNote => CicsOperation::IssueNote,
-        CicsPlanOperation::IssueQuery => CicsOperation::IssueQuery,
-        CicsPlanOperation::IssueReceive => CicsOperation::IssueReceive,
-        CicsPlanOperation::IssueReplace => CicsOperation::IssueReplace,
-        CicsPlanOperation::IssueSend => CicsOperation::IssueSend,
-        CicsPlanOperation::Route => CicsOperation::Route,
-        CicsPlanOperation::IssueWait => CicsOperation::IssueWait,
-        CicsPlanOperation::Load => CicsOperation::Load,
-        CicsPlanOperation::Release => CicsOperation::Release,
-        CicsPlanOperation::Link => CicsOperation::Link,
-        CicsPlanOperation::Xctl => CicsOperation::Xctl,
-        CicsPlanOperation::Return => CicsOperation::Return,
-        CicsPlanOperation::StartBrowse => CicsOperation::StartBrowse,
-        CicsPlanOperation::ResetBrowse => CicsOperation::ResetBrowse,
-        CicsPlanOperation::Unlock => CicsOperation::Unlock,
-        CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
-        CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
-        CicsPlanOperation::ReadTransientData => CicsOperation::ReadTransientData,
-        CicsPlanOperation::EndBrowse => CicsOperation::EndBrowse,
-        CicsPlanOperation::Delete => CicsOperation::Delete,
-        CicsPlanOperation::Write => CicsOperation::Write,
-        CicsPlanOperation::WriteTransientData => CicsOperation::WriteTransientData,
-        CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
-        CicsPlanOperation::DeleteTemporaryStorage => CicsOperation::DeleteTemporaryStorage,
-        CicsPlanOperation::ReadTemporaryStorage => CicsOperation::ReadTemporaryStorage,
-        CicsPlanOperation::WriteTemporaryStorage => CicsOperation::WriteTemporaryStorage,
-        CicsPlanOperation::Getmain => CicsOperation::Getmain,
-        CicsPlanOperation::Getmain64 => CicsOperation::Getmain64,
-        CicsPlanOperation::Freemain => CicsOperation::Freemain,
-        CicsPlanOperation::Freemain64 => CicsOperation::Freemain64,
-        CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,
-        CicsPlanOperation::SendMap => CicsOperation::SendMap,
-        CicsPlanOperation::SendText => CicsOperation::SendText,
-        CicsPlanOperation::SendPartnset => CicsOperation::SendPartnset,
-        CicsPlanOperation::SendControl => CicsOperation::SendControl,
-        CicsPlanOperation::SendPage => CicsOperation::SendPage,
-        CicsPlanOperation::ReceivePartn => CicsOperation::ReceivePartn,
-        CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
-        CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
-        CicsPlanOperation::Read => CicsOperation::Read,
-        CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
-        CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
-        CicsPlanOperation::SpoolClose => CicsOperation::SpoolClose,
-        CicsPlanOperation::SpoolOpenInput => CicsOperation::SpoolOpenInput,
-        CicsPlanOperation::SpoolOpenOutput => CicsOperation::SpoolOpenOutput,
-        CicsPlanOperation::SpoolRead => CicsOperation::SpoolRead,
-        CicsPlanOperation::SpoolWrite => CicsOperation::SpoolWrite,
-        CicsPlanOperation::EnterTraceNum => CicsOperation::EnterTraceNum,
-        CicsPlanOperation::Monitor => CicsOperation::Monitor,
-        CicsPlanOperation::DumpTransaction => CicsOperation::DumpTransaction,
-        CicsPlanOperation::Dump => CicsOperation::Dump,
-        CicsPlanOperation::Trace => CicsOperation::Trace,
-        CicsPlanOperation::EnterTraceId => CicsOperation::EnterTraceId,
-        CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
-        CicsPlanOperation::Suspend => CicsOperation::Suspend,
-        CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
-        CicsPlanOperation::WaitExternal => CicsOperation::WaitExternal,
-        CicsPlanOperation::WaitCics => CicsOperation::WaitCics,
-        CicsPlanOperation::Assign => CicsOperation::Assign,
-        CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
-        CicsPlanOperation::QuerySecurity => CicsOperation::QuerySecurity,
-        CicsPlanOperation::VerifyPassword => CicsOperation::VerifyPassword,
-        CicsPlanOperation::ChangePassword => CicsOperation::ChangePassword,
-        CicsPlanOperation::ChangePhrase => CicsOperation::ChangePhrase,
-        CicsPlanOperation::RequestPassTicket => CicsOperation::RequestPassTicket,
-        CicsPlanOperation::RequestEncryptPassTicket => CicsOperation::RequestEncryptPassTicket,
-        CicsPlanOperation::Signon => CicsOperation::Signon,
-        CicsPlanOperation::Signoff => CicsOperation::Signoff,
-        CicsPlanOperation::VerifyPhrase => CicsOperation::VerifyPhrase,
-        CicsPlanOperation::VerifyToken => CicsOperation::VerifyToken,
-        CicsPlanOperation::Start => CicsOperation::Start,
-        CicsPlanOperation::StartAttach => CicsOperation::StartAttach,
-        CicsPlanOperation::StartBrexit => CicsOperation::StartBrexit,
-        CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
-        CicsPlanOperation::DocumentCreate => CicsOperation::DocumentCreate,
-        CicsPlanOperation::DefineInputEvent => CicsOperation::DefineInputEvent,
-        CicsPlanOperation::DefineCompositeEvent => CicsOperation::DefineCompositeEvent,
-        CicsPlanOperation::DocumentDelete => CicsOperation::DocumentDelete,
-        CicsPlanOperation::DocumentInsert => CicsOperation::DocumentInsert,
-        CicsPlanOperation::DocumentRetrieve => CicsOperation::DocumentRetrieve,
-        CicsPlanOperation::DocumentSet => CicsOperation::DocumentSet,
-        CicsPlanOperation::InvokeService => CicsOperation::InvokeService,
-        CicsPlanOperation::SoapFaultAdd => CicsOperation::SoapFaultAdd,
-        CicsPlanOperation::SoapFaultCreate => CicsOperation::SoapFaultCreate,
-        CicsPlanOperation::SoapFaultDelete => CicsOperation::SoapFaultDelete,
-        CicsPlanOperation::WsaContextBuild => CicsOperation::WsaContextBuild,
-        CicsPlanOperation::WsaContextDelete => CicsOperation::WsaContextDelete,
-        CicsPlanOperation::WsaContextGet => CicsOperation::WsaContextGet,
-        CicsPlanOperation::WsaEprCreate => CicsOperation::WsaEprCreate,
-        CicsPlanOperation::TransformDataToJson => CicsOperation::TransformDataToJson,
-        CicsPlanOperation::TransformDataToXml => CicsOperation::TransformDataToXml,
-        CicsPlanOperation::TransformJsonToData => CicsOperation::TransformJsonToData,
-        CicsPlanOperation::TransformXmlToData => CicsOperation::TransformXmlToData,
-        CicsPlanOperation::WaitJournalName => CicsOperation::WaitJournalName,
-        CicsPlanOperation::WaitJournalNum => CicsOperation::WaitJournalNum,
-        CicsPlanOperation::WriteJournalName => CicsOperation::WriteJournalName,
-        CicsPlanOperation::WriteJournalNum => CicsOperation::WriteJournalNum,
-        CicsPlanOperation::WebParseUrl => CicsOperation::WebParseUrl,
-        CicsPlanOperation::WebOpen => CicsOperation::WebOpen,
-        CicsPlanOperation::WebClose => CicsOperation::WebClose,
-        CicsPlanOperation::WebExtract => CicsOperation::WebExtract,
-        CicsPlanOperation::ExtractWeb => CicsOperation::ExtractWeb,
-        CicsPlanOperation::WebRead => CicsOperation::WebRead,
-        CicsPlanOperation::WebStartBrowse => CicsOperation::WebStartBrowse,
-        CicsPlanOperation::WebReadNext => CicsOperation::WebReadNext,
-        CicsPlanOperation::WebEndBrowse => CicsOperation::WebEndBrowse,
-        CicsPlanOperation::WebWrite => CicsOperation::WebWrite,
-        CicsPlanOperation::WebSend => CicsOperation::WebSend,
-        CicsPlanOperation::WebRetrieve => CicsOperation::WebRetrieve,
-        CicsPlanOperation::WebReceive => CicsOperation::WebReceive,
-        CicsPlanOperation::WebConverse => CicsOperation::WebConverse,
-    }
-}
+pub(super) use super::host_operation::host_operation;
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
@@ -526,6 +370,30 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::ConversationSession => "SESSION",
         CicsOperandName::ConversationMaxProcLen => "MAXPROCLEN",
         CicsOperandName::ConversationNetName => "NETNAME",
+        CicsOperandName::ConversationSysid => "SYSID",
+        CicsOperandName::ConversationPartner => "PARTNER",
+        CicsOperandName::ConversationProfile => "PROFILE",
+        CicsOperandName::ConversationModeName => "MODENAME",
+        CicsOperandName::ConversationProcess => "PROCESS",
+        CicsOperandName::ConversationResource => "RESOURCE",
+        CicsOperandName::ConversationReturnProcess => "RPROCESS",
+        CicsOperandName::ConversationReturnResource => "RRESOURCE",
+        CicsOperandName::ConversationQueue => "QUEUE",
+        CicsOperandName::ConversationIuType => "IUTYPE",
+        CicsOperandName::ConversationDataStream => "DATASTR",
+        CicsOperandName::ConversationRecordFormat => "RECFM",
+        CicsOperandName::ConversationProcName => "PROCNAME",
+        CicsOperandName::ConversationProcLength => "PROCLENGTH",
+        CicsOperandName::ConversationPipList => "PIPLIST",
+        CicsOperandName::ConversationPipLength => "PIPLENGTH",
+        CicsOperandName::ConversationSyncLevel => "SYNCLEVEL",
+        CicsOperandName::ConversationFrom => "FROM",
+        CicsOperandName::ConversationFromLength => "FROMLENGTH",
+        CicsOperandName::ConversationFromFullLength => "FROMFLENGTH",
+        CicsOperandName::ConversationMaxLength => "MAXLENGTH",
+        CicsOperandName::ConversationMaxFullLength => "MAXFLENGTH",
+        CicsOperandName::ConversationToLength => "TOLENGTH",
+        CicsOperandName::ConversationToFullLength => "TOFLENGTH",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -872,6 +740,15 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::PipLength => "PIPLENGTH",
         CicsOutputName::TctSysId => "SYSID",
         CicsOutputName::TctTermId => "TERMID",
+        CicsOutputName::ConversationConvid => "CONVID",
+        CicsOutputName::ConversationRetcode => "RETCODE",
+        CicsOutputName::ConversationPrinConvid => "PRINCONVID",
+        CicsOutputName::ConversationPrinSysid => "PRINSYSID",
+        CicsOutputName::ConversationConvData => "CONVDATA",
+        CicsOutputName::ConversationInto => "INTO",
+        CicsOutputName::ConversationSet => "SET",
+        CicsOutputName::ConversationToLength => "TOLENGTH",
+        CicsOutputName::ConversationToFullLength => "TOFLENGTH",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",
@@ -998,6 +875,10 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::BtsNoSuspend => "NOSUSPEND",
         CicsPlanOption::BtsAcqActivity => "ACQACTIVITY",
         CicsPlanOption::BtsAcqProcess => "ACQPROCESS",
+        CicsPlanOption::ConversationNoQueue => "NOQUEUE",
+        CicsPlanOption::ConversationNotruncate => "NOTRUNCATE",
+        CicsPlanOption::ConversationDefresp => "DEFRESP",
+        CicsPlanOption::ConversationFmh => "FMH",
         CicsPlanOption::DefResp => "DEFRESP",
         CicsPlanOption::NoWait => "NOWAIT",
         CicsPlanOption::Rrn => "RRN",
@@ -1135,5 +1016,44 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::WebNotruncate => "NOTRUNCATE",
         CicsPlanOption::WebNoClientConvert => "NOCLICONVERT",
         CicsPlanOption::WebNoServerConvert => "NOSRVCONVERT",
+    }
+}
+
+#[cfg(test)]
+mod conversation_tests {
+    use super::*;
+
+    #[test]
+    fn conversation_plans_route_mapped_forms_only() {
+        for (plan, expected) in [
+            (
+                CicsPlanOperation::AllocateConversation,
+                CicsOperation::AllocateConversation,
+            ),
+            (CicsPlanOperation::BuildAttach, CicsOperation::BuildAttach),
+            (
+                CicsPlanOperation::ConnectProcess,
+                CicsOperation::ConnectProcess,
+            ),
+            (CicsPlanOperation::Converse, CicsOperation::Converse),
+            (
+                CicsPlanOperation::FreeConversation,
+                CicsOperation::FreeConversation,
+            ),
+        ] {
+            assert_eq!(host_operation(plan), Some(expected));
+        }
+        for operation in [
+            CicsPlanOperation::GdsAllocateConversation,
+            CicsPlanOperation::GdsAssignConversation,
+            CicsPlanOperation::GdsConnectProcess,
+            CicsPlanOperation::GdsFreeConversation,
+        ] {
+            assert_eq!(host_operation(operation), None);
+        }
+        assert_eq!(
+            host_operation(CicsPlanOperation::Read),
+            Some(CicsOperation::Read)
+        );
     }
 }

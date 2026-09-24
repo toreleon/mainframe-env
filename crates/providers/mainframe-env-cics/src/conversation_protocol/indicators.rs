@@ -18,7 +18,7 @@ pub struct ConversationIndicators {
 }
 
 impl ConversationIndicators {
-    pub(super) fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 

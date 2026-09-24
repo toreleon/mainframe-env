@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 198,
+    "markdown_documents": 199,
     "navigation_groups": 5,
-    "normative_documents": 48,
+    "normative_documents": 49,
     "xtask_commands": 170
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:d96c0f9b4de2ce6ff0e962fbe87504ede7c7fa2bc42f0f9fcf941e6f9e98c0b9",
+      "sha256": "sha256:3c2fd97141e07577815156f6904912cac165af41a375c6bc6c5b0d00b62d692b",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 83,
-      "sha256": "sha256:dcb41b73bbf2ba31bc9a903781f4a07d9695248d0af4ac4694e34f932400b028",
+      "relative_links": 84,
+      "sha256": "sha256:576984b0257ae5de28106021148ce34c9244ab03ee362c5b272e0224b9e1ca40",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:494a81893d94fb9a70d5bf5246fb4a6d432e7e55417f05e941ef7ec53d66bc7b",
+      "sha256": "sha256:f5dc4ce7af371ae45a2d0e0da251f5040e1ab8282aca4432e589e630661eca2c",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -827,10 +827,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md",
+      "relative_links": 1,
+      "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
+      "sha256": "sha256:a136cbbfe1ee5fadd8a4f3d1f5bd756066494457b824e0881ae04272375fe9e2",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0020: Persist explicit conversation peer frames with protocol state",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 19,
-      "sha256": "sha256:896a8693debb840c53260e3da6865c6cb2212bfb06ab031f4727d4534b6893e2",
+      "relative_links": 20,
+      "sha256": "sha256:24ba234da3dcd7de76d2f04ad7237221dd8fabcc0ec31c350fcdc57ccfdd0822",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1185,8 +1197,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 88,
-      "sha256": "sha256:e3a5abee179127340b452289d938eca039168471e0106d739b021692bad95697",
+      "relative_links": 89,
+      "sha256": "sha256:4602b70141e254f9ce2654c0bb29a464958a9e012cda0114be241a30ada5c237",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
@@ -1964,6 +1976,10 @@
           "path": "docs/decisions/0019-bts-lifecycle-authority.md"
         },
         {
+          "label": "ADR-0020: Conversation peer exchange ledger",
+          "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2127,7 +2143,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:96da88e0424d33d800238df5d89f181896a6abfe92100595a4bdc5c38e5192de",
+  "registry_sha256": "sha256:5540daceaf12acb0e1ae44fd4e628765dbd2cf6b08ff323c4391f939737ef468",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

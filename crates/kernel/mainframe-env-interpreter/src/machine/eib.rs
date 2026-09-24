@@ -38,6 +38,7 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
+        ("EIBRSRCE".into(), CobolValue::Bytes(vec![b' '; 8])),
         (
             "EIBCPOSN".into(),
             CobolValue::Decimal(Decimal {
@@ -46,6 +47,8 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBEOC".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBSIG".into(), CobolValue::Bytes(vec![0x00])),
         ("EIBREQID".into(), CobolValue::Bytes(vec![0x00; 8])),
         (
             "EIBCALEN".into(),
@@ -84,6 +87,26 @@ pub(super) fn write_context(
         mainframe_env_ir::cics_application_registry_for_runtime_operation(operation.runtime_name())
     {
         machine.write("EIBFN", &descriptor.eibfn)?;
+    }
+    if operation == CicsOperation::AllocateConversation
+        && let Some(value) = response.outputs.get("EIBRSRCE")
+    {
+        if value.schema() != "mainframe-env.cics.eib-rsrce@1" || value.bytes().len() != 8 {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        machine.write("EIBRSRCE", value.bytes())?;
+    }
+    if operation == CicsOperation::Converse {
+        for name in ["EIBEOC", "EIBFMH", "EIBSIG"] {
+            if let Some(value) = response.outputs.get(name) {
+                if value.schema() != "mainframe-env.cics.eib-flag@1"
+                    || !matches!(value.bytes(), [0] | [0xff])
+                {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                }
+                machine.write(name, value.bytes())?;
+            }
+        }
     }
     if matches!(
         operation,

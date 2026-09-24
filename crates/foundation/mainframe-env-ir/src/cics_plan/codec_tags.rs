@@ -1,3 +1,4 @@
+mod conversation;
 mod options;
 mod output;
 pub(super) use options::{option_from_tag, option_tag};
@@ -11,6 +12,25 @@ use super::{
 const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
 const ASSIGN_OUTPUT_LEGACY_COUNT: u16 = 78;
 const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u16 = 96;
+
+pub(super) fn bounded_count(value: usize, maximum: usize) -> Result<(), CicsPlanCodecProblem> {
+    if value > maximum || u32::try_from(value).is_err() {
+        Err(CicsPlanCodecProblem::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+pub(super) fn require_order<T: Copy + Ord>(
+    previous: Option<T>,
+    current: T,
+) -> Result<(), CicsPlanCodecProblem> {
+    match previous {
+        Some(previous) if previous == current => Err(CicsPlanCodecProblem::Malformed),
+        Some(previous) if previous > current => Err(CicsPlanCodecProblem::NonCanonical),
+        _ => Ok(()),
+    }
+}
 
 #[cfg(test)]
 pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u16> = 68..=71;
@@ -198,6 +218,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::VerifyToken => 139,
         CicsPlanOperation::Signon => 136,
         CicsPlanOperation::Signoff => 135,
+        other => conversation::operation_tag(other),
     }
 }
 
@@ -378,7 +399,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         139 => Ok(CicsPlanOperation::VerifyToken),
         136 => Ok(CicsPlanOperation::Signon),
         135 => Ok(CicsPlanOperation::Signoff),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::operation_from_tag(value),
     }
 }
 
@@ -689,6 +710,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebSendUriMap => 290,
         CicsOperandName::WebReceiveMaxLength => 291,
         CicsOperandName::WebReceiveStatusLength => 292,
+        other => conversation::operand_tag(other),
     }
 }
 
@@ -999,6 +1021,6 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         290 => Ok(CicsOperandName::WebSendUriMap),
         291 => Ok(CicsOperandName::WebReceiveMaxLength),
         292 => Ok(CicsOperandName::WebReceiveStatusLength),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::operand_from_tag(value),
     }
 }

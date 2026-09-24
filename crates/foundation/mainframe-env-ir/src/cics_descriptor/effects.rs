@@ -1,5 +1,17 @@
 use super::*;
 
+pub(super) const CONVERSATION_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalRead,
+    Effect::TerminalWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
+
 pub(super) const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 pub(super) const TRACE_EFFECTS: &[Effect] = &[
     Effect::MemoryWrite,
