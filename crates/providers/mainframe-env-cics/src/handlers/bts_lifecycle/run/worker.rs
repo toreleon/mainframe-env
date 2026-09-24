@@ -119,6 +119,9 @@ impl<'a> BtsLifecycleStore<'a> {
             if record.state == BtsRunState::Finished {
                 return Ok(None);
             }
+            if record.state == BtsRunState::Deferred {
+                return Err(HostProblem::IdempotencyConflict);
+            }
             let mut process = self
                 .load_process(&record.process_type, &record.process_name)?
                 .ok_or_else(key)?;

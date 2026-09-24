@@ -21,6 +21,7 @@ mod worker;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BtsRunState {
+    Deferred,
     Pending,
     Attached,
     Finished,
@@ -64,6 +65,8 @@ pub struct BtsRunRecord {
 struct BtsRunOutbox {
     schema_version: String,
     pending: BTreeSet<String>,
+    #[serde(default)]
+    deferred: BTreeSet<String>,
     #[serde(skip)]
     row_version: u64,
 }
@@ -73,16 +76,19 @@ impl BtsRunOutbox {
         Self {
             schema_version: OUTBOX_SCHEMA.into(),
             pending: BTreeSet::new(),
+            deferred: BTreeSet::new(),
             row_version: 0,
         }
     }
 
     fn validate(&self) -> Result<(), HostProblem> {
         if self.schema_version != OUTBOX_SCHEMA
-            || self.pending.len() > MAX_PENDING_RUNS
+            || self.pending.len() + self.deferred.len() > MAX_PENDING_RUNS
+            || !self.pending.is_disjoint(&self.deferred)
             || self
                 .pending
                 .iter()
+                .chain(self.deferred.iter())
                 .any(|id| id.len() != 64 || !id.bytes().all(|b| b.is_ascii_hexdigit()))
         {
             return Err(HostProblem::InfrastructureFailure);
@@ -118,6 +124,7 @@ impl BtsRunRecord {
             || self.input_event != "DFHINITIAL"
                 && super::super::event_control::event_name(&self.input_event).is_err()
             || self.scheduled_tick == 0
+            || self.state == BtsRunState::Deferred && self.synchronous
             || self.state == BtsRunState::Finished && self.completion.is_none()
             || self.state != BtsRunState::Finished && self.completion.is_some()
             || self.abcode.as_deref().is_some_and(|code| code.len() != 4)
@@ -129,6 +136,9 @@ impl BtsRunRecord {
 
     pub fn work_record(&self) -> Result<WorkRecord, HostProblem> {
         self.validate()?;
+        if self.state == BtsRunState::Deferred {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         let limits = InvocationLimits::default();
         Ok(WorkRecord {
             work_id: self.work_id.clone(),
@@ -504,7 +514,7 @@ impl<'a> BtsLifecycleStore<'a> {
                 return Err(HostProblem::IdempotencyConflict);
             }
             let mut outbox = self.load_run_outbox()?;
-            if outbox.pending.len() >= MAX_PENDING_RUNS {
+            if outbox.pending.len() + outbox.deferred.len() >= MAX_PENDING_RUNS {
                 return Err(HostProblem::ResourceExhausted);
             }
             let old_version = process.row_version;
@@ -1329,5 +1339,46 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn deferred_outbox_reader_is_additive_and_cannot_enqueue_work() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = published_process(&authority);
+        let first = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "run", [1; 32], [1; 32], 1000, 5,
+            )
+            .unwrap();
+        let row = memory
+            .get_provider_state(OUTBOX_NAMESPACE, "pending")
+            .unwrap()
+            .unwrap();
+        let mut old: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        old.as_object_mut().unwrap().remove("deferred");
+        memory
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: row.version + 1,
+                    payload: serde_json::to_vec(&old).unwrap(),
+                    ..row.clone()
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        let loaded = authority.load_run_outbox().unwrap();
+        assert!(loaded.deferred.is_empty());
+        assert!(loaded.pending.contains(&first.run_id));
+        let mut invalid = loaded.clone();
+        invalid.deferred.insert(first.run_id.clone());
+        assert_eq!(invalid.validate(), Err(HostProblem::InfrastructureFailure));
+        let mut deferred = first;
+        deferred.state = BtsRunState::Deferred;
+        let encoded = serde_json::to_vec(&deferred).unwrap();
+        let decoded: BtsRunRecord = serde_json::from_slice(&encoded).unwrap();
+        decoded.validate().unwrap();
+        assert_eq!(decoded.work_record(), Err(HostProblem::IdempotencyConflict));
     }
 }

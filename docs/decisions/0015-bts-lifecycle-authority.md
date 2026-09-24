@@ -156,6 +156,16 @@ committed with the process CAS and event pool, without a second outbox entry.
 A fired event reports `EVENTERR 111/7`; exact retries return the retained
 activation. Memory and SQLite reopen regressions cover the event queue and
 single work identity. Source: the same baseline C RUN topic, lines 119–126.
+The additive RUN outbox now has a disjoint, bounded deferred set and the RUN
+record can name a deferred asynchronous state. First-version outboxes lacking
+that set remain readable. Work conversion and lease promotion reject deferred
+records; the public SUSPEND/RESUME path does not create or release them yet.
+This prepares an atomic deferred-to-pending transition without admitting work
+while suspended. Source: baseline C SUSPEND rows `0215`–`0217`,
+`dfhp4_suspendbts.html` SHA-256
+`ddae8c6a987bb1f1341ef0f34040a150a60fa6b449c6ef8de16c7abf480049cd`;
+baseline B RESUME rows `0172`–`0174`, `dfhp4_resume.html` SHA-256
+`350da29cf791bb80915ba22880a6919b1f313e89cf858440013031a993f2eb7f`.
 
 Terminal parent completion deletes settled descendants, their activity
 indexes, and direct-child completion events atomically with the parent RUN

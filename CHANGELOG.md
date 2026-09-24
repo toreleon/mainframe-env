@@ -29,6 +29,10 @@ All notable changes to mainframe-env are documented here.
   coalesce into one active worker while each event and exact request replay
   commits atomically. Repeating a fired event retains EVENTERR 111/7.
 
+- Added an additive deferred BTS RUN state and bounded deferred outbox index.
+  Retained v1 outboxes without the field remain readable; deferred records
+  cannot be enqueued or promoted as work.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.
