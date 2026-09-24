@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod allocate;
 mod data;
 mod definitions;
+mod exchange;
 mod free;
 mod gds;
 mod gds_allocate;

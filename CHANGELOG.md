@@ -48,6 +48,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Versioned the conversation ledger for explicit APPC/MRO peer frames and
+  outbound exchange records. Version 1 rows reopen unchanged and upgrade on
+  mutation; trusted frame offers are bounded, owner-fenced, and CAS replayed.
+  No peer response is inferred from a local send or MQ acknowledgement.
+
 - Added APPC basic GDS FREE with six-byte RETCODE outcomes and source-pinned
   zero STATE CVDA after release. A trusted peer-completion hook records FREE
   protocol state and an exact replay receipt before GDS FREE can return session

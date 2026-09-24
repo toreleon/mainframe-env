@@ -37376,4 +37376,81 @@ mod tests {
             Err(HostProblem::Unsupported)
         );
     }
+
+    #[test]
+    fn explicit_conversation_peer_frame_is_durable_and_replay_fenced() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            1,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRN1")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, connect.clone(), 2),
+            connect,
+        )
+        .unwrap();
+        let frame = ConversationPeerFrame {
+            data: b"RESPONSE".to_vec(),
+            next_state: ConversationState::Receive,
+            end_of_chain: true,
+            inbound_fmh: false,
+            signal: false,
+        };
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            frame.clone(),
+            "frame-1",
+        )
+        .unwrap();
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            frame.clone(),
+            "frame-1",
+        )
+        .unwrap();
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let key = u32::from_be_bytes(token).to_string();
+        assert_eq!(ledger.exchanges[&key].inbound, vec![frame.clone()]);
+        let mut conflicting = frame;
+        conflicting.data = b"DIFFERENT".to_vec();
+        assert_eq!(
+            cics.offer_conversation_peer_frame(
+                &invocation.run_unit_id,
+                token,
+                conflicting,
+                "frame-1",
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+    }
 }
