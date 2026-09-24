@@ -469,6 +469,7 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
 
 mod cancel;
 mod children;
+mod container_scope;
 mod context;
 mod participant;
 mod removal;
@@ -477,6 +478,7 @@ mod run;
 mod store;
 mod transid;
 mod transitions;
+pub use container_scope::{BtsAcquiredProcessContainerScope, BtsProcessContainerAccess};
 pub use context::BtsActivityContext;
 pub(in crate::service) use participant::settle_recorded_uow;
 pub use run::{BTS_RUN_WORK_GENERATION, BtsRunRecord, BtsRunState};
