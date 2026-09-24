@@ -425,6 +425,7 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
     schema_version: 1,
 };
 
+mod cancel;
 mod children;
 mod context;
 mod participant;

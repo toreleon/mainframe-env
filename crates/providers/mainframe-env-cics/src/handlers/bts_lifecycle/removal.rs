@@ -80,6 +80,76 @@ impl<'a> BtsLifecycleStore<'a> {
                 }
             };
             let mut writes = Vec::with_capacity(removed.len() + 1);
+            match removal {
+                BtsRemoval::Reset { activity_id } => {
+                    let subject = original
+                        .get(activity_id)
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    if let Some(parent) = subject.parent_id.as_deref()
+                        && let Some(event) =
+                            super::super::event_control::activity_completion::reset(
+                                self.store,
+                                parent,
+                                subject
+                                    .completion_event
+                                    .as_deref()
+                                    .ok_or(HostProblem::InfrastructureFailure)?,
+                                activity_id,
+                            )?
+                    {
+                        writes.push(event);
+                    }
+                    let children = original
+                        .values()
+                        .filter(|child| {
+                            child.parent_id.as_deref() == Some(activity_id.as_str())
+                                && !process.activities.contains_key(&child.id)
+                        })
+                        .map(|child| {
+                            Ok((
+                                child
+                                    .completion_event
+                                    .clone()
+                                    .ok_or(HostProblem::InfrastructureFailure)?,
+                                child.id.clone(),
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, HostProblem>>()?;
+                    if !children.is_empty()
+                        && let Some(event) =
+                            super::super::event_control::activity_completion::delete_many(
+                                self.store,
+                                activity_id,
+                                &children,
+                            )?
+                    {
+                        writes.push(event);
+                    }
+                }
+                BtsRemoval::Delete {
+                    parent_id,
+                    child_name,
+                } => {
+                    let child = original
+                        .values()
+                        .find(|child| {
+                            child.parent_id.as_deref() == Some(parent_id)
+                                && child.name == *child_name
+                        })
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    if let Some(event) = super::super::event_control::activity_completion::delete(
+                        self.store,
+                        parent_id,
+                        child
+                            .completion_event
+                            .as_deref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                        &child.id,
+                    )? {
+                        writes.push(event);
+                    }
+                }
+            }
             for id in removed {
                 let index = self
                     .load_activity_index(&id)?
@@ -95,9 +165,14 @@ impl<'a> BtsLifecycleStore<'a> {
                 }
                 writes.push(ProviderStateMutation::Delete {
                     namespace: ACTIVITY_INDEX_NAMESPACE.into(),
-                    key: id,
+                    key: id.clone(),
                     expected_version: index.row_version,
                 });
+                if let Some(pool) =
+                    super::super::event_control::activity_completion::delete_pool(self.store, &id)?
+                {
+                    writes.push(pool);
+                }
             }
             let reply = BtsReply::normal();
             process.replays.insert(

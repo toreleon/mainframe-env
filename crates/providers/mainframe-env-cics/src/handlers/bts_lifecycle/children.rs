@@ -15,7 +15,13 @@ pub struct BtsChildDefinition {
 impl BtsChildDefinition {
     pub fn validate(&self) -> Result<(), HostProblem> {
         validate_name(&self.name, 16, false)?;
-        validate_name(&self.completion_event, 16, false)?;
+        if super::super::event_control::event_name(&self.completion_event)
+            .ok()
+            .as_deref()
+            != Some(self.completion_event.as_str())
+        {
+            return Err(HostProblem::Malformed);
+        }
         validate_identifier(&self.program, 8)?;
         validate_identifier(&self.transid, 4)?;
         validate_identifier(&self.userid, 8)?;
@@ -142,9 +148,16 @@ impl<'a> BtsLifecycleStore<'a> {
                 .epoch
                 .checked_add(1)
                 .ok_or(HostProblem::ResourceExhausted)?;
+            let completion_event = super::super::event_control::activity_completion::define(
+                self.store,
+                parent_id,
+                &definition.completion_event,
+                &id,
+            )?;
             match self.store.mutate_provider_states_atomic(vec![
                 put_process(&key, &process, Some(expected))?,
                 put_activity_index(&index, None)?,
+                completion_event,
             ]) {
                 Ok(()) => return Ok(id),
                 Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
@@ -203,6 +216,7 @@ impl<'a> BtsLifecycleStore<'a> {
             .map(|activity| activity.id.clone())
             .collect::<Vec<_>>();
         let mut writes = Vec::with_capacity(pending.len());
+        let mut removed_events: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
         for id in pending {
             let index = self
                 .load_activity_index(&id)?
@@ -226,12 +240,31 @@ impl<'a> BtsLifecycleStore<'a> {
                 if process.activities[&id].acquired_by.is_some() {
                     return Err(condition("LOCKED", 100, 0));
                 }
-                process.activities.remove(&id);
+                let child = process
+                    .activities
+                    .remove(&id)
+                    .expect("selected pending child");
+                removed_events
+                    .entry(child.parent_id.ok_or(HostProblem::InfrastructureFailure)?)
+                    .or_default()
+                    .push((
+                        child
+                            .completion_event
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                        id.clone(),
+                    ));
                 writes.push(ProviderStateMutation::Delete {
                     namespace: ACTIVITY_INDEX_NAMESPACE.into(),
                     key: id,
                     expected_version: index.row_version,
                 });
+            }
+        }
+        for (parent, children) in removed_events {
+            if let Some(event) = super::super::event_control::activity_completion::delete_many(
+                self.store, &parent, &children,
+            )? {
+                writes.push(event);
             }
         }
         Ok(writes)
@@ -249,6 +282,7 @@ fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::handlers::event_control;
     use mainframe_env_store::MemoryStore;
 
     fn active_process<'a>(authority: &BtsLifecycleStore<'a>) -> String {
@@ -298,6 +332,11 @@ mod tests {
             )
             .unwrap();
         assert_eq!(id.len(), 52);
+        let pool = event_control::load_activity_from_store(&memory, &root).unwrap();
+        assert!(matches!(
+            &pool.events["DONE"].kind,
+            event_control::EventKind::Activity { child_id } if child_id == &id
+        ));
         let replay = authority
             .define_child(
                 "TYPE", "ORDER", &root, &child, "UOW2", "EXEC2", "USER", "define", [2; 32],
@@ -369,6 +408,8 @@ mod tests {
             .finish_uow("UOW2", "EXEC2", "USER", false)
             .unwrap();
         assert!(authority.load_activity_index(&id).unwrap().is_none());
+        let pool = event_control::load_activity_from_store(&memory, &root).unwrap();
+        assert!(!pool.events.contains_key("DONE"));
         let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
         assert_eq!(process.activities.len(), 1);
         assert!(process.activities.contains_key(&root));

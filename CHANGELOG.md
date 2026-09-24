@@ -74,6 +74,11 @@ All notable changes to mainframe-env are documented here.
   delivery accepts that exact indexed activity, while closed contexts cannot
   fall back to a legacy event binding.
 
+- Added activity completion events to the existing BTS event pool and made
+  child definition, rollback, reset, delete, and forced cancellation update
+  their process and event rows in one atomic store mutation. This remains
+  shared authority work; public lifecycle command registration is pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

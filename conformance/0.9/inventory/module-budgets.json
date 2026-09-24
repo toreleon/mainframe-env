@@ -286,6 +286,7 @@
     "handler_modules": [
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/cancel.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/children.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/context.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/participant.rs",
@@ -313,6 +314,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/document_control/set.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/transport.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/event_control/activity_completion.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/composite.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/delete.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/timer.rs",

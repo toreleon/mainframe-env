@@ -8,7 +8,9 @@ use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
     HostRequest, canonical_request_digest,
 };
-use mainframe_env_store_api::{ProviderStateRecord, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -21,6 +23,7 @@ const MAX_QUEUE: usize = 256;
 const MAX_REPLAYS: usize = 512;
 const MAX_CAS_ATTEMPTS: usize = 8;
 
+pub(in crate::service) mod activity_completion;
 mod composite;
 mod delete;
 mod retrieve;
@@ -49,6 +52,9 @@ pub(super) struct EventRecord {
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum EventKind {
     Input,
+    Activity {
+        child_id: String,
+    },
     Composite {
         all: bool,
         children: Vec<String>,
@@ -508,8 +514,14 @@ pub(super) fn load_activity(
     service: &CicsService,
     activity: &str,
 ) -> Result<ActivityState, HostProblem> {
-    let Some(row) = service
-        .store
+    load_activity_from_store(service.store.as_ref(), activity)
+}
+
+pub(in crate::service) fn load_activity_from_store(
+    store: &dyn ProviderStateStore,
+    activity: &str,
+) -> Result<ActivityState, HostProblem> {
+    let Some(row) = store
         .get_provider_state(ACTIVITY_NAMESPACE, activity)
         .map_err(store_error)?
     else {
@@ -523,6 +535,30 @@ pub(super) fn load_activity(
     state.version = row.version;
     validate_activity(&state)?;
     Ok(state)
+}
+
+pub(in crate::service) fn activity_mutation(
+    activity: &str,
+    state: &ActivityState,
+) -> Result<ProviderStateMutation, HostProblem> {
+    validate_activity(state)?;
+    let payload = serde_json::to_vec(state).map_err(|_| HostProblem::ResourceExhausted)?;
+    if payload.len() > MAX_ACTIVITY_BYTES {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let version = state
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok(ProviderStateMutation::Put(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: ACTIVITY_NAMESPACE.into(),
+            key: activity.into(),
+            version,
+            payload,
+        },
+        expected_version: (state.version != 0).then_some(state.version),
+    }))
 }
 
 pub(super) fn persist_activity(

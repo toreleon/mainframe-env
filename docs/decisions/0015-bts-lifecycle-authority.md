@@ -61,6 +61,11 @@ Existing event commands resolve a registered run's BTS context first and use
 the 52-character lifecycle activity ID as their event-pool key. Closed BTS
 bindings block fallback to the older standalone event context. Input-event
 delivery checks the indexed active activity before changing event state.
+An activity completion event is an `Activity` event-pool record bound to its
+exact child ID. DEFINE ACTIVITY creates it with the child and index in one
+store mutation. Rollback and DELETE remove it, RESET clears its fired state,
+and forced CANCEL fires it with the process transition. Composite memberships
+and reattachment queues change in the same event-row mutation.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed

@@ -38,6 +38,11 @@ pub(super) fn validate(state: &ActivityState) -> Result<(), HostProblem> {
         }
         match &event.kind {
             EventKind::Input => {}
+            EventKind::Activity { child_id } => {
+                if child_id.len() != 52 || !child_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+            }
             EventKind::Timer { timer } => {
                 let record = state
                     .timers
