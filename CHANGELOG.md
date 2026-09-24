@@ -20,6 +20,9 @@ All notable changes to mainframe-env are documented here.
   boundary. The shared conversation row retains a pre-dispatch marker, and a
   restarted flush reconciles the same send ID without transmitting it again.
   This internal adapter contract does not change application row readiness.
+- Added source-shaped GDS `CONVDATA` bytes for APPC basic receive and wait,
+  including field-complete, receive, signal, confirm, syncpoint, free, error
+  code, rollback, and zeroed reserved fields. GDS rows remain unready.
 
 ### Changed
 

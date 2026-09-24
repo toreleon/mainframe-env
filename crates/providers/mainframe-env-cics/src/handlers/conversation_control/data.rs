@@ -35,11 +35,16 @@ pub struct ConversationDataFrame {
     pub fmh: bool,
     pub signal: bool,
     pub end_structured_field: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<[u8; 4]>,
 }
 
 impl ConversationDataFrame {
     pub fn validate(&self) -> Result<(), ConversationProblem> {
-        if self.bytes.len() > MAX_FRAME_BYTES || self.signal && !self.bytes.is_empty() {
+        if self.bytes.len() > MAX_FRAME_BYTES
+            || self.signal && !self.bytes.is_empty()
+            || self.error_code.is_some() && (self.signal || !self.bytes.is_empty())
+        {
             return Err(ConversationProblem::Length);
         }
         Ok(())
@@ -67,6 +72,8 @@ pub struct ConversationDataState {
     outbound: Vec<StagedSend>,
     signal_pending: bool,
     terminal_error: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    peer_error_code: Option<[u8; 4]>,
     #[serde(default, skip_serializing_if = "is_zero")]
     last_peer_sequence: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -87,6 +94,7 @@ impl ConversationDataState {
             && self.outbound.is_empty()
             && !self.signal_pending
             && !self.terminal_error
+            && self.peer_error_code.is_none()
             && self.last_peer_sequence == 0
             && self.next_send_id == 0
             && self.last_acked_send_id == 0
@@ -167,10 +175,51 @@ pub struct ConversationDataReply {
     pub condition: DataCondition,
     pub end_of_chain: bool,
     pub inbound_fmh: bool,
+    /// CDBCOMPL source indicator for one LLID-delimited GDS field.
+    pub gds_field_complete: bool,
     pub state: ConversationState,
 }
 
 impl ConversationRecord {
+    /// Produce the 24-byte DFHCDBLK area from the retained APPC basic state.
+    /// Reserved bytes remain zero and no mapped EXEC condition is implied.
+    pub fn gds_convdata(&self, field_complete: bool) -> Result<[u8; 24], ConversationProblem> {
+        if self.kind != ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        let mut block = [0; 24];
+        block[0] = u8::from(field_complete) * 0xff; // CDBCOMPL
+        block[1] = u8::from(matches!(
+            self.state,
+            ConversationState::SyncReceive
+                | ConversationState::SyncSend
+                | ConversationState::SyncFree
+        )) * 0xff; // CDBSYNC
+        block[2] = u8::from(matches!(
+            self.state,
+            ConversationState::Free | ConversationState::ConfFree | ConversationState::SyncFree
+        )) * 0xff; // CDBFREE
+        block[3] = u8::from(matches!(
+            self.state,
+            ConversationState::Receive
+                | ConversationState::ConfReceive
+                | ConversationState::SyncReceive
+        )) * 0xff; // CDBRECV
+        block[4] = u8::from(self.data.signal_pending) * 0xff; // CDBSIG
+        block[5] = u8::from(matches!(
+            self.state,
+            ConversationState::ConfReceive
+                | ConversationState::ConfSend
+                | ConversationState::ConfFree
+        )) * 0xff; // CDBCONF
+        if let Some(code) = self.data.peer_error_code {
+            block[6] = 0xff; // CDBERR
+            block[7..11].copy_from_slice(&code); // CDBERRCD
+        }
+        block[11] = u8::from(self.state == ConversationState::Rollback) * 0xff; // CDBSYNRB
+        Ok(block)
+    }
+
     /// A partner change-direction indicator may arrive independently of local
     /// SEND INVITE. It is a verified transport event, not a delivery guess.
     pub fn peer_offered_data(
@@ -198,6 +247,9 @@ impl ConversationRecord {
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
         frame.validate()?;
+        if frame.error_code.is_some() && self.kind != ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
         let digest: [u8; 32] =
             Sha256::digest(serde_json::to_vec(&frame).map_err(|_| ConversationProblem::Malformed)?)
                 .into();
@@ -215,7 +267,9 @@ impl ConversationRecord {
         let mut next = self.data.clone();
         next.last_peer_sequence = peer_sequence;
         next.last_peer_digest = Some(digest);
-        if frame.signal {
+        if let Some(code) = frame.error_code {
+            next.peer_error_code = Some(code);
+        } else if frame.signal {
             next.signal_pending = true;
         } else {
             next.inbound.push(frame);
@@ -277,6 +331,7 @@ impl ConversationRecord {
             fmh,
             signal: false,
             end_structured_field: true,
+            error_code: None,
         };
         frame.validate()?;
         let next_state = if last {
@@ -397,6 +452,7 @@ impl ConversationRecord {
                 condition: DataCondition::Signal,
                 end_of_chain: false,
                 inbound_fmh: false,
+                gds_field_complete: false,
                 state: self.state,
             }));
         }
@@ -412,6 +468,7 @@ impl ConversationRecord {
                     condition: DataCondition::Normal,
                     end_of_chain: false,
                     inbound_fmh: false,
+                    gds_field_complete: false,
                     state: self.state,
                 }));
             }
@@ -420,6 +477,7 @@ impl ConversationRecord {
             let mut partial_take = 0usize;
             let mut end_of_chain = false;
             let mut inbound_fmh = false;
+            let mut field_complete = false;
             for frame in &self.data.inbound {
                 let room = max_length.saturating_sub(bytes.len());
                 let take = room.min(frame.bytes.len());
@@ -431,6 +489,7 @@ impl ConversationRecord {
                 }
                 consumed += 1;
                 end_of_chain = frame.end_of_chain;
+                field_complete = frame.end_structured_field;
                 if llid || frame.end_of_chain || bytes.len() == max_length {
                     break;
                 }
@@ -450,6 +509,7 @@ impl ConversationRecord {
                 condition: DataCondition::Normal,
                 end_of_chain,
                 inbound_fmh,
+                gds_field_complete: llid && field_complete,
                 state: self.state,
             }));
         }
@@ -486,6 +546,7 @@ impl ConversationRecord {
             condition,
             end_of_chain: consumed_end,
             inbound_fmh: frame.fmh,
+            gds_field_complete: false,
             state: self.state,
         }))
     }
@@ -556,6 +617,7 @@ mod tests {
             fmh: false,
             signal: false,
             end_structured_field: true,
+            error_code: None,
         }
     }
 
@@ -759,6 +821,11 @@ mod tests {
             .unwrap();
         assert_eq!(first.bytes, b"ABC");
         assert_eq!(first.condition, DataCondition::Normal);
+        assert!(first.gds_field_complete);
+        assert_eq!(
+            record.gds_convdata(first.gds_field_complete).unwrap()[0],
+            0xff
+        );
         assert_eq!(record.data.pending_inbound(), 1);
         let last = record
             .receive_data(&owner, ConversationContext::Local, true, 2, true, false)
@@ -774,6 +841,70 @@ mod tests {
         assert_eq!(final_part.bytes, b"FG");
         assert!(final_part.end_of_chain);
         assert_eq!(record.state, ConversationState::Send);
+    }
+
+    #[test]
+    fn basic_convdata_has_pinned_indicators_and_zero_reserved_bytes() {
+        let owner = owner();
+        let mut record = ConversationRecord::allocate(
+            *b"0005",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner.clone(),
+            false,
+        )
+        .unwrap();
+        record
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                vec![],
+                0,
+            )
+            .unwrap();
+        record
+            .peer_offered_data(&owner, ConversationContext::Local)
+            .unwrap();
+        record
+            .enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                1,
+                ConversationDataFrame {
+                    bytes: Vec::new(),
+                    end_of_chain: false,
+                    fmh: false,
+                    signal: true,
+                    end_structured_field: false,
+                    error_code: None,
+                },
+            )
+            .unwrap();
+        record
+            .enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                2,
+                ConversationDataFrame {
+                    bytes: Vec::new(),
+                    end_of_chain: false,
+                    fmh: false,
+                    signal: false,
+                    end_structured_field: false,
+                    error_code: Some([0x08, 0x89, 0, 0]),
+                },
+            )
+            .unwrap();
+        let data = record.gds_convdata(false).unwrap();
+        assert_eq!(data[3], 0xff); // CDBRECV
+        assert_eq!(data[4], 0xff); // CDBSIG
+        assert_eq!(data[6], 0xff); // CDBERR
+        assert_eq!(&data[7..11], &[0x08, 0x89, 0, 0]);
+        assert!(data[12..].iter().all(|byte| *byte == 0));
+        record.state = ConversationState::Rollback;
+        assert_eq!(record.gds_convdata(false).unwrap()[11], 0xff); // CDBSYNRB
     }
 
     #[test]
