@@ -92,10 +92,10 @@ EXPECTED_FAMILIES = {
     "recovery": "Recovery",
     "interval-control": "IntervalControl",
     "storage-control": "StorageControl",
-    "transform-control": "TransformControl",
-    "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "transform-control": "TransformControl",
+    "spool-control": "SpoolControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
     "builtin-function-control": "BuiltinFunctionControl",
