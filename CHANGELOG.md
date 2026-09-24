@@ -21,6 +21,10 @@ All notable changes to mainframe-env are documented here.
   conversation handler, including PREPARE and CONFIRMATION sync-level codes.
   These internal mappings do not register the five GDS ISSUE rows.
 
+- Added ISSUE owner, APPC form, sync-level, and state preflight to the sealed
+  conversation record. The check is mutation-free until a partner control is
+  staged and confirmed; no ISSUE route gains readiness.
+
 - Verified default ISSUE DISCONNECT and compatibility RESET against two
   concurrent PostgreSQL providers and restart replay. Each device and source
   session advances once; both catalog rows remain unregistered.

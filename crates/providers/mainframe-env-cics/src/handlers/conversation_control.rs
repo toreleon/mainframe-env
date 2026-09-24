@@ -22,6 +22,7 @@ mod gds_assign;
 mod gds_connect_process;
 mod gds_free;
 mod gds_issue;
+mod issue_transition;
 mod ledger;
 mod peer;
 mod replay;
@@ -39,6 +40,7 @@ pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
 };
 pub use gds_issue::{GdsIssueFailure, GdsIssueFlow};
+pub use issue_transition::IssueValidationProblem;
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
     ConversationSystemDefinition,

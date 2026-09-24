@@ -1,6 +1,6 @@
 //! Source-specific GDS ISSUE return codes over the shared APPC basic ledger.
 
-use super::{ConversationKind, ConversationProblem, GdsReturnCode};
+use super::{ConversationKind, ConversationProblem, GdsReturnCode, IssueValidationProblem};
 
 /// The five APPC basic ISSUE controls share the six-byte GDS result area.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,6 +23,17 @@ pub enum GdsIssueFailure {
 }
 
 impl GdsIssueFailure {
+    #[must_use]
+    pub const fn from_validation(
+        problem: IssueValidationProblem,
+        kind: ConversationKind,
+    ) -> Option<Self> {
+        match problem {
+            IssueValidationProblem::WrongSyncLevel => Some(Self::WrongSyncLevel),
+            IssueValidationProblem::Protocol(problem) => Self::from_problem(problem, kind),
+        }
+    }
+
     /// Only source-defined protocol failures become GDS return codes.
     /// Corrupt rows and resource failures remain infrastructure outcomes.
     #[must_use]
