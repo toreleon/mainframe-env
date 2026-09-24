@@ -79,10 +79,27 @@ pub(in crate::service) fn invoke(
             .cloned()
             .ok_or(HostProblem::NotFound)?
     };
-    let terminal = current_session
-        .input
-        .terminal_id
-        .as_deref()
+    let alternate_lu61 = request
+        .arguments
+        .get("SESSION")
+        .map(|value| {
+            let bytes = value.bytes();
+            if !(1..=4).contains(&bytes.len()) {
+                return Err(HostProblem::Malformed);
+            }
+            let name = std::str::from_utf8(bytes)
+                .map_err(|_| HostProblem::Malformed)?
+                .trim_end()
+                .to_ascii_uppercase();
+            if !valid_name(&name, 4) {
+                return Err(HostProblem::Malformed);
+            }
+            Ok(name)
+        })
+        .transpose()?;
+    let terminal = alternate_lu61
+        .clone()
+        .or_else(|| current_session.input.terminal_id.clone())
         .ok_or_else(not_allocated)?;
     if matches!(
         request.operation,
@@ -110,7 +127,7 @@ pub(in crate::service) fn invoke(
             CicsOperation::IssueDisconnect | CicsOperation::IssueReset
         )
         && !request.arguments.contains_key("SESSION");
-    if !current_session.connected && !already_disconnected {
+    if !current_session.connected && !already_disconnected && alternate_lu61.is_none() {
         return Err(not_allocated());
     }
     if service
@@ -125,6 +142,13 @@ pub(in crate::service) fn invoke(
     let current = IssueDeviceRecord::load(service.store.as_ref(), &terminal)
         .map_err(store_error)?
         .ok_or_else(not_allocated)?;
+    if alternate_lu61.is_some()
+        && (current.definition.kind != IssueDeviceKind::Lu61
+            || current.state.lu61_owner_run_unit.as_deref()
+                != Some(run.invocation.run_unit_id.as_str()))
+    {
+        return Err(not_allocated());
+    }
     service.authorize(
         run,
         "FACILITY",
@@ -194,10 +218,10 @@ pub(in crate::service) fn invoke(
             .map_err(|problem| device_condition(request.operation, problem))?;
         }
         CicsOperation::IssueDisconnect | CicsOperation::IssueReset => {
-            if request.arguments.contains_key("SESSION") {
-                return Err(HostProblem::Unsupported);
-            }
-            if already_disconnected {
+            if alternate_lu61.is_some() {
+                next.disconnect()
+                    .map_err(|problem| device_condition(request.operation, problem))?;
+            } else if already_disconnected {
                 if !current.state.disconnected {
                     return Err(HostProblem::UnknownOutcome);
                 }
@@ -547,6 +571,9 @@ fn device_condition(operation: CicsOperation, problem: IssueDeviceProblem) -> Ho
     match (operation, problem) {
         (CicsOperation::IssueLoad, IssueDeviceProblem::NotConfigured) => condition("NONVAL", 9, 0),
         (CicsOperation::IssueLoad, IssueDeviceProblem::Disconnected) => condition("NOSTART", 10, 0),
+        (CicsOperation::IssueDisconnect, IssueDeviceProblem::NotConfigured) => {
+            condition("TERMERR", 81, 0)
+        }
         (_, IssueDeviceProblem::WrongDevice | IssueDeviceProblem::NotConfigured) => {
             condition("INVREQ", 16, 0)
         }

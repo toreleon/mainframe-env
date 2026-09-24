@@ -85,7 +85,11 @@ All notable changes to mainframe-env are documented here.
 
 - Added guarded default-facility ISSUE DISCONNECT and compatibility ISSUE
   RESET effects with atomic physical-device and terminal-session updates.
-  The source's alternate SESSION form remains pending.
+
+- Added the LUTYPE6.1 ISSUE DISCONNECT `SESSION` form over the existing
+  physical facility record. A one to four character alternate TCTTE must be
+  owned by the issuing task; device and receipt commit atomically, leaving
+  the principal terminal connected. APPC/MRO ownership remains shared.
 
 - Verified default ISSUE DISCONNECT receipt replay across SQLite restart with
   the session already closed; a new default request returns NORMAL without

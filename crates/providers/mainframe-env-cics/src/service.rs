@@ -7611,6 +7611,120 @@ mod tests {
     }
 
     #[test]
+    fn issue_disconnect_alternate_lu61_is_owner_fenced_and_capability_checked() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        for (terminal, allowed) in [("S001", true), ("S002", false)] {
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.into(),
+                kind: handlers::IssueDeviceKind::Lu61,
+                control_unit: None,
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: allowed,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let current = handlers::IssueDeviceRecord::load(store.as_ref(), terminal)
+                .unwrap()
+                .unwrap();
+            let mut owned = current.clone();
+            owned
+                .assign_lu61_owner(invocation.run_unit_id.as_str())
+                .unwrap();
+            current.persist(&mut owned, store.as_ref()).unwrap();
+        }
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let alternate = request(
+            CicsOperation::IssueDisconnect,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+            1,
+        );
+        let response = handlers::invoke_issue_device(&service, &mut run, &alternate).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        assert!(service.lock().unwrap().sessions[session.as_str()].connected);
+        let closed = handlers::IssueDeviceRecord::load(store.as_ref(), "S001")
+            .unwrap()
+            .unwrap();
+        assert!(closed.state.disconnected);
+        assert_eq!(closed.version, 3);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &alternate),
+            Ok(response)
+        );
+        let foreign_invocation = invocation_for("lu61-foreign", BTreeMap::new());
+        let foreign_session = SessionId::new("lu61-foreign", 64).unwrap();
+        service.create_session(&foreign_session, 24, 80).unwrap();
+        service
+            .register_run(
+                foreign_invocation.clone(),
+                &foreign_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let mut foreign = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&foreign_invocation.run_unit_id)
+            .unwrap();
+        let unowned = request(
+            CicsOperation::IssueDisconnect,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+            2,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut foreign, &unowned),
+            Err(HostProblem::Condition {
+                name: "NOTALLOC".into(),
+                response: 61,
+                response2: 0,
+            })
+        );
+        let denied = request(
+            CicsOperation::IssueDisconnect,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S002"))]),
+            3,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &denied),
+            Err(HostProblem::Condition {
+                name: "TERMERR".into(),
+                response: 81,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "S002")
+                .unwrap()
+                .unwrap()
+                .version,
+            2
+        );
+        let malformed = request(
+            CicsOperation::IssueDisconnect,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"ABCDE"))]),
+            4,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &malformed),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
     fn issue_eraseaup_wait_clears_only_unprotected_fields_and_mdt() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store);
