@@ -14,6 +14,7 @@ mod assign;
 mod diagnostics;
 mod legacy;
 mod names;
+mod output_capacity;
 mod registry;
 mod response;
 mod response_output;
@@ -25,7 +26,6 @@ use runtime_validation::validate_machine_slot;
 mod spool_control;
 mod storage64;
 mod task_wait;
-mod web_control;
 mod web_service_control;
 pub(super) use address::CicsAddressSet;
 use diagnostics::{argument_summary, invalid_plan};
@@ -473,7 +473,7 @@ pub(super) fn execute(
         }
         let target = CicsTarget::Resolved(output.target.clone());
         web_service_control::output_arguments(machine, output.name, &target, &mut arguments)?;
-        if let Some((name, capacity)) = web_control::output_capacity(machine, output.name, &target)?
+        if let Some((name, capacity)) = output_capacity::for_binding(machine, output.name, &target)?
         {
             arguments.insert(name, capacity);
         }

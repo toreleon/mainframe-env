@@ -308,10 +308,10 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         CicsPlanOperation::BuildAttach => CicsOperation::BuildAttach,
         CicsPlanOperation::ConnectProcess => CicsOperation::ConnectProcess,
         CicsPlanOperation::FreeConversation => CicsOperation::FreeConversation,
+        CicsPlanOperation::Converse => CicsOperation::Converse,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::GdsConnectProcess
-        | CicsPlanOperation::Converse
         | CicsPlanOperation::GdsFreeConversation => return None,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
@@ -1069,19 +1069,29 @@ mod conversation_tests {
     use super::*;
 
     #[test]
-    fn unregistered_conversation_plans_have_no_host_alias() {
-        assert_eq!(
-            host_operation(CicsPlanOperation::AllocateConversation),
-            Some(CicsOperation::AllocateConversation)
-        );
+    fn conversation_plans_route_mapped_forms_only() {
+        for (plan, expected) in [
+            (
+                CicsPlanOperation::AllocateConversation,
+                CicsOperation::AllocateConversation,
+            ),
+            (CicsPlanOperation::BuildAttach, CicsOperation::BuildAttach),
+            (
+                CicsPlanOperation::ConnectProcess,
+                CicsOperation::ConnectProcess,
+            ),
+            (CicsPlanOperation::Converse, CicsOperation::Converse),
+            (
+                CicsPlanOperation::FreeConversation,
+                CicsOperation::FreeConversation,
+            ),
+        ] {
+            assert_eq!(host_operation(plan), Some(expected));
+        }
         for operation in [
             CicsPlanOperation::GdsAllocateConversation,
             CicsPlanOperation::GdsAssignConversation,
-            CicsPlanOperation::BuildAttach,
-            CicsPlanOperation::ConnectProcess,
             CicsPlanOperation::GdsConnectProcess,
-            CicsPlanOperation::Converse,
-            CicsPlanOperation::FreeConversation,
             CicsPlanOperation::GdsFreeConversation,
         ] {
             assert_eq!(host_operation(operation), None);

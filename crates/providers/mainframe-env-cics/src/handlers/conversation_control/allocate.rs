@@ -111,13 +111,20 @@ pub(super) fn invoke(
         };
         let mut eibrsrce = [b' '; 8];
         eibrsrce[..4].copy_from_slice(&allocated.token);
+        let mut outputs = BTreeMap::from([("EIBRSRCE".into(), eibrsrce.to_vec())]);
+        if request.arguments.contains_key("STATE") {
+            outputs.insert(
+                "STATE".into(),
+                super::state_cvda::bytes(ConversationState::Allocated),
+            );
+        }
         let reply = ConversationReply {
             condition: "NORMAL".into(),
             response: 0,
             response2: 0,
             state: Some(ConversationState::Allocated),
             token: Some(allocated.token),
-            outputs: BTreeMap::from([("EIBRSRCE".into(), eibrsrce.to_vec())]),
+            outputs,
         };
         let replay = ConversationReplay {
             schema_version: 1,
@@ -150,13 +157,13 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
     let has_partner = request.arguments.contains_key("PARTNER");
     if has_sysid == has_partner
         || request.arguments.contains_key("PROFILE") && !has_sysid
-        || request.arguments.contains_key("STATE")
         || request.arguments.keys().any(|name| {
             !matches!(
                 name.as_str(),
                 "SYSID"
                     | "PARTNER"
                     | "PROFILE"
+                    | "STATE"
                     | "RESP"
                     | "RESP2"
                     | "OPTION.NOQUEUE"
@@ -255,6 +262,7 @@ fn response(
         )
         .map_err(|_| HostProblem::ResourceExhausted)?,
     );
+    super::state_cvda::insert_output(&mut result, reply.outputs.get("STATE"))?;
     Ok(result)
 }
 

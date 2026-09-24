@@ -6,6 +6,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added mapped APPC/MRO CONVERSE over explicit durable peer frames. It sends
+  bounded application data, consumes one real peer result, records outbound
+  data and protocol state atomically with replay, and reports source EOC,
+  INBFMH, SIGNAL and LENGERR outcomes. NOTRUNCATE retains the remainder for a
+  later RECEIVE sibling. The reviewed numeric conversation STATE table now
+  supplies fullword CVDA outputs for ALLOCATE, GDS ALLOCATE, CONNECT PROCESS,
+  GDS CONNECT PROCESS and CONVERSE. Selected compiled COBOL routes pass on Memory and
+  SQLite, and the isolated application registry reaches 160 typed, 0 legacy,
+  and 103 unready.
+
 - Versioned the conversation ledger for explicit APPC/MRO peer frames and
   outbound exchange records. Version 1 rows reopen unchanged and upgrade on
   mutation; trusted frame offers are bounded, owner-fenced, and CAS replayed.

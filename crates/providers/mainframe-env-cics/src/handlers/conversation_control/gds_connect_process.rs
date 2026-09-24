@@ -168,13 +168,20 @@ pub(super) fn invoke(
             Err(ConversationProblem::StaleOwner) => return Err(HostProblem::IdempotencyConflict),
             Err(problem) => return response(service, run, &failure_reply(map_problem(problem))),
         }
+        let mut outputs = BTreeMap::from([("RETCODE".into(), GdsReturnCode::NORMAL.0.to_vec())]);
+        if request.arguments.contains_key("STATE") {
+            outputs.insert(
+                "STATE".into(),
+                super::state_cvda::bytes(ConversationState::Send),
+            );
+        }
         let reply = ConversationReply {
             condition: "NORMAL".into(),
             response: 0,
             response2: 0,
             state: Some(ConversationState::Send),
             token: Some(token),
-            outputs: BTreeMap::from([("RETCODE".into(), GdsReturnCode::NORMAL.0.to_vec())]),
+            outputs,
         };
         let replay = ConversationReplay {
             schema_version: 1,
@@ -209,7 +216,6 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
         || has("PROCNAME") == has("PARTNER")
         || has("PROCNAME") != has("PROCLENGTH")
         || has("PIPLIST") != has("PIPLENGTH")
-        || has("STATE")
         || has("CONVDATA")
         || request.arguments.keys().any(|name| {
             !matches!(
@@ -222,6 +228,7 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
                     | "PIPLENGTH"
                     | "SYNCLEVEL"
                     | "RETCODE"
+                    | "STATE"
                     | "RESP"
                     | "RESP2"
                     | "OPTION.NOHANDLE"
@@ -290,5 +297,6 @@ fn response(
         BoundedPayload::new(RETCODE_SCHEMA, code.clone(), InvocationLimits::default())
             .map_err(|_| HostProblem::ResourceExhausted)?,
     );
+    super::state_cvda::insert_output(&mut result, reply.outputs.get("STATE"))?;
     Ok(result)
 }

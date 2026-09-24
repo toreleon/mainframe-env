@@ -47,6 +47,8 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBEOC".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBSIG".into(), CobolValue::Bytes(vec![0x00])),
         ("EIBREQID".into(), CobolValue::Bytes(vec![0x00; 8])),
         (
             "EIBCALEN".into(),
@@ -93,6 +95,18 @@ pub(super) fn write_context(
             return Err(MachineProblem::UnexpectedHostResult);
         }
         machine.write("EIBRSRCE", value.bytes())?;
+    }
+    if operation == CicsOperation::Converse {
+        for name in ["EIBEOC", "EIBFMH", "EIBSIG"] {
+            if let Some(value) = response.outputs.get(name) {
+                if value.schema() != "mainframe-env.cics.eib-flag@1"
+                    || !matches!(value.bytes(), [0] | [0xff])
+                {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                }
+                machine.write(name, value.bytes())?;
+            }
+        }
     }
     if matches!(
         operation,

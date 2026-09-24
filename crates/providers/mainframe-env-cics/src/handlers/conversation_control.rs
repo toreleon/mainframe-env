@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod allocate;
 mod build_attach;
 mod connect_process;
+mod converse;
 mod definitions;
 mod exchange;
 mod free;
@@ -22,6 +23,7 @@ mod gds_free;
 mod ledger;
 mod peer;
 mod replay;
+mod state_cvda;
 pub use definitions::{
     ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
     ConversationProfileDefinition,
@@ -67,6 +69,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::GdsFreeConversation => {
             gds_free::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::Converse => converse::invoke(service, run, request, retention_tick),
         _ => Err(HostProblem::Unsupported),
     }
 }

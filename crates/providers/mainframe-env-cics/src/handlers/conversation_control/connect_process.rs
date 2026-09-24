@@ -88,13 +88,20 @@ pub(super) fn invoke(
                 sync_level,
             )
             .map_err(map_problem)?;
+        let mut outputs = BTreeMap::new();
+        if request.arguments.contains_key("STATE") {
+            outputs.insert(
+                "STATE".into(),
+                super::state_cvda::bytes(ConversationState::Send),
+            );
+        }
         let reply = ConversationReply {
             condition: "NORMAL".into(),
             response: 0,
             response2: 0,
             state: Some(ConversationState::Send),
             token: Some(token),
-            outputs: BTreeMap::new(),
+            outputs,
         };
         let replay = ConversationReplay {
             schema_version: 1,
@@ -128,7 +135,6 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
         || has("PROCNAME") == has("PARTNER")
         || has("PROCNAME") != has("PROCLENGTH")
         || has("PIPLIST") != has("PIPLENGTH")
-        || has("STATE")
         || request.arguments.keys().any(|name| {
             !matches!(
                 name.as_str(),
@@ -140,6 +146,7 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
                     | "PIPLIST"
                     | "PIPLENGTH"
                     | "SYNCLEVEL"
+                    | "STATE"
                     | "RESP"
                     | "RESP2"
                     | "OPTION.NOHANDLE"
@@ -245,7 +252,7 @@ fn response(
     if reply.condition != "NORMAL" || reply.response != 0 || reply.response2 != 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
-    service.response(
+    let mut result = service.response(
         run,
         CicsDisposition::Complete,
         "NORMAL",
@@ -254,7 +261,9 @@ fn response(
         None,
         None,
         Vec::new(),
-    )
+    )?;
+    super::state_cvda::insert_output(&mut result, reply.outputs.get("STATE"))?;
+    Ok(result)
 }
 
 fn condition(name: &str, response: i32, response2: i32) -> HostProblem {

@@ -1525,10 +1525,10 @@ impl CicsService {
         let retention_tick = effect.deadline_tick.max(run.invocation.deadline_tick);
         let result = self.invoke_run(&mut run, request, retention_tick);
         let result = match (&result, replay_identity.as_ref()) {
+            // A waiting CONVERSE has no result to replay until its peer frame arrives.
+            (Ok(response), Some(_)) if handlers::deferred_converse(operation, response) => result,
             (Ok(response), Some((key, digest))) => {
-                let result_digest =
-                    canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
-                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                let result_digest = handlers::cics_result_digest(response)?;
                 let mut replay = CicsEffectReplay {
                     effect_key: Some(key.as_str().into()),
                     owner_execution: Some(replay_owner.clone()),
@@ -5406,6 +5406,7 @@ mod tests {
             ("GDS CONNECT PROCESS", CicsOperation::GdsConnectProcess),
             ("FREE", CicsOperation::FreeConversation),
             ("GDS FREE", CicsOperation::GdsFreeConversation),
+            ("CONVERSE", CicsOperation::Converse),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6708,7 +6709,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 161);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 162);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -35844,6 +35845,7 @@ mod tests {
             ("MODENAME".into(), cics_literal(b"BASIC1")),
             ("CONVID".into(), argument(b"TOKEN-X")),
             ("RETCODE".into(), argument(b"RETURN-X")),
+            ("STATE".into(), argument(b"STATE-X")),
             ("OPTION.NOQUEUE".into(), cics_option()),
         ]);
         let allocate = request(CicsOperation::GdsAllocateConversation, arguments.clone(), 1);
@@ -35856,6 +35858,7 @@ mod tests {
         assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
         assert_eq!(result.outputs["CONVID"].bytes(), &[0, 0, 0, 1]);
         assert_eq!(result.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(result.outputs["STATE"].bytes(), &82_i32.to_be_bytes());
         assert_eq!(
             ConversationLedger::load(store.as_ref())
                 .unwrap()
@@ -35886,6 +35889,7 @@ mod tests {
         assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
         assert_eq!(result.outputs["RETCODE"].bytes(), &[1, 4, 4, 0, 0, 0]);
         assert!(!result.outputs.contains_key("CONVID"));
+        assert!(!result.outputs.contains_key("STATE"));
 
         let mut unknown_mode = arguments.clone();
         unknown_mode.insert("MODENAME".into(), cics_literal(b"ABSENT"));
@@ -36163,6 +36167,7 @@ mod tests {
                 ("PIPLIST".into(), cics_literal(&[0, 4, 0, 0])),
                 ("PIPLENGTH".into(), cics_decimal(4)),
                 ("SYNCLEVEL".into(), cics_decimal(1)),
+                ("STATE".into(), argument(b"STATE-X")),
             ]),
             2,
         );
@@ -36173,6 +36178,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        assert_eq!(result.outputs["STATE"].bytes(), &90_i32.to_be_bytes());
         let record = ConversationLedger::load(store.as_ref())
             .unwrap()
             .conversation(token)
@@ -36366,6 +36372,7 @@ mod tests {
                 ("PIPLENGTH".into(), cics_decimal(4)),
                 ("SYNCLEVEL".into(), cics_decimal(1)),
                 ("RETCODE".into(), argument(b"RETURN-X")),
+                ("STATE".into(), argument(b"STATE-X")),
             ]),
             2,
         );
@@ -36377,6 +36384,7 @@ mod tests {
             .unwrap();
         assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
         assert_eq!(result.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(result.outputs["STATE"].bytes(), &90_i32.to_be_bytes());
         let record = ConversationLedger::load(store.as_ref())
             .unwrap()
             .conversation(token)
@@ -36888,7 +36896,10 @@ mod tests {
         let (invocation, _) = registered(&cics);
         let allocate = request(
             CicsOperation::AllocateConversation,
-            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            BTreeMap::from([
+                ("SYSID".into(), cics_literal(b"SYS1")),
+                ("STATE".into(), argument(b"STATE-X")),
+            ]),
             1,
         );
         let allocated = cics
@@ -36900,6 +36911,7 @@ mod tests {
         let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
             .try_into()
             .unwrap();
+        assert_eq!(allocated.outputs["STATE"].bytes(), &82_i32.to_be_bytes());
         let connect = request(
             CicsOperation::ConnectProcess,
             BTreeMap::from([
@@ -36948,6 +36960,469 @@ mod tests {
                 "frame-1",
             ),
             Err(HostProblem::IdempotencyConflict)
+        );
+    }
+
+    #[test]
+    fn converse_waits_for_explicit_peer_and_replays_one_exchange() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            1,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRN1")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, connect.clone(), 2),
+            connect,
+        )
+        .unwrap();
+        let converse = request(
+            CicsOperation::Converse,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"REQUEST")),
+                ("FROMLENGTH".into(), cics_decimal(7)),
+                ("INTO".into(), argument(b"INTO-X")),
+                ("CAPACITY.INTO".into(), cics_decimal(16)),
+                ("TOLENGTH".into(), argument(b"LEN-X")),
+                ("CAPACITY.TOLENGTH".into(), cics_decimal(16)),
+                ("STATE".into(), argument(b"STATE-X")),
+            ]),
+            3,
+        );
+        let waiting = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 3),
+                converse.clone(),
+            )
+            .unwrap();
+        assert_eq!(waiting.disposition, CicsDisposition::Suspended);
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: b"RESPONSE".to_vec(),
+                next_state: ConversationState::Receive,
+                end_of_chain: false,
+                inbound_fmh: false,
+                signal: false,
+            },
+            "converse-frame-1",
+        )
+        .unwrap();
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 3),
+                converse.clone(),
+            )
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        assert_eq!(result.outputs["INTO"].bytes(), b"RESPONSE");
+        assert_eq!(result.outputs["TOLENGTH"].bytes(), b"8");
+        assert_eq!(result.outputs["STATE"].bytes(), &88_i32.to_be_bytes());
+        assert_eq!(result.outputs["EIBEOC"].bytes(), &[0]);
+        let replayed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 3),
+                converse,
+            )
+            .unwrap();
+        assert_eq!(replayed.outputs, result.outputs);
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let record = ledger.conversation(token).unwrap();
+        assert_eq!(record.state, ConversationState::Receive);
+        let key = u32::from_be_bytes(token).to_string();
+        assert!(ledger.exchanges[&key].inbound.is_empty());
+        assert_eq!(ledger.exchanges[&key].outbound.len(), 1);
+        assert_eq!(ledger.exchanges[&key].outbound[0].data, b"REQUEST");
+    }
+
+    #[test]
+    fn converse_truncation_reports_original_length_or_retains_remainder() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            1,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRN1")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, connect.clone(), 2),
+            connect,
+        )
+        .unwrap();
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: b"ABCDEFGHIJ".to_vec(),
+                next_state: ConversationState::Send,
+                end_of_chain: false,
+                inbound_fmh: false,
+                signal: false,
+            },
+            "truncate-1",
+        )
+        .unwrap();
+        let arguments = BTreeMap::from([
+            ("CONVID".into(), cics_literal(&token)),
+            ("FROM".into(), cics_literal(b"REQUEST")),
+            ("INTO".into(), argument(b"INTO-X")),
+            ("CAPACITY.INTO".into(), cics_decimal(4)),
+            ("TOLENGTH".into(), argument(b"LEN-X")),
+            ("CAPACITY.TOLENGTH".into(), cics_decimal(4)),
+        ]);
+        let truncated = responding(request(CicsOperation::Converse, arguments.clone(), 3));
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, truncated.clone(), 3),
+                truncated,
+            )
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response),
+            ("LENGERR", 22)
+        );
+        assert_eq!(result.outputs["INTO"].bytes(), b"ABCD");
+        assert_eq!(result.outputs["TOLENGTH"].bytes(), b"10");
+        let key = u32::from_be_bytes(token).to_string();
+        assert!(
+            ConversationLedger::load(store.as_ref()).unwrap().exchanges[&key]
+                .retained
+                .is_empty()
+        );
+
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: b"KLMNOPQRST".to_vec(),
+                next_state: ConversationState::Receive,
+                end_of_chain: false,
+                inbound_fmh: false,
+                signal: false,
+            },
+            "truncate-2",
+        )
+        .unwrap();
+        let mut arguments = arguments;
+        arguments.insert("OPTION.NOTRUNCATE".into(), cics_option());
+        let notruncate = request(CicsOperation::Converse, arguments, 4);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, notruncate.clone(), 4),
+                notruncate,
+            )
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        assert_eq!(result.outputs["INTO"].bytes(), b"KLMN");
+        assert_eq!(result.outputs["TOLENGTH"].bytes(), b"4");
+        assert_eq!(
+            ConversationLedger::load(store.as_ref()).unwrap().exchanges[&key].retained,
+            b"OPQRST"
+        );
+    }
+
+    #[test]
+    fn converse_mro_attach_and_inbound_fmh_precede_eoc() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "MRO1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let build = request(
+            CicsOperation::BuildAttach,
+            BTreeMap::from([
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("PROCESS".into(), cics_literal(b"TRN1")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, build.clone(), 1), build)
+            .unwrap();
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"MRO1"))]),
+            2,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 2),
+                allocate,
+            )
+            .unwrap();
+        let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: b"OK".to_vec(),
+                next_state: ConversationState::Receive,
+                end_of_chain: true,
+                inbound_fmh: true,
+                signal: false,
+            },
+            "mro-fmh-1",
+        )
+        .unwrap();
+        let converse = responding(request(
+            CicsOperation::Converse,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("FROM".into(), cics_literal(b"REQUEST")),
+                ("SET".into(), argument(b"SET-X")),
+                ("MAXLENGTH".into(), cics_decimal(8)),
+                ("OPTION.FMH".into(), cics_option()),
+                ("OPTION.DEFRESP".into(), cics_option()),
+            ]),
+            3,
+        ));
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 3),
+                converse,
+            )
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("INBFMH", 7));
+        assert_eq!(result.outputs["SET"].bytes(), b"OK");
+        assert_eq!(result.outputs["EIBFMH"].bytes(), &[0xff]);
+        assert_eq!(result.outputs["EIBEOC"].bytes(), &[0xff]);
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let key = u32::from_be_bytes(token).to_string();
+        let outbound = &ledger.exchanges[&key].outbound[0];
+        assert_eq!(outbound.attach_id.as_deref(), Some("HEADER1"));
+        assert!(outbound.fmh);
+        assert!(outbound.definite_response);
+        assert_eq!(outbound.data, b"REQUEST");
+        assert_eq!(
+            ledger.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+    }
+
+    #[test]
+    fn converse_reconciles_after_outer_receipt_failure_without_resending() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "MRO1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let token = cics
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "MRO1",
+                ConversationKind::Mro,
+            )
+            .unwrap();
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: b"RESPONSE".to_vec(),
+                next_state: ConversationState::Receive,
+                end_of_chain: false,
+                inbound_fmh: false,
+                signal: false,
+            },
+            "receipt-failure-frame",
+        )
+        .unwrap();
+        let converse = request(
+            CicsOperation::Converse,
+            BTreeMap::from([
+                ("FROM".into(), cics_literal(b"REQUEST")),
+                ("INTO".into(), argument(b"INTO-X")),
+                ("CAPACITY.INTO".into(), cics_decimal(16)),
+            ]),
+            1,
+        );
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 1),
+                converse.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let key = u32::from_be_bytes(token).to_string();
+        assert!(ledger.exchanges[&key].inbound.is_empty());
+        assert_eq!(ledger.exchanges[&key].outbound.len(), 1);
+        assert_eq!(
+            ledger.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 1),
+                converse,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"RESPONSE");
+        assert_eq!(
+            ConversationLedger::load(store.as_ref()).unwrap().exchanges[&key]
+                .outbound
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn conversation_postgres_concurrent_allocation_and_reopen() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let suffix = std::process::id().to_string();
+        let session = SessionId::new(format!("postgres-conversation-{suffix}"), 128).unwrap();
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let setup = service(store);
+            setup.create_session(&session, 24, 80).unwrap();
+            setup
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "PGCV".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+        }
+        let first = service(Arc::new(
+            PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+        ));
+        let second = service(Arc::new(
+            PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+        ));
+        let first_invocation = invocation_for(&format!("pg-conv-a-{suffix}"), BTreeMap::new());
+        let second_invocation = invocation_for(&format!("pg-conv-b-{suffix}"), BTreeMap::new());
+        for (service, invocation) in [(&first, &first_invocation), (&second, &second_invocation)] {
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+        }
+        let barrier = Arc::new(Barrier::new(2));
+        let allocate = |service: Arc<CicsService>, invocation: Invocation, sequence: u64| {
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let command = request(
+                    CicsOperation::AllocateConversation,
+                    BTreeMap::from([
+                        ("SYSID".into(), cics_literal(b"PGCV")),
+                        ("OPTION.NOQUEUE".into(), cics_option()),
+                    ]),
+                    sequence,
+                );
+                barrier.wait();
+                (
+                    sequence,
+                    service.invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), sequence),
+                        command,
+                    ),
+                )
+            })
+        };
+        let left = allocate(first, first_invocation, 701);
+        let right = allocate(second, second_invocation, 702);
+        let left = left.join().unwrap();
+        let right = right.join().unwrap();
+        let mut wins = Vec::new();
+        let mut busy = 0;
+        for (sequence, outcome) in [left, right] {
+            let response = outcome.unwrap();
+            if response.condition == "NORMAL" {
+                wins.push(sequence);
+                assert_eq!(response.outputs["EIBRSRCE"].bytes()[..4], [0, 0, 0, 1]);
+            } else {
+                assert_eq!(
+                    (response.condition.as_str(), response.response),
+                    ("SYSBUSY", 59)
+                );
+                busy += 1;
+            }
+        }
+        assert_eq!((wins.len(), busy), (1, 1));
+        let reopened = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let ledger = ConversationLedger::load(&reopened).unwrap();
+        assert_eq!(
+            ledger
+                .conversations
+                .values()
+                .filter(|record| !record.released)
+                .count(),
+            1
+        );
+        assert!(
+            load_conversation_replay(&reopened, &format!("outer-{}", wins[0]))
+                .unwrap()
+                .is_some()
         );
     }
 }

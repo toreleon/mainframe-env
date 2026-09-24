@@ -160,16 +160,23 @@ pub(super) fn invoke(
             }
             Err(_) => return Err(HostProblem::InfrastructureFailure),
         };
+        let mut outputs = BTreeMap::from([
+            ("CONVID".into(), record.token.to_vec()),
+            ("RETCODE".into(), GdsReturnCode::NORMAL.0.to_vec()),
+        ]);
+        if request.arguments.contains_key("STATE") {
+            outputs.insert(
+                "STATE".into(),
+                super::state_cvda::bytes(ConversationState::Allocated),
+            );
+        }
         let reply = ConversationReply {
             condition: "NORMAL".into(),
             response: 0,
             response2: 0,
             state: Some(ConversationState::Allocated),
             token: Some(record.token),
-            outputs: BTreeMap::from([
-                ("CONVID".into(), record.token.to_vec()),
-                ("RETCODE".into(), GdsReturnCode::NORMAL.0.to_vec()),
-            ]),
+            outputs,
         };
         let replay = ConversationReplay {
             schema_version: 1,
@@ -212,6 +219,7 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
                     | "MODENAME"
                     | "CONVID"
                     | "RETCODE"
+                    | "STATE"
                     | "RESP"
                     | "RESP2"
                     | "OPTION.NOQUEUE"
@@ -300,5 +308,6 @@ fn response(
     if !result.outputs.contains_key("RETCODE") {
         return Err(HostProblem::InfrastructureFailure);
     }
+    super::state_cvda::insert_output(&mut result, reply.outputs.get("STATE"))?;
     Ok(result)
 }

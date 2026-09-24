@@ -48,9 +48,21 @@ mod web_service_control;
 
 use super::{CicsService, Run};
 use crate::generated::CicsCommandFamily;
-use mainframe_env_host_api::{AccessIntent, CicsRequest, CicsResponse, HostProblem};
+use mainframe_env_host_api::{
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+    HostResult, canonical_result_digest,
+};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
+
+pub(super) fn deferred_converse(operation: CicsOperation, response: &CicsResponse) -> bool {
+    operation == CicsOperation::Converse && response.disposition == CicsDisposition::Suspended
+}
+
+pub(super) fn cics_result_digest(response: &CicsResponse) -> Result<[u8; 32], HostProblem> {
+    canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
+        .map_err(|_| HostProblem::InfrastructureFailure)
+}
 
 pub(super) fn originating_task_for(
     session: &super::Session,
