@@ -3,6 +3,55 @@
 use super::*;
 
 impl BtsLifecycleStore<'_> {
+    /// Retire deferred RUN rows whose activity is forced or removed by the
+    /// caller's process transition. The caller includes these writes in the
+    /// same CAS batch as the process and event-pool changes.
+    pub(in crate::service) fn retire_deferred_for_ids(
+        &self,
+        process: &BtsProcess,
+        activity_ids: &[String],
+    ) -> Result<Vec<ProviderStateMutation>, HostProblem> {
+        let targets = activity_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        if targets.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut outbox = self.load_run_outbox()?;
+        let mut writes = Vec::new();
+        for id in outbox.deferred.clone() {
+            let mut record = self
+                .load_run(&id)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if record.process_type != process.process_type
+                || record.process_name != process.name
+                || !targets.contains(record.activity_id.as_str())
+            {
+                continue;
+            }
+            let activity = process
+                .activities
+                .get(&record.activity_id)
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if record.state != BtsRunState::Deferred
+                || record.activation_epoch != activity.activation_epoch
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let old_version = record.row_version;
+            record.state = BtsRunState::Finished;
+            record.completion = Some(BtsCompletion::Forced);
+            record.abcode = None;
+            writes.push(put_run(&record, Some(old_version))?);
+            outbox.deferred.remove(&id);
+        }
+        if !writes.is_empty() {
+            writes.push(put_outbox(&outbox)?);
+        }
+        Ok(writes)
+    }
+
     fn deferred_for_activity(
         &self,
         process: &BtsProcess,
@@ -471,5 +520,103 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn cancel_and_reset_retire_deferred_rows_without_admitting_work() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "suspend",
+                [1; 32],
+                |process| {
+                    process.set_suspended(&root, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let first = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "first", [2; 32], [2; 32], 1000, 5,
+            )
+            .unwrap();
+        authority
+            .cancel_with_events(
+                "TYPE", "ORDER", &root, "UOW2", "EXEC2", "USER", "cancel", [3; 32],
+            )
+            .unwrap();
+        assert_eq!(
+            authority
+                .load_run(&first.run_id)
+                .unwrap()
+                .unwrap()
+                .completion,
+            Some(BtsCompletion::Forced)
+        );
+        assert!(authority.load_run_outbox().unwrap().deferred.is_empty());
+        assert!(memory.get_work(&first.work_id).unwrap().is_none());
+        authority
+            .remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "reset-first",
+                [4; 32],
+                &super::super::super::removal::BtsRemoval::Reset {
+                    activity_id: root.clone(),
+                },
+            )
+            .unwrap();
+        let second = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "second", [5; 32], [2; 32], 2000, 5,
+            )
+            .unwrap();
+        assert_eq!(second.state, BtsRunState::Deferred);
+        authority
+            .remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "reset-second",
+                [6; 32],
+                &super::super::super::removal::BtsRemoval::Reset { activity_id: root },
+            )
+            .unwrap();
+        assert_eq!(
+            authority
+                .load_run(&second.run_id)
+                .unwrap()
+                .unwrap()
+                .completion,
+            Some(BtsCompletion::Forced)
+        );
+        assert!(authority.load_run_outbox().unwrap().deferred.is_empty());
+        assert!(memory.get_work(&second.work_id).unwrap().is_none());
     }
 }

@@ -48,7 +48,7 @@ impl<'a> BtsLifecycleStore<'a> {
                 ))
             })
             .collect::<Result<Vec<_>, HostProblem>>()?;
-        let mut writes = Vec::with_capacity(removed.len() * 2 + 1);
+        let mut writes = Vec::new();
         if !direct.is_empty()
             && let Some(event) = super::super::event_control::activity_completion::delete_many(
                 self.store, parent_id, &direct,
@@ -127,7 +127,8 @@ impl<'a> BtsLifecycleStore<'a> {
             if process.replays.len() >= MAX_REPLAYS {
                 return Err(HostProblem::ResourceExhausted);
             }
-            let original = process.activities.clone();
+            let old = process.clone();
+            let original = &old.activities;
             let removed = match removal {
                 BtsRemoval::Reset { activity_id } => {
                     validate_activity_id(activity_id)?;
@@ -163,7 +164,11 @@ impl<'a> BtsLifecycleStore<'a> {
             {
                 return Err(condition("LOCKED", 100, 0));
             }
-            let mut writes = Vec::with_capacity(removed.len() + 1);
+            let mut retire_ids = removed.clone();
+            if let BtsRemoval::Reset { activity_id } = removal {
+                retire_ids.push(activity_id.clone());
+            }
+            let mut writes = self.retire_deferred_for_ids(&old, &retire_ids)?;
             match removal {
                 BtsRemoval::Reset { activity_id } => {
                     let subject = original
@@ -497,5 +502,72 @@ mod tests {
             authority.load_process("TYPE", "ORDER").unwrap(),
             Some(before)
         );
+    }
+
+    #[test]
+    fn delete_retires_a_deferred_child_in_the_same_atomic_batch() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let (root, child) = parent_and_child(&authority);
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "suspend-child",
+                [9; 32],
+                |process| {
+                    process.set_suspended(&child, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let deferred = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &child,
+                None,
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:42",
+                "deferred-child",
+                [10; 32],
+                [10; 32],
+                1000,
+                5,
+            )
+            .unwrap();
+        assert_eq!(deferred.state, super::super::run::BtsRunState::Deferred);
+        authority
+            .remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "delete-deferred",
+                [11; 32],
+                &BtsRemoval::Delete {
+                    parent_id: root,
+                    child_name: "CHILD".into(),
+                },
+            )
+            .unwrap();
+        assert!(authority.load_activity_index(&child).unwrap().is_none());
+        let retired = authority.load_run(&deferred.run_id).unwrap().unwrap();
+        assert_eq!(retired.state, super::super::run::BtsRunState::Finished);
+        assert_eq!(retired.completion, Some(BtsCompletion::Forced));
+        let outbox = memory
+            .get_provider_state("cics-bts-run-outbox-v1", "pending")
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&outbox.payload).unwrap();
+        assert!(value["deferred"].as_array().unwrap().is_empty());
     }
 }

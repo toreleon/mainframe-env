@@ -181,8 +181,16 @@ request for the first event and preserves the full queue for the worker. A
 versioned no-op event-pool write fences the queue snapshot with the process
 transition. Work enqueue occurs after the durable commit and startup recovery
 can readmit the same identity. Exact RESUME retries return that request.
-Cancellation and subtree removal of still-deferred requests, and late event
-delivery after a worker's final retrieval, remain unsealed.
+Cancellation, RESET, and DELETE now retire affected deferred requests with
+the process transition in one CAS batch, leaving no runnable work. Parent
+completion still declines suspended descendants. DEFINE rollback and late
+event delivery after a worker's final retrieval remain unsealed. Source:
+baseline A CANCEL rows `0017`–`0019`, `dfhp4_cancelbts.html` SHA-256
+`e05f60f142c8d7ed615e813cb22bab3d7cd56b1f3ad50eadcc251769d286a0df`;
+DELETE row `0041`, `dfhp4_deleteactivity.html` SHA-256
+`3d91328683fc209e5ee8583f96f8c77de09c99caf6ca1994b2e19e81a00e7a24`;
+baseline B RESET row `0170`, `dfhp4_resetactivity.html` SHA-256
+`23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52`.
 
 Terminal parent completion deletes settled descendants, their activity
 indexes, and direct-child completion events atomically with the parent RUN

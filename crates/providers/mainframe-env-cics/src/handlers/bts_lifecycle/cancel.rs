@@ -60,6 +60,7 @@ impl<'a> BtsLifecycleStore<'a> {
                     response2: 0,
                 });
             }
+            let mut writes = self.retire_deferred_for_ids(&old, &ids)?;
             let mut by_parent: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
             for id in ids {
                 let activity = old
@@ -76,7 +77,6 @@ impl<'a> BtsLifecycleStore<'a> {
                     ));
                 }
             }
-            let mut writes = Vec::with_capacity(by_parent.len() + 1);
             for (parent, children) in by_parent {
                 if let Some(event) = super::super::event_control::activity_completion::post_many(
                     self.store, &parent, &children,
