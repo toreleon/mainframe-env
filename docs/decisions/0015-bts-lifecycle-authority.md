@@ -174,6 +174,15 @@ deferred row; no work conversion or worker promotion is allowed. RESUME must
 atomically release this reservation before the path is sealed. Source: the
 same SUSPEND topic and baseline C RUN topic `dfhp4_run.html` SHA-256
 `2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`.
+RESUME now moves a deferred reservation, process mode, request row, and outbox
+entry to runnable state in one CAS batch. If a suspended DORMANT activity has
+fired queued events without a deferred RUN, RESUME creates one synthetic RUN
+request for the first event and preserves the full queue for the worker. A
+versioned no-op event-pool write fences the queue snapshot with the process
+transition. Work enqueue occurs after the durable commit and startup recovery
+can readmit the same identity. Exact RESUME retries return that request.
+Cancellation and subtree removal of still-deferred requests, and late event
+delivery after a worker's final retrieval, remain unsealed.
 
 Terminal parent completion deletes settled descendants, their activity
 indexes, and direct-child completion events atomically with the parent RUN

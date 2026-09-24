@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:59d8ec765d65629cde23c4d6651db114ff9349df1341c8d3533d394014084d16",
+      "sha256": "sha256:be2a60b47cda5478b3b60b97a318d2527cfcac65ba92443ec758ac61556ec6df",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -773,7 +773,7 @@
       "path": "docs/decisions/0015-bts-lifecycle-authority.md",
       "relative_links": 0,
       "scope": "shared BTS process/activity state for 23 lifecycle application rows",
-      "sha256": "sha256:563cbee5f4f83c96f2a7335dae91bccf4cfca34acfd436841f7316e321e7f8d9",
+      "sha256": "sha256:d17438b295140f78f71787ac1fa17643a036c7bd0f6994d04ceae5d25b4d7a72",
       "status": "Proposed for the incremental CIC-904.bts-lifecycle slice",
       "title": "ADR-0015: Shared BTS lifecycle authority",
       "xtask_commands": 0
@@ -1122,7 +1122,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 85,
-      "sha256": "sha256:c0c4d37846be1ba2907531245cace1082a6dbe719ffa72941df1b308fe82ad7a",
+      "sha256": "sha256:e67c4b47a9c86e7e549e9a63fd58b4044fe5c00354cc47903de065f251f43542",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 2
     },

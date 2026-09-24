@@ -287,6 +287,18 @@ pub(in crate::service) fn prepare_run_input_event(
     activity_mutation(activity, &state)
 }
 
+/// Fence the current event queue in the same CAS batch as RESUME. The first
+/// queued event can trigger one reattachment and the worker retrieves all
+/// events retained in this snapshot.
+pub(in crate::service) fn prepare_resume_event_fence(
+    store: &dyn ProviderStateStore,
+    activity: &str,
+) -> Result<(Vec<String>, ProviderStateMutation), HostProblem> {
+    let state = load_activity_from_store(store, activity)?;
+    let queued = state.reattach.iter().cloned().collect();
+    Ok((queued, activity_mutation(activity, &state)?))
+}
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,

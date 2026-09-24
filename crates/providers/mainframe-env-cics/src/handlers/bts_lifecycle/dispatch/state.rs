@@ -72,19 +72,46 @@ pub(super) fn invoke(
                 | CicsOperation::SuspendAcqProcess
                 | CicsOperation::SuspendActivity
         );
-        authority.mutate_process(
-            &process.process_type,
-            &process.name,
-            run_unit,
-            owner_execution,
-            owner_principal,
-            replay_key,
-            digest,
-            |process| {
-                process.set_suspended(&activity_id, suspended)?;
-                Ok(BtsReply::normal())
-            },
-        )?;
+        if suspended {
+            authority.mutate_process(
+                &process.process_type,
+                &process.name,
+                run_unit,
+                owner_execution,
+                owner_principal,
+                replay_key,
+                digest,
+                |process| {
+                    process.set_suspended(&activity_id, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )?;
+        } else {
+            let tick = service
+                .replay_clock
+                .as_ref()
+                .map(|clock| clock.now_tick())
+                .transpose()?;
+            let (_, released) = authority.resume_deferred(
+                &process.process_type,
+                &process.name,
+                &activity_id,
+                run_unit,
+                owner_execution,
+                owner_principal,
+                replay_key,
+                digest,
+                tick,
+                run.invocation.priority,
+            )?;
+            if let Some(record) = released
+                && matches!(record.state, BtsRunState::Pending | BtsRunState::Attached)
+            {
+                service
+                    .enqueue_bts_run_work(&record)
+                    .map_err(|_| HostProblem::UnknownOutcome)?;
+            }
+        }
     }
     response(service, run, BTreeMap::new())
 }

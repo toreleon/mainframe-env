@@ -31442,8 +31442,8 @@ mod tests {
     #[test]
     fn bts_suspended_async_run_returns_without_admitting_work() {
         use handlers::bts_lifecycle::{
-            BtsLifecycleStore, BtsMode, BtsProcess, BtsProcessTypeDefinition, BtsRunState,
-            BtsTransactionDefinition,
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsMode, BtsProcess,
+            BtsProcessTypeDefinition, BtsRunState, BtsTransactionDefinition,
         };
 
         let store = Arc::new(MemoryStore::new(Default::default()));
@@ -31536,6 +31536,169 @@ mod tests {
         let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
         assert_eq!(process.activities[&root].mode, BtsMode::Initial);
         assert!(process.activities[&root].suspended);
+        let resume = request(
+            CicsOperation::ResumeAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, resume.clone(), 2),
+                resume.clone()
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let released = authority.load_run(&record.run_id).unwrap().unwrap();
+        assert_eq!(released.state, BtsRunState::Pending);
+        let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(process.activities[&root].mode, BtsMode::Active);
+        assert!(!process.activities[&root].suspended);
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&work).unwrap().unwrap();
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, resume.clone(), 2), resume)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+    }
+
+    #[test]
+    fn bts_resume_acquired_process_admits_fired_event_work() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcess, BtsProcessTypeDefinition, BtsRunState,
+            BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "EVENTS", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "EVENTS", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire(run_unit, execution, "IBMUSER", "TYPE", "EVENTS", &root)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "EVENTS",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "activate",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 1, "checkpoint")?;
+                    Ok(handlers::bts_lifecycle::BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "EVENTS", &root, 1, 1)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        cics.post_input_event(&root, "READY").unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "EVENTS",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "dormant",
+                [2; 32],
+                |process| {
+                    process.finish(
+                        &root,
+                        1,
+                        1,
+                        handlers::bts_lifecycle::BtsCompletion::Incomplete,
+                        None,
+                        None,
+                    )?;
+                    process.set_suspended(&root, true)?;
+                    Ok(handlers::bts_lifecycle::BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let resume = request(
+            CicsOperation::ResumeAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, resume.clone(), 2),
+                resume.clone()
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let rows = store
+            .list_provider_state("cics-bts-run-request-v1", 2)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let record: handlers::bts_lifecycle::BtsRunRecord =
+            serde_json::from_slice(&rows[0].payload).unwrap();
+        assert_eq!(record.state, BtsRunState::Pending);
+        assert_eq!(record.input_event, "READY");
+        assert!(store.get_work(&record.work_id).unwrap().is_some());
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, resume.clone(), 2), resume)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-bts-run-request-v1", 2)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]

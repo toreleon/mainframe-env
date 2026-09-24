@@ -35,7 +35,11 @@ All notable changes to mainframe-env are documented here.
 
 - Asynchronous RUN against a suspended activity now reserves a deferred
   activation and exact replay without admitting worker work. Its event and
-  process transition commit together; RESUME release remains pending.
+  process transition commit together.
+
+- RESUME now atomically releases a deferred RUN into the pending outbox, or
+  creates one work row for fired events queued on a suspended dormant activity.
+  Exact retries and SQLite reopen retain the same work identity.
 
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential

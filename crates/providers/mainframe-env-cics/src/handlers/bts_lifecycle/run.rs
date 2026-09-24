@@ -16,6 +16,7 @@ const RUN_LIFETIME_TICKS: u64 = 86_400_000;
 /// Work generation claimed by the server's CICS task worker.
 pub const BTS_RUN_WORK_GENERATION: &str = "cics-bts-run-v1";
 
+mod deferred;
 mod worker;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
