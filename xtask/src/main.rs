@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod carddemo_v09_host;
 mod docs;
 mod evidence_seal;
 mod jcl_catalog;
@@ -213,6 +214,8 @@ enum XtaskCommand {
     CarddemoCore(CheckArgs),
     CarddemoFileCall(CheckArgs),
     CarddemoHost(CheckArgs),
+    #[command(name = "carddemo-v09-host")]
+    CarddemoV09Host(CheckArgs),
     CarddemoPackage(CheckArgs),
     CarddemoResources(CheckArgs),
     CarddemoPrograms(CheckArgs),
@@ -510,6 +513,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         }
         XtaskCommand::CarddemoHost(args) => {
             checked!("carddemo-host", args, check_carddemo_host(root))
+        }
+        XtaskCommand::CarddemoV09Host(args) => {
+            checked!("carddemo-v09-host", args, carddemo_v09_host::check(root))
         }
         XtaskCommand::CarddemoPackage(args) => {
             checked!("carddemo-package", args, check_carddemo_package(root))
