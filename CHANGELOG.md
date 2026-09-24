@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Verified ISSUE PRINT's atomic display, printer, and replay receipt commit
+  across PostgreSQL 18.6 restart and concurrent provider instances. The row
+  remains unregistered pending selected execution and the remaining gates.
+
 - Added a PostgreSQL 18.6 restart and concurrent-provider regression for the
   ISSUE ENDFILE/ENDOUTPUT device and replay receipt transaction. The rows
   remain unregistered pending selected execution and the remaining slice gates.

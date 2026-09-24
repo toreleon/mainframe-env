@@ -8795,6 +8795,159 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn issue_print_postgres_restarts_and_concurrent_providers_commit_once() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let marker = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let suffix = format!("{marker:x}");
+        let printer_id = format!("P{:03X}", marker % 4096);
+        let invocation = invocation_for(&format!("print-pg-{suffix}"), BTreeMap::new());
+        let session = SessionId::new(format!("print-pg-session-{suffix}"), 64).unwrap();
+        let mut command = request(CicsOperation::IssuePrint, BTreeMap::new(), 1);
+        command.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("print-pg-effect-{suffix}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let terminal_id;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            let current = service.lock().unwrap().sessions[session.as_str()].clone();
+            terminal_id = current.input.terminal_id.clone().unwrap();
+            let mut displayed = current.clone();
+            displayed.version += 1;
+            displayed.screen = b"PRINT\0DATA".to_vec();
+            service
+                .persist_session(session.as_str(), &displayed, Some(current.version))
+                .unwrap();
+            service
+                .lock()
+                .unwrap()
+                .sessions
+                .insert(session.as_str().into(), displayed);
+            for (terminal, kind, printers) in [
+                (
+                    terminal_id.as_str(),
+                    handlers::IssueDeviceKind::Display3270,
+                    vec![printer_id.clone()],
+                ),
+                (
+                    printer_id.as_str(),
+                    handlers::IssueDeviceKind::Printer3270,
+                    vec![],
+                ),
+            ] {
+                handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                    terminal: terminal.into(),
+                    kind,
+                    control_unit: Some("CU1".into()),
+                    printers,
+                    programs: vec![],
+                    applications: vec![],
+                    logon_logmode: None,
+                    disconnect_allowed: true,
+                    pass_allowed: false,
+                })
+                .unwrap()
+                .install(store.as_ref())
+                .unwrap();
+            }
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .remove(&invocation.run_unit_id)
+                .unwrap();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 2)
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .remove(&invocation.run_unit_id)
+                .unwrap();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            for terminal in [&terminal_id, &printer_id] {
+                let record = handlers::IssueDeviceRecord::load(store.as_ref(), terminal)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(record.state.last_print, b"PRINT\0DATA");
+                assert_eq!(record.state.print_count, 1);
+            }
+        }
+        let mut concurrent = request(CicsOperation::IssuePrint, BTreeMap::new(), 2);
+        concurrent.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("print-pg-concurrent-{suffix}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let worker = service(store);
+            worker
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 3)
+                .unwrap();
+            let mut run = worker
+                .lock()
+                .unwrap()
+                .runs
+                .remove(&invocation.run_unit_id)
+                .unwrap();
+            let gate = barrier.clone();
+            let request = concurrent.clone();
+            workers.push(std::thread::spawn(move || {
+                gate.wait();
+                let result = handlers::invoke_terminal_control(&worker, &mut run, &request);
+                match result {
+                    Err(HostProblem::UnknownOutcome) => {
+                        handlers::invoke_terminal_control(&worker, &mut run, &request)
+                    }
+                    other => other,
+                }
+            }));
+        }
+        for worker in workers {
+            assert_eq!(worker.join().unwrap().unwrap().condition, "NORMAL");
+        }
+        let store = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        for terminal in [&terminal_id, &printer_id] {
+            let record = handlers::IssueDeviceRecord::load(&store, terminal)
+                .unwrap()
+                .unwrap();
+            assert_eq!(record.state.last_print, b"PRINT\0DATA");
+            assert_eq!(record.state.print_count, 2);
+        }
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());
