@@ -341,6 +341,38 @@ fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
 }
 
 #[test]
+fn conversation_extract_process_returns_mapped_pip_beyond_basic_limit() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-mapped-pip", BTreeMap::new());
+    let session = SessionId::new("extract-mapped-pip", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    let (mapped, _, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let before = ConversationLedger::load(store.as_ref()).unwrap();
+    let mut next = before.clone();
+    let mut pip = vec![0; 764];
+    pip[..2].copy_from_slice(&764u16.to_be_bytes());
+    next.conversation_mut(mapped).unwrap().pip = pip.clone();
+    assert!(before.persist(&mut next, store.as_ref()).unwrap());
+    let response = extract_call(
+        &cics,
+        &invocation.run_unit_id,
+        CicsOperation::ExtractProcess,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&mapped)),
+            ("PIPLIST".into(), argument(b"PIP-X")),
+            ("PIPLIST.MAXLENGTH".into(), cics_decimal(32_763)),
+            ("PIPLENGTH".into(), argument(b"LEN-X")),
+        ]),
+        1,
+    );
+    assert_eq!(response.outputs["PIPLIST"].bytes(), pip);
+    assert_eq!(response.outputs["PIPLENGTH"].bytes(), b"764");
+}
+
+#[test]
 fn conversation_extract_negative_conditions_do_not_change_protocol_or_position() {
     let store = Arc::new(MemoryStore::new(Default::default()));
     let cics = service(store.clone());

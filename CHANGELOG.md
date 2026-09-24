@@ -63,6 +63,10 @@ All notable changes to mainframe-env are documented here.
   v2 integration and applicable gates remain pending; no licensed credit is
   claimed.
 
+- Support the source's 32,763-byte mapped APPC PIP bound while retaining the
+  763-byte GDS basic bound, including durable record encoding and EXTRACT
+  PROCESS pointer output beyond the basic limit.
+
 - Retain unresolved POINT and LOGONMSG replies in the bounded extraction
   sidecar until their outer replay rows exist. An interleaved retry after a
   failed outer insert returns the original LOGONMSG bytes without changing a

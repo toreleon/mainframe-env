@@ -23,8 +23,11 @@ pub use ledger::{
 pub const CONVERSATION_RECORD_VERSION: u16 = 1;
 /// Maximum length of a partner process name defined by APPC.
 pub const MAX_PROCESS_BYTES: usize = 64;
-/// Maximum APPC PIP list length, including each record's four-byte header.
-pub const MAX_PIP_BYTES: usize = 763;
+/// Mapped APPC PIP limit; basic GDS has its own 763-byte limit.
+pub const MAX_PIP_BYTES: usize = 32_763;
+/// APPC basic PIP limit from GDS CONNECT PROCESS.
+pub const MAX_BASIC_PIP_BYTES: usize = 763;
+const MAX_RECORD_BYTES: usize = 4 * MAX_PIP_BYTES + 4096;
 
 /// The session protocol selected at allocation, independent of its carrier.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -151,7 +154,7 @@ impl ConversationRecord {
     /// Decode an existing provider row. Unknown schema versions, malformed
     /// lengths and impossible state combinations cannot become live sessions.
     pub fn decode(bytes: &[u8]) -> Result<Self, ConversationProblem> {
-        if bytes.len() > 2048 {
+        if bytes.len() > MAX_RECORD_BYTES {
             return Err(ConversationProblem::Length);
         }
         let record: Self =
@@ -163,7 +166,7 @@ impl ConversationRecord {
     pub fn encode(&self) -> Result<Vec<u8>, ConversationProblem> {
         self.validate()?;
         let encoded = serde_json::to_vec(self).map_err(|_| ConversationProblem::Malformed)?;
-        if encoded.len() > 2048 {
+        if encoded.len() > MAX_RECORD_BYTES {
             return Err(ConversationProblem::Length);
         }
         Ok(encoded)
@@ -182,7 +185,7 @@ impl ConversationRecord {
                 .process
                 .as_ref()
                 .is_some_and(|name| name.is_empty() || name.len() > MAX_PROCESS_BYTES)
-            || self.pip.len() > MAX_PIP_BYTES
+            || self.pip.len() > pip_limit(self.kind)
             || self.sync_level.is_some_and(|level| level > 2)
             || (self.released && self.state != ConversationState::Free)
             || (self.process.is_none() && self.sync_level.is_some())
@@ -203,7 +206,7 @@ impl ConversationRecord {
         {
             return Err(ConversationProblem::Malformed);
         }
-        validate_pip(&self.pip)?;
+        validate_pip(&self.pip, self.kind)?;
         Ok(())
     }
 
@@ -257,7 +260,7 @@ impl ConversationRecord {
         if process.is_empty() || process.len() > MAX_PROCESS_BYTES || sync_level > 2 {
             return Err(ConversationProblem::Length);
         }
-        validate_pip(&pip)?;
+        validate_pip(&pip, self.kind)?;
         self.next_sequence()?;
         self.process = Some(process);
         self.pip = pip;
@@ -358,11 +361,19 @@ impl ConversationRecord {
     }
 }
 
-fn validate_pip(pip: &[u8]) -> Result<(), ConversationProblem> {
+fn pip_limit(kind: ConversationKind) -> usize {
+    if kind == ConversationKind::AppcBasic {
+        MAX_BASIC_PIP_BYTES
+    } else {
+        MAX_PIP_BYTES
+    }
+}
+
+fn validate_pip(pip: &[u8], kind: ConversationKind) -> Result<(), ConversationProblem> {
     if pip.is_empty() {
         return Ok(());
     }
-    if !(4..=MAX_PIP_BYTES).contains(&pip.len()) {
+    if !(4..=pip_limit(kind)).contains(&pip.len()) {
         return Err(ConversationProblem::Length);
     }
     let mut cursor = 0usize;
@@ -492,6 +503,85 @@ mod tests {
         );
         mro.state = ConversationState::ConfReceive;
         assert_eq!(mro.encode(), Err(ConversationProblem::Malformed));
+    }
+
+    #[test]
+    fn mapped_and_basic_pip_bounds_survive_record_encoding() {
+        let mut mapped_pip = vec![255; MAX_PIP_BYTES];
+        mapped_pip[..2].copy_from_slice(&(MAX_PIP_BYTES as u16).to_be_bytes());
+        mapped_pip[2..4].fill(0);
+        let mut mapped = ConversationRecord::allocate(
+            *b"C020",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        mapped
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                b"TRAN".to_vec(),
+                mapped_pip.clone(),
+                0,
+            )
+            .unwrap();
+        assert_eq!(
+            ConversationRecord::decode(&mapped.encode().unwrap())
+                .unwrap()
+                .pip,
+            mapped_pip
+        );
+
+        let mut basic_pip = vec![0; MAX_BASIC_PIP_BYTES];
+        basic_pip[..2].copy_from_slice(&(MAX_BASIC_PIP_BYTES as u16).to_be_bytes());
+        let mut basic = ConversationRecord::allocate(
+            *b"C021",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        basic
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                b"TRAN".to_vec(),
+                basic_pip.clone(),
+                0,
+            )
+            .unwrap();
+        assert_eq!(
+            ConversationRecord::decode(&basic.encode().unwrap())
+                .unwrap()
+                .pip,
+            basic_pip
+        );
+        let mut too_large = vec![0; MAX_BASIC_PIP_BYTES + 1];
+        too_large[..2].copy_from_slice(&((MAX_BASIC_PIP_BYTES + 1) as u16).to_be_bytes());
+        let mut rejected = ConversationRecord::allocate(
+            *b"C022",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            rejected.connect(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                b"TRAN".to_vec(),
+                too_large,
+                0,
+            ),
+            Err(ConversationProblem::Length)
+        );
     }
 
     #[test]

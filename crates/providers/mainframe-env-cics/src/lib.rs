@@ -16,7 +16,7 @@ pub use conversation_protocol::{
     ConversationOwner, ConversationProblem, ConversationRecord, ConversationState,
     ConversationSystemDefinition, GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure,
     GdsExtractAttributesFailure, GdsExtractProcessFailure, GdsFreeFailure, GdsReturnCode,
-    MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+    MAX_BASIC_PIP_BYTES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
 };
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 
