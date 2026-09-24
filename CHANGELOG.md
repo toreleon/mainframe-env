@@ -66,10 +66,15 @@ All notable changes to mainframe-env are documented here.
   Version 2 conversation records retain the selected PROFILE or MODENAME and
   continue reading canonical version 1 records. Durable system, PARTNER, and
   PROFILE/MODENAME definitions now provide bounded allocation inputs.
-  The nine command routes remain unregistered while selected execution and
-  recovery gates are completed. IBM CICS TS 6.x `sources-a` catalog rows
+  The other eight command routes remain unregistered while selected execution
+  and recovery gates are completed. IBM CICS TS 6.x `sources-a` catalog rows
   `0007`, `0008`, `0012`, `0015`, `0028`, `0029`, `0030`, `0081`, and `0082`
   bind this work; no licensed differential credit is claimed.
+
+- Added the selected mapped APPC/MRO `ALLOCATE` command route with SAF before
+  durable session allocation, exact replay, NOQUEUE/SYSBUSY behavior and
+  EIBRSRCE/EIBFN output. Its LU6.1 and numeric STATE forms remain explicit
+  unsupported paths pending source-backed implementation.
 
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and

@@ -96,6 +96,7 @@ EXPECTED_FAMILIES = {
     "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "conversation-control": "ConversationControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
     "document-control": "DocumentControl",
@@ -110,6 +111,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("AddSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0004"),
     ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
+    ("AllocateConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0007"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
@@ -719,6 +721,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "UpdateCounter",
         "UpdateDCounter",
         "AddressSet",
+        "AllocateConversation",
         "Asktime",
         "AsktimeEib",
         "Deq",
@@ -942,6 +945,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "AllocateConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
     "Address": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
@@ -1512,6 +1516,7 @@ def _load_typed_execution_registrations(
         "AddSubevent",
         "Address",
         "AddressSet",
+        "AllocateConversation",
         "AsktimeEib",
         "Cancel",
         "ChangePassword",
@@ -1930,6 +1935,7 @@ def load_catalog(
                 "ChangeTask",
                 "Address",
                 "AddressSet",
+                "AllocateConversation",
                 "AsktimeEib",
                 "Cancel",
                 "Delay",

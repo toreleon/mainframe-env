@@ -53,7 +53,7 @@ pub(crate) fn respond(
                     None,
                     Vec::new(),
                 )
-            } else if matches!(name, "ENQBUSY" | "EXPIRED" | "NOSTG")
+            } else if matches!(name, "ENQBUSY" | "EXPIRED" | "NOSTG" | "SYSBUSY")
                 || run.ignored_conditions.contains("ERROR")
             {
                 service.response(

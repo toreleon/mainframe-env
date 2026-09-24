@@ -38,6 +38,7 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
+        ("EIBRSRCE".into(), CobolValue::Bytes(vec![b' '; 8])),
         (
             "EIBCPOSN".into(),
             CobolValue::Decimal(Decimal {
@@ -84,6 +85,14 @@ pub(super) fn write_context(
         mainframe_env_ir::cics_application_registry_for_runtime_operation(operation.runtime_name())
     {
         machine.write("EIBFN", &descriptor.eibfn)?;
+    }
+    if operation == CicsOperation::AllocateConversation
+        && let Some(value) = response.outputs.get("EIBRSRCE")
+    {
+        if value.schema() != "mainframe-env.cics.eib-rsrce@1" || value.bytes().len() != 8 {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        machine.write("EIBRSRCE", value.bytes())?;
     }
     if matches!(
         operation,

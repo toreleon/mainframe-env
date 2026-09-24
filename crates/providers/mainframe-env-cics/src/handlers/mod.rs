@@ -52,6 +52,17 @@ use mainframe_env_host_api::{AccessIntent, CicsRequest, CicsResponse, HostProble
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
 
+pub(super) fn originating_task_for(
+    session: &super::Session,
+    invocation: &mainframe_env_execution_api::Invocation,
+) -> String {
+    if session.run_unit.is_empty() {
+        invocation.run_unit_id.as_str().to_string()
+    } else {
+        session.run_unit.clone()
+    }
+}
+
 pub(super) fn assert_descriptor(
     descriptor: &crate::generated::CicsCommandDescriptor,
     request: &CicsRequest,
@@ -128,6 +139,9 @@ pub use conversation_control::{
     GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure, GdsReturnCode, GdsWaitFailure,
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, load_conversation_replay, prune_conversation_replays,
 };
+pub(super) use conversation_control::{
+    context as conversation_context, deadline as conversation_deadline,
+};
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
 pub use diagnostics::{
@@ -201,6 +215,9 @@ pub(super) fn invoke_extended_control(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match family {
+        crate::generated::CicsCommandFamily::ConversationControl => {
+            conversation_control::invoke(service, run, request, retention_tick)
+        }
         crate::generated::CicsCommandFamily::TransformControl => {
             transform_control::invoke(service, run, request)
         }

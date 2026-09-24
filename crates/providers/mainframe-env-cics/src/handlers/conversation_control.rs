@@ -4,8 +4,11 @@
 //! ownership and protocol state. The caller persists each validated transition
 //! with the enclosing provider effect and audit record.
 
+use crate::service::{CicsService, Run};
+use mainframe_env_host_api::{CicsOperation, CicsRequest, CicsResponse, HostProblem};
 use serde::{Deserialize, Serialize};
 
+mod allocate;
 mod data;
 mod definitions;
 mod gds;
@@ -27,6 +30,48 @@ pub use replay::{
     CONVERSATION_REPLAY_NAMESPACE, ConversationReplay, ConversationReply, load_conversation_replay,
     prune_conversation_replays,
 };
+
+pub(in crate::service) fn invoke(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+) -> Result<CicsResponse, HostProblem> {
+    match request.operation {
+        CicsOperation::AllocateConversation => {
+            allocate::invoke(service, run, request, retention_tick)
+        }
+        _ => Err(HostProblem::Unsupported),
+    }
+}
+
+pub(in crate::service) fn context(run: &Run) -> Result<ConversationContext, HostProblem> {
+    let Some(value) = run.invocation.bindings.get("cics.execution-context") else {
+        return Ok(ConversationContext::Local);
+    };
+    if value.schema() != "mainframe-env.cics.execution-context@1" {
+        return Err(HostProblem::Malformed);
+    }
+    match value.bytes() {
+        b"local" => Ok(ConversationContext::Local),
+        b"dpl-synconreturn" | b"dpl-without-synconreturn" | b"dpl-executionset-subset" => {
+            Ok(ConversationContext::DplServer)
+        }
+        _ => Err(HostProblem::Malformed),
+    }
+}
+
+pub(in crate::service) fn deadline(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    if run.invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    if let Some(clock) = &service.replay_clock
+        && clock.now_tick()? >= run.invocation.deadline_tick
+    {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
+}
 
 /// Durable encoding version for one allocated conversation.
 pub const CONVERSATION_RECORD_VERSION: u16 = 2;

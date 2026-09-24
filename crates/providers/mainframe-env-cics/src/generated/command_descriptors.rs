@@ -23,6 +23,7 @@ pub(crate) enum CicsCommandFamily {
     StorageControl,
     TransformControl,
     SpoolControl,
+    ConversationControl,
     SecurityControl,
     Diagnostics,
     DocumentControl,
@@ -70,6 +71,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0006",
         family: CicsCommandFamily::TaskControl,
         mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::AllocateConversation,
+        syntax: "ALLOCATE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0007",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::AsktimeEib,

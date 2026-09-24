@@ -122,7 +122,7 @@ impl ConversationReplay {
         if self.owner_execution != execution
             || self.owner_run_unit != run_unit
             || self.owner_principal != principal
-            || self.owner_epoch != epoch
+            || epoch < self.owner_epoch
             || self.mutation_sequence != sequence
             || self.request_digest != digest
         {
@@ -234,6 +234,10 @@ mod tests {
         assert_eq!(
             reopened.matches_request("exec", "run", "user", 1, 4, [7; 32]),
             Err(StoreError::Conflict)
+        );
+        assert_eq!(
+            reopened.matches_request("exec", "run", "user", 3, 4, [7; 32]),
+            Ok(&saved.reply)
         );
         assert_eq!(
             prune_conversation_replays(&store, 199, &BTreeSet::new()),
