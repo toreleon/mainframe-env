@@ -164,6 +164,50 @@ fn conversation_extract_reads_shared_ledger_and_positions_owned_lu() {
     );
     assert_eq!(again.outputs["LENGTH"].bytes(), b"0");
     assert_eq!(again.outputs["INTO"].bytes(), b"");
+    let current = store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    let mut presentation =
+        handlers::ExtractMetadata::for_run_unit(invocation.run_unit_id.as_str().into());
+    let previous: handlers::ExtractMetadata = serde_json::from_slice(&current.payload).unwrap();
+    presentation.session_names = previous.session_names;
+    presentation.netnames = previous.netnames;
+    presentation.received_attach = previous.received_attach;
+    presentation.network_attached = previous.network_attached;
+    presentation.session_names.insert("L2".into(), lu);
+    presentation.logon_message = Some(b"HELLO".to_vec());
+    handlers::publish_metadata(&cics, presentation.clone(), Some(current.version)).unwrap();
+    let published = store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    let preserved: handlers::ExtractMetadata = serde_json::from_slice(&published.payload).unwrap();
+    assert_eq!(preserved.selected_token, Some(lu));
+    assert!(preserved.logon_consumed);
+    assert_eq!(preserved.session_names["L2"], lu);
+    let before_rejection = published.clone();
+    presentation.logon_message = Some(b"OTHER".to_vec());
+    assert_eq!(
+        handlers::publish_metadata(&cics, presentation, Some(published.version)),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(
+        store
+            .get_provider_state(
+                "cics-conversation-extract-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap(),
+        before_rejection
+    );
     assert_ne!(mapped, basic);
 }
 

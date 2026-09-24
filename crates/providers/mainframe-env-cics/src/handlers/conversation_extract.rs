@@ -133,7 +133,7 @@ pub(in crate::service) fn invoke(
 #[allow(dead_code)]
 pub(in crate::service) fn publish_metadata(
     service: &CicsService,
-    metadata: ExtractMetadata,
+    mut metadata: ExtractMetadata,
     expected_version: Option<u64>,
 ) -> Result<(), HostProblem> {
     metadata.validate()?;
@@ -144,6 +144,26 @@ pub(in crate::service) fn publish_metadata(
         .any(|id| id.as_str() == metadata.run_unit)
     {
         return Err(HostProblem::Unauthorized);
+    }
+    if let Some(row) = service
+        .store
+        .get_provider_state(NAMESPACE, &metadata.run_unit)
+        .map_err(store_error)?
+    {
+        let current = decode(&row, &metadata.run_unit)?;
+        if current.logon_consumed && current.logon_message != metadata.logon_message {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        metadata.selected_token = current.selected_token;
+        metadata.logon_consumed = current.logon_consumed;
+        metadata.mutation_replays = current.mutation_replays;
+        metadata.last_mutation = current.last_mutation;
+    } else if metadata.selected_token.is_some()
+        || metadata.logon_consumed
+        || !metadata.mutation_replays.is_empty()
+        || metadata.last_mutation.is_some()
+    {
+        return Err(HostProblem::Malformed);
     }
     write_metadata(service, &metadata, expected_version)
 }

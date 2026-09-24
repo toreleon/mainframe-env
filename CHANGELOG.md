@@ -68,6 +68,10 @@ All notable changes to mainframe-env are documented here.
   failed outer insert returns the original LOGONMSG bytes without changing a
   newer POINT selection.
 
+- Preserve POINT selection, consumed logon data, and unresolved replies when a
+  trusted terminal or conversation owner republishes task extraction facts
+  under the sidecar's expected store version.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline
