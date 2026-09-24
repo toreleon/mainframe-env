@@ -103,6 +103,10 @@ All notable changes to mainframe-env are documented here.
 - Routed default COPY and ERASEAUP through the existing terminal/BMS state.
   Their selected family regressions pass; COPY's CTLCHAR option remains
   unsupported until its referenced CCC bit table is pinned and reviewed.
+- Selected mapped APPC and LU6.1 ISSUE SIGNAL through the shared family
+  router. Existing APPC tokens take precedence over symbolic TCTTE names,
+  including foreign-token collisions; the LU6.1 alternate/principal paths
+  retain their device owner fence and replay.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

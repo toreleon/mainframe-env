@@ -165,10 +165,10 @@ pub(in crate::service) fn invoke(
         CicsOperation::IssueAbend
         | CicsOperation::IssueConfirmation
         | CicsOperation::IssueError
-        | CicsOperation::IssuePrepare
-        | CicsOperation::IssueSignal => {
+        | CicsOperation::IssuePrepare => {
             issue_staging::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::IssueSignal => issue_signal(service, run, request, retention_tick),
         CicsOperation::GdsIssueAbend
         | CicsOperation::GdsIssueConfirmation
         | CicsOperation::GdsIssueError
@@ -188,6 +188,38 @@ pub(in crate::service) fn invoke(
             super::terminal_control::invoke(service, run, request)
         }
         _ => Err(HostProblem::Unsupported),
+    }
+}
+
+fn issue_signal(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("CONVID") || request.arguments.contains_key("STATE") {
+        return issue_staging::invoke(service, run, request, retention_tick);
+    }
+    let ledger =
+        ConversationLedger::load(service.store.as_ref()).map_err(crate::service::store_error)?;
+    if let Some(session) = request.arguments.get("SESSION") {
+        if let Ok(token) = <[u8; 4]>::try_from(session.bytes())
+            && ledger.conversation(token).is_some()
+        {
+            return issue_staging::invoke(service, run, request, retention_tick);
+        }
+        return super::issue_device::invoke(service, run, request);
+    }
+    if ledger.conversations.values().any(|record| {
+        record.principal_facility
+            && !record.released
+            && record.kind == ConversationKind::AppcMapped
+            && record.owner.execution == run.invocation.execution_id.as_str()
+            && record.owner.run_unit == run.invocation.run_unit_id.as_str()
+    }) {
+        issue_staging::invoke(service, run, request, retention_tick)
+    } else {
+        super::issue_device::invoke(service, run, request)
     }
 }
 

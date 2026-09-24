@@ -8879,7 +8879,7 @@ mod tests {
         let mut run = source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueSignal,
-            BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
+            BTreeMap::from([("SESSION".into(), cics_literal(&source_token))]),
             1,
         );
         assert_eq!(
@@ -11643,13 +11643,25 @@ mod tests {
         );
         service.inject_replay_unknown_after_persist_once();
         assert_eq!(
-            handlers::invoke_issue_device(&service, &mut run, &alternate),
+            handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &alternate,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            ),
             Err(HostProblem::UnknownOutcome)
         );
         assert_eq!(
-            handlers::invoke_issue_device(&service, &mut run, &alternate)
-                .unwrap()
-                .condition,
+            handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &alternate,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap()
+            .condition,
             "NORMAL"
         );
         let signaled = handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
@@ -11659,9 +11671,15 @@ mod tests {
         assert!(signaled.state.lu61_signal_pending);
         let principal = request(CicsOperation::IssueSignal, BTreeMap::new(), 2);
         assert_eq!(
-            handlers::invoke_issue_device(&service, &mut run, &principal)
-                .unwrap()
-                .condition,
+            handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &principal,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap()
+            .condition,
             "NORMAL"
         );
         assert_eq!(
@@ -11702,6 +11720,98 @@ mod tests {
                 .unwrap()
                 .version,
             4
+        );
+    }
+
+    #[test]
+    fn issue_signal_session_token_collision_does_not_fall_back_to_lu61_device() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 2,
+                enabled: true,
+            })
+            .unwrap();
+        let (invocation, session) = registered(&service);
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("S003".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "S003".into(),
+            kind: handlers::IssueDeviceKind::Lu61,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let current_device = handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
+            .unwrap()
+            .unwrap();
+        let mut owned_device = current_device.clone();
+        owned_device
+            .assign_lu61_owner(invocation.run_unit_id.as_str())
+            .unwrap();
+        current_device
+            .persist(&mut owned_device, store.as_ref())
+            .unwrap();
+        let token = *b"S003";
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversations.insert(
+            u32::from_be_bytes(token).to_string(),
+            ConversationRecord::allocate(
+                token,
+                "SYS1",
+                ConversationKind::AppcMapped,
+                ConversationOwner {
+                    execution: "foreign".into(),
+                    run_unit: "foreign".into(),
+                    lease_epoch: 1,
+                },
+                false,
+            )
+            .unwrap(),
+        );
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        let command = request(
+            CicsOperation::IssueSignal,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S003"))]),
+            1,
+        );
+        assert_eq!(
+            handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTALLOC".into(),
+                response: 61,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
+                .unwrap()
+                .unwrap()
+                .version,
+            owned_device.version
         );
     }
 
