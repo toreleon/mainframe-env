@@ -3693,17 +3693,23 @@ mod tests {
         fail_next: AtomicBool,
     }
 
-    struct FailCicsReplayCasStore {
-        inner: MemoryStore,
+    struct FailCicsReplayCasStore<S> {
+        inner: S,
         fail_insert: AtomicBool,
         fail_next: AtomicBool,
         fail_session: AtomicBool,
     }
 
-    impl FailCicsReplayCasStore {
+    impl FailCicsReplayCasStore<MemoryStore> {
         fn new() -> Self {
+            Self::with_inner(MemoryStore::new(Default::default()))
+        }
+    }
+
+    impl<S> FailCicsReplayCasStore<S> {
+        fn with_inner(inner: S) -> Self {
             Self {
-                inner: MemoryStore::new(Default::default()),
+                inner,
                 fail_insert: AtomicBool::new(false),
                 fail_next: AtomicBool::new(false),
                 fail_session: AtomicBool::new(false),
@@ -3711,7 +3717,9 @@ mod tests {
         }
     }
 
-    impl mainframe_env_store_api::AuditSink for FailCicsReplayCasStore {
+    impl<S: ProviderStateStore + ArtifactStore> mainframe_env_store_api::AuditSink
+        for FailCicsReplayCasStore<S>
+    {
         fn record_audit(
             &self,
             record: mainframe_env_execution_api::AuditRecord,
@@ -3730,7 +3738,7 @@ mod tests {
         }
     }
 
-    impl ArtifactStore for FailCicsReplayCasStore {
+    impl<S: ProviderStateStore + ArtifactStore> ArtifactStore for FailCicsReplayCasStore<S> {
         fn health(&self) -> Result<mainframe_env_store_api::ArtifactStoreHealth, StoreError> {
             self.inner.health()
         }
@@ -3748,7 +3756,7 @@ mod tests {
         }
     }
 
-    impl ProviderStateStore for FailCicsReplayCasStore {
+    impl<S: ProviderStateStore + ArtifactStore> ProviderStateStore for FailCicsReplayCasStore<S> {
         fn get_provider_state(
             &self,
             namespace: &str,

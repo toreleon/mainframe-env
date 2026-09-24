@@ -66,7 +66,7 @@ All notable changes to mainframe-env are documented here.
 - Retain unresolved POINT and LOGONMSG replies in the bounded extraction
   sidecar until their outer replay rows exist. An interleaved retry after a
   failed outer insert returns the original LOGONMSG bytes without changing a
-  newer POINT selection.
+  newer POINT selection, including after SQLite reopen.
 
 - Preserve POINT selection, consumed logon data, and unresolved replies when a
   trusted terminal or conversation owner republishes task extraction facts

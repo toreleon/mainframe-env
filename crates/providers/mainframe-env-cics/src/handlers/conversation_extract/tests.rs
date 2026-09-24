@@ -740,3 +740,83 @@ fn conversation_extract_replays_unknown_logon_after_interleaved_point() {
     assert_eq!(row["mutation_replays"].as_array().unwrap().len(), 1);
     assert_eq!(metadata.selected_token, Some(metadata.session_names["L1"]));
 }
+
+#[test]
+fn conversation_extract_unknown_reply_survives_sqlite_restart_after_point() {
+    let root = std::env::temp_dir().join(format!(
+        "mainframe-conv-extract-replay-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id(),
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+    let store = Arc::new(FailCicsReplayCasStore::with_inner(
+        SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+    ));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-sqlite-replay", BTreeMap::new());
+    let session = SessionId::new("extract-sqlite-replay", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let logon = request(
+        CicsOperation::ExtractLogonMsg,
+        BTreeMap::from([
+            ("INTO".into(), argument(b"LOGON-X")),
+            ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+            ("LENGTH".into(), argument(b"LEN-X")),
+        ]),
+        1,
+    );
+    store.fail_insert.store(true, Ordering::SeqCst);
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, logon.clone(), 1), logon.clone()),
+        Err(HostProblem::UnknownOutcome)
+    );
+    let point = request(
+        CicsOperation::Point,
+        BTreeMap::from([("SESSION".into(), cics_literal(b"M1"))]),
+        2,
+    );
+    cics.invoke(&effect(&invocation.run_unit_id, point.clone(), 2), point)
+        .unwrap();
+    let before = store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    drop((cics, store));
+
+    let reopened_store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+    let reopened = service(reopened_store.clone());
+    let resumed_session = SessionId::new("extract-sqlite-replay-resumed", 64).unwrap();
+    reopened.create_session(&resumed_session, 24, 80).unwrap();
+    reopened
+        .register_run(invocation.clone(), &resumed_session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    let recovered = reopened
+        .invoke(&effect(&invocation.run_unit_id, logon.clone(), 1), logon)
+        .unwrap();
+    assert_eq!(recovered.outputs["INTO"].bytes(), b"HELLO");
+    assert_eq!(recovered.outputs["LENGTH"].bytes(), b"5");
+    let after = reopened_store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(after, before);
+    let metadata: handlers::ExtractMetadata = serde_json::from_slice(&after.payload).unwrap();
+    assert_eq!(metadata.selected_token, Some(metadata.session_names["M1"]));
+    assert!(metadata.logon_consumed);
+    assert!(reopened_store
+        .get_provider_state("cics-effect-replay-v1", "outer-1")
+        .unwrap()
+        .is_some());
+    drop((reopened, reopened_store));
+    std::fs::remove_dir_all(root).unwrap();
+}
