@@ -25,6 +25,10 @@ All notable changes to mainframe-env are documented here.
   concurrent PostgreSQL providers and restart replay. Each device and source
   session advances once; both catalog rows remain unregistered.
 
+- Verified the alternate LUTYPE6.1 ISSUE DISCONNECT SESSION form across
+  PostgreSQL restart and concurrent providers. The owner-fenced device closes
+  once while the principal session remains connected.
+
 - Prevented the COBOL copybook preprocessor from interpreting `COPY` inside
   `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
   source origins remain intact.
