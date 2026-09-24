@@ -7869,6 +7869,109 @@ mod tests {
     }
 
     #[test]
+    fn issue_print_unknown_outcome_replays_after_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-print-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let invocation = invocation_for("issue-print-restart", BTreeMap::new());
+        let session = SessionId::new("issue-print-session", 64).unwrap();
+        let command = request(CicsOperation::IssuePrint, BTreeMap::new(), 1);
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            let current = service.lock().unwrap().sessions[session.as_str()].clone();
+            let mut next = current.clone();
+            next.version += 1;
+            next.screen = b"PRINT\0DATA".to_vec();
+            service
+                .persist_session(session.as_str(), &next, Some(current.version))
+                .unwrap();
+            service
+                .lock()
+                .unwrap()
+                .sessions
+                .insert(session.as_str().into(), next);
+            for (terminal, kind, printers) in [
+                (
+                    "T000",
+                    handlers::IssueDeviceKind::Display3270,
+                    vec!["P001".into()],
+                ),
+                ("P001", handlers::IssueDeviceKind::Printer3270, vec![]),
+            ] {
+                handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                    terminal: terminal.into(),
+                    kind,
+                    control_unit: Some("CU1".into()),
+                    printers,
+                    programs: vec![],
+                    applications: vec![],
+                    logon_logmode: None,
+                    disconnect_allowed: true,
+                    pass_allowed: false,
+                })
+                .unwrap()
+                .install(store.as_ref())
+                .unwrap();
+            }
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            let printer = handlers::IssueDeviceRecord::load(store.as_ref(), "P001")
+                .unwrap()
+                .unwrap();
+            assert_eq!(printer.state.last_print, b"PRINT\0DATA");
+            assert_eq!(printer.state.print_count, 1);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 2)
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            for terminal in ["T000", "P001"] {
+                let record = handlers::IssueDeviceRecord::load(store.as_ref(), terminal)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(record.state.last_print, b"PRINT\0DATA");
+                assert_eq!(record.state.print_count, 1);
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

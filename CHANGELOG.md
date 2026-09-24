@@ -110,6 +110,9 @@ All notable changes to mainframe-env are documented here.
   printer as well as the source display. Both physical records and the replay
   receipt share one atomic commit.
 
+- Verified uncertain ISSUE PRINT recovery after SQLite restart: receipt replay
+  preserves the display and printer images and leaves both print counts at one.
+
 - ISSUE PRINT accepts configured 3650 host conversational 3270 displays with
   a printer peer, as required by the pinned PRINT topic.
 
