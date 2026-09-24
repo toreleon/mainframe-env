@@ -29,6 +29,9 @@ All notable changes to mainframe-env are documented here.
   PostgreSQL restart and concurrent providers. The owner-fenced device closes
   once while the principal session remains connected.
 
+- Verified the LUTYPE6.1 ISSUE SIGNAL pending marker across PostgreSQL restart
+  and concurrent providers. Partner-side condition consumption remains open.
+
 - Prevented the COBOL copybook preprocessor from interpreting `COPY` inside
   `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
   source origins remain intact.
