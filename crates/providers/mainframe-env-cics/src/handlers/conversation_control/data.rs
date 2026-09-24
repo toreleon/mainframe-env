@@ -9,6 +9,7 @@ use super::{
     ConversationRecord, ConversationState,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 const MAX_FRAMES: usize = 256;
 const MAX_FRAME_BYTES: usize = 32_767;
@@ -46,6 +47,7 @@ impl ConversationDataFrame {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct StagedSend {
+    id: u64,
     frame: ConversationDataFrame,
     next_state: ConversationState,
 }
@@ -57,6 +59,18 @@ pub struct ConversationDataState {
     outbound: Vec<StagedSend>,
     signal_pending: bool,
     terminal_error: bool,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    last_peer_sequence: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_peer_digest: Option<[u8; 32]>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    next_send_id: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    last_acked_send_id: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 impl ConversationDataState {
@@ -65,6 +79,9 @@ impl ConversationDataState {
             && self.outbound.is_empty()
             && !self.signal_pending
             && !self.terminal_error
+            && self.last_peer_sequence == 0
+            && self.next_send_id == 0
+            && self.last_acked_send_id == 0
     }
 
     pub fn validate(&self) -> Result<(), ConversationProblem> {
@@ -79,6 +96,20 @@ impl ConversationDataState {
             .try_fold(0usize, |total, size| total.checked_add(size))
             .ok_or(ConversationProblem::Exhausted)?;
         if bytes > MAX_QUEUED_BYTES
+            || (self.last_peer_sequence == 0) != self.last_peer_digest.is_none()
+            || self.last_acked_send_id > self.next_send_id
+            || self
+                .outbound
+                .first()
+                .is_some_and(|send| send.id <= self.last_acked_send_id)
+            || self
+                .outbound
+                .last()
+                .is_some_and(|send| send.id > self.next_send_id)
+            || self
+                .outbound
+                .windows(2)
+                .any(|pair| pair[0].id >= pair[1].id)
             || self
                 .inbound
                 .iter()
@@ -107,6 +138,10 @@ impl ConversationDataState {
 
     pub fn pending_outbound(&self) -> usize {
         self.outbound.len()
+    }
+
+    pub fn next_outbound(&self) -> Option<(u64, &ConversationDataFrame)> {
+        self.outbound.first().map(|send| (send.id, &send.frame))
     }
 
     pub fn pending_inbound(&self) -> usize {
@@ -148,14 +183,28 @@ impl ConversationRecord {
         &mut self,
         owner: &ConversationOwner,
         context: ConversationContext,
+        peer_sequence: u64,
         frame: ConversationDataFrame,
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
         frame.validate()?;
+        let digest: [u8; 32] =
+            Sha256::digest(serde_json::to_vec(&frame).map_err(|_| ConversationProblem::Malformed)?)
+                .into();
+        if peer_sequence == self.data.last_peer_sequence
+            && self.data.last_peer_digest == Some(digest)
+        {
+            return Ok(());
+        }
+        if peer_sequence != self.data.last_peer_sequence.saturating_add(1) {
+            return Err(ConversationProblem::WrongState);
+        }
         if self.data.terminal_error {
             return Err(ConversationProblem::WrongState);
         }
         let mut next = self.data.clone();
+        next.last_peer_sequence = peer_sequence;
+        next.last_peer_digest = Some(digest);
         if frame.signal {
             next.signal_pending = true;
         } else {
@@ -189,7 +238,7 @@ impl ConversationRecord {
         invite: bool,
         last: bool,
         fmh: bool,
-    ) -> Result<(), ConversationProblem> {
+    ) -> Result<u64, ConversationProblem> {
         self.check_owner(owner, context)?;
         if self.kind == ConversationKind::AppcBasic {
             return Err(ConversationProblem::WrongKind);
@@ -228,11 +277,20 @@ impl ConversationRecord {
             ConversationState::Send
         };
         let mut next = self.data.clone();
-        next.outbound.push(StagedSend { frame, next_state });
+        let send_id = next
+            .next_send_id
+            .checked_add(1)
+            .ok_or(ConversationProblem::Exhausted)?;
+        next.next_send_id = send_id;
+        next.outbound.push(StagedSend {
+            id: send_id,
+            frame,
+            next_state,
+        });
         next.validate()?;
         self.next_sequence()?;
         self.data = next;
-        Ok(())
+        Ok(send_id)
     }
 
     /// Peer-confirmed completion of the oldest staged SEND. The adapter must
@@ -241,13 +299,18 @@ impl ConversationRecord {
         &mut self,
         owner: &ConversationOwner,
         context: ConversationContext,
+        send_id: u64,
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
-        if self.data.outbound.is_empty() {
+        if send_id != 0 && send_id == self.data.last_acked_send_id {
+            return Ok(());
+        }
+        if self.data.outbound.first().map(|send| send.id) != Some(send_id) {
             return Err(ConversationProblem::WrongState);
         }
         self.next_sequence()?;
         let send = self.data.outbound.remove(0);
+        self.data.last_acked_send_id = send_id;
         self.state = send.next_state;
         Ok(())
     }
@@ -464,16 +527,48 @@ mod tests {
         record = ConversationRecord::decode(&encoded).unwrap();
         assert_eq!(record.data.pending_outbound(), 1);
         record
-            .acknowledge_send(&owner, ConversationContext::Local)
+            .acknowledge_send(&owner, ConversationContext::Local, 1)
             .unwrap();
+        assert_eq!(
+            record.acknowledge_send(&owner, ConversationContext::Local, 1),
+            Ok(())
+        );
         assert_eq!(
             record.wait_transmitted(&owner, ConversationContext::Local, false),
             Ok(true)
         );
         assert_eq!(record.state, ConversationState::Receive);
         record
-            .enqueue_peer_data(&owner, ConversationContext::Local, frame(b"ABCDEFGH", true))
+            .enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                1,
+                frame(b"ABCDEFGH", true),
+            )
             .unwrap();
+        assert_eq!(
+            record.enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                1,
+                frame(b"ABCDEFGH", true)
+            ),
+            Ok(())
+        );
+        assert_eq!(record.data.pending_inbound(), 1);
+        assert_eq!(
+            record.enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                1,
+                frame(b"DIFFERENT", true),
+            ),
+            Err(ConversationProblem::WrongState)
+        );
+        assert_eq!(
+            record.enqueue_peer_data(&owner, ConversationContext::Local, 3, frame(b"GAP", true)),
+            Err(ConversationProblem::WrongState)
+        );
         let first = record
             .receive_data(&owner, ConversationContext::Local, false, 3, true, true)
             .unwrap()
@@ -517,7 +612,7 @@ mod tests {
         let mut stale = owner.clone();
         stale.lease_epoch = 8;
         assert_eq!(
-            record.acknowledge_send(&stale, ConversationContext::Local),
+            record.acknowledge_send(&stale, ConversationContext::Local, 1),
             Err(ConversationProblem::StaleOwner)
         );
         assert_eq!(record.data.pending_outbound(), 1);
@@ -553,10 +648,10 @@ mod tests {
             .peer_offered_data(&owner, ConversationContext::Local)
             .unwrap();
         record
-            .enqueue_peer_data(&owner, ConversationContext::Local, frame(b"ABC", false))
+            .enqueue_peer_data(&owner, ConversationContext::Local, 1, frame(b"ABC", false))
             .unwrap();
         record
-            .enqueue_peer_data(&owner, ConversationContext::Local, frame(b"DEFG", true))
+            .enqueue_peer_data(&owner, ConversationContext::Local, 2, frame(b"DEFG", true))
             .unwrap();
         let first = record
             .receive_data(&owner, ConversationContext::Local, true, 10, true, true)
@@ -606,7 +701,12 @@ mod tests {
             .peer_offered_data(&owner, ConversationContext::Local)
             .unwrap();
         record
-            .enqueue_peer_data(&owner, ConversationContext::Local, frame(b"ABCDEFG", true))
+            .enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                1,
+                frame(b"ABCDEFG", true),
+            )
             .unwrap();
         let reply = record
             .receive_data(&owner, ConversationContext::Local, false, 3, false, false)

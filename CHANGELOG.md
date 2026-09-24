@@ -12,6 +12,10 @@ All notable changes to mainframe-env are documented here.
   staged sends, explicit transmission acknowledgement, partial receive, and
   GDS return-code contracts. The public routes remain unready pending selected
   host dispatch and acceptance gates.
+- Peer conversation frames now carry a monotonic event sequence and digest,
+  while staged sends carry distinct acknowledgement IDs. Exact duplicate
+  delivery or acknowledgement is idempotent; gaps and conflicting replays fail
+  without advancing the shared durable conversation record.
 
 ### Changed
 
