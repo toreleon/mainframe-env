@@ -148,6 +148,21 @@ impl CicsService {
                 child.reply_channel == reply_channel || child.freed && child.reply_channel.is_none()
             }))
     }
+    /// Read the sibling token outcome for crash-gap reconciliation.
+    pub(in crate::service) fn bts_child_outcome(
+        &self,
+        parent: &RunUnitId,
+        token: [u8; 16],
+    ) -> Result<Option<(CicsBtsChildCompletion, Option<String>)>, HostProblem> {
+        let state = load(self, parent.as_str())?;
+        let child = state
+            .children
+            .get(&token_key(&token))
+            .ok_or(HostProblem::NotFound)?;
+        Ok(child
+            .completion
+            .map(|completion| (completion, child.abcode.clone())))
+    }
 }
 
 fn change(

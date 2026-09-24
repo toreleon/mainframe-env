@@ -377,6 +377,46 @@ impl<'a> BtsLifecycleStore<'a> {
         }
         Err(HostProblem::UnknownOutcome)
     }
+    /// Close a crash gap only after the sibling token row proves completion.
+    fn finish_transid_from_child(
+        &self,
+        run_id: &str,
+        completion: CicsBtsChildCompletion,
+        abcode: Option<&str>,
+    ) -> Result<BtsTransidRecord, HostProblem> {
+        for _ in 0..MAX_CAS_ATTEMPTS {
+            let mut record = self.load_transid(run_id)?.ok_or(HostProblem::NotFound)?;
+            if record.state == BtsTransidState::Finished {
+                return if record.completion == Some(completion)
+                    && record.abcode.as_deref() == abcode
+                {
+                    Ok(record)
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            let mut outbox = self.load_transid_outbox()?;
+            if !outbox.pending.remove(run_id) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let expected = record.row_version;
+            record.state = BtsTransidState::Finished;
+            record.completion = Some(completion);
+            record.abcode = abcode.map(str::to_owned);
+            match self.store.mutate_provider_states_atomic(vec![
+                put_transid(&record, Some(expected))?,
+                put_outbox(&outbox)?,
+            ]) {
+                Ok(()) => {
+                    record.row_version = expected + 1;
+                    return Ok(record);
+                }
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(error) => return Err(store_error(error)),
+            }
+        }
+        Err(HostProblem::UnknownOutcome)
+    }
 }
 
 impl CicsService {
@@ -417,14 +457,59 @@ impl CicsService {
         let outbox = authority.load_transid_outbox()?;
         let mut admitted = 0;
         for run_id in outbox.pending {
+            if self.reconcile_bts_transid_work(&run_id)?.is_some() {
+                continue;
+            }
             let record = authority
                 .load_transid(&run_id)?
                 .ok_or(HostProblem::InfrastructureFailure)?;
-            self.register_bts_transid_child(&record)?;
+            match self.register_bts_transid_child(&record) {
+                Ok(()) => {}
+                // The request remains pending for an exact parent retry.
+                Err(HostProblem::Unauthorized) => continue,
+                Err(problem) => return Err(problem),
+            }
             self.enqueue_bts_transid_work(&record)?;
             admitted += 1;
         }
         Ok(admitted)
+    }
+
+    /// Reconcile a retained child result after a crash between token completion
+    /// and closing the RUN TRANSID request/outbox. Never invent an outcome.
+    pub fn reconcile_bts_transid_work(
+        &self,
+        run_id: &str,
+    ) -> Result<Option<BtsTransidRecord>, HostProblem> {
+        let authority = BtsLifecycleStore::new(self.store.as_ref());
+        let record = authority
+            .load_transid(run_id)?
+            .ok_or(HostProblem::NotFound)?;
+        let parent = RunUnitId::new(&record.parent_run_unit, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let observed = match self.bts_child_outcome(&parent, record.token) {
+            Ok(outcome) => outcome,
+            Err(HostProblem::NotFound) if record.state != BtsTransidState::Finished => None,
+            Err(problem) => return Err(problem),
+        };
+        if let Some((completion, abcode)) = observed {
+            return authority
+                .finish_transid_from_child(run_id, completion, abcode.as_deref())
+                .map(Some);
+        }
+        if record.state == BtsTransidState::Finished {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let work = self
+            .work_store
+            .as_ref()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .get_work(&record.work_id)
+            .map_err(store_error)?;
+        if work.as_ref().is_some_and(|work| work.state.terminal()) {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        Ok(None)
     }
 
     pub fn promote_bts_transid_work(

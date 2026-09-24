@@ -31216,6 +31216,121 @@ mod tests {
     }
 
     #[test]
+    fn bts_transid_restart_reconciles_completed_child_before_work_readmission() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransidState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (parent, _) = registered(&first);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let record = authority
+            .start_transid(
+                parent.run_unit_id.as_str(),
+                parent.execution_id.as_str(),
+                "IBMUSER",
+                "child",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                None,
+                BTreeMap::new(),
+                1_000,
+                4,
+            )
+            .unwrap();
+        first.register_bts_transid_child(&record).unwrap();
+        first.enqueue_bts_transid_work(&record).unwrap();
+        let claimed = store
+            .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        first.promote_bts_transid_work(&claimed).unwrap();
+        first
+            .complete_bts_child(
+                &parent.run_unit_id,
+                record.token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            )
+            .unwrap();
+        drop(first);
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(reopened.recover_bts_transid_work().unwrap(), 0);
+        assert_eq!(
+            authority
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Finished
+        );
+    }
+
+    #[test]
+    fn bts_transid_cancelled_work_without_child_outcome_stays_unknown() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsTransidState};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (parent, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let record = authority
+            .start_transid(
+                parent.run_unit_id.as_str(),
+                parent.execution_id.as_str(),
+                "IBMUSER",
+                "child",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                None,
+                BTreeMap::new(),
+                1_000,
+                4,
+            )
+            .unwrap();
+        cics.register_bts_transid_child(&record).unwrap();
+        cics.enqueue_bts_transid_work(&record).unwrap();
+        let cancelled = store.request_cancellation(&record.work_id).unwrap();
+        assert_eq!(cancelled.state, WorkState::Cancelled);
+        assert_eq!(
+            cics.reconcile_bts_transid_work(&record.run_id),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            authority
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Pending
+        );
+    }
+
+    #[test]
     fn bts_run_outbox_readmits_work_after_provider_reopen() {
         use handlers::bts_lifecycle::{
             BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess, BtsRunState,
