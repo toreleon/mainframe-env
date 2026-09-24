@@ -19,6 +19,12 @@ All notable changes to mainframe-env are documented here.
   an atomic process/event transition. An incomplete child retains the event;
   RESET ACTIVITY restores a consumed event as NOTFIRED.
 
+- New BTS RUN work identities now include the exact effect key, allowing a
+  later execution of the same source statement after RESET. Retained
+  statement-only IDs remain readable for exact retries. A synchronous
+  continuation reuses its current activation and saves the new effect key for
+  durable exact replay.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

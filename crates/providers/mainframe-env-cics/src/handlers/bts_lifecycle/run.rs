@@ -205,6 +205,63 @@ impl<'a> BtsLifecycleStore<'a> {
         Ok(Some(record))
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn synchronous_continuation(
+        &self,
+        process: &BtsProcess,
+        activity_id: &str,
+        owner_run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        statement_id: &str,
+        request_shape_digest: [u8; 32],
+    ) -> Result<Option<BtsRunRecord>, HostProblem> {
+        let activity = process
+            .activities
+            .get(activity_id)
+            .ok_or(HostProblem::NotFound)?;
+        if activity.mode == BtsMode::Initial {
+            return Ok(None);
+        }
+        let mut seen = BTreeSet::new();
+        let mut found = None;
+        for replay in process.replays.values() {
+            if replay.owner_run_unit != owner_run_unit
+                || replay.owner_execution != owner_execution
+                || replay.owner_principal != owner_principal
+            {
+                continue;
+            }
+            let Some(bytes) = replay.outputs.get("BTS.RUNID") else {
+                continue;
+            };
+            let id = std::str::from_utf8(bytes).map_err(|_| HostProblem::InfrastructureFailure)?;
+            if !seen.insert(id) {
+                continue;
+            }
+            let saved = self
+                .load_run(id)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if saved.synchronous
+                && saved.owner_run_unit == owner_run_unit
+                && saved.owner_execution == owner_execution
+                && saved.owner_principal == owner_principal
+                && saved.statement_id == statement_id
+                && saved.request_shape_digest == request_shape_digest
+                && saved.process_type == process.process_type
+                && saved.process_name == process.name
+                && saved.activity_id == activity_id
+                && saved.activation_epoch == activity.activation_epoch
+            {
+                if found.is_some() {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                found = Some(saved);
+            }
+        }
+        Ok(found)
+    }
+
     /// Move an INITIAL or DORMANT activity to ACTIVE with its exact outbox row
     /// and a reattachment input event in one store transaction.
     #[allow(clippy::too_many_arguments)]
@@ -235,10 +292,17 @@ impl<'a> BtsLifecycleStore<'a> {
         if scheduled_tick == 0 {
             return Err(HostProblem::Malformed);
         }
-        let run_id = run_id(owner_run_unit, owner_execution, statement_id);
+        let run_id = run_id(owner_run_unit, owner_execution, statement_id, effect_key);
+        let legacy_run_id = legacy_run_id(owner_run_unit, owner_execution, statement_id);
         let key = Self::process_key(process_type, process_name)?;
         for _ in 0..MAX_CAS_ATTEMPTS {
-            if let Some(saved) = self.load_run(&run_id)? {
+            for candidate in [&run_id, &legacy_run_id] {
+                let Some(saved) = self.load_run(candidate)? else {
+                    continue;
+                };
+                if candidate == &legacy_run_id && saved.effect_key != effect_key {
+                    continue;
+                }
                 if saved.owner_run_unit != owner_run_unit
                     || saved.owner_execution != owner_execution
                     || saved.owner_principal != owner_principal
@@ -256,18 +320,92 @@ impl<'a> BtsLifecycleStore<'a> {
                 }
                 return Ok(saved);
             }
-            let mut outbox = self.load_run_outbox()?;
-            if outbox.pending.len() >= MAX_PENDING_RUNS {
-                return Err(HostProblem::ResourceExhausted);
-            }
             let mut process = self
                 .load_process(process_type, process_name)?
                 .ok_or(HostProblem::NotFound)?;
             if !process.visible_to(owner_run_unit) {
                 return Err(HostProblem::NotFound);
             }
+            if let Some(replay) = process.replays.get(effect_key) {
+                if replay.owner_run_unit != owner_run_unit
+                    || replay.owner_execution != owner_execution
+                    || replay.owner_principal != owner_principal
+                    || replay.request_digest != request_digest
+                {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                let id = replay
+                    .outputs
+                    .get("BTS.RUNID")
+                    .ok_or(HostProblem::IdempotencyConflict)?;
+                let id = std::str::from_utf8(id).map_err(|_| HostProblem::InfrastructureFailure)?;
+                let saved = self
+                    .load_run(id)?
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                if saved.owner_run_unit != owner_run_unit
+                    || saved.owner_execution != owner_execution
+                    || saved.owner_principal != owner_principal
+                    || saved.statement_id != statement_id
+                    || saved.request_shape_digest != request_shape_digest
+                    || saved.process_type != process_type
+                    || saved.process_name != process_name
+                    || saved.activity_id != activity_id
+                {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                return Ok(saved);
+            }
+            if synchronous
+                && let Some(saved) = self.synchronous_continuation(
+                    &process,
+                    activity_id,
+                    owner_run_unit,
+                    owner_execution,
+                    owner_principal,
+                    statement_id,
+                    request_shape_digest,
+                )?
+            {
+                if process.replays.len() >= MAX_REPLAYS {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let old_version = process.row_version;
+                process.epoch = process
+                    .epoch
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                process.replays.insert(
+                    effect_key.into(),
+                    BtsReplay {
+                        owner_execution: owner_execution.into(),
+                        owner_run_unit: owner_run_unit.into(),
+                        owner_principal: owner_principal.into(),
+                        request_digest,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        outputs: BTreeMap::from([(
+                            "BTS.RUNID".into(),
+                            saved.run_id.as_bytes().to_vec(),
+                        )]),
+                    },
+                );
+                match self.store.mutate_provider_states_atomic(vec![put_process(
+                    &key,
+                    &process,
+                    Some(old_version),
+                )?]) {
+                    Ok(()) => return Ok(saved),
+                    Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                    Err(error) => return Err(store_error(error)),
+                }
+            }
             if process.replays.len() >= MAX_REPLAYS || process.replays.contains_key(effect_key) {
                 return Err(HostProblem::IdempotencyConflict);
+            }
+            let mut outbox = self.load_run_outbox()?;
+            if outbox.pending.len() >= MAX_PENDING_RUNS {
+                return Err(HostProblem::ResourceExhausted);
             }
             let old_version = process.row_version;
             let ticket = process.start(activity_id, input_event, synchronous)?;
@@ -460,7 +598,17 @@ fn same_work(current: &WorkRecord, expected: &WorkRecord) -> bool {
         && current.payload == expected.payload
 }
 
-fn run_id(run_unit: &str, execution: &str, statement_id: &str) -> String {
+fn run_id(run_unit: &str, execution: &str, statement_id: &str, effect_key: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"bts-run-effect-v2");
+    for field in [run_unit, execution, statement_id, effect_key] {
+        digest.update((field.len() as u32).to_be_bytes());
+        digest.update(field.as_bytes());
+    }
+    format!("{:x}", digest.finalize())
+}
+
+fn legacy_run_id(run_unit: &str, execution: &str, statement_id: &str) -> String {
     let mut digest = Sha256::new();
     for field in [run_unit, execution, statement_id] {
         digest.update((field.len() as u32).to_be_bytes());
@@ -653,5 +801,217 @@ mod tests {
                 .mode,
             BtsMode::Active
         );
+    }
+
+    #[test]
+    fn a_retried_activity_can_run_from_the_same_statement_after_reset() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = published_process(&authority);
+        let first = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                None,
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:42",
+                "run-first",
+                [1; 32],
+                [1; 32],
+                1000,
+                5,
+            )
+            .unwrap();
+        memory.enqueue(first.work_record().unwrap()).unwrap();
+        let claimed = memory
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1000, 30_000)
+            .unwrap()
+            .unwrap();
+        authority.promote_run(&claimed).unwrap().unwrap();
+        authority
+            .finish_run(&claimed, BtsCompletion::Normal, None, None)
+            .unwrap();
+        authority
+            .remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "reset",
+                [2; 32],
+                &super::super::removal::BtsRemoval::Reset {
+                    activity_id: root.clone(),
+                },
+            )
+            .unwrap();
+        let second = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                None,
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:42",
+                "run-second",
+                [3; 32],
+                [1; 32],
+                2000,
+                5,
+            )
+            .unwrap();
+        assert_ne!(first.run_id, second.run_id);
+        assert_eq!(second.activation_epoch, 2);
+        assert_eq!(second.state, BtsRunState::Pending);
+        assert_eq!(
+            authority
+                .start_run(
+                    "TYPE",
+                    "ORDER",
+                    &root,
+                    None,
+                    false,
+                    None,
+                    "UOW2",
+                    "EXEC2",
+                    "USER",
+                    "UOW2:42",
+                    "run-second",
+                    [3; 32],
+                    [1; 32],
+                    3000,
+                    5,
+                )
+                .unwrap(),
+            second
+        );
+    }
+
+    #[test]
+    fn a_retained_statement_only_run_id_replays_without_rekeying() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = published_process(&authority);
+        let first = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, true, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "legacy", [3; 32], [3; 32], 1000, 5,
+            )
+            .unwrap();
+        let old_id = legacy_run_id("UOW2", "EXEC2", "UOW2:42");
+        let mut retained = first.clone();
+        retained.run_id = old_id.clone();
+        retained.work_id = format!("cics-bts-run:{old_id}");
+        retained.row_version = 0;
+        let mut process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        let old_process_version = process.row_version;
+        process.epoch += 1;
+        process
+            .replays
+            .get_mut("legacy")
+            .unwrap()
+            .outputs
+            .insert("BTS.RUNID".into(), old_id.as_bytes().to_vec());
+        let mut outbox = authority.load_run_outbox().unwrap();
+        assert!(outbox.pending.remove(&first.run_id));
+        outbox.pending.insert(old_id.clone());
+        memory
+            .mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Delete {
+                    namespace: RUN_NAMESPACE.into(),
+                    key: first.run_id,
+                    expected_version: first.row_version,
+                },
+                put_run(&retained, None).unwrap(),
+                put_process(
+                    &BtsLifecycleStore::process_key("TYPE", "ORDER").unwrap(),
+                    &process,
+                    Some(old_process_version),
+                )
+                .unwrap(),
+                put_outbox(&outbox).unwrap(),
+            ])
+            .unwrap();
+        let reopened = BtsLifecycleStore::new(&memory);
+        let replayed = reopened
+            .start_run(
+                "TYPE", "ORDER", &root, None, true, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "legacy", [3; 32], [3; 32], 2000, 5,
+            )
+            .unwrap();
+        assert_eq!(replayed.run_id, old_id);
+        assert_eq!(replayed.activation_epoch, 1);
+        assert_eq!(reopened.load_run(&old_id).unwrap(), Some(replayed));
+    }
+
+    #[test]
+    fn synchronous_continuation_replays_exactly_even_after_reset() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = published_process(&authority);
+        let first = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, true, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "start", [1; 32], [7; 32], 1000, 5,
+            )
+            .unwrap();
+        memory.enqueue(first.work_record().unwrap()).unwrap();
+        let claimed = memory
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1000, 30_000)
+            .unwrap()
+            .unwrap();
+        authority.promote_run(&claimed).unwrap().unwrap();
+        authority
+            .finish_run(&claimed, BtsCompletion::Normal, None, None)
+            .unwrap();
+        let continuation = || {
+            authority.start_run(
+                "TYPE", "ORDER", &root, None, true, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "resume", [2; 32], [7; 32], 2000, 5,
+            )
+        };
+        assert_eq!(
+            continuation().unwrap(),
+            authority.load_run(&first.run_id).unwrap().unwrap()
+        );
+        assert_eq!(
+            authority.start_run(
+                "TYPE", "ORDER", &root, None, true, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "resume", [3; 32], [7; 32], 2000, 5,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        authority
+            .remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "reset",
+                [4; 32],
+                &super::super::removal::BtsRemoval::Reset {
+                    activity_id: root.clone(),
+                },
+            )
+            .unwrap();
+        assert_eq!(continuation().unwrap().run_id, first.run_id);
+        let second = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, true, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "second", [5; 32], [7; 32], 3000, 5,
+            )
+            .unwrap();
+        assert_ne!(second.run_id, first.run_id);
+        assert_eq!(second.activation_epoch, 2);
     }
 }

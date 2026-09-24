@@ -140,6 +140,16 @@ unit. Completion updates the process, completion event, request, and outbox
 in one transaction. A terminal work row with a still-pending RUN returns an
 unknown outcome for exact owner reconciliation. Startup recovery leaves that
 outbox entry pending and continues admitting independent RUN work.
+New work IDs bind the effect key as well as the source statement, so a second
+execution after RESET has a distinct run row and activation epoch. The reader
+still recognizes retained statement-only IDs for exact retries; it does not
+rekey old work or change its outbox identity. Source: baseline C rows
+`0183`–`0185`, `dfhp4_run.html` SHA-256
+`2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`.
+A reissued synchronous statement in the same activation returns the existing
+RUN row, including its terminal result, and records the new effect key in the
+process replay map. Exact retries survive RESET; changed request bytes under
+that key conflict. Only a fresh effect after RESET allocates new work.
 
 Terminal parent completion deletes settled descendants, their activity
 indexes, and direct-child completion events atomically with the parent RUN
