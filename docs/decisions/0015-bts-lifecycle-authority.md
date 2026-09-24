@@ -32,6 +32,12 @@ the syncpoint owner. BTS supplies no universal prepare, automatic
 compensation, or automatic redispatch after an unknown outcome. The local
 participant declaration is `BTS_PARTICIPANT`.
 
+The CICS syncpoint path settles BTS child definitions and its one acquisition
+before finalizing the UOW. Reconciliation reuses the durable UOW owner metadata
+and BTS owner rows to finish an interrupted settlement. Each step is
+idempotent; a multi-provider syncpoint can still return unknown outcome and
+must be reconciled rather than redispatched automatically.
+
 The opaque root ID binds the full process key to its defining UOW, so a later
 incarnation does not reuse that activity identity. Child IDs bind the root ID
 to a monotonic child sequence. A child definition and its index are one CAS

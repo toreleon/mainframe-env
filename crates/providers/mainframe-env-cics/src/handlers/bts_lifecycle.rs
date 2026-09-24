@@ -427,10 +427,12 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
 
 mod children;
 mod context;
+mod participant;
 mod removal;
 mod store;
 mod transitions;
 pub use context::BtsActivityContext;
+pub(in crate::service) use participant::settle_recorded_uow;
 pub use store::BtsLifecycleStore;
 
 fn put_process(

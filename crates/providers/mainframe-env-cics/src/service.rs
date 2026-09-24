@@ -1803,6 +1803,7 @@ impl CicsService {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
+        handlers::bts_lifecycle::settle_recorded_uow(self, &existing)?;
         if existing.finalized {
             return Ok(());
         }
@@ -1840,8 +1841,7 @@ impl CicsService {
             .map_err(store_error)
     }
 
-    /// Resolve an outer CICS effect from the durable provider replay ledger
-    /// without dispatching the mutation again.
+    /// Resolve an outer CICS effect from the durable provider replay ledger.
     pub fn reconciled_effect_result_digest(
         &self,
         key: &IdempotencyKey,

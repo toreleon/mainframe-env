@@ -65,6 +65,10 @@ All notable changes to mainframe-env are documented here.
   and a retained closed state for replay protection. Public command routing
   remains pending.
 
+- Connected BTS pending process/child publication and UOW acquisition release
+  to the CICS syncpoint and uncertain-outcome reconciliation paths. The
+  participant is idempotent and owner-fenced; command routing remains pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

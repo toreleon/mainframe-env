@@ -187,7 +187,10 @@ impl<'a> BtsLifecycleStore<'a> {
         Err(HostProblem::UnknownOutcome)
     }
 
-    fn load_context_row(&self, run_unit: &str) -> Result<Option<BtsActivityContext>, HostProblem> {
+    pub(super) fn load_context_row(
+        &self,
+        run_unit: &str,
+    ) -> Result<Option<BtsActivityContext>, HostProblem> {
         validate_identifier(run_unit, 256)?;
         let Some(row) = self
             .store
