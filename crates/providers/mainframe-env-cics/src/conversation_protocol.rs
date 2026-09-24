@@ -153,9 +153,7 @@ impl ConversationRecord {
             return Err(ConversationProblem::WrongSyncLevel);
         }
         let next = match flow {
-            ConversationIssue::Abend if self.state != ConversationState::Allocated => {
-                ConversationState::Free
-            }
+            ConversationIssue::Abend => ConversationState::Free,
             ConversationIssue::Confirmation if self.state == ConversationState::ConfReceive => {
                 ConversationState::Receive
             }
@@ -498,6 +496,29 @@ mod tests {
             Ok(ConversationState::Free)
         );
         assert!(mapped.released);
+    }
+
+    #[test]
+    fn issue_abend_releases_an_owned_allocated_conversation() {
+        for (kind, basic) in [
+            (ConversationKind::AppcMapped, false),
+            (ConversationKind::AppcBasic, true),
+        ] {
+            let mut record =
+                ConversationRecord::allocate(*b"I005", "SYS1", kind, owner(3), false).unwrap();
+            assert_eq!(
+                record.issue(
+                    &owner(3),
+                    ConversationContext::Local,
+                    basic,
+                    ConversationIssue::Abend,
+                ),
+                Ok(ConversationState::Free)
+            );
+            assert!(record.released);
+            assert_eq!(record.sequence, 1);
+            ConversationRecord::decode(&record.encode().unwrap()).unwrap();
+        }
     }
 
     #[test]

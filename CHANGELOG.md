@@ -11,6 +11,10 @@ All notable changes to mainframe-env are documented here.
   internal until selected provider and host routes are sealed; MCEP v1 rejects
   their operation tags, including the 256–258 width boundary.
 
+- Corrected the shared APPC ISSUE ABEND transition to release an owned
+  ALLOCATED conversation. The pinned GDS topic explicitly permits ABEND
+  regardless of conversation state.
+
 - Pending ISSUE host identities now fail closed through an optional generated
   descriptor lookup. GDS ISSUE protocol failures retain their distinct
   six-byte return codes without turning corrupt state into a normal response.
