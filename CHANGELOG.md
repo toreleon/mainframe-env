@@ -19,6 +19,11 @@ All notable changes to mainframe-env are documented here.
   A carrier confirms only after the target's owner-fenced, SAF-authorized
   transition and exact event receipt commit. Mapped/basic target indicators,
   replay conflict, foreign-owner denial, and SQLite restart are covered.
+- Added a bounded CIC-906 validation receipt for DEFINE COUNTER, BTS LINK
+  ACQPROCESS, and mapped APPC SEND. Focused tests cover typed SAF denial,
+  pre-dispatch audit saturation, outer-receipt uncertainty, owner fencing,
+  selected replay/restart paths, and SEND live cancellation/deadline without
+  expanding the 191 typed application routes or claiming release credit.
 - Integrated exactly seven CIC-905 conversation data/wait rows with the
   existing 184 typed routes, yielding 191 typed and 72 unready application
   commands while retaining the sealed CONVERSE, EXTRACT, CardDemo, and bounded
@@ -387,6 +392,11 @@ All notable changes to mainframe-env are documented here.
   explicit child exit after the durable receipt, fresh-process owner fencing and
   replay checks, and a disposable PostgreSQL 18.6 launcher. Command semantics
   and registry readiness are unchanged.
+- Added a sealed CICS BIF DEEDIT/DIGEST licensed-oracle family manifest and v2
+  capture contract with exact family, environment, observation, and protected
+  signature checks. The existing file/UOW pilot remains compatible; no licensed
+  campaign or full-minor credit is claimed.
+
 - Integrated nine CIC-905 conversation-open routes with the existing EXTRACT,
   miscellaneous, BTS, and CIC-906 slices. The registry derives 184 typed and
   79 unready API rows. One versioned APPC/MRO ledger now owns allocations,
