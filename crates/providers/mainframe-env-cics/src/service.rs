@@ -14723,12 +14723,25 @@ mod tests {
             CicsOperation::Retrieve,
             BTreeMap::from([
                 ("INTO".into(), argument(b"DATA-OUT")),
-                ("LENGTH".into(), cics_decimal(16)),
+                ("INTO.MAXLENGTH".into(), cics_decimal(16)),
                 ("RTRANSID".into(), argument(b"RTRANS-X")),
                 ("RTERMID".into(), argument(b"RTERM-X")),
                 ("QUEUE".into(), argument(b"QUEUE-X")),
             ]),
             2,
+        );
+        let mut unbounded = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([("INTO".into(), argument(b"DATA-OUT"))]),
+            200,
+        );
+        unbounded.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        assert_eq!(
+            service.invoke(
+                &effect(&next.run_unit_id, unbounded.clone(), 200),
+                unbounded,
+            ),
+            Err(HostProblem::Malformed)
         );
         retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
         let retrieved = service
@@ -14738,7 +14751,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(retrieved.outputs["INTO"].bytes(), b"PAYL");
-        assert_eq!(retrieved.outputs["LENGTH"].bytes(), b"4");
+        assert!(!retrieved.outputs.contains_key("LENGTH"));
         assert_eq!(retrieved.outputs["RTRANSID"].bytes(), b"BACK");
         assert_eq!(retrieved.outputs["RTERMID"].bytes(), b"T001");
         assert_eq!(retrieved.outputs["QUEUE"].bytes(), b"WORKQ");
@@ -14846,6 +14859,62 @@ mod tests {
             ),
             ("ENDDATA", 29, 0)
         );
+
+        let short_start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"REQ0003")),
+                ("FROM".into(), argument(b"FOUR")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            7,
+        );
+        service
+            .invoke(
+                &effect(&issuer.run_unit_id, short_start.clone(), 7),
+                short_start,
+            )
+            .unwrap();
+        let work = store
+            .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+            .unwrap()
+            .unwrap();
+        service.promote_start_work(&work, 1_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                1_000,
+            )
+            .unwrap();
+        let mut short_retrieve = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-OUT")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+            ]),
+            8,
+        );
+        short_retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        short_retrieve.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP".into(),
+            response2_field: Some("RESP2".into()),
+        };
+        let shortened = service
+            .invoke(
+                &effect(&next.run_unit_id, short_retrieve.clone(), 8),
+                short_retrieve,
+            )
+            .unwrap();
+        assert_eq!(
+            (shortened.condition.as_str(), shortened.response),
+            ("LENGERR", 22)
+        );
+        assert_eq!(shortened.outputs["INTO"].bytes(), b"FOU");
+        assert!(!shortened.outputs.contains_key("LENGTH"));
     }
 
     #[test]
