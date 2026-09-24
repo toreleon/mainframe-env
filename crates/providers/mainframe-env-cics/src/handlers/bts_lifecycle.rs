@@ -970,6 +970,58 @@ mod tests {
     }
 
     #[test]
+    fn process_rollback_retires_deferred_root_run_atomically() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "suspend-root",
+                [1; 32],
+                |process| {
+                    process.set_suspended(&root, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW1", "EXEC1", "USER", "UOW1:42",
+                "run-root", [2; 32], [2; 32], 1000, 5,
+            )
+            .unwrap();
+        assert_eq!(run.state, BtsRunState::Deferred);
+        authority
+            .finish_uow("UOW1", "EXEC1", "USER", false)
+            .unwrap();
+        assert!(authority.load_process("TYPE", "ORDER").unwrap().is_none());
+        assert!(authority.load_activity_index(&root).unwrap().is_none());
+        assert_eq!(
+            authority.load_run(&run.run_id).unwrap().unwrap().completion,
+            Some(BtsCompletion::Forced)
+        );
+        let outbox = memory
+            .get_provider_state("cics-bts-run-outbox-v1", "pending")
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&outbox.payload).unwrap();
+        assert!(value["deferred"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
     fn acquisition_and_replay_survive_reopen_without_repeating_transition() {
         let memory = MemoryStore::new(Default::default());
         let authority = BtsLifecycleStore::new(&memory);

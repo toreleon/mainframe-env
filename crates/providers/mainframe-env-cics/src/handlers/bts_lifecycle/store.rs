@@ -795,8 +795,14 @@ impl<'a> BtsLifecycleStore<'a> {
                     writes.push(self.settle_process_name(repository, &process, run_unit, commit)?);
                 }
             }
-            writes.extend(self.settle_pending_children(&mut process, run_unit, commit)?);
-            if process.pending_uow.as_deref() == Some(run_unit) && !commit {
+            let delete_process = process.pending_uow.as_deref() == Some(run_unit) && !commit;
+            writes.extend(self.settle_pending_children(
+                &mut process,
+                run_unit,
+                commit,
+                delete_process,
+            )?);
+            if delete_process {
                 writes.push(ProviderStateMutation::Delete {
                     namespace: PROCESS_NAMESPACE.into(),
                     key,

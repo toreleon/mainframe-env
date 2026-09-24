@@ -182,7 +182,7 @@ impl<'a> BtsLifecycleStore<'a> {
             let mut process = self
                 .load_process(process_type, process_name)?
                 .ok_or(HostProblem::NotFound)?;
-            let mut writes = self.settle_pending_children(&mut process, run_unit, commit)?;
+            let mut writes = self.settle_pending_children(&mut process, run_unit, commit, false)?;
             if writes.is_empty() {
                 return Ok(());
             }
@@ -206,6 +206,7 @@ impl<'a> BtsLifecycleStore<'a> {
         process: &mut BtsProcess,
         run_unit: &str,
         commit: bool,
+        retire_entire_process: bool,
     ) -> Result<Vec<ProviderStateMutation>, HostProblem> {
         let pending = process
             .activities
@@ -215,7 +216,16 @@ impl<'a> BtsLifecycleStore<'a> {
             })
             .map(|activity| activity.id.clone())
             .collect::<Vec<_>>();
-        let mut writes = Vec::with_capacity(pending.len());
+        let mut writes = if commit {
+            Vec::new()
+        } else {
+            let retired = if retire_entire_process {
+                process.activities.keys().cloned().collect::<Vec<_>>()
+            } else {
+                pending.clone()
+            };
+            self.retire_deferred_for_ids(process, &retired)?
+        };
         let mut removed_events: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
         for id in pending {
             let index = self
@@ -413,5 +423,81 @@ mod tests {
         let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
         assert_eq!(process.activities.len(), 1);
         assert!(process.activities.contains_key(&root));
+    }
+
+    #[test]
+    fn child_rollback_retires_deferred_run_with_child_index() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = active_process(&authority);
+        let child = authority
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "WORKER".into(),
+                    transid: "BTS2".into(),
+                    userid: "USER".into(),
+                },
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "define",
+                [2; 32],
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "suspend-child",
+                [3; 32],
+                |process| {
+                    process.set_suspended(&child, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &child,
+                None,
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:42",
+                "run-child",
+                [4; 32],
+                [4; 32],
+                1000,
+                5,
+            )
+            .unwrap();
+        assert_eq!(run.state, super::super::run::BtsRunState::Deferred);
+        authority
+            .finish_child_uow("TYPE", "ORDER", "UOW2", false)
+            .unwrap();
+        assert!(authority.load_activity_index(&child).unwrap().is_none());
+        assert_eq!(
+            authority.load_run(&run.run_id).unwrap().unwrap().completion,
+            Some(BtsCompletion::Forced)
+        );
+        let outbox = memory
+            .get_provider_state("cics-bts-run-outbox-v1", "pending")
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&outbox.payload).unwrap();
+        assert!(value["deferred"].as_array().unwrap().is_empty());
+        assert!(authority.load_process("TYPE", "ORDER").unwrap().is_some());
     }
 }

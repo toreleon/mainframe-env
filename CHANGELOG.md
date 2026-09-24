@@ -44,6 +44,9 @@ All notable changes to mainframe-env are documented here.
 - CANCEL, RESET, and DELETE now retire affected deferred BTS RUN records and
   their outbox entries in the same atomic batch as the activity transition.
 
+- DEFINE ACTIVITY and DEFINE PROCESS rollback now retire deferred BTS RUN
+  reservations atomically with pending child or process deletion.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.
