@@ -7221,8 +7221,10 @@ mod tests {
             .unwrap();
         let no_wait = request(CicsOperation::IssueEraseAup, BTreeMap::new(), 1);
         assert_eq!(
-            handlers::invoke_terminal_control(&service, &mut run, &no_wait),
-            Err(HostProblem::Unsupported)
+            handlers::invoke_terminal_control(&service, &mut run, &no_wait)
+                .unwrap()
+                .condition,
+            "NORMAL"
         );
         let command = request(
             CicsOperation::IssueEraseAup,
@@ -7295,14 +7297,16 @@ mod tests {
             .runs
             .remove(&target_run.run_unit_id)
             .unwrap();
-        let incomplete = request(
+        let no_wait = request(
             CicsOperation::IssueCopy,
             BTreeMap::from([("TERMID".into(), cics_literal(b"T005"))]),
             1,
         );
         assert_eq!(
-            handlers::invoke_terminal_control(&service, &mut run, &incomplete),
-            Err(HostProblem::Unsupported)
+            handlers::invoke_terminal_control(&service, &mut run, &no_wait)
+                .unwrap()
+                .condition,
+            "NORMAL"
         );
         let command = request(
             CicsOperation::IssueCopy,

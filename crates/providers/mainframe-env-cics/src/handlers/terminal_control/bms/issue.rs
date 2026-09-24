@@ -16,12 +16,8 @@ pub(in crate::service::handlers::terminal_control) fn eraseaup(
         return Ok(response);
     }
     check_request_live(service, run)?;
-    // The source permits immediate return without WAIT. That asynchronous
-    // form needs a retained pending terminal-control operation; fail closed
-    // until it can join the existing terminal IO completion boundary.
-    if !request.arguments.contains_key("OPTION.WAIT") {
-        return Err(HostProblem::Unsupported);
-    }
+    // The terminal executor completes this local buffer operation at its
+    // start boundary. Without WAIT, that is one permitted completion order.
     let (current, map) = {
         let state = service.lock()?;
         let current = state
@@ -150,7 +146,7 @@ pub(in crate::service::handlers::terminal_control) fn copy(
         return Ok(response);
     }
     check_request_live(service, run)?;
-    if !request.arguments.contains_key("OPTION.WAIT") || request.arguments.contains_key("CTLCHAR") {
+    if request.arguments.contains_key("CTLCHAR") {
         return Err(HostProblem::Unsupported);
     }
     let source_id = std::str::from_utf8(request.arguments["TERMID"].bytes())

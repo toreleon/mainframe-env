@@ -74,6 +74,10 @@ All notable changes to mainframe-env are documented here.
   BMS-backed ISSUE COPY and ERASEAUP. Their exact saved receipts remain
   replayable after an uncertain commit.
 
+- Completed no-WAIT COPY and ERASEAUP at the local terminal buffer start
+  boundary. Both forms return NORMAL after the atomic local effect; WAIT
+  retains the same completed result.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.
