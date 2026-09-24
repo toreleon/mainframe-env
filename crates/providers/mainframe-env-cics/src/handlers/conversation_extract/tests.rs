@@ -356,6 +356,28 @@ fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
     assert_eq!(basic_success.outputs["PROCNAME"].bytes(), b"BASICP  ");
     assert_eq!(basic_success.outputs["PROCLENGTH"].bytes(), b"6");
     assert_eq!(basic_success.outputs["SYNCLEVEL"].bytes(), b"1");
+    let mut short_gds = request(
+        CicsOperation::GdsExtractProcess,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&basic)),
+            ("RETCODE".into(), argument(b"RC-X")),
+            ("PROCNAME".into(), argument(b"NAME-X")),
+            ("PROCNAME.MAXLENGTH".into(), cics_decimal(5)),
+            ("PROCLENGTH".into(), argument(b"LEN-X")),
+            ("MAXPROCLEN".into(), cics_decimal(5)),
+        ]),
+        3,
+    );
+    short_gds.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(),
+        response2_field: Some("RESP2-X".into()),
+    };
+    let short_gds = cics
+        .invoke(&effect(&invocation.run_unit_id, short_gds.clone(), 3), short_gds)
+        .unwrap();
+    assert_eq!(short_gds.condition, "NORMAL");
+    assert_eq!(short_gds.outputs["RETCODE"].bytes(), [5, 0, 0, 0, 0, 0x20]);
+    assert!(!short_gds.outputs.contains_key("PROCNAME"));
     let indicators = extract_call(
         &cics,
         &invocation.run_unit_id,
