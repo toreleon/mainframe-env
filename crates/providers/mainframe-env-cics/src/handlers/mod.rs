@@ -138,8 +138,8 @@ pub use conversation_control::{
     ConversationProfileDefinition, ConversationRecord, ConversationReplay, ConversationReply,
     ConversationState, ConversationSystemDefinition, ConversationTransmitOutcome, DataCondition,
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure,
-    GdsReturnCode, GdsWaitFailure, MAX_PIP_BYTES, MAX_PROCESS_BYTES, load_conversation_replay,
-    prune_conversation_replays,
+    GdsReturnCode, GdsWaitFailure, MAX_PIP_BYTES, MAX_PROCESS_BYTES, SignalFacilityRecord,
+    SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
 pub(super) use conversation_control::{
     context as conversation_context, deadline as conversation_deadline,

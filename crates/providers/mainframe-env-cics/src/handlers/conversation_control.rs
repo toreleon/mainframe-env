@@ -27,7 +27,7 @@ pub use gds::{
 };
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
-    ConversationSystemDefinition,
+    ConversationSystemDefinition, SignalFacilityRecord, SignalLuType,
 };
 pub use replay::{
     CONVERSATION_REPLAY_NAMESPACE, ConversationReplay, ConversationReply, load_conversation_replay,

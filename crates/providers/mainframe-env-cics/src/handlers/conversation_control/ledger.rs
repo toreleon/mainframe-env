@@ -15,6 +15,29 @@ const MAX_ROW_BYTES: usize = 4 * 1024 * 1024;
 const MAX_SYSTEMS: usize = 256;
 const MAX_CONVERSATIONS: usize = 4096;
 const MAX_ATTACH_HEADERS: usize = 4096;
+const MAX_SIGNAL_FACILITIES: usize = 4096;
+
+/// Principal logical-unit classes for which IBM permits WAIT SIGNAL.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SignalLuType {
+    LuType4,
+    LuType61,
+    Pipeline3601,
+    Interactive3767,
+    Batch3770,
+    FullFunction3790,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalFacilityRecord {
+    pub owner: ConversationOwner,
+    pub lu_type: SignalLuType,
+    pub pending: bool,
+    pub terminal_error: bool,
+    pub last_event_sequence: u64,
+}
 
 /// Installed APPC or MRO session group. An APPC group may be selected by
 /// either mapped ALLOCATE or basic GDS ALLOCATE.
@@ -100,6 +123,8 @@ pub struct ConversationLedger {
     pub systems: BTreeMap<String, ConversationSystemDefinition>,
     pub conversations: BTreeMap<String, ConversationRecord>,
     pub attach_headers: BTreeMap<String, ConversationAttachHeader>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub signal_facilities: BTreeMap<String, SignalFacilityRecord>,
 }
 
 impl Default for ConversationLedger {
@@ -111,6 +136,7 @@ impl Default for ConversationLedger {
             systems: BTreeMap::new(),
             conversations: BTreeMap::new(),
             attach_headers: BTreeMap::new(),
+            signal_facilities: BTreeMap::new(),
         }
     }
 }
@@ -295,7 +321,8 @@ impl ConversationLedger {
                 && record.owner.run_unit == owner.run_unit
                 && record.principal_facility
                 && !record.released
-        }) {
+        }) || self.signal_facilities.contains_key(&signal_key(&owner))
+        {
             return Err(ConversationProblem::WrongState);
         }
         let mut record = self.allocate(sysid, kind, owner)?;
@@ -314,6 +341,113 @@ impl ConversationLedger {
     pub fn conversation_mut(&mut self, token: [u8; 4]) -> Option<&mut ConversationRecord> {
         self.conversations
             .get_mut(&u32::from_be_bytes(token).to_string())
+    }
+
+    pub fn install_signal_facility(
+        &mut self,
+        owner: ConversationOwner,
+        lu_type: SignalLuType,
+    ) -> Result<(), ConversationProblem> {
+        if !owner.valid()
+            || self.conversations.values().any(|record| {
+                record.owner.execution == owner.execution
+                    && record.owner.run_unit == owner.run_unit
+                    && record.principal_facility
+                    && !record.released
+            })
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        let key = signal_key(&owner);
+        if let Some(existing) = self.signal_facilities.get(&key) {
+            return if existing.owner == owner && existing.lu_type == lu_type {
+                Ok(())
+            } else {
+                Err(ConversationProblem::WrongState)
+            };
+        }
+        if self.signal_facilities.len() >= MAX_SIGNAL_FACILITIES {
+            return Err(ConversationProblem::Exhausted);
+        }
+        self.signal_facilities.insert(
+            key,
+            SignalFacilityRecord {
+                owner,
+                lu_type,
+                pending: false,
+                terminal_error: false,
+                last_event_sequence: 0,
+            },
+        );
+        Ok(())
+    }
+
+    pub fn post_signal(
+        &mut self,
+        owner: &ConversationOwner,
+        event_sequence: u64,
+    ) -> Result<(), ConversationProblem> {
+        let facility = self.signal_facility_mut(owner)?;
+        if event_sequence == facility.last_event_sequence && event_sequence != 0 {
+            return Ok(());
+        }
+        if facility.terminal_error
+            || event_sequence != facility.last_event_sequence.saturating_add(1)
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        facility.last_event_sequence = event_sequence;
+        facility.pending = true;
+        Ok(())
+    }
+
+    pub fn signal_pending(&self, owner: &ConversationOwner) -> Result<bool, ConversationProblem> {
+        let facility = self.signal_facility(owner)?;
+        if facility.terminal_error {
+            return Err(ConversationProblem::WrongState);
+        }
+        Ok(facility.pending)
+    }
+
+    pub fn consume_signal(
+        &mut self,
+        owner: &ConversationOwner,
+    ) -> Result<bool, ConversationProblem> {
+        let facility = self.signal_facility_mut(owner)?;
+        if facility.terminal_error {
+            return Err(ConversationProblem::WrongState);
+        }
+        let pending = facility.pending;
+        facility.pending = false;
+        Ok(pending)
+    }
+
+    fn signal_facility(
+        &self,
+        owner: &ConversationOwner,
+    ) -> Result<&SignalFacilityRecord, ConversationProblem> {
+        let record = self
+            .signal_facilities
+            .get(&signal_key(owner))
+            .ok_or(ConversationProblem::NotOwned)?;
+        if record.owner.lease_epoch != owner.lease_epoch {
+            return Err(ConversationProblem::StaleOwner);
+        }
+        Ok(record)
+    }
+
+    fn signal_facility_mut(
+        &mut self,
+        owner: &ConversationOwner,
+    ) -> Result<&mut SignalFacilityRecord, ConversationProblem> {
+        let record = self
+            .signal_facilities
+            .get_mut(&signal_key(owner))
+            .ok_or(ConversationProblem::NotOwned)?;
+        if record.owner.lease_epoch != owner.lease_epoch {
+            return Err(ConversationProblem::StaleOwner);
+        }
+        Ok(record)
     }
 
     pub fn set_attach(
@@ -366,6 +500,10 @@ impl ConversationLedger {
         }
         self.attach_headers
             .retain(|_, header| &header.owner != owner);
+        let prior_signals = self.signal_facilities.len();
+        self.signal_facilities
+            .retain(|_, facility| &facility.owner != owner);
+        released += prior_signals - self.signal_facilities.len();
         Ok(released)
     }
 
@@ -375,6 +513,7 @@ impl ConversationLedger {
             || self.systems.len() > MAX_SYSTEMS
             || self.conversations.len() > MAX_CONVERSATIONS
             || self.attach_headers.len() > MAX_ATTACH_HEADERS
+            || self.signal_facilities.len() > MAX_SIGNAL_FACILITIES
         {
             return Err(ConversationProblem::Malformed);
         }
@@ -419,6 +558,20 @@ impl ConversationLedger {
                 return Err(ConversationProblem::Malformed);
             }
         }
+        for (key, facility) in &self.signal_facilities {
+            if !facility.owner.valid()
+                || key != &signal_key(&facility.owner)
+                || facility.pending && facility.last_event_sequence == 0
+                || self.conversations.values().any(|record| {
+                    record.owner.execution == facility.owner.execution
+                        && record.owner.run_unit == facility.owner.run_unit
+                        && record.principal_facility
+                        && !record.released
+                })
+            {
+                return Err(ConversationProblem::Malformed);
+            }
+        }
         Ok(())
     }
 
@@ -434,6 +587,10 @@ impl ConversationLedger {
 
 fn attach_key(owner: &ConversationOwner, name: &str) -> String {
     format!("{}\0{}\0{name}", owner.execution, owner.run_unit)
+}
+
+fn signal_key(owner: &ConversationOwner) -> String {
+    format!("{}\0{}", owner.execution, owner.run_unit)
 }
 
 #[cfg(test)]
@@ -709,6 +866,70 @@ mod tests {
         let current = ConversationLedger::load(&reopened).unwrap();
         assert!(current.conversation(token).unwrap().principal_facility);
         drop(reopened);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn signal_facility_is_principal_bounded_and_event_replay_is_exact() {
+        let mut ledger = ConversationLedger::default();
+        ledger
+            .install_signal_facility(owner(), SignalLuType::LuType4)
+            .unwrap();
+        assert_eq!(ledger.signal_pending(&owner()), Ok(false));
+        ledger.post_signal(&owner(), 1).unwrap();
+        assert_eq!(ledger.post_signal(&owner(), 1), Ok(()));
+        assert_eq!(
+            ledger.post_signal(&owner(), 3),
+            Err(ConversationProblem::WrongState)
+        );
+        assert_eq!(ledger.signal_pending(&owner()), Ok(true));
+        assert_eq!(ledger.consume_signal(&owner()), Ok(true));
+        assert_eq!(ledger.consume_signal(&owner()), Ok(false));
+        assert_eq!(ledger.post_signal(&owner(), 1), Ok(()));
+        assert_eq!(ledger.signal_pending(&owner()), Ok(false));
+        let mut stale = owner();
+        stale.lease_epoch += 1;
+        assert_eq!(
+            ledger.post_signal(&stale, 2),
+            Err(ConversationProblem::StaleOwner)
+        );
+        ledger.post_signal(&owner(), 2).unwrap();
+        assert_eq!(ledger.release_task(&owner()), Ok(1));
+        assert_eq!(
+            ledger.signal_pending(&owner()),
+            Err(ConversationProblem::NotOwned)
+        );
+    }
+
+    #[test]
+    fn sqlite_reopen_preserves_pending_signal_and_consumption() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-signal-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let first = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let initial = ConversationLedger::load(&first).unwrap();
+        let mut installed = initial.clone();
+        installed
+            .install_signal_facility(owner(), SignalLuType::LuType61)
+            .unwrap();
+        installed.post_signal(&owner(), 1).unwrap();
+        assert!(initial.persist(&mut installed, &first).unwrap());
+        drop(first);
+        let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let current = ConversationLedger::load(&reopened).unwrap();
+        assert_eq!(current.signal_pending(&owner()), Ok(true));
+        let mut consumed = current.clone();
+        assert_eq!(consumed.consume_signal(&owner()), Ok(true));
+        assert!(current.persist(&mut consumed, &reopened).unwrap());
+        drop(reopened);
+        let final_store = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let final_state = ConversationLedger::load(&final_store).unwrap();
+        assert_eq!(final_state.signal_pending(&owner()), Ok(false));
+        drop(final_store);
         std::fs::remove_dir_all(root).unwrap();
     }
 

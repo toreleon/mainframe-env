@@ -25,6 +25,9 @@ All notable changes to mainframe-env are documented here.
   code, rollback, and zeroed reserved fields. GDS rows remain unready.
 - Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,
   `MAXFLENGTH` is bounded to 32,767, and BUFFER/LLID cannot be combined.
+- Added a durable principal signal facility for the six LU classes named by
+  WAIT SIGNAL. Ordered peer events, one-time consumption, lease fencing, task
+  cleanup, and SQLite reopen are covered without registering the command.
 
 ### Changed
 
