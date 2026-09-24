@@ -35821,6 +35821,77 @@ mod tests {
     }
 
     #[test]
+    fn conversation_transport_flushes_all_staged_frames_in_order() {
+        struct Carrier(AtomicUsize);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                send_id: u64,
+                _frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                assert_eq!(self.0.fetch_add(1, Ordering::SeqCst) as u64 + 1, send_id);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "MRO1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("MRO1", ConversationKind::Mro, owner.clone())
+            .unwrap()
+            .token;
+        for (bytes, invite) in [(b"ONE".as_slice(), false), (b"TWO".as_slice(), true)] {
+            next.conversation_mut(token)
+                .unwrap()
+                .stage_send(
+                    &owner,
+                    ConversationContext::Local,
+                    bytes.to_vec(),
+                    invite,
+                    false,
+                    false,
+                )
+                .unwrap();
+        }
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let carrier = Arc::new(Carrier(AtomicUsize::new(0)));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        assert_eq!(
+            cics.flush_conversation_send(&run, token),
+            Ok(ConversationTransmitOutcome::Confirmed)
+        );
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+        let saved = ConversationLedger::load(store.as_ref()).unwrap();
+        let record = saved.conversation(token).unwrap();
+        assert_eq!(record.data.pending_outbound(), 0);
+        assert_eq!(record.state, ConversationState::Receive);
+        assert_eq!(
+            cics.flush_conversation_send(&run, token),
+            Ok(ConversationTransmitOutcome::Confirmed)
+        );
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
     fn conversation_allocate_owns_eibrsrce_busy_and_partner_profile_selection() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let cics = service(store.clone());

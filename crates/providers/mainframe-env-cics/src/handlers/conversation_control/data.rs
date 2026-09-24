@@ -13,7 +13,7 @@ use mainframe_env_host_api::HostProblem;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const MAX_FRAMES: usize = 256;
+pub(super) const MAX_FRAMES: usize = 256;
 const MAX_FRAME_BYTES: usize = 32_767;
 const MAX_QUEUED_BYTES: usize = 65_536;
 

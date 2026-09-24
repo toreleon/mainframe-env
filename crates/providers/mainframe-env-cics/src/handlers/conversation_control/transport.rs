@@ -6,6 +6,7 @@
 //! never repeats `transmit` for that ID.
 
 use super::ConversationDataFrame;
+use super::data::MAX_FRAMES;
 use super::{ConversationLedger, ConversationOwner, ConversationProblem};
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_execution_api::Invocation;
@@ -55,7 +56,7 @@ impl CicsService {
             lease_epoch: u64::from(run.invocation.attempt),
         };
         let context = super::context(run)?;
-        for _ in 0..32 {
+        for _ in 0..=MAX_FRAMES {
             super::deadline(self, run)?;
             let current = ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
             let record = current
@@ -95,6 +96,7 @@ impl CicsService {
             if outcome == ConversationTransmitOutcome::Pending {
                 return Ok(outcome);
             }
+            let mut acknowledged = false;
             for _ in 0..32 {
                 let current = ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
                 let mut next = current.clone();
@@ -113,10 +115,13 @@ impl CicsService {
                     {
                         return Err(HostProblem::UnknownOutcome);
                     }
-                    return Ok(ConversationTransmitOutcome::Confirmed);
+                    acknowledged = true;
+                    break;
                 }
             }
-            return Err(HostProblem::UnknownOutcome);
+            if !acknowledged {
+                return Err(HostProblem::UnknownOutcome);
+            }
         }
         Err(HostProblem::UnknownOutcome)
     }
