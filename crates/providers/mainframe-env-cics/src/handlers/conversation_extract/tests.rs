@@ -290,6 +290,24 @@ fn conversation_extract_negative_conditions_do_not_change_protocol_or_position()
     cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS").unwrap();
     let (_, basic, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
     let ledger_before = ConversationLedger::load(store.as_ref()).unwrap();
+    let initial_metadata = store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    let mut aliases: handlers::ExtractMetadata =
+        serde_json::from_slice(&initial_metadata.payload).unwrap();
+    aliases.netnames.insert(
+        "MISSING1".into(),
+        handlers::LuName {
+            token: *b"BAD1",
+            sysid: "LU61".into(),
+            termid: "T001".into(),
+        },
+    );
+    handlers::publish_metadata(&cics, aliases, Some(initial_metadata.version)).unwrap();
     let meta_before = store.get_provider_state(
         "cics-conversation-extract-v1", invocation.run_unit_id.as_str(),
     ).unwrap().unwrap();
@@ -301,6 +319,22 @@ fn conversation_extract_negative_conditions_do_not_change_protocol_or_position()
                 ("TERMID".into(), argument(b"TERM-X")),
             ]),
             ("INVREQ", 16),
+        ),
+        (
+            CicsOperation::ExtractTct,
+            BTreeMap::from([
+                ("NETNAME".into(), cics_literal(b"UNKNOWN1")),
+                ("TERMID".into(), argument(b"TERM-X")),
+            ]),
+            ("INVREQ", 16),
+        ),
+        (
+            CicsOperation::ExtractTct,
+            BTreeMap::from([
+                ("NETNAME".into(), cics_literal(b"MISSING1")),
+                ("TERMID".into(), argument(b"TERM-X")),
+            ]),
+            ("NOTALLOC", 61),
         ),
         (
             CicsOperation::ExtractAttach,

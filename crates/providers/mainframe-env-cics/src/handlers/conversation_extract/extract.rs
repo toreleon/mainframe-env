@@ -166,14 +166,19 @@ pub(super) fn tct(
     metadata: &ExtractMetadata,
     owner: &ConversationOwner,
 ) -> Result<CicsResponse, HostProblem> {
-    let netname = text(request, "NETNAME")?.ok_or(HostProblem::Malformed)?;
-    if netname.len() != 8 {
+    let netname = request
+        .arguments
+        .get("NETNAME")
+        .ok_or(HostProblem::Malformed)?
+        .bytes();
+    if netname.len() != 8 || !netname.is_ascii() {
         return Err(condition("INVREQ", 16, 0));
     }
+    let netname = std::str::from_utf8(netname).map_err(|_| condition("INVREQ", 16, 0))?;
     let entry = metadata
         .netnames
-        .get(&netname)
-        .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
+        .get(netname)
+        .ok_or_else(|| condition("INVREQ", 16, 0))?;
     let facility = ledger
         .conversation(entry.token)
         .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
