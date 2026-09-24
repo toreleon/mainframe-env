@@ -8898,6 +8898,131 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn issue_pass_task_end_is_atomic_after_postgres_restart_and_race() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let suffix = format!(
+            "{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let invocation = invocation_for(&format!("pass-pg-{suffix}"), BTreeMap::new());
+        let session = SessionId::new(format!("pass-pg-session-{suffix}"), 64).unwrap();
+        let mut command = request(
+            CicsOperation::IssuePass,
+            BTreeMap::from([
+                ("LUNAME".into(), cics_literal(b"APPL1")),
+                ("FROM".into(), enqueue_value(b"DATA")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("OPTION.LOGONLOGMODE".into(), cics_option()),
+                ("OPTION.NOQUIESCE".into(), cics_option()),
+            ]),
+            1,
+        );
+        command.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("pass-pg-effect-{suffix}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let terminal;
+        let mut replay_run;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            terminal = service.lock().unwrap().sessions[session.as_str()]
+                .input
+                .terminal_id
+                .clone()
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.clone(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec!["APPL1".into()],
+                logon_logmode: Some("MODE1".into()),
+                disconnect_allowed: true,
+                pass_allowed: true,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            replay_run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut replay_run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            let staged = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap();
+            assert_eq!(staged.version, 2);
+            assert_eq!(staged.state.pass_target.as_deref(), Some("APPL1"));
+            assert_eq!(staged.state.pass_data, b"DATA");
+            assert_eq!(staged.state.pass_logmode.as_deref(), Some("MODE1"));
+            assert!(staged.state.pass_noquiesce && !staged.state.pass_delivered);
+        }
+        let gate = Arc::new(Barrier::new(2));
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let worker = service(store);
+            worker
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 2)
+                .unwrap();
+            let principal = invocation.principal.id().clone();
+            let session = session.clone();
+            let gate = gate.clone();
+            workers.push(std::thread::spawn(move || {
+                gate.wait();
+                worker.complete_terminal_run(&session, &principal, 3)
+            }));
+        }
+        let results = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert!(
+            results
+                .iter()
+                .any(|result| matches!(result, Err(HostProblem::UnknownOutcome)))
+        );
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let device = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(device.version, 3);
+        assert!(device.state.pass_delivered && device.state.disconnected);
+        let row = store
+            .get_provider_state("cics-session", session.as_str())
+            .unwrap()
+            .unwrap();
+        assert!(
+            !decode_session(&row.payload, row.version, CicsLimits::default())
+                .unwrap()
+                .connected
+        );
+        let service = service(store);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut replay_run, &command)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+    }
+
+    #[test]
     fn issue_disconnect_and_reset_update_session_and_device_atomically_with_replay() {
         for operation in [CicsOperation::IssueDisconnect, CicsOperation::IssueReset] {
             let store = Arc::new(MemoryStore::new(Default::default()));

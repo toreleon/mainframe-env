@@ -12,6 +12,11 @@ All notable changes to mainframe-env are documented here.
   pre-integration ledger module and preserved exact ISSUE reply validation
   in the integrated interpreter output path.
 
+- Verified the physical ISSUE PASS task-end transaction across PostgreSQL
+  restart and concurrent providers. The saved stage receipt replays after an
+  uncertain result, and exactly one device delivery commits with the source
+  session disconnect. The catalog row remains unregistered.
+
 - Prevented the COBOL copybook preprocessor from interpreting `COPY` inside
   `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
   source origins remain intact.
