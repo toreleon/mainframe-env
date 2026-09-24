@@ -8054,7 +8054,8 @@ mod tests {
     #[test]
     fn issue_print_selects_first_available_printer_and_replays_exact_effect() {
         let store = Arc::new(MemoryStore::new(Default::default()));
-        let service = service(store.clone());
+        let (host, seen) = command_authorities(false);
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
         let (invocation, session) = registered(&service);
         {
             let mut state = service.lock().unwrap();
@@ -8114,6 +8115,16 @@ mod tests {
             .unwrap();
         assert_eq!(printer.state.print_count, 1);
         assert_eq!(printer.state.last_print, b"SCREEN\0IMAGE");
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.ISSUE.DEVICE.P002"
+                        && *intent == AccessIntent::Update
+                })
+        );
         assert_eq!(
             handlers::invoke_terminal_control(&service, &mut run, &command),
             Ok(response)
