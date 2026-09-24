@@ -85,6 +85,9 @@ All notable changes to mainframe-env are documented here.
   printer as well as the source display. Both physical records and the replay
   receipt share one atomic commit.
 
+- ISSUE PRINT accepts configured 3650 host conversational 3270 displays with
+  a printer peer, as required by the pinned PRINT topic.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

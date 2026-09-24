@@ -136,7 +136,10 @@ impl IssueDeviceDefinition {
                 self.kind,
                 IssueDeviceKind::Display3270 | IssueDeviceKind::Printer3270
             ) && self.control_unit.is_none()
-            || self.kind != IssueDeviceKind::Display3270 && !self.printers.is_empty()
+            || !matches!(
+                self.kind,
+                IssueDeviceKind::Display3270 | IssueDeviceKind::Interpreter3650
+            ) && !self.printers.is_empty()
             || self.kind != IssueDeviceKind::Interpreter3650 && !self.programs.is_empty()
             || self.pass_allowed && self.applications.is_empty()
         {
@@ -289,10 +292,15 @@ impl IssueDeviceRecord {
             || self.state.print_count > 0
                 && !matches!(
                     self.definition.kind,
-                    IssueDeviceKind::Display3270 | IssueDeviceKind::Printer3270
+                    IssueDeviceKind::Display3270
+                        | IssueDeviceKind::Printer3270
+                        | IssueDeviceKind::Interpreter3650
                 )
             || self.state.last_printer.is_some()
-                && self.definition.kind != IssueDeviceKind::Display3270
+                && !matches!(
+                    self.definition.kind,
+                    IssueDeviceKind::Display3270 | IssueDeviceKind::Interpreter3650
+                )
             || self.state.printer_out_of_service
                 && self.definition.kind != IssueDeviceKind::Printer3270
             || self.state.printer_attached_run.is_some()
@@ -467,8 +475,10 @@ impl IssueDeviceRecord {
 
     pub fn record_print(&mut self, printer: &str, bytes: &[u8]) -> Result<(), IssueDeviceProblem> {
         self.active()?;
-        if self.definition.kind != IssueDeviceKind::Display3270
-            || !self.definition.printers.iter().any(|name| name == printer)
+        if !matches!(
+            self.definition.kind,
+            IssueDeviceKind::Display3270 | IssueDeviceKind::Interpreter3650
+        ) || !self.definition.printers.iter().any(|name| name == printer)
         {
             return Err(IssueDeviceProblem::NotConfigured);
         }
@@ -660,5 +670,16 @@ mod tests {
             Err(IssueDeviceProblem::Length)
         );
         assert_eq!(device.state.print_count, 1);
+    }
+
+    #[test]
+    fn host_conversational_3650_can_print_its_3270_image() {
+        let mut definition = definition("T365", IssueDeviceKind::Interpreter3650);
+        definition.printers.push("P001".into());
+        let mut device = IssueDeviceRecord::new(definition).unwrap();
+        device.record_print("P001", b"3650 DISPLAY").unwrap();
+        assert_eq!(device.state.last_printer.as_deref(), Some("P001"));
+        assert_eq!(device.state.last_print, b"3650 DISPLAY");
+        device.validate().unwrap();
     }
 }

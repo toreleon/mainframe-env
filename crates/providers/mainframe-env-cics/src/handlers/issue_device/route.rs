@@ -214,7 +214,10 @@ pub(in crate::service) fn invoke(
             }
         }
         CicsOperation::IssuePrint => {
-            if current.definition.kind != IssueDeviceKind::Display3270 {
+            if !matches!(
+                current.definition.kind,
+                IssueDeviceKind::Display3270 | IssueDeviceKind::Interpreter3650
+            ) {
                 return Err(condition("INVREQ", 16, 0));
             }
             if current_session.screen.len() > MAX_PRINT_BYTES {
