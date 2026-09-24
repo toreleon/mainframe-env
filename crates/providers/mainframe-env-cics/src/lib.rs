@@ -14,6 +14,7 @@ pub use conversation_protocol::{
     ConversationIndicators, GdsExtractAttributesFailure, GdsExtractProcessFailure,
 };
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
+pub use service::IssuePassTransfer;
 pub use service::bts_lifecycle;
 pub use service::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,

@@ -11,6 +11,7 @@ mod bts_link;
 mod builtin_function;
 mod condition;
 mod conversation_extract;
+pub(in crate::service) use conversation_extract::publish_pass_logon;
 #[cfg(test)]
 pub(in crate::service) use conversation_extract::{ExtractMetadata, LuName, publish_metadata};
 mod conversation_control;
@@ -26,6 +27,7 @@ mod host_boundary;
 mod interval;
 mod interval_control;
 mod issue_device;
+pub use issue_device::IssuePassTransfer;
 #[cfg(test)]
 pub(in crate::service) use issue_device::{
     IssueDeviceDefinition, IssueDeviceKind, IssueDeviceRecord, invoke as invoke_issue_device,

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 200,
+    "markdown_documents": 201,
     "navigation_groups": 5,
-    "normative_documents": 50,
+    "normative_documents": 51,
     "xtask_commands": 170
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:e1b630672ec4e8e9c2695ea4fefcc60ded3d873fe2500d2547f6c8ca7a75e437",
+      "sha256": "sha256:3628043a189fd450fccee088f5dac89e434e0b3a3d7e4389deb26bc4273c9437",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 85,
-      "sha256": "sha256:a41b7be26ccc9844d7a3f7f209cc35a6cfce8cd3e79deab460ed6b67741c84d7",
+      "relative_links": 86,
+      "sha256": "sha256:96bd4694e812952846ce253a2e69bdaaa501d7f1dc6c51ae4bea532932df6bcb",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -851,10 +851,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS terminal and Communications Server adapter maintainers",
+      "path": "docs/decisions/0022-issue-pass-target-handoff.md",
+      "relative_links": 0,
+      "scope": "CIC-905 ISSUE PASS and target CICS EXTRACT LOGONMSG",
+      "sha256": "sha256:86a2ca133a8c7a00f5fe18eef87d64706b872103dd16a75b9a218eaa7feebad1",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0022: Retain and claim an ISSUE PASS target handoff",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 21,
-      "sha256": "sha256:7c89ca17f64ef05300544d4bcd0f03d249493f78f59ebd3cf61dc0f46f407654",
+      "relative_links": 22,
+      "sha256": "sha256:7a80bef7cabd839d02521d187e6cee48db1e1dbf8ad5f58faaaaeba04c54d5c9",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1209,8 +1221,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 90,
-      "sha256": "sha256:0b405221803bee919fc1ef0001fe2fe7bfb1194dccfb069f442814831d00d48d",
+      "relative_links": 91,
+      "sha256": "sha256:6ff2d1d51c3f2455067d09ede534861deeae43dfc4c90e680b49da66a6cd18c0",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
@@ -1996,6 +2008,10 @@
           "path": "docs/decisions/0021-conversation-issue-control-staging.md"
         },
         {
+          "label": "ADR-0022: ISSUE PASS target handoff",
+          "path": "docs/decisions/0022-issue-pass-target-handoff.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2159,7 +2175,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:59d035c07de6d46ec9e6dcee74dea361401d483eb3c3789da7f5875c9e0de839",
+  "registry_sha256": "sha256:2dd8fa7c0619a8a6d6b0d5ebb6a32df070b175e2e7d8a306b86a639f30193c52",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

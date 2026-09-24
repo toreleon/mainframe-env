@@ -168,6 +168,53 @@ pub(in crate::service) fn publish_metadata(
     write_metadata(service, &metadata, expected_version)
 }
 
+/// A trusted PASS handoff publishes logon bytes for a CICS target with
+/// LGNMSG=YES. Repeating the same handoff never restores consumed data.
+pub(in crate::service) fn publish_pass_logon(
+    service: &CicsService,
+    run_unit: &str,
+    data: &[u8],
+) -> Result<(), HostProblem> {
+    if run_unit.is_empty() || run_unit.len() > 128 || data.len() > 255 {
+        return Err(HostProblem::Malformed);
+    }
+    if !service
+        .lock()?
+        .runs
+        .keys()
+        .any(|id| id.as_str() == run_unit)
+    {
+        return Err(HostProblem::Unauthorized);
+    }
+    for _ in 0..32 {
+        let row = service
+            .store
+            .get_provider_state(NAMESPACE, run_unit)
+            .map_err(store_error)?;
+        let mut metadata = if let Some(row) = &row {
+            decode(row, run_unit)?
+        } else {
+            ExtractMetadata::for_run_unit(run_unit.into())
+        };
+        if metadata.logon_message.as_deref() == Some(data)
+            && (metadata.network_attached || metadata.logon_consumed)
+        {
+            return Ok(());
+        }
+        if metadata.logon_consumed || metadata.logon_message.is_some() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        metadata.network_attached = true;
+        metadata.logon_message = Some(data.to_vec());
+        match write_metadata(service, &metadata, row.as_ref().map(|row| row.version)) {
+            Ok(()) => return Ok(()),
+            Err(HostProblem::IdempotencyConflict) => continue,
+            Err(problem) => return Err(problem),
+        }
+    }
+    Err(HostProblem::UnknownOutcome)
+}
+
 fn decode(row: &ProviderStateRecord, key: &str) -> Result<ExtractMetadata, HostProblem> {
     if row.namespace != NAMESPACE
         || row.key != key

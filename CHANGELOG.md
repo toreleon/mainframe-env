@@ -17,6 +17,12 @@ All notable changes to mainframe-env are documented here.
   uncertain result, and exactly one device delivery commits with the source
   session disconnect. The catalog row remains unregistered.
 
+- Added a trusted target claim for committed ISSUE PASS. It returns bounded
+  logon data, mode, and NOQUIESCE exactly once by target run and event ID;
+  a CICS target with LGNMSG enabled can consume the bytes through the existing
+  EXTRACT LOGONMSG route. Memory, SQLite restart, and PostgreSQL claim races
+  pass. External carrier delivery and row registration remain pending.
+
 - Restored source-specific GDS ISSUE six-byte failure codes in the sealed
   conversation handler, including PREPARE and CONFIRMATION sync-level codes.
   These internal mappings do not register the five GDS ISSUE rows.

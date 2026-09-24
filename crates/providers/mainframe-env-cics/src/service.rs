@@ -9225,6 +9225,384 @@ mod tests {
     }
 
     #[test]
+    fn issue_pass_target_claim_is_exact_and_owner_fenced() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let source = invocation_for("pass-target-source", BTreeMap::new());
+        let source_session = SessionId::new("pass-target-source", 64).unwrap();
+        service
+            .launch_terminal(
+                source.clone(),
+                &source_session,
+                "MENU",
+                24,
+                80,
+                "csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        let terminal = service.lock().unwrap().sessions[source_session.as_str()]
+            .input
+            .terminal_id
+            .clone()
+            .unwrap();
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: terminal.clone(),
+            kind: handlers::IssueDeviceKind::Display3270,
+            control_unit: Some("CU1".into()),
+            printers: vec![],
+            programs: vec![],
+            applications: vec!["APPL1".into()],
+            logon_logmode: Some("MODE1".into()),
+            disconnect_allowed: true,
+            pass_allowed: true,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let mut source_run = service.lock().unwrap().runs[&source.run_unit_id].clone();
+        let command = request(
+            CicsOperation::IssuePass,
+            BTreeMap::from([
+                ("LUNAME".into(), cics_literal(b"APPL1")),
+                ("FROM".into(), enqueue_value(b"HELLO")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("OPTION.LOGONLOGMODE".into(), cics_option()),
+                ("OPTION.NOQUIESCE".into(), cics_option()),
+            ]),
+            1,
+        );
+        handlers::invoke_issue_device(&service, &mut source_run, &command).unwrap();
+        service
+            .complete_terminal_run(&source_session, source.principal.id(), 2)
+            .unwrap();
+        let target = invocation_for("pass-target-claim", BTreeMap::new());
+        let target_session = SessionId::new("pass-target-claim", 64).unwrap();
+        service.create_session(&target_session, 24, 80).unwrap();
+        service
+            .register_run(target.clone(), &target_session, "MENU", "APPL1", "MESYS")
+            .unwrap();
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.claim_issue_pass(&terminal, &target.run_unit_id, "claim-1"),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let transfer = service
+            .claim_issue_pass(&terminal, &target.run_unit_id, "claim-1")
+            .unwrap();
+        assert_eq!(
+            transfer,
+            IssuePassTransfer {
+                terminal: terminal.clone(),
+                application: "APPL1".into(),
+                logon_data: b"HELLO".to_vec(),
+                logmode: Some("MODE1".into()),
+                noquiesce: true,
+            }
+        );
+        service
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        service
+            .install_conversation_principal_for_run(
+                &target.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .claim_issue_pass_for_cics(&terminal, &target.run_unit_id, "claim-1", true)
+                .unwrap(),
+            transfer
+        );
+        let logon = request(
+            CicsOperation::ExtractLogonMsg,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"LOGON-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+                ("LENGTH".into(), argument(b"LEN-X")),
+            ]),
+            2,
+        );
+        let received = service
+            .invoke(&effect(&target.run_unit_id, logon.clone(), 2), logon)
+            .unwrap();
+        assert_eq!(received.outputs["INTO"].bytes(), b"HELLO");
+        assert_eq!(received.outputs["LENGTH"].bytes(), b"5");
+        assert_eq!(
+            service
+                .claim_issue_pass_for_cics(&terminal, &target.run_unit_id, "claim-1", true)
+                .unwrap(),
+            transfer
+        );
+        let repeated = request(
+            CicsOperation::ExtractLogonMsg,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"LOGON-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+                ("LENGTH".into(), argument(b"LEN-X")),
+            ]),
+            3,
+        );
+        let consumed = service
+            .invoke(&effect(&target.run_unit_id, repeated.clone(), 3), repeated)
+            .unwrap();
+        assert_eq!(consumed.outputs["LENGTH"].bytes(), b"0");
+        assert_eq!(
+            service.claim_issue_pass(&terminal, &target.run_unit_id, "claim-2"),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let foreign = invocation_for("pass-target-foreign", BTreeMap::new());
+        let foreign_session = SessionId::new("pass-target-foreign", 64).unwrap();
+        service.create_session(&foreign_session, 24, 80).unwrap();
+        service
+            .register_run(foreign.clone(), &foreign_session, "MENU", "APPL2", "MESYS")
+            .unwrap();
+        assert_eq!(
+            service.claim_issue_pass(&terminal, &foreign.run_unit_id, "claim-1"),
+            Err(HostProblem::Unauthorized)
+        );
+        let claimed = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(claimed.version, 4);
+        assert_eq!(
+            claimed.state.pass_claimed_by.as_deref(),
+            Some(target.run_unit_id.as_str())
+        );
+        assert_eq!(claimed.state.pass_claim_event.as_deref(), Some("claim-1"));
+    }
+
+    #[test]
+    fn issue_pass_target_claim_replays_after_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-pass-claim-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let source = invocation_for("pass-claim-sql-source", BTreeMap::new());
+        let source_session = SessionId::new("pass-claim-sql-source", 64).unwrap();
+        let target = invocation_for("pass-claim-sql-target", BTreeMap::new());
+        let target_session = SessionId::new("pass-claim-sql-target", 64).unwrap();
+        let terminal;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(
+                    source.clone(),
+                    &source_session,
+                    "MENU",
+                    24,
+                    80,
+                    "csrf",
+                    1,
+                    100,
+                )
+                .unwrap();
+            terminal = service.lock().unwrap().sessions[source_session.as_str()]
+                .input
+                .terminal_id
+                .clone()
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.clone(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec!["APPL1".into()],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: true,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let mut run = service.lock().unwrap().runs[&source.run_unit_id].clone();
+            let command = request(
+                CicsOperation::IssuePass,
+                BTreeMap::from([
+                    ("LUNAME".into(), cics_literal(b"APPL1")),
+                    ("FROM".into(), enqueue_value(b"LOGON")),
+                    ("LENGTH".into(), cics_decimal(5)),
+                ]),
+                1,
+            );
+            handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            service
+                .complete_terminal_run(&source_session, source.principal.id(), 2)
+                .unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service.create_session(&target_session, 24, 80).unwrap();
+            service
+                .register_run(target.clone(), &target_session, "MENU", "APPL1", "MESYS")
+                .unwrap();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                service.claim_issue_pass(&terminal, &target.run_unit_id, "claim-sql"),
+                Err(HostProblem::UnknownOutcome)
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .register_run(target.clone(), &target_session, "MENU", "APPL1", "MESYS")
+                .unwrap();
+            let transfer = service
+                .claim_issue_pass(&terminal, &target.run_unit_id, "claim-sql")
+                .unwrap();
+            assert_eq!(transfer.logon_data, b"LOGON");
+            assert_eq!(transfer.application, "APPL1");
+            let claimed = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap();
+            assert_eq!(claimed.version, 4);
+            assert_eq!(claimed.state.pass_claim_event.as_deref(), Some("claim-sql"));
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn issue_pass_target_claim_races_once_after_postgres_restart() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let suffix = format!(
+            "{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let source = invocation_for(&format!("claim-pg-source-{suffix}"), BTreeMap::new());
+        let source_session = SessionId::new(format!("claim-pg-source-{suffix}"), 64).unwrap();
+        let target = invocation_for(&format!("claim-pg-target-{suffix}"), BTreeMap::new());
+        let target_session = SessionId::new(format!("claim-pg-target-{suffix}"), 64).unwrap();
+        let terminal;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(
+                    source.clone(),
+                    &source_session,
+                    "MENU",
+                    24,
+                    80,
+                    "csrf",
+                    1,
+                    100,
+                )
+                .unwrap();
+            terminal = service.lock().unwrap().sessions[source_session.as_str()]
+                .input
+                .terminal_id
+                .clone()
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.clone(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec!["APPL1".into()],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: true,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let mut run = service.lock().unwrap().runs[&source.run_unit_id].clone();
+            let command = request(
+                CicsOperation::IssuePass,
+                BTreeMap::from([
+                    ("LUNAME".into(), cics_literal(b"APPL1")),
+                    ("FROM".into(), enqueue_value(b"DATA")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]),
+                1,
+            );
+            handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            service
+                .complete_terminal_run(&source_session, source.principal.id(), 2)
+                .unwrap();
+            service.create_session(&target_session, 24, 80).unwrap();
+            service
+                .register_run(target.clone(), &target_session, "MENU", "APPL1", "MESYS")
+                .unwrap();
+        }
+        let gate = Arc::new(Barrier::new(2));
+        let mut workers = Vec::new();
+        for inject_unknown in [true, false] {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let worker = service(store);
+            worker
+                .register_run(target.clone(), &target_session, "MENU", "APPL1", "MESYS")
+                .unwrap();
+            if inject_unknown {
+                worker.inject_replay_unknown_after_persist_once();
+            }
+            let gate = gate.clone();
+            let terminal = terminal.clone();
+            let run_unit = target.run_unit_id.clone();
+            workers.push(std::thread::spawn(move || {
+                gate.wait();
+                worker.claim_issue_pass(&terminal, &run_unit, "claim-pg")
+            }));
+        }
+        let results = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>();
+        assert!(results.iter().any(Result::is_ok));
+        assert!(results.iter().all(|result| match result {
+            Ok(transfer) => transfer.logon_data == b"DATA",
+            Err(problem) => *problem == HostProblem::UnknownOutcome,
+        }));
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let record = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(record.version, 4);
+        assert_eq!(
+            record.state.pass_claimed_by.as_deref(),
+            Some(target.run_unit_id.as_str())
+        );
+        let reopened = service(store);
+        reopened
+            .register_run(target.clone(), &target_session, "MENU", "APPL1", "MESYS")
+            .unwrap();
+        assert_eq!(
+            reopened
+                .claim_issue_pass(&terminal, &target.run_unit_id, "claim-pg")
+                .unwrap()
+                .logon_data,
+            b"DATA"
+        );
+    }
+
+    #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn issue_pass_task_end_is_atomic_after_postgres_restart_and_race() {
         let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")

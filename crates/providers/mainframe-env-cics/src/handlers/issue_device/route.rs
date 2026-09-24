@@ -2,6 +2,7 @@
 
 use super::super::{CicsService, Run, store_error};
 use super::*;
+use mainframe_env_execution_api::RunUnitId;
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, CicsUnitOfWorkOutcome,
     HostProblem, HostRequest, canonical_request_digest,
@@ -678,6 +679,96 @@ pub(in crate::service) fn finish_task(
         }
         Err(StoreError::Conflict | StoreError::AlreadyExists) => Err(HostProblem::UnknownOutcome),
         Err(error) => Err(super::super::super::mutation_problem(store_error(error))),
+    }
+}
+
+impl CicsService {
+    /// Trusted Communications Server target claims one committed PASS result.
+    /// The device row is the replay authority for this handoff.
+    pub fn claim_issue_pass(
+        &self,
+        terminal: &str,
+        target_run_unit: &RunUnitId,
+        event_id: &str,
+    ) -> Result<IssuePassTransfer, HostProblem> {
+        if !valid_name(terminal, 4)
+            || event_id.is_empty()
+            || event_id.len() > 128
+            || !event_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut run = self
+            .lock()?
+            .runs
+            .get(target_run_unit)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let application = run.applid.clone();
+        for _ in 0..32 {
+            let current = IssueDeviceRecord::load(self.store.as_ref(), terminal)
+                .map_err(store_error)?
+                .ok_or(HostProblem::NotFound)?;
+            if current.state.pass_target.as_deref() != Some(application.as_str()) {
+                return Err(HostProblem::Unauthorized);
+            }
+            if current.state.pass_claimed_by.is_some() {
+                return if current.state.pass_claimed_by.as_deref() == Some(target_run_unit.as_str())
+                    && current.state.pass_claim_event.as_deref() == Some(event_id)
+                {
+                    current
+                        .pass_transfer()
+                        .map_err(|_| HostProblem::InfrastructureFailure)
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            check_request_live(self, &run)?;
+            self.authorize(
+                &mut run,
+                "FACILITY",
+                &format!("CICS.ISSUE.DEVICE.{terminal}"),
+                AccessIntent::Read,
+            )?;
+            let mut next = current.clone();
+            next.claim_pass(&application, target_run_unit.as_str(), event_id)
+                .map_err(|_| HostProblem::Unauthorized)?;
+            if current
+                .persist(&mut next, self.store.as_ref())
+                .map_err(|error| super::super::super::mutation_problem(store_error(error)))?
+            {
+                if run.invocation.cancellation_requested()
+                    || request_expired(self, &run)?
+                    || self
+                        .replay_unknown_after_persist
+                        .swap(false, Ordering::SeqCst)
+                {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+                return next
+                    .pass_transfer()
+                    .map_err(|_| HostProblem::InfrastructureFailure);
+            }
+        }
+        Err(HostProblem::UnknownOutcome)
+    }
+
+    /// Trusted CICS target claim. LGNMSG controls whether EXTRACT LOGONMSG
+    /// receives the PASS user data; exact retries repair a split handoff.
+    pub fn claim_issue_pass_for_cics(
+        &self,
+        terminal: &str,
+        target_run_unit: &RunUnitId,
+        event_id: &str,
+        lgnmsg_enabled: bool,
+    ) -> Result<IssuePassTransfer, HostProblem> {
+        let transfer = self.claim_issue_pass(terminal, target_run_unit, event_id)?;
+        if lgnmsg_enabled {
+            super::super::publish_pass_logon(self, target_run_unit.as_str(), &transfer.logon_data)?;
+        }
+        Ok(transfer)
     }
 }
 

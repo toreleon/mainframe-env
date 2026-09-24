@@ -69,6 +69,11 @@ pub struct IssueDeviceState {
     pub pass_noquiesce: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub pass_delivered: bool,
+    /// Target run and carrier event that consumed a committed PASS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pass_claimed_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pass_claim_event: Option<String>,
     pub disconnected: bool,
     /// Task that owns an alternate LUTYPE6.1 TCTTE facility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -93,6 +98,16 @@ pub struct IssueDeviceRecord {
     pub version: u64,
     pub definition: IssueDeviceDefinition,
     pub state: IssueDeviceState,
+}
+
+/// Exact logon material supplied to a trusted target application claim.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IssuePassTransfer {
+    pub terminal: String,
+    pub application: String,
+    pub logon_data: Vec<u8>,
+    pub logmode: Option<String>,
+    pub noquiesce: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -278,7 +293,23 @@ impl IssueDeviceRecord {
                     || self.state.pass_logmode.is_some()
                     || self.state.pass_use_logon_mode
                     || self.state.pass_noquiesce
-                    || self.state.pass_delivered)
+                    || self.state.pass_delivered
+                    || self.state.pass_claimed_by.is_some()
+                    || self.state.pass_claim_event.is_some())
+            || self.state.pass_claimed_by.is_some() != self.state.pass_claim_event.is_some()
+            || self.state.pass_claimed_by.is_some() && !self.state.pass_delivered
+            || self
+                .state
+                .pass_claimed_by
+                .as_ref()
+                .is_some_and(|run| run.is_empty() || run.len() > 128 || run.contains('\0'))
+            || self.state.pass_claim_event.as_ref().is_some_and(|event| {
+                event.is_empty()
+                    || event.len() > 128
+                    || !event.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
+                    })
+            })
             || self
                 .state
                 .pass_owner_run_unit
@@ -446,6 +477,8 @@ impl IssueDeviceRecord {
         self.state.pass_use_logon_mode = use_logon_mode;
         self.state.pass_noquiesce = noquiesce;
         self.state.pass_delivered = false;
+        self.state.pass_claimed_by = None;
+        self.state.pass_claim_event = None;
         Ok(())
     }
 
@@ -483,7 +516,60 @@ impl IssueDeviceRecord {
         self.state.pass_logmode = None;
         self.state.pass_use_logon_mode = false;
         self.state.pass_noquiesce = false;
+        self.state.pass_claimed_by = None;
+        self.state.pass_claim_event = None;
         Ok(true)
+    }
+
+    pub fn claim_pass(
+        &mut self,
+        application: &str,
+        target_run_unit: &str,
+        event_id: &str,
+    ) -> Result<bool, IssueDeviceProblem> {
+        if !self.state.pass_delivered
+            || !self.state.disconnected
+            || self.state.pass_target.as_deref() != Some(application)
+            || target_run_unit.is_empty()
+            || target_run_unit.len() > 128
+            || target_run_unit.contains('\0')
+            || event_id.is_empty()
+            || event_id.len() > 128
+            || !event_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
+        if self.state.pass_claimed_by.is_some() {
+            return if self.state.pass_claimed_by.as_deref() == Some(target_run_unit)
+                && self.state.pass_claim_event.as_deref() == Some(event_id)
+            {
+                Ok(false)
+            } else {
+                Err(IssueDeviceProblem::StaleOwner)
+            };
+        }
+        self.state.pass_claimed_by = Some(target_run_unit.into());
+        self.state.pass_claim_event = Some(event_id.into());
+        Ok(true)
+    }
+
+    pub fn pass_transfer(&self) -> Result<IssuePassTransfer, IssueDeviceProblem> {
+        if !self.state.pass_delivered || self.state.pass_claimed_by.is_none() {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
+        Ok(IssuePassTransfer {
+            terminal: self.definition.terminal.clone(),
+            application: self
+                .state
+                .pass_target
+                .clone()
+                .ok_or(IssueDeviceProblem::Malformed)?,
+            logon_data: self.state.pass_data.clone(),
+            logmode: self.state.pass_logmode.clone(),
+            noquiesce: self.state.pass_noquiesce,
+        })
     }
 
     pub fn disconnect(&mut self) -> Result<(), IssueDeviceProblem> {
