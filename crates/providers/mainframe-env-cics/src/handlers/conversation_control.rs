@@ -9,6 +9,8 @@ use mainframe_env_host_api::{CicsOperation, CicsRequest, CicsResponse, HostProbl
 use serde::{Deserialize, Serialize};
 
 mod allocate;
+mod build_attach;
+mod connect_process;
 mod data;
 mod definitions;
 mod exchange;
@@ -26,7 +28,14 @@ mod wait_signal;
 pub use data::{
     ConversationDataFrame, ConversationDataReply, ConversationDataState, DataCondition,
 };
-pub use definitions::{ConversationPartnerDefinition, ConversationProfileDefinition};
+pub use definitions::{
+    ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationProfileDefinition,
+};
+pub use exchange::{
+    ConversationExchangeState, ConversationOutboundFrame, ConversationPeerFrame,
+    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_RECORDED_OUTBOUND_FRAMES,
+};
 pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure,
     GdsReturnCode, GdsWaitFailure,
@@ -158,8 +167,10 @@ pub(in crate::service) fn deadline(service: &CicsService, run: &Run) -> Result<(
 pub const CONVERSATION_RECORD_VERSION: u16 = 2;
 /// Maximum length of a partner process name defined by APPC.
 pub const MAX_PROCESS_BYTES: usize = 64;
-/// Maximum APPC PIP list length, including each record's four-byte header.
-pub const MAX_PIP_BYTES: usize = 763;
+/// Mapped APPC PIP limit; basic GDS has its own 763-byte limit.
+pub const MAX_PIP_BYTES: usize = 32_763;
+/// APPC basic PIP limit from GDS CONNECT PROCESS.
+pub const MAX_BASIC_PIP_BYTES: usize = 763;
 const MAX_CONVERSATION_RECORD_BYTES: usize = 384 * 1024;
 
 /// The session protocol selected at allocation, independent of its carrier.
@@ -398,7 +409,7 @@ impl ConversationRecord {
         {
             return Err(ConversationProblem::Malformed);
         }
-        validate_pip(&self.pip)?;
+        validate_pip(&self.pip, self.kind)?;
         self.data.validate()?;
         Ok(())
     }

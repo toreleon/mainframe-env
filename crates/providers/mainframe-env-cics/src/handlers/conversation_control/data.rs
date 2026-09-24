@@ -27,7 +27,7 @@ pub enum DataCondition {
     Signal,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConversationDataFrame {
     pub bytes: Vec<u8>,
@@ -37,6 +37,14 @@ pub struct ConversationDataFrame {
     pub end_structured_field: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_code: Option<[u8; 4]>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub invite: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub confirm: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub defresp: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attach_id: Option<String>,
 }
 
 impl ConversationDataFrame {
@@ -44,6 +52,17 @@ impl ConversationDataFrame {
         if self.bytes.len() > MAX_FRAME_BYTES
             || self.signal && !self.bytes.is_empty()
             || self.error_code.is_some() && (self.signal || !self.bytes.is_empty())
+            || self.invite && self.end_of_chain
+            || self.confirm && self.defresp
+            || (self.signal || self.error_code.is_some())
+                && (self.invite || self.confirm || self.defresp || self.attach_id.is_some())
+            || self.attach_id.as_ref().is_some_and(|name| {
+                name.is_empty()
+                    || name.len() > 8
+                    || !name.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+                    })
+            })
         {
             return Err(ConversationProblem::Length);
         }
@@ -164,6 +183,10 @@ impl ConversationDataState {
 
     pub fn pending_inbound(&self) -> usize {
         self.inbound.len()
+    }
+
+    pub fn terminal_error(&self) -> bool {
+        self.terminal_error
     }
 }
 
@@ -345,6 +368,10 @@ impl ConversationRecord {
             signal: false,
             end_structured_field: true,
             error_code: None,
+            invite,
+            confirm: false,
+            defresp: false,
+            attach_id: None,
         };
         frame.validate()?;
         let next_state = if last {
@@ -583,6 +610,9 @@ impl CicsService {
                 super::ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
             let mut next = current.clone();
             let record = next.conversation_mut(token).ok_or(HostProblem::NotFound)?;
+            if record.kind != ConversationKind::AppcBasic {
+                return Err(HostProblem::Unsupported);
+            }
             record
                 .enqueue_peer_data(owner, context, peer_sequence, frame.clone())
                 .map_err(|problem| match problem {
@@ -631,6 +661,7 @@ mod tests {
             signal: false,
             end_structured_field: true,
             error_code: None,
+            ..Default::default()
         }
     }
 
@@ -887,6 +918,7 @@ mod tests {
             signal: true,
             end_structured_field: false,
             error_code: None,
+            ..Default::default()
         };
         record
             .enqueue_peer_data(&owner, ConversationContext::Local, 1, signal)
@@ -942,6 +974,7 @@ mod tests {
                     signal: true,
                     end_structured_field: false,
                     error_code: None,
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -957,6 +990,7 @@ mod tests {
                     signal: false,
                     end_structured_field: false,
                     error_code: Some([0x08, 0x89, 0, 0]),
+                    ..Default::default()
                 },
             )
             .unwrap();

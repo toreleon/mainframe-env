@@ -63,7 +63,12 @@ impl CicsService {
                 .conversation(token)
                 .ok_or_else(|| problem(ConversationProblem::NotOwned))?;
             record.check_owner(&owner, context).map_err(problem)?;
-            let Some((send_id, frame, attempted)) = record.data.next_outbound() else {
+            let key = u32::from_be_bytes(token).to_string();
+            let Some((send_id, frame, attempted)) = current
+                .exchanges
+                .get(&key)
+                .and_then(super::ConversationExchangeState::next_outbound)
+            else {
                 return Ok(ConversationTransmitOutcome::Confirmed);
             };
             let Some(transport) = self.conversation_transport()? else {
@@ -73,9 +78,7 @@ impl CicsService {
             let system = record.system.clone();
             if !attempted {
                 let mut next = current.clone();
-                next.conversation_mut(token)
-                    .ok_or(HostProblem::InfrastructureFailure)?
-                    .mark_send_attempted(&owner, context, send_id)
+                next.mark_mapped_send_attempted(token, &owner, context, send_id)
                     .map_err(problem)?;
                 if !current
                     .persist(&mut next, self.store.as_ref())
@@ -100,11 +103,7 @@ impl CicsService {
             for _ in 0..32 {
                 let current = ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
                 let mut next = current.clone();
-                let record = next
-                    .conversation_mut(token)
-                    .ok_or(HostProblem::UnknownOutcome)?;
-                record
-                    .acknowledge_send(&owner, context, send_id)
+                next.acknowledge_mapped_send(token, &owner, context, send_id)
                     .map_err(problem)?;
                 if current
                     .persist(&mut next, self.store.as_ref())

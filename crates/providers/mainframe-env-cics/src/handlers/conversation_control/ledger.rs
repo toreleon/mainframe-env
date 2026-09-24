@@ -1,8 +1,8 @@
 //! Versioned, CAS-backed allocation and attach-header authority.
 
 use super::{
-    ConversationExchangeState, ConversationKind, ConversationOwner, ConversationPeerFrame,
-    ConversationProblem, ConversationRecord, MAX_PROCESS_BYTES,
+    ConversationDataFrame, ConversationExchangeState, ConversationKind, ConversationOwner,
+    ConversationPeerFrame, ConversationProblem, ConversationRecord, MAX_PROCESS_BYTES,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -17,6 +17,7 @@ const MAX_SYSTEMS: usize = 256;
 const MAX_CONVERSATIONS: usize = 4096;
 const MAX_ATTACH_HEADERS: usize = 4096;
 const MAX_SIGNAL_FACILITIES: usize = 4096;
+const LEDGER_VERSION: u16 = 2;
 
 /// Principal logical-unit classes for which IBM permits WAIT SIGNAL.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -125,6 +126,8 @@ pub struct ConversationLedger {
     pub conversations: BTreeMap<String, ConversationRecord>,
     pub attach_headers: BTreeMap<String, ConversationAttachHeader>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub exchanges: BTreeMap<String, ConversationExchangeState>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub signal_facilities: BTreeMap<String, SignalFacilityRecord>,
 }
 
@@ -137,6 +140,7 @@ impl Default for ConversationLedger {
             systems: BTreeMap::new(),
             conversations: BTreeMap::new(),
             attach_headers: BTreeMap::new(),
+            exchanges: BTreeMap::new(),
             signal_facilities: BTreeMap::new(),
         }
     }
@@ -346,6 +350,165 @@ impl ConversationLedger {
             .get_mut(&u32::from_be_bytes(token).to_string())
     }
 
+    pub fn offer_peer_frame(
+        &mut self,
+        token: [u8; 4],
+        frame: ConversationPeerFrame,
+    ) -> Result<(), ConversationProblem> {
+        let key = u32::from_be_bytes(token).to_string();
+        let record = self
+            .conversations
+            .get(&key)
+            .ok_or(ConversationProblem::NotOwned)?;
+        if record.released || record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        self.exchanges.entry(key).or_default().offer(frame)
+    }
+
+    pub fn exchange_mut(&mut self, token: [u8; 4]) -> Option<&mut ConversationExchangeState> {
+        self.exchanges
+            .get_mut(&u32::from_be_bytes(token).to_string())
+    }
+
+    pub fn remove_exchange(&mut self, token: [u8; 4]) {
+        self.exchanges
+            .remove(&u32::from_be_bytes(token).to_string());
+    }
+
+    pub fn receive_mapped_peer_frame(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        max_length: usize,
+        retain_remainder: bool,
+    ) -> Result<Option<super::ConversationDataReply>, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if record.data.terminal_error() || record.state != super::ConversationState::Receive {
+            return Err(ConversationProblem::WrongState);
+        }
+        let kind = record.kind;
+        let key = u32::from_be_bytes(token).to_string();
+        let Some(exchange) = self.exchanges.get_mut(&key) else {
+            return Ok(None);
+        };
+        let reply = exchange.receive_mapped(kind, max_length, retain_remainder)?;
+        if let Some(ref reply) = reply {
+            let record = self
+                .conversation_mut(token)
+                .ok_or(ConversationProblem::Malformed)?;
+            record.next_sequence()?;
+            record.state = reply.state;
+        }
+        Ok(reply)
+    }
+
+    pub fn stage_mapped_send(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        frame: ConversationDataFrame,
+    ) -> Result<u64, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if record.data.terminal_error()
+            || record.state != super::ConversationState::Send
+                && !(record.kind == ConversationKind::Mro
+                    && record.state == super::ConversationState::Allocated)
+            || frame.confirm
+                && (record.kind != ConversationKind::AppcMapped
+                    || !matches!(record.sync_level, Some(1 | 2)))
+            || frame.defresp && record.kind != ConversationKind::Mro
+            || frame
+                .attach_id
+                .as_ref()
+                .is_some_and(|name| self.attach(owner, name).is_none())
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        let next_state = if frame.end_of_chain {
+            super::ConversationState::PendFree
+        } else if frame.invite {
+            super::ConversationState::Receive
+        } else {
+            super::ConversationState::Send
+        };
+        let key = u32::from_be_bytes(token).to_string();
+        let id = self
+            .exchanges
+            .entry(key)
+            .or_default()
+            .stage_send(frame, next_state)?;
+        let record = self
+            .conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?;
+        record.next_sequence()?;
+        if next_state == super::ConversationState::Receive {
+            record.state = super::ConversationState::PendReceive;
+        } else if next_state == super::ConversationState::PendFree {
+            record.state = super::ConversationState::PendFree;
+        }
+        Ok(id)
+    }
+
+    pub fn mark_mapped_send_attempted(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        send_id: u64,
+    ) -> Result<(), ConversationProblem> {
+        self.conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?
+            .check_owner(owner, context)?;
+        self.exchange_mut(token)
+            .ok_or(ConversationProblem::WrongState)?
+            .mark_send_attempted(send_id)?;
+        self.conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?
+            .next_sequence()
+    }
+
+    pub fn acknowledge_mapped_send(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        send_id: u64,
+    ) -> Result<(), ConversationProblem> {
+        self.conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?
+            .check_owner(owner, context)?;
+        let exchange = self
+            .exchange_mut(token)
+            .ok_or(ConversationProblem::WrongState)?;
+        let confirmed_state = exchange.acknowledge_send(send_id)?;
+        let pending_state = exchange.pending_sends.last().map(|send| send.next_state);
+        let record = self
+            .conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?;
+        record.next_sequence()?;
+        record.state = match pending_state {
+            Some(super::ConversationState::Receive) => super::ConversationState::PendReceive,
+            Some(super::ConversationState::PendFree) => super::ConversationState::PendFree,
+            _ => confirmed_state,
+        };
+        Ok(())
+    }
+
     pub fn install_signal_facility(
         &mut self,
         owner: ConversationOwner,
@@ -523,6 +686,11 @@ impl ConversationLedger {
         }
         self.attach_headers
             .retain(|_, header| &header.owner != owner);
+        self.exchanges.retain(|key, _| {
+            self.conversations
+                .get(key)
+                .is_some_and(|record| !record.released)
+        });
         let prior_signals = self.signal_facilities.len();
         self.signal_facilities
             .retain(|_, facility| &facility.owner != owner);
@@ -537,6 +705,7 @@ impl ConversationLedger {
             || self.systems.len() > MAX_SYSTEMS
             || self.conversations.len() > MAX_CONVERSATIONS
             || self.attach_headers.len() > MAX_ATTACH_HEADERS
+            || self.exchanges.len() > MAX_CONVERSATIONS
             || self.signal_facilities.len() > MAX_SIGNAL_FACILITIES
         {
             return Err(ConversationProblem::Malformed);
@@ -579,6 +748,14 @@ impl ConversationLedger {
         for (key, header) in &self.attach_headers {
             header.validate()?;
             if key != &attach_key(&header.owner, &header.name) {
+                return Err(ConversationProblem::Malformed);
+            }
+        }
+        for (key, exchange) in &self.exchanges {
+            exchange.validate()?;
+            if !self.conversations.get(key).is_some_and(|record| {
+                !record.released && record.kind != ConversationKind::AppcBasic
+            }) {
                 return Err(ConversationProblem::Malformed);
             }
         }
@@ -825,6 +1002,100 @@ mod tests {
         assert_eq!(ledger.schema_version, LEDGER_VERSION);
         drop(reopened);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn mapped_receive_uses_one_exchange_frame_across_replayable_remainder() {
+        let store = MemoryStore::new(Default::default());
+        let current = ConversationLedger::load(&store).unwrap();
+        let mut staged = current.clone();
+        staged
+            .register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        let token = staged
+            .allocate("SYS1", ConversationKind::AppcMapped, owner())
+            .unwrap()
+            .token;
+        let record = staged.conversation_mut(token).unwrap();
+        record
+            .connect(
+                &owner(),
+                super::super::ConversationContext::Local,
+                false,
+                b"PROC".to_vec(),
+                Vec::new(),
+                0,
+            )
+            .unwrap();
+        record
+            .peer_offered_data(&owner(), super::super::ConversationContext::Local)
+            .unwrap();
+        staged
+            .offer_peer_frame(
+                token,
+                ConversationPeerFrame {
+                    data: b"ABCDEFGH".to_vec(),
+                    next_state: super::super::ConversationState::Send,
+                    end_of_chain: true,
+                    inbound_fmh: false,
+                    signal: false,
+                },
+            )
+            .unwrap();
+        assert!(current.persist(&mut staged, &store).unwrap());
+        let mut partial = ConversationLedger::load(&store).unwrap();
+        let first = partial
+            .receive_mapped_peer_frame(
+                token,
+                &owner(),
+                super::super::ConversationContext::Local,
+                3,
+                true,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.bytes, b"ABC");
+        assert_eq!(first.condition, super::super::DataCondition::Normal);
+        assert_eq!(
+            partial.exchanges[&u32::from_be_bytes(token).to_string()].retained,
+            b"DEFGH"
+        );
+        assert_eq!(
+            partial.conversation(token).unwrap().data.pending_inbound(),
+            0
+        );
+        assert!(staged.persist(&mut partial, &store).unwrap());
+        let mut reopened = ConversationLedger::load(&store).unwrap();
+        let last = reopened
+            .receive_mapped_peer_frame(
+                token,
+                &owner(),
+                super::super::ConversationContext::Local,
+                16,
+                true,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(last.bytes, b"DEFGH");
+        assert_eq!(last.condition, super::super::DataCondition::EndOfChain);
+        assert_eq!(
+            reopened.conversation(token).unwrap().state,
+            super::super::ConversationState::Send
+        );
+        assert_eq!(
+            reopened.conversation(token).unwrap().data.pending_inbound(),
+            0
+        );
+        assert!(
+            reopened.exchanges[&u32::from_be_bytes(token).to_string()]
+                .retained
+                .is_empty()
+        );
     }
 
     #[test]

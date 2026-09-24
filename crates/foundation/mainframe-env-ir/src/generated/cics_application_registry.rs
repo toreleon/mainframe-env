@@ -5,7 +5,7 @@ pub const CICS_APPLICATION_REGISTRY_FROZEN: bool = true;
 
 /// Digest of the complete 263-row non-executable registry shape.
 pub const CICS_APPLICATION_REGISTRY_SHA256: &str =
-    "sha256:7f9760e558215000a515b02aaa9c266236df05497ec062ca72ffcda4acf67561";
+    "sha256:1579ea4c47435ab0c59ae5998c7c0d566a1058826bdc4501e3d8f453cd8406cb";
 
 /// Digest of the normalized EIBRESP condition-name array.
 pub const CICS_APPLICATION_CONDITION_NAMES_SHA256: &str =

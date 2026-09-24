@@ -323,7 +323,6 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
-        | CicsPlanOperation::FreeConversation
         | CicsPlanOperation::GdsFreeConversation
         | CicsPlanOperation::ReceiveConversation
         | CicsPlanOperation::GdsReceiveConversation

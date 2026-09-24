@@ -35773,28 +35773,26 @@ mod tests {
             .allocate("MRO1", ConversationKind::Mro, owner.clone())
             .unwrap()
             .token;
-        next.conversation_mut(token)
-            .unwrap()
-            .stage_send(
-                &owner,
-                ConversationContext::Local,
-                b"PAYLOAD".to_vec(),
-                true,
-                false,
-                false,
-            )
-            .unwrap();
+        next.stage_mapped_send(
+            token,
+            &owner,
+            ConversationContext::Local,
+            ConversationDataFrame {
+                bytes: b"PAYLOAD".to_vec(),
+                end_structured_field: true,
+                invite: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert!(initial.persist(&mut next, store.as_ref()).unwrap());
         assert_eq!(
             cics.flush_conversation_send(&run, token),
             Ok(ConversationTransmitOutcome::Pending)
         );
         assert_eq!(
-            ConversationLedger::load(store.as_ref())
-                .unwrap()
-                .conversation(token)
-                .unwrap()
-                .data
+            ConversationLedger::load(store.as_ref()).unwrap().exchanges
+                [&u32::from_be_bytes(token).to_string()]
                 .next_outbound()
                 .map(|send| send.2),
             Some(false)
@@ -35864,17 +35862,18 @@ mod tests {
             .unwrap()
             .token;
         for (bytes, invite) in [(b"ONE".as_slice(), false), (b"TWO".as_slice(), true)] {
-            next.conversation_mut(token)
-                .unwrap()
-                .stage_send(
-                    &owner,
-                    ConversationContext::Local,
-                    bytes.to_vec(),
+            next.stage_mapped_send(
+                token,
+                &owner,
+                ConversationContext::Local,
+                ConversationDataFrame {
+                    bytes: bytes.to_vec(),
+                    end_structured_field: true,
                     invite,
-                    false,
-                    false,
-                )
-                .unwrap();
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         }
         assert!(initial.persist(&mut next, store.as_ref()).unwrap());
         let carrier = Arc::new(Carrier(AtomicUsize::new(0)));
@@ -35887,7 +35886,10 @@ mod tests {
         assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
         let saved = ConversationLedger::load(store.as_ref()).unwrap();
         let record = saved.conversation(token).unwrap();
-        assert_eq!(record.data.pending_outbound(), 0);
+        assert_eq!(
+            saved.exchanges[&u32::from_be_bytes(token).to_string()].pending_outbound(),
+            0
+        );
         assert_eq!(record.state, ConversationState::Receive);
         assert_eq!(
             cics.flush_conversation_send(&run, token),

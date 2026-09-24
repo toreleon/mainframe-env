@@ -48,6 +48,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Reconciled the imported conversation-open peer-frame ledger with the
+  conversation data slice. Mapped RECEIVE consumes the shared exchange queue
+  and retains NOTRUNCATE remainders there; mapped SEND stages, marks attempted,
+  reconciles, and acknowledges on that same durable exchange. Memory and
+  SQLite reopen regressions cover the combined state. The six remaining data
+  and wait application rows retain zero readiness credit until their selected
+  host routes pass.
+
 - Versioned the conversation ledger for explicit APPC/MRO peer frames and
   outbound exchange records. Version 1 rows reopen unchanged and upgrade on
   mutation; trusted frame offers are bounded, owner-fenced, and CAS replayed.
