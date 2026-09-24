@@ -189,6 +189,9 @@ pub(super) fn execute(
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
     }
+    if plan.operation == CicsPlanOperation::ReceiveConversation {
+        retrieve::release_conversation_receive_set(machine);
+    }
     if matches!(
         plan.operation,
         CicsPlanOperation::ReceivePartn
@@ -590,14 +593,36 @@ pub(super) fn execute(
             | CicsOutputName::WebConverseStatusLength
             | CicsOutputName::WebConverseMediaType
             | CicsOutputName::WebConverseBodyCharset
-            | CicsOutputName::ConversationDataInto
-            | CicsOutputName::ConversationDataSet
             | CicsOutputName::ConversationDataLength
             | CicsOutputName::ConversationDataFullLength
             | CicsOutputName::ConversationDataRetcode
             | CicsOutputName::ConversationDataConvData
             | CicsOutputName::ConversationDataState
             | CicsOutputName::Assign(_) => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::ConversationDataInto => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "INTO.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::ConversationDataSet => {
+                arguments.extend(retrieve::allocation_arguments(
+                    machine,
+                    &target,
+                    plan.operation,
+                )?);
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => {
@@ -1117,6 +1142,28 @@ mod tests {
         assert_eq!(offset, 0);
         assert!(!machine.freed_allocations.contains(&base));
         retrieve::release_temporary_storage_set(&mut machine);
+        assert!(machine.freed_allocations.contains(&base));
+    }
+
+    #[test]
+    fn conversation_receive_set_allocation_expires_at_next_receive() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PTR-X", 4);
+        write_output(
+            &mut machine,
+            CicsOperation::ReceiveConversation,
+            "SET",
+            &CicsTarget::Resolved(slot.clone()),
+            &payload("mainframe-env.cics.payload@1", b"REPLY".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        let pointer = machine
+            .read_reference(&resolved_slot(&machine, &slot).unwrap())
+            .unwrap();
+        let (base, offset) = machine.decode_address(&pointer).unwrap().unwrap();
+        assert_eq!(offset, 0);
+        assert!(!machine.freed_allocations.contains(&base));
+        retrieve::release_conversation_receive_set(&mut machine);
         assert!(machine.freed_allocations.contains(&base));
     }
 

@@ -22,6 +22,7 @@ mod gds_connect_process;
 mod gds_free;
 mod ledger;
 mod peer;
+mod receive;
 mod replay;
 mod transport;
 mod wait_signal;
@@ -128,6 +129,9 @@ pub(in crate::service) fn invoke(
             gds_connect_process::invoke(service, run, request, retention_tick)
         }
         CicsOperation::FreeConversation => free::invoke(service, run, request, retention_tick),
+        CicsOperation::ReceiveConversation => {
+            receive::invoke(service, run, request, retention_tick)
+        }
         CicsOperation::GdsFreeConversation => {
             gds_free::invoke(service, run, request, retention_tick)
         }
@@ -161,6 +165,17 @@ pub(in crate::service) fn deadline(service: &CicsService, run: &Run) -> Result<(
         return Err(HostProblem::TimedOut);
     }
     Ok(())
+}
+
+pub(in crate::service) fn suspends_without_outer_replay(
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> bool {
+    response.disposition == mainframe_env_host_api::CicsDisposition::Suspended
+        && matches!(
+            operation,
+            CicsOperation::WaitSignal | CicsOperation::ReceiveConversation
+        )
 }
 
 /// Durable encoding version for one allocated conversation.
@@ -266,6 +281,9 @@ pub struct ConversationRecord {
     /// canonical v1 records, whose default is recovered by the v2 reader.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub processing_profile: Option<String>,
+    /// Trusted TCTTE selector for an MRO alternate facility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mro_session_name: Option<String>,
     /// Pending peer and local data share this allocation's durable owner and
     /// CAS lifecycle. Empty v1/v2 rows retain their canonical encoding.
     #[serde(default, skip_serializing_if = "ConversationDataState::is_empty")]
@@ -338,6 +356,7 @@ impl ConversationRecord {
             pip: Vec::new(),
             sequence: 0,
             processing_profile: Some(processing_profile.into()),
+            mro_session_name: None,
             data: ConversationDataState::default(),
         };
         record.validate()?;
@@ -383,6 +402,14 @@ impl ConversationRecord {
                 profile.is_empty()
                     || profile.len() > 8
                     || !profile.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+                    })
+            })
+            || self.mro_session_name.as_ref().is_some_and(|name| {
+                self.kind != ConversationKind::Mro
+                    || name.is_empty()
+                    || name.len() > 4
+                    || !name.bytes().all(|byte| {
                         byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
                     })
             })

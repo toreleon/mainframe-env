@@ -8,7 +8,9 @@ pub(super) fn allocation_arguments(
     let mut capacity = allocation_capacity(machine, target)?;
     if matches!(
         operation,
-        CicsPlanOperation::ReceivePartn | CicsPlanOperation::IssueReceive
+        CicsPlanOperation::ReceivePartn
+            | CicsPlanOperation::IssueReceive
+            | CicsPlanOperation::ReceiveConversation
     ) {
         let live = machine
             .bases
@@ -21,7 +23,11 @@ pub(super) fn allocation_arguments(
         {
             0
         } else {
-            capacity.saturating_sub(PARTITION_RECEIVE_MARKER.len())
+            capacity.saturating_sub(if operation == CicsPlanOperation::ReceiveConversation {
+                CONVERSATION_RECEIVE_MARKER.len()
+            } else {
+                PARTITION_RECEIVE_MARKER.len()
+            })
         };
     }
     let mut arguments = BTreeMap::from([(
@@ -358,6 +364,22 @@ pub(super) fn release_temporary_storage_set(machine: &mut ReferenceMachine) {
 }
 
 const PARTITION_RECEIVE_MARKER: &[u8] = b"MEC-RECEIVE-PARTN";
+const CONVERSATION_RECEIVE_MARKER: &[u8] = b"MEC-RECEIVE-CONVERSATION";
+
+pub(super) fn release_conversation_receive_set(machine: &mut ReferenceMachine) {
+    let mut releases = Vec::new();
+    for marker in machine.static_base_count..machine.bases.len().saturating_sub(2) {
+        if machine.bases[marker] == CONVERSATION_RECEIVE_MARKER
+            && machine.bases[marker + 1].is_empty()
+            && machine.freed_allocations.contains(&marker)
+            && machine.freed_allocations.contains(&(marker + 1))
+            && !machine.freed_allocations.contains(&(marker + 2))
+        {
+            releases.push(marker + 2);
+        }
+    }
+    machine.freed_allocations.extend(releases);
+}
 
 pub(super) fn release_partition_receive_set(machine: &mut ReferenceMachine) {
     let mut releases = Vec::new();
@@ -400,12 +422,16 @@ pub(super) fn write_set_output(
     if value.bytes().len() > capacity
         || matches!(
             operation,
-            CicsOperation::ReceivePartn | CicsOperation::IssueReceive
-        ) && (value
-            .bytes()
-            .len()
-            .saturating_add(PARTITION_RECEIVE_MARKER.len())
-            > capacity
+            CicsOperation::ReceivePartn
+                | CicsOperation::IssueReceive
+                | CicsOperation::ReceiveConversation
+        ) && (value.bytes().len().saturating_add(
+            if operation == CicsOperation::ReceiveConversation {
+                CONVERSATION_RECEIVE_MARKER.len()
+            } else {
+                PARTITION_RECEIVE_MARKER.len()
+            },
+        ) > capacity
             || machine
                 .bases
                 .iter()
@@ -429,12 +455,17 @@ pub(super) fn write_set_output(
         marker + 2
     } else if matches!(
         operation,
-        CicsOperation::ReceivePartn | CicsOperation::IssueReceive
+        CicsOperation::ReceivePartn
+            | CicsOperation::IssueReceive
+            | CicsOperation::ReceiveConversation
     ) {
         let marker = machine.bases.len();
-        machine
-            .bases
-            .extend([PARTITION_RECEIVE_MARKER.to_vec(), Vec::new()]);
+        let marker_bytes = if operation == CicsOperation::ReceiveConversation {
+            CONVERSATION_RECEIVE_MARKER
+        } else {
+            PARTITION_RECEIVE_MARKER
+        };
+        machine.bases.extend([marker_bytes.to_vec(), Vec::new()]);
         machine.freed_allocations.extend([marker, marker + 1]);
         marker + 2
     } else {

@@ -81,6 +81,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0082"
     },
     {
+      "operation": "ReceiveConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0161"
+    },
+    {
       "operation": "AsktimeEib",
       "interface": "api",
       "family": "time",

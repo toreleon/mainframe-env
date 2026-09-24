@@ -123,6 +123,8 @@ pub(super) fn resolve(
                 HirCicsOperation::WebReceive
                     | HirCicsOperation::WebConverse
                     | HirCicsOperation::Converse
+                    | HirCicsOperation::ReceiveConversation
+                    | HirCicsOperation::GdsReceiveConversation
             )
         {
             continue;

@@ -350,6 +350,48 @@ impl ConversationLedger {
             .get_mut(&u32::from_be_bytes(token).to_string())
     }
 
+    pub fn bind_mro_session(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        name: &str,
+    ) -> Result<(), ConversationProblem> {
+        if name.is_empty()
+            || name.len() > 4
+            || !name.bytes().all(|byte| {
+                byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+            })
+        {
+            return Err(ConversationProblem::Malformed);
+        }
+        if self.conversations.values().any(|record| {
+            record.token != token
+                && !record.released
+                && record.owner.execution == owner.execution
+                && record.owner.run_unit == owner.run_unit
+                && record.mro_session_name.as_deref() == Some(name)
+        }) {
+            return Err(ConversationProblem::WrongState);
+        }
+        let record = self
+            .conversation_mut(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind != ConversationKind::Mro {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if record.mro_session_name.as_deref() == Some(name) {
+            return Ok(());
+        }
+        if record.mro_session_name.is_some() {
+            return Err(ConversationProblem::WrongState);
+        }
+        record.next_sequence()?;
+        record.mro_session_name = Some(name.into());
+        Ok(())
+    }
+
     pub fn offer_peer_frame(
         &mut self,
         token: [u8; 4],
@@ -725,6 +767,18 @@ impl ConversationLedger {
             }
         }
         let mut principals = std::collections::BTreeSet::new();
+        let mut mro_sessions = std::collections::BTreeSet::new();
+        for record in self
+            .conversations
+            .values()
+            .filter(|record| !record.released)
+        {
+            if let Some(name) = record.mro_session_name.as_deref()
+                && !mro_sessions.insert((&record.owner.execution, &record.owner.run_unit, name))
+            {
+                return Err(ConversationProblem::Malformed);
+            }
+        }
         for record in self
             .conversations
             .values()

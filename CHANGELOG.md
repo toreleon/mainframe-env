@@ -6,11 +6,20 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Selected mapped APPC/MRO RECEIVE through the accepted host ABI, typed COBOL
+  interpreter, and durable peer exchange. The route handles NOTRUNCATE,
+  truncation, EOC, SIGNAL, MRO FMH, STATE, length outputs, and exact replay.
+  Memory, SQLite reopen, pointer lifetime, and a compiled online provider
+  route now cover the promoted application row `0161`.
+- The shared conversation record can now bind an MRO alternate facility's
+  trusted symbolic SESSION name. MRO RECEIVE resolves that name under the
+  existing owner and lease and gives INBFMH precedence over EOC.
+
 - Reserved distinct MCEP v2 identities for the seven CIC-905 conversation
   data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
   Extended the shared durable conversation record with bounded peer data,
   staged sends, explicit transmission acknowledgement, partial receive, and
-  GDS return-code contracts. Six data/terminal-wait rows remain unready pending
+  GDS return-code contracts. Five data/terminal-wait rows remain unready pending
   selected host dispatch and acceptance gates.
 - Peer conversation frames now carry a monotonic event sequence and digest,
   while staged sends carry distinct acknowledgement IDs. Exact duplicate

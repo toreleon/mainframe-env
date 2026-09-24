@@ -23,6 +23,8 @@ pub enum CicsOperation {
     FreeConversation,
     /// Return one completed APPC basic facility with GDS return codes.
     GdsFreeConversation,
+    /// Consume one task-owned mapped APPC or MRO peer frame.
+    ReceiveConversation,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -323,6 +325,7 @@ impl CicsOperation {
             Self::GdsConnectProcess => "GdsConnectProcess",
             Self::FreeConversation => "FreeConversation",
             Self::GdsFreeConversation => "GdsFreeConversation",
+            Self::ReceiveConversation => "ReceiveConversation",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -512,6 +515,7 @@ impl CicsOperation {
                 | Self::GdsConnectProcess
                 | Self::FreeConversation
                 | Self::GdsFreeConversation
+                | Self::ReceiveConversation
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -750,6 +754,7 @@ impl CicsOperation {
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
             ("RECEIVE", Some("PARTN")) => Self::ReceivePartn,
+            ("RECEIVE", _) => Self::ReceiveConversation,
             ("RETRIEVE", Some("REATTACH")) => Self::RetrieveReattachEvent,
             ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
             ("RETRIEVE", _) => Self::Retrieve,

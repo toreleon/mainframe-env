@@ -146,6 +146,7 @@ pub use conversation_control::{
 };
 pub(super) use conversation_control::{
     context as conversation_context, deadline as conversation_deadline,
+    suspends_without_outer_replay,
 };
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;

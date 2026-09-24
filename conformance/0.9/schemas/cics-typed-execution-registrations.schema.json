@@ -22,8 +22,8 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 137,
-      "maxItems": 137,
+      "minItems": 138,
+      "maxItems": 138,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -85,6 +85,7 @@
               "GdsConnectProcess",
               "GdsFreeConversation",
               "GdsAssignConversation",
+              "ReceiveConversation",
               "Getmain",
               "Getmain64",
               "HandleAid",
@@ -276,6 +277,7 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0149",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0155",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0160",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0161",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0168",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0167",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0159",

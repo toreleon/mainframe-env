@@ -319,12 +319,12 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         CicsPlanOperation::BuildAttach => CicsOperation::BuildAttach,
         CicsPlanOperation::ConnectProcess => CicsOperation::ConnectProcess,
         CicsPlanOperation::FreeConversation => CicsOperation::FreeConversation,
+        CicsPlanOperation::ReceiveConversation => CicsOperation::ReceiveConversation,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
         | CicsPlanOperation::GdsFreeConversation
-        | CicsPlanOperation::ReceiveConversation
         | CicsPlanOperation::GdsReceiveConversation
         | CicsPlanOperation::SendConversation
         | CicsPlanOperation::GdsWaitConversation
@@ -1111,21 +1111,33 @@ mod conversation_tests {
     use super::*;
 
     #[test]
-    fn unregistered_conversation_plans_have_no_host_alias() {
+    fn registered_conversation_plans_have_selected_host_aliases() {
         assert_eq!(
             host_operation(CicsPlanOperation::AllocateConversation),
             Some(CicsOperation::AllocateConversation)
         );
+        assert_eq!(
+            host_operation(CicsPlanOperation::BuildAttach),
+            Some(CicsOperation::BuildAttach)
+        );
+        assert_eq!(
+            host_operation(CicsPlanOperation::ConnectProcess),
+            Some(CicsOperation::ConnectProcess)
+        );
+        assert_eq!(
+            host_operation(CicsPlanOperation::FreeConversation),
+            Some(CicsOperation::FreeConversation)
+        );
+        assert_eq!(
+            host_operation(CicsPlanOperation::ReceiveConversation),
+            Some(CicsOperation::ReceiveConversation)
+        );
         for operation in [
             CicsPlanOperation::GdsAllocateConversation,
             CicsPlanOperation::GdsAssignConversation,
-            CicsPlanOperation::BuildAttach,
-            CicsPlanOperation::ConnectProcess,
             CicsPlanOperation::GdsConnectProcess,
             CicsPlanOperation::Converse,
-            CicsPlanOperation::FreeConversation,
             CicsPlanOperation::GdsFreeConversation,
-            CicsPlanOperation::ReceiveConversation,
             CicsPlanOperation::GdsReceiveConversation,
             CicsPlanOperation::SendConversation,
             CicsPlanOperation::GdsWaitConversation,
