@@ -17,6 +17,10 @@ All notable changes to mainframe-env are documented here.
   uncertain result, and exactly one device delivery commits with the source
   session disconnect. The catalog row remains unregistered.
 
+- Restored source-specific GDS ISSUE six-byte failure codes in the sealed
+  conversation handler, including PREPARE and CONFIRMATION sync-level codes.
+  These internal mappings do not register the five GDS ISSUE rows.
+
 - Prevented the COBOL copybook preprocessor from interpreting `COPY` inside
   `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
   source origins remain intact.

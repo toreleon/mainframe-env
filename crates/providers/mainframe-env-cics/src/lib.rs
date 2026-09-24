@@ -22,9 +22,10 @@ pub use service::{
     ConversationPartnerDefinition, ConversationPartnerProcessDefinition, ConversationPeerFrame,
     ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
     ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
-    GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode, MAX_BASIC_PIP_BYTES,
-    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
-    MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay, prune_conversation_replays,
+    GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow,
+    GdsReturnCode, MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay,
+    prune_conversation_replays,
 };
 
 pub use retention::{
