@@ -174,6 +174,11 @@ All notable changes to mainframe-env are documented here.
   and passed it through the child invocation binding. Older request rows
   default to writable when the flag is absent.
 
+- Removed RUN TRANSID CHANNEL's name-global transform-container copy. The
+  option now fails before child admission until the task-owned BTS channel
+  snapshot port is reconciled; RUN TRANSID without CHANNEL still starts a
+  local child.
+
 - Added the bounded BTS lifecycle host, IR, compiler, interpreter, and CICS
   dispatch scaffolding, plus an installed process-type/transaction catalog and
   selected RUN and RUN TRANSID worker admission. The candidate generated

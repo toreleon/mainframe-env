@@ -1,7 +1,6 @@
 //! RUN TRANSID local child request, source conditions, and token response.
 
 use super::*;
-use crate::service::CicsTransformContainerMode;
 use mainframe_env_host_api::{HostRequest, canonical_request_digest};
 use std::collections::BTreeMap;
 
@@ -42,26 +41,13 @@ pub(super) fn invoke(
             HostProblem::Unauthorized => condition("NOTAUTH", 70, 101),
             other => other,
         })?;
-    let containers = if let Some(channel) = channel.as_deref() {
-        let state = service.lock()?;
-        state
-            .transform_containers
-            .iter()
-            .filter(|((name, _), _)| name == channel)
-            .map(|((_, name), data)| {
-                (
-                    name.clone(),
-                    BtsTransidContainer {
-                        character: data.mode == CicsTransformContainerMode::Char,
-                        bytes: data.bytes.clone(),
-                        ..Default::default()
-                    },
-                )
-            })
-            .collect::<BTreeMap<_, _>>()
-    } else {
-        BTreeMap::new()
-    };
+    // The transform-container map is shared by channel name and cannot prove
+    // task ownership. The sibling BTS channel authority must supply the
+    // issue-time snapshot before this option can be admitted.
+    if channel.is_some() {
+        return Err(HostProblem::Unsupported);
+    }
+    let containers = BTreeMap::new();
     let mutation = request
         .mutation
         .as_ref()

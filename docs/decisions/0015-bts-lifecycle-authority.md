@@ -194,6 +194,12 @@ it through the child invocation's channel binding; first-version rows without
 the field remain readable. This is issue-time metadata from the sibling
 channel authority, not another channel state authority. The selected CHANNEL
 route still requires that task-owned snapshot to be wired before sealing.
+The former public route's transform-container map was keyed only by channel
+name, so it could not establish issuing-task ownership. CHANNEL now returns an
+explicit unsupported outcome after source validation and transaction SAF,
+before token or request admission. The channel-free local child route remains
+executable. This is a fail-closed integration boundary, not source readiness
+or licensed execution credit.
 Source: baseline C catalog row `0186`, `dfhp4_runtransid.html` SHA-256
 `b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
 

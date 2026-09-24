@@ -31459,19 +31459,11 @@ mod tests {
             BtsTransactionDefinition::new("BT01", "CHILD", true, false).unwrap(),
         )
         .unwrap();
-        cics.put_transform_container(
-            "INPUT",
-            "MESSAGE",
-            CicsTransformContainerMode::Char,
-            b"snapshot".to_vec(),
-        )
-        .unwrap();
         let (parent, _) = registered(&cics);
         let command = request(
             CicsOperation::RunTransId,
             BTreeMap::from([
                 ("TRANSID".into(), argument(b"BT01")),
-                ("CHANNEL".into(), argument(b"INPUT")),
                 ("CHILD".into(), argument(b"CHILD-X")),
             ]),
             1,
@@ -31490,7 +31482,8 @@ mod tests {
         let record: handlers::bts_lifecycle::BtsTransidRecord =
             serde_json::from_slice(&rows[0].payload).unwrap();
         assert_eq!(record.token, token);
-        assert_eq!(record.containers["MESSAGE"].bytes, b"snapshot");
+        assert!(record.channel.is_none());
+        assert!(record.containers.is_empty());
         let work = store
             .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_000, 30_000)
             .unwrap()
@@ -31579,11 +31572,40 @@ mod tests {
                 })
             );
         }
+        cics.put_transform_container(
+            "INPUT",
+            "MESSAGE",
+            CicsTransformContainerMode::Char,
+            b"another-task-data".to_vec(),
+        )
+        .unwrap();
+        let channel_request = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT04")),
+                ("CHANNEL".into(), argument(b"INPUT")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&parent.run_unit_id, channel_request.clone(), 5),
+                channel_request,
+            ),
+            Err(HostProblem::Unsupported)
+        );
         assert!(
             store
                 .list_provider_state("cics-bts-transid-run-v1", 1)
                 .unwrap()
                 .is_empty()
+        );
+        assert!(
+            store
+                .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
         );
     }
 
