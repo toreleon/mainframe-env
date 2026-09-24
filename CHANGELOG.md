@@ -107,6 +107,10 @@ All notable changes to mainframe-env are documented here.
   router. Existing APPC tokens take precedence over symbolic TCTTE names,
   including foreign-token collisions; the LU6.1 alternate/principal paths
   retain their device owner fence and replay.
+- Registered CIC-905 ISSUE ENDFILE row 0117 through the public 3740 provider
+  route and typed compiled COBOL. ENDOUTPUT sets both durable markers;
+  source conditions, exact replay, and backend tests pass. The integrated
+  registry is 192 typed and 71 unready, with nineteen ISSUE rows pending.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

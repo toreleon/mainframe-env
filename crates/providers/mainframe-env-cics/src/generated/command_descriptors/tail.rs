@@ -2,7 +2,14 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 40] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 41] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::Signoff,
+        syntax: "SIGNOFF",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0195",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::WsaContextBuild,
         syntax: "WSACONTEXT BUILD",

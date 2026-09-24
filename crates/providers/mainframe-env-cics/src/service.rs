@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 193);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 194);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8330,6 +8330,61 @@ mod tests {
                 .version,
             3
         );
+    }
+
+    #[test]
+    fn registered_issue_endfile_public_route_commits_once_with_endoutput() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        let terminal = "T001";
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified(terminal.into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: terminal.into(),
+            kind: handlers::IssueDeviceKind::Entry3740,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let command = request(
+            CicsOperation::IssueEndfile,
+            BTreeMap::from([("OPTION.ENDOUTPUT".into(), cics_option())]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command
+                )
+                .unwrap(),
+            first
+        );
+        let saved = handlers::IssueDeviceRecord::load(store.as_ref(), terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.version, 2);
+        assert!(saved.state.endfile && saved.state.endoutput);
     }
 
     #[test]

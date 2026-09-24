@@ -841,6 +841,14 @@ impl CicsOperation {
             ("ALLOCATE", _) => Self::AllocateConversation,
             ("GDS", Some("ALLOCATE")) => Self::GdsAllocateConversation,
             ("GDS", Some("ASSIGN")) => Self::GdsAssignConversation,
+            ("GDS", Some("ISSUE")) => match words.get(2).map(String::as_str) {
+                Some("ABEND") => Self::GdsIssueAbend,
+                Some("CONFIRMATION") => Self::GdsIssueConfirmation,
+                Some("ERROR") => Self::GdsIssueError,
+                Some("PREPARE") => Self::GdsIssuePrepare,
+                Some("SIGNAL") => Self::GdsIssueSignal,
+                _ => return None,
+            },
             ("BUILD", Some("ATTACH")) => Self::BuildAttach,
             ("CONNECT", Some("PROCESS")) => Self::ConnectProcess,
             ("GDS", Some("CONNECT")) => Self::GdsConnectProcess,
@@ -1070,7 +1078,6 @@ impl CicsOperation {
                 | Self::IssueSignal
                 | Self::IssueCopy
                 | Self::IssueDisconnect
-                | Self::IssueEndfile
                 | Self::IssueEndoutput
                 | Self::IssueEods
                 | Self::IssueEraseAup
@@ -1165,7 +1172,7 @@ mod issue_tests {
     use super::CicsOperation;
 
     #[test]
-    fn exact_issue_heads_are_distinct_and_pending() {
+    fn exact_issue_heads_are_distinct_with_endfile_admitted() {
         let heads = [
             ("ISSUE ABEND", CicsOperation::IssueAbend),
             ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
@@ -1197,7 +1204,10 @@ mod issue_tests {
                 .map(str::to_string)
                 .collect::<Vec<_>>();
             assert_eq!(CicsOperation::from_tokens(&tokens), Some(expected));
-            assert!(!expected.supported());
+            assert_eq!(
+                expected.supported(),
+                expected == CicsOperation::IssueEndfile
+            );
             assert!(expected.is_mutating());
         }
         assert_eq!(

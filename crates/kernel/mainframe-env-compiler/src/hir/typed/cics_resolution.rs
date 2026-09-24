@@ -109,6 +109,21 @@ pub(super) fn validated_command(
             }
             Err(ResolutionFailure::Unsupported) => unreachable!("clause parser is fail-closed"),
         };
+        if candidate.descriptor.label_tokens.first() == Some(&"ISSUE")
+            && let Some(suffix) = candidate
+                .head_tokens
+                .get(candidate.descriptor.label_tokens.len()..)
+        {
+            for token in suffix {
+                if candidate.descriptor.options.iter().any(|option| {
+                    option.name == *token
+                        && option.value_shape == CicsApplicationOptionValueShape::Flag
+                }) && !options.iter().any(|option| option == token)
+                {
+                    options.push((*token).into());
+                }
+            }
+        }
         if candidate.descriptor.label_tokens == ["WEB", "STARTBROWSE"]
             && candidate.head_tokens.len() == 3
             && let Some(kind) = candidate.head_tokens.last()
@@ -827,6 +842,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if conversation_data::is_data_wait(operation) => {
             conversation_data::required_clauses(operation)
         }
+        operation if issue_control::is_issue(operation) => &[][..],
         HirCicsOperation::VerifyPhrase => &["PHRASE", "PHRASELEN", "USERID"][..],
         HirCicsOperation::Syncpoint => &[][..],
         HirCicsOperation::WaitJournalName

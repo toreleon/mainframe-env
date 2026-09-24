@@ -658,6 +658,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::IssueEndfile,
+        syntax: "ISSUE ENDFILE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0117",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueErase,
         syntax: "ISSUE ERASE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0120",
@@ -1112,13 +1119,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::SecurityControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::Signoff,
-        syntax: "SIGNOFF",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0195",
-        family: CicsCommandFamily::SecurityControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1159,6 +1159,7 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[37],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[38],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[39],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[40],
 ];
 
 mod lookup;
