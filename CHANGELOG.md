@@ -10,6 +10,10 @@ All notable changes to mainframe-env are documented here.
   `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
   source origins remain intact.
 
+- Updated a stale compiler qualifier fixture for the already typed REQUEST
+  PASSTICKET route, restoring the full compiler library gate without changing
+  that command's implementation or registration.
+
 - Retained owner-fenced LUTYPE6.1 ISSUE SIGNAL direction requests in the
   existing physical TCTTE record, with exact replay and SQLite restart proof.
   APPC/MRO indicators remain in the shared conversation ledger.
