@@ -14,6 +14,76 @@ pub enum BtsRemoval {
 }
 
 impl<'a> BtsLifecycleStore<'a> {
+    /// Prepare atomic deletion of settled descendants when a parent finishes.
+    /// Live, acquired, or pending descendants require explicit reconciliation.
+    pub(super) fn completed_parent_cleanup(
+        &self,
+        process: &mut BtsProcess,
+        parent_id: &str,
+    ) -> Result<Vec<ProviderStateMutation>, HostProblem> {
+        let removed = process
+            .subtree_ids(parent_id)
+            .into_iter()
+            .filter(|id| id != parent_id)
+            .collect::<Vec<_>>();
+        if removed.iter().any(|id| {
+            let child = &process.activities[id];
+            !matches!(child.mode, BtsMode::Initial | BtsMode::Complete)
+                || child.acquired_by.is_some()
+                || child.pending_uow.is_some()
+        }) {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let direct = process
+            .activities
+            .values()
+            .filter(|activity| activity.parent_id.as_deref() == Some(parent_id))
+            .map(|child| {
+                Ok((
+                    child
+                        .completion_event
+                        .clone()
+                        .ok_or(HostProblem::InfrastructureFailure)?,
+                    child.id.clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>, HostProblem>>()?;
+        let mut writes = Vec::with_capacity(removed.len() * 2 + 1);
+        if !direct.is_empty()
+            && let Some(event) = super::super::event_control::activity_completion::delete_many(
+                self.store, parent_id, &direct,
+            )?
+        {
+            writes.push(event);
+        }
+        for id in &removed {
+            let child = &process.activities[id];
+            let index = self
+                .load_activity_index(id)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if index.process_type != process.process_type
+                || index.process_name != process.name
+                || index.parent_id != child.parent_id
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            writes.push(ProviderStateMutation::Delete {
+                namespace: ACTIVITY_INDEX_NAMESPACE.into(),
+                key: id.clone(),
+                expected_version: index.row_version,
+            });
+            if let Some(pool) =
+                super::super::event_control::activity_completion::delete_pool(self.store, id)?
+            {
+                writes.push(pool);
+            }
+        }
+        for id in removed {
+            process.activities.remove(&id);
+        }
+        Ok(writes)
+    }
+
     /// Atomically remove descendant indexes with RESET or DELETE and save the
     /// effect reply. The caller has already checked BTS scope and SAF.
     pub fn remove_subtree(

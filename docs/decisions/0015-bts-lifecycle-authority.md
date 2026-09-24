@@ -124,6 +124,15 @@ in one transaction. A terminal work row with a still-pending RUN returns an
 unknown outcome for exact owner reconciliation. Startup recovery leaves that
 outbox entry pending and continues admitting independent RUN work.
 
+Terminal parent completion deletes settled descendants, their activity
+indexes, and direct-child completion events atomically with the parent RUN
+record. A live, acquired, or pending descendant leaves the transition
+unresolved; the parent remains active until the descendant is reconciled.
+This conservative path does not yet establish every automatic deletion case
+in the pinned DELETE ACTIVITY contract. Source: baseline A catalog row `0041`,
+`dfhp4_deleteactivity.html` SHA-256
+`3d91328683fc209e5ee8583f96f8c77de09c99caf6ca1994b2e19e81a00e7a24`.
+
 RUN TRANSID issues a child token through the sibling `CicsService` registration
 and completion signatures. This checkout carries a compatible child-token
 port while the sibling FETCH/FREE lane is separate. The token row is an

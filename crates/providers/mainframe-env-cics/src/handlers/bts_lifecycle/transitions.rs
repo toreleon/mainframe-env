@@ -263,7 +263,7 @@ impl BtsProcess {
         Ok(ids)
     }
 
-    fn subtree_ids(&self, root_id: &str) -> Vec<String> {
+    pub(super) fn subtree_ids(&self, root_id: &str) -> Vec<String> {
         let mut ids = vec![root_id.to_string()];
         let mut offset = 0;
         while offset < ids.len() {

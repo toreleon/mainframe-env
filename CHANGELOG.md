@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Terminal BTS parent completion now deletes settled descendants, their
+  activity indexes, and completion-event pools in the same provider-state
+  mutation. A live descendant leaves completion unresolved for explicit
+  reconciliation, preserving the parent and child rows.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

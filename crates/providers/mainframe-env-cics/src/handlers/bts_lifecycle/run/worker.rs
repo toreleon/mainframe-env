@@ -202,6 +202,11 @@ impl<'a> BtsLifecycleStore<'a> {
                 abcode,
                 abprogram,
             )?;
+            let mut cleanup = if completion == BtsCompletion::Incomplete {
+                Vec::new()
+            } else {
+                self.completed_parent_cleanup(&mut process, &record.activity_id)?
+            };
             process.epoch = process
                 .epoch
                 .checked_add(1)
@@ -222,6 +227,7 @@ impl<'a> BtsLifecycleStore<'a> {
                 put_run(&record, Some(old_record))?,
                 put_outbox(&outbox)?,
             ];
+            writes.append(&mut cleanup);
             if completion != BtsCompletion::Incomplete {
                 let activity = process
                     .activities

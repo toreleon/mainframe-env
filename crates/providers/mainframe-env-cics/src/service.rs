@@ -32094,6 +32094,206 @@ mod tests {
     }
 
     #[test]
+    fn bts_parent_completion_deletes_settled_child_and_index_atomically() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsChildDefinition, BtsCompletion, BtsLifecycleStore,
+            BtsProcess,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:44",
+                "run", [1; 32], [1; 32], 1_000, 4,
+            )
+            .unwrap();
+        let child = authority
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: "USER".into(),
+                },
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "define-child",
+                [2; 32],
+            )
+            .unwrap();
+        authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();
+        assert!(authority.load_activity_index(&child).unwrap().is_some());
+        cics.enqueue_bts_run_work(&run).unwrap();
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&work).unwrap();
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+        let completed = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(completed.activities.len(), 1);
+        assert_eq!(
+            completed.activities[&root].completion,
+            BtsCompletion::Normal
+        );
+        assert!(authority.load_activity_index(&child).unwrap().is_none());
+        let pool = store
+            .get_provider_state("cics-event-activity-v1", &root)
+            .unwrap();
+        assert!(pool.is_none_or(|row| {
+            serde_json::from_slice::<serde_json::Value>(&row.payload).unwrap()["events"]
+                .get("DONE")
+                .is_none()
+        }));
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+    }
+
+    #[test]
+    fn bts_parent_completion_with_active_child_preserves_both_rows() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsChildDefinition, BtsCompletion, BtsLifecycleStore, BtsMode,
+            BtsProcess, BtsRunState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let parent_run = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                None,
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:44",
+                "parent-run",
+                [1; 32],
+                [1; 32],
+                1_000,
+                4,
+            )
+            .unwrap();
+        let child = authority
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: "USER".into(),
+                },
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "define-child",
+                [2; 32],
+            )
+            .unwrap();
+        authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();
+        authority
+            .acquire("UOW3", "EXEC3", "USER", "TYPE", "ORDER", &child)
+            .unwrap();
+        authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &child,
+                None,
+                false,
+                None,
+                "UOW3",
+                "EXEC3",
+                "USER",
+                "UOW3:45",
+                "child-run",
+                [3; 32],
+                [3; 32],
+                1_000,
+                4,
+            )
+            .unwrap();
+        authority.finish_uow("UOW3", "EXEC3", "USER", true).unwrap();
+        cics.enqueue_bts_run_work(&parent_run).unwrap();
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&work).unwrap();
+        assert_eq!(
+            cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(process.activities[&root].mode, BtsMode::Active);
+        assert_eq!(process.activities[&child].mode, BtsMode::Active);
+        assert!(authority.load_activity_index(&child).unwrap().is_some());
+        assert_eq!(
+            authority
+                .load_run(&parent_run.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsRunState::Attached
+        );
+    }
+
+    #[test]
     fn bts_run_outbox_admits_exact_work_after_sqlite_process_reopen() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsRunState};
 
