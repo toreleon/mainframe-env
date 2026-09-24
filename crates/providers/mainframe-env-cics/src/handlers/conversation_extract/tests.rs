@@ -608,3 +608,91 @@ fn conversation_extract_timeout_and_cancellation_leave_metadata_unmodified() {
         before
     );
 }
+
+#[test]
+fn conversation_extract_replays_unknown_logon_after_interleaved_point() {
+    let store = Arc::new(FailCicsReplayCasStore::new());
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-replay-gap", BTreeMap::new());
+    let session = SessionId::new("extract-replay-gap", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let key = invocation.run_unit_id.as_str();
+    let logon = request(
+        CicsOperation::ExtractLogonMsg,
+        BTreeMap::from([
+            ("INTO".into(), argument(b"LOGON-X")),
+            ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+            ("LENGTH".into(), argument(b"LEN-X")),
+        ]),
+        1,
+    );
+    store.fail_insert.store(true, Ordering::SeqCst);
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, logon.clone(), 1), logon.clone()),
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert!(store
+        .get_provider_state("cics-effect-replay-v1", "outer-1")
+        .unwrap()
+        .is_none());
+    let point = request(
+        CicsOperation::Point,
+        BTreeMap::from([("SESSION".into(), cics_literal(b"M1"))]),
+        2,
+    );
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, point.clone(), 2), point)
+            .unwrap()
+            .condition,
+        "NORMAL"
+    );
+    let before_retry = store
+        .get_provider_state("cics-conversation-extract-v1", key)
+        .unwrap()
+        .unwrap();
+    let metadata: handlers::ExtractMetadata = serde_json::from_slice(&before_retry.payload).unwrap();
+    assert_eq!(metadata.selected_token, Some(metadata.session_names["M1"]));
+    assert!(metadata.logon_consumed);
+    let row: serde_json::Value = serde_json::from_slice(&before_retry.payload).unwrap();
+    assert_eq!(row["mutation_replays"].as_array().unwrap().len(), 2);
+
+    let mut conflict = logon.clone();
+    conflict
+        .arguments
+        .insert("INTO".into(), argument(b"OTHER-X"));
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, conflict.clone(), 1), conflict),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    let recovered = cics
+        .invoke(&effect(&invocation.run_unit_id, logon.clone(), 1), logon)
+        .unwrap();
+    assert_eq!(recovered.outputs["INTO"].bytes(), b"HELLO");
+    assert_eq!(recovered.outputs["LENGTH"].bytes(), b"5");
+    assert_eq!(
+        store
+            .get_provider_state("cics-conversation-extract-v1", key)
+            .unwrap()
+            .unwrap(),
+        before_retry
+    );
+
+    let later = request(
+        CicsOperation::Point,
+        BTreeMap::from([("SESSION".into(), cics_literal(b"L1"))]),
+        3,
+    );
+    cics.invoke(&effect(&invocation.run_unit_id, later.clone(), 3), later)
+        .unwrap();
+    let after = store
+        .get_provider_state("cics-conversation-extract-v1", key)
+        .unwrap()
+        .unwrap();
+    let metadata: handlers::ExtractMetadata = serde_json::from_slice(&after.payload).unwrap();
+    let row: serde_json::Value = serde_json::from_slice(&after.payload).unwrap();
+    assert_eq!(row["mutation_replays"].as_array().unwrap().len(), 1);
+    assert_eq!(metadata.selected_token, Some(metadata.session_names["L1"]));
+}

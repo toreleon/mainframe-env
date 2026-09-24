@@ -63,6 +63,11 @@ All notable changes to mainframe-env are documented here.
   v2 integration and applicable gates remain pending; no licensed credit is
   claimed.
 
+- Retain unresolved POINT and LOGONMSG replies in the bounded extraction
+  sidecar until their outer replay rows exist. An interleaved retry after a
+  failed outer insert returns the original LOGONMSG bytes without changing a
+  newer POINT selection.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

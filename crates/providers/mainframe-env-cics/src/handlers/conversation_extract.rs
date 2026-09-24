@@ -20,7 +20,7 @@ use mainframe_env_store_api::ProviderStateRecord;
 pub(in crate::service) use metadata::ExtractMetadata;
 #[cfg(test)]
 pub(in crate::service) use metadata::LuName;
-use metadata::{MAX_ROW_BYTES, MutationReplay, NAMESPACE};
+use metadata::{MAX_ROW_BYTES, MAX_UNRESOLVED_REPLAYS, MutationReplay, NAMESPACE};
 use std::collections::BTreeMap;
 
 pub(in crate::service) fn invoke(
@@ -42,8 +42,12 @@ pub(in crate::service) fn invoke(
     };
     let owner = owner(run);
     let mutation = mutation_identity(request)?;
-    if let (Some((effect_key, digest)), Some(replay)) = (&mutation, &metadata.last_mutation)
-        && replay.key == *effect_key
+    if let Some((effect_key, digest)) = &mutation
+        && let Some(replay) = metadata
+            .mutation_replays
+            .iter()
+            .chain(metadata.last_mutation.iter())
+            .find(|replay| replay.key == *effect_key)
     {
         if replay.request_sha256 != *digest {
             return Err(HostProblem::IdempotencyConflict);
@@ -77,6 +81,28 @@ pub(in crate::service) fn invoke(
         _ => Err(HostProblem::InfrastructureFailure),
     }?;
     if let Some((effect_key, digest)) = mutation {
+        // Keep any reply whose outer replay insert has not yet succeeded.
+        // Later task effects may execute before a caller retries an unknown
+        // outcome, so replacing only the most recent reply is insufficient.
+        let previous = metadata
+            .mutation_replays
+            .drain(..)
+            .chain(metadata.last_mutation.take());
+        let mut unresolved = Vec::new();
+        for replay in previous {
+            if service
+                .store
+                .get_provider_state("cics-effect-replay-v1", &replay.key)
+                .map_err(store_error)?
+                .is_none()
+            {
+                unresolved.push(replay);
+            }
+        }
+        if unresolved.len() >= MAX_UNRESOLVED_REPLAYS {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        metadata.mutation_replays = unresolved;
         match request.operation {
             CicsOperation::ExtractLogonMsg => metadata.logon_consumed = true,
             CicsOperation::Point => {
@@ -91,7 +117,7 @@ pub(in crate::service) fn invoke(
             outputs.insert(name.clone(), value.bytes().to_vec());
             output_schemas.insert(name.clone(), value.schema().to_string());
         }
-        metadata.last_mutation = Some(MutationReplay {
+        metadata.mutation_replays.push(MutationReplay {
             key: effect_key,
             request_sha256: digest,
             outputs,

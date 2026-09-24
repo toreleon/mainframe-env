@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 
 pub(super) const NAMESPACE: &str = "cics-conversation-extract-v1";
 pub(super) const MAX_ROW_BYTES: usize = 8192;
+pub(super) const MAX_UNRESOLVED_REPLAYS: usize = 16;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,6 +41,9 @@ pub(crate) struct ExtractMetadata {
     pub network_attached: bool,
     pub logon_message: Option<Vec<u8>>,
     pub logon_consumed: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) mutation_replays: Vec<MutationReplay>,
+    /// V1 rows written before unresolved replays were retained as a set.
     pub(super) last_mutation: Option<MutationReplay>,
 }
 
@@ -55,6 +59,7 @@ impl ExtractMetadata {
             network_attached: false,
             logon_message: None,
             logon_consumed: false,
+            mutation_replays: Vec::new(),
             last_mutation: None,
         }
     }
@@ -86,8 +91,19 @@ impl ExtractMetadata {
         {
             return Err(HostProblem::InfrastructureFailure);
         }
-        if let Some(replay) = &self.last_mutation {
-            if replay.key.is_empty()
+        if self.mutation_replays.len() + usize::from(self.last_mutation.is_some())
+            > MAX_UNRESOLVED_REPLAYS
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut keys = std::collections::BTreeSet::new();
+        for replay in self
+            .mutation_replays
+            .iter()
+            .chain(self.last_mutation.iter())
+        {
+            if !keys.insert(&replay.key)
+                || replay.key.is_empty()
                 || replay.key.len() > 256
                 || replay.request_sha256.len() != 64
                 || replay.outputs.len() > 16
