@@ -91,6 +91,10 @@ All notable changes to mainframe-env are documented here.
   owned by the issuing task; device and receipt commit atomically, leaving
   the principal terminal connected. APPC/MRO ownership remains shared.
 
+- Verified alternate LUTYPE6.1 DISCONNECT after SQLite restart and an
+  uncertain commit: the selected device stays disconnected, the principal
+  session stays connected, and exact replay does not advance the device twice.
+
 - Verified default ISSUE DISCONNECT receipt replay across SQLite restart with
   the session already closed; a new default request returns NORMAL without
   advancing the session or device.

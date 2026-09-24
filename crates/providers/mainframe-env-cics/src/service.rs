@@ -7725,6 +7725,100 @@ mod tests {
     }
 
     #[test]
+    fn issue_disconnect_alternate_lu61_replays_after_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-lu61-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let invocation = invocation_for("issue-lu61-restart", BTreeMap::new());
+        let session = SessionId::new("issue-lu61-session", 64).unwrap();
+        let command = request(
+            CicsOperation::IssueDisconnect,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+            1,
+        );
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "S001".into(),
+                kind: handlers::IssueDeviceKind::Lu61,
+                control_unit: None,
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let current = handlers::IssueDeviceRecord::load(store.as_ref(), "S001")
+                .unwrap()
+                .unwrap();
+            let mut owned = current.clone();
+            owned
+                .assign_lu61_owner(invocation.run_unit_id.as_str())
+                .unwrap();
+            current.persist(&mut owned, store.as_ref()).unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            assert!(service.lock().unwrap().sessions[session.as_str()].connected);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            let alternate = handlers::IssueDeviceRecord::load(store.as_ref(), "S001")
+                .unwrap()
+                .unwrap();
+            assert!(alternate.state.disconnected);
+            assert_eq!(alternate.version, 3);
+            assert_eq!(
+                alternate.state.lu61_owner_run_unit.as_deref(),
+                Some(invocation.run_unit_id.as_str())
+            );
+            assert!(service.lock().unwrap().sessions[session.as_str()].connected);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn issue_eraseaup_wait_clears_only_unprotected_fields_and_mdt() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store);
