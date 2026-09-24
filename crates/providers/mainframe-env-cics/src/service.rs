@@ -6700,7 +6700,9 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 143);
+        assert!(!CicsOperation::IssueSignal.supported());
+        assert!(command_descriptor(CicsOperation::IssueSignal).is_none());
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 153);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6709,47 +6711,47 @@ mod tests {
             assert!(rows.insert(descriptor.official_row));
             assert!(!descriptor.syntax.is_empty());
             assert_eq!(descriptor.mutating, descriptor.operation.is_mutating());
-            assert_eq!(command_descriptor(descriptor.operation), descriptor);
+            assert_eq!(command_descriptor(descriptor.operation), Some(descriptor));
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 17);
-        let asktime = command_descriptor(CicsOperation::Asktime);
+        assert_eq!(families.len(), 19);
+        let asktime = command_descriptor(CicsOperation::Asktime).unwrap();
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
             asktime.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0010"
         );
-        let bare_asktime = command_descriptor(CicsOperation::AsktimeEib);
+        let bare_asktime = command_descriptor(CicsOperation::AsktimeEib).unwrap();
         assert_eq!(bare_asktime.syntax, "ASKTIME");
         assert_eq!(
             bare_asktime.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
         );
-        let document = command_descriptor(CicsOperation::DocumentCreate);
+        let document = command_descriptor(CicsOperation::DocumentCreate).unwrap();
         assert_eq!(document.syntax, "DOCUMENT CREATE");
         assert_eq!(
             document.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0051"
         );
-        let document_delete = command_descriptor(CicsOperation::DocumentDelete);
+        let document_delete = command_descriptor(CicsOperation::DocumentDelete).unwrap();
         assert_eq!(document_delete.syntax, "DOCUMENT DELETE");
         assert_eq!(
             document_delete.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0052"
         );
-        let document_insert = command_descriptor(CicsOperation::DocumentInsert);
+        let document_insert = command_descriptor(CicsOperation::DocumentInsert).unwrap();
         assert_eq!(document_insert.syntax, "DOCUMENT INSERT");
         assert_eq!(
             document_insert.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0053"
         );
-        let document_retrieve = command_descriptor(CicsOperation::DocumentRetrieve);
+        let document_retrieve = command_descriptor(CicsOperation::DocumentRetrieve).unwrap();
         assert_eq!(document_retrieve.syntax, "DOCUMENT RETRIEVE");
         assert_eq!(
             document_retrieve.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0054"
         );
-        let document_set = command_descriptor(CicsOperation::DocumentSet);
+        let document_set = command_descriptor(CicsOperation::DocumentSet).unwrap();
         assert_eq!(document_set.syntax, "DOCUMENT SET");
         assert_eq!(
             document_set.official_row,

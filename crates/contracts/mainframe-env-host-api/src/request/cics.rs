@@ -831,7 +831,19 @@ impl CicsOperation {
 
     #[must_use]
     pub const fn supported(self) -> bool {
-        true
+        !matches!(
+            self,
+            Self::IssueAbend
+                | Self::GdsIssueAbend
+                | Self::IssueConfirmation
+                | Self::GdsIssueConfirmation
+                | Self::IssueError
+                | Self::GdsIssueError
+                | Self::IssuePrepare
+                | Self::GdsIssuePrepare
+                | Self::GdsIssueSignal
+                | Self::IssueSignal
+        )
     }
 }
 

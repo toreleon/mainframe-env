@@ -71,7 +71,8 @@ pub(super) fn authorize_and_describe(
         &format!("CICS.{}", run.transaction),
         AccessIntent::Execute,
     )?;
-    let descriptor = crate::generated::command_descriptor(request.operation);
+    let descriptor =
+        crate::generated::command_descriptor(request.operation).ok_or(HostProblem::Unsupported)?;
     assert_descriptor(descriptor, request);
     Ok(descriptor)
 }

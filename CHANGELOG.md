@@ -11,6 +11,10 @@ All notable changes to mainframe-env are documented here.
   internal until selected provider and host routes are sealed; MCEP v1 rejects
   their operation tags, including the 256–258 width boundary.
 
+- Pending ISSUE host identities now fail closed through an optional generated
+  descriptor lookup. GDS ISSUE protocol failures retain their distinct
+  six-byte return codes without turning corrupt state into a normal response.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

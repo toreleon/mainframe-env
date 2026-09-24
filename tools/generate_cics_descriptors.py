@@ -4979,14 +4979,16 @@ def render_provider_lookup(root: Path = ROOT) -> str:
         "",
         "use super::*;",
         "",
-        "pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static CicsCommandDescriptor {",
+        "pub(crate) const fn command_descriptor(",
+        "    operation: CicsOperation,",
+        ") -> Option<&'static CicsCommandDescriptor> {",
         "    match operation {",
     ]
     for index, operation in enumerate(operations):
         lines.append(
-            f"        CicsOperation::{operation['operation']} => &CICS_COMMAND_DESCRIPTORS[{index}],"
+            f"        CicsOperation::{operation['operation']} => Some(&CICS_COMMAND_DESCRIPTORS[{index}]),"
         )
-    lines.extend(["    }", "}", ""])
+    lines.extend(["        _ => None,", "    }", "}", ""])
     return "\n".join(lines)
 
 
