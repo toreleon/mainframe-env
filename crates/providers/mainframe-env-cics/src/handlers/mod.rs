@@ -1,4 +1,6 @@
 mod bms_map;
+mod bts_child_bridge;
+pub use bts_child_bridge::CicsBtsChildCompletion;
 pub mod bts_lifecycle;
 mod condition;
 mod counter_control;

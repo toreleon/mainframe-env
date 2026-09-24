@@ -285,6 +285,7 @@
     "handler_directory": "crates/providers/mainframe-env-cics/src/handlers",
     "handler_modules": [
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_child_bridge.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/cancel.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/children.rs",

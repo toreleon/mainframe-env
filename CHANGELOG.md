@@ -101,6 +101,11 @@ All notable changes to mainframe-env are documented here.
   exact replay and leave an existing process unchanged. Public command routing
   remains pending.
 
+- Added the RUN TRANSID child-token port with the sibling FETCH/FREE method
+  signatures and `cics-bts-child-ownership-v1` row shape. Registration and
+  terminal completion are owner-checked and versioned; RUN TRANSID task
+  admission and public command readiness remain pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

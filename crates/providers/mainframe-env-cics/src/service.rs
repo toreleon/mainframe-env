@@ -31374,6 +31374,62 @@ mod tests {
     }
 
     #[test]
+    fn bts_child_port_retains_exact_token_and_terminal_outcome() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (parent, _) = registered(&cics);
+        let token = [7; 16];
+        cics.register_bts_child(&parent.run_unit_id, token, Some("REPLY"))
+            .unwrap();
+        cics.register_bts_child(&parent.run_unit_id, [8; 16], Some("A.B"))
+            .unwrap();
+        assert!(
+            cics.bts_child_registered(&parent.run_unit_id, token, Some("REPLY"))
+                .unwrap()
+        );
+        assert_eq!(
+            cics.register_bts_child(&parent.run_unit_id, token, Some("REPLY")),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        cics.complete_bts_child(
+            &parent.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Abend,
+            Some("ASRA"),
+        )
+        .unwrap();
+        cics.complete_bts_child(
+            &parent.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Abend,
+            Some("ASRA"),
+        )
+        .unwrap();
+        assert_eq!(
+            cics.complete_bts_child(
+                &parent.run_unit_id,
+                token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let row = store
+            .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(
+            value["children"]["07070707070707070707070707070707"]["completion"],
+            "Abend"
+        );
+        assert_eq!(
+            value["children"]["07070707070707070707070707070707"]["abcode"],
+            "ASRA"
+        );
+    }
+
+    #[test]
     fn bts_context_routes_events_to_the_fenced_activity_identity() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
 

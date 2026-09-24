@@ -106,6 +106,15 @@ unit. Completion updates the process, completion event, request, and outbox
 in one transaction. A terminal work row with a still-pending RUN returns an
 unknown outcome for explicit reconciliation.
 
+RUN TRANSID issues a child token through the sibling `CicsService` registration
+and completion signatures. This checkout carries a compatible child-token
+port while the sibling FETCH/FREE lane is separate. The token row is an
+ownership and reply record only; it does not duplicate process or activity
+lifecycle state. Reconciliation must retain the single `cics-bts-process-v1`
+authority and the sibling's token row. The sibling's current channel-name
+validator accepts fewer characters than pinned RUN TRANSID; its validator
+must be widened when the modules are joined.
+
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed
 identities, and excess state. There is no prior BTS process row to migrate.
