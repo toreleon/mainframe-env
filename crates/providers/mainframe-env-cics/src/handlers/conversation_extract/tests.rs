@@ -405,3 +405,156 @@ fn conversation_extract_dpl_principal_restrictions_are_command_specific() {
     );
     assert_eq!(gds.outputs["RETCODE"].bytes(), [3, 1, 0, 0, 0, 0]);
 }
+
+#[test]
+fn conversation_extract_point_saf_denial_is_audited_before_selection() {
+    let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+    let secrets = Arc::new(MemorySecretResolver::default());
+    secrets.insert("secret:ibmuser", b"PASSWORD".to_vec());
+    let racf = RacfService::open(store.clone(), secrets, Default::default()).unwrap();
+    racf.add_user(
+        "IBMUSER",
+        &SecretRef::new("secret:ibmuser", HostLimits::default()).unwrap(),
+    )
+    .unwrap();
+    let host = Arc::new(ScopedHostService::new(
+        Arc::new(
+            RegistrySnapshot::new(
+                1,
+                racf_providers(racf.clone(), InvocationLimits::default()),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        ),
+        HostLimits::default(),
+    ));
+    let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+    let invocation = invocation_for("extract-saf", BTreeMap::new());
+    let session = SessionId::new("extract-saf", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    let (_, _, lu) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let key = invocation.run_unit_id.as_str();
+    let before = store
+        .get_provider_state("cics-conversation-extract-v1", key)
+        .unwrap()
+        .unwrap();
+    let denied = request(
+        CicsOperation::Point,
+        BTreeMap::from([("CONVID".into(), cics_literal(&lu))]),
+        1,
+    );
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied),
+        Err(HostProblem::Unauthorized)
+    );
+    assert_eq!(
+        store
+            .get_provider_state("cics-conversation-extract-v1", key)
+            .unwrap()
+            .unwrap(),
+        before
+    );
+    assert!(store
+        .audit_records(&invocation.execution_id, 0, 16)
+        .unwrap()
+        .iter()
+        .any(|record| record.decision == AuditDecision::Deny));
+
+    racf.define_profile(
+        "TCICSTRN",
+        "CICS.MENU",
+        "IBMUSER",
+        Some(AccessIntent::Execute),
+    )
+    .unwrap();
+    let permitted = extract_call(
+        &cics,
+        &invocation.run_unit_id,
+        CicsOperation::Point,
+        BTreeMap::from([("CONVID".into(), cics_literal(&lu))]),
+        2,
+    );
+    assert_eq!(permitted.condition, "NORMAL");
+    let after = store
+        .get_provider_state("cics-conversation-extract-v1", key)
+        .unwrap()
+        .unwrap();
+    let metadata: handlers::ExtractMetadata = serde_json::from_slice(&after.payload).unwrap();
+    assert_eq!(metadata.selected_token, Some(lu));
+}
+
+#[test]
+fn conversation_extract_timeout_and_cancellation_leave_metadata_unmodified() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-stop", BTreeMap::new());
+    let session = SessionId::new("extract-stop", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    let (_, _, lu) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let before = store
+        .get_provider_state("cics-conversation-extract-v1", invocation.run_unit_id.as_str())
+        .unwrap()
+        .unwrap();
+    let outer = ScopedHostService::new(
+        Arc::new(
+            RegistrySnapshot::new(
+                1,
+                vec![cics_provider(cics, InvocationLimits::default())],
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        ),
+        HostLimits::default(),
+    );
+    let point = request(
+        CicsOperation::Point,
+        BTreeMap::from([("CONVID".into(), cics_literal(&lu))]),
+        1,
+    );
+    assert_eq!(
+        outer
+            .invoke(
+                &invocation,
+                invocation.deadline_tick,
+                false,
+                effect(&invocation.run_unit_id, point.clone(), 1),
+            )
+            .into_transaction_parts()
+            .0
+            .outcome,
+        Err(HostProblem::TimedOut)
+    );
+    let logon = request(
+        CicsOperation::ExtractLogonMsg,
+        BTreeMap::from([
+            ("INTO".into(), argument(b"LOGON-X")),
+            ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+            ("LENGTH".into(), argument(b"LEN-X")),
+        ]),
+        2,
+    );
+    assert_eq!(
+        outer
+            .invoke(
+                &invocation,
+                1,
+                true,
+                effect(&invocation.run_unit_id, logon.clone(), 2),
+            )
+            .into_transaction_parts()
+            .0
+            .outcome,
+        Err(HostProblem::Cancelled)
+    );
+    assert_eq!(
+        store
+            .get_provider_state("cics-conversation-extract-v1", invocation.run_unit_id.as_str())
+            .unwrap()
+            .unwrap(),
+        before
+    );
+}
