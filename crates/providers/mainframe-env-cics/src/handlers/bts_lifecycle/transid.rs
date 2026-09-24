@@ -15,6 +15,7 @@ const MAX_PENDING: usize = 4096;
 const MAX_RUN_BYTES: usize = 1_048_576;
 const MAX_CONTAINERS: usize = 256;
 const MAX_CONTAINER_BYTES: usize = 65_536;
+const MAX_TOTAL_CONTAINER_BYTES: usize = 524_288;
 const LIFETIME_TICKS: u64 = 86_400_000;
 
 /// Work generation for local child tasks issued by RUN TRANSID.
@@ -29,11 +30,55 @@ pub enum BtsTransidState {
 }
 
 /// Exact container bytes at the point where RUN TRANSID was issued.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BtsTransidContainer {
     pub character: bool,
+    /// Retained v1 rows omitted these fields; new channel snapshots carry them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ccsid: Option<u16>,
+    #[serde(default)]
+    pub read_only: bool,
+    #[serde(with = "snapshot_bytes")]
     pub bytes: Vec<u8>,
+}
+
+mod snapshot_bytes {
+    use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SavedBytes {
+        Base64(String),
+        Legacy(Vec<u8>),
+    }
+
+    pub(super) fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
+    }
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match SavedBytes::deserialize(deserializer)? {
+            SavedBytes::Base64(value) => base64::engine::general_purpose::STANDARD
+                .decode(value)
+                .map_err(serde::de::Error::custom),
+            SavedBytes::Legacy(bytes) => Ok(bytes),
+        }
+    }
+}
+
+fn valid_container_metadata(container: &BtsTransidContainer) -> bool {
+    matches!(
+        (container.character, container.ccsid),
+        (true, None | Some(37 | 1208)) | (false, None | Some(0))
+    )
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -110,7 +155,10 @@ impl BtsTransidRecord {
             || self.channel.is_none() && !self.containers.is_empty()
             || self.containers.len() > MAX_CONTAINERS
             || self.containers.iter().any(|(name, data)| {
-                name.is_empty() || name.len() > 16 || data.bytes.len() > MAX_CONTAINER_BYTES
+                name.is_empty()
+                    || name.len() > 16
+                    || data.bytes.len() > MAX_CONTAINER_BYTES
+                    || !valid_container_metadata(data)
             })
             || self.scheduled_tick == 0
             || self.state == BtsTransidState::Pending && self.lease_epoch != 0
@@ -284,6 +332,9 @@ impl<'a> BtsLifecycleStore<'a> {
                 || containers
                     .keys()
                     .any(|name| name.is_empty() || name.len() > 16)
+                || containers
+                    .values()
+                    .any(|data| !valid_container_metadata(data))
                 || scheduled_tick == 0
             {
                 return Err(HostProblem::Malformed);
@@ -292,6 +343,10 @@ impl<'a> BtsLifecycleStore<'a> {
                 || containers
                     .values()
                     .any(|data| data.bytes.len() > MAX_CONTAINER_BYTES)
+                || containers
+                    .values()
+                    .try_fold(0usize, |sum, data| sum.checked_add(data.bytes.len()))
+                    .is_none_or(|total| total > MAX_TOTAL_CONTAINER_BYTES)
             {
                 return Err(HostProblem::ResourceExhausted);
             }
@@ -771,6 +826,8 @@ mod tests {
                     "MESSAGE".into(),
                     BtsTransidContainer {
                         character: true,
+                        ccsid: Some(37),
+                        read_only: true,
                         bytes: b"snapshot".to_vec(),
                     },
                 )]),
@@ -825,6 +882,58 @@ mod tests {
     }
 
     #[test]
+    fn retained_v1_child_snapshot_without_metadata_remains_readable() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let record = authority
+            .start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "legacy",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                BTreeMap::from([(
+                    "MESSAGE".into(),
+                    BtsTransidContainer {
+                        character: true,
+                        ccsid: Some(37),
+                        read_only: true,
+                        bytes: b"saved".to_vec(),
+                    },
+                )]),
+                1_000,
+                4,
+            )
+            .unwrap();
+        let row = memory
+            .get_provider_state(RUN_NAMESPACE, &record.run_id)
+            .unwrap()
+            .unwrap();
+        let mut old: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let container = old["containers"]["MESSAGE"].as_object_mut().unwrap();
+        container.remove("ccsid");
+        container.remove("read_only");
+        container.insert("bytes".into(), serde_json::json!(b"saved".to_vec()));
+        memory
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: row.version + 1,
+                    payload: serde_json::to_vec(&old).unwrap(),
+                    ..row.clone()
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        let loaded = authority.load_transid(&record.run_id).unwrap().unwrap();
+        assert_eq!(loaded.containers["MESSAGE"].ccsid, None);
+        assert!(!loaded.containers["MESSAGE"].read_only);
+        assert_eq!(loaded.containers["MESSAGE"].bytes, b"saved");
+    }
+
+    #[test]
     fn transid_snapshot_bounds_reject_new_work_but_keep_issue_time_replay() {
         let memory = MemoryStore::new(Default::default());
         let authority = BtsLifecycleStore::new(&memory);
@@ -843,6 +952,7 @@ mod tests {
                     BtsTransidContainer {
                         character: true,
                         bytes: b"issue-time".to_vec(),
+                        ..Default::default()
                     },
                 )]),
                 1_000,
@@ -856,6 +966,7 @@ mod tests {
                     BtsTransidContainer {
                         character: false,
                         bytes: vec![number as u8],
+                        ..Default::default()
                     },
                 )
             })
@@ -897,6 +1008,58 @@ mod tests {
                 "UOW1",
                 "EXEC1",
                 "USER",
+                "total-too-large",
+                [5; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                (0..9)
+                    .map(|number| {
+                        (
+                            format!("C{number}"),
+                            BtsTransidContainer {
+                                character: false,
+                                ccsid: Some(0),
+                                read_only: true,
+                                bytes: vec![0; MAX_CONTAINER_BYTES],
+                            },
+                        )
+                    })
+                    .collect(),
+                1_001,
+                4,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            authority.start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "bad-ccsid",
+                [6; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                BTreeMap::from([(
+                    "MESSAGE".into(),
+                    BtsTransidContainer {
+                        character: true,
+                        ccsid: Some(500),
+                        read_only: false,
+                        bytes: b"bad".to_vec(),
+                    },
+                )]),
+                1_001,
+                4,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            authority.start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
                 "third",
                 [3; 32],
                 "BT01",
@@ -907,6 +1070,7 @@ mod tests {
                     BtsTransidContainer {
                         character: true,
                         bytes: vec![0; MAX_CONTAINER_BYTES + 1],
+                        ..Default::default()
                     },
                 )]),
                 1_001,
@@ -937,6 +1101,56 @@ mod tests {
     }
 
     #[test]
+    fn maximum_child_copy_fits_bounded_row_and_invocation_payload() {
+        let memory = MemoryStore::new(Default::default());
+        let containers = (0..8)
+            .map(|number| {
+                (
+                    format!("C{number}"),
+                    BtsTransidContainer {
+                        character: false,
+                        ccsid: Some(0),
+                        read_only: true,
+                        bytes: vec![255; MAX_CONTAINER_BYTES],
+                    },
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let record = BtsLifecycleStore::new(&memory)
+            .start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "maximum",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                containers.clone(),
+                1_000,
+                4,
+            )
+            .unwrap();
+        let row = memory
+            .get_provider_state(RUN_NAMESPACE, &record.run_id)
+            .unwrap()
+            .unwrap();
+        assert!(row.payload.len() <= MAX_RUN_BYTES);
+        assert!(
+            serde_json::to_vec(&record.containers).unwrap().len()
+                <= InvocationLimits::default().max_payload_bytes
+        );
+        assert_eq!(
+            BtsLifecycleStore::new(&memory)
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .containers,
+            containers
+        );
+    }
+
+    #[test]
     fn transid_snapshot_and_pending_outbox_survive_sqlite_reopen() {
         let directory = std::env::temp_dir().join(format!(
             "mainframe-env-bts-transid-{}-{}",
@@ -961,6 +1175,8 @@ mod tests {
                         "MESSAGE".into(),
                         BtsTransidContainer {
                             character: true,
+                            ccsid: Some(1208),
+                            read_only: true,
                             bytes: b"issue-time".to_vec(),
                         },
                     )]),

@@ -731,3 +731,58 @@ fn bts_transid_invocation(
     .and_then(|invocation| invocation.with_provider_generations(generations, limits))
     .map_err(|_| HostProblem::InfrastructureFailure)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mainframe_env_cics::bts_lifecycle::{BtsLifecycleStore, BtsTransidContainer};
+    use mainframe_env_store::MemoryStore;
+
+    #[test]
+    fn child_invocation_carries_exact_channel_metadata_snapshot() {
+        let store = MemoryStore::new(Default::default());
+        let containers = BTreeMap::from([
+            (
+                "CHAR".into(),
+                BtsTransidContainer {
+                    character: true,
+                    ccsid: Some(37),
+                    read_only: true,
+                    bytes: b"child-input".to_vec(),
+                },
+            ),
+            (
+                "BIT".into(),
+                BtsTransidContainer {
+                    character: false,
+                    ccsid: Some(0),
+                    read_only: false,
+                    bytes: vec![0, 255],
+                },
+            ),
+        ]);
+        let task = BtsLifecycleStore::new(&store)
+            .start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "child",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                Some("INPUT"),
+                containers.clone(),
+                1_000,
+                4,
+            )
+            .unwrap();
+        let work = task.work_record().unwrap();
+        let artifact = ArtifactRef::new("artifact:none", InvocationLimits::default()).unwrap();
+        let invocation = bts_transid_invocation(&work, &task, artifact).unwrap();
+        assert_eq!(invocation.bindings["cics.channel"].bytes(), b"INPUT");
+        let retained: BTreeMap<String, BtsTransidContainer> =
+            serde_json::from_slice(invocation.bindings["cics.bts-child-channel-snapshot"].bytes())
+                .unwrap();
+        assert_eq!(retained, containers);
+    }
+}

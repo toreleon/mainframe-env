@@ -139,6 +139,11 @@ All notable changes to mainframe-env are documented here.
   payload limits before admission. Exact retries retain the original
   issue-time copy when the current channel has changed.
 
+- Extended the versioned RUN TRANSID child snapshot to retain optional CCSID
+  and read-only metadata from the task-owned channel port. Existing v1 rows
+  remain readable; new base64 snapshots fit the bounded request and invocation
+  payloads at the aggregate byte limit.
+
 - Added the bounded BTS lifecycle host, IR, compiler, interpreter, and CICS
   dispatch scaffolding, plus an installed process-type/transaction catalog and
   selected RUN and RUN TRANSID worker admission. The candidate generated

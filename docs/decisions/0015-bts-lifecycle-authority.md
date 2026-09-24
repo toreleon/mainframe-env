@@ -166,6 +166,13 @@ name: validate task ownership and scope, create a missing empty channel under
 its capacity CAS, and copy the bounded containers at issue time. RUN TRANSID
 then retains that copy in its existing request row without a fallback to the
 global transform map.
+The sibling now exposes `snapshot_channel_for_bts_child(&mut Run, channel)`
+for that handoff. The additive v1 RUN TRANSID payload can retain each copied
+container's character mode, CCSID, read-only flag, and bytes; older payloads
+without the two metadata fields remain readable. New byte payloads use a
+bounded base64 JSON string to fit the request row and invocation payload; the
+v1 reader also accepts the earlier byte-array form. The child invocation
+carries the retained map.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed

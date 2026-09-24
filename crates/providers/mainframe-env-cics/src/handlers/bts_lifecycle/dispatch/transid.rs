@@ -54,6 +54,7 @@ pub(super) fn invoke(
                     BtsTransidContainer {
                         character: data.mode == CicsTransformContainerMode::Char,
                         bytes: data.bytes.clone(),
+                        ..Default::default()
                     },
                 )
             })
