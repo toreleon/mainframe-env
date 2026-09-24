@@ -7,6 +7,7 @@ use std::fmt;
 mod address;
 mod assign;
 mod browse;
+mod bts_child_link;
 mod certificate;
 mod codec_tags;
 mod condition_handlers;
@@ -434,6 +435,9 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
+        CicsPlanOperation::FetchAny | CicsPlanOperation::FetchChild | CicsPlanOperation::FreeChild
+        | CicsPlanOperation::LinkAcqActivity | CicsPlanOperation::LinkAcqProcess
+        | CicsPlanOperation::LinkActivity => bts_child_link::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::Address => address::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::AddressSet => {
@@ -1191,6 +1195,95 @@ mod tests {
             storage: StorageId::from_index(index).unwrap(),
             qualified_layout_name: name.into(),
         }
+    }
+
+    #[test]
+    fn bts_child_link_v2_tags_round_trip_and_v1_stays_closed() {
+        let limits = CicsPlanLimits::default();
+        let plans = [
+            CicsEffectPlan {
+                operation: CicsPlanOperation::FetchAny,
+                operands: vec![],
+                options: BTreeSet::from([CicsPlanOption::BtsNoSuspend]),
+                outputs: vec![
+                    CicsOutputBinding {
+                        name: CicsOutputName::BtsAny,
+                        target: slot(1, "ANY-X"),
+                    },
+                    CicsOutputBinding {
+                        name: CicsOutputName::BtsCompStatus,
+                        target: slot(2, "STATUS-X"),
+                    },
+                ],
+                condition: CicsCondition::Default,
+            },
+            CicsEffectPlan {
+                operation: CicsPlanOperation::FetchChild,
+                operands: vec![CicsNamedOperand {
+                    name: CicsOperandName::BtsChild,
+                    value: CicsOperandValue::Literal(b"1234567890ABCDEF".to_vec()),
+                }],
+                options: BTreeSet::new(),
+                outputs: vec![CicsOutputBinding {
+                    name: CicsOutputName::BtsCompStatus,
+                    target: slot(2, "STATUS-X"),
+                }],
+                condition: CicsCondition::Default,
+            },
+            CicsEffectPlan {
+                operation: CicsPlanOperation::FreeChild,
+                operands: vec![CicsNamedOperand {
+                    name: CicsOperandName::BtsChild,
+                    value: CicsOperandValue::Literal(b"1234567890ABCDEF".to_vec()),
+                }],
+                options: BTreeSet::new(),
+                outputs: vec![],
+                condition: CicsCondition::Default,
+            },
+            CicsEffectPlan {
+                operation: CicsPlanOperation::LinkAcqActivity,
+                operands: vec![],
+                options: BTreeSet::from([CicsPlanOption::BtsAcqActivity]),
+                outputs: vec![],
+                condition: CicsCondition::Default,
+            },
+            CicsEffectPlan {
+                operation: CicsPlanOperation::LinkAcqProcess,
+                operands: vec![],
+                options: BTreeSet::from([CicsPlanOption::BtsAcqProcess]),
+                outputs: vec![],
+                condition: CicsCondition::Default,
+            },
+            CicsEffectPlan {
+                operation: CicsPlanOperation::LinkActivity,
+                operands: vec![CicsNamedOperand {
+                    name: CicsOperandName::BtsActivity,
+                    value: CicsOperandValue::Literal(b"CHILD".to_vec()),
+                }],
+                options: BTreeSet::new(),
+                outputs: vec![],
+                condition: CicsCondition::Default,
+            },
+        ];
+        for (plan, tag) in plans.iter().zip(216..=221) {
+            let bytes = encode_cics_effect_plan(plan, limits).unwrap();
+            assert_eq!(&bytes[..6], b"MCEP\0\x02");
+            assert_eq!(u16::from_be_bytes([bytes[6], bytes[7]]), tag);
+            assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+            assert_eq!(
+                encode_cics_effect_plan_version(plan, limits, LEGACY_VERSION),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+        let mut invalid = plans[0].clone();
+        invalid.operands.push(CicsNamedOperand {
+            name: CicsOperandName::BtsTimeout,
+            value: CicsOperandValue::Integer(1),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     fn read_plan() -> CicsEffectPlan {

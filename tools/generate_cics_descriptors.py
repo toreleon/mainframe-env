@@ -23,6 +23,10 @@ OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_de
 LOOKUP_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/lookup.rs"
 )
+PROVIDER_TAIL_OUTPUT_PATH = Path(
+    "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
+)
+PROVIDER_INLINE_OPERATIONS = 153
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -96,6 +100,7 @@ EXPECTED_FAMILIES = {
 TYPED_EXECUTION_FAMILIES = {
     "transform-control": "TransformControl",
     "spool-control": "SpoolControl",
+    "bts-control": "BtsControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
     "builtin-function-control": "BuiltinFunctionControl",
@@ -108,6 +113,17 @@ TYPED_EXECUTION_FAMILIES = {
     "operator-control": "OperatorControl",
     "network-control": "NetworkControl",
 }
+# CIC-901's runtime descriptor remains a frozen 25-operation source input.
+# Later typed registrations live in a separate catalog and must not change
+# source-map identities merely by entering the runtime operation list below.
+FROZEN_RUNTIME_OPERATION_NAMES = frozenset({
+    "Abend", "Asktime", "Assign", "Delete", "EndBrowse", "FormatTime",
+    "HandleAbend", "HandleCondition", "Inquire", "Link", "Read", "ReadNext",
+    "ReadPrev", "ReceiveMap", "Retrieve", "Return", "Rewrite", "SendMap",
+    "SendText", "SetFileStatus", "StartBrowse", "Syncpoint", "Write",
+    "WriteTransientData", "Xctl",
+})
+
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
     ("AddSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0004"),
@@ -507,6 +523,12 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0258",
     ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
+    ("FetchAny", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0077"),
+    ("FetchChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0078"),
+    ("FreeChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0083"),
+    ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
+    ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
+    ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
 ]
 
 CONTRACT_BATCHES = (
@@ -711,6 +733,7 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "FetchAny", "FetchChild", "FreeChild", "LinkAcqActivity", "LinkAcqProcess", "LinkActivity",
         "Abend",
         "AddSubevent",
         "Address",
@@ -938,6 +961,12 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "FetchAny": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FetchChild": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FreeChild": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "LinkAcqActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkAcqProcess": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
     "SignalEvent": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "RetrieveReattachEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "RetrieveSubevent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
@@ -1686,6 +1715,12 @@ def _load_typed_execution_registrations(
         "RetrieveSubevent",
         "TestEvent",
         "SignalEvent",
+        "FetchAny",
+        "FetchChild",
+        "FreeChild",
+        "LinkAcqActivity",
+        "LinkAcqProcess",
+        "LinkActivity",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -1971,7 +2006,10 @@ def load_catalog(
     expected_runtime = (
         EXPECTED_RUNTIME_OPERATIONS
         if include_runtime_admission
-        else [row for row in EXPECTED_RUNTIME_OPERATIONS if row[0] in operation_names]
+        else [
+            row for row in EXPECTED_RUNTIME_OPERATIONS
+            if row[0] in FROZEN_RUNTIME_OPERATION_NAMES
+        ]
     )
     if observed_runtime != expected_runtime:
         raise DescriptorError("CICS runtime operation compatibility set drifted")
@@ -4875,6 +4913,41 @@ def _rust_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=True)
 
 
+def _render_provider_entries(
+    operations: list[dict[str, Any]], family_variants: dict[str, str]
+) -> list[str]:
+    lines = []
+    for operation in operations:
+        lines.extend(
+            [
+                "    CicsCommandDescriptor {",
+                f"        operation: CicsOperation::{operation['operation']},",
+                f"        syntax: {_rust_string(operation['label'])},",
+                f"        official_row: {_rust_string(operation['official_row'])},",
+                f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
+                f"        mutating: {str(operation['mutating']).lower()},",
+                "    },",
+            ]
+        )
+    return lines
+
+
+def render_provider_tail(root: Path = ROOT) -> str:
+    catalog = load_catalog(root)
+    family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
+    operations = catalog["_runtime_operations"][PROVIDER_INLINE_OPERATIONS:]
+    lines = [
+        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
+        "",
+        "use super::*;",
+        "",
+        f"pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; {len(operations)}] = [",
+    ]
+    lines.extend(_render_provider_entries(operations, family_variants))
+    lines.extend(["];", ""])
+    return "\n".join(lines)
+
+
 def render_provider(
     root: Path = ROOT, contracts: dict[str, Any] | None = None
 ) -> str:
@@ -4917,19 +4990,10 @@ def render_provider(
             "pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[",
         ]
     )
-    for operation in operations:
-        lines.extend(
-            [
-                "    CicsCommandDescriptor {",
-                f"        operation: CicsOperation::{operation['operation']},",
-                f"        syntax: {_rust_string(operation['label'])},",
-                f"        official_row: {_rust_string(operation['official_row'])},",
-                f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
-                f"        mutating: {str(operation['mutating']).lower()},",
-                "    },",
-            ]
-        )
-    lines.extend(["];", "", "mod lookup;", "pub(crate) use lookup::command_descriptor;", ""])
+    lines.extend(_render_provider_entries(operations[:PROVIDER_INLINE_OPERATIONS], family_variants))
+    for index in range(PROVIDER_INLINE_OPERATIONS, len(operations)):
+        lines.append(f"    tail::CICS_COMMAND_DESCRIPTOR_TAIL[{index - PROVIDER_INLINE_OPERATIONS}],")
+    lines.extend(["];", "", "mod lookup;", "mod tail;", "pub(crate) use lookup::command_descriptor;", ""])
     return "\n".join(lines)
 
 
@@ -5322,6 +5386,7 @@ def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     return {
         OUTPUT_PATH: render_provider(root, contracts),
         LOOKUP_OUTPUT_PATH: render_provider_lookup(root),
+        PROVIDER_TAIL_OUTPUT_PATH: render_provider_tail(root),
         HOST_OUTPUT_PATH: render_host(root),
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),
         IR_REGISTRY_OUTPUT_PATH: render_ir_registry(root, contracts),
@@ -5360,7 +5425,7 @@ def main() -> None:
         generate()
         print(
             "cics-command-descriptors: generated "
-            f"{OUTPUT_PATH}, {LOOKUP_OUTPUT_PATH}, {HOST_OUTPUT_PATH}, {COMPILER_SPI_COMPAT_OUTPUT_PATH}, "
+            f"{OUTPUT_PATH}, {LOOKUP_OUTPUT_PATH}, {PROVIDER_TAIL_OUTPUT_PATH}, {HOST_OUTPUT_PATH}, {COMPILER_SPI_COMPAT_OUTPUT_PATH}, "
             f"{IR_REGISTRY_OUTPUT_PATH}, and {CONTRACT_OUTPUT_PATH}"
         )
 

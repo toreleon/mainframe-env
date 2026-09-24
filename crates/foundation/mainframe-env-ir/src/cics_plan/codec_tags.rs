@@ -23,6 +23,12 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::FetchAny => 216,
+        CicsPlanOperation::FetchChild => 217,
+        CicsPlanOperation::FreeChild => 218,
+        CicsPlanOperation::LinkAcqActivity => 219,
+        CicsPlanOperation::LinkAcqProcess => 220,
+        CicsPlanOperation::LinkActivity => 221,
         CicsPlanOperation::AddSubevent => 105,
         CicsPlanOperation::RemoveSubevent => 113,
         CicsPlanOperation::DeleteEvent => 110,
@@ -189,6 +195,12 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        216 => Ok(CicsPlanOperation::FetchAny),
+        217 => Ok(CicsPlanOperation::FetchChild),
+        218 => Ok(CicsPlanOperation::FreeChild),
+        219 => Ok(CicsPlanOperation::LinkAcqActivity),
+        220 => Ok(CicsPlanOperation::LinkAcqProcess),
+        221 => Ok(CicsPlanOperation::LinkActivity),
         105 => Ok(CicsPlanOperation::AddSubevent),
         113 => Ok(CicsPlanOperation::RemoveSubevent),
         110 => Ok(CicsPlanOperation::DeleteEvent),
@@ -356,6 +368,10 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
+        CicsOperandName::BtsChild => 1088,
+        CicsOperandName::BtsActivity => 1089,
+        CicsOperandName::BtsInputEvent => 1090,
+        CicsOperandName::BtsTimeout => 1091,
         CicsOperandName::Event => 320,
         CicsOperandName::SubEvent => 329,
         CicsOperandName::SubEvent1 => 321,
@@ -657,6 +673,10 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
+        1088 => Ok(CicsOperandName::BtsChild),
+        1089 => Ok(CicsOperandName::BtsActivity),
+        1090 => Ok(CicsOperandName::BtsInputEvent),
+        1091 => Ok(CicsOperandName::BtsTimeout),
         320 => Ok(CicsOperandName::Event),
         329 => Ok(CicsOperandName::SubEvent),
         321 => Ok(CicsOperandName::SubEvent1),

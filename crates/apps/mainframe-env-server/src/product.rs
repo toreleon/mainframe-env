@@ -6311,13 +6311,16 @@ mod tests {
         PendingOnlineTransfer, decode_online_machine_continuation,
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
+    use mainframe_env_cics::bts_lifecycle::{
+        BtsActivity, BtsActivityIndex, BtsCompletion, BtsLifecycleStore, BtsMode, BtsProcess,
+    };
     use mainframe_env_cics::{
         CICS_DELAY_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
-        CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition, CicsCertificateName,
-        CicsClientCertificate, CicsEventPostMode, CicsJavaStatus, CicsMonitorAction,
-        CicsMonitorPointDefinition, CicsPartitionDefinition, CicsPartitionSetDefinition,
-        CicsProgramDefinition, CicsTcpipAuthenticate, CicsTcpipContext, CicsTcpipPrivacy,
-        CicsTcpipSslType,
+        CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition, CicsBtsChildCompletion,
+        CicsCertificateName, CicsClientCertificate, CicsEventPostMode, CicsJavaStatus,
+        CicsMonitorAction, CicsMonitorPointDefinition, CicsPartitionDefinition,
+        CicsPartitionSetDefinition, CicsProgramDefinition, CicsTcpipAuthenticate, CicsTcpipContext,
+        CicsTcpipPrivacy, CicsTcpipSslType,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -19501,6 +19504,451 @@ mod tests {
                 .get_provider_state("cics-program-load-v1", "LOADPGM")
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn online_bts_fetch_child_uses_compiled_selected_provider_and_durable_token() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSFET. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-X PIC X(16) VALUE '1234567890ABCDEF'. 01 STATUS-X PIC S9(9) COMP. 01 CHANNEL-X PIC X(16). 01 TIMEOUT-X PIC S9(9) COMP VALUE 10. 01 FN-X PIC X(2). 01 RC-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FETCH CHILD(CHILD-X) COMPSTATUS(STATUS-X) CHANNEL(CHANNEL-X) TIMEOUT(TIMEOUT-X) RESP(RC-X) END-EXEC. MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN.";
+        let artifact = published_source_fixture("BTSFET", source);
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "BTSFET".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("BF00".into(), "BTSFET".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSFET".into(),
+                    map: "BTSFET".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("bts-fetch-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "BF00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "BF00",
+                24,
+                80,
+                "bts-fetch-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let resource = format!(
+            "CICS.BTS.CHILD.{:x}",
+            Sha256::digest(invocation.run_unit_id.as_str().as_bytes())
+        );
+        server
+            .racf
+            .define_profile("BTSCHILD", &resource, "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("BTSCHILD", &resource, "IBMUSER", AccessIntent::Update)
+            .unwrap();
+        let token = *b"1234567890ABCDEF";
+        server
+            .cics
+            .register_bts_child(&invocation.run_unit_id, token, Some("REPLY"))
+            .unwrap();
+        server
+            .cics
+            .complete_bts_child(
+                &invocation.run_unit_id,
+                token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "BTSFET", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "BTSFET", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        machine
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(machine.variable("FN-X").unwrap().bytes(), &[0x34, 0x42]);
+        assert_eq!(machine.variable("RC-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            machine.variable("CHANNEL-X").unwrap().bytes(),
+            b"REPLY           "
+        );
+        assert_eq!(machine.variable("STATUS-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert!(
+            server
+                .store
+                .get_provider_state(
+                    "cics-bts-child-ownership-v1",
+                    invocation.run_unit_id.as_str()
+                )
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn online_bts_link_acqprocess_runs_nested_named_activity_in_shared_tree() {
+        let main = published_source_fixture(
+            "BTSMAIN",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSMAIN. DATA DIVISION. WORKING-STORAGE SECTION. 01 FN-X PIC X(2). 01 RC-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS LINK ACQPROCESS RESP(RC-X) END-EXEC. MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let child = published_source_fixture(
+            "BTSRUN",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSRUN. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('GO') END-EXEC. EXEC CICS LINK ACTIVITY('GRAND') END-EXEC. EXEC CICS DEFINE INPUT EVENT('AFTER') END-EXEC. GOBACK.",
+        );
+        let grandchild = published_source_fixture(
+            "BTSGRND",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSGRND. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('PING') END-EXEC. EXEC CICS RETURN END-EXEC.",
+        );
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        for (class, resource) in [
+            ("FACILITY", "CICS.PROGRAM.BTSRUN"),
+            ("FACILITY", "CICS.PROGRAM.BTSGRND"),
+            ("BTSPROCESS", "CICS.BTS.PROCESS.TYPE.PROC"),
+        ] {
+            server
+                .racf
+                .define_profile(class, resource, "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit(class, resource, "IBMUSER", AccessIntent::Execute)
+                .unwrap();
+        }
+        let main_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(main.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let child_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(child.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let grandchild_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(grandchild.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "BTSMAIN".into(),
+                        artifact: main_ref.clone(),
+                        payload: main.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(main.manifest().clone()),
+                        semantic_identity: main.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "BTSRUN".into(),
+                        artifact: child_ref.clone(),
+                        payload: child.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(child.manifest().clone()),
+                        semantic_identity: child.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "BTSGRND".into(),
+                        artifact: grandchild_ref.clone(),
+                        payload: grandchild.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(grandchild.manifest().clone()),
+                        semantic_identity: grandchild.semantic_id().to_reference(),
+                    },
+                ],
+                transactions: BTreeMap::from([("BT00".into(), "BTSMAIN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSMAIN".into(),
+                    map: "BTSMAIN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[
+                CicsProgramDefinition {
+                    name: "BTSRUN".into(),
+                    generation: 1,
+                    artifact: child_ref,
+                    semantic_identity: child.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                },
+                CicsProgramDefinition {
+                    name: "BTSGRND".into(),
+                    generation: 1,
+                    artifact: grandchild_ref,
+                    semantic_identity: grandchild.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                },
+            ])
+            .unwrap();
+        let session = SessionId::new("bts-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "BT00", Some(main_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "BT00",
+                24,
+                80,
+                "bts-selected-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let child_token = *b"BTSCHILD00000001";
+        server
+            .cics
+            .register_bts_child(&invocation.run_unit_id, child_token, Some("REPLY"))
+            .unwrap();
+        let authority = BtsLifecycleStore::new(server.store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let grandchild_id = BtsLifecycleStore::child_id("TYPE", "PROC", 1).unwrap();
+        server
+            .racf
+            .define_profile("BTSEVENT", &format!("CICS.BTS.{root}.GO"), "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "BTSEVENT",
+                &format!("CICS.BTS.{root}.GO"),
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile(
+                "BTSEVENT",
+                &format!("CICS.BTS.{root}.AFTER"),
+                "IBMUSER",
+                None,
+            )
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "BTSEVENT",
+                &format!("CICS.BTS.{root}.AFTER"),
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        for (class, resource, intent) in [
+            (
+                "BTSACTIVITY",
+                format!("CICS.BTS.ACTIVITY.{grandchild_id}"),
+                AccessIntent::Execute,
+            ),
+            (
+                "BTSEVENT",
+                format!("CICS.BTS.{grandchild_id}.PING"),
+                AccessIntent::Update,
+            ),
+        ] {
+            server
+                .racf
+                .define_profile(class, &resource, "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit(class, &resource, "IBMUSER", intent)
+                .unwrap();
+        }
+        let mut process = BtsProcess::new(
+            "TYPE",
+            "PROC",
+            &root,
+            "BTSRUN",
+            "BT00",
+            "IBMUSER",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap();
+        process.activities.insert(
+            grandchild_id.clone(),
+            BtsActivity {
+                id: grandchild_id.clone(),
+                name: "GRAND".into(),
+                parent_id: Some(root.clone()),
+                completion_event: None,
+                program: "BTSGRND".into(),
+                transid: "BT00".into(),
+                userid: "IBMUSER".into(),
+                mode: BtsMode::Initial,
+                completion: BtsCompletion::Incomplete,
+                suspended: false,
+                activation_epoch: 0,
+                checkpoint: None,
+                acquired_by: None,
+                abcode: None,
+                abprogram: None,
+            },
+        );
+        process.next_child_sequence = 2;
+        authority
+            .define_process(
+                process,
+                invocation.run_unit_id.as_str(),
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let index = BtsActivityIndex {
+            schema_version: "mainframe-env.cics.bts-activity-index@1".into(),
+            activity_id: grandchild_id.clone(),
+            process_type: "TYPE".into(),
+            process_name: "PROC".into(),
+            parent_id: Some(root.clone()),
+            pending_uow: Some(invocation.run_unit_id.as_str().into()),
+            row_version: 0,
+        };
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-bts-activity-index-v1".into(),
+                    key: grandchild_id.clone(),
+                    version: 1,
+                    payload: serde_json::to_vec(&index).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "BTSMAIN", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "BTSMAIN", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            main.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        machine
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(machine.variable("FN-X").unwrap().bytes(), &[0x34, 0x2A]);
+        assert_eq!(machine.variable("RC-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        let event = server
+            .store
+            .get_provider_state("cics-event-activity-v1", &root)
+            .unwrap()
+            .unwrap();
+        let event: serde_json::Value = serde_json::from_slice(&event.payload).unwrap();
+        assert!(event["events"].get("GO").is_some());
+        assert!(event["events"].get("AFTER").is_some());
+        let grandchild_event = server
+            .store
+            .get_provider_state("cics-event-activity-v1", &grandchild_id)
+            .unwrap()
+            .unwrap();
+        let grandchild_event: serde_json::Value =
+            serde_json::from_slice(&grandchild_event.payload).unwrap();
+        assert!(grandchild_event["events"].get("PING").is_some());
+        let completed = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert_eq!(completed.activities[&root].mode, BtsMode::Dormant);
+        assert_eq!(completed.activities[&grandchild_id].mode, BtsMode::Dormant);
+        let children = server
+            .store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let children: serde_json::Value = serde_json::from_slice(&children.payload).unwrap();
+        assert!(
+            children["children"]
+                .as_object()
+                .unwrap()
+                .values()
+                .all(|child| child["freed"] == false)
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state("cics-bts-link-frame-v1", invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
+        );
+        let selected = server
+            .store
+            .list_provider_state(crate::cobol::retention::CALL_REPLAY_NAMESPACE, 16)
+            .unwrap();
+        assert_eq!(selected.len(), 2);
+        assert!(
+            selected[0]
+                .payload
+                .windows(b"online-call-execution".len())
+                .any(|part| part == b"online-call-execution")
         );
     }
 

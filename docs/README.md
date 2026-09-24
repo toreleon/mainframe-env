@@ -81,6 +81,7 @@ explicitly names that authority as superseded.
 - [ADR-0016: CICS TCP/IP ingress context](decisions/0016-cics-tcpip-ingress-context.md)
 - [ADR-0017: CICS immediate START target authority](decisions/0017-cics-immediate-start-target-authority.md)
 - [ADR-0018: CICS START ATTACH lifetime](decisions/0018-cics-start-attach-lifetime.md)
+- [ADR-0019: BTS lifecycle authority](decisions/0019-bts-lifecycle-authority.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

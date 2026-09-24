@@ -5,6 +5,9 @@ mod bridge_profile;
 mod bridge_runtime;
 mod bridge_start;
 mod bridge_terminal;
+mod bts_child_link;
+pub mod bts_lifecycle;
+mod bts_link;
 mod builtin_function;
 mod condition;
 mod counter_control;
@@ -73,6 +76,26 @@ pub(super) fn assert_descriptor(
     debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
 }
 
+fn bts_live(service: &CicsService, run: &Run, retention_tick: u64) -> Result<(), HostProblem> {
+    if run.invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    let tick = match &service.replay_clock {
+        Some(clock) => clock.now_tick()?,
+        None => retention_tick.saturating_sub(1),
+    };
+    if tick >= run.invocation.deadline_tick {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
+}
+
+/// A selected program LINK retains its caller's run unit on nested RETURN.
+fn selected_link_return(run: &Run) -> bool {
+    run.invocation.parent_execution_id.is_some()
+        && run.invocation.bindings.contains_key("cobol.call.arguments")
+}
+
 pub(super) fn authorize_and_describe(
     service: &CicsService,
     run: &mut Run,
@@ -134,6 +157,8 @@ pub use bridge_definition::{CicsBridgeExitDefault, CicsBridgeExitSelection};
 pub use bridge_profile::{CicsBridgeAbiProfile, CicsBridgeAbiSelection};
 pub use bridge_runtime::CicsBridgeRuntime;
 pub use bridge_start::{CICS_BRIDGE_START_WORK_GENERATION, CicsBridgeStartIntent};
+pub use bts_child_link::CicsBtsChildCompletion;
+pub use bts_link::CicsBtsLinkContext;
 pub(super) use condition::respond as condition;
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
@@ -262,6 +287,14 @@ pub(super) fn invoke_extended_control(
                 event_control::invoke(service, run, request)
             }
         }
+        crate::generated::CicsCommandFamily::BtsControl => match request.operation {
+            mainframe_env_host_api::CicsOperation::FetchAny
+            | mainframe_env_host_api::CicsOperation::FetchChild
+            | mainframe_env_host_api::CicsOperation::FreeChild => {
+                bts_child_link::invoke_child(service, run, request, retention_tick)
+            }
+            _ => bts_link::invoke(service, run, request, retention_tick),
+        },
         crate::generated::CicsCommandFamily::Diagnostics => {
             invoke_diagnostics(service, run, request)
         }
@@ -310,6 +343,8 @@ pub(super) fn invoke_interval_or_spool_control(
 }
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    bts_child_link::release_task(service, run)?;
+    bts_link::release_task(service, run)?;
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
     document_control::release_task(service, run)?;

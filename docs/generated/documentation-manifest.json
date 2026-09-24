@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 195,
+    "markdown_documents": 196,
     "navigation_groups": 5,
-    "normative_documents": 47,
+    "normative_documents": 48,
     "xtask_commands": 168
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:d57860c72a3b2e397a463a42c2c8e18f34fb0c566d14331bdb046b2fbdbb8f26",
+      "sha256": "sha256:7b12fa87ace74aed99f372ffa84acd1b03ee16e914b943620ed03e9081500dd0",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 82,
-      "sha256": "sha256:0e5abcc453cffdbab1f7fa9c24ea2afd3adc74994f3b9e9a7f15d06bfc042901",
+      "relative_links": 83,
+      "sha256": "sha256:dcb41b73bbf2ba31bc9a903781f4a07d9695248d0af4ac4694e34f932400b028",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:ec7b85406f0d156e4758b2f6034085230c6bb80a4ec7dd8dd770404beb884e4a",
+      "sha256": "sha256:494a81893d94fb9a70d5bf5246fb4a6d432e7e55417f05e941ef7ec53d66bc7b",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -815,10 +815,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0019-bts-lifecycle-authority.md",
+      "relative_links": 0,
+      "scope": "shared BTS process/activity state for 23 lifecycle application rows",
+      "sha256": "sha256:68b56fca05e26926a211bd2905193954522e967a2556d97ca152781fb83ab3e6",
+      "status": "Proposed for the incremental CIC-904.bts-lifecycle slice",
+      "title": "ADR-0019: Shared BTS lifecycle authority",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 18,
-      "sha256": "sha256:576008fc4cac435990267642c404b58df241d8df6f9cc4e43ff0732cab02cdb2",
+      "relative_links": 19,
+      "sha256": "sha256:896a8693debb840c53260e3da6865c6cb2212bfb06ab031f4727d4534b6893e2",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1157,8 +1169,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 84,
-      "sha256": "sha256:523a0c907871895bebcad661cfdf837e3e3792fd826942b0b3d1dd16ca419ddb",
+      "relative_links": 85,
+      "sha256": "sha256:2d9efb79cadca2f4bd1d1b6148fc5eb9c9ac5da42e9e2701b2fdd38dc27d2650",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 1
     },
@@ -1932,6 +1944,10 @@
           "path": "docs/decisions/0018-cics-start-attach-lifetime.md"
         },
         {
+          "label": "ADR-0019: BTS lifecycle authority",
+          "path": "docs/decisions/0019-bts-lifecycle-authority.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2095,7 +2111,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:9afb90234857db3e6bc418cca492ede69749f40cd3b5c22982b9dab242cd649e",
+  "registry_sha256": "sha256:96da88e0424d33d800238df5d89f181896a6abfe92100595a4bdc5c38e5192de",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

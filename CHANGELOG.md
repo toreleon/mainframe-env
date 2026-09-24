@@ -10,6 +10,9 @@ All notable changes to mainframe-env are documented here.
   v0.9 head. Regenerated descriptors and contracts now report 161 typed,
   0 legacy compatibility, and 102 unready application rows; CICSMESSAGE
   remains unready. The merge retains prior codec tags and both MCEP versions.
+- Integrated the six BTS child and LINK command rows on that sealed aggregate.
+  The combined registry reports 167 typed, 0 legacy compatibility, and 96
+  unready rows. All 161 previously typed row contracts remain unchanged.
 
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
@@ -29,6 +32,10 @@ All notable changes to mainframe-env are documented here.
   bytes, and malformed or unknown tags fail closed.
 
 ### Fixed
+
+- Restored the frozen CIC-901 source descriptor hash by keeping later transform
+  and spool family admissions in the typed registry. The three accepted IBM
+  source maps and their corpus bindings remain unchanged.
 
 - Rebased the ten CICS security-control commands onto the local v0.9
   integration head. Shared command registrations, generated descriptors,
@@ -61,6 +68,24 @@ All notable changes to mainframe-env are documented here.
   unique and decodes to its original identity.
 
 ### Added
+
+- Added typed BTS `FETCH ANY`, `FETCH CHILD`, `FREE CHILD`, `LINK ACQACTIVITY`,
+  `LINK ACQPROCESS`, and `LINK ACTIVITY` routes over the shared lifecycle
+  authority. Child tokens are parent owned and durable; LINK selects an
+  installed program, resolves nested named descendants from the active
+  lifecycle frame, retains parent child tokens across nested selected RETURN,
+  binds durable activity context to its execution and principal, and fences
+  uncertain dispatch without automatic replay, including after SQLite and
+  PostgreSQL reopen.
+  The child checkout registered 157 typed, 0 legacy, and 106 unready rows;
+  the combined registry registers 167 typed, 0 legacy, and 96 unready rows.
+  Licensed differential evidence remains pending.
+
+- Added the shared versioned BTS process/activity authority for the pending
+  lifecycle slice, with UOW-scoped acquisition epochs, atomic pending DEFINE
+  publication or rollback, checkpoint references, and durable exact replay.
+  This does not yet register BTS lifecycle commands; the application split
+  remains 151 typed, 0 legacy, and 112 unready.
 
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and

@@ -66,6 +66,7 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::BtsTimeout => SlotUse::FullwordInput,
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
@@ -180,6 +181,10 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::BtsAny | CicsOutputName::BtsChannel | CicsOutputName::BtsAbcode => {
+            SlotUse::Output
+        }
+        CicsOutputName::BtsCompStatus => SlotUse::FullwordOutput,
         CicsOutputName::CounterValue
         | CicsOutputName::CounterMinimum
         | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
@@ -307,6 +312,12 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::FetchAny => CicsOperation::FetchAny,
+        CicsPlanOperation::FetchChild => CicsOperation::FetchChild,
+        CicsPlanOperation::FreeChild => CicsOperation::FreeChild,
+        CicsPlanOperation::LinkAcqActivity => CicsOperation::LinkAcqActivity,
+        CicsPlanOperation::LinkAcqProcess => CicsOperation::LinkAcqProcess,
+        CicsPlanOperation::LinkActivity => CicsOperation::LinkActivity,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
@@ -473,6 +484,10 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::BtsChild => "CHILD",
+        CicsOperandName::BtsActivity => "ACTIVITY",
+        CicsOperandName::BtsInputEvent => "INPUTEVENT",
+        CicsOperandName::BtsTimeout => "TIMEOUT",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -794,6 +809,10 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::BtsAny => "ANY",
+        CicsOutputName::BtsCompStatus => "COMPSTATUS",
+        CicsOutputName::BtsChannel => "CHANNEL",
+        CicsOutputName::BtsAbcode => "ABCODE",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",
@@ -917,6 +936,9 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::BtsNoSuspend => "NOSUSPEND",
+        CicsPlanOption::BtsAcqActivity => "ACQACTIVITY",
+        CicsPlanOption::BtsAcqProcess => "ACQPROCESS",
         CicsPlanOption::DefResp => "DEFRESP",
         CicsPlanOption::NoWait => "NOWAIT",
         CicsPlanOption::Rrn => "RRN",

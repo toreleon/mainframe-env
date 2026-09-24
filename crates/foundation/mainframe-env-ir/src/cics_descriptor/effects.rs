@@ -150,6 +150,15 @@ pub(super) const CONTROL_TRANSFER_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+pub(super) const BTS_FETCH_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 pub(super) const HANDLE_STACK_EFFECTS: &[Effect] = &[
     Effect::MemoryWrite,
     Effect::Security,

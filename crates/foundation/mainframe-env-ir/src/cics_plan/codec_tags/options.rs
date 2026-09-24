@@ -2,6 +2,9 @@ use super::*;
 
 pub(in crate::cics_plan) const fn option_tag(value: CicsPlanOption) -> u16 {
     match value {
+        CicsPlanOption::BtsNoSuspend => 1020,
+        CicsPlanOption::BtsAcqActivity => 1021,
+        CicsPlanOption::BtsAcqProcess => 1022,
         CicsPlanOption::SecurityBasicAuth => 380,
         CicsPlanOption::SecurityJwt => 381,
         CicsPlanOption::SecurityKerberos => 382,
@@ -146,6 +149,9 @@ pub(in crate::cics_plan) fn option_from_tag(
     value: u16,
 ) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
+        1020 => Ok(CicsPlanOption::BtsNoSuspend),
+        1021 => Ok(CicsPlanOption::BtsAcqActivity),
+        1022 => Ok(CicsPlanOption::BtsAcqProcess),
         380 => Ok(CicsPlanOption::SecurityBasicAuth),
         381 => Ok(CicsPlanOption::SecurityJwt),
         382 => Ok(CicsPlanOption::SecurityKerberos),

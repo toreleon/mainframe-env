@@ -8,6 +8,18 @@ use std::collections::BTreeMap;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
+    /// Fetch the next completed child token owned by this parent task.
+    FetchAny,
+    /// Fetch the completion of one parent-owned child token.
+    FetchChild,
+    /// Free a child token and its unfetched reply resources.
+    FreeChild,
+    /// Synchronously activate the acquired BTS activity.
+    LinkAcqActivity,
+    /// Synchronously activate the acquired BTS process root.
+    LinkAcqProcess,
+    /// Synchronously activate one named child activity.
+    LinkActivity,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
     /// Return checked virtual addresses for task storage areas.
@@ -318,6 +330,12 @@ impl CicsOperation {
     pub const fn runtime_name(self) -> &'static str {
         match self {
             Self::Abend => "Abend",
+            Self::FetchAny => "FetchAny",
+            Self::FetchChild => "FetchChild",
+            Self::FreeChild => "FreeChild",
+            Self::LinkAcqActivity => "LinkAcqActivity",
+            Self::LinkAcqProcess => "LinkAcqProcess",
+            Self::LinkActivity => "LinkActivity",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
             Self::AddressSet => "AddressSet",
@@ -508,7 +526,13 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::ChangePassword
+            Self::FetchAny
+                | Self::FetchChild
+                | Self::FreeChild
+                | Self::LinkAcqActivity
+                | Self::LinkAcqProcess
+                | Self::LinkActivity
+                | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
                 | Self::RequestEncryptPassTicket
@@ -679,6 +703,12 @@ impl CicsOperation {
             ("BIF", Some("DIGEST")) => Self::BifDigest,
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
+            ("FETCH", Some("ANY")) => Self::FetchAny,
+            ("FETCH", Some("CHILD")) => Self::FetchChild,
+            ("FREE", Some("CHILD")) => Self::FreeChild,
+            ("LINK", Some("ACQACTIVITY")) => Self::LinkAcqActivity,
+            ("LINK", Some("ACQPROCESS")) => Self::LinkAcqProcess,
+            ("LINK", Some("ACTIVITY")) => Self::LinkActivity,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("CHANGE", Some("PASSWORD")) => Self::ChangePassword,
             ("CHANGE", Some("PHRASE")) => Self::ChangePhrase,

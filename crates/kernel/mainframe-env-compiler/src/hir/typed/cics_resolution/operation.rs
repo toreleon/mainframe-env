@@ -15,6 +15,12 @@ pub(super) fn resolve(
     descriptor: &CicsApplicationRegistryDescriptor,
 ) -> Resolution<HirCicsOperation> {
     Ok(match descriptor.label_tokens {
+        ["FETCH", "ANY"] => HirCicsOperation::FetchAny,
+        ["FETCH", "CHILD"] => HirCicsOperation::FetchChild,
+        ["FREE", "CHILD"] => HirCicsOperation::FreeChild,
+        ["LINK", "ACQACTIVITY"] => HirCicsOperation::LinkAcqActivity,
+        ["LINK", "ACQPROCESS"] => HirCicsOperation::LinkAcqProcess,
+        ["LINK", "ACTIVITY"] => HirCicsOperation::LinkActivity,
         ["ABEND"] => HirCicsOperation::Abend,
         ["ADD", "SUBEVENT"] => HirCicsOperation::AddSubevent,
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,

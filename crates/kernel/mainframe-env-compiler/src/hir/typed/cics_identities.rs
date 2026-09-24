@@ -1,5 +1,11 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    FetchAny,
+    FetchChild,
+    FreeChild,
+    LinkAcqActivity,
+    LinkAcqProcess,
+    LinkActivity,
     ChangePassword,
     ChangePhrase,
     QuerySecurity,
@@ -163,6 +169,10 @@ pub enum HirCicsOperation {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
+    BtsChild,
+    BtsActivity,
+    BtsInputEvent,
+    BtsTimeout,
     ResClass,
     ResId,
     ResIdLength,
@@ -468,6 +478,9 @@ pub enum HirCicsOption {
     OperatorCritical,
     CertificateOwner,
     CertificateIssuer,
+    BtsNoSuspend,
+    BtsAcqActivity,
+    BtsAcqProcess,
     SecurityBasicAuth,
     SecurityJwt,
     SecurityKerberos,

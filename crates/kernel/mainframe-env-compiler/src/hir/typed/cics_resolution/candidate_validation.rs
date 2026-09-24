@@ -114,6 +114,14 @@ pub(super) fn validate_candidate(
             (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
                 if descriptor.runtime_operation == Some("StartBrexit") && *name == "BRDATA" => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
+                if matches!(
+                    descriptor.label_tokens,
+                    ["FETCH", "ANY"] | ["FETCH", "CHILD"]
+                ) && *name == "COMPSTATUS"
+                    && has_value
+                {
+                    continue;
+                }
                 if web_control::reviewed_ambiguous_shape(descriptor, name, has_value) {
                     continue;
                 }

@@ -3,6 +3,14 @@ use super::super::{CicsAssignOutput, CicsCertificateOutput, CicsTcpipOutput};
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    /// Opaque token selected by FETCH ANY.
+    BtsAny,
+    /// Child completion CVDA.
+    BtsCompStatus,
+    /// Reply channel name fetched from a child.
+    BtsChannel,
+    /// Four-character child abend code.
+    BtsAbcode,
     /// Verified eight-character user identity.
     SecurityIsUserId,
     /// Four-byte token encryption-key handle.

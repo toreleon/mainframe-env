@@ -2,6 +2,10 @@ use mainframe_env_ir::{CicsAssignOutput, CicsCertificateOutput, CicsTcpipOutput}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
+    BtsAny,
+    BtsCompStatus,
+    BtsChannel,
+    BtsAbcode,
     SecurityRead,
     SecurityUpdate,
     SecurityControl,
