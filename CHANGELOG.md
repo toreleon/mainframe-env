@@ -85,6 +85,11 @@ All notable changes to mainframe-env are documented here.
   online programs complete the lifecycle row. Public RUN registration remains
   pending while source options and failure paths are finished.
 
+- Retained exact DEFINE PROCESS and ACQUIRE effect identities in the BTS
+  acquisition row. Same-key retries survive reopen and reject changed inputs;
+  a held acquisition reports source INVREQ rather than losing its replay
+  identity after UOW settlement. Public command registration remains pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

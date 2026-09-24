@@ -144,6 +144,37 @@ impl<'a> BtsLifecycleStore<'a> {
         owner_execution: &str,
         owner_principal: &str,
     ) -> Result<(), HostProblem> {
+        self.define_process_inner(process, run_unit, owner_execution, owner_principal, None)
+    }
+
+    /// Atomically retain the DEFINE effect so a crash-gap retry is exact.
+    pub fn define_process_exact(
+        &self,
+        process: BtsProcess,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        effect_key: &str,
+        request_digest: [u8; 32],
+    ) -> Result<(), HostProblem> {
+        validate_identifier(effect_key, 256)?;
+        self.define_process_inner(
+            process,
+            run_unit,
+            owner_execution,
+            owner_principal,
+            Some((effect_key, request_digest)),
+        )
+    }
+
+    fn define_process_inner(
+        &self,
+        process: BtsProcess,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        effect: Option<(&str, [u8; 32])>,
+    ) -> Result<(), HostProblem> {
         validate_identifier(run_unit, 256)?;
         if process.pending_uow.as_deref() != Some(run_unit) || process.row_version != 0 {
             return Err(HostProblem::Malformed);
@@ -156,13 +187,56 @@ impl<'a> BtsLifecycleStore<'a> {
             .unwrap_or(BtsAcquisition::empty(owner_execution, owner_principal)?);
         if acquisition.owner_execution != owner_execution
             || acquisition.owner_principal != owner_principal
-            || acquisition.is_held()
         {
             return Err(HostProblem::IdempotencyConflict);
+        }
+        if let Some((effect_key, request_digest)) = effect {
+            if acquisition
+                .effect
+                .as_ref()
+                .is_some_and(|saved| saved.key == effect_key)
+            {
+                let saved = acquisition.effect.as_ref().expect("checked effect");
+                return if saved.operation == "DEFINE PROCESS"
+                    && saved.request_digest == request_digest
+                    && saved.process_type == process.process_type
+                    && saved.process_name == process.name
+                    && saved.activity_id == process.root_id
+                {
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+        }
+        if acquisition.is_held() {
+            return Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 22,
+            });
+        }
+        if self
+            .load_process(&process.process_type, &process.name)?
+            .is_some()
+        {
+            return Err(HostProblem::Condition {
+                name: "PROCESSERR".into(),
+                response: 108,
+                response2: 2,
+            });
         }
         acquisition.process_type = Some(process.process_type.clone());
         acquisition.process_name = Some(process.name.clone());
         acquisition.activity_id = Some(process.root_id.clone());
+        acquisition.effect = effect.map(|(key, request_digest)| BtsAcquisitionEffect {
+            operation: "DEFINE PROCESS".into(),
+            key: key.into(),
+            request_digest,
+            process_type: process.process_type.clone(),
+            process_name: process.name.clone(),
+            activity_id: process.root_id.clone(),
+        });
         let key = Self::process_key(&process.process_type, &process.name)?;
         let root_index = BtsActivityIndex {
             schema_version: ACTIVITY_INDEX_SCHEMA.into(),
@@ -173,13 +247,25 @@ impl<'a> BtsLifecycleStore<'a> {
             pending_uow: Some(run_unit.into()),
             row_version: 0,
         };
-        self.store
-            .mutate_provider_states_atomic(vec![
-                put_process(&key, &process, None)?,
-                put_acquisition(run_unit, &acquisition)?,
-                put_activity_index(&root_index, None)?,
-            ])
-            .map_err(store_error)
+        match self.store.mutate_provider_states_atomic(vec![
+            put_process(&key, &process, None)?,
+            put_acquisition(run_unit, &acquisition)?,
+            put_activity_index(&root_index, None)?,
+        ]) {
+            Ok(()) => Ok(()),
+            Err(StoreError::AlreadyExists | StoreError::Conflict)
+                if self
+                    .load_process(&process.process_type, &process.name)?
+                    .is_some() =>
+            {
+                Err(HostProblem::Condition {
+                    name: "PROCESSERR".into(),
+                    response: 108,
+                    response2: 2,
+                })
+            }
+            Err(error) => Err(store_error(error)),
+        }
     }
 
     /// Acquire one published process or descendant in the current UOW.
@@ -193,10 +279,95 @@ impl<'a> BtsLifecycleStore<'a> {
         process_name: &str,
         activity_id: &str,
     ) -> Result<(), HostProblem> {
+        self.acquire_inner(
+            run_unit,
+            owner_execution,
+            owner_principal,
+            process_type,
+            process_name,
+            activity_id,
+            None,
+        )
+    }
+
+    /// Atomically save the exact ACQUIRE effect with the acquisition lease.
+    #[allow(clippy::too_many_arguments)]
+    pub fn acquire_exact(
+        &self,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        process_type: &str,
+        process_name: &str,
+        activity_id: &str,
+        operation: &'static str,
+        effect_key: &str,
+        request_digest: [u8; 32],
+    ) -> Result<(), HostProblem> {
+        if !matches!(operation, "ACQUIRE ACTIVITYID" | "ACQUIRE PROCESS") {
+            return Err(HostProblem::Malformed);
+        }
+        validate_identifier(effect_key, 256)?;
+        self.acquire_inner(
+            run_unit,
+            owner_execution,
+            owner_principal,
+            process_type,
+            process_name,
+            activity_id,
+            Some((operation, effect_key, request_digest)),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn acquire_inner(
+        &self,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        process_type: &str,
+        process_name: &str,
+        activity_id: &str,
+        effect: Option<(&str, &str, [u8; 32])>,
+    ) -> Result<(), HostProblem> {
         validate_identifier(run_unit, 256)?;
         validate_activity_id(activity_id)?;
         let key = Self::process_key(process_type, process_name)?;
         for _ in 0..MAX_CAS_ATTEMPTS {
+            let mut acquisition = self
+                .load_acquisition(run_unit)?
+                .unwrap_or(BtsAcquisition::empty(owner_execution, owner_principal)?);
+            if acquisition.owner_execution != owner_execution
+                || acquisition.owner_principal != owner_principal
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if let Some((operation, effect_key, request_digest)) = effect {
+                if acquisition
+                    .effect
+                    .as_ref()
+                    .is_some_and(|saved| saved.key == effect_key)
+                {
+                    let saved = acquisition.effect.as_ref().expect("checked effect");
+                    return if saved.operation == operation
+                        && saved.request_digest == request_digest
+                        && saved.process_type == process_type
+                        && saved.process_name == process_name
+                        && saved.activity_id == activity_id
+                    {
+                        Ok(())
+                    } else {
+                        Err(HostProblem::IdempotencyConflict)
+                    };
+                }
+            }
+            if acquisition.is_held() {
+                return Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: 22,
+                });
+            }
             let index = self
                 .load_activity_index(activity_id)?
                 .ok_or(HostProblem::NotFound)?;
@@ -227,19 +398,19 @@ impl<'a> BtsLifecycleStore<'a> {
                     response2: if root { 13 } else { 19 },
                 });
             }
-            let mut acquisition = self
-                .load_acquisition(run_unit)?
-                .unwrap_or(BtsAcquisition::empty(owner_execution, owner_principal)?);
-            if acquisition.owner_execution != owner_execution
-                || acquisition.owner_principal != owner_principal
-                || acquisition.is_held()
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
             activity.acquired_by = Some(run_unit.into());
             acquisition.process_type = Some(process_type.into());
             acquisition.process_name = Some(process_name.into());
             acquisition.activity_id = Some(activity_id.into());
+            acquisition.effect =
+                effect.map(|(operation, key, request_digest)| BtsAcquisitionEffect {
+                    operation: operation.into(),
+                    key: key.into(),
+                    request_digest,
+                    process_type: process_type.into(),
+                    process_name: process_name.into(),
+                    activity_id: activity_id.into(),
+                });
             let expected = process.row_version;
             process.epoch = process
                 .epoch

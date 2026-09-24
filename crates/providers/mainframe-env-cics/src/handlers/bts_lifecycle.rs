@@ -320,8 +320,22 @@ pub struct BtsAcquisition {
     pub process_type: Option<String>,
     pub process_name: Option<String>,
     pub activity_id: Option<String>,
+    #[serde(default)]
+    pub effect: Option<BtsAcquisitionEffect>,
     #[serde(skip)]
     pub row_version: u64,
+}
+
+/// One exact ACQUIRE or DEFINE PROCESS effect retained across UOW release.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BtsAcquisitionEffect {
+    pub operation: String,
+    pub key: String,
+    pub request_digest: [u8; 32],
+    pub process_type: String,
+    pub process_name: String,
+    pub activity_id: String,
 }
 
 impl BtsAcquisition {
@@ -336,6 +350,7 @@ impl BtsAcquisition {
             process_type: None,
             process_name: None,
             activity_id: None,
+            effect: None,
             row_version: 0,
         })
     }
@@ -363,6 +378,15 @@ impl BtsAcquisition {
                 .activity_id
                 .as_deref()
                 .is_some_and(|id| validate_activity_id(id).is_err())
+            || self.effect.as_ref().is_some_and(|effect| {
+                !matches!(
+                    effect.operation.as_str(),
+                    "ACQUIRE ACTIVITYID" | "ACQUIRE PROCESS" | "DEFINE PROCESS"
+                ) || validate_identifier(&effect.key, 256).is_err()
+                    || validate_name(&effect.process_type, 8, true).is_err()
+                    || validate_name(&effect.process_name, 36, true).is_err()
+                    || validate_activity_id(&effect.activity_id).is_err()
+            })
         {
             return Err(HostProblem::InfrastructureFailure);
         }
@@ -572,6 +596,86 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static NEXT_SQLITE: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn acquisition_and_definition_replay_exact_effect_after_restart() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        let process =
+            BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
+        authority
+            .define_process_exact(process.clone(), "UOW1", "EXEC1", "USER", "define", [1; 32])
+            .unwrap();
+        let reopened = BtsLifecycleStore::new(&memory);
+        reopened
+            .define_process_exact(process.clone(), "UOW1", "EXEC1", "USER", "define", [1; 32])
+            .unwrap();
+        assert_eq!(
+            reopened.define_process_exact(process, "UOW1", "EXEC1", "USER", "define", [2; 32]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        reopened
+            .acquire_exact(
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "TYPE",
+                "ORDER",
+                &root,
+                "ACQUIRE PROCESS",
+                "acquire",
+                [3; 32],
+            )
+            .unwrap();
+        let restarted = BtsLifecycleStore::new(&memory);
+        restarted
+            .acquire_exact(
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "TYPE",
+                "ORDER",
+                &root,
+                "ACQUIRE PROCESS",
+                "acquire",
+                [3; 32],
+            )
+            .unwrap();
+        assert_eq!(
+            restarted.acquire_exact(
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "TYPE",
+                "ORDER",
+                &root,
+                "ACQUIRE PROCESS",
+                "acquire",
+                [4; 32],
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert_eq!(
+            restarted.acquire_exact(
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "TYPE",
+                "ORDER",
+                &root,
+                "ACQUIRE PROCESS",
+                "different",
+                [5; 32],
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 22,
+            })
+        );
+    }
 
     #[test]
     fn definition_and_acquisition_are_atomic_and_fenced_across_restart() {
@@ -784,7 +888,7 @@ mod tests {
             let process =
                 BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
             authority
-                .define_process(process, "UOW1", "EXEC1", "USER")
+                .define_process_exact(process, "UOW1", "EXEC1", "USER", "define", [9; 32])
                 .unwrap();
             assert!(authority.load_process("TYPE", "ORDER").unwrap().is_some());
         }
@@ -799,14 +903,24 @@ mod tests {
                     .visible_to("UOW2")
             );
             authority
+                .define_process_exact(
+                    BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1")
+                        .unwrap(),
+                    "UOW1",
+                    "EXEC1",
+                    "USER",
+                    "define",
+                    [9; 32],
+                )
+                .unwrap();
+            authority
                 .finish_uow("UOW1", "EXEC1", "USER", false)
                 .unwrap();
             assert!(authority.load_process("TYPE", "ORDER").unwrap().is_none());
             assert!(authority.load_activity_index(&root).unwrap().is_none());
-            assert_eq!(
-                authority.load_acquisition("UOW1").unwrap().unwrap().epoch,
-                2
-            );
+            let acquisition = authority.load_acquisition("UOW1").unwrap().unwrap();
+            assert_eq!(acquisition.epoch, 2);
+            assert_eq!(acquisition.effect.unwrap().request_digest, [9; 32]);
         }
         std::fs::remove_dir_all(directory).unwrap();
     }

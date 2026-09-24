@@ -32,6 +32,15 @@ the syncpoint owner. BTS supplies no universal prepare, automatic
 compensation, or automatic redispatch after an unknown outcome. The local
 participant declaration is `BTS_PARTICIPANT`.
 
+DEFINE PROCESS and ACQUIRE retain their exact operation, effect key, request
+digest, and selected process/activity identity in the acquisition row in the
+same atomic transition. A retry with the same key and request returns the
+saved result after reopen or UOW release; changed request bytes conflict.
+An already-held acquisition with another key returns `INVREQ 16/22`.
+Duplicate process names return `PROCESSERR 108/2`. The effect survives an
+acquisition epoch tombstone, including rollback, until its replay window is
+explicitly retired.
+
 The CICS syncpoint path settles BTS child definitions and its one acquisition
 before finalizing the UOW. Reconciliation reuses the durable UOW owner metadata
 and BTS owner rows to finish an interrupted settlement. Each step is
