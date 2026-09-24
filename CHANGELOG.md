@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Fenced new physical ISSUE effects to the run unit and principal retained by
+  a launched terminal, while preserving exact receipt replay. An unowned
+  alternate LU6.1 session now has its source-defined NOTALLOC test expectation.
+
 - Rejected malformed mapped/GDS ISSUE STATE, CONVDATA, and RETCODE host outputs
   before writing receiving storage. Exact reply lengths and the shared GDS
   return-code schema now guard the typed interpreter boundary.

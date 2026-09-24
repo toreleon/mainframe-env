@@ -120,6 +120,12 @@ pub(in crate::service) fn invoke(
     if let Some(receipt) = load_receipt(service, effect_key, run, mutation.sequence, digest)? {
         return receipt_response(service, run, &receipt);
     }
+    if !current_session.run_unit.is_empty()
+        && (current_session.run_unit != run.invocation.run_unit_id.as_str()
+            || current_session.principal != run.invocation.principal.id().as_str())
+    {
+        return Err(not_allocated());
+    }
     check_request_live(service, run)?;
     let already_disconnected = !current_session.connected
         && matches!(

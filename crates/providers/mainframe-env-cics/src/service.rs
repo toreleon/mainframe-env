@@ -6844,6 +6844,85 @@ mod tests {
     }
 
     #[test]
+    fn issue_device_rejects_a_foreign_run_on_an_owned_terminal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let owner = invocation_for("issue-device-owner", BTreeMap::new());
+        let foreign = invocation_for("issue-device-foreign", BTreeMap::new());
+        let session = SessionId::new("issue-device-owned-session", 64).unwrap();
+        service
+            .launch_terminal(owner.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+            .unwrap();
+        service
+            .register_run(foreign.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let terminal = service.lock().unwrap().sessions[session.as_str()]
+            .input
+            .terminal_id
+            .clone()
+            .unwrap();
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: terminal.clone(),
+            kind: handlers::IssueDeviceKind::Entry3740,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let command = request(CicsOperation::IssueEndfile, BTreeMap::new(), 1);
+        let mut foreign_run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&foreign.run_unit_id)
+            .unwrap();
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut foreign_run, &command),
+            Err(HostProblem::Condition {
+                name: "NOTALLOC".into(),
+                response: 61,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap()
+                .version,
+            1
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].version,
+            1
+        );
+        let mut owner_run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&owner.run_unit_id)
+            .unwrap();
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut owner_run, &command)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap()
+                .version,
+            2
+        );
+    }
+
+    #[test]
     fn issue_endfile_unknown_outcome_replays_after_sqlite_restart() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-issue-endfile-{}-{:?}",
@@ -7661,7 +7740,11 @@ mod tests {
                 );
                 assert_eq!(
                     handlers::invoke_issue_device(&service, &mut run, &alternate),
-                    Err(HostProblem::Unsupported)
+                    Err(HostProblem::Condition {
+                        name: "NOTALLOC".into(),
+                        response: 61,
+                        response2: 0,
+                    })
                 );
                 assert_eq!(
                     handlers::IssueDeviceRecord::load(store.as_ref(), "T004")
