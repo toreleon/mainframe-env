@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod allocate;
 mod definitions;
 mod gds;
+mod gds_allocate;
 mod ledger;
 mod replay;
 pub use definitions::{ConversationPartnerDefinition, ConversationProfileDefinition};
@@ -35,6 +36,9 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::AllocateConversation => {
             allocate::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::GdsAllocateConversation => {
+            gds_allocate::invoke(service, run, request, retention_tick)
         }
         _ => Err(HostProblem::Unsupported),
     }

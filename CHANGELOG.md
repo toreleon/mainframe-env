@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added the source-bounded APPC basic GDS ALLOCATE host route. It selects an
+  installed MODENAME or PARTNER, allocates a task-owned conversation in the
+  durable session ledger, returns a four-byte CONVID and six-byte RETCODE, and
+  reports GDS failures without EXEC CICS conditions. This assembler/C-only row
+  brings the isolated registry to 153 typed, 0 legacy, and 110 unready.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

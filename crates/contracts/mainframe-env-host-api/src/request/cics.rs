@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 pub enum CicsOperation {
     /// Allocate one task-owned mapped APPC or MRO conversation.
     AllocateConversation,
+    /// Allocate one task-owned APPC basic conversation with GDS return codes.
+    GdsAllocateConversation,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -300,6 +302,7 @@ impl CicsOperation {
     pub const fn runtime_name(self) -> &'static str {
         match self {
             Self::AllocateConversation => "AllocateConversation",
+            Self::GdsAllocateConversation => "GdsAllocateConversation",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -482,6 +485,7 @@ impl CicsOperation {
         matches!(
             self,
             Self::AllocateConversation
+                | Self::GdsAllocateConversation
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -630,6 +634,7 @@ impl CicsOperation {
         let first = words.first()?.as_str();
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ALLOCATE", _) => Self::AllocateConversation,
+            ("GDS", Some("ALLOCATE")) => Self::GdsAllocateConversation,
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
