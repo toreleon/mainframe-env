@@ -7118,6 +7118,108 @@ mod tests {
     }
 
     #[test]
+    fn issue_eraseaup_wait_clears_only_unprotected_fields_and_mdt() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "ISSUEMS".into(),
+                map: "ISSUE".into(),
+                line: 1,
+                column: 1,
+                rows: 1,
+                columns: 8,
+                fields: vec![
+                    BmsFieldDefinition {
+                        name: "OPEN".into(),
+                        row: 1,
+                        column: 1,
+                        length: 4,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    },
+                    BmsFieldDefinition {
+                        name: "LOCK".into(),
+                        row: 1,
+                        column: 5,
+                        length: 4,
+                        initial: b"KEEP".to_vec(),
+                        color: None,
+                        highlight: None,
+                        protected: true,
+                        secret: false,
+                        fset: true,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    },
+                ],
+            })
+            .unwrap();
+        let (invocation, session) = registered(&service);
+        {
+            let mut state = service.lock().unwrap();
+            let terminal = state.sessions.get_mut(session.as_str()).unwrap();
+            terminal.mapset = Some("ISSUEMS".into());
+            terminal.map = Some("ISSUE".into());
+            terminal.field_values = BTreeMap::from([
+                ("OPEN".into(), b"DATA".to_vec()),
+                ("LOCK".into(), b"KEEP".to_vec()),
+            ]);
+            terminal.field_protection =
+                BTreeMap::from([("OPEN".into(), false), ("LOCK".into(), true)]);
+            terminal.field_modified =
+                BTreeMap::from([("OPEN".into(), true), ("LOCK".into(), true)]);
+        }
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let no_wait = request(CicsOperation::IssueEraseAup, BTreeMap::new(), 1);
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &no_wait),
+            Err(HostProblem::Unsupported)
+        );
+        let command = request(
+            CicsOperation::IssueEraseAup,
+            BTreeMap::from([("OPTION.WAIT".into(), cics_option())]),
+            2,
+        );
+        let response = handlers::invoke_terminal_control(&service, &mut run, &command).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        let state = service.lock().unwrap();
+        let terminal = &state.sessions[session.as_str()];
+        let committed_version = terminal.version;
+        assert_eq!(terminal.field_values["OPEN"], [0; 4]);
+        assert_eq!(terminal.field_values["LOCK"], b"KEEP");
+        assert_eq!(terminal.field_modified["OPEN"], false);
+        assert_eq!(terminal.field_modified["LOCK"], true);
+        drop(state);
+        let controls = service.terminal_control_snapshot(&session).unwrap();
+        assert_eq!(controls.cursor, 0);
+        assert!(controls.keyboard_unlocked);
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &command),
+            Ok(response)
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].version,
+            committed_version
+        );
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

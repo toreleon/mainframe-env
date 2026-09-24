@@ -50,6 +50,10 @@ All notable changes to mainframe-env are documented here.
   RESET effects with atomic physical-device and terminal-session updates.
   The source's alternate SESSION form remains pending.
 
+- Added a BMS-backed ISSUE ERASEAUP WAIT route that clears unprotected fields
+  to nulls, resets their modified tags, positions the cursor, and restores
+  the keyboard through the existing durable terminal authority.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

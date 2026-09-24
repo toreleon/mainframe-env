@@ -10,8 +10,10 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::{ProviderStateMutation, ProviderStateRecord, ProviderStateWrite};
 
 mod control;
+mod issue;
 mod page;
 mod route;
+pub(super) use issue::eraseaup as issue_eraseaup;
 
 const STATE_NAMESPACE: &str = "cics-terminal-bms-v1";
 const RECEIPT_NAMESPACE: &str = "cics-terminal-bms-receipt-v1";
