@@ -1361,7 +1361,7 @@ fn parse_replace_directive(
 
 fn find_copy_directive(source: &str, from: usize) -> Result<Option<CopyDirective>, SyntaxProblem> {
     let bytes = source.as_bytes();
-    let mut index = from;
+    let (mut index, mut in_exec) = (from, false);
     while index < bytes.len() {
         if source[index..].starts_with("*>") {
             index = source[index..]
@@ -1384,7 +1384,7 @@ fn find_copy_directive(source: &str, from: usize) -> Result<Option<CopyDirective
             while index < bytes.len() && is_word_byte(bytes[index]) {
                 index += 1;
             }
-            if source[start..index].eq_ignore_ascii_case("COPY") {
+            if replace_scan::is_copy_directive(&source[start..index], &mut in_exec) {
                 return find_copy_end(source, start, index).map(Some);
             }
             continue;
@@ -2568,6 +2568,18 @@ mod tests {
         let syntax =
             decode_and_lex(&bundle(source, SourceFormat::Free), SyntaxLimits::default()).unwrap();
         assert!(syntax.expansions().is_empty());
+    }
+    #[test]
+    fn issue_copy_inside_exec_does_not_consume_a_real_copybook() {
+        let source = "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. ISCOPY.\n       PROCEDURE DIVISION.\n           EXEC CICS ISSUE COPY\n             TERMID('T001') END-EXEC.\n       COPY ACTUAL.\n";
+        let syntax = decode_and_lex(
+            &bundle_with_copy(source, "ACTUAL", "       DISPLAY 'OK'.\n"),
+            SyntaxLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(syntax.expansions().len(), 1);
+        assert!(syntax.semantic_text().contains("ISSUE COPY"));
+        assert!(syntax.semantic_text().contains("DISPLAY 'OK'"));
     }
     #[test]
     fn copy_words_inside_replace_pseudotext_are_not_expanded() {

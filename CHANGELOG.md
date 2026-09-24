@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Prevented the COBOL copybook preprocessor from interpreting `COPY` inside
+  `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
+  source origins remain intact.
+
 - Retained owner-fenced LUTYPE6.1 ISSUE SIGNAL direction requests in the
   existing physical TCTTE record, with exact replay and SQLite restart proof.
   APPC/MRO indicators remain in the shared conversation ledger.
