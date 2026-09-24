@@ -1171,6 +1171,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "ALLOCATE",
                 "GDS ALLOCATE",
                 "GDS ASSIGN",
+                "BUILD ATTACH",
                 "ASKTIME",
                 "ASKTIME ABSTIME",
                 "CHANGE TASK",

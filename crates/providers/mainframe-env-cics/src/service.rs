@@ -5400,6 +5400,7 @@ mod tests {
             ("ALLOCATE", CicsOperation::AllocateConversation),
             ("GDS ALLOCATE", CicsOperation::GdsAllocateConversation),
             ("GDS ASSIGN", CicsOperation::GdsAssignConversation),
+            ("BUILD ATTACH", CicsOperation::BuildAttach),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6702,7 +6703,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 156);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 157);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();

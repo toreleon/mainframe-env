@@ -46,6 +46,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012"
     },
     {
+      "operation": "BuildAttach",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0015"
+    },
+    {
       "operation": "AsktimeEib",
       "interface": "api",
       "family": "time",

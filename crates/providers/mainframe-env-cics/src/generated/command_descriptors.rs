@@ -115,6 +115,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::BuildAttach,
+        syntax: "BUILD ATTACH",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0015",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Cancel,
         syntax: "CANCEL",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0016",
