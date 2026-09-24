@@ -32866,6 +32866,27 @@ mod tests {
                 "NORMAL"
             );
         }
+        for (operation, sequence, name, response, response2) in [
+            (CicsOperation::SuspendAcqProcess, 13, "INVREQ", 16, 14),
+            (CicsOperation::ResumeAcqProcess, 14, "PROCESSERR", 108, 14),
+        ] {
+            let command = request(
+                operation,
+                BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&acquirer.run_unit_id, command.clone(), sequence),
+                    command
+                ),
+                Err(HostProblem::Condition {
+                    name: name.into(),
+                    response,
+                    response2,
+                })
+            );
+        }
     }
 
     #[test]

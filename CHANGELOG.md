@@ -109,6 +109,10 @@ All notable changes to mainframe-env are documented here.
   commands, with root read/write versus descendant read-only access, owner and
   UOW fencing, and an explicit root requirement for ACQPROCESS.
 
+- Corrected complete-root SUSPEND ACQPROCESS to return the SUSPEND
+  `INVREQ 16/14` activity-mode condition; RESUME ACQPROCESS retains its separate
+  `PROCESSERR 108/14` condition.
+
 - Added the RUN TRANSID child-token port with the sibling FETCH/FREE method
   signatures and `cics-bts-child-ownership-v1` row shape. Registration and
   terminal completion are owner-checked and versioned; RUN TRANSID task

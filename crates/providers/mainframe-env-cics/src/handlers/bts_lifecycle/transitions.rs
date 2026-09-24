@@ -152,7 +152,7 @@ impl BtsProcess {
             .get_mut(activity_id)
             .ok_or_else(|| missing(root))?;
         if matches!(activity.mode, BtsMode::Complete | BtsMode::Cancelling) {
-            return Err(if root {
+            return Err(if root && !suspended {
                 condition("PROCESSERR", 108, 14)
             } else if suspended {
                 condition("INVREQ", 16, 14)
@@ -311,6 +311,21 @@ mod tests {
     fn process() -> BtsProcess {
         let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW").unwrap()
+    }
+
+    #[test]
+    fn complete_root_suspend_and_resume_use_their_distinct_conditions() {
+        let mut state = process();
+        let root = state.root_id.clone();
+        state.cancel_subtree(&root).unwrap();
+        assert_eq!(
+            state.set_suspended(&root, true),
+            Err(condition("INVREQ", 16, 14))
+        );
+        assert_eq!(
+            state.set_suspended(&root, false),
+            Err(condition("PROCESSERR", 108, 14))
+        );
     }
 
     #[test]
