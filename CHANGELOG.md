@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Selected APPC basic GDS RECEIVE through the accepted host ABI and durable
+  conversation record. BUFFER and LLID delimiters, CONVDATA, STATE, FLENGTH,
+  six-byte RETCODE failures, one-time SIGNAL, exact replay, and SQLite reopen
+  have focused direct-provider coverage; this assembler/C-only row has no
+  COBOL runtime alias.
 - Selected mapped APPC/MRO RECEIVE through the accepted host ABI, typed COBOL
   interpreter, and durable peer exchange. The route handles NOTRUNCATE,
   truncation, EOC, SIGNAL, MRO FMH, STATE, length outputs, and exact replay.
@@ -19,7 +24,7 @@ All notable changes to mainframe-env are documented here.
   data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
   Extended the shared durable conversation record with bounded peer data,
   staged sends, explicit transmission acknowledgement, partial receive, and
-  GDS return-code contracts. Five data/terminal-wait rows remain unready pending
+  GDS return-code contracts. Four data/terminal-wait rows remain unready pending
   selected host dispatch and acceptance gates.
 - Peer conversation frames now carry a monotonic event sequence and digest,
   while staged sends carry distinct acknowledgement IDs. Exact duplicate
@@ -33,7 +38,7 @@ All notable changes to mainframe-env are documented here.
   one-time dispatch and reconciliation for each frame.
 - Added source-shaped GDS `CONVDATA` bytes for APPC basic receive and wait,
   including field-complete, receive, signal, confirm, syncpoint, free, error
-  code, rollback, and zeroed reserved fields. GDS rows remain unready.
+  code, rollback, and zeroed reserved fields. GDS WAIT remains unready.
 - A GDS RECEIVE now consumes a pending peer SIGNAL once and preserves CDBSIG
   in that command's CONVDATA reply while clearing the pending ledger bit.
 - Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,

@@ -5405,6 +5405,7 @@ mod tests {
             ("GDS CONNECT PROCESS", CicsOperation::GdsConnectProcess),
             ("FREE", CicsOperation::FreeConversation),
             ("GDS FREE", CicsOperation::GdsFreeConversation),
+            ("GDS RECEIVE", CicsOperation::GdsReceiveConversation),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -36545,6 +36546,337 @@ mod tests {
                 .iter()
                 .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
         );
+    }
+
+    #[test]
+    fn gds_receive_host_route_respects_llid_buffer_retcode_and_convdata() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcBasic, owner.clone())
+            .unwrap()
+            .token;
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                Vec::new(),
+                0,
+            )
+            .unwrap();
+        record
+            .peer_offered_data(&owner, ConversationContext::Local)
+            .unwrap();
+        for (sequence, bytes, end) in [(1, b"ONE".as_slice(), false), (2, b"TWO".as_slice(), true)]
+        {
+            record
+                .enqueue_peer_data(
+                    &owner,
+                    ConversationContext::Local,
+                    sequence,
+                    ConversationDataFrame {
+                        bytes: bytes.to_vec(),
+                        end_of_chain: end,
+                        end_structured_field: true,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+        }
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let first = request(
+            CicsOperation::GdsReceiveConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("INTO".into(), cics_option()),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("FLENGTH".into(), cics_option()),
+                ("MAXFLENGTH".into(), cics_decimal(8)),
+                ("CONVDATA".into(), cics_option()),
+                ("RETCODE".into(), cics_option()),
+                ("OPTION.LLID".into(), cics_option()),
+            ]),
+            1,
+        );
+        let first_reply = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, first.clone(), 1),
+                first.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (first_reply.condition.as_str(), first_reply.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(first_reply.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(first_reply.outputs["INTO"].bytes(), b"ONE");
+        assert_eq!(first_reply.outputs["FLENGTH"].bytes(), b"3");
+        assert_eq!(first_reply.outputs["STATE"].bytes(), b"88");
+        assert_eq!(first_reply.outputs["CONVDATA"].bytes()[0], 0xff);
+        assert_eq!(first_reply.outputs["CONVDATA"].bytes()[3], 0xff);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+                .unwrap(),
+            first_reply
+        );
+        let second = request(
+            CicsOperation::GdsReceiveConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("INTO".into(), cics_option()),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("FLENGTH".into(), cics_option()),
+                ("MAXFLENGTH".into(), cics_decimal(8)),
+                ("CONVDATA".into(), cics_option()),
+                ("RETCODE".into(), cics_option()),
+                ("OPTION.BUFFER".into(), cics_option()),
+            ]),
+            2,
+        );
+        let second_reply = cics
+            .invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second)
+            .unwrap();
+        assert_eq!(second_reply.outputs["INTO"].bytes(), b"TWO");
+        assert_eq!(second_reply.outputs["FLENGTH"].bytes(), b"3");
+        assert_eq!(second_reply.outputs["STATE"].bytes(), b"90");
+        let invalid = request(
+            CicsOperation::GdsReceiveConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("INTO".into(), cics_option()),
+                ("INTO.MAXLENGTH".into(), cics_decimal(32_768)),
+                ("FLENGTH".into(), cics_option()),
+                ("MAXFLENGTH".into(), cics_decimal(32_768)),
+                ("RETCODE".into(), cics_option()),
+            ]),
+            3,
+        );
+        let rejected = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (rejected.condition.as_str(), rejected.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(
+            rejected.outputs["RETCODE"].bytes(),
+            &[5, 0, 0, 0, 0x7f, 0xff]
+        );
+        let wrong_state = request(
+            CicsOperation::GdsReceiveConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("INTO".into(), cics_option()),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("FLENGTH".into(), cics_option()),
+                ("MAXFLENGTH".into(), cics_decimal(8)),
+                ("RETCODE".into(), cics_option()),
+            ]),
+            4,
+        );
+        let checked = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wrong_state.clone(), 4),
+                wrong_state,
+            )
+            .unwrap();
+        assert_eq!(checked.outputs["RETCODE"].bytes(), &[3, 8, 0, 0, 0, 0]);
+        let saved = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut signaling = saved.clone();
+        let record = signaling.conversation_mut(token).unwrap();
+        record
+            .peer_offered_data(&owner, ConversationContext::Local)
+            .unwrap();
+        record
+            .enqueue_peer_data(
+                &owner,
+                ConversationContext::Local,
+                3,
+                ConversationDataFrame {
+                    signal: true,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert!(saved.persist(&mut signaling, store.as_ref()).unwrap());
+        let signal = request(
+            CicsOperation::GdsReceiveConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("INTO".into(), cics_option()),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("FLENGTH".into(), cics_option()),
+                ("MAXFLENGTH".into(), cics_decimal(8)),
+                ("CONVDATA".into(), cics_option()),
+                ("RETCODE".into(), cics_option()),
+            ]),
+            5,
+        );
+        let signaled = cics
+            .invoke(&effect(&invocation.run_unit_id, signal.clone(), 5), signal)
+            .unwrap();
+        assert_eq!(
+            (signaled.condition.as_str(), signaled.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(signaled.outputs["FLENGTH"].bytes(), b"0");
+        assert_eq!(signaled.outputs["CONVDATA"].bytes()[4], 0xff);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .gds_convdata(false)
+                .unwrap()[4],
+            0
+        );
+    }
+
+    #[test]
+    fn gds_receive_sqlite_reopens_partial_field_and_replay() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-gds-receive-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let token;
+        let first;
+        let first_reply;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let (invocation, _) = registered(&cics);
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let initial = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = initial.clone();
+            next.register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+            token = next
+                .allocate("SYS1", ConversationKind::AppcBasic, owner.clone())
+                .unwrap()
+                .token;
+            let record = next.conversation_mut(token).unwrap();
+            record
+                .connect(
+                    &owner,
+                    ConversationContext::Local,
+                    true,
+                    b"PROC".to_vec(),
+                    Vec::new(),
+                    0,
+                )
+                .unwrap();
+            record
+                .peer_offered_data(&owner, ConversationContext::Local)
+                .unwrap();
+            record
+                .enqueue_peer_data(
+                    &owner,
+                    ConversationContext::Local,
+                    1,
+                    ConversationDataFrame {
+                        bytes: b"SQLITE".to_vec(),
+                        end_of_chain: true,
+                        end_structured_field: true,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+            first = request(
+                CicsOperation::GdsReceiveConversation,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("INTO".into(), cics_option()),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+                    ("FLENGTH".into(), cics_option()),
+                    ("MAXFLENGTH".into(), cics_decimal(3)),
+                    ("CONVDATA".into(), cics_option()),
+                    ("RETCODE".into(), cics_option()),
+                    ("OPTION.LLID".into(), cics_option()),
+                ]),
+                1,
+            );
+            first_reply = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, first.clone(), 1),
+                    first.clone(),
+                )
+                .unwrap();
+            assert_eq!(first_reply.outputs["INTO"].bytes(), b"SQL");
+            assert_eq!(first_reply.outputs["CONVDATA"].bytes()[0], 0);
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let invocation = invocation();
+            let session = SessionId::new("session", 64).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                ledger.conversation(token).unwrap().data.pending_inbound(),
+                1
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+                    .unwrap(),
+                first_reply
+            );
+            let last = request(
+                CicsOperation::GdsReceiveConversation,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("INTO".into(), cics_option()),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                    ("FLENGTH".into(), cics_option()),
+                    ("MAXFLENGTH".into(), cics_decimal(8)),
+                    ("CONVDATA".into(), cics_option()),
+                    ("RETCODE".into(), cics_option()),
+                    ("OPTION.LLID".into(), cics_option()),
+                ]),
+                2,
+            );
+            let reply = cics
+                .invoke(&effect(&invocation.run_unit_id, last.clone(), 2), last)
+                .unwrap();
+            assert_eq!(reply.outputs["INTO"].bytes(), b"ITE");
+            assert_eq!(reply.outputs["CONVDATA"].bytes()[0], 0xff);
+            assert_eq!(reply.outputs["STATE"].bytes(), b"90");
+        }
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

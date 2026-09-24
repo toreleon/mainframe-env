@@ -20,6 +20,7 @@ mod gds_allocate;
 mod gds_assign;
 mod gds_connect_process;
 mod gds_free;
+mod gds_receive;
 mod ledger;
 mod peer;
 mod receive;
@@ -132,6 +133,9 @@ pub(in crate::service) fn invoke(
         CicsOperation::ReceiveConversation => {
             receive::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::GdsReceiveConversation => {
+            gds_receive::invoke(service, run, request, retention_tick)
+        }
         CicsOperation::GdsFreeConversation => {
             gds_free::invoke(service, run, request, retention_tick)
         }
@@ -174,7 +178,9 @@ pub(in crate::service) fn suspends_without_outer_replay(
     response.disposition == mainframe_env_host_api::CicsDisposition::Suspended
         && matches!(
             operation,
-            CicsOperation::WaitSignal | CicsOperation::ReceiveConversation
+            CicsOperation::WaitSignal
+                | CicsOperation::ReceiveConversation
+                | CicsOperation::GdsReceiveConversation
         )
 }
 
