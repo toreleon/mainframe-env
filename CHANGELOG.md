@@ -15,6 +15,10 @@ All notable changes to mainframe-env are documented here.
   ALLOCATED conversation. The pinned GDS topic explicitly permits ABEND
   regardless of conversation state.
 
+- Retained an ISSUE SIGNAL direction-change request in the shared APPC
+  protocol record. The optional field decodes earlier rows canonically and
+  is cleared on ABEND; partner delivery remains pending integration.
+
 - Pending ISSUE host identities now fail closed through an optional generated
   descriptor lookup. GDS ISSUE protocol failures retain their distinct
   six-byte return codes without turning corrupt state into a normal response.

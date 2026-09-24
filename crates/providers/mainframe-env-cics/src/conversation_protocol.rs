@@ -102,6 +102,13 @@ pub struct ConversationRecord {
     pub process: Option<Vec<u8>>,
     pub pip: Vec<u8>,
     pub sequence: u64,
+    /// Direction-change flow awaiting the partner's next protocol command.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub signal_pending: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// Local/DPL invocation context supplied by the trusted host boundary.
@@ -180,6 +187,9 @@ impl ConversationRecord {
         self.state = next;
         if flow == ConversationIssue::Abend {
             self.released = true;
+            self.signal_pending = false;
+        } else if flow == ConversationIssue::Signal {
+            self.signal_pending = true;
         }
         Ok(next)
     }
@@ -203,6 +213,7 @@ impl ConversationRecord {
             process: None,
             pip: Vec::new(),
             sequence: 0,
+            signal_pending: false,
         };
         record.validate()?;
         Ok(record)
@@ -245,6 +256,7 @@ impl ConversationRecord {
             || self.pip.len() > MAX_PIP_BYTES
             || self.sync_level.is_some_and(|level| level > 2)
             || (self.released && self.state != ConversationState::Free)
+            || self.signal_pending && (self.released || self.kind == ConversationKind::Mro)
             || (self.process.is_none() && self.sync_level.is_some())
             || (self.kind != ConversationKind::Mro
                 && self.state != ConversationState::Allocated
@@ -519,6 +531,70 @@ mod tests {
             assert_eq!(record.sequence, 1);
             ConversationRecord::decode(&record.encode().unwrap()).unwrap();
         }
+    }
+
+    #[test]
+    fn issue_signal_is_durable_until_the_protocol_flow_is_resolved() {
+        let mut record = ConversationRecord::allocate(
+            *b"I006",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        let legacy_bytes = record.encode().unwrap();
+        assert!(!String::from_utf8_lossy(&legacy_bytes).contains("signal_pending"));
+        record
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                b"TRAN".to_vec(),
+                vec![],
+                1,
+            )
+            .unwrap();
+        record
+            .complete_converse(
+                &owner(3),
+                ConversationContext::Local,
+                ConversationState::Receive,
+            )
+            .unwrap();
+        assert_eq!(
+            record.issue(
+                &owner(2),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Signal,
+            ),
+            Err(ConversationProblem::StaleOwner)
+        );
+        assert!(!record.signal_pending);
+        assert_eq!(
+            record.issue(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Signal,
+            ),
+            Ok(ConversationState::Receive)
+        );
+        assert!(
+            ConversationRecord::decode(&record.encode().unwrap())
+                .unwrap()
+                .signal_pending
+        );
+        record
+            .issue(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                ConversationIssue::Abend,
+            )
+            .unwrap();
+        assert!(!record.signal_pending && record.released);
     }
 
     #[test]
