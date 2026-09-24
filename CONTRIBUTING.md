@@ -32,9 +32,23 @@ environment. A skipped external test receives no evidence credit.
 4. Regenerate derived files through `cargo xtask`; do not hand-edit generated
    Rust, catalogs, ledgers, or receipts.
 5. Run the narrow affected tests, then the applicable gates below.
-6. Update user-visible documentation and `CHANGELOG.md` in the same change.
+6. Update user-visible documentation and add a unique
+   [`changes/unreleased`](changes/README.md) fragment in the same change. Do not
+   edit `CHANGELOG.md` directly in parallel feature pull requests.
 7. Keep implementation, release promotion, publication, and deployment as
    separate decisions.
+
+Install the repository-local documentation-manifest merge driver once per
+clone before maintaining parallel worktrees:
+
+```bash
+python3 -B tools/setup_git_merge_drivers.py
+```
+
+Feature branches run `cargo xtask changelog --check` and continue to regenerate
+the documentation manifest normally. Release or batch integration runs
+`cargo xtask changelog` once to consume all fragments, update `CHANGELOG.md`,
+and regenerate the manifest in one reviewed metadata commit.
 
 ## Verification scope
 

@@ -1,0 +1,155 @@
+{
+  "schema_version": "mainframe-env.cics-spi-fepi-source-authority@1",
+  "target_version": "0.10.0",
+  "work_package": "SPI-1001.source-authority",
+  "status": "reviewed-identity-only",
+  "baseline": {
+    "id": "ibm-cics-ts-6x-2026-08-31",
+    "catalog": "conformance/0.2/catalogs/cics.json",
+    "catalog_sha256": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba",
+    "manifest": "conformance/0.2/manifests/cics-topics.json",
+    "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+    "toc_sha256": "sha256:f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+  },
+  "topic": {
+    "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+    "sha256": "sha256:78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25",
+    "bytes": 265761,
+    "last_modified": "2026-07-23",
+    "retained_archive_locator": "raw/html/sha256/78/78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25.html"
+  },
+  "tables": {
+    "spi": {
+      "table_id": "dfha8mf__eibfn_table_cmds_spi",
+      "interface": "SPI",
+      "raw_rows": 273,
+      "unique_command_labels": 269,
+      "official_denominator": 269,
+      "deduplication_key": "normalized-command-label",
+      "duplicate_labels": [
+        {
+          "label": "INQUIRE NETNAME",
+          "catalog_eibfn": "5216",
+          "additional_source_eibfn": ["5206"]
+        },
+        {
+          "label": "INQUIRE SYSTEM",
+          "catalog_eibfn": "5402",
+          "additional_source_eibfn": ["5412"]
+        },
+        {
+          "label": "INQUIRE TERMINAL",
+          "catalog_eibfn": "5202",
+          "additional_source_eibfn": ["5212"]
+        },
+        {
+          "label": "SET TERMINAL",
+          "catalog_eibfn": "5204",
+          "additional_source_eibfn": ["5214"]
+        }
+      ],
+      "normalizations": [
+        {
+          "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0192",
+          "source_eibfn": "70 32",
+          "catalog_eibfn": "7032",
+          "rule": "remove-source-whitespace"
+        }
+      ]
+    },
+    "fepi": {
+      "table_id": "dfha8mf__eibfn_table_cmds_fepi",
+      "interface": "FEPI",
+      "raw_rows": 39,
+      "unique_command_labels": 39,
+      "official_denominator": 39,
+      "deduplication_key": "normalized-command-label",
+      "duplicate_labels": [],
+      "normalizations": []
+    }
+  },
+  "projection_boundary": {
+    "allowed_facts": ["official_row", "command_label", "interface", "eibfn_identity"],
+    "blocked_facts": [
+      "grammar",
+      "options",
+      "resource_schema",
+      "conditions",
+      "execution_context",
+      "authorized_intent",
+      "audit_effect",
+      "concurrency",
+      "lock_order",
+      "implicit_syncpoint",
+      "quiesce_drain",
+      "lifecycle",
+      "restart",
+      "recovery"
+    ],
+    "semantic_authority": false,
+    "automatic_registration": false
+  },
+  "source_gaps": [
+    {
+      "id": "SPI-1001.source-gap.spi-command-bodies",
+      "interface": "SPI",
+      "affected_rows": 269,
+      "required_topic_path": null,
+      "required_topic_sha256": null,
+      "state": "blocked-unmapped-unpinned-command-bodies",
+      "reason": "No reviewed SPI row-to-command-topic mapping or digest-pinned command-body manifest exists for 0.10; the EIBFN inventory table is not grammar or behavior authority.",
+      "dependent_facts": [
+        "grammar",
+        "options",
+        "resource_schema",
+        "conditions",
+        "execution_context",
+        "authorized_intent",
+        "audit_effect",
+        "concurrency",
+        "lock_order",
+        "implicit_syncpoint",
+        "quiesce_drain",
+        "lifecycle",
+        "restart",
+        "recovery"
+      ],
+      "resolution": "Review a complete 269-row SPI topic map, register exact topic paths and SHA-256 values, reproduce matching retained HTML offline, and independently review projections."
+    },
+    {
+      "id": "SPI-1001.source-gap.fepi-command-bodies",
+      "interface": "FEPI",
+      "affected_rows": 39,
+      "required_topic_path": null,
+      "required_topic_sha256": null,
+      "state": "blocked-unmapped-unpinned-command-bodies",
+      "reason": "No reviewed FEPI row-to-command-topic mapping or digest-pinned command-body manifest exists for 0.10; the EIBFN inventory table is not grammar or behavior authority.",
+      "dependent_facts": [
+        "grammar",
+        "options",
+        "resource_schema",
+        "conditions",
+        "execution_context",
+        "authorized_intent",
+        "audit_effect",
+        "concurrency",
+        "lock_order",
+        "implicit_syncpoint",
+        "quiesce_drain",
+        "lifecycle",
+        "restart",
+        "recovery"
+      ],
+      "resolution": "Review a complete 39-row FEPI topic map, register exact topic paths and SHA-256 values, reproduce matching retained HTML offline, and independently review projections."
+    }
+  ],
+  "shared_authorities": {
+    "condition": "cics-eibresp-condition-name@1",
+    "security": "docs/architecture/PLUGIN-AND-SECURITY.md",
+    "effect": "mainframe-env.effect-canonical@1",
+    "execution": "docs/architecture/EXECUTION-AND-DURABILITY.md",
+    "persistence": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
+    "storage": "docs/contracts/DURABLE-STORAGE-PROFILE.md"
+  },
+  "coverage_credit": 0
+}

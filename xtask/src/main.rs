@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod carddemo_v09_host;
+mod changelog;
 mod docs;
 mod evidence_seal;
 mod jcl_catalog;
@@ -12,29 +13,32 @@ mod release_attestation;
 mod release_licenses;
 mod topic_manifests;
 mod work_package_seal;
+mod zosmf_contracts;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
     CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
-    RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, cics_pilot_runtime,
-    cobol_arithmetic_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
-    gnucobol_reference_fixture_digest, import_cics_oracle_capture, licensed_fixture_digest,
-    run_dataset_reference_simulation, run_gnucobol_reference_campaign,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
+    OracleCandidateExpectation, OracleHarnessValidationKind, RACF_ORACLE_RELATIVE_PATH,
+    RacfOracleCampaign, cics_pilot_runtime, cobol_arithmetic_pilot_runtime,
+    cobol_move_pilot_runtime, dataset_conformance_runtime, gnucobol_reference_fixture_digest,
+    import_cics_oracle_capture, licensed_fixture_digest, run_dataset_reference_simulation,
+    run_gnucobol_reference_campaign, validate_oracle_harness_receipt,
+    validate_oracle_harness_registry, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
     verify_cobol_data_runtime_fixtures, verify_cobol_exit, verify_cobol_file_runtime_fixtures,
     verify_cobol_frontend_fixtures, verify_cobol_function_boundary_runtime_fixtures,
     verify_cobol_function_fixtures, verify_cobol_function_runtime_fixtures,
@@ -164,6 +168,7 @@ enum EvidenceCommand {
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
     Versions(CheckArgs),
+    Changelog(CheckArgs),
     Docs(CheckArgs),
     Architecture(CheckArgs),
     ArchitectureFast(CheckArgs),
@@ -180,6 +185,7 @@ enum XtaskCommand {
     AbiLibraries(CheckArgs),
     ProgramRegistry(CheckArgs),
     RouteRegistries(CheckArgs),
+    ZosmfContracts(CheckArgs),
     Dehardcoding(CheckArgs),
     LedgerConsistency(CheckArgs),
     MigrationRollback(CheckArgs),
@@ -198,6 +204,7 @@ enum XtaskCommand {
     DatasetOracle(CheckArgs),
     JesOracle(CheckArgs),
     JesOracleCandidate,
+    LicensedHarness(CheckArgs),
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
@@ -280,10 +287,23 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
     }
     match command {
         XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
+        XtaskCommand::Changelog(args) => checked!(
+            "changelog",
+            args,
+            changelog::run(root, args.check).and_then(|()| {
+                if args.check {
+                    Ok(())
+                } else {
+                    docs::run(root, false, &Cli::command())
+                }
+            })
+        ),
         XtaskCommand::Docs(args) => checked!(
             "docs",
             args,
-            check_versions(root).and_then(|()| docs::run(root, args.check, &Cli::command()))
+            check_versions(root)
+                .and_then(|()| changelog::validate(root))
+                .and_then(|()| docs::run(root, args.check, &Cli::command()))
         ),
         XtaskCommand::ArchitectureFast(args) => {
             checked!("architecture-fast", args, check_architecture_fast(root))
@@ -359,6 +379,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 generate_route_registries(root)
             }
         ),
+        XtaskCommand::ZosmfContracts(args) => checked!(
+            "zosmf-contracts",
+            args,
+            zosmf_contracts::run(root, args.check)
+        ),
         XtaskCommand::Dehardcoding(args) => {
             checked!("dehardcoding", args, check_dehardcoding(root))
         }
@@ -427,6 +452,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             false,
             print_jes_oracle_candidate(root),
         ),
+        XtaskCommand::LicensedHarness(args) => {
+            checked!("licensed-harness", args, check_licensed_harness(root))
+        }
         XtaskCommand::CobolLanguage(args) => checked!(
             "cobol-language",
             args,
@@ -7694,6 +7722,54 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
     }
     check_declared_dependency_graph(root)?;
     check_common_execution_route(root)?;
+    let participant_contract = root.join("conformance/0.16/contracts/transaction-participant.json");
+    let participant_schema =
+        root.join("conformance/0.16/schemas/transaction-participant.schema.json");
+    validate_schema_instance(
+        &json(&participant_schema)?,
+        &json(&participant_contract)?,
+        &participant_contract,
+    )?;
+    let participant_fixtures =
+        root.join("conformance/0.16/fixtures/transaction-participant-compatibility.json");
+    let participant_fixture_schema =
+        root.join("conformance/0.16/schemas/transaction-participant-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&participant_fixture_schema)?,
+        &json(&participant_fixtures)?,
+        &participant_fixtures,
+    )?;
+    let participant_generator = root.join("tools/generate_transaction_participant.py");
+    require(
+        participant_generator.is_file(),
+        "transaction participant generator is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&participant_generator)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("transaction participant freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "transaction participant freshness guard failed",
+    )?;
+    let participant_bindings = root.join("tools/check_transaction_participant.py");
+    require(
+        participant_bindings.is_file(),
+        "transaction participant binding guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&participant_bindings)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("transaction participant binding guard: {error}"))?;
+    require(
+        status.success(),
+        "transaction participant binding guard failed",
+    )?;
     check_dehardcoding(root)?;
     if root
         .join("crates/contracts/mainframe-env-host-api/src/canonical.rs")
@@ -8438,6 +8514,54 @@ fn check_schemas(root: &Path) -> TaskResult {
         "CICS BIF oracle family manifest/fixture closure drifted",
     )?;
     validate_0_2_schema_artifacts(root)?;
+    let zosmf_normalization_path = root.join("conformance/0.11/catalogs/zosmf-normalization.json");
+    let zosmf_normalization_schema =
+        root.join("conformance/0.11/schemas/zosmf-normalization.schema.json");
+    validate_schema_instance(
+        &json(&zosmf_normalization_schema)?,
+        &json(&zosmf_normalization_path)?,
+        &zosmf_normalization_path,
+    )?;
+    for (artifact, schema) in [
+        (
+            "conformance/0.11/generated/zosmf-contracts.json",
+            "conformance/0.11/schemas/zosmf-generated-contracts.schema.json",
+        ),
+        (
+            "conformance/0.11/generated/zosmf-collision-report.json",
+            "conformance/0.11/schemas/zosmf-collision-report.schema.json",
+        ),
+        (
+            "conformance/0.11/generated/zosmf-closure-report.json",
+            "conformance/0.11/schemas/zosmf-closure-report.schema.json",
+        ),
+    ] {
+        let artifact_path = root.join(artifact);
+        validate_schema_instance(
+            &json(&root.join(schema))?,
+            &json(&artifact_path)?,
+            &artifact_path,
+        )?;
+    }
+    let spi_fepi_source_authority =
+        root.join("conformance/0.10/cics/spi-fepi-source-authority.json");
+    let spi_fepi_source_schema =
+        root.join("conformance/0.10/schemas/cics-spi-fepi-source-authority.schema.json");
+    validate_schema_instance(
+        &json(&spi_fepi_source_schema)?,
+        &json(&spi_fepi_source_authority)?,
+        &spi_fepi_source_authority,
+    )?;
+    let spi_fepi_identity_catalog =
+        root.join("conformance/0.10/generated/cics-spi-fepi-identity-catalog.json");
+    let spi_fepi_identity_schema =
+        root.join("conformance/0.10/schemas/cics-spi-fepi-identity-catalog.schema.json");
+    validate_schema_instance(
+        &json(&spi_fepi_identity_schema)?,
+        &json(&spi_fepi_identity_catalog)?,
+        &spi_fepi_identity_catalog,
+    )?;
+    check_licensed_environment_requirements(root)?;
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(
@@ -8659,6 +8783,211 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&surface_audit)?,
         &surface_audit,
     )
+}
+
+fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
+    let environment_requirements = root.join("conformance/0.17/environment/requirements.json");
+    let environment_requirements_schema =
+        root.join("conformance/0.17/schemas/licensed-environment-requirements.schema.json");
+    let environment_requirements_value = json(&environment_requirements)?;
+    validate_schema_instance(
+        &json(&environment_requirements_schema)?,
+        &environment_requirements_value,
+        &environment_requirements,
+    )?;
+    let slots = array(
+        &environment_requirements_value,
+        "slots",
+        &environment_requirements,
+    )?;
+    unique_rows(slots, "slot_id", &environment_requirements)?;
+    require(
+        slots.iter().all(|slot| {
+            slot["environment_status"] == "pending"
+                && slot["differential_status"] == "pending"
+                && slot["recorded_pending"]["numerator"] == 0
+        }),
+        "CER-1701 environment slots must remain pending with zero licensed credit",
+    )?;
+    for (slot_id, denominator) in [
+        ("cobol", 153),
+        ("racf-saf", 48),
+        ("dataset-vsam-ams", 36),
+        ("jes2", 16),
+    ] {
+        require(
+            slots.iter().any(|slot| {
+                slot["slot_id"] == slot_id && slot["recorded_pending"]["denominator"] == denominator
+            }),
+            &format!("CER-1701 changed the historical {slot_id} pending denominator"),
+        )?;
+    }
+    let source_index_path = root.join("conformance/0.2/catalogs/index.json");
+    let source_index = json(&source_index_path)?;
+    let baselines = array(&source_index, "baselines", &source_index_path)?;
+    for slot in slots {
+        for required in array(slot, "required_baselines", &environment_requirements)? {
+            let baseline_id = text(required, "baseline_id", &environment_requirements)?;
+            let baseline = baselines
+                .iter()
+                .find(|baseline| baseline["id"] == baseline_id)
+                .ok_or_else(|| format!("CER-1701 names unknown baseline {baseline_id}"))?;
+            require(
+                required["topic_manifest_sha256"] == baseline["source"]["sha256"]
+                    && required["catalog_sha256"] == baseline["catalog_sha256"],
+                &format!("CER-1701 source identity drifted for {baseline_id}"),
+            )?;
+        }
+    }
+
+    let harness_path = root.join("conformance/0.17/oracles/harnesses.json");
+    let harness_schema_path =
+        root.join("conformance/0.17/schemas/oracle-harness-registry.schema.json");
+    let harness_value = json(&harness_path)?;
+    validate_schema_instance(&json(&harness_schema_path)?, &harness_value, &harness_path)?;
+    let harness_bytes =
+        fs::read(&harness_path).map_err(|error| format!("{}: {error}", harness_path.display()))?;
+    let harness = validate_oracle_harness_registry(&harness_bytes)?;
+    let harness_slots = array(&harness_value, "slots", &harness_path)?;
+    unique_rows(harness_slots, "slot_id", &harness_path)?;
+    require(
+        harness.slot_ids().collect::<BTreeSet<_>>()
+            == slots
+                .iter()
+                .filter_map(|slot| slot["slot_id"].as_str())
+                .collect::<BTreeSet<_>>(),
+        "CER-1701 environment and harness slot sets differ",
+    )?;
+    for harness_slot in harness_slots {
+        let slot_id = text(harness_slot, "slot_id", &harness_path)?;
+        let requirement = slots
+            .iter()
+            .find(|slot| slot["slot_id"] == slot_id)
+            .ok_or_else(|| format!("CER-1701 harness slot {slot_id} has no requirement"))?;
+        let harness_baselines = array(harness_slot, "required_baselines", &harness_path)?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<BTreeSet<_>>();
+        let requirement_baselines =
+            array(requirement, "required_baselines", &environment_requirements)?
+                .iter()
+                .filter_map(|baseline| baseline["baseline_id"].as_str())
+                .collect::<BTreeSet<_>>();
+        require(
+            harness_baselines == requirement_baselines,
+            &format!("CER-1701 harness baseline set drifted for {slot_id}"),
+        )?;
+        if let Some(policy_path) = harness_slot["adapter"]["policy_path"].as_str() {
+            require(
+                root.join(policy_path).is_file(),
+                &format!("CER-1701 adapter policy is missing for {slot_id}"),
+            )?;
+        }
+        match harness_slot["fixture"]["digest_rule"].as_str() {
+            Some("cobol-four-fixture-length-prefix-sha256") => require(
+                harness_slot["fixture"]["digest"] == licensed_fixture_digest(),
+                "CER-1701 COBOL independent fixture digest drifted",
+            )?,
+            Some("file-bytes-sha256") => {
+                let fixture_path = harness_slot["fixture"]["path"]
+                    .as_str()
+                    .ok_or_else(|| format!("CER-1701 fixture path is missing for {slot_id}"))?;
+                let actual = format!("sha256:{}", file_digest(&root.join(fixture_path))?);
+                require(
+                    harness_slot["fixture"]["digest"].as_str() == Some(actual.as_str()),
+                    &format!("CER-1701 independent fixture digest drifted for {slot_id}"),
+                )?;
+            }
+            Some("pending") => require(
+                harness_slot["fixture"]["path"].is_null()
+                    && harness_slot["fixture"]["digest"].is_null(),
+                &format!("CER-1701 pending fixture has an identity for {slot_id}"),
+            )?,
+            _ => {
+                return Err(format!(
+                    "CER-1701 fixture digest rule is unknown for {slot_id}"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_licensed_harness(root: &Path) -> TaskResult {
+    check_licensed_environment_requirements(root)?;
+    let registry_path = root.join("conformance/0.17/oracles/harnesses.json");
+    let environment_path = root.join("conformance/0.17/fixtures/synthetic-environment.json");
+    let receipt_path = root.join("conformance/0.17/fixtures/synthetic-receipt.json");
+    let legacy_path = root.join("conformance/0.17/fixtures/synthetic-cics-capture.json");
+    let registry = fs::read(&registry_path)
+        .map_err(|error| format!("{}: {error}", registry_path.display()))?;
+    let environment = fs::read(&environment_path)
+        .map_err(|error| format!("{}: {error}", environment_path.display()))?;
+    let receipt =
+        fs::read(&receipt_path).map_err(|error| format!("{}: {error}", receipt_path.display()))?;
+    let legacy =
+        fs::read(&legacy_path).map_err(|error| format!("{}: {error}", legacy_path.display()))?;
+    let expectation = OracleCandidateExpectation {
+        slot_id: "cics".into(),
+        source_commit: "5ab706b1dd069e26db7cb9a2b66e921c9001fc39".into(),
+        source_tree_digest:
+            "sha256:c4e5c4d7d40d6c5618ae4cde2e478d18a531f690f4eebacf44cf16959f70c984".into(),
+        artifacts: BTreeMap::from([(
+            "synthetic-candidate-artifact".into(),
+            "sha256:6a1c9843c16282e72cc4acfd454948e3c2ca56898510d21e12fb0c52e5e34a04".into(),
+        )]),
+        catalogs: BTreeMap::from([(
+            "ibm-cics-ts-6x-2026-08-31".into(),
+            format!(
+                "sha256:{}",
+                file_digest(&root.join("conformance/0.2/catalogs/cics.json"))?
+            ),
+        )]),
+        conformance_spec_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/spec/v1/spec.json"))?
+        ),
+        fixture_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/cics/pilot-fixtures.json"))?
+        ),
+        oracle_adapter_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/oracles/cics-licensed-differential.json"))?
+        ),
+        normalization_policy_digest:
+            "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9".into(),
+    };
+    let validation =
+        validate_oracle_harness_receipt(&receipt, &environment, &registry, &legacy, &expectation)?;
+    require(
+        validation.kind() == OracleHarnessValidationKind::PlumbingOnly
+            && validation.licensed_differential_credit() == 0,
+        "CER-1701 synthetic fixture attempted to claim licensed differential credit",
+    )?;
+    println!(
+        "licensed-harness slot={} receipt={} plumbing=pass licensed-credit=0 differential=pending",
+        validation.slot_id(),
+        validation.receipt_digest()
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod licensed_environment_schema_tests {
+    use super::*;
+
+    #[test]
+    fn cer_1701_environment_requirements_are_schema_valid_and_pending() {
+        let root = repository_root().expect("repository root");
+        check_licensed_environment_requirements(&root).expect("CER-1701 environment authority");
+    }
+
+    #[test]
+    fn cer_1701_synthetic_harness_is_zero_credit() {
+        let root = repository_root().expect("repository root");
+        check_licensed_harness(&root).expect("CER-1701 synthetic harness");
+    }
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {

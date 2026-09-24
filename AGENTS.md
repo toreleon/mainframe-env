@@ -52,6 +52,7 @@ Under `crates/`: `foundation/` owns primitives, `contracts/` interfaces,
 - `cargo test -p PACKAGE`: test an affected package.
 - `cargo fmt --all -- --check`: check formatting.
 - `cargo deny check`: mandatory dependency policy.
+- `cargo xtask changelog --check`: validate isolated change fragments.
 - `cargo xtask docs --check`: validate documentation.
 
 More: [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -87,7 +88,11 @@ applicable. Cover negative cases, recovery, authorization, backend parity, and
 
 Use `codex/<topic>` branches and prefixes `feat(dev):`, `fix(ir):`, `docs:`, or
 `ci:`. Preserve unrelated changes. PRs explain behavior, issues, checks/skips,
-and migration risks. Update documentation/`CHANGELOG.md`; add ADRs for boundary changes.
+and migration risks. Parallel feature PRs add a unique TOML file under
+`changes/unreleased/` instead of editing `CHANGELOG.md`; release or batch
+integration consumes the fragments with `cargo xtask changelog`. Regenerate
+derived documentation normally and install the repository merge driver with
+`python3 -B tools/setup_git_merge_drivers.py`. Add ADRs for boundary changes.
 
 ## Security & Configuration
 

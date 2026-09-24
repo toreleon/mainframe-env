@@ -32,6 +32,7 @@
     "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
     "docs/contracts/RETENTION-LIFECYCLE-V1.md",
     "docs/contracts/RELEASE-BUILD-V1.md",
+    "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
     "docs/decisions/0001-technology-stack.md",
     "docs/decisions/0002-deterministic-core.md",
     "docs/decisions/0003-contract-serialization.md",
@@ -88,6 +89,7 @@
         {"label": "Provider object-row persistence", "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"},
         {"label": "Durable retention lifecycle", "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md"},
         {"label": "Target release build type", "path": "docs/contracts/RELEASE-BUILD-V1.md"},
+        {"label": "Transaction participant contract", "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md"},
         {"label": "Release builder security model", "path": "docs/architecture/RELEASE-BUILDER.md"}
       ]
     },

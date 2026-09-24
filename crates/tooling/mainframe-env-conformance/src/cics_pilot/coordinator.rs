@@ -27,6 +27,11 @@ impl PilotExecution {
         );
         Self { coordinator, store }
     }
+
+    #[cfg(test)]
+    pub(super) fn coordinator(&self) -> &ExecutionCoordinator {
+        &self.coordinator
+    }
 }
 
 pub(super) fn drive_artifact(

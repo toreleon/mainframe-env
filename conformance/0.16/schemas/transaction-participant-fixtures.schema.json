@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/0.16/transaction-participant-fixtures.schema.json",
+  "title": "mainframe-env transaction participant compatibility fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "reader_cases", "cics_cases"],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.transaction-participant-fixtures@1"
+    },
+    "contract_version": { "const": 1 },
+    "reader_cases": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/reader-case" }
+    },
+    "cics_cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/cics-case" }
+    }
+  },
+  "$defs": {
+    "reader-case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "expected"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "version": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "expected": { "enum": ["accepted", "incompatible-version"] }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "response", "response2", "outcome", "uow_state"],
+      "properties": {
+        "condition": { "enum": ["NORMAL", "ROLLEDBACK", "INVREQ"] },
+        "response": { "enum": [0, 16, 82] },
+        "response2": { "enum": [0, 200] },
+        "outcome": {
+          "type": ["string", "null"],
+          "enum": ["committed", "rolled-back", null]
+        },
+        "uow_state": { "enum": ["committed", "rolled-back", "absent"] }
+      }
+    },
+    "cics-case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "execution_context", "remote_outcome", "requested", "mode", "syncpoint_owner", "expected"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "execution_context": {
+          "enum": ["local", "dpl-synconreturn", "dpl-without-synconreturn", "dpl-executionset-subset"]
+        },
+        "remote_outcome": {
+          "type": ["string", "null"],
+          "enum": ["commit-capable", "unable-to-commit", null]
+        },
+        "requested": { "enum": ["commit", "rollback"] },
+        "mode": {
+          "enum": ["local", "distributed-owned", "distributed-subordinate"]
+        },
+        "syncpoint_owner": { "enum": ["participant", "upstream-host"] },
+        "expected": { "$ref": "#/$defs/expected" }
+      }
+    }
+  }
+}

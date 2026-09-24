@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/licensed-environment-manifest@1",
+  "title": "CER-1701 external licensed-environment manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "manifest_state",
+    "environment_class",
+    "licensed_execution",
+    "grants_final_differential_credit",
+    "source_evidence",
+    "products",
+    "locale",
+    "topology",
+    "authorization",
+    "capabilities",
+    "tools",
+    "capture",
+    "redaction",
+    "bounds"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.licensed-environment-manifest@1"},
+    "manifest_id": {"$ref": "#/$defs/id"},
+    "manifest_state": {"const": "captured"},
+    "environment_class": {"enum": ["licensed-ibm", "synthetic"]},
+    "licensed_execution": {"type": "boolean"},
+    "grants_final_differential_credit": {"const": false},
+    "source_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["baseline_id", "topic_manifest_sha256", "catalog_sha256"],
+        "properties": {
+          "baseline_id": {"$ref": "#/$defs/id"},
+          "topic_manifest_sha256": {"$ref": "#/$defs/digest"},
+          "catalog_sha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "products": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "product_id",
+          "slot_ids",
+          "product_name",
+          "version",
+          "service_level",
+          "fmids",
+          "reported_apars",
+          "reported_ptfs",
+          "identity_capture_digest"
+        ],
+        "properties": {
+          "product_id": {"$ref": "#/$defs/id"},
+          "slot_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/slot"}
+          },
+          "product_name": {"$ref": "#/$defs/text"},
+          "version": {"$ref": "#/$defs/text"},
+          "service_level": {"$ref": "#/$defs/text"},
+          "fmids": {"$ref": "#/$defs/identities"},
+          "reported_apars": {"$ref": "#/$defs/identities"},
+          "reported_ptfs": {"$ref": "#/$defs/identities"},
+          "identity_capture_digest": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "locale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "territory",
+        "timezone",
+        "default_ccsid",
+        "terminal_ccsid",
+        "data_ccsids"
+      ],
+      "properties": {
+        "language": {"type": "string", "pattern": "^[a-z]{2,3}$"},
+        "territory": {"type": "string", "pattern": "^[A-Z]{2}$"},
+        "timezone": {"type": "string", "minLength": 1, "maxLength": 128},
+        "default_ccsid": {"$ref": "#/$defs/ccsid"},
+        "terminal_ccsid": {"$ref": "#/$defs/ccsid"},
+        "data_ccsids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/ccsid"}
+        }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sysplex_id", "systems", "services", "network_zone"],
+      "properties": {
+        "sysplex_id": {"type": ["string", "null"], "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$"},
+        "systems": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "services": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["service_id", "slot_ids", "system_id", "endpoint_class"],
+            "properties": {
+              "service_id": {"$ref": "#/$defs/id"},
+              "slot_ids": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "uniqueItems": true,
+                "items": {"$ref": "#/$defs/slot"}
+              },
+              "system_id": {"$ref": "#/$defs/id"},
+              "endpoint_class": {"enum": ["batch", "cics", "db2", "ims", "mq", "zosmf", "security", "dataset"]}
+            }
+          }
+        },
+        "network_zone": {"$ref": "#/$defs/id"}
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "principal_ref", "least_authority_review", "resource_rules", "audit_capture"],
+      "properties": {
+        "model": {"enum": ["saf", "synthetic"]},
+        "principal_ref": {"type": "string", "pattern": "^secretref:[A-Za-z0-9._:/@+-]{1,240}$"},
+        "least_authority_review": {"enum": ["accepted", "pending"]},
+        "resource_rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slot_id", "resource_class", "resource_pattern", "access"],
+            "properties": {
+              "slot_id": {"$ref": "#/$defs/slot"},
+              "resource_class": {"$ref": "#/$defs/id"},
+              "resource_pattern": {"$ref": "#/$defs/text"},
+              "access": {"enum": ["READ", "UPDATE", "CONTROL", "ALTER", "EXECUTE"]}
+            }
+          }
+        },
+        "audit_capture": {"const": "redacted-digest-only"}
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slot_id", "status", "capability_ids", "limitations"],
+        "properties": {
+          "slot_id": {"$ref": "#/$defs/slot"},
+          "status": {"enum": ["available", "unavailable"]},
+          "capability_ids": {
+            "type": "array",
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/id"}
+          },
+          "limitations": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/text"}
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool_id", "version", "license", "binary_sha256", "configuration_sha256", "trust_roots_sha256"],
+        "properties": {
+          "tool_id": {"$ref": "#/$defs/id"},
+          "version": {"$ref": "#/$defs/text"},
+          "license": {"$ref": "#/$defs/text"},
+          "binary_sha256": {"$ref": "#/$defs/digest"},
+          "configuration_sha256": {"$ref": "#/$defs/digest"},
+          "trust_roots_sha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_class", "raw_outputs_retained_outside_git", "raw_capture_digest_required", "protected_runner_attestation_required"],
+      "properties": {
+        "adapter_class": {"enum": ["zowe-cli-sdk", "supported-ibm-client", "synthetic-fixture"]},
+        "raw_outputs_retained_outside_git": {"const": true},
+        "raw_capture_digest_required": {"const": true},
+        "protected_runner_attestation_required": {"type": "boolean"}
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "secrets_by_reference_only", "forbidden_fields", "scan_required"],
+      "properties": {
+        "policy_id": {"$ref": "#/$defs/id"},
+        "secrets_by_reference_only": {"const": true},
+        "forbidden_fields": {
+          "const": ["credential", "password", "passphrase", "private-key", "token", "customer-data", "raw-licensed-output"]
+        },
+        "scan_required": {"const": true}
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_manifest_bytes", "max_products", "max_capabilities", "max_topology_services"],
+      "properties": {
+        "max_manifest_bytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "max_products": {"type": "integer", "minimum": 1, "maximum": 32},
+        "max_capabilities": {"type": "integer", "minimum": 1, "maximum": 2560},
+        "max_topology_services": {"type": "integer", "minimum": 1, "maximum": 128}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"environment_class": {"const": "licensed-ibm"}}},
+      "then": {
+        "properties": {
+          "licensed_execution": {"const": true},
+          "capture": {"properties": {"protected_runner_attestation_required": {"const": true}}},
+          "authorization": {"properties": {"model": {"const": "saf"}, "least_authority_review": {"const": "accepted"}}}
+        }
+      },
+      "else": {
+        "properties": {
+          "licensed_execution": {"const": false},
+          "capture": {"properties": {"adapter_class": {"const": "synthetic-fixture"}}},
+          "authorization": {"properties": {"model": {"const": "synthetic"}}}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.:/@+-]+$"},
+    "text": {"type": "string", "minLength": 1, "maxLength": 512},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ccsid": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "identities": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "slot": {
+      "enum": ["cobol", "racf-saf", "dataset-vsam-ams", "jes2", "cics", "db2", "ims", "mq", "zosmf", "cross-resource"]
+    }
+  }
+}

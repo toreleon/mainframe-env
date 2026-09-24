@@ -253,6 +253,7 @@
           },
           "family": {
             "enum": [
+              "builtin-function-control",
               "conversation-control",
               "counter-control",
               "diagnostics",
@@ -261,6 +262,8 @@
               "file-control",
               "interval-control",
               "journal-control",
+              "network-control",
+              "operator-control",
               "program-control",
               "queue-control",
               "security-control",

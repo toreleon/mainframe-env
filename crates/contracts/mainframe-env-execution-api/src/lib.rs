@@ -30,6 +30,7 @@ mod audit;
 mod context;
 mod identity;
 mod machine;
+mod participant;
 
 pub use audit::{
     AUDIT_RECORD_CONTRACT, AuditDecision, AuditRecord, AuditResourceDigest,
@@ -47,6 +48,16 @@ pub use machine::{
     Abend, AbendDumpDisposition, ChildInvocation, Completion, Condition, ExecutionOutcome, Frame,
     FrameId, LifecycleEvent, LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum,
     Suspension, Transfer,
+};
+pub use participant::{
+    ExplicitSyncpoint, ParticipantCapabilities, ParticipantContextCapability,
+    ParticipantContractProblem, ParticipantDeadlineCancellation, ParticipantEffectStep,
+    ParticipantFencing, ParticipantLockStep, ParticipantMode, ParticipantOutcome,
+    ParticipantRejection, ParticipantSchemas, ParticipantSecurityAudit, ParticipantStatus,
+    PrepareCapability, SyncpointOwner, TRANSACTION_PARTICIPANT_CONTRACT,
+    TRANSACTION_PARTICIPANT_VERSION, TransactionParticipantContract,
+    TransactionParticipantDescriptor, read_transaction_participant_contract,
+    transaction_participant_contract_v1,
 };
 
 /// Stable identifier for this execution contract generation.

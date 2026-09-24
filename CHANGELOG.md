@@ -1241,6 +1241,38 @@ All notable changes to mainframe-env are documented here.
   program dispatch on rejected requests. For a missing current platform, the
   implementation follows the command's Conditions table (`INVREQ` 16/1), not
   the conflicting description text (`APPNOTFOUND`).
+- Added the ZMF-1101 z/OSMF 3.2 normalization authority for all 27 pinned
+  service families and 189 direct-guide headings. Deterministic generation now
+  emits route, operation, schema/error, backend-ownership, collision, and
+  closure contracts while preserving the existing 23 official routes, keeping
+  all seven `/mainframe-env/*` routes outside official coverage, and withholding
+  every candidate operation whose backend or detailed payload contract is not
+  accepted.
+
+- Added the source-backed, non-routing CICS SPI/FEPI identity foundation for
+  269 unique SPI and 39 FEPI commands. The generated registry preserves the
+  four duplicate-label EIBFN identities and shared FEPI codes, installs no
+  handlers or public routes, and keeps grammar, option, resource, condition,
+  lifecycle, and recovery semantics blocked until exact command bodies are
+  mapped and digest-pinned.
+
+- Added the additive `mainframe-env.transaction-participant@1` INT-1601 early
+  contract. It freezes one provider-neutral capability/outcome vocabulary,
+  shared effect and lock/CAS ordering, read-version policy, and an accepted
+  CICS local/owned-DPL mapping while keeping Db2, IMS, and MQ bindings
+  explicitly pending. The existing coordinator exposes the descriptor without
+  dispatching from it, and the CICS recovery handler consumes its context
+  applicability and rejection mapping. It adds no route, profile behavior,
+  universal 2PC, or exactly-once claim.
+
+- Added the CER-1701 licensed-certification harness foundation. Versioned
+  zero-credit contracts now bind external environment facts, product and
+  service/APAR/PTF identity, locale/CCSID, topology, authorization,
+  capabilities, independent fixtures, reviewed normalization, bounds, source
+  candidate, catalogs/spec, artifacts, legacy adapter receipts, and replay
+  commands. Ten subsystem/cross-resource slots remain explicitly pending;
+  synthetic fixtures and fail-closed mutation tests validate plumbing without
+  claiming licensed IBM differential credit.
 
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
