@@ -76,6 +76,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Default ISSUE DISCONNECT and compatibility ISSUE RESET now return a fresh
+  normal replay receipt when their supported terminal session is already
+  disconnected. The source lists no condition for these terminal types, and
+  the no-op does not advance the device or session version.
+
 - Rebased the ten CICS security-control commands onto the local v0.9
   integration head. Shared command registrations, generated descriptors,
   codec-v2 tags, compiler/interpreter routes, and recovery tests now retain

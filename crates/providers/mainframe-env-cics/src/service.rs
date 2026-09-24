@@ -7114,6 +7114,20 @@ mod tests {
                     .version,
                 2
             );
+            let repeated = request(operation, BTreeMap::new(), 3);
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &repeated)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            assert_eq!(
+                handlers::IssueDeviceRecord::load(store.as_ref(), "T004")
+                    .unwrap()
+                    .unwrap()
+                    .version,
+                2
+            );
         }
     }
 

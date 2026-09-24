@@ -102,7 +102,13 @@ pub(in crate::service) fn invoke(
     if let Some(receipt) = load_receipt(service, effect_key, run, mutation.sequence, digest)? {
         return receipt_response(service, run, &receipt);
     }
-    if !current_session.connected {
+    let already_disconnected = !current_session.connected
+        && matches!(
+            request.operation,
+            CicsOperation::IssueDisconnect | CicsOperation::IssueReset
+        )
+        && !request.arguments.contains_key("SESSION");
+    if !current_session.connected && !already_disconnected {
         return Err(not_allocated());
     }
     if service
@@ -189,15 +195,21 @@ pub(in crate::service) fn invoke(
             if request.arguments.contains_key("SESSION") {
                 return Err(HostProblem::Unsupported);
             }
-            next.disconnect()
-                .map_err(|problem| device_condition(request.operation, problem))?;
-            let mut updated = current_session.clone();
-            updated.version = updated
-                .version
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            updated.connected = false;
-            disconnected_session = Some(updated);
+            if already_disconnected {
+                if !current.state.disconnected {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+            } else {
+                next.disconnect()
+                    .map_err(|problem| device_condition(request.operation, problem))?;
+                let mut updated = current_session.clone();
+                updated.version = updated
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                updated.connected = false;
+                disconnected_session = Some(updated);
+            }
         }
         CicsOperation::IssuePrint => {
             if current.definition.kind != IssueDeviceKind::Display3270 {
@@ -247,7 +259,6 @@ pub(in crate::service) fn invoke(
         response: 0,
         response2: 0,
     };
-    let state_write = current.mutation(&mut next).map_err(store_error)?;
     let receipt_write = ProviderStateMutation::Put(ProviderStateWrite {
         record: ProviderStateRecord {
             namespace: RECEIPT_NAMESPACE.into(),
@@ -257,7 +268,10 @@ pub(in crate::service) fn invoke(
         },
         expected_version: None,
     });
-    let mut writes = vec![state_write, receipt_write];
+    let mut writes = vec![receipt_write];
+    if !already_disconnected {
+        writes.push(current.mutation(&mut next).map_err(store_error)?);
+    }
     if let Some(printer_write) = printer_write {
         writes.push(printer_write);
     }
