@@ -304,8 +304,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsOperation> {
     Some(match operation {
-        CicsPlanOperation::AllocateConversation
-        | CicsPlanOperation::GdsAllocateConversation
+        CicsPlanOperation::AllocateConversation => CicsOperation::AllocateConversation,
+        CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::BuildAttach
         | CicsPlanOperation::ConnectProcess
@@ -1069,9 +1069,12 @@ mod conversation_tests {
     use super::*;
 
     #[test]
-    fn conversation_plans_have_no_host_alias_until_handlers_are_registered() {
+    fn unregistered_conversation_plans_have_no_host_alias() {
+        assert_eq!(
+            host_operation(CicsPlanOperation::AllocateConversation),
+            Some(CicsOperation::AllocateConversation)
+        );
         for operation in [
-            CicsPlanOperation::AllocateConversation,
             CicsPlanOperation::GdsAllocateConversation,
             CicsPlanOperation::GdsAssignConversation,
             CicsPlanOperation::BuildAttach,

@@ -1,7 +1,5 @@
 #[path = "handlers/mod.rs"]
 mod handlers;
-#[path = "handlers/task_identity.rs"]
-mod task_identity;
 
 use crate::generated::CicsCommandFamily;
 #[cfg(test)]
@@ -1052,7 +1050,7 @@ impl CicsService {
             .get("cics.retrieve")
             .map(|value| value.bytes().to_vec())
             .unwrap_or_default();
-        let originating_task = task_identity::originating_task_for(
+        let originating_task = handlers::originating_task_for(
             state
                 .sessions
                 .get(session.as_str())
@@ -1192,7 +1190,7 @@ impl CicsService {
             transaction: next.transaction.clone(),
             commarea: next.commarea.clone(),
         };
-        let originating_task = task_identity::originating_task_for(
+        let originating_task = handlers::originating_task_for(
             state
                 .sessions
                 .get(session.as_str())
@@ -1736,7 +1734,12 @@ impl CicsService {
             return Err(HostProblem::IdempotencyConflict);
         }
         let descriptor = handlers::authorize_and_describe(self, run, &request)?;
-        match descriptor.family {
+        let family = descriptor.family;
+        if family == CicsCommandFamily::ConversationControl {
+            handlers::conversation_context(run)?;
+            handlers::conversation_deadline(self, run)?;
+        }
+        match family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
                 handlers::invoke_task_control(self, run, &request, retention_tick)
             }
@@ -1754,7 +1757,7 @@ impl CicsService {
                 handlers::invoke_recovery(self, run, &request, retention_tick)
             }
             CicsCommandFamily::IntervalControl | CicsCommandFamily::SpoolControl => {
-                handlers::invoke_interval_or_spool_control(self, run, &request, descriptor.family)
+                handlers::invoke_interval_or_spool_control(self, run, &request, family)
             }
             CicsCommandFamily::DocumentControl => {
                 handlers::invoke_document_control(self, run, &request, retention_tick)
@@ -1764,14 +1767,11 @@ impl CicsService {
             | CicsCommandFamily::WebServiceControl
             | CicsCommandFamily::WebControl
             | CicsCommandFamily::EventControl
+            | CicsCommandFamily::ConversationControl
             | CicsCommandFamily::Diagnostics
-            | CicsCommandFamily::SecurityControl => handlers::invoke_extended_control(
-                self,
-                run,
-                &request,
-                descriptor.family,
-                retention_tick,
-            ),
+            | CicsCommandFamily::SecurityControl => {
+                handlers::invoke_extended_control(self, run, &request, family, retention_tick)
+            }
         }
         .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
     }
@@ -5398,6 +5398,7 @@ mod tests {
             ("ABEND", CicsOperation::Abend),
             ("ADDRESS", CicsOperation::Address),
             ("ADDRESS SET", CicsOperation::AddressSet),
+            ("ALLOCATE", CicsOperation::AllocateConversation),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -5426,7 +5427,7 @@ mod tests {
             ("IGNORE CONDITION ERROR", CicsOperation::IgnoreCondition),
             ("INQUIRE PROGRAM(PGM)", CicsOperation::Inquire),
             (
-                "INVOKE APPLICATION('PAYMENTS')",
+                "INVOKE APPLICATION ('PAYMENTS')",
                 CicsOperation::InvokeApplication,
             ),
             ("LINK", CicsOperation::Link),
@@ -5461,13 +5462,13 @@ mod tests {
             ("TRANSFORM DATATOXML", CicsOperation::TransformDataToXml),
             ("TRANSFORM JSONTODATA", CicsOperation::TransformJsonToData),
             ("TRANSFORM XMLTODATA", CicsOperation::TransformXmlToData),
-            ("WAIT JOURNALNAME('ACCTS')", CicsOperation::WaitJournalName),
-            ("WAIT JOURNALNUM(7)", CicsOperation::WaitJournalNum),
+            ("WAIT JOURNALNAME ('ACCTS')", CicsOperation::WaitJournalName),
+            ("WAIT JOURNALNUM (7)", CicsOperation::WaitJournalNum),
             (
-                "WRITE JOURNALNAME('ACCTS')",
+                "WRITE JOURNALNAME ('ACCTS')",
                 CicsOperation::WriteJournalName,
             ),
-            ("WRITE JOURNALNUM(7)", CicsOperation::WriteJournalNum),
+            ("WRITE JOURNALNUM (7)", CicsOperation::WriteJournalNum),
             ("UNLOCK", CicsOperation::Unlock),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
@@ -6700,7 +6701,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 143);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 154);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6712,7 +6713,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 17);
+        assert_eq!(families.len(), 20);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
@@ -35669,5 +35670,147 @@ mod tests {
             ("LENGERR", 22, 1)
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn conversation_allocate_owns_eibrsrce_busy_and_partner_profile_selection() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        cics.register_conversation_profile(ConversationProfileDefinition {
+            name: "FAST".into(),
+            kind: ConversationKind::AppcMapped,
+            maximum_data_bytes: 1024,
+        })
+        .unwrap();
+        cics.register_conversation_partner(ConversationPartnerDefinition {
+            name: "PARTNER1".into(),
+            sysid: "SYS1".into(),
+            profile: "FAST".into(),
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([
+                ("PARTNER".into(), cics_literal(b"PARTNER1")),
+                ("OPTION.NOQUEUE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate.clone(),
+            )
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        assert_eq!(
+            result.outputs["EIBRSRCE"].bytes(),
+            &[0, 0, 0, 1, b' ', b' ', b' ', b' ']
+        );
+        let saved = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            saved
+                .conversation([0, 0, 0, 1])
+                .unwrap()
+                .effective_processing_profile(),
+            "FAST"
+        );
+        let replayed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        assert_eq!(replayed.outputs["EIBRSRCE"], result.outputs["EIBRSRCE"]);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .len(),
+            1
+        );
+
+        let busy = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([
+                ("SYSID".into(), cics_literal(b"SYS1")),
+                ("OPTION.NOQUEUE".into(), cics_option()),
+            ]),
+            2,
+        );
+        let busy_result = cics
+            .invoke(&effect(&invocation.run_unit_id, busy.clone(), 2), busy)
+            .unwrap();
+        assert_eq!(
+            (
+                busy_result.disposition,
+                busy_result.condition.as_str(),
+                busy_result.response
+            ),
+            (CicsDisposition::Ignored, "SYSBUSY", 59)
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn conversation_allocate_reconciles_after_outer_receipt_failure() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            1,
+        );
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .len(),
+            1
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["EIBRSRCE"].bytes()[..4], [0, 0, 0, 1]);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .len(),
+            1
+        );
     }
 }

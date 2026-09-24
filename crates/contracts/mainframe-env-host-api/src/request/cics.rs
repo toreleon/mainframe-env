@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    /// Allocate one task-owned mapped APPC or MRO conversation.
+    AllocateConversation,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -297,6 +299,7 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::AllocateConversation => "AllocateConversation",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -478,7 +481,8 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::ChangePassword
+            Self::AllocateConversation
+                | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
                 | Self::RequestEncryptPassTicket
@@ -625,6 +629,7 @@ impl CicsOperation {
             .collect();
         let first = words.first()?.as_str();
         Some(match (first, words.get(1).map(String::as_str)) {
+            ("ALLOCATE", _) => Self::AllocateConversation,
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
