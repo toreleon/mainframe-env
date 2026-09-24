@@ -8106,6 +8106,24 @@ fn check_schemas(root: &Path) -> TaskResult {
             &artifact_path,
         )?;
     }
+    let spi_fepi_source_authority =
+        root.join("conformance/0.10/cics/spi-fepi-source-authority.json");
+    let spi_fepi_source_schema =
+        root.join("conformance/0.10/schemas/cics-spi-fepi-source-authority.schema.json");
+    validate_schema_instance(
+        &json(&spi_fepi_source_schema)?,
+        &json(&spi_fepi_source_authority)?,
+        &spi_fepi_source_authority,
+    )?;
+    let spi_fepi_identity_catalog =
+        root.join("conformance/0.10/generated/cics-spi-fepi-identity-catalog.json");
+    let spi_fepi_identity_schema =
+        root.join("conformance/0.10/schemas/cics-spi-fepi-identity-catalog.schema.json");
+    validate_schema_instance(
+        &json(&spi_fepi_identity_schema)?,
+        &json(&spi_fepi_identity_catalog)?,
+        &spi_fepi_identity_catalog,
+    )?;
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(

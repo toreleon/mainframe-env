@@ -32,6 +32,13 @@ All notable changes to mainframe-env are documented here.
   every candidate operation whose backend or detailed payload contract is not
   accepted.
 
+- Added the source-backed, non-routing CICS SPI/FEPI identity foundation for
+  269 unique SPI and 39 FEPI commands. The generated registry preserves the
+  four duplicate-label EIBFN identities and shared FEPI codes, installs no
+  handlers or public routes, and keeps grammar, option, resource, condition,
+  lifecycle, and recovery semantics blocked until exact command bodies are
+  mapped and digest-pinned.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,

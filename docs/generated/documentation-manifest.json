@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 189,
+    "markdown_documents": 190,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 174
+    "xtask_commands": 176
   },
   "documents": [
     {
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a9d86bfb31dc71fdec985bd72c6521ddce69875ac80ab477afee6ab0ed82b1fe",
+      "sha256": "sha256:c6f210557f2c826b9a01846a4d8257f2ae8fc15b685cae3f43261b00152c0918",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1009,6 +1009,14 @@
       "sha256": "sha256:2a91b82dfbc4d2db4c6dc15dfe5f17bbc2fb24e223ed8fbcd2598daf43816c7a",
       "title": "mainframe-env 0.8.0 review — JES2 execution and real utility semantics",
       "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.10.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:24ed248c3ab07cbc032be4b8e0bcd50b3658049136fe3b1d25d12e5189526e5f",
+      "title": "mainframe-env 0.10.0 implementation status",
+      "xtask_commands": 2
     },
     {
       "normative": false,
