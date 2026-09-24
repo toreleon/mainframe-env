@@ -40,6 +40,21 @@ pub(super) fn resolve(
         ["INVOKE", "APPLICATION"] => HirCicsOperation::InvokeApplication,
         ["INVOKE", "SERVICE"] => HirCicsOperation::InvokeService,
         ["ISSUE", "ABORT"] => HirCicsOperation::IssueAbort,
+        ["ISSUE", "ABEND"] => HirCicsOperation::IssueAbend,
+        ["ISSUE", "CONFIRMATION"] => HirCicsOperation::IssueConfirmation,
+        ["ISSUE", "COPY"] => HirCicsOperation::IssueCopy,
+        ["ISSUE", "DISCONNECT"] => HirCicsOperation::IssueDisconnect,
+        ["ISSUE", "ENDFILE"] => HirCicsOperation::IssueEndfile,
+        ["ISSUE", "ENDOUTPUT"] => HirCicsOperation::IssueEndoutput,
+        ["ISSUE", "EODS"] => HirCicsOperation::IssueEods,
+        ["ISSUE", "ERASEAUP"] => HirCicsOperation::IssueEraseAup,
+        ["ISSUE", "ERROR"] => HirCicsOperation::IssueError,
+        ["ISSUE", "LOAD"] => HirCicsOperation::IssueLoad,
+        ["ISSUE", "PASS"] => HirCicsOperation::IssuePass,
+        ["ISSUE", "PREPARE"] => HirCicsOperation::IssuePrepare,
+        ["ISSUE", "PRINT"] => HirCicsOperation::IssuePrint,
+        ["ISSUE", "RESET"] => HirCicsOperation::IssueReset,
+        ["ISSUE", "SIGNAL"] => HirCicsOperation::IssueSignal,
         ["ISSUE", "ADD"] => HirCicsOperation::IssueAdd,
         ["ISSUE", "END"] => HirCicsOperation::IssueEnd,
         ["ISSUE", "ERASE"] => HirCicsOperation::IssueErase,
@@ -234,7 +249,22 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "TERMINAL" => HirCicsOption::Terminal,
         "FMH" => HirCicsOption::Fmh,
         "PROTECT" => HirCicsOption::Protect,
+        "WAIT"
+            if matches!(
+                operation,
+                HirCicsOperation::IssueCopy | HirCicsOperation::IssueEraseAup
+            ) =>
+        {
+            HirCicsOption::IssueWaitOption
+        }
         "WAIT" => HirCicsOption::Wait,
+        "ENDOUTPUT" if operation == HirCicsOperation::IssueEndfile => HirCicsOption::IssueEndOutput,
+        "ENDFILE" if operation == HirCicsOperation::IssueEndoutput => HirCicsOption::IssueEndFile,
+        "CONVERSE" if operation == HirCicsOperation::IssueLoad => HirCicsOption::IssueConverse,
+        "LOGONLOGMODE" if operation == HirCicsOperation::IssuePass => {
+            HirCicsOption::IssueLogonLogmode
+        }
+        "NOQUIESCE" if operation == HirCicsOperation::IssuePass => HirCicsOption::IssueNoQuiesce,
         "AFTER" => HirCicsOption::After,
         "AT" => HirCicsOption::At,
         "FOR" => HirCicsOption::For,
@@ -260,5 +290,57 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "NOCLICONVERT" => HirCicsOption::WebNoClientConvert,
         "NOSRVCONVERT" => HirCicsOption::WebNoServerConvert,
         _ => super::spool_control::option(option).expect("allowed CICS option"),
+    }
+}
+
+#[cfg(test)]
+mod issue_tests {
+    use super::*;
+    use mainframe_env_ir::CICS_APPLICATION_REGISTRY;
+
+    #[test]
+    fn assigned_issue_rows_keep_distinct_cobol_heads_and_gds_rejection() {
+        let mapped_and_device = [
+            ("0108", HirCicsOperation::IssueAbend),
+            ("0112", HirCicsOperation::IssueConfirmation),
+            ("0114", HirCicsOperation::IssueCopy),
+            ("0115", HirCicsOperation::IssueDisconnect),
+            ("0117", HirCicsOperation::IssueEndfile),
+            ("0118", HirCicsOperation::IssueEndoutput),
+            ("0119", HirCicsOperation::IssueEods),
+            ("0121", HirCicsOperation::IssueEraseAup),
+            ("0122", HirCicsOperation::IssueError),
+            ("0124", HirCicsOperation::IssueLoad),
+            ("0126", HirCicsOperation::IssuePass),
+            ("0127", HirCicsOperation::IssuePrepare),
+            ("0129", HirCicsOperation::IssuePrint),
+            ("0133", HirCicsOperation::IssueReset),
+            ("0136", HirCicsOperation::IssueSignal),
+        ];
+        for (row, expected) in mapped_and_device {
+            let descriptor = CICS_APPLICATION_REGISTRY
+                .iter()
+                .find(|descriptor| descriptor.official_row.ends_with(row))
+                .unwrap();
+            assert!(matches!(resolve(descriptor), Ok(actual) if actual == expected));
+        }
+        for row in ["0109", "0113", "0123", "0128", "0135"] {
+            let descriptor = CICS_APPLICATION_REGISTRY
+                .iter()
+                .find(|descriptor| descriptor.official_row.ends_with(row))
+                .unwrap();
+            assert!(matches!(
+                resolve(descriptor),
+                Err(ResolutionFailure::Unsupported)
+            ));
+        }
+        assert_eq!(
+            resolve_option("WAIT", HirCicsOperation::IssueCopy),
+            HirCicsOption::IssueWaitOption
+        );
+        assert_eq!(
+            resolve_option("ENDOUTPUT", HirCicsOperation::IssueEndfile),
+            HirCicsOption::IssueEndOutput
+        );
     }
 }

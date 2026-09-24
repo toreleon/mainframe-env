@@ -198,6 +198,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::WebConverseMediaType
         | HirCicsOutputName::WebConverseBodyCharset
         | HirCicsOutputName::SecurityRead
+        | HirCicsOutputName::IssueState
         | HirCicsOutputName::SecurityUpdate
         | HirCicsOutputName::SecurityControl
         | HirCicsOutputName::SecurityAlter

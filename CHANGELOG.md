@@ -23,6 +23,10 @@ All notable changes to mainframe-env are documented here.
   and canonical request identities while keeping them explicitly unsupported
   until their provider routes and catalog registrations are executable.
 
+- Added typed COBOL HIR lowering identities and command-specific operand,
+  output, and option checks for the fifteen mapped/device ISSUE forms. GDS
+  ISSUE remains excluded from COBOL lowering by its source language contract.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

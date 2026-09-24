@@ -28,6 +28,7 @@ mod file_operands;
 mod format_time;
 mod handle_abend;
 mod interval_control;
+mod issue_control;
 mod journal_control;
 mod legacy_compatibility;
 mod numeric_value;
@@ -452,6 +453,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             counter_control::allowed_clauses(operation)
         }
         op if outboard::is_issue(op) => outboard::allowed_clauses(op),
+        op if issue_control::is_issue(op) => issue_control::allowed_clauses(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -577,6 +579,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             counter_control::allowed_options(operation)
         }
         op if outboard::is_issue(op) => outboard::allowed_options(op),
+        op if issue_control::is_issue(op) => issue_control::allowed_options(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -636,6 +639,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     route::validate_constraints(&clauses, &raw_options, operation)?;
     security_control::validate(&clauses, operation, semantic)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
+    issue_control::validate(&clauses, &raw_options, operation)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
@@ -900,6 +904,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
     operands.extend(route::operands(&clauses, operation, semantic)?);
     operands.extend(outboard::operands(&clauses, operation, semantic)?);
+    operands.extend(issue_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
@@ -957,6 +962,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(issue_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

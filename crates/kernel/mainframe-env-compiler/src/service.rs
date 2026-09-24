@@ -1840,6 +1840,28 @@ mod tests {
                 CicsPlanOperation::IssueSend => crate::HirCicsOperation::IssueSend,
                 CicsPlanOperation::Route => crate::HirCicsOperation::Route,
                 CicsPlanOperation::IssueWait => crate::HirCicsOperation::IssueWait,
+                CicsPlanOperation::IssueAbend => crate::HirCicsOperation::IssueAbend,
+                CicsPlanOperation::IssueConfirmation => crate::HirCicsOperation::IssueConfirmation,
+                CicsPlanOperation::IssueCopy => crate::HirCicsOperation::IssueCopy,
+                CicsPlanOperation::IssueDisconnect => crate::HirCicsOperation::IssueDisconnect,
+                CicsPlanOperation::IssueEndfile => crate::HirCicsOperation::IssueEndfile,
+                CicsPlanOperation::IssueEndoutput => crate::HirCicsOperation::IssueEndoutput,
+                CicsPlanOperation::IssueEods => crate::HirCicsOperation::IssueEods,
+                CicsPlanOperation::IssueEraseAup => crate::HirCicsOperation::IssueEraseAup,
+                CicsPlanOperation::IssueError => crate::HirCicsOperation::IssueError,
+                CicsPlanOperation::IssueLoad => crate::HirCicsOperation::IssueLoad,
+                CicsPlanOperation::IssuePass => crate::HirCicsOperation::IssuePass,
+                CicsPlanOperation::IssuePrepare => crate::HirCicsOperation::IssuePrepare,
+                CicsPlanOperation::IssuePrint => crate::HirCicsOperation::IssuePrint,
+                CicsPlanOperation::IssueReset => crate::HirCicsOperation::IssueReset,
+                CicsPlanOperation::IssueSignal => crate::HirCicsOperation::IssueSignal,
+                CicsPlanOperation::GdsIssueAbend
+                | CicsPlanOperation::GdsIssueConfirmation
+                | CicsPlanOperation::GdsIssueError
+                | CicsPlanOperation::GdsIssuePrepare
+                | CicsPlanOperation::GdsIssueSignal => {
+                    panic!("GDS ISSUE is not applicable to COBOL HIR")
+                }
                 CicsPlanOperation::Load => crate::HirCicsOperation::Load,
                 CicsPlanOperation::Release => crate::HirCicsOperation::Release,
                 CicsPlanOperation::Link => crate::HirCicsOperation::Link,
