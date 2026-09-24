@@ -5533,6 +5533,280 @@ mod tests {
         );
     }
 
+    // Run through an isolated database: the parent owns only its two test-binary children.
+    #[test]
+    #[ignore = "requires task-owned MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn bts_selected_link_reconciles_after_postgres_process_exit() {
+        use std::process::{Command, Stdio};
+        use std::time::{Duration, Instant};
+
+        std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("task-owned PostgreSQL 18 test URL");
+        struct Scratch(std::path::PathBuf);
+        impl Drop for Scratch {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let scratch = Scratch(std::env::temp_dir().join(format!(
+            "cic906-bts-process-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        )));
+        std::fs::create_dir(&scratch.0).unwrap();
+        let token = format!("{}", std::process::id());
+        let binary = std::env::current_exe().unwrap();
+        for (stage, expected_code) in [("dispatch", 86), ("restart", 0)] {
+            let mut child = Command::new(&binary)
+                .args([
+                    "--ignored",
+                    "--exact",
+                    "service::tests::bts_postgres_process_restart_child",
+                    "--nocapture",
+                ])
+                .env("CIC906_BTS_STAGE", stage)
+                .env("CIC906_BTS_TOKEN", &token)
+                .env("CIC906_BTS_SCRATCH", &scratch.0)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let child_pid = child.id();
+            let deadline = Instant::now() + Duration::from_secs(45);
+            let status = loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    break status;
+                }
+                if Instant::now() >= deadline {
+                    child.kill().unwrap(); // This handle is the exact test child PID.
+                    let output = child.wait_with_output().unwrap();
+                    panic!(
+                        "{stage} child {child_pid} timed out: {} {}",
+                        String::from_utf8_lossy(&output.stdout),
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                }
+                std::thread::sleep(Duration::from_millis(25));
+            };
+            let output = child.wait_with_output().unwrap();
+            assert_eq!(
+                status.code(),
+                Some(expected_code),
+                "{stage} child {child_pid}: {} {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            if stage == "dispatch" {
+                assert_eq!(
+                    std::fs::read_to_string(scratch.0.join("receipt-boundary")).unwrap(),
+                    child_pid.to_string()
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "subprocess stage of bts_selected_link_reconciles_after_postgres_process_exit"]
+    fn bts_postgres_process_restart_child() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
+
+        let stage = std::env::var("CIC906_BTS_STAGE").expect("subprocess stage");
+        let token = std::env::var("CIC906_BTS_TOKEN").expect("subprocess token");
+        let scratch = std::path::PathBuf::from(
+            std::env::var("CIC906_BTS_SCRATCH").expect("subprocess scratch directory"),
+        );
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("task-owned PostgreSQL 18 test URL");
+        let sequence = 3_000_000 + u64::from(std::process::id());
+        // The first child writes its identity; the restart child must reuse it.
+        let sequence = if stage == "dispatch" {
+            std::fs::write(scratch.join("sequence"), sequence.to_string()).unwrap();
+            sequence
+        } else {
+            std::fs::read_to_string(scratch.join("sequence"))
+                .unwrap()
+                .parse()
+                .unwrap()
+        };
+        let process_name = format!("PROC{token}");
+        let invocation = invocation_for(&format!("bts-crash-{token}"), BTreeMap::new());
+        let link = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            sequence,
+        );
+        let replay_key = format!("outer-{sequence}");
+        let root = BtsLifecycleStore::root_id("TYPE", &process_name).unwrap();
+        let seen: ProgramLinkTrace = Arc::new(Mutex::new(Vec::new()));
+        let host = invoke_authorities(false, seen.clone());
+        let store = Arc::new(PostgresStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let artifacts = Arc::new(PostgresArtifactStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        if stage == "dispatch" {
+            let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(artifacts.clone()).unwrap();
+            let session = SessionId::new(format!("bts-crash-{token}-first"), 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            register_load_program(
+                &cics,
+                artifacts.as_ref(),
+                "BTSRUN",
+                1,
+                b"compiled-program",
+                0,
+            );
+            authority
+                .define_process(
+                    BtsProcess::new(
+                        "TYPE",
+                        &process_name,
+                        &root,
+                        "BTSRUN",
+                        "MENU",
+                        "IBMUSER",
+                        invocation.run_unit_id.as_str(),
+                    )
+                    .unwrap(),
+                    invocation.run_unit_id.as_str(),
+                    invocation.execution_id.as_str(),
+                    invocation.principal.id().as_str(),
+                )
+                .unwrap();
+            cics.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, link.clone(), sequence),
+                    link
+                ),
+                Err(HostProblem::UnknownOutcome)
+            );
+            assert_eq!(seen.lock().unwrap().len(), 1);
+            assert_eq!(
+                authority
+                    .load_process("TYPE", &process_name)
+                    .unwrap()
+                    .unwrap()
+                    .activities[&root]
+                    .mode,
+                BtsMode::Dormant
+            );
+            assert_eq!(
+                store
+                    .get_provider_state("cics-effect-replay-v1", &replay_key)
+                    .unwrap()
+                    .unwrap()
+                    .version,
+                1
+            );
+            std::fs::write(
+                scratch.join("receipt-boundary"),
+                std::process::id().to_string(),
+            )
+            .unwrap();
+            std::process::exit(86); // No service/adapters are dropped after the receipt.
+        }
+        assert_eq!(stage, "restart");
+        let before = authority
+            .load_process("TYPE", &process_name)
+            .unwrap()
+            .unwrap();
+        assert_eq!(before.activities[&root].mode, BtsMode::Dormant);
+        assert!(!before.replays.is_empty());
+        let replay_before = store
+            .get_provider_state("cics-effect-replay-v1", &replay_key)
+            .unwrap()
+            .unwrap();
+        let audit_before = store
+            .audit_records(&invocation.execution_id, 0, 128)
+            .unwrap();
+        assert!(!audit_before.is_empty());
+        let artifact = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(b"compiled-program")),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let artifact_before = artifacts.get_artifact(&artifact).unwrap().unwrap();
+        assert_eq!(artifact_before.payload, b"compiled-program");
+        assert!(artifact_before.executable.is_some());
+
+        let mut wrong_owner = invocation.clone();
+        wrong_owner.execution_id =
+            ExecutionId::new(format!("wrong-{token}"), InvocationLimits::default()).unwrap();
+        let wrong_cics =
+            CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
+        let wrong_session = SessionId::new(format!("bts-crash-{token}-wrong"), 64).unwrap();
+        wrong_cics.create_session(&wrong_session, 24, 80).unwrap();
+        wrong_cics
+            .register_run(wrong_owner, &wrong_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        wrong_cics.bind_artifact_store(artifacts.clone()).unwrap();
+        assert_eq!(
+            wrong_cics.invoke(
+                &effect(&invocation.run_unit_id, link.clone(), sequence),
+                link.clone()
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(seen.lock().unwrap().is_empty());
+
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        cics.bind_artifact_store(artifacts.clone()).unwrap();
+        let session = SessionId::new(format!("bts-crash-{token}-second"), 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, link.clone(), sequence),
+                link,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("NORMAL", 0, 0)
+        );
+        assert!(seen.lock().unwrap().is_empty());
+        assert_eq!(
+            authority
+                .load_process("TYPE", &process_name)
+                .unwrap()
+                .unwrap(),
+            before
+        );
+        assert_eq!(
+            store
+                .get_provider_state("cics-effect-replay-v1", &replay_key)
+                .unwrap()
+                .unwrap(),
+            replay_before
+        );
+        assert_eq!(
+            store
+                .audit_records(&invocation.execution_id, 0, 128)
+                .unwrap(),
+            audit_before
+        );
+        assert_eq!(
+            artifacts.get_artifact(&artifact).unwrap().unwrap(),
+            artifact_before
+        );
+        assert!(
+            store
+                .get_provider_state("cics-bts-link-frame-v1", invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
+        );
+    }
+
     #[test]
     fn bts_named_child_and_acquired_activity_use_shared_tree_and_uow_lease() {
         use handlers::bts_lifecycle::{
