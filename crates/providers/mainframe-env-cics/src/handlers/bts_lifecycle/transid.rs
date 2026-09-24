@@ -1,7 +1,7 @@
 //! Durable local child-task admission for RUN TRANSID.
 
 use super::*;
-use crate::service::{CicsBtsChildCompletion, CicsService};
+use crate::service::{CicsBtsChildCompletion, CicsService, Run};
 use mainframe_env_execution_api::{
     ArtifactRef, ExecutionId, InvocationLimits, RunUnitId, Selector,
 };
@@ -104,7 +104,7 @@ impl BtsTransidRecord {
             || self
                 .channel
                 .as_deref()
-                .is_some_and(|name| name.is_empty() || name.chars().count() > 16)
+                .is_some_and(|name| !valid_channel_name(name))
             || self.channel.is_none() && !self.containers.is_empty()
             || self.containers.len() > 256
             || self
@@ -116,7 +116,10 @@ impl BtsTransidRecord {
             || self.state == BtsTransidState::Attached && self.lease_epoch == 0
             || self.state == BtsTransidState::Finished && self.completion.is_none()
             || self.state != BtsTransidState::Finished && self.completion.is_some()
-            || self.abcode.as_deref().is_some_and(|code| code.len() != 4)
+            || self.abcode.as_deref().is_some_and(|code| {
+                code.len() != 4 || !code.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            })
+            || (self.completion == Some(CicsBtsChildCompletion::Abend)) != self.abcode.is_some()
         {
             return Err(HostProblem::InfrastructureFailure);
         }
@@ -163,6 +166,36 @@ impl BtsTransidRecord {
 
 fn valid_run_id(id: &str) -> bool {
     id.len() == 64 && id.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn valid_channel_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.chars().count() <= 16
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric()
+                || matches!(
+                    character,
+                    '$' | '@'
+                        | '#'
+                        | '.'
+                        | '/'
+                        | '-'
+                        | '_'
+                        | '%'
+                        | '&'
+                        | '?'
+                        | '!'
+                        | ':'
+                        | '|'
+                        | '"'
+                        | '='
+                        | '¬'
+                        | ','
+                        | ';'
+                        | '<'
+                        | '>'
+                )
+        })
 }
 
 impl<'a> BtsLifecycleStore<'a> {
@@ -239,7 +272,6 @@ impl<'a> BtsLifecycleStore<'a> {
                     && saved.transaction == transaction
                     && saved.program == program
                     && saved.channel.as_deref() == channel
-                    && saved.containers == containers
                     && saved.priority == priority
                 {
                     Ok(saved)
@@ -377,6 +409,7 @@ impl<'a> BtsLifecycleStore<'a> {
         }
         Err(HostProblem::UnknownOutcome)
     }
+
     /// Close a crash gap only after the sibling token row proves completion.
     fn finish_transid_from_child(
         &self,
@@ -420,6 +453,37 @@ impl<'a> BtsLifecycleStore<'a> {
 }
 
 impl CicsService {
+    pub(in crate::service) fn register_bts_transid_child_inflight(
+        &self,
+        run: &Run,
+        record: &BtsTransidRecord,
+    ) -> Result<(), HostProblem> {
+        record.validate()?;
+        if record.parent_run_unit != run.invocation.run_unit_id.as_str()
+            || record.parent_execution != run.invocation.execution_id.as_str()
+            || record.parent_principal != run.invocation.principal.id().as_str()
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let parent = &run.invocation.run_unit_id;
+        if self.bts_child_registered(parent, record.token, record.channel.as_deref())? {
+            return Ok(());
+        }
+        match self.register_bts_child_inflight(run, record.token, record.channel.as_deref()) {
+            Ok(()) => Ok(()),
+            Err(HostProblem::IdempotencyConflict)
+                if self.bts_child_registered(
+                    parent,
+                    record.token,
+                    record.channel.as_deref(),
+                )? =>
+            {
+                Ok(())
+            }
+            Err(problem) => Err(problem),
+        }
+    }
+
     pub fn register_bts_transid_child(&self, record: &BtsTransidRecord) -> Result<(), HostProblem> {
         record.validate()?;
         let parent = RunUnitId::new(&record.parent_run_unit, InvocationLimits::default())
@@ -668,7 +732,10 @@ fn enqueue_exact(work_store: &dyn WorkStore, record: &BtsTransidRecord) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_SQLITE: AtomicU64 = AtomicU64::new(1);
 
     #[test]
     fn transid_outbox_replays_and_fences_claimed_completion() {
@@ -739,5 +806,74 @@ mod tests {
             Ok(finished)
         );
         assert!(reopened.load_transid_outbox().unwrap().pending.is_empty());
+    }
+
+    #[test]
+    fn transid_snapshot_and_pending_outbox_survive_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-transid-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let first = {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            BtsLifecycleStore::new(&sqlite)
+                .start_transid(
+                    "UOW1",
+                    "EXEC1",
+                    "USER",
+                    "run-transid",
+                    [1; 32],
+                    "BT01",
+                    "CHILD",
+                    Some("INPUT"),
+                    BTreeMap::from([(
+                        "MESSAGE".into(),
+                        BtsTransidContainer {
+                            character: true,
+                            bytes: b"issue-time".to_vec(),
+                        },
+                    )]),
+                    1000,
+                    5,
+                )
+                .unwrap()
+        };
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let reopened = BtsLifecycleStore::new(&sqlite);
+            assert_eq!(
+                reopened.load_transid(&first.run_id).unwrap(),
+                Some(first.clone())
+            );
+            assert!(
+                reopened
+                    .load_transid_outbox()
+                    .unwrap()
+                    .pending
+                    .contains(&first.run_id)
+            );
+            assert_eq!(
+                reopened
+                    .start_transid(
+                        "UOW1",
+                        "EXEC1",
+                        "USER",
+                        "run-transid",
+                        [1; 32],
+                        "BT01",
+                        "CHILD",
+                        Some("INPUT"),
+                        BTreeMap::new(),
+                        2000,
+                        5,
+                    )
+                    .unwrap(),
+                first
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

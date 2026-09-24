@@ -25,6 +25,14 @@ impl<'a> BtsLifecycleStore<'a> {
         Ok(key)
     }
 
+    /// Stable RACF-compatible resource identity for process lifecycle reads.
+    pub fn saf_resource(process_type: &str, name: &str) -> Result<String, HostProblem> {
+        Ok(format!(
+            "CICS.BTS.{}",
+            Self::process_key(process_type, name)?.replace('/', ".")
+        ))
+    }
+
     /// Stable, opaque 52-character root identity for one defining UOW.
     pub fn root_id(
         process_type: &str,

@@ -217,6 +217,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SecurityEncryptLength
         | HirCicsOutputName::SecurityLangInUse
         | HirCicsOutputName::SecurityNatLangInUse
+        | HirCicsOutputName::BtsActivityId
+        | HirCicsOutputName::BtsCompStatus
+        | HirCicsOutputName::BtsMode
+        | HirCicsOutputName::BtsSuspStatus
+        | HirCicsOutputName::BtsAbCode
+        | HirCicsOutputName::BtsAbProgram
+        | HirCicsOutputName::BtsChildToken
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

@@ -50,6 +50,7 @@ impl CicsService {
         delay::validate_store(store.as_ref(), limits)?;
         let service = Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))?;
         service.recover_bts_run_work()?;
+        service.recover_bts_transid_work()?;
         Ok(service)
     }
 

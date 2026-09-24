@@ -24,6 +24,19 @@ resolves each opaque 52-character activity ID to its process without an
 unbounded scan. A per-run-unit acquisition row retains an epoch tombstone
 across syncpoints so stale UOW owners cannot recreate an old lease identity.
 
+The authority exposes `acquired_process_container_scope(run_unit,
+owner_execution, owner_principal)` as a read projection for sibling BTS
+container commands. It verifies the held acquisition, exact owner, process
+row, activity and index, and pending-UOW visibility. A root acquisition,
+including DEFINE PROCESS, yields read/write process-container access; an
+acquired descendant yields read-only process-container access. The latter
+does not satisfy GET CONTAINER (BTS) `ACQPROCESS`, which specifically requires
+an acquired root in the current UOW (`INVREQ 16/15` otherwise). The API
+provides no descendant command selector while that selector remains
+unresolved. The caller still owns SAF/audit and must resolve the scope in its
+command's current UOW; syncpoint release leaves only the acquisition epoch
+tombstone. A deferred NOCHECK duplicate has no process tree to borrow.
+
 DEFINE PROCESS writes the pending process, root index, and defining UOW
 acquisition atomically. A successful syncpoint publishes the definition and
 releases the acquisition atomically; rollback removes the pending process and
@@ -121,10 +134,24 @@ RUN TRANSID also owns a separate `cics-bts-transid-run-v1` request and
 the bounded channel-container snapshot at issue time. A worker claim advances
 its lease epoch; a stale claim cannot finish it. Terminal completion writes
 the sibling token outcome first, then closes the request and outbox atomically,
-so a crash in between can retry the idempotent completion. A request retained
+so a crash in between can reconcile the retained child outcome after restart.
+The outbox reader checks that token outcome before readmitting pending work.
+A terminal work item without a token outcome remains an unknown outcome;
+startup recovery leaves it pending while processing other child work, and
+exact per-request reconciliation reports `UnknownOutcome`. Recovery never
+invents a normal completion or abend code. A request retained
 before token registration may be recovered only when the parent run remains
 available, otherwise it stays unresolved rather than asserting task start.
 These are child task records, not process/activity lifecycle rows.
+
+The selected server route executes the installed local transaction in a new
+run unit under the inherited principal. `launch_background_task` repeats
+transaction SAF authorization at attach and records security failure in the
+child token. The issue-time channel identity and bounded container snapshot
+are passed as invocation bindings. The in-flight parent is temporarily outside
+the service's live-run map during command dispatch, so token registration uses
+the authenticated `Run` directly while writing the sibling-compatible row;
+the public `register_bts_child` signature retains its live-parent guard.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed

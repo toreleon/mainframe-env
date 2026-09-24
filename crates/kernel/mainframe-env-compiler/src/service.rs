@@ -1789,6 +1789,31 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::AcquireActivityId => crate::HirCicsOperation::AcquireActivityId,
+                CicsPlanOperation::AcquireProcess => crate::HirCicsOperation::AcquireProcess,
+                CicsPlanOperation::CancelAcqActivity => crate::HirCicsOperation::CancelAcqActivity,
+                CicsPlanOperation::CancelAcqProcess => crate::HirCicsOperation::CancelAcqProcess,
+                CicsPlanOperation::CancelActivity => crate::HirCicsOperation::CancelActivity,
+                CicsPlanOperation::CheckAcqActivity => crate::HirCicsOperation::CheckAcqActivity,
+                CicsPlanOperation::CheckAcqProcess => crate::HirCicsOperation::CheckAcqProcess,
+                CicsPlanOperation::CheckActivity => crate::HirCicsOperation::CheckActivity,
+                CicsPlanOperation::DefineActivity => crate::HirCicsOperation::DefineActivity,
+                CicsPlanOperation::DefineProcess => crate::HirCicsOperation::DefineProcess,
+                CicsPlanOperation::DeleteActivity => crate::HirCicsOperation::DeleteActivity,
+                CicsPlanOperation::ResetAcqProcess => crate::HirCicsOperation::ResetAcqProcess,
+                CicsPlanOperation::ResetActivity => crate::HirCicsOperation::ResetActivity,
+                CicsPlanOperation::ResumeAcqActivity => crate::HirCicsOperation::ResumeAcqActivity,
+                CicsPlanOperation::ResumeAcqProcess => crate::HirCicsOperation::ResumeAcqProcess,
+                CicsPlanOperation::ResumeActivity => crate::HirCicsOperation::ResumeActivity,
+                CicsPlanOperation::RunAcqActivity => crate::HirCicsOperation::RunAcqActivity,
+                CicsPlanOperation::RunAcqProcess => crate::HirCicsOperation::RunAcqProcess,
+                CicsPlanOperation::RunActivity => crate::HirCicsOperation::RunActivity,
+                CicsPlanOperation::RunTransId => crate::HirCicsOperation::RunTransId,
+                CicsPlanOperation::SuspendAcqActivity => {
+                    crate::HirCicsOperation::SuspendAcqActivity
+                }
+                CicsPlanOperation::SuspendAcqProcess => crate::HirCicsOperation::SuspendAcqProcess,
+                CicsPlanOperation::SuspendActivity => crate::HirCicsOperation::SuspendActivity,
                 CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
                 CicsPlanOperation::QuerySecurity => crate::HirCicsOperation::QuerySecurity,
                 CicsPlanOperation::VerifyPassword => crate::HirCicsOperation::VerifyPassword,

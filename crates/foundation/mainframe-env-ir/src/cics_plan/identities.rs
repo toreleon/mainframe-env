@@ -4,6 +4,30 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// BTS process and activity lifecycle commands, catalog rows 0002–0217.
+    AcquireActivityId,
+    AcquireProcess,
+    CancelAcqActivity,
+    CancelAcqProcess,
+    CancelActivity,
+    CheckAcqActivity,
+    CheckAcqProcess,
+    CheckActivity,
+    DefineActivity,
+    DefineProcess,
+    DeleteActivity,
+    ResetAcqProcess,
+    ResetActivity,
+    ResumeAcqActivity,
+    ResumeAcqProcess,
+    ResumeActivity,
+    RunAcqActivity,
+    RunAcqProcess,
+    RunActivity,
+    RunTransId,
+    SuspendAcqActivity,
+    SuspendAcqProcess,
+    SuspendActivity,
     /// Change a standard RACF password under one SAF effect.
     ChangePassword,
     /// Change a length-selected password or phrase under one SAF effect.
@@ -310,6 +334,17 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    BtsActivityId,
+    BtsProcess,
+    BtsProcessType,
+    BtsActivity,
+    BtsEvent,
+    BtsInputEvent,
+    BtsTransId,
+    BtsProgram,
+    BtsUserId,
+    BtsFacilityToken,
+    BtsChannel,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
@@ -834,6 +869,10 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    /// Execute the BTS target and wait for its activation to finish.
+    BtsSynchronous,
+    /// Attach the BTS target in a separate UOW without waiting.
+    BtsAsynchronous,
     /// BasicAuth token syntax.
     SecurityBasicAuth,
     /// JSON Web Token syntax.

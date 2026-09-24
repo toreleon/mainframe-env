@@ -17,6 +17,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
 mod assign_validation;
+mod bts_lifecycle;
 mod candidate_validation;
 mod clause_parser;
 mod command_recognition;
@@ -451,6 +452,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if counter_control::is_counter(operation) => {
             counter_control::allowed_clauses(operation)
         }
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_clauses(operation),
         op if outboard::is_issue(op) => outboard::allowed_clauses(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
@@ -576,6 +578,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if counter_control::is_counter(operation) => {
             counter_control::allowed_options(operation)
         }
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_options(operation),
         op if outboard::is_issue(op) => outboard::allowed_options(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
@@ -634,6 +637,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     route::validate_constraints(&clauses, &raw_options, operation)?;
+    bts_lifecycle::validate_constraints(operation, &clauses, &raw_options)?;
     security_control::validate(&clauses, operation, semantic)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
@@ -757,6 +761,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
         operation if counter_control::is_counter(operation) => counter_control::required(operation),
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::required(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -910,6 +915,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     )?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_lifecycle::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
     operands.extend(security_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
@@ -954,6 +960,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_lifecycle::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
@@ -982,6 +989,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         })
         .map(|option| {
             counter_control::option(operation, option)
+                .or_else(|| bts_lifecycle::option(operation, option))
                 .or_else(|| event_control::option(operation, option))
                 .or_else(|| diagnostics::option(operation, option))
                 .or_else(|| {

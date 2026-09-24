@@ -20,6 +20,9 @@ TYPED_EXECUTION_REGISTRATIONS_PATH = Path(
     "conformance/0.9/cics/typed-execution-registrations.json"
 )
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
+PROVIDER_BTS_OUTPUT_PATH = Path(
+    "crates/providers/mainframe-env-cics/src/generated/command_descriptors/bts_entries.rs"
+)
 LOOKUP_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/lookup.rs"
 )
@@ -96,6 +99,7 @@ EXPECTED_FAMILIES = {
     "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "bts-control": "BtsControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
     "document-control": "DocumentControl",
@@ -494,6 +498,29 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0258",
     ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
+    ("AcquireActivityId", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0002"),
+    ("AcquireProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0003"),
+    ("CancelAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0017"),
+    ("CancelAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0018"),
+    ("CancelActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0019"),
+    ("CheckAcqActivity", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0023"),
+    ("CheckAcqProcess", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0024"),
+    ("CheckActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0025"),
+    ("DefineActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0032"),
+    ("DefineProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0037"),
+    ("DeleteActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0041"),
+    ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
+    ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
+    ("ResumeAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0172"),
+    ("ResumeAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0173"),
+    ("ResumeActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0174"),
+    ("RunAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0183"),
+    ("RunAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0184"),
+    ("RunActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0185"),
+    ("RunTransId", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0186"),
+    ("SuspendAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0215"),
+    ("SuspendAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0216"),
+    ("SuspendActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0217"),
 ]
 
 CONTRACT_BATCHES = (
@@ -698,6 +725,29 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "AcquireActivityId",
+        "AcquireProcess",
+        "CancelAcqActivity",
+        "CancelAcqProcess",
+        "CancelActivity",
+        "CheckAcqActivity",
+        "CheckAcqProcess",
+        "CheckActivity",
+        "DefineActivity",
+        "DefineProcess",
+        "DeleteActivity",
+        "ResetAcqProcess",
+        "ResetActivity",
+        "ResumeAcqActivity",
+        "ResumeAcqProcess",
+        "ResumeActivity",
+        "RunAcqActivity",
+        "RunAcqProcess",
+        "RunActivity",
+        "RunTransId",
+        "SuspendAcqActivity",
+        "SuspendAcqProcess",
+        "SuspendActivity",
         "Abend",
         "AddSubevent",
         "Address",
@@ -1324,6 +1374,35 @@ TYPED_RUNTIME_IR_EFFECTS = {
 }
 
 
+_BTS_READ_EFFECTS = frozenset({"memory-read", "memory-write", "condition"})
+_BTS_MUTATE_EFFECTS = _BTS_READ_EFFECTS | {"transaction"}
+_BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_READ_EFFECTS
+        for name in ("CheckAcqActivity", "CheckAcqProcess")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_RUN_EFFECTS
+        for name in ("RunAcqActivity", "RunAcqProcess", "RunActivity", "RunTransId")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_MUTATE_EFFECTS
+        for name in (
+            "AcquireActivityId", "AcquireProcess", "CancelAcqActivity", "CancelAcqProcess",
+            "CancelActivity", "CheckActivity", "DefineActivity", "DefineProcess",
+            "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
+            "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
+            "SuspendAcqProcess", "SuspendActivity",
+        )
+    }
+)
+
+
 class DescriptorError(ValueError):
     """The descriptor authority is malformed or its generated source is stale."""
 
@@ -1637,6 +1716,29 @@ def _load_typed_execution_registrations(
         "RetrieveSubevent",
         "TestEvent",
         "SignalEvent",
+        "AcquireActivityId",
+        "AcquireProcess",
+        "CancelAcqActivity",
+        "CancelAcqProcess",
+        "CancelActivity",
+        "CheckAcqActivity",
+        "CheckAcqProcess",
+        "CheckActivity",
+        "DefineActivity",
+        "DefineProcess",
+        "DeleteActivity",
+        "ResetAcqProcess",
+        "ResetActivity",
+        "ResumeAcqActivity",
+        "ResumeAcqProcess",
+        "ResumeActivity",
+        "RunAcqActivity",
+        "RunAcqProcess",
+        "RunActivity",
+        "RunTransId",
+        "SuspendAcqActivity",
+        "SuspendAcqProcess",
+        "SuspendActivity",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -4921,7 +5023,10 @@ def render_provider(
     condition_authority = contracts.get("condition_name_authority") or {}
     condition_names = condition_authority.get("allowed_names", [])
     family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
-    operations = catalog["_runtime_operations"]
+    operations = [
+        operation for operation in catalog["_runtime_operations"]
+        if operation["family"] != "bts-control"
+    ]
     lines = [
         "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
         "",
@@ -4967,7 +5072,36 @@ def render_provider(
                 "    },",
             ]
         )
-    lines.extend(["];", "", "mod lookup;", "pub(crate) use lookup::command_descriptor;", ""])
+    lines.extend(["];", "", "mod bts_entries;", "mod lookup;",
+                  "use bts_entries::BTS_COMMAND_DESCRIPTORS;",
+                  "pub(crate) use lookup::command_descriptor;", ""])
+    return "\n".join(lines)
+
+
+def render_provider_bts(root: Path = ROOT) -> str:
+    """Keep this slice's 23 descriptors below the generated-module ceiling."""
+    catalog = load_catalog(root)
+    family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
+    lines = [
+        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
+        "",
+        "use super::*;",
+        "",
+        "pub(super) const BTS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[",
+    ]
+    for operation in catalog["_runtime_operations"]:
+        if operation["family"] != "bts-control":
+            continue
+        lines.extend([
+            "    CicsCommandDescriptor {",
+            f"        operation: CicsOperation::{operation['operation']},",
+            f"        syntax: {_rust_string(operation['label'])},",
+            f"        official_row: {_rust_string(operation['official_row'])},",
+            f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
+            f"        mutating: {str(operation['mutating']).lower()},",
+            "    },",
+        ])
+    lines.extend(["];", ""])
     return "\n".join(lines)
 
 
@@ -4982,9 +5116,17 @@ def render_provider_lookup(root: Path = ROOT) -> str:
         "pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static CicsCommandDescriptor {",
         "    match operation {",
     ]
-    for index, operation in enumerate(operations):
+    core_index = 0
+    bts_index = 0
+    for operation in operations:
+        if operation["family"] == "bts-control":
+            collection, index = "BTS_COMMAND_DESCRIPTORS", bts_index
+            bts_index += 1
+        else:
+            collection, index = "CICS_COMMAND_DESCRIPTORS", core_index
+            core_index += 1
         lines.append(
-            f"        CicsOperation::{operation['operation']} => &CICS_COMMAND_DESCRIPTORS[{index}],"
+            f"        CicsOperation::{operation['operation']} => &{collection}[{index}],"
         )
     lines.extend(["    }", "}", ""])
     return "\n".join(lines)
@@ -5359,6 +5501,7 @@ def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     contracts = build_contracts(root)
     return {
         OUTPUT_PATH: render_provider(root, contracts),
+        PROVIDER_BTS_OUTPUT_PATH: render_provider_bts(root),
         LOOKUP_OUTPUT_PATH: render_provider_lookup(root),
         HOST_OUTPUT_PATH: render_host(root),
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),

@@ -2,6 +2,13 @@ use super::*;
 
 pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
+        CicsOutputName::BtsActivityId => 760,
+        CicsOutputName::BtsCompStatus => 761,
+        CicsOutputName::BtsMode => 762,
+        CicsOutputName::BtsSuspStatus => 763,
+        CicsOutputName::BtsAbCode => 764,
+        CicsOutputName::BtsAbProgram => 765,
+        CicsOutputName::BtsChildToken => 766,
         CicsOutputName::TimerStatus => 376,
         CicsOutputName::EventName => 377,
         CicsOutputName::SubEventName => 378,
@@ -128,6 +135,13 @@ pub(in crate::cics_plan) fn output_from_tag(
     value: u16,
 ) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
+        760 => Ok(CicsOutputName::BtsActivityId),
+        761 => Ok(CicsOutputName::BtsCompStatus),
+        762 => Ok(CicsOutputName::BtsMode),
+        763 => Ok(CicsOutputName::BtsSuspStatus),
+        764 => Ok(CicsOutputName::BtsAbCode),
+        765 => Ok(CicsOutputName::BtsAbProgram),
+        766 => Ok(CicsOutputName::BtsChildToken),
         376 => Ok(CicsOutputName::TimerStatus),
         377 => Ok(CicsOutputName::EventName),
         378 => Ok(CicsOutputName::SubEventName),

@@ -27,6 +27,9 @@ pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Optio
 
 #[derive(Clone, Copy)]
 pub(super) enum SlotUse {
+    BtsTextInput(usize),
+    BtsExactInput(usize),
+    BtsExactOutput(usize),
     Input,
     HalfwordInput,
     FullwordInput,
@@ -65,6 +68,17 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::BtsActivityId => SlotUse::BtsTextInput(52),
+        CicsOperandName::BtsProcess => SlotUse::BtsTextInput(36),
+        CicsOperandName::BtsProcessType
+        | CicsOperandName::BtsProgram
+        | CicsOperandName::BtsUserId => SlotUse::BtsTextInput(8),
+        CicsOperandName::BtsTransId => SlotUse::BtsTextInput(4),
+        CicsOperandName::BtsActivity
+        | CicsOperandName::BtsEvent
+        | CicsOperandName::BtsInputEvent
+        | CicsOperandName::BtsChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::BtsFacilityToken => SlotUse::BtsExactInput(8),
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
@@ -166,6 +180,13 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::BtsActivityId => SlotUse::BtsExactOutput(52),
+        CicsOutputName::BtsAbCode => SlotUse::BtsExactOutput(4),
+        CicsOutputName::BtsAbProgram => SlotUse::BtsExactOutput(8),
+        CicsOutputName::BtsChildToken => SlotUse::BtsExactOutput(16),
+        CicsOutputName::BtsCompStatus | CicsOutputName::BtsMode | CicsOutputName::BtsSuspStatus => {
+            SlotUse::FullwordOutput
+        }
         CicsOutputName::CounterValue
         | CicsOutputName::CounterMinimum
         | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
@@ -282,6 +303,29 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::AcquireActivityId => CicsOperation::AcquireActivityId,
+        CicsPlanOperation::AcquireProcess => CicsOperation::AcquireProcess,
+        CicsPlanOperation::CancelAcqActivity => CicsOperation::CancelAcqActivity,
+        CicsPlanOperation::CancelAcqProcess => CicsOperation::CancelAcqProcess,
+        CicsPlanOperation::CancelActivity => CicsOperation::CancelActivity,
+        CicsPlanOperation::CheckAcqActivity => CicsOperation::CheckAcqActivity,
+        CicsPlanOperation::CheckAcqProcess => CicsOperation::CheckAcqProcess,
+        CicsPlanOperation::CheckActivity => CicsOperation::CheckActivity,
+        CicsPlanOperation::DefineActivity => CicsOperation::DefineActivity,
+        CicsPlanOperation::DefineProcess => CicsOperation::DefineProcess,
+        CicsPlanOperation::DeleteActivity => CicsOperation::DeleteActivity,
+        CicsPlanOperation::ResetAcqProcess => CicsOperation::ResetAcqProcess,
+        CicsPlanOperation::ResetActivity => CicsOperation::ResetActivity,
+        CicsPlanOperation::ResumeAcqActivity => CicsOperation::ResumeAcqActivity,
+        CicsPlanOperation::ResumeAcqProcess => CicsOperation::ResumeAcqProcess,
+        CicsPlanOperation::ResumeActivity => CicsOperation::ResumeActivity,
+        CicsPlanOperation::RunAcqActivity => CicsOperation::RunAcqActivity,
+        CicsPlanOperation::RunAcqProcess => CicsOperation::RunAcqProcess,
+        CicsPlanOperation::RunActivity => CicsOperation::RunActivity,
+        CicsPlanOperation::RunTransId => CicsOperation::RunTransId,
+        CicsPlanOperation::SuspendAcqActivity => CicsOperation::SuspendAcqActivity,
+        CicsPlanOperation::SuspendAcqProcess => CicsOperation::SuspendAcqProcess,
+        CicsPlanOperation::SuspendActivity => CicsOperation::SuspendActivity,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
@@ -438,6 +482,17 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::BtsActivityId => "ACTIVITYID",
+        CicsOperandName::BtsProcess => "PROCESS",
+        CicsOperandName::BtsProcessType => "PROCESSTYPE",
+        CicsOperandName::BtsActivity => "ACTIVITY",
+        CicsOperandName::BtsEvent => "EVENT",
+        CicsOperandName::BtsInputEvent => "INPUTEVENT",
+        CicsOperandName::BtsTransId => "TRANSID",
+        CicsOperandName::BtsProgram => "PROGRAM",
+        CicsOperandName::BtsUserId => "USERID",
+        CicsOperandName::BtsFacilityToken => "FACILITYTOKN",
+        CicsOperandName::BtsChannel => "CHANNEL",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -743,6 +798,13 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::BtsActivityId => "ACTIVITYID",
+        CicsOutputName::BtsCompStatus => "COMPSTATUS",
+        CicsOutputName::BtsMode => "MODE",
+        CicsOutputName::BtsSuspStatus => "SUSPSTATUS",
+        CicsOutputName::BtsAbCode => "ABCODE",
+        CicsOutputName::BtsAbProgram => "ABPROGRAM",
+        CicsOutputName::BtsChildToken => "CHILD",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",
@@ -860,6 +922,8 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::BtsSynchronous => "SYNCHRONOUS",
+        CicsPlanOption::BtsAsynchronous => "ASYNCHRONOUS",
         CicsPlanOption::DefResp => "DEFRESP",
         CicsPlanOption::NoWait => "NOWAIT",
         CicsPlanOption::Rrn => "RRN",

@@ -101,6 +101,10 @@ All notable changes to mainframe-env are documented here.
   exact replay and leave an existing process unchanged. Public command routing
   remains pending.
 
+- Exposed the held BTS acquisition's process-container scope to sibling
+  commands, with root read/write versus descendant read-only access, owner and
+  UOW fencing, and an explicit root requirement for ACQPROCESS.
+
 - Added the RUN TRANSID child-token port with the sibling FETCH/FREE method
   signatures and `cics-bts-child-ownership-v1` row shape. Registration and
   terminal completion are owner-checked and versioned; RUN TRANSID task
@@ -111,6 +115,24 @@ All notable changes to mainframe-env are documented here.
   snapshot are retained for exact replay; work claims fence completion by
   lease epoch and deliver the result through the child-token port. Server
   attach and public command routing remain pending.
+
+- Reconciled RUN TRANSID restart against the retained child-token result
+  before readmitting work. SQLite reopen preserves its channel snapshot and
+  outbox; terminal work without a child result remains unresolved while
+  independent work recovers, and its exact reconciliation reports an unknown
+  outcome.
+
+- Added the bounded BTS lifecycle host, IR, compiler, interpreter, and CICS
+  dispatch scaffolding, plus an installed process-type/transaction catalog and
+  selected RUN and RUN TRANSID worker admission. The candidate generated
+  registry is 174 typed, 0 legacy, and 89 unready; acceptance gates and
+  child-task failure reconciliation remain in progress.
+
+- Bound ACQUIRE PROCESS to its PROCESS and PROCESSTYPE form and compiled CHECK
+  CVDA outputs to exact binary receivers. Compiled COBOL now exercises DEFINE
+  PROCESS NOCHECK, ACQUIRE, CHECK, RUN, and RUN TRANSID through selected server
+  workers. The CICS contract and registration schemas advance to the isolated
+  174/89 candidate and 151 exact registrations.
 
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and

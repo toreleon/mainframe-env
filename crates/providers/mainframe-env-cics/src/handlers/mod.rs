@@ -193,6 +193,9 @@ pub(super) fn invoke_extended_control(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match family {
+        crate::generated::CicsCommandFamily::BtsControl => {
+            bts_lifecycle::invoke(service, run, request)
+        }
         crate::generated::CicsCommandFamily::TransformControl => {
             transform_control::invoke(service, run, request)
         }

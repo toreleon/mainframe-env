@@ -1,6 +1,6 @@
 //! RUN TRANSID child-token port, byte-compatible with the sibling FETCH/FREE row.
 
-use super::super::{CicsService, store_error};
+use super::super::{CicsService, Run, store_error};
 use mainframe_env_execution_api::RunUnitId;
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{ProviderStateRecord, StoreError};
@@ -96,6 +96,42 @@ impl CicsService {
         })
     }
 
+    /// The provider holds this authenticated run outside the live-run map
+    /// while dispatching RUN TRANSID. It writes the same child-ownership row.
+    pub(in crate::service) fn register_bts_child_inflight(
+        &self,
+        run: &Run,
+        token: [u8; 16],
+        reply_channel: Option<&str>,
+    ) -> Result<(), HostProblem> {
+        if token == [0; 16] {
+            return Err(HostProblem::Unauthorized);
+        }
+        let reply_channel = reply_channel.map(channel_name).transpose()?;
+        change(self, run.invocation.run_unit_id.as_str(), |state| {
+            let key = token_key(&token);
+            if state.children.contains_key(&key) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if state.children.len() == MAX_CHILDREN {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            state.children.insert(
+                key,
+                Child {
+                    token,
+                    reply_channel: reply_channel.clone(),
+                    completion: None,
+                    abcode: None,
+                    fetched: false,
+                    channel_fetched: false,
+                    freed: false,
+                },
+            );
+            Ok(())
+        })
+    }
+
     /// Retain a terminal child outcome for FETCH CHILD or FETCH ANY.
     pub fn complete_bts_child(
         &self,
@@ -148,6 +184,7 @@ impl CicsService {
                 child.reply_channel == reply_channel || child.freed && child.reply_channel.is_none()
             }))
     }
+
     /// Read the sibling token outcome for crash-gap reconciliation.
     pub(in crate::service) fn bts_child_outcome(
         &self,

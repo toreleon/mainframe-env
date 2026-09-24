@@ -1,5 +1,31 @@
 use super::*;
 
+pub(super) const BTS_READ_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+pub(super) const BTS_MUTATE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+pub(super) const BTS_RUN_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::ProgramControl,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
+
 pub(super) const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 pub(super) const TRACE_EFFECTS: &[Effect] = &[
     Effect::MemoryWrite,

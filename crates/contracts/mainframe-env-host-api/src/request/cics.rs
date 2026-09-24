@@ -7,6 +7,29 @@ use std::collections::BTreeMap;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    AcquireActivityId,
+    AcquireProcess,
+    CancelAcqActivity,
+    CancelAcqProcess,
+    CancelActivity,
+    CheckAcqActivity,
+    CheckAcqProcess,
+    CheckActivity,
+    DefineActivity,
+    DefineProcess,
+    DeleteActivity,
+    ResetAcqProcess,
+    ResetActivity,
+    ResumeAcqActivity,
+    ResumeAcqProcess,
+    ResumeActivity,
+    RunAcqActivity,
+    RunAcqProcess,
+    RunActivity,
+    RunTransId,
+    SuspendAcqActivity,
+    SuspendAcqProcess,
+    SuspendActivity,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -297,6 +320,29 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::AcquireActivityId => "AcquireActivityId",
+            Self::AcquireProcess => "AcquireProcess",
+            Self::CancelAcqActivity => "CancelAcqActivity",
+            Self::CancelAcqProcess => "CancelAcqProcess",
+            Self::CancelActivity => "CancelActivity",
+            Self::CheckAcqActivity => "CheckAcqActivity",
+            Self::CheckAcqProcess => "CheckAcqProcess",
+            Self::CheckActivity => "CheckActivity",
+            Self::DefineActivity => "DefineActivity",
+            Self::DefineProcess => "DefineProcess",
+            Self::DeleteActivity => "DeleteActivity",
+            Self::ResetAcqProcess => "ResetAcqProcess",
+            Self::ResetActivity => "ResetActivity",
+            Self::ResumeAcqActivity => "ResumeAcqActivity",
+            Self::ResumeAcqProcess => "ResumeAcqProcess",
+            Self::ResumeActivity => "ResumeActivity",
+            Self::RunAcqActivity => "RunAcqActivity",
+            Self::RunAcqProcess => "RunAcqProcess",
+            Self::RunActivity => "RunActivity",
+            Self::RunTransId => "RunTransId",
+            Self::SuspendAcqActivity => "SuspendAcqActivity",
+            Self::SuspendAcqProcess => "SuspendAcqProcess",
+            Self::SuspendActivity => "SuspendActivity",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -478,7 +524,28 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::ChangePassword
+            Self::AcquireActivityId
+                | Self::AcquireProcess
+                | Self::CancelAcqActivity
+                | Self::CancelAcqProcess
+                | Self::CancelActivity
+                | Self::CheckActivity
+                | Self::DefineActivity
+                | Self::DefineProcess
+                | Self::DeleteActivity
+                | Self::ResetAcqProcess
+                | Self::ResetActivity
+                | Self::ResumeAcqActivity
+                | Self::ResumeAcqProcess
+                | Self::ResumeActivity
+                | Self::RunAcqActivity
+                | Self::RunAcqProcess
+                | Self::RunActivity
+                | Self::RunTransId
+                | Self::SuspendAcqActivity
+                | Self::SuspendAcqProcess
+                | Self::SuspendActivity
+                | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
                 | Self::RequestEncryptPassTicket

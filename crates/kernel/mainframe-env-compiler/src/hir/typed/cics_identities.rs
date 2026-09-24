@@ -1,5 +1,28 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    AcquireActivityId,
+    AcquireProcess,
+    CancelAcqActivity,
+    CancelAcqProcess,
+    CancelActivity,
+    CheckAcqActivity,
+    CheckAcqProcess,
+    CheckActivity,
+    DefineActivity,
+    DefineProcess,
+    DeleteActivity,
+    ResetAcqProcess,
+    ResetActivity,
+    ResumeAcqActivity,
+    ResumeAcqProcess,
+    ResumeActivity,
+    RunAcqActivity,
+    RunAcqProcess,
+    RunActivity,
+    RunTransId,
+    SuspendAcqActivity,
+    SuspendAcqProcess,
+    SuspendActivity,
     ChangePassword,
     ChangePhrase,
     QuerySecurity,
@@ -153,6 +176,17 @@ pub enum HirCicsOperation {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
+    BtsActivityId,
+    BtsProcess,
+    BtsProcessType,
+    BtsActivity,
+    BtsEvent,
+    BtsInputEvent,
+    BtsTransId,
+    BtsProgram,
+    BtsUserId,
+    BtsFacilityToken,
+    BtsChannel,
     ResClass,
     ResId,
     ResIdLength,
@@ -434,6 +468,8 @@ pub enum HirCicsOperandName {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOption {
+    BtsSynchronous,
+    BtsAsynchronous,
     SecurityBasicAuth,
     SecurityJwt,
     SecurityKerberos,

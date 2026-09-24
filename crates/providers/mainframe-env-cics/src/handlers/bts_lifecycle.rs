@@ -468,9 +468,11 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
 };
 
 mod cancel;
+mod catalog;
 mod children;
 mod container_scope;
 mod context;
+mod dispatch;
 mod participant;
 mod removal;
 mod repository;
@@ -478,8 +480,11 @@ mod run;
 mod store;
 mod transid;
 mod transitions;
+pub use catalog::{BtsProcessTypeDefinition, BtsTransactionDefinition};
+pub use children::BtsChildDefinition;
 pub use container_scope::{BtsAcquiredProcessContainerScope, BtsProcessContainerAccess};
 pub use context::BtsActivityContext;
+pub(super) use dispatch::invoke;
 pub(in crate::service) use participant::settle_recorded_uow;
 pub use run::{BTS_RUN_WORK_GENERATION, BtsRunRecord, BtsRunState};
 pub use store::BtsLifecycleStore;

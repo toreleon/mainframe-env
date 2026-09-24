@@ -100,7 +100,9 @@ pub(super) fn validate_candidate(
                 ));
             }
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
-                if web_control::reviewed_ambiguous_shape(descriptor, name, has_value) {
+                if web_control::reviewed_ambiguous_shape(descriptor, name, has_value)
+                    || bts_lifecycle::reviewed_ambiguous_shape(descriptor, name, has_value)
+                {
                     continue;
                 }
                 return Err(format!(

@@ -1,7 +1,10 @@
-use super::{CicsEffectPlan, CicsPlanOperation, CicsPlanOption};
+use super::{CicsEffectPlan, CicsPlanOperation, CicsPlanOption, bts_lifecycle};
 
 pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
     plan.options.iter().any(|option| match plan.operation {
+        operation if bts_lifecycle::is_bts(operation) => {
+            !bts_lifecycle::allowed_option(operation, *option)
+        }
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

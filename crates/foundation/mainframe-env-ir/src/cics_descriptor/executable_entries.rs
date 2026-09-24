@@ -1,9 +1,10 @@
+mod bts_entries;
 mod security_entries;
 
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 151] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 174] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1142,4 +1143,27 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 151] = [
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[7],
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[8],
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[9],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[0],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[1],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[2],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[3],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[4],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[5],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[6],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[7],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[8],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[9],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[10],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[11],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[12],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[13],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[14],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[15],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[16],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[17],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[18],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[19],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[20],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[21],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[22],
 ];

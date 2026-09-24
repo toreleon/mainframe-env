@@ -22,8 +22,8 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 128,
-      "maxItems": 128,
+      "minItems": 151,
+      "maxItems": 151,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -165,7 +165,30 @@
               "RetrieveReattachEvent",
               "RetrieveSubevent",
               "TestEvent",
-              "SignalEvent"
+              "SignalEvent",
+              "AcquireActivityId",
+              "AcquireProcess",
+              "CancelAcqActivity",
+              "CancelAcqProcess",
+              "CancelActivity",
+              "CheckAcqActivity",
+              "CheckAcqProcess",
+              "CheckActivity",
+              "DefineActivity",
+              "DefineProcess",
+              "DeleteActivity",
+              "ResetAcqProcess",
+              "ResetActivity",
+              "ResumeAcqActivity",
+              "ResumeAcqProcess",
+              "ResumeActivity",
+              "RunAcqActivity",
+              "RunAcqProcess",
+              "RunActivity",
+              "RunTransId",
+              "SuspendAcqActivity",
+              "SuspendAcqProcess",
+              "SuspendActivity"
             ]
           },
           "interface": {
@@ -173,6 +196,7 @@
           },
           "family": {
             "enum": [
+              "bts-control",
               "counter-control",
               "diagnostics",
               "document-control",
@@ -325,7 +349,30 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0176",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0177",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0219",
-              "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0194",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0002",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0003",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0017",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0018",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0019",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0023",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0024",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0025",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0032",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0037",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0041",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0169",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0170",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0172",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0173",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0174",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0183",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0184",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0185",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0186",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0215",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0216",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
             ]
           }
         }

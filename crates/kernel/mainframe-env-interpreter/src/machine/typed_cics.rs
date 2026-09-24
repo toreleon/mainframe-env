@@ -104,6 +104,9 @@ pub(super) fn suspension(
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Delay => ("cics-delay", true),
+        CicsOperation::RunAcqActivity
+        | CicsOperation::RunAcqProcess
+        | CicsOperation::RunActivity => ("cics-bts-run", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
         CicsOperation::WaitJournalName => ("cics-journal", true),
@@ -477,7 +480,14 @@ pub(super) fn execute(
             arguments.insert(name, capacity);
         }
         match output.name {
-            CicsOutputName::Abstime
+            CicsOutputName::BtsActivityId
+            | CicsOutputName::BtsCompStatus
+            | CicsOutputName::BtsMode
+            | CicsOutputName::BtsSuspStatus
+            | CicsOutputName::BtsAbCode
+            | CicsOutputName::BtsAbProgram
+            | CicsOutputName::BtsChildToken
+            | CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate
             | CicsOutputName::SecurityControl
@@ -670,6 +680,20 @@ pub(super) fn execute(
             "DELAY.ID".into(),
             payload(
                 "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::RunAcqActivity
+            | CicsPlanOperation::RunAcqProcess
+            | CicsPlanOperation::RunActivity
+    ) {
+        arguments.insert(
+            "BTS.RUN.ID".into(),
+            payload(
+                "mainframe-env.cics.bts-run-id@1",
                 format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
             )?,
         );

@@ -23,6 +23,7 @@ pub(crate) enum CicsCommandFamily {
     StorageControl,
     TransformControl,
     SpoolControl,
+    BtsControl,
     SecurityControl,
     Diagnostics,
     DocumentControl,
@@ -1116,5 +1117,7 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     },
 ];
 
+mod bts_entries;
 mod lookup;
+use bts_entries::BTS_COMMAND_DESCRIPTORS;
 pub(crate) use lookup::command_descriptor;

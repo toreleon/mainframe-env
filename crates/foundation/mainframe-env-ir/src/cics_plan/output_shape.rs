@@ -1,7 +1,10 @@
-use super::{CicsOutputName, CicsPlanOperation};
+use super::{CicsOutputName, CicsPlanOperation, bts_lifecycle};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        operation if bts_lifecycle::is_bts(operation) => {
+            bts_lifecycle::allowed_output(operation, output)
+        }
         CicsPlanOperation::Asktime => matches!(
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
