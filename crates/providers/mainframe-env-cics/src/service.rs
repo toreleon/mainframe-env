@@ -11879,7 +11879,14 @@ mod tests {
             BTreeMap::from([("OPTION.WAIT".into(), cics_option())]),
             2,
         );
-        let response = handlers::invoke_terminal_control(&service, &mut run, &command).unwrap();
+        let response = handlers::invoke_extended_control(
+            &service,
+            &mut run,
+            &command,
+            crate::generated::CicsCommandFamily::ConversationControl,
+            100,
+        )
+        .unwrap();
         assert_eq!(response.condition, "NORMAL");
         let state = service.lock().unwrap();
         let terminal = &state.sessions[session.as_str()];
@@ -12024,9 +12031,15 @@ mod tests {
             "NORMAL"
         );
         assert_eq!(
-            handlers::invoke_terminal_control(&service, &mut owner_run, &copy)
-                .unwrap()
-                .condition,
+            handlers::invoke_extended_control(
+                &service,
+                &mut owner_run,
+                &copy,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap()
+            .condition,
             "NORMAL"
         );
         let state = service.lock().unwrap();

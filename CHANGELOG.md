@@ -100,6 +100,9 @@ All notable changes to mainframe-env are documented here.
 - Routed eight physical ISSUE heads from the conversation-control family to
   the existing durable device handler. A selected ENDFILE family regression
   verifies atomic state and replay; the device rows remain unregistered.
+- Routed default COPY and ERASEAUP through the existing terminal/BMS state.
+  Their selected family regressions pass; COPY's CTLCHAR option remains
+  unsupported until its referenced CCC bit table is pinned and reviewed.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

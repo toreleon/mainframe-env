@@ -184,6 +184,9 @@ pub(in crate::service) fn invoke(
         | CicsOperation::IssuePass
         | CicsOperation::IssuePrint
         | CicsOperation::IssueReset => super::issue_device::invoke(service, run, request),
+        CicsOperation::IssueCopy | CicsOperation::IssueEraseAup => {
+            super::terminal_control::invoke(service, run, request)
+        }
         _ => Err(HostProblem::Unsupported),
     }
 }
