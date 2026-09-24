@@ -6315,7 +6315,7 @@ mod tests {
         CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
         CicsEventPostMode, CicsJavaStatus, CicsMonitorAction, CicsMonitorPointDefinition,
         CicsPartitionDefinition, CicsPartitionSetDefinition, CicsProgramDefinition,
-        ConversationKind, ConversationSystemDefinition,
+        ConversationKind, ConversationLedger, ConversationOwner, ConversationSystemDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -24083,6 +24083,117 @@ mod tests {
                 .unwrap()
                 .iter()
                 .filter(|entry| entry.operation == CicsOperation::AllocateConversation)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn compiled_build_attach_persists_task_owned_mro_header() {
+        let artifact = published_source_fixture(
+            "CVATTACH",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVATTACH.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 BUILD-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS BUILD ATTACH ATTACHID('HEADER1') PROCESS('TRN1') IUTYPE(17) DATASTR(208) RECFM(1) END-EXEC.\nMOVE EIBFN TO BUILD-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("ATTACH", "CICS.ATTACH.HEADER1", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "ATTACH",
+                "CICS.ATTACH.HEADER1",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CVATTACH".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CVAT".into(), "CVATTACH".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CVATTACH".into(),
+                    map: "CVATTACH".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("build-attach-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CVAT", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CVAT",
+                24,
+                80,
+                "attach-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CVATTACH", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("BUILD-FN").unwrap().bytes(),
+            &[0x04, 0x26]
+        );
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let ledger = ConversationLedger::load(server.store.as_ref()).unwrap();
+        let header = ledger.attach(&owner, "HEADER1").unwrap();
+        assert_eq!(&header.process, b"TRN1");
+        assert_eq!(
+            (header.iu_type, header.data_stream, header.record_format),
+            (17, 208, 1)
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::BuildAttach)
                 .count(),
             1
         );

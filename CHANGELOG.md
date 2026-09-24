@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added BUILD ATTACH for task-owned MRO attach headers. The command replaces
+  the named durable header, applies source defaults to omitted fields, checks
+  low-order SNA bit fields, and retains an exact replay receipt. The compiled
+  COBOL route reaches the selected provider and EIBFN `0426`. The isolated
+  registry is 155 typed, 0 legacy, and 108 unready.
+
 - Added GDS ASSIGN over the durable principal-facility record installed by a
   trusted task ingress. It returns optional four-byte principal CONVID/SYSID
   and the six-byte GDS RETCODE, including the no-facility and wrong-kind cases.

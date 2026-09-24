@@ -10,6 +10,7 @@ impl Canonical for CicsOperation {
                 out.variant("CicsOperation", "GdsAllocateConversation", 0)
             }
             Self::GdsAssignConversation => out.variant("CicsOperation", "GdsAssignConversation", 0),
+            Self::BuildAttach => out.variant("CicsOperation", "BuildAttach", 0),
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
             Self::AddSubevent => out.variant("CicsOperation", "AddSubevent", 0),
             Self::Address => out.variant("CicsOperation", "Address", 0),

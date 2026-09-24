@@ -305,9 +305,9 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsOperation> {
     Some(match operation {
         CicsPlanOperation::AllocateConversation => CicsOperation::AllocateConversation,
+        CicsPlanOperation::BuildAttach => CicsOperation::BuildAttach,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
-        | CicsPlanOperation::BuildAttach
         | CicsPlanOperation::ConnectProcess
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse

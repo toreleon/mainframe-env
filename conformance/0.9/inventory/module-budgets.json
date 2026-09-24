@@ -288,6 +288,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/allocate.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/build_attach.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/build_attach.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/definitions.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/gds.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/gds_allocate.rs",

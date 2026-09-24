@@ -9,6 +9,7 @@ use mainframe_env_host_api::{CicsOperation, CicsRequest, CicsResponse, HostProbl
 use serde::{Deserialize, Serialize};
 
 mod allocate;
+mod build_attach;
 mod definitions;
 mod gds;
 mod gds_allocate;
@@ -42,6 +43,7 @@ pub(in crate::service) fn invoke(
             gds_allocate::invoke(service, run, request, retention_tick)
         }
         CicsOperation::GdsAssignConversation => gds_assign::invoke(service, run, request),
+        CicsOperation::BuildAttach => build_attach::invoke(service, run, request, retention_tick),
         _ => Err(HostProblem::Unsupported),
     }
 }

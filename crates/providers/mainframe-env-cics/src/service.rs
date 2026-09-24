@@ -5401,6 +5401,7 @@ mod tests {
             ("ALLOCATE", CicsOperation::AllocateConversation),
             ("GDS ALLOCATE", CicsOperation::GdsAllocateConversation),
             ("GDS ASSIGN", CicsOperation::GdsAssignConversation),
+            ("BUILD ATTACH", CicsOperation::BuildAttach),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6703,7 +6704,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 156);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 157);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -36004,5 +36005,111 @@ mod tests {
             assert_eq!(result.outputs["RETCODE"].bytes(), expected);
             assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
         }
+    }
+
+    #[test]
+    fn build_attach_replaces_unspecified_fields_with_defaults_and_replays() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let build = request(
+            CicsOperation::BuildAttach,
+            BTreeMap::from([
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("PROCESS".into(), cics_literal(b"TRN1")),
+                ("IUTYPE".into(), cics_decimal(17)),
+                ("DATASTR".into(), cics_decimal(208)),
+                ("RECFM".into(), cics_decimal(1)),
+            ]),
+            1,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, build.clone(), 1),
+                build.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let header = ledger.attach(&owner, "HEADER1").unwrap();
+        assert_eq!(&header.process, b"TRN1");
+        assert_eq!(
+            (header.iu_type, header.data_stream, header.record_format),
+            (17, 208, 1)
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, build.clone(), 1), build)
+            .unwrap();
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .attach_headers
+                .len(),
+            1
+        );
+
+        let replace = request(
+            CicsOperation::BuildAttach,
+            BTreeMap::from([("ATTACHID".into(), cics_literal(b"HEADER1"))]),
+            2,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, replace.clone(), 2),
+            replace,
+        )
+        .unwrap();
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let header = ledger.attach(&owner, "HEADER1").unwrap().clone();
+        assert!(header.process.is_empty());
+        assert_eq!(
+            (header.iu_type, header.data_stream, header.record_format),
+            (0, 0, 4)
+        );
+
+        let invalid = request(
+            CicsOperation::BuildAttach,
+            BTreeMap::from([
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("DATASTR".into(), cics_decimal(209)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .attach(&owner, "HEADER1")
+                .unwrap(),
+            &header
+        );
+
+        let binary = request(
+            CicsOperation::BuildAttach,
+            BTreeMap::from([
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("IUTYPE".into(), enqueue_value(&[0xab, 0x11])),
+                ("DATASTR".into(), enqueue_value(&[0xee, 0xd0])),
+                ("RECFM".into(), enqueue_value(&[0xff, 0x04])),
+            ]),
+            4,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, binary.clone(), 4), binary)
+            .unwrap();
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        let header = ledger.attach(&owner, "HEADER1").unwrap();
+        assert_eq!(
+            (header.iu_type, header.data_stream, header.record_format),
+            (17, 208, 4)
+        );
     }
 }
