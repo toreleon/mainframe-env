@@ -5133,21 +5133,22 @@ mod tests {
         );
     }
 
-    #[test]
-    fn bts_child_ownership_recovers_after_sqlite_reopen() {
-        let directory = std::env::temp_dir().join(format!(
-            "mainframe-env-bts-child-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
-        ));
-        std::fs::create_dir_all(&directory).unwrap();
-        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+    fn bts_child_reopen<S>(make_store: impl Fn() -> Arc<S>, label: &str)
+    where
+        S: ProviderStateStore + 'static,
+    {
+        let unique = format!("{label}-{}", std::process::id());
+        let sequence = if label == "postgres" {
+            1_000_000 + u64::from(std::process::id())
+        } else {
+            1
+        };
         let token = *b"1234567890ABCDEF";
-        let invocation = invocation_for("bts-sqlite", BTreeMap::new());
+        let invocation = invocation_for(&format!("bts-{unique}"), BTreeMap::new());
         {
-            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let store = make_store();
             let cics = service(store);
-            let session = SessionId::new("bts-sqlite-first", 64).unwrap();
+            let session = SessionId::new(format!("bts-{unique}-first"), 64).unwrap();
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
                 .unwrap();
@@ -5162,9 +5163,9 @@ mod tests {
             .unwrap();
         }
         {
-            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let store = make_store();
             let cics = service(store);
-            let session = SessionId::new("bts-sqlite-second", 64).unwrap();
+            let session = SessionId::new(format!("bts-{unique}-second"), 64).unwrap();
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
                 .unwrap();
@@ -5175,15 +5176,44 @@ mod tests {
                     ("COMPSTATUS".into(), argument(b"STATUS-X")),
                     ("CHANNEL".into(), argument(b"CHANNEL-X")),
                 ]),
-                1,
+                sequence,
             );
             let response = cics
-                .invoke(&effect(&invocation.run_unit_id, fetch.clone(), 1), fetch)
+                .invoke(
+                    &effect(&invocation.run_unit_id, fetch.clone(), sequence),
+                    fetch,
+                )
                 .unwrap();
             assert_eq!(response.outputs["COMPSTATUS"].bytes(), b"SECERROR");
             assert_eq!(response.outputs["CHANNEL"].bytes(), b"REPLY           ");
         }
+    }
+
+    #[test]
+    fn bts_child_ownership_recovers_after_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-child-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        bts_child_reopen(
+            || Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+            "sqlite",
+        );
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn bts_child_ownership_recovers_after_postgres_reopen() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("isolated PostgreSQL 18 test URL");
+        bts_child_reopen(
+            || Arc::new(PostgresStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+            "postgres",
+        );
     }
 
     #[test]
@@ -5361,16 +5391,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn bts_selected_link_reconciles_outer_receipt_after_sqlite_reopen() {
+    fn bts_selected_link_reopen<S>(make_store: impl Fn() -> Arc<S>, label: &str)
+    where
+        S: ProviderStateStore + ArtifactStore + 'static,
+    {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
-        let directory = std::env::temp_dir().join(format!(
-            "mainframe-env-bts-link-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
-        ));
-        std::fs::create_dir_all(&directory).unwrap();
-        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let unique = format!("{label}-{}", std::process::id());
+        let process_name = format!("PROC{}", std::process::id());
+        let sequence = if label == "postgres" {
+            2_000_000 + u64::from(std::process::id())
+        } else {
+            1
+        };
         let seen: ProgramLinkTrace = Arc::new(Mutex::new(Vec::new()));
         let providers = vec![
             Arc::new(Authority {
@@ -5385,18 +5417,18 @@ mod tests {
             Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
             HostLimits::default(),
         ));
-        let invocation = invocation_for("bts-link-sqlite", BTreeMap::new());
+        let invocation = invocation_for(&format!("bts-link-{unique}"), BTreeMap::new());
         let link = request(
             CicsOperation::LinkAcqProcess,
             BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
-            1,
+            sequence,
         );
-        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", &process_name).unwrap();
         {
-            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let store = make_store();
             let cics =
                 CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
-            let session = SessionId::new("bts-link-sqlite-first", 64).unwrap();
+            let session = SessionId::new(format!("bts-link-{unique}-first"), 64).unwrap();
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
                 .unwrap();
@@ -5407,7 +5439,7 @@ mod tests {
                 .define_process(
                     BtsProcess::new(
                         "TYPE",
-                        "PROC",
+                        &process_name,
                         &root,
                         "BTSRUN",
                         "MENU",
@@ -5423,7 +5455,7 @@ mod tests {
             cics.inject_replay_unknown_after_persist_once();
             assert_eq!(
                 cics.invoke(
-                    &effect(&invocation.run_unit_id, link.clone(), 1),
+                    &effect(&invocation.run_unit_id, link.clone(), sequence),
                     link.clone()
                 ),
                 Err(HostProblem::UnknownOutcome)
@@ -5431,7 +5463,7 @@ mod tests {
             assert_eq!(seen.lock().unwrap().len(), 1);
             assert_eq!(
                 authority
-                    .load_process("TYPE", "PROC")
+                    .load_process("TYPE", &process_name)
                     .unwrap()
                     .unwrap()
                     .activities[&root]
@@ -5440,14 +5472,17 @@ mod tests {
             );
         }
         {
-            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let store = make_store();
             let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
-            let session = SessionId::new("bts-link-sqlite-second", 64).unwrap();
+            let session = SessionId::new(format!("bts-link-{unique}-second"), 64).unwrap();
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
                 .unwrap();
             let response = cics
-                .invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link)
+                .invoke(
+                    &effect(&invocation.run_unit_id, link.clone(), sequence),
+                    link,
+                )
                 .unwrap();
             assert_eq!(
                 (
@@ -5465,7 +5500,33 @@ mod tests {
                     .is_none()
             );
         }
+    }
+
+    #[test]
+    fn bts_selected_link_reconciles_outer_receipt_after_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-link-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        bts_selected_link_reopen(
+            || Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+            "sqlite",
+        );
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn bts_selected_link_reconciles_outer_receipt_after_postgres_reopen() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("isolated PostgreSQL 18 test URL");
+        bts_selected_link_reopen(
+            || Arc::new(PostgresStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+            "postgres",
+        );
     }
 
     #[test]
