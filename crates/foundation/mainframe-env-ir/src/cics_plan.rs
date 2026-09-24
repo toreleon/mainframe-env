@@ -1455,6 +1455,120 @@ mod tests {
     }
 
     #[test]
+    fn all_twenty_issue_heads_have_distinct_canonical_v2_plans() {
+        let operations = [
+            CicsPlanOperation::IssueAbend,
+            CicsPlanOperation::GdsIssueAbend,
+            CicsPlanOperation::IssueConfirmation,
+            CicsPlanOperation::GdsIssueConfirmation,
+            CicsPlanOperation::IssueCopy,
+            CicsPlanOperation::IssueDisconnect,
+            CicsPlanOperation::IssueEndfile,
+            CicsPlanOperation::IssueEndoutput,
+            CicsPlanOperation::IssueEods,
+            CicsPlanOperation::IssueEraseAup,
+            CicsPlanOperation::IssueError,
+            CicsPlanOperation::GdsIssueError,
+            CicsPlanOperation::IssueLoad,
+            CicsPlanOperation::IssuePass,
+            CicsPlanOperation::IssuePrepare,
+            CicsPlanOperation::GdsIssuePrepare,
+            CicsPlanOperation::IssuePrint,
+            CicsPlanOperation::IssueReset,
+            CicsPlanOperation::GdsIssueSignal,
+            CicsPlanOperation::IssueSignal,
+        ];
+        for (index, operation) in operations.into_iter().enumerate() {
+            let basic = matches!(
+                operation,
+                CicsPlanOperation::GdsIssueAbend
+                    | CicsPlanOperation::GdsIssueConfirmation
+                    | CicsPlanOperation::GdsIssueError
+                    | CicsPlanOperation::GdsIssuePrepare
+                    | CicsPlanOperation::GdsIssueSignal
+            );
+            let selector = if basic
+                || matches!(
+                    operation,
+                    CicsPlanOperation::IssueAbend
+                        | CicsPlanOperation::IssueConfirmation
+                        | CicsPlanOperation::IssueError
+                        | CicsPlanOperation::IssuePrepare
+                        | CicsPlanOperation::IssueSignal
+                ) {
+                Some(CicsOperandName::IssueConvid)
+            } else {
+                match operation {
+                    CicsPlanOperation::IssueCopy => Some(CicsOperandName::IssueTermId),
+                    CicsPlanOperation::IssueDisconnect => Some(CicsOperandName::IssueSession),
+                    CicsPlanOperation::IssueLoad => Some(CicsOperandName::IssueProgram),
+                    CicsPlanOperation::IssuePass => Some(CicsOperandName::IssueLuName),
+                    _ => None,
+                }
+            };
+            let operands = selector
+                .map(|name| CicsNamedOperand {
+                    name,
+                    value: CicsOperandValue::Literal(b"I001".to_vec()),
+                })
+                .into_iter()
+                .collect();
+            let mut outputs = Vec::new();
+            if basic {
+                outputs.push(CicsOutputBinding {
+                    name: CicsOutputName::IssueConvData,
+                    target: slot(1, "RESULT.CONVDATA"),
+                });
+                outputs.push(CicsOutputBinding {
+                    name: CicsOutputName::IssueRetCode,
+                    target: slot(2, "RESULT.RETCODE"),
+                });
+            }
+            if basic
+                || matches!(
+                    operation,
+                    CicsPlanOperation::IssueAbend
+                        | CicsPlanOperation::IssueConfirmation
+                        | CicsPlanOperation::IssueError
+                        | CicsPlanOperation::IssuePrepare
+                        | CicsPlanOperation::IssueSignal
+                )
+            {
+                outputs.push(CicsOutputBinding {
+                    name: CicsOutputName::IssueState,
+                    target: slot(3, "RESULT.STATE"),
+                });
+            }
+            outputs.sort_by_key(|output| output.name);
+            let options = match operation {
+                CicsPlanOperation::IssueCopy | CicsPlanOperation::IssueEraseAup => {
+                    BTreeSet::from([CicsPlanOption::IssueWaitOption])
+                }
+                CicsPlanOperation::IssueEndfile => BTreeSet::from([CicsPlanOption::IssueEndOutput]),
+                CicsPlanOperation::IssueEndoutput => BTreeSet::from([CicsPlanOption::IssueEndFile]),
+                CicsPlanOperation::IssueLoad => BTreeSet::from([CicsPlanOption::IssueConverse]),
+                CicsPlanOperation::IssuePass => BTreeSet::from([CicsPlanOption::IssueNoQuiesce]),
+                _ => BTreeSet::new(),
+            };
+            let plan = CicsEffectPlan {
+                operation,
+                operands,
+                options,
+                outputs,
+                condition: CicsCondition::Default,
+            };
+            let limits = CicsPlanLimits::default();
+            let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+            assert_eq!(&encoded[6..8], &(239u16 + index as u16).to_be_bytes());
+            assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+            assert_eq!(
+                encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
     fn define_input_event_uses_reserved_v2_tags_without_changing_v1() {
         let limits = CicsPlanLimits::default();
         let plan = CicsEffectPlan {
