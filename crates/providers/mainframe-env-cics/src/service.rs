@@ -212,15 +212,6 @@ enum DatasetUndo {
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CicsTraceEntry {
-    pub operation: CicsOperation,
-    pub outcome: String,
-    pub response: i32,
-    pub response2: i32,
-    pub payload_bytes: usize,
-}
-
 /// Read-only view of a bounded CICS spool report.
 /// The token and ownership fields reflect the last durable state transition.
 /// Record bytes are copied so callers cannot mutate the provider's state.
@@ -282,6 +273,7 @@ struct State {
     journals: BTreeMap<String, handlers::JournalRecord>,
     spool: handlers::SpoolState,
     web: handlers::WebState,
+    conversation_transport: Option<Arc<dyn handlers::CicsConversationTransport>>,
     // Internal authority for the declared records-core slice. Command handlers
     // remain deliberately disconnected until the producer/consumer slices seal.
     #[allow(dead_code)]
@@ -322,6 +314,13 @@ pub trait CicsReplayClock: Send + Sync {
 }
 
 impl CicsService {
+    /// Resolve the APPC/MRO carrier without holding the mutex during dispatch.
+    pub(in crate::service) fn conversation_transport(
+        &self,
+    ) -> Result<Option<Arc<dyn handlers::CicsConversationTransport>>, HostProblem> {
+        Ok(self.lock()?.conversation_transport.clone())
+    }
+
     fn invoke_host(
         &self,
         invocation: &Invocation,
@@ -476,6 +475,7 @@ impl CicsService {
                 journals: handlers::load_journals(store.as_ref(), limits)?,
                 spool,
                 web,
+                conversation_transport: None,
                 interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
@@ -35671,6 +35671,114 @@ mod tests {
             ("LENGERR", 22, 1)
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn conversation_transport_reconciles_attempted_send_without_redispatch() {
+        use crate::{
+            CicsConversationTransport, ConversationDataFrame, ConversationTransmitOutcome,
+        };
+
+        struct Carrier {
+            sends: AtomicUsize,
+            reconciles: AtomicUsize,
+        }
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                _frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.sends.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Pending)
+            }
+
+            fn reconcile(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.reconciles.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "MRO1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("MRO1", ConversationKind::Mro, owner.clone())
+            .unwrap()
+            .token;
+        next.conversation_mut(token)
+            .unwrap()
+            .stage_send(
+                &owner,
+                ConversationContext::Local,
+                b"PAYLOAD".to_vec(),
+                true,
+                false,
+                false,
+            )
+            .unwrap();
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        assert_eq!(
+            cics.flush_conversation_send(&run, token),
+            Ok(ConversationTransmitOutcome::Pending)
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .data
+                .next_outbound()
+                .map(|send| send.2),
+            Some(false)
+        );
+        let carrier = Arc::new(Carrier {
+            sends: AtomicUsize::new(0),
+            reconciles: AtomicUsize::new(0),
+        });
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        assert_eq!(
+            cics.flush_conversation_send(&run, token),
+            Ok(ConversationTransmitOutcome::Pending)
+        );
+        assert_eq!(
+            cics.flush_conversation_send(&run, token),
+            Ok(ConversationTransmitOutcome::Confirmed)
+        );
+        assert_eq!(carrier.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(carrier.reconciles.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .state,
+            ConversationState::Receive
+        );
     }
 
     #[test]

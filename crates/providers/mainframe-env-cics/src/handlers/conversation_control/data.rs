@@ -8,6 +8,8 @@ use super::{
     ConversationContext, ConversationKind, ConversationOwner, ConversationProblem,
     ConversationRecord, ConversationState,
 };
+use crate::service::{CicsService, mutation_problem, store_error};
+use mainframe_env_host_api::HostProblem;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -50,6 +52,12 @@ struct StagedSend {
     id: u64,
     frame: ConversationDataFrame,
     next_state: ConversationState,
+    #[serde(default, skip_serializing_if = "is_false")]
+    dispatch_attempted: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -140,8 +148,10 @@ impl ConversationDataState {
         self.outbound.len()
     }
 
-    pub fn next_outbound(&self) -> Option<(u64, &ConversationDataFrame)> {
-        self.outbound.first().map(|send| (send.id, &send.frame))
+    pub fn next_outbound(&self) -> Option<(u64, &ConversationDataFrame, bool)> {
+        self.outbound
+            .first()
+            .map(|send| (send.id, &send.frame, send.dispatch_attempted))
     }
 
     pub fn pending_inbound(&self) -> usize {
@@ -286,6 +296,7 @@ impl ConversationRecord {
             id: send_id,
             frame,
             next_state,
+            dispatch_attempted: false,
         });
         next.validate()?;
         self.next_sequence()?;
@@ -295,6 +306,29 @@ impl ConversationRecord {
 
     /// Peer-confirmed completion of the oldest staged SEND. The adapter must
     /// persist its external outcome before calling this transition.
+    pub fn mark_send_attempted(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        send_id: u64,
+    ) -> Result<(), ConversationProblem> {
+        self.check_owner(owner, context)?;
+        let Some(send) = self.data.outbound.first() else {
+            return Err(ConversationProblem::WrongState);
+        };
+        if send.id != send_id {
+            return Err(ConversationProblem::WrongState);
+        }
+        if send.dispatch_attempted {
+            return Ok(());
+        }
+        self.next_sequence()?;
+        self.data.outbound[0].dispatch_attempted = true;
+        Ok(())
+    }
+
+    /// Only a transport-confirmed or reconciled outcome may remove this
+    /// pre-dispatch uncertainty marker. No caller retries the transmission.
     pub fn acknowledge_send(
         &mut self,
         owner: &ConversationOwner,
@@ -306,6 +340,9 @@ impl ConversationRecord {
             return Ok(());
         }
         if self.data.outbound.first().map(|send| send.id) != Some(send_id) {
+            return Err(ConversationProblem::WrongState);
+        }
+        if !self.data.outbound[0].dispatch_attempted {
             return Err(ConversationProblem::WrongState);
         }
         self.next_sequence()?;
@@ -454,6 +491,52 @@ impl ConversationRecord {
     }
 }
 
+impl CicsService {
+    /// Accept one authenticated peer event into the existing conversation
+    /// ledger. The caller supplies its transport event sequence and the
+    /// allocation owner/lease; a duplicate with different bytes is rejected.
+    pub fn accept_conversation_peer_frame(
+        &self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        peer_sequence: u64,
+        frame: ConversationDataFrame,
+    ) -> Result<(), HostProblem> {
+        frame.validate().map_err(|_| HostProblem::Malformed)?;
+        for _ in 0..32 {
+            let current =
+                super::ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
+            let mut next = current.clone();
+            let record = next.conversation_mut(token).ok_or(HostProblem::NotFound)?;
+            record
+                .enqueue_peer_data(owner, context, peer_sequence, frame.clone())
+                .map_err(|problem| match problem {
+                    ConversationProblem::NotOwned
+                    | ConversationProblem::StaleOwner
+                    | ConversationProblem::DplPrincipal => HostProblem::Unauthorized,
+                    ConversationProblem::Length | ConversationProblem::Malformed => {
+                        HostProblem::Malformed
+                    }
+                    ConversationProblem::Exhausted => HostProblem::ResourceExhausted,
+                    ConversationProblem::WrongKind | ConversationProblem::WrongState => {
+                        HostProblem::IdempotencyConflict
+                    }
+                })?;
+            if next == current {
+                return Ok(());
+            }
+            if current
+                .persist(&mut next, self.store.as_ref())
+                .map_err(|error| mutation_problem(store_error(error)))?
+            {
+                return Ok(());
+            }
+        }
+        Err(HostProblem::UnknownOutcome)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +609,23 @@ mod tests {
         let encoded = record.encode().unwrap();
         record = ConversationRecord::decode(&encoded).unwrap();
         assert_eq!(record.data.pending_outbound(), 1);
+        assert_eq!(record.data.next_outbound().map(|send| send.2), Some(false));
+        assert_eq!(
+            record.acknowledge_send(&owner, ConversationContext::Local, 1),
+            Err(ConversationProblem::WrongState)
+        );
+        record
+            .mark_send_attempted(&owner, ConversationContext::Local, 1)
+            .unwrap();
+        let sequence = record.sequence;
+        assert_eq!(
+            record.mark_send_attempted(&owner, ConversationContext::Local, 1),
+            Ok(())
+        );
+        assert_eq!(record.sequence, sequence);
+        let encoded = record.encode().unwrap();
+        record = ConversationRecord::decode(&encoded).unwrap();
+        assert_eq!(record.data.next_outbound().map(|send| send.2), Some(true));
         record
             .acknowledge_send(&owner, ConversationContext::Local, 1)
             .unwrap();

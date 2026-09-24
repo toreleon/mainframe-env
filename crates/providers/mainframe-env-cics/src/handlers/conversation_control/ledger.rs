@@ -556,6 +556,9 @@ mod tests {
                 false,
             )
             .unwrap();
+        conversation
+            .mark_send_attempted(&owner(), super::super::ConversationContext::Local, 1)
+            .unwrap();
         assert!(
             installed
                 .persist_with_replay(&mut allocated, &replay(token), &first)
@@ -568,6 +571,15 @@ mod tests {
         assert_eq!(
             current.conversation(token).unwrap().data.pending_outbound(),
             1
+        );
+        assert_eq!(
+            current
+                .conversation(token)
+                .unwrap()
+                .data
+                .next_outbound()
+                .map(|send| send.2),
+            Some(true)
         );
         let saved = super::super::load_conversation_replay(&reopened, "alloc-effect")
             .unwrap()

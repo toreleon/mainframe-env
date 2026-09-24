@@ -41,6 +41,7 @@ mod task_wait;
 mod terminal_control;
 mod terminal_run;
 mod time;
+mod trace;
 mod transform_control;
 pub(in crate::service) mod transient_data;
 mod web_control;
@@ -131,13 +132,14 @@ pub(super) use bms_map::{
 pub(super) use condition::respond as condition;
 pub use conversation_control::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
-    ConversationAttachHeader, ConversationContext, ConversationDataFrame, ConversationDataReply,
-    ConversationDataState, ConversationKind, ConversationLedger, ConversationOwner,
-    ConversationPartnerDefinition, ConversationProblem, ConversationProfileDefinition,
-    ConversationRecord, ConversationReplay, ConversationReply, ConversationState,
-    ConversationSystemDefinition, DataCondition, GdsAllocateFailure, GdsAssignFailure,
-    GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure, GdsReturnCode, GdsWaitFailure,
-    MAX_PIP_BYTES, MAX_PROCESS_BYTES, load_conversation_replay, prune_conversation_replays,
+    CicsConversationTransport, ConversationAttachHeader, ConversationContext,
+    ConversationDataFrame, ConversationDataReply, ConversationDataState, ConversationKind,
+    ConversationLedger, ConversationOwner, ConversationPartnerDefinition, ConversationProblem,
+    ConversationProfileDefinition, ConversationRecord, ConversationReplay, ConversationReply,
+    ConversationState, ConversationSystemDefinition, ConversationTransmitOutcome, DataCondition,
+    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure,
+    GdsReturnCode, GdsWaitFailure, MAX_PIP_BYTES, MAX_PROCESS_BYTES, load_conversation_replay,
+    prune_conversation_replays,
 };
 pub(super) use conversation_control::{
     context as conversation_context, deadline as conversation_deadline,
@@ -201,6 +203,7 @@ pub(super) use terminal_control::{
 };
 pub(in crate::service) use terminal_run::terminal_secret_digest;
 pub(super) use time::invoke as invoke_time;
+pub use trace::CicsTraceEntry;
 pub use web_control::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
     CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,

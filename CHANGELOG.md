@@ -16,6 +16,10 @@ All notable changes to mainframe-env are documented here.
   while staged sends carry distinct acknowledgement IDs. Exact duplicate
   delivery or acknowledgement is idempotent; gaps and conflicting replays fail
   without advancing the shared durable conversation record.
+- Added a transport-neutral send confirmation and read-only reconciliation
+  boundary. The shared conversation row retains a pre-dispatch marker, and a
+  restarted flush reconciles the same send ID without transmitting it again.
+  This internal adapter contract does not change application row readiness.
 
 ### Changed
 

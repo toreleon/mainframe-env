@@ -15,6 +15,7 @@ mod gds;
 mod gds_allocate;
 mod ledger;
 mod replay;
+mod transport;
 pub use data::{
     ConversationDataFrame, ConversationDataReply, ConversationDataState, DataCondition,
 };
@@ -31,6 +32,27 @@ pub use replay::{
     CONVERSATION_REPLAY_NAMESPACE, ConversationReplay, ConversationReply, load_conversation_replay,
     prune_conversation_replays,
 };
+pub use transport::{CicsConversationTransport, ConversationTransmitOutcome};
+
+impl CicsService {
+    /// Install one transport adapter for this region. A different adapter
+    /// requires a fresh service instance after the old one is drained.
+    pub fn install_conversation_transport(
+        &self,
+        transport: std::sync::Arc<dyn CicsConversationTransport>,
+    ) -> Result<(), HostProblem> {
+        let mut state = self.lock()?;
+        if let Some(existing) = state.conversation_transport.as_ref() {
+            return if std::sync::Arc::ptr_eq(existing, &transport) {
+                Ok(())
+            } else {
+                Err(HostProblem::IdempotencyConflict)
+            };
+        }
+        state.conversation_transport = Some(transport);
+        Ok(())
+    }
+}
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
