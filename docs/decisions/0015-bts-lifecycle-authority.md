@@ -32,6 +32,16 @@ the syncpoint owner. BTS supplies no universal prepare, automatic
 compensation, or automatic redispatch after an unknown outcome. The local
 participant declaration is `BTS_PARTICIPANT`.
 
+The opaque root ID binds the full process key to its defining UOW, so a later
+incarnation does not reuse that activity identity. Child IDs bind the root ID
+to a monotonic child sequence. A child definition and its index are one CAS
+batch; a syncpoint publishes or removes pending child/index pairs with the
+acquisition change. A reset or delete removes descendant indexes with the
+process row. Activity completion and coordinator checkpoint references carry
+activation and lease epochs. The first v1 writer omitted an activity-level
+pending-UOW field; the reader derives it only for its pending root and rewrites
+the additive shape at the next mutation.
+
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed
 identities, and excess state. There is no prior BTS process row to migrate.

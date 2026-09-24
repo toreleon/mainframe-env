@@ -73,6 +73,9 @@ pub struct BtsActivity {
     pub activation_epoch: u64,
     pub checkpoint: Option<BtsCheckpoint>,
     pub acquired_by: Option<String>,
+    /// A newly defined child is visible only in this UOW until syncpoint.
+    #[serde(default)]
+    pub pending_uow: Option<String>,
     pub abcode: Option<String>,
     pub abprogram: Option<String>,
 }
@@ -161,6 +164,7 @@ impl BtsProcess {
             activation_epoch: 0,
             checkpoint: None,
             acquired_by: Some(defining_uow.into()),
+            pending_uow: Some(defining_uow.into()),
             abcode: None,
             abprogram: None,
         };
@@ -212,6 +216,7 @@ impl BtsProcess {
             return Err(bad());
         }
         let mut names = BTreeSet::new();
+        let mut completion_events = BTreeSet::new();
         for (id, activity) in &self.activities {
             if id != &activity.id
                 || validate_activity_id(id).is_err()
@@ -236,6 +241,14 @@ impl BtsProcess {
                     .acquired_by
                     .as_deref()
                     .is_some_and(|owner| validate_identifier(owner, 256).is_err())
+                || activity
+                    .pending_uow
+                    .as_deref()
+                    .is_some_and(|owner| validate_identifier(owner, 256).is_err())
+                || activity
+                    .completion_event
+                    .as_deref()
+                    .is_some_and(|name| validate_name(name, 16, false).is_err())
                 || activity.mode == BtsMode::Complete
                     && activity.completion == BtsCompletion::Incomplete
                 || activity.mode != BtsMode::Complete
@@ -250,9 +263,19 @@ impl BtsProcess {
                 return Err(bad());
             }
             match &activity.parent_id {
-                None if id == &self.root_id && activity.name == self.name => {}
+                None if id == &self.root_id
+                    && activity.name == self.name
+                    && activity.pending_uow == self.pending_uow => {}
                 Some(parent) if id != &self.root_id && self.activities.contains_key(parent) => {
+                    if activity.completion_event.is_none() {
+                        return Err(bad());
+                    }
                     if !names.insert((parent.clone(), activity.name.clone())) {
+                        return Err(bad());
+                    }
+                    if !completion_events
+                        .insert((parent.clone(), activity.completion_event.clone()))
+                    {
                         return Err(bad());
                     }
                 }
@@ -402,7 +425,10 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
     schema_version: 1,
 };
 
+mod children;
+mod removal;
 mod store;
+mod transitions;
 pub use store::BtsLifecycleStore;
 
 fn put_process(
@@ -473,10 +499,12 @@ fn put_activity_index(
     }))
 }
 
-fn activity_id(process_key: &str, sequence: u64) -> String {
+fn activity_id(process_key: &str, incarnation: &str, sequence: u64) -> String {
     let mut hash = Sha256::new();
     hash.update(b"mainframe-env.cics.bts-activity-id@1\0");
     hash.update(process_key.as_bytes());
+    hash.update([0]);
+    hash.update(incarnation.as_bytes());
     hash.update([0]);
     hash.update(sequence.to_be_bytes());
     let digest = hash.finalize();
@@ -542,7 +570,7 @@ mod tests {
     fn definition_and_acquisition_are_atomic_and_fenced_across_restart() {
         let memory = MemoryStore::new(Default::default());
         let authority = BtsLifecycleStore::new(&memory);
-        let root = BtsLifecycleStore::root_id("TYPE", "ORDER").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         let process =
             BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
         authority
@@ -583,14 +611,24 @@ mod tests {
     fn duplicate_definition_leaves_prior_process_and_acquisition_unchanged() {
         let memory = MemoryStore::new(Default::default());
         let authority = BtsLifecycleStore::new(&memory);
-        let root = BtsLifecycleStore::root_id("TYPE", "ORDER").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         let first =
             BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
         authority
             .define_process(first, "UOW1", "EXEC1", "USER")
             .unwrap();
-        let second =
-            BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW2").unwrap();
+        let second_root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW2").unwrap();
+        assert_ne!(root, second_root);
+        let second = BtsProcess::new(
+            "TYPE",
+            "ORDER",
+            &second_root,
+            "MAIN",
+            "BTS1",
+            "USER",
+            "UOW2",
+        )
+        .unwrap();
         assert!(
             authority
                 .define_process(second, "UOW2", "EXEC2", "USER")
@@ -609,7 +647,7 @@ mod tests {
 
     #[test]
     fn cycle_and_checkpoint_epoch_are_rejected() {
-        let root = BtsLifecycleStore::root_id("TYPE", "ORDER").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         let mut process =
             BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW").unwrap();
         process.activities.get_mut(&root).unwrap().checkpoint = Some(BtsCheckpoint {
@@ -628,7 +666,7 @@ mod tests {
     fn rollback_removes_pending_process_and_root_index_atomically() {
         let memory = MemoryStore::new(Default::default());
         let authority = BtsLifecycleStore::new(&memory);
-        let root = BtsLifecycleStore::root_id("TYPE", "ORDER").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         let process =
             BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
         authority
@@ -649,7 +687,7 @@ mod tests {
     fn acquisition_and_replay_survive_reopen_without_repeating_transition() {
         let memory = MemoryStore::new(Default::default());
         let authority = BtsLifecycleStore::new(&memory);
-        let root = BtsLifecycleStore::root_id("TYPE", "ORDER").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         let process =
             BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
         authority
@@ -732,7 +770,7 @@ mod tests {
         ));
         std::fs::create_dir_all(&directory).unwrap();
         let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
-        let root = BtsLifecycleStore::root_id("TYPE", "ORDER").unwrap();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
         {
             let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
             let authority = BtsLifecycleStore::new(&sqlite);
@@ -764,5 +802,35 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn first_v1_pending_root_remains_readable_after_child_uow_extension() {
+        let memory = MemoryStore::new(Default::default());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        let process =
+            BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
+        let mut old = serde_json::to_value(&process).unwrap();
+        old["activities"][&root]
+            .as_object_mut()
+            .unwrap()
+            .remove("pending_uow");
+        memory
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: PROCESS_NAMESPACE.into(),
+                    key: BtsLifecycleStore::process_key("TYPE", "ORDER").unwrap(),
+                    version: 1,
+                    payload: serde_json::to_vec(&old).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let reopened = BtsLifecycleStore::new(&memory);
+        let loaded = reopened.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(
+            loaded.activities[&root].pending_uow.as_deref(),
+            Some("UOW1")
+        );
     }
 }

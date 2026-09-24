@@ -55,6 +55,11 @@ All notable changes to mainframe-env are documented here.
   This does not yet register BTS lifecycle commands; the application split
   remains 151 typed, 0 legacy, and 112 unready.
 
+- Added bounded BTS child activity definition and lifecycle transitions to the
+  shared authority, including incarnation-scoped IDs, atomic index cleanup on
+  reset/delete, UOW publication or rollback, and stale checkpoint rejection.
+  Public command registration remains pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

@@ -2,7 +2,7 @@ use super::*;
 
 /// Store facade used by all BTS process/activity commands.
 pub struct BtsLifecycleStore<'a> {
-    store: &'a dyn ProviderStateStore,
+    pub(super) store: &'a dyn ProviderStateStore,
 }
 
 impl<'a> BtsLifecycleStore<'a> {
@@ -25,19 +25,30 @@ impl<'a> BtsLifecycleStore<'a> {
         Ok(key)
     }
 
-    /// Stable, opaque 52-character root identity for one process incarnation.
-    pub fn root_id(process_type: &str, name: &str) -> Result<String, HostProblem> {
+    /// Stable, opaque 52-character root identity for one defining UOW.
+    pub fn root_id(
+        process_type: &str,
+        name: &str,
+        defining_uow: &str,
+    ) -> Result<String, HostProblem> {
+        validate_identifier(defining_uow, 256)?;
         let key = Self::process_key(process_type, name)?;
-        Ok(activity_id(&key, 0))
+        Ok(activity_id(&key, defining_uow, 0))
     }
 
-    /// Stable, opaque child identity within one process row's monotonic sequence.
-    pub fn child_id(process_type: &str, name: &str, sequence: u64) -> Result<String, HostProblem> {
+    /// Stable, opaque child identity within one process incarnation.
+    pub fn child_id(
+        process_type: &str,
+        name: &str,
+        root_id: &str,
+        sequence: u64,
+    ) -> Result<String, HostProblem> {
+        validate_activity_id(root_id)?;
         if sequence == 0 {
             return Err(HostProblem::Malformed);
         }
         let key = Self::process_key(process_type, name)?;
-        Ok(activity_id(&key, sequence))
+        Ok(activity_id(&key, root_id, sequence))
     }
 
     pub fn load_process(
@@ -59,6 +70,20 @@ impl<'a> BtsLifecycleStore<'a> {
         let mut process: BtsProcess =
             serde_json::from_slice(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
         process.row_version = row.version;
+        // The first v1 writer did not carry activity-level pending_uow. Its
+        // only possible pending activity was the root, owned by the process.
+        if process.pending_uow.is_some()
+            && process
+                .activities
+                .get(&process.root_id)
+                .is_some_and(|root| root.pending_uow.is_none())
+        {
+            process
+                .activities
+                .get_mut(&process.root_id)
+                .expect("checked root")
+                .pending_uow = process.pending_uow.clone();
+        }
         process.validate()?;
         if process.process_type != process_type || process.name != name {
             return Err(HostProblem::InfrastructureFailure);
@@ -123,7 +148,7 @@ impl<'a> BtsLifecycleStore<'a> {
         if process.pending_uow.as_deref() != Some(run_unit) || process.row_version != 0 {
             return Err(HostProblem::Malformed);
         }
-        if process.root_id != Self::root_id(&process.process_type, &process.name)? {
+        if process.root_id != Self::root_id(&process.process_type, &process.name, run_unit)? {
             return Err(HostProblem::Malformed);
         }
         let mut acquisition = self
@@ -380,6 +405,7 @@ impl<'a> BtsLifecycleStore<'a> {
             current.activity_id = None;
             let key = Self::process_key(&process_type, &process_name)?;
             let mut writes = vec![put_acquisition(run_unit, &current)?];
+            writes.extend(self.settle_pending_children(&mut process, run_unit, commit)?);
             if process.pending_uow.as_deref() == Some(run_unit) && !commit {
                 writes.push(ProviderStateMutation::Delete {
                     namespace: PROCESS_NAMESPACE.into(),
@@ -394,6 +420,11 @@ impl<'a> BtsLifecycleStore<'a> {
             } else {
                 if process.pending_uow.as_deref() == Some(run_unit) {
                     process.pending_uow = None;
+                    process
+                        .activities
+                        .get_mut(&process.root_id)
+                        .ok_or(HostProblem::InfrastructureFailure)?
+                        .pending_uow = None;
                     let mut published = index;
                     published.pending_uow = None;
                     writes.push(put_activity_index(&published, Some(published.row_version))?);
