@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod catalog;
+mod cics_administrative;
 mod cics_descriptor;
 mod cics_plan;
 mod cobol_config;
@@ -19,6 +20,15 @@ pub use catalog::{
     CatalogProblem, CicsOperationContract, DecimalConditionContract, DecimalOperationContract,
     LegalityProfile, OperationCatalog, OperationSchema, OperationSemanticContract,
     cobol_layout_definition_identity, cobol_layout_definition_schema,
+};
+pub use cics_administrative::{
+    CICS_SPI_FEPI_AUTOMATIC_REGISTRATION, CICS_SPI_FEPI_COVERAGE_CREDIT,
+    CICS_SPI_FEPI_IDENTITY_REGISTRY, CICS_SPI_FEPI_IDENTITY_REGISTRY_SHA256,
+    CICS_SPI_FEPI_PUBLIC_ROUTES, CICS_SPI_FEPI_RUNTIME_HANDLERS, CICS_SPI_FEPI_SEMANTIC_AUTHORITY,
+    CICS_SPI_FEPI_SOURCE_AUTHORITY_SHA256, CICS_SPI_FEPI_SOURCE_TOPIC,
+    CICS_SPI_FEPI_SOURCE_TOPIC_SHA256, CicsAdministrativeCommandIdentity,
+    CicsAdministrativeInterface, cics_administrative_identities_for_eibfn,
+    cics_administrative_identity_for_official_row,
 };
 pub use cics_descriptor::{
     CICS_APPLICATION_AID_NAMES, CICS_APPLICATION_CONDITION_AUTHORITY_SHA256,

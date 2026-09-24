@@ -103,6 +103,22 @@ class Spi1001CatalogTests(unittest.TestCase):
             catalog_tool.identity_digest(commands), catalog_tool.identity_digest(changed)
         )
 
+    def test_rust_registry_is_deterministic_and_has_no_dispatch_surface(self) -> None:
+        catalog = catalog_tool.final_catalog()
+        rendered = catalog_tool.render_rust_from_catalog(catalog).decode()
+        self.assertEqual(rendered.count("CicsAdministrativeCommandIdentity {"), 308)
+        self.assertIn("CICS_SPI_FEPI_AUTOMATIC_REGISTRATION: bool = false", rendered)
+        self.assertIn("CICS_SPI_FEPI_PUBLIC_ROUTES: bool = false", rendered)
+        self.assertNotIn("handler_id", rendered)
+        self.assertNotIn("runtime_operation", rendered)
+
+    def test_rust_registry_rejects_advertisement_mutation(self) -> None:
+        catalog = catalog_tool.final_catalog()
+        catalog["commands"][0]["runtime"]["advertised"] = True
+        catalog["identity_sha256"] = catalog_tool.identity_digest(catalog["commands"])
+        with self.assertRaisesRegex(catalog_tool.CatalogError, "executable or credited"):
+            catalog_tool.render_rust_from_catalog(catalog)
+
 
 if __name__ == "__main__":
     unittest.main()
