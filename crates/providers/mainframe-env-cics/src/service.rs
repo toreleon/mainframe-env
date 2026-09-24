@@ -7323,6 +7323,101 @@ mod tests {
     }
 
     #[test]
+    fn issue_print_selects_first_available_printer_and_replays_exact_effect() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        {
+            let mut state = service.lock().unwrap();
+            let current = state.sessions.get_mut(session.as_str()).unwrap();
+            current.input = handlers::TerminalInput::identified("T006".into());
+            current.screen = b"SCREEN\0IMAGE".to_vec();
+        }
+        for (terminal, kind, printers) in [
+            (
+                "T006",
+                handlers::IssueDeviceKind::Display3270,
+                vec!["P001".into(), "P002".into()],
+            ),
+            ("P001", handlers::IssueDeviceKind::Printer3270, vec![]),
+            ("P002", handlers::IssueDeviceKind::Printer3270, vec![]),
+        ] {
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.into(),
+                kind,
+                control_unit: Some("CU1".into()),
+                printers,
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+        }
+        let unavailable = handlers::IssueDeviceRecord::load(store.as_ref(), "P001")
+            .unwrap()
+            .unwrap();
+        let mut next_unavailable = unavailable.clone();
+        next_unavailable.state.printer_out_of_service = true;
+        unavailable
+            .persist(&mut next_unavailable, store.as_ref())
+            .unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let command = request(CicsOperation::IssuePrint, BTreeMap::new(), 1);
+        let response = handlers::invoke_terminal_control(&service, &mut run, &command).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        let printed = handlers::IssueDeviceRecord::load(store.as_ref(), "T006")
+            .unwrap()
+            .unwrap();
+        assert_eq!(printed.state.last_print, b"SCREEN\0IMAGE");
+        assert_eq!(printed.state.last_printer.as_deref(), Some("P002"));
+        assert_eq!(printed.state.print_count, 1);
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &command),
+            Ok(response)
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "T006")
+                .unwrap()
+                .unwrap()
+                .state
+                .print_count,
+            1
+        );
+        let available = handlers::IssueDeviceRecord::load(store.as_ref(), "P002")
+            .unwrap()
+            .unwrap();
+        let mut attached = available.clone();
+        attached.state.printer_attached_run = Some("other-task".into());
+        available.persist(&mut attached, store.as_ref()).unwrap();
+        let busy = request(CicsOperation::IssuePrint, BTreeMap::new(), 2);
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &busy),
+            Err(HostProblem::Condition {
+                name: "TERMERR".into(),
+                response: 81,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "T006")
+                .unwrap()
+                .unwrap()
+                .state
+                .print_count,
+            1
+        );
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

@@ -72,6 +72,12 @@ pub struct IssueDeviceState {
     pub disconnected: bool,
     pub print_count: u32,
     pub last_print: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_printer: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub printer_out_of_service: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub printer_attached_run: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -281,6 +287,17 @@ impl IssueDeviceRecord {
                 && self.definition.kind != IssueDeviceKind::Entry3740
             || self.state.eods && self.definition.kind != IssueDeviceKind::Interpreter3650
             || self.state.print_count > 0 && self.definition.kind != IssueDeviceKind::Display3270
+            || self.state.last_printer.is_some()
+                && self.definition.kind != IssueDeviceKind::Display3270
+            || self.state.printer_out_of_service
+                && self.definition.kind != IssueDeviceKind::Printer3270
+            || self.state.printer_attached_run.is_some()
+                && self.definition.kind != IssueDeviceKind::Printer3270
+            || self
+                .state
+                .printer_attached_run
+                .as_ref()
+                .is_some_and(|owner| owner.is_empty() || owner.len() > 128)
         {
             return Err(IssueDeviceProblem::Malformed);
         }
@@ -444,10 +461,10 @@ impl IssueDeviceRecord {
         Ok(())
     }
 
-    pub fn record_print(&mut self, bytes: &[u8]) -> Result<(), IssueDeviceProblem> {
+    pub fn record_print(&mut self, printer: &str, bytes: &[u8]) -> Result<(), IssueDeviceProblem> {
         self.active()?;
         if self.definition.kind != IssueDeviceKind::Display3270
-            || self.definition.printers.is_empty()
+            || !self.definition.printers.iter().any(|name| name == printer)
         {
             return Err(IssueDeviceProblem::NotConfigured);
         }
@@ -460,7 +477,15 @@ impl IssueDeviceRecord {
             .checked_add(1)
             .ok_or(IssueDeviceProblem::Capacity)?;
         self.state.last_print = bytes.to_vec();
+        self.state.last_printer = Some(printer.into());
         Ok(())
+    }
+
+    pub fn printer_available(&self) -> bool {
+        self.definition.kind == IssueDeviceKind::Printer3270
+            && !self.state.disconnected
+            && !self.state.printer_out_of_service
+            && self.state.printer_attached_run.is_none()
     }
 }
 
@@ -601,16 +626,17 @@ mod tests {
         definition.control_unit = Some("CU1".into());
         let mut device = IssueDeviceRecord::new(definition.clone()).unwrap();
         assert_eq!(
-            device.record_print(b"SCREEN"),
+            device.record_print("P001", b"SCREEN"),
             Err(IssueDeviceProblem::NotConfigured)
         );
         definition.printers.push("P001".into());
         device = IssueDeviceRecord::new(definition).unwrap();
-        device.record_print(b"SCREEN").unwrap();
+        device.record_print("P001", b"SCREEN").unwrap();
         assert_eq!(device.state.print_count, 1);
         assert_eq!(device.state.last_print, b"SCREEN");
+        assert_eq!(device.state.last_printer.as_deref(), Some("P001"));
         assert_eq!(
-            device.record_print(&vec![0; MAX_PRINT_BYTES + 1]),
+            device.record_print("P001", &vec![0; MAX_PRINT_BYTES + 1]),
             Err(IssueDeviceProblem::Length)
         );
         assert_eq!(device.state.print_count, 1);

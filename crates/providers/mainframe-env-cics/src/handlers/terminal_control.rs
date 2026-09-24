@@ -91,6 +91,7 @@ pub(in crate::service) fn invoke(
         | CicsOperation::IssueEods
         | CicsOperation::IssueLoad
         | CicsOperation::IssuePass
+        | CicsOperation::IssuePrint
         | CicsOperation::IssueDisconnect
         | CicsOperation::IssueReset => super::issue_device::invoke(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),

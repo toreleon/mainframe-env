@@ -85,7 +85,10 @@ pub(in crate::service) fn invoke(
         .ok_or_else(not_allocated)?;
     if matches!(
         request.operation,
-        CicsOperation::IssueEndfile | CicsOperation::IssueEndoutput | CicsOperation::IssueEods
+        CicsOperation::IssueEndfile
+            | CicsOperation::IssueEndoutput
+            | CicsOperation::IssueEods
+            | CicsOperation::IssuePrint
     ) {
         reject_dpl_principal(run)?;
     }
@@ -122,6 +125,7 @@ pub(in crate::service) fn invoke(
     )?;
     let mut next = current.clone();
     let mut disconnected_session = None;
+    let mut printer_write = None;
     match request.operation {
         CicsOperation::IssueEndfile => next
             .mark_endfile(request.arguments.contains_key("OPTION.ENDOUTPUT"))
@@ -195,6 +199,37 @@ pub(in crate::service) fn invoke(
             updated.connected = false;
             disconnected_session = Some(updated);
         }
+        CicsOperation::IssuePrint => {
+            if current.definition.kind != IssueDeviceKind::Display3270 {
+                return Err(condition("INVREQ", 16, 0));
+            }
+            if current_session.screen.len() > MAX_PRINT_BYTES {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            let mut selected = None;
+            for id in &current.definition.printers {
+                let Some(printer) =
+                    IssueDeviceRecord::load(service.store.as_ref(), id).map_err(store_error)?
+                else {
+                    continue;
+                };
+                if printer.printer_available() {
+                    selected = Some((id, printer));
+                    break;
+                }
+            }
+            let (printer_id, printer) = selected.ok_or_else(|| condition("TERMERR", 81, 0))?;
+            service.authorize(
+                run,
+                "FACILITY",
+                &format!("CICS.ISSUE.DEVICE.{printer_id}"),
+                AccessIntent::Update,
+            )?;
+            next.record_print(printer_id, &current_session.screen)
+                .map_err(|problem| device_condition(request.operation, problem))?;
+            let mut reserved = printer.clone();
+            printer_write = Some(printer.mutation(&mut reserved).map_err(store_error)?);
+        }
         _ => return Err(HostProblem::Unsupported),
     }
     let receipt = IssueDeviceReceipt {
@@ -223,6 +258,9 @@ pub(in crate::service) fn invoke(
         expected_version: None,
     });
     let mut writes = vec![state_write, receipt_write];
+    if let Some(printer_write) = printer_write {
+        writes.push(printer_write);
+    }
     if let Some(updated) = &disconnected_session {
         writes.push(ProviderStateMutation::Put(ProviderStateWrite {
             record: ProviderStateRecord {
@@ -247,7 +285,7 @@ pub(in crate::service) fn invoke(
         }
         Err(StoreError::Conflict | StoreError::AlreadyExists) => {
             let saved = load_receipt(service, effect_key, run, mutation.sequence, digest)?
-                .ok_or(HostProblem::IdempotencyConflict)?;
+                .ok_or(HostProblem::UnknownOutcome)?;
             receipt_response(service, run, &saved)
         }
         Err(error) => Err(super::super::super::mutation_problem(store_error(error))),
@@ -264,6 +302,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             | CicsOperation::IssuePass
             | CicsOperation::IssueDisconnect
             | CicsOperation::IssueReset
+            | CicsOperation::IssuePrint
     ) || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
     {
         return Err(HostProblem::Malformed);

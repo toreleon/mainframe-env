@@ -60,6 +60,11 @@ All notable changes to mainframe-env are documented here.
   atomic target/receipt commit. Asynchronous and CCC-specific forms remain
   pending.
 
+- Added ISSUE PRINT selection of the first available installed printer, with
+  printer availability and the exact printed image retained in the physical
+  device authority. Printer and display state join the replay receipt in one
+  atomic commit after SAF.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.
