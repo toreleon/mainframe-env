@@ -3,7 +3,9 @@
 use super::{
     ConversationKind, ConversationOwner, ConversationProblem, ConversationRecord, MAX_PROCESS_BYTES,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -154,6 +156,47 @@ impl ConversationLedger {
             },
             (self.version != 0).then_some(self.version),
         ) {
+            Ok(()) => Ok(true),
+            Err(StoreError::Conflict) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Commit protocol state and its exact request reply in one provider-store
+    /// mutation. A stale CAS or reused replay key writes neither row.
+    pub fn persist_with_replay(
+        &self,
+        next: &mut Self,
+        replay: &super::ConversationReplay,
+        store: &dyn ProviderStateStore,
+    ) -> Result<bool, StoreError> {
+        next.version = self
+            .version
+            .checked_add(1)
+            .ok_or(StoreError::CapacityExceeded)?;
+        let state_payload = next.encode().map_err(|_| StoreError::CapacityExceeded)?;
+        let replay_payload = replay.encode()?;
+        let writes = vec![
+            ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: CONVERSATION_STATE_NAMESPACE.into(),
+                    key: KEY.into(),
+                    version: next.version,
+                    payload: state_payload,
+                },
+                expected_version: (self.version != 0).then_some(self.version),
+            },
+            ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: super::CONVERSATION_REPLAY_NAMESPACE.into(),
+                    key: replay.effect_key.clone(),
+                    version: 1,
+                    payload: replay_payload,
+                },
+                expected_version: None,
+            },
+        ];
+        match store.put_provider_states_atomic(writes) {
             Ok(()) => Ok(true),
             Err(StoreError::Conflict) => Ok(false),
             Err(error) => Err(error),
@@ -341,6 +384,29 @@ mod tests {
     use super::*;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
 
+    fn replay(token: [u8; 4]) -> super::super::ConversationReplay {
+        super::super::ConversationReplay {
+            schema_version: 1,
+            effect_key: "alloc-effect".into(),
+            owner_execution: "execution".into(),
+            owner_run_unit: "run".into(),
+            owner_principal: "user".into(),
+            owner_epoch: 1,
+            mutation_sequence: 1,
+            request_digest: [7; 32],
+            deadline_tick: 100,
+            retain_until_tick: 200,
+            reply: super::super::ConversationReply {
+                condition: "NORMAL".into(),
+                response: 0,
+                response2: 0,
+                state: Some(super::super::ConversationState::Allocated),
+                token: Some(token),
+                outputs: BTreeMap::from([("CONVID".into(), token.to_vec())]),
+            },
+        }
+    }
+
     fn owner() -> ConversationOwner {
         ConversationOwner {
             execution: "execution".into(),
@@ -446,11 +512,19 @@ mod tests {
             .allocate("SYS1", ConversationKind::AppcMapped, owner())
             .unwrap()
             .token;
-        assert!(installed.persist(&mut allocated, &first).unwrap());
+        assert!(
+            installed
+                .persist_with_replay(&mut allocated, &replay(token), &first)
+                .unwrap()
+        );
         drop(first);
         let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
         let current = ConversationLedger::load(&reopened).unwrap();
         assert_eq!(current.conversation(token).unwrap().owner, owner());
+        let saved = super::super::load_conversation_replay(&reopened, "alloc-effect")
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.reply.token, Some(token));
         let mut released = current.clone();
         assert_eq!(released.release_task(&owner()), Ok(1));
         assert!(current.persist(&mut released, &reopened).unwrap());
@@ -463,5 +537,40 @@ mod tests {
         );
         drop(reopened);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn atomic_replay_write_rejects_stale_state_without_partial_receipt() {
+        let store = MemoryStore::new(Default::default());
+        let initial = ConversationLedger::load(&store).unwrap();
+        let mut installed = initial.clone();
+        installed
+            .register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        assert!(initial.persist(&mut installed, &store).unwrap());
+        let mut stale = initial.clone();
+        stale
+            .register_system(ConversationSystemDefinition {
+                sysid: "SYS2".into(),
+                kind: ConversationKind::Mro,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        assert!(
+            !initial
+                .persist_with_replay(&mut stale, &replay([0, 0, 0, 1]), &store)
+                .unwrap()
+        );
+        assert!(
+            super::super::load_conversation_replay(&store, "alloc-effect")
+                .unwrap()
+                .is_none()
+        );
     }
 }

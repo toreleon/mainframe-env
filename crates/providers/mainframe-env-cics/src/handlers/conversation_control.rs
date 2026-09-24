@@ -8,12 +8,17 @@ use serde::{Deserialize, Serialize};
 
 mod gds;
 mod ledger;
+mod replay;
 pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
 };
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
     ConversationSystemDefinition,
+};
+pub use replay::{
+    CONVERSATION_REPLAY_NAMESPACE, ConversationReplay, ConversationReply, load_conversation_replay,
+    prune_conversation_replays,
 };
 
 /// Durable encoding version for one allocated conversation.
