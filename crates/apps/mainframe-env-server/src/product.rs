@@ -23983,7 +23983,7 @@ mod tests {
     fn compiled_conversation_extract_process_uses_sqlite_selected_route_and_reopens() {
         let artifact = published_source_fixture(
             "CEXTR",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PROC-X PIC X(32).\n01 PROC-LEN PIC S9(4) COMP.\n01 SYNC-X PIC S9(4) COMP.\n01 PROC-FN PIC X(2).\n01 STATE-X PIC S9(8) COMP.\n01 ATTR-FN PIC X(2).\n01 POINT-FN PIC X(2).\n01 ATTACH-FN PIC X(2).\n01 TCT-FN PIC X(2).\n01 LOGON-FN PIC X(2).\n01 ATTACH-X PIC X(64).\n01 TERM-X PIC X(4).\n01 LOGON-X PIC X(256).\n01 LOGON-LEN PIC S9(4) COMP.\n01 RC PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) SYNCLEVEL(SYNC-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO PROC-FN.\nEXEC CICS EXTRACT ATTRIBUTES STATE(STATE-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTR-FN.\nEXEC CICS POINT SESSION('L1') RESP(RC) END-EXEC.\nMOVE EIBFN TO POINT-FN.\nEXEC CICS EXTRACT ATTACH ATTACHID('HDR1') PROCESS(ATTACH-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTACH-FN.\nEXEC CICS EXTRACT TCT NETNAME('LUNAME01') TERMID(TERM-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO TCT-FN.\nEXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO LOGON-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PROC-X PIC X(32).\n01 PROC-LEN PIC S9(4) COMP.\n01 SYNC-X PIC S9(4) COMP.\n01 PIP-PTR POINTER-32.\n01 PIP-LEN PIC S9(4) COMP.\n01 PIP-OBS PIC X(4).\n01 PROC-FN PIC X(2).\n01 STATE-X PIC S9(8) COMP.\n01 ATTR-FN PIC X(2).\n01 POINT-FN PIC X(2).\n01 ATTACH-FN PIC X(2).\n01 TCT-FN PIC X(2).\n01 LOGON-FN PIC X(2).\n01 ATTACH-X PIC X(64).\n01 TERM-X PIC X(4).\n01 LOGON-X PIC X(256).\n01 LOGON-LEN PIC S9(4) COMP.\n01 RC PIC S9(9) COMP.\nLINKAGE SECTION.\n01 PIP-VIEW PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) SYNCLEVEL(SYNC-X) PIPLIST(PIP-PTR) PIPLENGTH(PIP-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO PROC-FN.\nSET ADDRESS OF PIP-VIEW TO PIP-PTR.\nMOVE PIP-VIEW TO PIP-OBS.\nEXEC CICS EXTRACT ATTRIBUTES STATE(STATE-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTR-FN.\nEXEC CICS POINT SESSION('L1') RESP(RC) END-EXEC.\nMOVE EIBFN TO POINT-FN.\nEXEC CICS EXTRACT ATTACH ATTACHID('HDR1') PROCESS(ATTACH-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTACH-FN.\nEXEC CICS EXTRACT TCT NETNAME('LUNAME01') TERMID(TERM-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO TCT-FN.\nEXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO LOGON-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -24083,6 +24083,9 @@ mod tests {
             .allocate("LU61", ConversationKind::LuType61, owner.clone())
             .unwrap()
             .token;
+        let mut pip = vec![255; 32_763];
+        pip[..2].copy_from_slice(&32_763u16.to_be_bytes());
+        pip[2..4].fill(0);
         ledger
             .conversation_mut(token)
             .unwrap()
@@ -24091,7 +24094,7 @@ mod tests {
                 ConversationContext::Local,
                 false,
                 b"ORDER".to_vec(),
-                Vec::new(),
+                pip,
                 2,
             )
             .unwrap();
@@ -24151,6 +24154,11 @@ mod tests {
         assert_eq!(&restored.variable("PROC-X").unwrap().bytes()[..5], b"ORDER");
         assert_eq!(restored.variable("PROC-LEN").unwrap().bytes(), &[0, 5]);
         assert_eq!(restored.variable("SYNC-X").unwrap().bytes(), &[0, 2]);
+        assert_eq!(restored.variable("PIP-LEN").unwrap().bytes(), &[0x7f, 0xfb]);
+        assert_eq!(
+            restored.variable("PIP-OBS").unwrap().bytes(),
+            &[0x7f, 0xfb, 0, 0]
+        );
         assert_eq!(restored.variable("PROC-FN").unwrap().bytes(), &[0x04, 0x2e]);
         assert_eq!(
             restored.variable("STATE-X").unwrap().bytes(),

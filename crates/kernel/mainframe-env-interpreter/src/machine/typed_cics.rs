@@ -1214,6 +1214,41 @@ mod tests {
     }
 
     #[test]
+    fn extract_process_pip_length_uses_full_halfword_and_checks_host_bounds() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PIP-LEN", 2);
+        let target = CicsTarget::Resolved(slot.clone());
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractProcess,
+            "PIPLENGTH",
+            &target,
+            &payload("mainframe-env.cics.decimal@1", b"32763".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
+            Ok(vec![0x7f, 0xfb])
+        );
+        for (operation, value) in [
+            (CicsOperation::ExtractProcess, b"32764".as_slice()),
+            (CicsOperation::GdsExtractProcess, b"764".as_slice()),
+        ] {
+            assert_eq!(
+                write_output(
+                    &mut machine,
+                    operation,
+                    "PIPLENGTH",
+                    &target,
+                    &payload("mainframe-env.cics.decimal@1", value.to_vec()).unwrap(),
+                    None,
+                ),
+                Err(MachineProblem::UnexpectedHostResult)
+            );
+        }
+    }
+
+    #[test]
     fn legacy_resp_binding_takes_precedence_over_nohandle() {
         let tokens = [
             "EXEC", "CICS", "ASKTIME", "NOHANDLE", "RESP", "(", "RESP-X", ")", "RESP2", "(",

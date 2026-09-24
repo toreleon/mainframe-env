@@ -65,7 +65,9 @@ All notable changes to mainframe-env are documented here.
 
 - Support the source's 32,763-byte mapped APPC PIP bound while retaining the
   763-byte GDS basic bound, including durable record encoding and EXTRACT
-  PROCESS pointer output beyond the basic limit.
+  PROCESS pointer output beyond the basic limit. The compiled SQLite route
+  dereferences the maximum mapped PIP and writes its exact halfword length,
+  with forged out-of-range host results rejected.
 
 - Retain unresolved POINT and LOGONMSG replies in the bounded extraction
   sidecar until their outer replay rows exist. An interleaved retry after a
