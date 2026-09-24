@@ -371,7 +371,7 @@ impl ConversationRecord {
                 .process
                 .as_ref()
                 .is_some_and(|name| name.is_empty() || name.len() > MAX_PROCESS_BYTES)
-            || self.pip.len() > MAX_PIP_BYTES
+            || self.pip.len() > pip_limit(self.kind)
             || self.sync_level.is_some_and(|level| level > 2)
             || (self.released && self.state != ConversationState::Free)
             || (self.released && !self.data.is_empty())
@@ -438,7 +438,7 @@ impl ConversationRecord {
         if process.is_empty() || process.len() > MAX_PROCESS_BYTES || sync_level > 2 {
             return Err(ConversationProblem::Length);
         }
-        validate_pip(&pip)?;
+        validate_pip(&pip, self.kind)?;
         self.next_sequence()?;
         self.process = Some(process);
         self.pip = pip;
@@ -536,11 +536,19 @@ impl ConversationRecord {
     }
 }
 
-fn validate_pip(pip: &[u8]) -> Result<(), ConversationProblem> {
+fn pip_limit(kind: ConversationKind) -> usize {
+    if kind == ConversationKind::AppcBasic {
+        MAX_BASIC_PIP_BYTES
+    } else {
+        MAX_PIP_BYTES
+    }
+}
+
+fn validate_pip(pip: &[u8], kind: ConversationKind) -> Result<(), ConversationProblem> {
     if pip.is_empty() {
         return Ok(());
     }
-    if !(4..=MAX_PIP_BYTES).contains(&pip.len()) {
+    if !(4..=pip_limit(kind)).contains(&pip.len()) {
         return Err(ConversationProblem::Length);
     }
     let mut cursor = 0usize;
@@ -706,6 +714,51 @@ mod tests {
         record
             .release(&owner(3), ConversationContext::Local, true)
             .unwrap();
+    }
+
+    #[test]
+    fn mapped_and_basic_pip_limits_follow_distinct_source_bounds() {
+        let mut pip = vec![0; 764];
+        pip[..2].copy_from_slice(&764u16.to_be_bytes());
+        let mut mapped = ConversationRecord::allocate(
+            *b"C007",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        mapped
+            .connect(
+                &owner(3),
+                ConversationContext::Local,
+                false,
+                b"TRAN".to_vec(),
+                pip.clone(),
+                0,
+            )
+            .unwrap();
+        assert!(mapped.validate().is_ok());
+        let mut basic = ConversationRecord::allocate(
+            *b"C008",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner(3),
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            basic.connect(
+                &owner(3),
+                ConversationContext::Local,
+                true,
+                b"TRAN".to_vec(),
+                pip,
+                0,
+            ),
+            Err(ConversationProblem::Length)
+        );
+        assert_eq!(basic.state, ConversationState::Allocated);
     }
 
     #[test]

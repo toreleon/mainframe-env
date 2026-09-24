@@ -11,6 +11,7 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreErro
 use serde::{Deserialize, Serialize};
 
 const PARTNER_NAMESPACE: &str = "cics-conversation-partner-v1";
+const PARTNER_PROCESS_NAMESPACE: &str = "cics-conversation-partner-process-v1";
 const PROFILE_NAMESPACE: &str = "cics-conversation-profile-v1";
 const MAX_DEFINITION_BYTES: usize = 1024;
 const MAX_REGISTRATION_RETRIES: usize = 32;
@@ -31,6 +32,24 @@ impl ConversationPartnerDefinition {
             || !valid_name(&self.sysid, 4)
             || !valid_name(&self.profile, 8)
         {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(())
+    }
+}
+
+/// Remote TPNAME/XTPNAME selected by CONNECT PROCESS PARTNER. CICS does not
+/// inspect its characters; only the APPC 1–64-byte bound applies.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConversationPartnerProcessDefinition {
+    pub name: String,
+    pub process: Vec<u8>,
+}
+
+impl ConversationPartnerProcessDefinition {
+    pub fn validate(&self) -> Result<(), HostProblem> {
+        if !valid_name(&self.name, 8) || !(1..=64).contains(&self.process.len()) {
             return Err(HostProblem::Malformed);
         }
         Ok(())
@@ -128,6 +147,28 @@ pub(super) fn load_partner(
     Ok(Some(definition))
 }
 
+pub(super) fn load_partner_process(
+    store: &dyn ProviderStateStore,
+    name: &str,
+) -> Result<Option<ConversationPartnerProcessDefinition>, HostProblem> {
+    let Some(row) = store
+        .get_provider_state(PARTNER_PROCESS_NAMESPACE, name)
+        .map_err(store_error)?
+    else {
+        return Ok(None);
+    };
+    let definition: ConversationPartnerProcessDefinition =
+        serde_json::from_slice(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if row.version != 1
+        || row.key != definition.name
+        || definition.validate().is_err()
+        || encode(&definition)? != row.payload
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(Some(definition))
+}
+
 pub(super) fn load_profile(
     store: &dyn ProviderStateStore,
     name: &str,
@@ -164,6 +205,13 @@ pub(super) fn load_profile(
 }
 
 impl CicsService {
+    pub fn conversation_partner_process(
+        &self,
+        name: &str,
+    ) -> Result<Option<ConversationPartnerProcessDefinition>, HostProblem> {
+        load_partner_process(self.store.as_ref(), name)
+    }
+
     /// Trusted ingress installs the principal APPC/MRO facility for one live
     /// task. Reissuing the same installation returns its durable token.
     pub fn install_conversation_principal_for_run(
@@ -276,6 +324,23 @@ impl CicsService {
         )
     }
 
+    pub fn register_conversation_partner_process(
+        &self,
+        definition: ConversationPartnerProcessDefinition,
+    ) -> Result<(), HostProblem> {
+        definition.validate()?;
+        if load_partner(self.store.as_ref(), &definition.name)?.is_none() {
+            return Err(HostProblem::NotFound);
+        }
+        let payload = encode(&definition)?;
+        write_immutable(
+            self.store.as_ref(),
+            PARTNER_PROCESS_NAMESPACE,
+            &definition.name,
+            payload,
+        )
+    }
+
     pub fn register_conversation_profile(
         &self,
         definition: ConversationProfileDefinition,
@@ -319,8 +384,13 @@ mod tests {
             kind: ConversationKind::AppcMapped,
             maximum_data_bytes: 1024,
         };
+        let process = ConversationPartnerProcessDefinition {
+            name: "PARTNER1".into(),
+            process: b"REMOTE-TXN".to_vec(),
+        };
         partner.validate().unwrap();
         profile.validate().unwrap();
+        process.validate().unwrap();
         write_immutable(
             &first,
             PARTNER_NAMESPACE,
@@ -333,6 +403,13 @@ mod tests {
             PROFILE_NAMESPACE,
             &profile.name,
             encode(&profile).unwrap(),
+        )
+        .unwrap();
+        write_immutable(
+            &first,
+            PARTNER_PROCESS_NAMESPACE,
+            &process.name,
+            encode(&process).unwrap(),
         )
         .unwrap();
         drop(first);
@@ -348,6 +425,10 @@ mod tests {
         assert_eq!(
             load_profile(&reopened, "FAST", ConversationKind::Mro),
             Ok(None)
+        );
+        assert_eq!(
+            load_partner_process(&reopened, "PARTNER1"),
+            Ok(Some(process))
         );
         assert_eq!(
             write_immutable(
@@ -376,6 +457,22 @@ mod tests {
     #[test]
     fn malformed_names_and_reserved_mode_fail_before_storage() {
         let store = MemoryStore::new(Default::default());
+        assert_eq!(
+            ConversationPartnerProcessDefinition {
+                name: "PARTNER1".into(),
+                process: vec![],
+            }
+            .validate(),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            ConversationPartnerProcessDefinition {
+                name: "PARTNER1".into(),
+                process: vec![0, 0xff],
+            }
+            .validate()
+            .is_ok()
+        );
         let invalid = ConversationPartnerDefinition {
             name: "lower".into(),
             sysid: "SYS1".into(),
