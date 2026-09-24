@@ -38,6 +38,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-conversation-extract-cvda",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-conversation-extract-cvda-2026-09-24",
+      "manifest": "conformance/0.9/manifests/cics-conversation-extract-cvda-topics.json",
+      "manifest_sha256": "sha256:738d3eab89ea7811b4917550b0a0c92225bbccad7cbc21a5171ec75250f0abc2",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:5cb3be0964a59a86cecc72b625ade3ffb508d781665bd67c914684c33d17e11c",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-bms-map-origin",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-bms-map-origin-2026-09-14",
