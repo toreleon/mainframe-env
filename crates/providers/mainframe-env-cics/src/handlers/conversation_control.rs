@@ -23,6 +23,7 @@ mod gds_assign;
 mod gds_connect_process;
 mod gds_free;
 mod gds_issue;
+mod gds_issue_route;
 mod gds_receive;
 mod gds_wait;
 mod issue_staging;
@@ -167,6 +168,13 @@ pub(in crate::service) fn invoke(
         | CicsOperation::IssuePrepare
         | CicsOperation::IssueSignal => {
             issue_staging::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::GdsIssueAbend
+        | CicsOperation::GdsIssueConfirmation
+        | CicsOperation::GdsIssueError
+        | CicsOperation::GdsIssuePrepare
+        | CicsOperation::GdsIssueSignal => {
+            gds_issue_route::invoke(service, run, request, retention_tick)
         }
         _ => Err(HostProblem::Unsupported),
     }

@@ -51,4 +51,6 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
   read-only reconciliation after uncertain dispatch, and commits the final
   receipt only on a confirmed result. The internal mapped command route now
   invokes this carrier on staging and exact retry. Public command registration
-  and selected compiled execution remain acceptance gates.
+  and selected compiled execution remain acceptance gates. The APPC basic GDS
+  route uses the same intent and returns six-byte failure codes without EXEC
+  CICS conditions; it does not create another control authority.

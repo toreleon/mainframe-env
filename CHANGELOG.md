@@ -92,6 +92,11 @@ All notable changes to mainframe-env are documented here.
   dispatch. A same-key resume reconciles an attempted control; a confirmed
   carrier result returns the saved command reply. Public ISSUE rows remain
   unregistered.
+- Added internal APPC basic GDS ISSUE routing for all five controls through
+  the same durable intent and carrier. Confirmed results expose source-sized
+  RETCODE and CONVDATA plus numeric STATE; wrong owner, form, state, and sync
+  level return GDS codes without changing the ledger. SQLite restart
+  reconciles an attempted control once. The five rows remain unregistered.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

@@ -322,6 +322,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/gds_connect_process.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/gds_free.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/gds_issue.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/gds_issue_route.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/issue_transition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/issue_staging.rs",
       "crates/providers/mainframe-env-cics/src/handlers/conversation_control/issue_transport.rs",

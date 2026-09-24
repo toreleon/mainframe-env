@@ -9266,6 +9266,440 @@ mod tests {
     }
 
     #[test]
+    fn five_gds_issue_controls_return_exact_basic_outputs_after_carrier_confirmation() {
+        struct Carrier;
+
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        for (operation, sync_level, source_state, result_state) in [
+            (
+                CicsOperation::GdsIssueAbend,
+                None,
+                ConversationState::Allocated,
+                ConversationState::Free,
+            ),
+            (
+                CicsOperation::GdsIssueConfirmation,
+                Some(1),
+                ConversationState::ConfReceive,
+                ConversationState::Receive,
+            ),
+            (
+                CicsOperation::GdsIssueError,
+                Some(0),
+                ConversationState::Send,
+                ConversationState::Send,
+            ),
+            (
+                CicsOperation::GdsIssuePrepare,
+                Some(2),
+                ConversationState::Send,
+                ConversationState::SyncReceive,
+            ),
+            (
+                CicsOperation::GdsIssueSignal,
+                Some(0),
+                ConversationState::Receive,
+                ConversationState::Receive,
+            ),
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = service(store.clone());
+            service
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 2,
+                    enabled: true,
+                })
+                .unwrap();
+            let (invocation, _) = registered(&service);
+            let token = service
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                )
+                .unwrap();
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            if let Some(level) = sync_level {
+                let current = ConversationLedger::load(store.as_ref()).unwrap();
+                let mut next = current.clone();
+                let record = next.conversation_mut(token).unwrap();
+                record
+                    .connect(
+                        &owner,
+                        ConversationContext::Local,
+                        true,
+                        b"PROC".to_vec(),
+                        vec![],
+                        level,
+                    )
+                    .unwrap();
+                record.state = source_state;
+                assert!(current.persist(&mut next, store.as_ref()).unwrap());
+            }
+            service
+                .install_conversation_transport(Arc::new(Carrier))
+                .unwrap();
+            let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+            let command = request(
+                operation,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("RETCODE".into(), argument(b"RETCODE-X")),
+                    ("CONVDATA".into(), argument(b"CONVDATA-X")),
+                    ("STATE".into(), argument(b"STATE-X")),
+                ]),
+                1,
+            );
+            let invoke = |run: &mut Run| {
+                handlers::invoke_extended_control(
+                    &service,
+                    run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+            };
+            let first = invoke(&mut run).unwrap();
+            assert_eq!(
+                first.disposition,
+                CicsDisposition::Complete,
+                "{operation:?}"
+            );
+            assert_eq!(first.outputs["RETCODE"].bytes(), &[0; 6], "{operation:?}");
+            assert_eq!(first.outputs["CONVDATA"].bytes().len(), 24);
+            assert_eq!(
+                first.outputs["STATE"].bytes(),
+                result_state.cvda().to_string().as_bytes(),
+                "{operation:?}"
+            );
+            assert_eq!(invoke(&mut run).unwrap(), first, "{operation:?}");
+            let record = ConversationLedger::load(store.as_ref()).unwrap();
+            let record = record.conversation(token).unwrap();
+            assert_eq!(record.state, result_state, "{operation:?}");
+            assert!(record.pending_issue.is_none());
+            if operation == CicsOperation::GdsIssueAbend {
+                assert_eq!(first.outputs["CONVDATA"].bytes()[2], 0xff);
+            }
+            if operation == CicsOperation::GdsIssuePrepare {
+                assert_eq!(first.outputs["CONVDATA"].bytes()[1], 0xff);
+            }
+        }
+    }
+
+    #[test]
+    fn gds_issue_failure_codes_do_not_stage_or_raise_exec_conditions() {
+        for (kind, operation, level, state, foreign, expected) in [
+            (
+                ConversationKind::AppcMapped,
+                CicsOperation::GdsIssueAbend,
+                None,
+                ConversationState::Allocated,
+                false,
+                [3, 4, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueConfirmation,
+                Some(0),
+                ConversationState::ConfReceive,
+                false,
+                [3, 20, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssuePrepare,
+                Some(0),
+                ConversationState::Send,
+                false,
+                [3, 12, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssuePrepare,
+                Some(2),
+                ConversationState::Receive,
+                false,
+                [3, 36, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueSignal,
+                Some(0),
+                ConversationState::Send,
+                false,
+                [3, 8, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueAbend,
+                None,
+                ConversationState::Allocated,
+                true,
+                [4, 0, 0, 0, 0, 0],
+            ),
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = service(store.clone());
+            service
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 2,
+                    enabled: true,
+                })
+                .unwrap();
+            let (invocation, _) = registered(&service);
+            let token = service
+                .install_conversation_principal_for_run(&invocation.run_unit_id, "SYS1", kind)
+                .unwrap();
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            if level.is_some() || foreign {
+                let current = ConversationLedger::load(store.as_ref()).unwrap();
+                let mut next = current.clone();
+                let record = next.conversation_mut(token).unwrap();
+                if let Some(level) = level {
+                    record
+                        .connect(
+                            &owner,
+                            ConversationContext::Local,
+                            kind == ConversationKind::AppcBasic,
+                            b"PROC".to_vec(),
+                            vec![],
+                            level,
+                        )
+                        .unwrap();
+                    record.state = state;
+                }
+                if foreign {
+                    record.owner.execution = "foreign-owner".into();
+                }
+                assert!(current.persist(&mut next, store.as_ref()).unwrap());
+            }
+            let before = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+            let command = request(
+                operation,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("RETCODE".into(), argument(b"RETCODE-X")),
+                ]),
+                1,
+            );
+            let reply = handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap();
+            assert_eq!(reply.condition, "NORMAL");
+            assert_eq!(reply.response, 0);
+            assert_eq!(reply.outputs["RETCODE"].bytes(), &expected, "{operation:?}");
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn gds_issue_attempt_reconciles_after_sqlite_restart_without_resending() {
+        use std::sync::atomic::AtomicUsize;
+
+        struct Carrier {
+            sent: Arc<AtomicUsize>,
+            reconciled: Arc<AtomicUsize>,
+        }
+
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                flow: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                assert_eq!(flow, GdsIssueFlow::Abend);
+                self.sent.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Pending)
+            }
+
+            fn reconcile_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.reconciled.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-gds-issue-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("gds-issue-restart", BTreeMap::new());
+        let session = SessionId::new("gds-issue-restart", 64).unwrap();
+        let sent = Arc::new(AtomicUsize::new(0));
+        let reconciled = Arc::new(AtomicUsize::new(0));
+        let token;
+        let mut run;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            token = service
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                )
+                .unwrap();
+            run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+            service
+                .install_conversation_transport(Arc::new(Carrier {
+                    sent: sent.clone(),
+                    reconciled: reconciled.clone(),
+                }))
+                .unwrap();
+            let command = request(
+                CicsOperation::GdsIssueAbend,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("RETCODE".into(), argument(b"RETCODE-X")),
+                    ("CONVDATA".into(), argument(b"CONVDATA-X")),
+                    ("STATE".into(), argument(b"STATE-X")),
+                ]),
+                1,
+            );
+            assert_eq!(
+                handlers::invoke_extended_control(
+                    &service,
+                    &mut run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+            assert!(
+                ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .conversation(token)
+                    .unwrap()
+                    .pending_issue
+                    .as_ref()
+                    .unwrap()
+                    .attempted
+            );
+        }
+        let command = request(
+            CicsOperation::GdsIssueAbend,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("RETCODE".into(), argument(b"RETCODE-X")),
+                ("CONVDATA".into(), argument(b"CONVDATA-X")),
+                ("STATE".into(), argument(b"STATE-X")),
+            ]),
+            1,
+        );
+        for _ in 0..2 {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .install_conversation_transport(Arc::new(Carrier {
+                    sent: sent.clone(),
+                    reconciled: reconciled.clone(),
+                }))
+                .unwrap();
+            let reply = handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap();
+            assert_eq!(reply.disposition, CicsDisposition::Complete);
+            assert_eq!(reply.outputs["RETCODE"].bytes(), &[0; 6]);
+            assert_eq!(reply.outputs["CONVDATA"].bytes()[2], 0xff);
+            assert!(
+                ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .conversation(token)
+                    .unwrap()
+                    .released
+            );
+        }
+        assert_eq!(sent.load(Ordering::SeqCst), 1);
+        assert_eq!(reconciled.load(Ordering::SeqCst), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn mapped_issue_route_rejects_dpl_principal_before_staging() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

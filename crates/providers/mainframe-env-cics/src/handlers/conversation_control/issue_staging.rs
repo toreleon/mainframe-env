@@ -5,8 +5,8 @@
 
 use super::{
     ConversationLedger, ConversationOwner, ConversationProblem, ConversationReplay,
-    ConversationReply, ConversationTransmitOutcome, GdsIssueFlow, IssueRequestIdentity,
-    IssueValidationProblem, load_conversation_replay,
+    ConversationReply, ConversationTransmitOutcome, GdsIssueFlow, GdsReturnCode,
+    IssueRequestIdentity, IssueValidationProblem, load_conversation_replay,
 };
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
@@ -427,20 +427,38 @@ pub(in crate::service) fn confirm(
             .ok_or(HostProblem::InfrastructureFailure)?;
         request.validate().map_err(map_problem)?;
         if request.principal != run.invocation.principal.id().as_str()
-            || request.convdata_output
-            || request.retcode_output
+            || (request.convdata_output || request.retcode_output)
+                && record.kind != super::ConversationKind::AppcBasic
         {
             return Err(HostProblem::IdempotencyConflict);
         }
         let mut next = current.clone();
-        let state = next
+        let changed = next
             .conversation_mut(token)
-            .ok_or(HostProblem::InfrastructureFailure)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let state = changed
             .confirm_issue(&owner, super::context(run)?, effect_key, id)
             .map_err(map_problem)?;
+        let basic = changed.kind == super::ConversationKind::AppcBasic;
         let mut outputs = BTreeMap::from([("CONTROL_ID".into(), id.to_be_bytes().to_vec())]);
         if request.state_output {
-            outputs.insert("STATE".into(), super::state_cvda::bytes(state));
+            outputs.insert(
+                "STATE".into(),
+                if basic {
+                    state.cvda().to_string().into_bytes()
+                } else {
+                    super::state_cvda::bytes(state)
+                },
+            );
+        }
+        if request.convdata_output {
+            outputs.insert(
+                "CONVDATA".into(),
+                changed.gds_convdata(false).map_err(map_problem)?.to_vec(),
+            );
+        }
+        if request.retcode_output {
+            outputs.insert("RETCODE".into(), GdsReturnCode::NORMAL.0.to_vec());
         }
         let reply = ConversationReply {
             condition: "NORMAL".into(),
