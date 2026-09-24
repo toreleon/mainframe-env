@@ -56,7 +56,8 @@ All notable changes to mainframe-env are documented here.
 - Added typed BTS `FETCH ANY`, `FETCH CHILD`, `FREE CHILD`, `LINK ACQACTIVITY`,
   `LINK ACQPROCESS`, and `LINK ACTIVITY` routes over the shared lifecycle
   authority. Child tokens are parent owned and durable; LINK selects an
-  installed program and fences uncertain dispatch without automatic replay.
+  installed program, resolves nested named descendants from the active
+  lifecycle frame, and fences uncertain dispatch without automatic replay.
   The isolated CICS registry is 157 typed, 0 legacy, and 106 unready rows.
   Licensed differential evidence remains pending.
 

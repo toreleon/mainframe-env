@@ -6311,7 +6311,9 @@ mod tests {
         PendingOnlineTransfer, decode_online_machine_continuation,
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
-    use mainframe_env_cics::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+    use mainframe_env_cics::bts_lifecycle::{
+        BtsActivity, BtsActivityIndex, BtsCompletion, BtsLifecycleStore, BtsMode, BtsProcess,
+    };
     use mainframe_env_cics::{
         CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
         CicsBtsChildCompletion, CicsEventPostMode, CicsJavaStatus, CicsMonitorAction,
@@ -18816,19 +18818,24 @@ mod tests {
     }
 
     #[test]
-    fn online_bts_link_acqprocess_uses_compiled_selected_program() {
+    fn online_bts_link_acqprocess_runs_nested_named_activity_in_shared_tree() {
         let main = published_source_fixture(
             "BTSMAIN",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BTSMAIN. DATA DIVISION. WORKING-STORAGE SECTION. 01 FN-X PIC X(2). 01 RC-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS LINK ACQPROCESS RESP(RC-X) END-EXEC. MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
         );
         let child = published_source_fixture(
             "BTSRUN",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSRUN. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('GO') END-EXEC. GOBACK.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSRUN. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('GO') END-EXEC. EXEC CICS LINK ACTIVITY('GRAND') END-EXEC. GOBACK.",
+        );
+        let grandchild = published_source_fixture(
+            "BTSGRND",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSGRND. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('PING') END-EXEC. GOBACK.",
         );
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
         for (class, resource) in [
             ("FACILITY", "CICS.PROGRAM.BTSRUN"),
+            ("FACILITY", "CICS.PROGRAM.BTSGRND"),
             ("BTSPROCESS", "CICS.BTS.PROCESS.TYPE.PROC"),
         ] {
             server
@@ -18850,6 +18857,11 @@ mod tests {
             InvocationLimits::default(),
         )
         .unwrap();
+        let grandchild_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(grandchild.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
                 programs: vec![
@@ -18867,6 +18879,13 @@ mod tests {
                         manifest: VersionedArtifactManifest::V3(child.manifest().clone()),
                         semantic_identity: child.semantic_id().to_reference(),
                     },
+                    OnlineProgramDefinition {
+                        name: "BTSGRND".into(),
+                        artifact: grandchild_ref.clone(),
+                        payload: grandchild.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(grandchild.manifest().clone()),
+                        semantic_identity: grandchild.semantic_id().to_reference(),
+                    },
                 ],
                 transactions: BTreeMap::from([("BT00".into(), "BTSMAIN".into())]),
                 maps: vec![BmsMapDefinition {
@@ -18882,17 +18901,30 @@ mod tests {
             .unwrap();
         server
             .cics
-            .register_program_definitions(&[CicsProgramDefinition {
-                name: "BTSRUN".into(),
-                generation: 1,
-                artifact: child_ref,
-                semantic_identity: child.semantic_id().to_reference(),
-                entry_offset: 0,
-                enabled: true,
-                remote: false,
-                reload: false,
-                java_status: CicsJavaStatus::NotJava,
-            }])
+            .register_program_definitions(&[
+                CicsProgramDefinition {
+                    name: "BTSRUN".into(),
+                    generation: 1,
+                    artifact: child_ref,
+                    semantic_identity: child.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                },
+                CicsProgramDefinition {
+                    name: "BTSGRND".into(),
+                    generation: 1,
+                    artifact: grandchild_ref,
+                    semantic_identity: grandchild.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                },
+            ])
             .unwrap();
         let session = SessionId::new("bts-selected", 64).unwrap();
         let invocation = server
@@ -18913,6 +18945,7 @@ mod tests {
             .unwrap();
         let authority = BtsLifecycleStore::new(server.store.as_ref());
         let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let grandchild_id = BtsLifecycleStore::child_id("TYPE", "PROC", 1).unwrap();
         server
             .racf
             .define_profile("BTSEVENT", &format!("CICS.BTS.{root}.GO"), "IBMUSER", None)
@@ -18926,7 +18959,28 @@ mod tests {
                 AccessIntent::Update,
             )
             .unwrap();
-        let process = BtsProcess::new(
+        for (class, resource, intent) in [
+            (
+                "BTSACTIVITY",
+                format!("CICS.BTS.ACTIVITY.{grandchild_id}"),
+                AccessIntent::Execute,
+            ),
+            (
+                "BTSEVENT",
+                format!("CICS.BTS.{grandchild_id}.PING"),
+                AccessIntent::Update,
+            ),
+        ] {
+            server
+                .racf
+                .define_profile(class, &resource, "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit(class, &resource, "IBMUSER", intent)
+                .unwrap();
+        }
+        let mut process = BtsProcess::new(
             "TYPE",
             "PROC",
             &root,
@@ -18936,12 +18990,54 @@ mod tests {
             invocation.run_unit_id.as_str(),
         )
         .unwrap();
+        process.activities.insert(
+            grandchild_id.clone(),
+            BtsActivity {
+                id: grandchild_id.clone(),
+                name: "GRAND".into(),
+                parent_id: Some(root.clone()),
+                completion_event: None,
+                program: "BTSGRND".into(),
+                transid: "BT00".into(),
+                userid: "IBMUSER".into(),
+                mode: BtsMode::Initial,
+                completion: BtsCompletion::Incomplete,
+                suspended: false,
+                activation_epoch: 0,
+                checkpoint: None,
+                acquired_by: None,
+                abcode: None,
+                abprogram: None,
+            },
+        );
+        process.next_child_sequence = 2;
         authority
             .define_process(
                 process,
                 invocation.run_unit_id.as_str(),
                 invocation.execution_id.as_str(),
                 invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let index = BtsActivityIndex {
+            schema_version: "mainframe-env.cics.bts-activity-index@1".into(),
+            activity_id: grandchild_id.clone(),
+            process_type: "TYPE".into(),
+            process_name: "PROC".into(),
+            parent_id: Some(root.clone()),
+            pending_uow: Some(invocation.run_unit_id.as_str().into()),
+            row_version: 0,
+        };
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-bts-activity-index-v1".into(),
+                    key: grandchild_id.clone(),
+                    version: 1,
+                    payload: serde_json::to_vec(&index).unwrap(),
+                },
+                None,
             )
             .unwrap();
         let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
@@ -18977,6 +19073,17 @@ mod tests {
             .unwrap();
         let event: serde_json::Value = serde_json::from_slice(&event.payload).unwrap();
         assert!(event["events"].get("GO").is_some());
+        let grandchild_event = server
+            .store
+            .get_provider_state("cics-event-activity-v1", &grandchild_id)
+            .unwrap()
+            .unwrap();
+        let grandchild_event: serde_json::Value =
+            serde_json::from_slice(&grandchild_event.payload).unwrap();
+        assert!(grandchild_event["events"].get("PING").is_some());
+        let completed = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert_eq!(completed.activities[&root].mode, BtsMode::Dormant);
+        assert_eq!(completed.activities[&grandchild_id].mode, BtsMode::Dormant);
         assert!(
             server
                 .store
@@ -18988,7 +19095,7 @@ mod tests {
             .store
             .list_provider_state(crate::cobol::retention::CALL_REPLAY_NAMESPACE, 16)
             .unwrap();
-        assert_eq!(selected.len(), 1);
+        assert_eq!(selected.len(), 2);
         assert!(
             selected[0]
                 .payload

@@ -541,6 +541,9 @@ fn resolve_target(
 }
 
 fn active_activity(service: &CicsService, run: &Run) -> Result<Option<String>, HostProblem> {
+    if let Some(activity) = nested_activity_scope(service, run)? {
+        return Ok(Some(activity));
+    }
     let row = service
         .store
         .get_provider_state(CONTEXT_NS, run.invocation.run_unit_id.as_str())
