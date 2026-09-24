@@ -1,9 +1,57 @@
+mod option;
 mod output;
+pub use option::CicsPlanOption;
 pub use output::CicsOutputName;
 
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Fetch one eligible parent-owned child task.
+    FetchAny,
+    /// Fetch one child task by its opaque token.
+    FetchChild,
+    /// Release one parent-owned child token.
+    FreeChild,
+    /// Link to the UOW-acquired BTS activity.
+    LinkAcqActivity,
+    /// Link to the UOW-acquired BTS process root.
+    LinkAcqProcess,
+    /// Link to a named child of the current activity.
+    LinkActivity,
+    /// Read one owned LUTYPE6.1 or MRO attach header.
+    ExtractAttach,
+    /// Read mapped APPC or MRO state.
+    ExtractAttributes,
+    /// Read basic APPC state with GDS return code.
+    GdsExtractAttributes,
+    /// Extract one terminal logon message.
+    ExtractLogonMsg,
+    /// Read mapped APPC attach process information.
+    ExtractProcess,
+    /// Read basic APPC attach process information.
+    GdsExtractProcess,
+    /// Translate an LUTYPE6.1 network name to local IDs.
+    ExtractTct,
+    /// Position on one owned conversation facility.
+    Point,
+    /// Allocate a mapped APPC or MRO task-owned conversation.
+    AllocateConversation,
+    /// Allocate an APPC basic conversation and return a GDS code.
+    GdsAllocateConversation,
+    /// Return the principal APPC basic conversation identity.
+    GdsAssignConversation,
+    /// Construct one task-local MRO or LU6.1 attach header.
+    BuildAttach,
+    /// Connect an allocated APPC mapped conversation to a process.
+    ConnectProcess,
+    /// Connect an allocated APPC basic conversation to a process.
+    GdsConnectProcess,
+    /// Send and receive through one mapped APPC or MRO conversation.
+    Converse,
+    /// Return one mapped APPC or MRO session to CICS.
+    FreeConversation,
+    /// Return an APPC basic session after the peer reaches FREE.
+    GdsFreeConversation,
     /// Change a standard RACF password under one SAF effect.
     ChangePassword,
     /// Change a length-selected password or phrase under one SAF effect.
@@ -22,6 +70,18 @@ pub enum CicsPlanOperation {
     AsktimeEib,
     /// Transform one absolute-time value into selected display/binary fields.
     FormatTime,
+    /// Convert one architected date-time string into CICS absolute time.
+    ConvertTime,
+    /// Write one operator console message and optionally await its reply.
+    WriteOperator,
+    /// Extract selected fields of the accepted TCP/IP client certificate.
+    ExtractCertificate,
+    /// Extract source-bounded accepted TCP/IP connection fields.
+    ExtractTcpip,
+    /// Remove editing characters from one EBCDIC numeric field in place.
+    BifDeedit,
+    /// Compute a source-bounded SHA-1 digest in one of three representations.
+    BifDigest,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -60,6 +120,8 @@ pub enum CicsPlanOperation {
     UpdateCounter,
     /// IBM UPDATE named-counter command.
     UpdateDCounter,
+    /// Arm one task-owned timer-event control area for later posting.
+    Post,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -251,6 +313,8 @@ pub enum CicsPlanOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
     /// Query source-defined SAF access levels for a CICS or named resource.
@@ -273,6 +337,10 @@ pub enum CicsPlanOperation {
     PurgeMessage,
     /// Schedule one local interval-control START data record.
     Start,
+    /// Start one noncancelable facility-less local task immediately.
+    StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     /// Consume one expired interval-control START data record.
     Retrieve,
     /// Typed CICS web-service-control operation InvokeService.
@@ -368,6 +436,48 @@ pub enum CicsOperandName {
     IssueLength,
     /// Optional PASS logon mode.
     IssueLogMode,
+    /// Opaque sixteen-byte child token.
+    BtsChild,
+    /// Name of a current activity's child.
+    BtsActivity,
+    /// Input event for a dormant BTS activity.
+    BtsInputEvent,
+    /// Fullword wait limit in milliseconds.
+    BtsTimeout,
+    /// Task-local attach-header identifier.
+    ConversationAttachId,
+    /// Four-byte conversation token.
+    ConversationConvid,
+    /// One to four character session identifier.
+    ConversationSession,
+    /// Process-name receive capacity, defaulting to 32.
+    ConversationMaxProcLen,
+    /// Eight-character SNA network name.
+    ConversationNetName,
+    ConversationSysid,
+    ConversationPartner,
+    ConversationProfile,
+    ConversationModeName,
+    ConversationProcess,
+    ConversationResource,
+    ConversationReturnProcess,
+    ConversationReturnResource,
+    ConversationQueue,
+    ConversationIuType,
+    ConversationDataStream,
+    ConversationRecordFormat,
+    ConversationProcName,
+    ConversationProcLength,
+    ConversationPipList,
+    ConversationPipLength,
+    ConversationSyncLevel,
+    ConversationFrom,
+    ConversationFromLength,
+    ConversationFromFullLength,
+    ConversationMaxLength,
+    ConversationMaxFullLength,
+    ConversationToLength,
+    ConversationToFullLength,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
@@ -445,6 +555,12 @@ pub enum CicsOperandName {
     Commarea,
     /// `TRANSID(...)` next-transaction name.
     TransId,
+    /// `BREXIT(...)` override for a transaction's bridge exit default.
+    BrExit,
+    /// `BRDATA(...)` initial data passed to the bridge exit.
+    BrData,
+    /// `BRDATALENGTH(...)` selected initial data length.
+    BrDataLength,
     /// `TERMID(...)` principal facility for a started task.
     TermId,
     /// `RTRANSID(...)` metadata passed to a started task.
@@ -539,6 +655,32 @@ pub enum CicsOperandName {
     Aids,
     /// `ABSTIME(...)` packed-decimal input.
     Abstime,
+    /// `DATESTRING(...)` architected date-time input.
+    DateString,
+    /// `FIELD(...)` in-place built-in DEEDIT source.
+    Field,
+    /// `RECORD(...)` source for BIF DIGEST.
+    Record,
+    /// `RECORDLEN(...)` source byte count for BIF DIGEST.
+    RecordLength,
+    /// `DIGESTTYPE(...)` named CVDA selector for BIF DIGEST.
+    DigestType,
+    /// `TEXT(...)` bytes sent to the system console.
+    OperatorText,
+    /// `TEXTLENGTH(...)` selected text byte count.
+    OperatorTextLength,
+    /// `ROUTECODES(...)` one-byte console route codes.
+    OperatorRouteCodes,
+    /// `NUMROUTES(...)` selected route count.
+    OperatorNumRoutes,
+    /// `CONSNAME(...)` specific system console name.
+    OperatorConsName,
+    /// `ACTION(...)` retained descriptor code.
+    OperatorAction,
+    /// `MAXLENGTH(...)` reply area capacity.
+    OperatorMaxLength,
+    /// `TIMEOUT(...)` reply deadline in seconds.
+    OperatorTimeout,
     /// Optional one-byte date separator.
     DateSep,
     /// Optional one-byte time separator.
@@ -887,215 +1029,4 @@ pub enum CicsOperandName {
     WebReceiveMaxLength,
     /// Client status-text receiving capacity for WEB RECEIVE.
     WebReceiveStatusLength,
-}
-
-/// Flag option accepted by the typed CICS pilot.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsPlanOption {
-    /// Wait for COPY or ERASEAUP terminal completion.
-    IssueWaitOption,
-    /// ENDFILE additionally signals ENDOUTPUT.
-    IssueEndOutput,
-    /// ENDOUTPUT additionally signals ENDFILE.
-    IssueEndFile,
-    /// Loaded 3650 program may converse with the host.
-    IssueConverse,
-    /// PASS uses the logon-associated mode.
-    IssueLogonLogmode,
-    /// PASS skips session quiescing.
-    IssueNoQuiesce,
-    /// BasicAuth token syntax.
-    SecurityBasicAuth,
-    /// JSON Web Token syntax.
-    SecurityJwt,
-    /// Registered opaque Kerberos token syntax.
-    SecurityKerberos,
-    /// Raw token bytes.
-    SecurityBit,
-    /// Base64-encoded token bytes.
-    SecurityBase64,
-    Accum,
-    Formfeed,
-    DefaultScreen,
-    AlternateScreen,
-    EraseAup,
-    Print,
-    Alarm,
-    Frset,
-    Paging,
-    Last,
-    Honeom,
-    L40,
-    L64,
-    L80,
-    ReleasePage,
-    RetainPage,
-    Autopage,
-    CurrentPage,
-    AllPages,
-    NoAutopage,
-    OperPurge,
-    DefResp,
-    NoWait,
-    Rrn,
-    Console,
-    PrintMedium,
-    Card,
-    WpMedia1,
-    WpMedia2,
-    WpMedia3,
-    Nleom,
-    WpMedia4,
-    /// Retain lowercase bytes on a subsequent 8775 partition receive.
-    AsIs,
-    /// The composite predicate requires all child events.
-    EventAnd,
-    /// The composite predicate requires any child event.
-    EventOr,
-    TimerAfter,
-    TimerAt,
-    TimerOn,
-    AcqActivity,
-    AcqProcess,
-    /// Ignore and clear active abnormal-termination exits.
-    Cancel,
-    /// Suppress transaction-dump creation.
-    NoDump,
-    /// Reactivate the most recently canceled abnormal-termination exit.
-    Reset,
-    /// Establish a read-for-update context.
-    Update,
-    /// Roll back rather than commit at syncpoint.
-    Rollback,
-    /// Suppress default condition handling.
-    NoHandle,
-    /// Keep an enqueue until task termination.
-    Task,
-    /// Keep an enqueue until the current unit of work ends.
-    Uow,
-    /// Return `ENQBUSY` rather than suspending for a contended resource.
-    NoSuspend,
-    /// Erase the terminal buffer before mapped output is displayed.
-    Erase,
-    /// Use symbolic map cursor positioning.
-    Cursor,
-    /// Use the default date separator.
-    DateSep,
-    /// Use the default time separator.
-    TimeSep,
-    /// Unlock the terminal keyboard after output.
-    FreeKb,
-    /// Start a file browse at the first key greater than or equal to RIDFLD.
-    Gteq,
-    /// Match a keyed READ by the KEYLENGTH prefix of RIDFLD.
-    Generic,
-    /// Mark START data as containing function management headers.
-    Fmh,
-    /// Defer START work admission until a successful syncpoint.
-    Protect,
-    /// Wait for an expired START record rather than returning ENDDATA immediately.
-    Wait,
-    After,
-    At,
-    For,
-    Until,
-    /// Suppress the generated START request identifier in EIBREQID.
-    NoCheck,
-    /// Send only the initialized default data defined by a BMS map.
-    MapOnly,
-    /// Send only application data and its supplied BMS field attributes.
-    DataOnly,
-    /// Require a keyed READ to match the complete or generic RIDFLD key.
-    Equal,
-    /// Receive mapped input from the terminal that originated the transaction.
-    Terminal,
-    /// Allow deadlock timeout or ordinary purge to abend this wait.
-    Purgeable,
-    /// Ignore deadlock timeout or ordinary purge while this wait is active.
-    NotPurgeable,
-    /// Read the next temporary-storage item after the queue-wide cursor.
-    Next,
-    /// Replace an existing temporary-storage item instead of appending.
-    RewriteTemporary,
-    /// Select auxiliary storage when creating a temporary-storage queue.
-    Auxiliary,
-    /// Select main storage when creating a temporary-storage queue.
-    Main,
-    /// Require the named application major and minor version exactly.
-    ExactMatch,
-    /// Select the highest minor version at or above the named minimum.
-    Minimum,
-    /// Retain a LOAD ownership after the issuing task terminates.
-    Hold,
-    /// Preserve percent escapes and plus signs in document symbol lists.
-    Unescaped,
-    /// Omit bookmark and conversion tags from a document retrieval.
-    DocumentDataOnly,
-    /// Request CICS-key 64-bit storage.
-    CicsDataKey64,
-    /// Request user-key 64-bit storage.
-    UserDataKey64,
-    /// Retain 64-bit storage beyond task end.
-    Shared64,
-    /// Request an executable DSA for a below-bar location.
-    Executable64,
-    /// Fail immediately while the selected counter pool is rebuilding.
-    CounterNoSuspend,
-    /// Reserve the remaining numbers when a GET increment reaches the limit.
-    CounterReduce,
-    /// Rewind at limit or when the reservation exceeds the remaining range.
-    CounterWrap,
-    /// Retain a closed spool report.
-    SpoolKeep,
-    /// Delete a closed spool report.
-    SpoolDelete,
-    /// Emit output without carriage-control bytes.
-    SpoolNoCc,
-    /// Use ASA carriage control.
-    SpoolAsa,
-    /// Use machine carriage control.
-    SpoolMcc,
-    /// Create a print report.
-    SpoolPrint,
-    /// Create a punch report.
-    SpoolPunch,
-    /// Write a line-mode spool record.
-    SpoolLine,
-    /// Write a page-mode spool record.
-    SpoolPage,
-    TraceException,
-    DumpComplete,
-    DumpTask,
-    DumpStorage,
-    DumpProgram,
-    DumpTerminal,
-    DumpTables,
-    DumpFct,
-    DumpPct,
-    DumpPpt,
-    DumpSit,
-    DumpTct,
-    DumpTrt,
-    DumpDct,
-    TraceOn,
-    TraceOff,
-    TraceSystem,
-    TraceUser,
-    TraceEi,
-    TraceSingle,
-    TraceAccount,
-    TraceMonitor,
-    TracePerform,
-    /// Browse HTTP request or response headers.
-    WebBrowseHttpHeader,
-    /// Browse URL query parameters.
-    WebBrowseQueryParm,
-    /// Browse HTML form fields.
-    WebBrowseFormField,
-    /// Retain the unread HTTP body after a short WEB RECEIVE.
-    WebNotruncate,
-    /// Return client response bytes without code-page conversion.
-    WebNoClientConvert,
-    /// Return inbound request bytes without code-page conversion.
-    WebNoServerConvert,
 }

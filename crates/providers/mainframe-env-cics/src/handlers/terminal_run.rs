@@ -116,10 +116,19 @@ impl CicsService {
         }
         let run = state.runs.get(&run_id).cloned();
         drop(state);
-        if let Some(run) = run {
+        if let Some(run) = &run {
             handlers::release_task_state(self, &run)?;
         }
-        self.lock()?.runs.remove(&run_id);
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_some_and(|current| {
+            run.as_ref().is_none_or(|run| {
+                current.session != run.session
+                    || current.invocation.principal.id() != run.invocation.principal.id()
+            })
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        state.runs.remove(&run_id);
         Ok(trace)
     }
 
@@ -180,7 +189,14 @@ impl CicsService {
         }
         drop(state);
         handlers::release_task_state(self, &run)?;
-        self.lock()?.runs.remove(&run_id);
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_none_or(|current| {
+            current.session != run.session
+                || current.invocation.principal.id() != run.invocation.principal.id()
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        state.runs.remove(&run_id);
         Ok(())
     }
 }

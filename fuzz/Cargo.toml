@@ -28,6 +28,20 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "cics_source_parser"
+path = "fuzz_targets/cics_source_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cics_plan_decoder"
+path = "fuzz_targets/cics_plan_decoder.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]
 members = ["."]
 

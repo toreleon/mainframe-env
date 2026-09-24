@@ -1,26 +1,16 @@
+mod bts_entries;
+mod conversation_entries;
 mod issue_entries;
+mod misc_entries;
 mod security_entries;
+mod task_entries;
 
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 171] = [
-    CicsExecutableDescriptor {
-        operation: CicsPlanOperation::Deq,
-        namespace: "cics.task",
-        name: "deq",
-        major: 1,
-        effects: DEQ_EFFECTS,
-        runtime_import: CICS_RUNTIME_IMPORT,
-    },
-    CicsExecutableDescriptor {
-        operation: CicsPlanOperation::Enq,
-        namespace: "cics.task",
-        name: "enq",
-        major: 1,
-        effects: ENQ_EFFECTS,
-        runtime_import: CICS_RUNTIME_IMPORT,
-    },
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 204] = [
+    task_entries::TASK_QUEUE_DESCRIPTORS[0],
+    task_entries::TASK_QUEUE_DESCRIPTORS[1],
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Read,
         namespace: "cics.file",
@@ -1143,6 +1133,39 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 171] = [
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[7],
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[8],
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[9],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[0],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[1],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[2],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[3],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[4],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[5],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[6],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[7],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[8],
+    misc_entries::MISC_EXECUTABLE_DESCRIPTORS[9],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[0],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[1],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[2],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[3],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[4],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[5],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[0],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[1],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[2],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[3],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[4],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[5],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[6],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[7],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[0],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[1],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[2],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[3],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[4],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[5],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[6],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[7],
+    conversation_entries::CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS[8],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[0],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[1],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[2],

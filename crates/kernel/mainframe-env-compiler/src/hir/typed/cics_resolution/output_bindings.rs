@@ -120,7 +120,10 @@ pub(super) fn resolve(
         if name == "INTO"
             && matches!(
                 operation,
-                HirCicsOperation::WebReceive | HirCicsOperation::WebConverse
+                HirCicsOperation::WebReceive
+                    | HirCicsOperation::WebConverse
+                    | HirCicsOperation::ExtractLogonMsg
+                    | HirCicsOperation::Converse
             )
         {
             continue;
@@ -145,6 +148,7 @@ pub(super) fn resolve(
             && !matches!(
                 operation,
                 HirCicsOperation::Retrieve
+                    | HirCicsOperation::Post
                     | HirCicsOperation::Getmain
                     | HirCicsOperation::ReadTransientData
                     | HirCicsOperation::ReadTemporaryStorage

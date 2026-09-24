@@ -1,6 +1,6 @@
 //! Top-level command-head tokens carried into valued CICS clauses.
 
-use super::{compatibility_alias_target, journal_control};
+use super::{builtin_function, compatibility_alias_target, journal_control, task_wait};
 use crate::SemanticModel;
 use mainframe_env_ir::{CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor};
 
@@ -35,22 +35,25 @@ pub(super) fn option_value_shape(
         // syntax diagram currently materializes only WPMEDIA1.
         return Some(CicsApplicationOptionValueShape::Flag);
     }
-    journal_control::option_value_shape(descriptor, name).or_else(|| {
-        descriptor
-            .options
-            .iter()
-            .find(|option| option.name == name)
-            .map(|option| option.value_shape)
-            .or_else(|| {
-                compatibility_alias_target(descriptor, name).and_then(|canonical| {
-                    descriptor
-                        .options
-                        .iter()
-                        .find(|option| option.name == canonical)
-                        .map(|option| option.value_shape)
+    builtin_function::option_value_shape(descriptor, name)
+        .or_else(|| task_wait::option_value_shape(descriptor, name))
+        .or_else(|| journal_control::option_value_shape(descriptor, name))
+        .or_else(|| {
+            descriptor
+                .options
+                .iter()
+                .find(|option| option.name == name)
+                .map(|option| option.value_shape)
+                .or_else(|| {
+                    compatibility_alias_target(descriptor, name).and_then(|canonical| {
+                        descriptor
+                            .options
+                            .iter()
+                            .find(|option| option.name == canonical)
+                            .map(|option| option.value_shape)
+                    })
                 })
-            })
-    })
+        })
 }
 
 pub(super) fn statically_known_value_bytes(

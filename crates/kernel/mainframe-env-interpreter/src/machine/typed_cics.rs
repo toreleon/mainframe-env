@@ -1,23 +1,29 @@
 use super::*;
 use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
-    CICS_ASSIGN_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
-    CicsExecutableDescriptor, CicsOperandName, CicsOperandValue, CicsOperationContract,
-    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
-    Module, OperationCatalog, OperationSchema, OperationSemanticContract,
-    cics_executable_descriptor, cics_executable_descriptor_for_identity,
-    cobol_layout_definition_identity, decode_cics_effect_plan, verify_semantic_contracts,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_CERTIFICATE_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS,
+    CicsCertificateOutput, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
+    CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
+    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, CicsTcpipOutput, Effect, Module,
+    OperationCatalog, OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
+    decode_cics_effect_plan, verify_semantic_contracts,
 };
 
 mod address;
 mod assign;
+mod certificate;
+mod convert_time;
 mod diagnostics;
+mod host_operation;
 mod legacy;
 mod names;
+mod output_capacity;
+mod output_write;
+mod post;
 mod registry;
 mod response;
-mod response_output;
-pub(super) use response_output::write_output;
+pub(super) use output_write::write_output;
 mod retrieve;
 mod runtime_validation;
 mod slot_access;
@@ -25,7 +31,7 @@ use runtime_validation::validate_machine_slot;
 mod spool_control;
 mod storage64;
 mod task_wait;
-mod web_control;
+mod tcpip;
 mod web_service_control;
 pub(super) use address::CicsAddressSet;
 use diagnostics::{argument_summary, invalid_plan};
@@ -103,14 +109,18 @@ pub(super) fn suspension(
 ) -> MachineDrive<EffectRequest> {
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::Converse => ("cics-converse", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
+            ("cics-event", true)
+        }
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         operation if operation.is_counter() => ("cics-counter", true),
         CicsOperation::WriteJournalName => ("cics-journal", true),
         CicsOperation::WriteJournalNum => ("cics-journal", true),
+        CicsOperation::WriteOperator => ("cics-operator", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -184,8 +194,12 @@ pub(super) fn execute(
     if plan.operation == CicsPlanOperation::WsaContextGet {
         web_service_control::release_previous_set(machine);
     }
+    certificate::release_previous(machine);
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
+    }
+    if plan.operation == CicsPlanOperation::ExtractLogonMsg {
+        retrieve::release_logon_message_set(machine);
     }
     if matches!(
         plan.operation,
@@ -195,7 +209,8 @@ pub(super) fn execute(
     ) {
         retrieve::release_partition_receive_set(machine);
     }
-    let host_operation = names::host_operation(plan.operation);
+    let host_operation =
+        names::host_operation(plan.operation).ok_or(MachineProblem::UnsupportedForm)?;
     let address_set = address::action(&plan)?;
     let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
     let mut operand_outputs = BTreeMap::new();
@@ -394,6 +409,7 @@ pub(super) fn execute(
                         | CicsOperandName::WebReceiveMaxLength
                         | CicsOperandName::WebReceiveStatusLength
                         | CicsOperandName::WebPortNumber
+                        | CicsOperandName::BtsTimeout
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -473,15 +489,124 @@ pub(super) fn execute(
         }
         let target = CicsTarget::Resolved(output.target.clone());
         web_service_control::output_arguments(machine, output.name, &target, &mut arguments)?;
-        if let Some((name, capacity)) = web_control::output_capacity(machine, output.name, &target)?
+        if let Some((name, capacity)) = output_capacity::for_binding(machine, output.name, &target)?
         {
             arguments.insert(name, capacity);
         }
+        if matches!(
+            output.name,
+            CicsOutputName::DigestResult | CicsOutputName::OperatorReply
+        ) {
+            let name = if output.name == CicsOutputName::DigestResult {
+                "RESULT.MAXLENGTH"
+            } else {
+                "REPLY.MAXLENGTH"
+            };
+            arguments.insert(
+                name.into(),
+                payload(
+                    "mainframe-env.cics.decimal@1",
+                    resolved_slot(machine, &output.target)?
+                        .length
+                        .to_string()
+                        .into_bytes(),
+                )?,
+            );
+        }
+        if let CicsOutputName::Tcpip(identity) = output.name {
+            tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
+        }
         match output.name {
+            CicsOutputName::LogonSet | CicsOutputName::PipList => {
+                let capacity = retrieve::allocation_capacity(machine, &target)?;
+                arguments.insert(
+                    format!("{key}.MAXLENGTH"),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        capacity.to_string().into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::LogonInto => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "INTO.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::ProcessName => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "PROCNAME.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::AttachProcess
+            | CicsOutputName::AttachResource
+            | CicsOutputName::AttachReturnProcess
+            | CicsOutputName::AttachReturnResource
+            | CicsOutputName::AttachQueue => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    format!("{key}.MAXLENGTH"),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::IssueState
             | CicsOutputName::IssueConvData
             | CicsOutputName::IssueRetCode
-            | CicsOutputName::Abstime
+            | CicsOutputName::AttachIuType
+            | CicsOutputName::AttachDataStream
+            | CicsOutputName::AttachRecordFormat
+            | CicsOutputName::ConversationState
+            | CicsOutputName::ConversationData
+            | CicsOutputName::ConversationRetCode
+            | CicsOutputName::LogonLength
+            | CicsOutputName::ProcessLength
+            | CicsOutputName::SyncLevel
+            | CicsOutputName::PipLength
+            | CicsOutputName::TctSysId
+            | CicsOutputName::TctTermId
+            | CicsOutputName::ConversationConvid
+            | CicsOutputName::ConversationRetcode
+            | CicsOutputName::ConversationPrinConvid
+            | CicsOutputName::ConversationPrinSysid
+            | CicsOutputName::ConversationConvData
+            | CicsOutputName::ConversationInto
+            | CicsOutputName::ConversationSet
+            | CicsOutputName::ConversationToLength
+            | CicsOutputName::ConversationToFullLength => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate
             | CicsOutputName::SecurityControl
@@ -502,6 +627,10 @@ pub(super) fn execute(
             | CicsOutputName::SecurityNatLangInUse
             | CicsOutputName::TimerStatus
             | CicsOutputName::EventName
+            | CicsOutputName::BtsAny
+            | CicsOutputName::BtsCompStatus
+            | CicsOutputName::BtsChannel
+            | CicsOutputName::BtsAbcode
             | CicsOutputName::SubEventName
             | CicsOutputName::EventType
             | CicsOutputName::FireStatus
@@ -582,6 +711,12 @@ pub(super) fn execute(
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
+            CicsOutputName::Certificate(_) => {
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::Tcpip(_) => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Into => {
                 if matches!(
                     plan.operation,
@@ -631,7 +766,11 @@ pub(super) fn execute(
                 )?);
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::Ridfld => {
+            CicsOutputName::DigestResult
+            | CicsOutputName::Field
+            | CicsOutputName::Ridfld
+            | CicsOutputName::OperatorReply
+            | CicsOutputName::OperatorReplyLength => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Resp => response = Some(target),
@@ -674,6 +813,27 @@ pub(super) fn execute(
             "DELAY.ID".into(),
             payload(
                 "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if plan.operation == CicsPlanOperation::WriteOperator {
+        arguments.insert(
+            "OPERATOR.ID".into(),
+            payload(
+                "mainframe-env.cics.operator-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::FetchAny | CicsPlanOperation::FetchChild
+    ) {
+        arguments.insert(
+            "FETCH.ID".into(),
+            payload(
+                "mainframe-env.cics.fetch-id@1",
                 format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
             )?,
         );
@@ -1117,16 +1277,18 @@ mod tests {
                 );
                 assert_eq!(machine.read("OUTPUT-X").unwrap(), vec![b'X'; width]);
             }
-            write_output(
-                &mut machine,
-                CicsOperation::GdsIssueAbend,
-                name,
-                &target,
-                &payload(schema, vec![0; width]).unwrap(),
-                None,
-            )
-            .unwrap();
-            assert_eq!(machine.read("OUTPUT-X").unwrap(), vec![0; width]);
+            if name != "STATE" {
+                write_output(
+                    &mut machine,
+                    CicsOperation::GdsIssueAbend,
+                    name,
+                    &target,
+                    &payload(schema, vec![0; width]).unwrap(),
+                    None,
+                )
+                .unwrap();
+                assert_eq!(machine.read("OUTPUT-X").unwrap(), vec![0; width]);
+            }
         }
     }
 
@@ -1330,6 +1492,76 @@ mod tests {
         assert!(!machine.freed_allocations.contains(&base));
         retrieve::release_temporary_storage_set(&mut machine);
         assert!(machine.freed_allocations.contains(&base));
+    }
+
+    #[test]
+    fn extract_logonmsg_set_pointer_expires_at_the_next_extract() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("LOGON-PTR", 4);
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractLogonMsg,
+            "SET",
+            &CicsTarget::Resolved(slot.clone()),
+            &payload("mainframe-env.cics.payload@1", b"LOGON".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        let pointer = machine
+            .read_reference(&resolved_slot(&machine, &slot).unwrap())
+            .unwrap();
+        let (base, offset) = machine.decode_address(&pointer).unwrap().unwrap();
+        assert_eq!(offset, 0);
+        assert!(!machine.freed_allocations.contains(&base));
+        retrieve::release_logon_message_set(&mut machine);
+        assert!(machine.freed_allocations.contains(&base));
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractLogonMsg,
+            "SET",
+            &CicsTarget::Resolved(slot.clone()),
+            &payload("mainframe-env.cics.pointer-null@1", Vec::new()).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
+            Ok(vec![0; 4])
+        );
+    }
+
+    #[test]
+    fn extract_process_pip_length_uses_full_halfword_and_checks_host_bounds() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PIP-LEN", 2);
+        let target = CicsTarget::Resolved(slot.clone());
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractProcess,
+            "PIPLENGTH",
+            &target,
+            &payload("mainframe-env.cics.decimal@1", b"32763".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
+            Ok(vec![0x7f, 0xfb])
+        );
+        for (operation, value) in [
+            (CicsOperation::ExtractProcess, b"32764".as_slice()),
+            (CicsOperation::GdsExtractProcess, b"764".as_slice()),
+        ] {
+            assert_eq!(
+                write_output(
+                    &mut machine,
+                    operation,
+                    "PIPLENGTH",
+                    &target,
+                    &payload("mainframe-env.cics.decimal@1", value.to_vec()).unwrap(),
+                    None,
+                ),
+                Err(MachineProblem::UnexpectedHostResult)
+            );
+        }
     }
 
     #[test]

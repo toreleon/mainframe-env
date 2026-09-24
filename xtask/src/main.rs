@@ -10382,11 +10382,21 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     ];
     let mut hits = Vec::new();
     for rust_file in rust_files {
-        if rust_file.starts_with(&conformance) {
+        if rust_file.starts_with(&conformance)
+            || rust_file.file_name() == Some(OsStr::new("tests.rs"))
+            || rust_file
+                .components()
+                .any(|part| part.as_os_str() == OsStr::new("tests"))
+        {
             continue;
         }
         let source = read(&rust_file)?;
-        let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
+        let production_end = ["#[cfg(test)]", "#![cfg(test)]"]
+            .iter()
+            .filter_map(|marker| source.find(marker))
+            .min()
+            .unwrap_or(source.len());
+        let production = &source[..production_end];
         let upper = production.to_ascii_uppercase();
         for identity in forbidden_application_identities {
             if upper.contains(identity) {

@@ -2,9 +2,71 @@ use super::{CicsOutputName, CicsPlanOperation};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        CicsPlanOperation::FetchAny => matches!(
+            output,
+            CicsOutputName::BtsAny
+                | CicsOutputName::BtsCompStatus
+                | CicsOutputName::BtsChannel
+                | CicsOutputName::BtsAbcode
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::FetchChild => matches!(
+            output,
+            CicsOutputName::BtsCompStatus
+                | CicsOutputName::BtsChannel
+                | CicsOutputName::BtsAbcode
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        operation if super::conversation_control::is_operation(operation) => {
+            super::conversation_control::allowed_output(operation, output)
+        }
+        CicsPlanOperation::AllocateConversation
+        | CicsPlanOperation::GdsAllocateConversation
+        | CicsPlanOperation::GdsAssignConversation
+        | CicsPlanOperation::BuildAttach
+        | CicsPlanOperation::ConnectProcess
+        | CicsPlanOperation::GdsConnectProcess
+        | CicsPlanOperation::Converse
+        | CicsPlanOperation::FreeConversation
+        | CicsPlanOperation::GdsFreeConversation => {
+            super::conversation_open::output_allowed(operation, output)
+        }
         CicsPlanOperation::Asktime => matches!(
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::ConvertTime => matches!(
+            output,
+            CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::BifDeedit => matches!(
+            output,
+            CicsOutputName::Field | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::BifDigest => matches!(
+            output,
+            CicsOutputName::DigestResult | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::Post => matches!(
+            output,
+            CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::WriteOperator => matches!(
+            output,
+            CicsOutputName::OperatorReply
+                | CicsOutputName::OperatorReplyLength
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::ExtractCertificate => matches!(
+            output,
+            CicsOutputName::Certificate(_) | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::ExtractTcpip => matches!(
+            output,
+            CicsOutputName::Tcpip(_) | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => {
             matches!(

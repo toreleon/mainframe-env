@@ -1,5 +1,11 @@
 use super::super::{HirCicsOperation, HirCicsOption, Resolution, ResolutionFailure};
-use mainframe_env_ir::CicsApplicationRegistryDescriptor;
+use mainframe_env_ir::{CICS_APPLICATION_CONDITION_NAMES, CicsApplicationRegistryDescriptor};
+
+pub(super) fn is_condition_name(name: &str) -> bool {
+    CICS_APPLICATION_CONDITION_NAMES
+        .binary_search(&name)
+        .is_ok()
+}
 
 pub(super) fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
     descriptor.label_tokens.join(" ")
@@ -9,13 +15,39 @@ pub(super) fn resolve(
     descriptor: &CicsApplicationRegistryDescriptor,
 ) -> Resolution<HirCicsOperation> {
     Ok(match descriptor.label_tokens {
+        ["FETCH", "ANY"] => HirCicsOperation::FetchAny,
+        ["FETCH", "CHILD"] => HirCicsOperation::FetchChild,
+        ["FREE", "CHILD"] => HirCicsOperation::FreeChild,
+        ["LINK", "ACQACTIVITY"] => HirCicsOperation::LinkAcqActivity,
+        ["LINK", "ACQPROCESS"] => HirCicsOperation::LinkAcqProcess,
+        ["LINK", "ACTIVITY"] => HirCicsOperation::LinkActivity,
         ["ABEND"] => HirCicsOperation::Abend,
+        ["EXTRACT", "ATTACH"] => HirCicsOperation::ExtractAttach,
+        ["EXTRACT", "ATTRIBUTES"] => HirCicsOperation::ExtractAttributes,
+        ["GDS", "EXTRACT", "ATTRIBUTES"] => HirCicsOperation::GdsExtractAttributes,
+        ["EXTRACT", "LOGONMSG"] => HirCicsOperation::ExtractLogonMsg,
+        ["EXTRACT", "PROCESS"] => HirCicsOperation::ExtractProcess,
+        ["GDS", "EXTRACT", "PROCESS"] => HirCicsOperation::GdsExtractProcess,
+        ["EXTRACT", "TCT"] => HirCicsOperation::ExtractTct,
+        ["POINT"] => HirCicsOperation::Point,
+        ["ALLOCATE"] => HirCicsOperation::AllocateConversation,
+        ["GDS", "ALLOCATE"] => HirCicsOperation::GdsAllocateConversation,
+        ["GDS", "ASSIGN"] => HirCicsOperation::GdsAssignConversation,
+        ["BUILD", "ATTACH"] => HirCicsOperation::BuildAttach,
+        ["CONNECT", "PROCESS"] => HirCicsOperation::ConnectProcess,
+        ["GDS", "CONNECT", "PROCESS"] => HirCicsOperation::GdsConnectProcess,
+        ["CONVERSE"] => HirCicsOperation::Converse,
+        ["FREE"] => HirCicsOperation::FreeConversation,
+        ["GDS", "FREE"] => HirCicsOperation::GdsFreeConversation,
         ["ADD", "SUBEVENT"] => HirCicsOperation::AddSubevent,
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
         ["ADDRESS"] => HirCicsOperation::Address,
         ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
         ["ASKTIME"] => HirCicsOperation::AsktimeEib,
         ["FORMATTIME"] => HirCicsOperation::FormatTime,
+        ["CONVERTTIME"] => HirCicsOperation::ConvertTime,
+        ["BIF", "DEEDIT"] => HirCicsOperation::BifDeedit,
+        ["BIF", "DIGEST"] => HirCicsOperation::BifDigest,
         ["FREEMAIN"] => HirCicsOperation::Freemain,
         ["GETMAIN"] => HirCicsOperation::Getmain,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
@@ -102,6 +134,10 @@ pub(super) fn resolve(
         ["ASSIGN"] => HirCicsOperation::Assign,
         ["CANCEL"] => HirCicsOperation::Cancel,
         ["DELAY"] => HirCicsOperation::Delay,
+        ["POST"] => HirCicsOperation::Post,
+        ["WRITE", "OPERATOR"] => HirCicsOperation::WriteOperator,
+        ["EXTRACT", "CERTIFICATE"] => HirCicsOperation::ExtractCertificate,
+        ["EXTRACT", "TCPIP"] => HirCicsOperation::ExtractTcpip,
         ["PURGE", "MESSAGE"] => HirCicsOperation::PurgeMessage,
         ["QUERY", "SECURITY"] => HirCicsOperation::QuerySecurity,
         ["VERIFY", "PASSWORD"] => HirCicsOperation::VerifyPassword,
@@ -133,7 +169,10 @@ pub(super) fn resolve(
         ["SUSPEND"] => HirCicsOperation::Suspend,
         ["WAIT", "EVENT"] => HirCicsOperation::WaitEvent,
         ["WAIT", "EXTERNAL"] => HirCicsOperation::WaitExternal,
+        ["WAITCICS"] => HirCicsOperation::WaitCics,
         ["START"] => HirCicsOperation::Start,
+        ["START", "ATTACH"] => HirCicsOperation::StartAttach,
+        ["START", "BREXIT"] => HirCicsOperation::StartBrexit,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,
         ["DEFINE", "INPUT", "EVENT"] => HirCicsOperation::DefineInputEvent,
@@ -183,6 +222,7 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "JWT" => HirCicsOption::SecurityJwt,
         "KERBEROS" => HirCicsOption::SecurityKerberos,
         "BIT" => HirCicsOption::SecurityBit,
+        "BASE64" if operation == HirCicsOperation::BifDigest => HirCicsOption::DigestBase64,
         "BASE64" => HirCicsOption::SecurityBase64,
         "DEFRESP" => HirCicsOption::DefResp,
         "NOWAIT" => HirCicsOption::NoWait,
@@ -205,6 +245,13 @@ pub(super) fn resolve_option(option: &str, operation: HirCicsOperation) -> HirCi
         "WPMEDIA3" => HirCicsOption::WpMedia3,
         "NLEOM" => HirCicsOption::Nleom,
         "WPMEDIA4" => HirCicsOption::WpMedia4,
+        "HEX" => HirCicsOption::DigestHex,
+        "BINARY" => HirCicsOption::DigestBinary,
+        "IMMEDIATE" => HirCicsOption::OperatorImmediate,
+        "EVENTUAL" => HirCicsOption::OperatorEventual,
+        "CRITICAL" => HirCicsOption::OperatorCritical,
+        "OWNER" => HirCicsOption::CertificateOwner,
+        "ISSUER" => HirCicsOption::CertificateIssuer,
         "CANCEL" => HirCicsOption::Cancel,
         "NODUMP" => HirCicsOption::NoDump,
         "RESET" => HirCicsOption::Reset,

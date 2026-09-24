@@ -229,7 +229,10 @@ fn name(request: &CicsRequest, key: &str, invalid: i32) -> Result<String, HostPr
         })
 }
 
-pub(super) fn clock_millis(service: &CicsService, run: &mut Run) -> Result<u64, HostProblem> {
+pub(in crate::service::handlers) fn clock_millis(
+    service: &CicsService,
+    run: &mut Run,
+) -> Result<u64, HostProblem> {
     let timestamp = match service.nested(run, HostRequest::Clock(ClockRequest::UtcTimestamp))? {
         HostResult::Clock(value) => value,
         _ => return Err(HostProblem::ProviderFailure),

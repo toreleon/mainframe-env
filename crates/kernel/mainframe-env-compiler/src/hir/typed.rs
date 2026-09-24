@@ -963,6 +963,8 @@ mod tests {
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
+    use proptest::prelude::*;
+    use std::collections::BTreeSet;
 
     fn analyze(source: &str) -> crate::CobolAnalysis {
         let limits = SourceLimits::default();
@@ -994,6 +996,20 @@ mod tests {
         let bundle =
             SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap();
         CobolCompiler::default().analyze(&bundle)
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+        #[test]
+        fn cics_unknown_top_level_options_never_become_typed(
+            suffix in "[A-Z]{1,12}",
+        ) {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFZ. PROCEDURE DIVISION. EXEC CICS SYNCPOINT ZZ{suffix} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            prop_assert!(analysis.hir.is_none());
+        }
     }
 
     #[test]
@@ -2085,6 +2101,37 @@ mod tests {
     }
 
     #[test]
+    fn cics_waitcics_resolves_the_mvs_ecb_list_without_raw_fallback() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITCIC. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-LIST-PTR POINTER-32. 01 EVENT-COUNT PIC S9(9) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS WAITCICS ECBLIST(ECB-LIST-PTR) NUMEVENTS(EVENT-COUNT) NOTPURGEABLE NAME('MVSPOST') END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WAITCICS: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WAITCICS");
+        assert_eq!(command.operation, HirCicsOperation::WaitCics);
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::EcbList)
+        );
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::NumEvents)
+        );
+        assert!(command.options.contains(&HirCicsOption::NotPurgeable));
+    }
+
+    #[test]
     fn cics_address_set_resolves_both_virtual_pointer_directions() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 PTR-X POINTER. LINKAGE SECTION. 01 LINK-X PIC X(8). PROCEDURE DIVISION USING LINK-X. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF DATA-X) END-EXEC. EXEC CICS ADDRESS SET(ADDRESS OF LINK-X) USING(PTR-X) NOHANDLE END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed ADDRESS SET HIR");
@@ -2333,6 +2380,109 @@ mod tests {
             let message = diagnostic.public_message();
             message.contains("FORMATTIME") && message.contains("DAYCOUNT")
         }));
+    }
+
+    /// Row 0031: CONVERTTIME accepts the pinned DATESTRING/ABSTIME storage shape.
+    #[test]
+    fn cics_converttime_requires_one_64_character_source_and_packed_destination() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CVTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATE-X PIC X(64). 01 ABS-X PIC S9(15) COMP-3. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CONVERTTIME DATESTRING(DATE-X) ABSTIME(ABS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("CONVERTTIME: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed CONVERTTIME");
+        assert_eq!(command.operation, HirCicsOperation::ConvertTime);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DateString
+                && matches!(&operand.value, HirCicsValue::Data(reference) if reference.qualified_name == "DATE-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Abstime && output.target.qualified_name == "ABS-X"
+        }));
+
+        for (date_picture, abs_picture) in [("X(63)", "S9(15) COMP-3"), ("X(64)", "X(8)")] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCV. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATE-X PIC {date_picture}. 01 ABS-X PIC {abs_picture}. PROCEDURE DIVISION. EXEC CICS CONVERTTIME DATESTRING(DATE-X) ABSTIME(ABS-X) END-EXEC. STOP RUN."
+            );
+            assert!(
+                analyze(&source).hir.is_none(),
+                "accepted {date_picture}, {abs_picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn cics_bif_deedit_resolves_writable_in_place_field() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BIFDEEDIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 EDITED-X PIC X(9). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS BIF DEEDIT FIELD(EDITED-X) LENGTH(9) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("BIF DEEDIT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed BIF DEEDIT");
+        assert_eq!(command.operation, HirCicsOperation::BifDeedit);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Field
+                && matches!(&operand.value, HirCicsValue::Data(reference) if reference.qualified_name == "EDITED-X")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Field && output.target.qualified_name == "EDITED-X"
+        }));
+        for clause in ["FIELD(EDITED-X) LENGTH('NINE')", "FIELD(RESP-X)"] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADBIF. DATA DIVISION. WORKING-STORAGE SECTION. 01 EDITED-X PIC X(9). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS BIF DEEDIT {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
+    #[test]
+    fn cics_bif_digest_resolves_source_format_and_result_extent() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BIFDIGEST. DATA DIVISION. WORKING-STORAGE SECTION. 01 HASH-X PIC X(40). PROCEDURE DIVISION. EXEC CICS BIF DIGEST RECORD('abc') RECORDLEN(3) HEX RESULT(HASH-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("BIF DIGEST: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed BIF DIGEST");
+        assert_eq!(command.operation, HirCicsOperation::BifDigest);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Record
+                && matches!(&operand.value, HirCicsValue::Literal(value) if value == "abc")
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::DigestResult
+                && output.target.qualified_name == "HASH-X"
+        }));
+        for invalid_clause in [
+            "RECORD('abc') RECORDLEN(3) HEX BINARY RESULT(HASH-X)",
+            "RECORD('abc') RECORDLEN(3) DIGESTTYPE(DFHVALUE(UNKNOWN)) RESULT(HASH-X)",
+            "RECORD('abc') RECORDLEN(3) RESULT(HASH-X)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADHASH. DATA DIVISION. WORKING-STORAGE SECTION. 01 HASH-X PIC X(40). PROCEDURE DIVISION. EXEC CICS BIF DIGEST {invalid_clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {invalid_clause}");
+        }
     }
 
     /// Issue #207: bare DATESEP and TIMESEP select the documented defaults.
@@ -5063,12 +5213,7 @@ mod tests {
         let qualified = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PT-X PIC X(8). 01 APP-X PIC X(8) VALUE 'APP'. PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(PT-X) ESMAPPNAME(APP-X) END-EXEC. STOP RUN.",
         );
-        assert!(
-            qualified.diagnostics.is_empty(),
-            "{:?}",
-            qualified.diagnostics
-        );
-        assert!(qualified.hir.is_some());
+        assert!(qualified.hir.is_some(), "{:?}", qualified.diagnostics);
 
         let omitted = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. PROCEDURE DIVISION. EXEC CICS REQUEST ESMAPPNAME('APP') END-EXEC. STOP RUN.",
@@ -5645,6 +5790,210 @@ mod tests {
             ));
             assert!(analysis.hir.is_none(), "{command}");
         }
+    }
+
+    #[test]
+    fn cics_post_requires_checked_set_pointer_and_bounded_schedule() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. POSTONE. DATA DIVISION. WORKING-STORAGE SECTION. 01 POST-PTR POINTER-32. PROCEDURE DIVISION. EXEC CICS POST INTERVAL(1) SET(POST-PTR) REQID('TIMER1') END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("POST: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed POST");
+        assert_eq!(command.operation, HirCicsOperation::Post);
+        assert!(
+            command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::SetPointer
+                    && output.target.qualified_name == "POST-PTR")
+        );
+        for clause in ["INTERVAL(1)", "SET(POST-PTR) AFTER SECONDS(1) AT"] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADPOST. DATA DIVISION. WORKING-STORAGE SECTION. 01 POST-PTR POINTER-32. PROCEDURE DIVISION. EXEC CICS POST {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
+    #[test]
+    fn cics_write_operator_resolves_reply_action_and_rejects_conflicts() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. OPWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(16) VALUE 'ASK OPERATOR'. 01 REPLY-X PIC X(8). 01 REPLY-LEN PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITE OPERATOR TEXT(TEXT-X) ACTION(DFHVALUE(IMMEDIATE)) REPLY(REPLY-X) MAXLENGTH(8) REPLYLENGTH(REPLY-LEN) TIMEOUT(1) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE OPERATOR: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WRITE OPERATOR");
+        assert_eq!(command.operation, HirCicsOperation::WriteOperator);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::OperatorAction
+                && operand.value == HirCicsValue::Integer(2)
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::OperatorReply
+                && output.target.qualified_name == "REPLY-X"
+        }));
+        for clauses in [
+            "TEXT(TEXT-X) REPLY(REPLY-X)",
+            "TEXT(TEXT-X) MAXLENGTH(8)",
+            "TEXT(TEXT-X) TIMEOUT(1)",
+            "TEXT(TEXT-X) ACTION(9) IMMEDIATE",
+            "TEXT(TEXT-X) IMMEDIATE EVENTUAL",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADOP. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(16). 01 REPLY-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE OPERATOR {clauses} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clauses}");
+        }
+    }
+
+    #[test]
+    fn cics_extract_certificate_requires_checked_pointer_and_fullword_lengths() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CERTEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 CERT-PTR POINTER-32. 01 CERT-LEN PIC S9(9) COMP. 01 NAME-PTR POINTER-32. 01 NAME-LEN PIC S9(9) COMP. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS EXTRACT CERTIFICATE(CERT-PTR) LENGTH(CERT-LEN) COMMONNAME(NAME-PTR) COMMONNAMLEN(NAME-LEN) USERID(USER-X) OWNER END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("EXTRACT CERTIFICATE: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed EXTRACT CERTIFICATE");
+        assert_eq!(command.operation, HirCicsOperation::ExtractCertificate);
+        assert!(command.options.contains(&HirCicsOption::CertificateOwner));
+        assert!(command.outputs.iter().any(|output| {
+            output.name
+                == HirCicsOutputName::Certificate(
+                    mainframe_env_ir::CicsCertificateOutput::Certificate,
+                )
+                && output.target.qualified_name == "CERT-PTR"
+        }));
+        for clause in [
+            "CERTIFICATE(CERT-PTR) OWNER ISSUER",
+            "CERTIFICATE(CERT-LEN)",
+            "CERTIFICATE(CERT-PTR) COMMONNAMLEN(USER-X)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCRT. DATA DIVISION. WORKING-STORAGE SECTION. 01 CERT-PTR POINTER-32. 01 CERT-LEN PIC S9(9) COMP. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS EXTRACT {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
+    #[test]
+    fn cics_extract_tcpip_requires_paired_buffers_and_fullword_cvda_outputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TCPEXTR. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP VALUE 16. 01 PORT-NU PIC S9(9) COMP. 01 AUTH-X PIC S9(9) COMP. 01 FAMILY-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP CLIENTADDR(ADDR-X) CADDRLENGTH(ADDR-LEN) PORTNUMNU(PORT-NU) AUTHENTICATE(AUTH-X) CLNTIPFAMILY(FAMILY-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("EXTRACT TCPIP: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed EXTRACT TCPIP");
+        assert_eq!(command.operation, HirCicsOperation::ExtractTcpip);
+        assert!(command.outputs.iter().any(|output| output.name
+            == HirCicsOutputName::Tcpip(mainframe_env_ir::CicsTcpipOutput::ClientAddress)));
+        assert!(command.outputs.iter().any(|output| output.name
+            == HirCicsOutputName::Tcpip(mainframe_env_ir::CicsTcpipOutput::Authenticate)));
+        for clause in [
+            "CLIENTADDR(ADDR-X)",
+            "CADDRLENGTH(ADDR-LEN)",
+            "CLIENTADDR(ADDR-LEN) CADDRLENGTH(ADDR-LEN)",
+            "PORTNUMNU(ADDR-X)",
+            "AUTHENTICATE(ADDR-X)",
+            "CLNTIPFAMILY(ADDR-X)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTCP. DATA DIVISION. WORKING-STORAGE SECTION. 01 ADDR-X PIC X(16). 01 ADDR-LEN PIC S9(9) COMP. 01 PORT-NU PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT TCPIP {clause} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clause}");
+        }
+    }
+
+    #[test]
+    fn cics_start_attach_resolves_no_data_form_and_rejects_unshared_from() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ATSTART. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START ATTACH TRANSID('NX00') RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("START ATTACH: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed START ATTACH");
+        assert_eq!(command.operation, HirCicsOperation::StartAttach);
+        assert_eq!(command.operands.len(), 1);
+        for clauses in [
+            "TRANSID('NX00') FROM(DATA-X) LENGTH(4)",
+            "TRANSID('NX00') LENGTH(4)",
+            "FROM(DATA-X) LENGTH(4)",
+        ] {
+            let invalid = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4). PROCEDURE DIVISION. EXEC CICS START ATTACH {clauses} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&invalid).hir.is_none(), "accepted {clauses}");
+        }
+    }
+
+    #[test]
+    fn cics_start_brexit_resolves_default_and_explicit_exit() {
+        for (command, operands) in [
+            ("START BREXIT TRANSID('NX00')", 1),
+            ("START BREXIT('BRXIT') TRANSID('NX00')", 2),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BRSTART. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let resolved = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed START BREXIT");
+            assert_eq!(resolved.operation, HirCicsOperation::StartBrexit);
+            assert_eq!(resolved.operands.len(), operands);
+        }
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBR. PROCEDURE DIVISION. EXEC CICS START BREXIT() TRANSID('NX00') END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("operand clause is empty")
+        }));
     }
 
     #[test]

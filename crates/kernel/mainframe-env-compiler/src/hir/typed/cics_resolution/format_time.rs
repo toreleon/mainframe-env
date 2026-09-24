@@ -119,6 +119,12 @@ pub(super) fn require_output_shape(
         }
         HirCicsOutputName::Commarea
         | HirCicsOutputName::Partn
+        | HirCicsOutputName::Field
+        | HirCicsOutputName::DigestResult
+        | HirCicsOutputName::OperatorReply
+        | HirCicsOutputName::OperatorReplyLength
+        | HirCicsOutputName::Certificate(_)
+        | HirCicsOutputName::Tcpip(_)
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer
         | HirCicsOutputName::Ridfld
@@ -218,6 +224,40 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SecurityEncryptLength
         | HirCicsOutputName::SecurityLangInUse
         | HirCicsOutputName::SecurityNatLangInUse
+        | HirCicsOutputName::AttachProcess
+        | HirCicsOutputName::AttachResource
+        | HirCicsOutputName::AttachReturnProcess
+        | HirCicsOutputName::AttachReturnResource
+        | HirCicsOutputName::AttachQueue
+        | HirCicsOutputName::AttachIuType
+        | HirCicsOutputName::AttachDataStream
+        | HirCicsOutputName::AttachRecordFormat
+        | HirCicsOutputName::ConversationState
+        | HirCicsOutputName::ConversationData
+        | HirCicsOutputName::ConversationRetCode
+        | HirCicsOutputName::LogonInto
+        | HirCicsOutputName::LogonSet
+        | HirCicsOutputName::LogonLength
+        | HirCicsOutputName::ProcessName
+        | HirCicsOutputName::ProcessLength
+        | HirCicsOutputName::SyncLevel
+        | HirCicsOutputName::PipList
+        | HirCicsOutputName::PipLength
+        | HirCicsOutputName::TctSysId
+        | HirCicsOutputName::TctTermId
         | HirCicsOutputName::Assign(_) => Ok(()),
+        HirCicsOutputName::BtsAny
+        | HirCicsOutputName::BtsCompStatus
+        | HirCicsOutputName::BtsChannel
+        | HirCicsOutputName::BtsAbcode => Ok(()),
+        HirCicsOutputName::ConversationConvid
+        | HirCicsOutputName::ConversationRetcode
+        | HirCicsOutputName::ConversationPrinConvid
+        | HirCicsOutputName::ConversationPrinSysid
+        | HirCicsOutputName::ConversationConvData
+        | HirCicsOutputName::ConversationInto
+        | HirCicsOutputName::ConversationSet
+        | HirCicsOutputName::ConversationToLength
+        | HirCicsOutputName::ConversationToFullLength => Ok(()),
     }
 }

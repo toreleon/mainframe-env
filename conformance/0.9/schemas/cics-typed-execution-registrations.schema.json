@@ -22,8 +22,8 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 128,
-      "maxItems": 128,
+      "minItems": 152,
+      "maxItems": 152,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -74,6 +74,13 @@
               "Enq",
               "EnterTraceId",
               "EnterTraceNum",
+              "ExtractAttach",
+              "ExtractAttributes",
+              "GdsExtractAttributes",
+              "ExtractLogonMsg",
+              "ExtractProcess",
+              "GdsExtractProcess",
+              "ExtractTct",
               "ExtractWeb",
               "Freemain",
               "Freemain64",
@@ -95,6 +102,7 @@
               "IssueWait",
               "Load",
               "Monitor",
+              "Point",
               "PopHandle",
               "PurgeMessage",
               "PushHandle",
@@ -165,7 +173,13 @@
               "RetrieveReattachEvent",
               "RetrieveSubevent",
               "TestEvent",
-              "SignalEvent"
+              "SignalEvent",
+              "FetchAny",
+              "FetchChild",
+              "FreeChild",
+              "LinkAcqActivity",
+              "LinkAcqProcess",
+              "LinkActivity"
             ]
           },
           "interface": {
@@ -173,6 +187,7 @@
           },
           "family": {
             "enum": [
+              "conversation-control",
               "counter-control",
               "diagnostics",
               "document-control",
@@ -190,7 +205,8 @@
               "time",
               "transform-control",
               "web-control",
-              "web-service-control"
+              "web-service-control",
+              "bts-control"
             ]
           },
           "mutating": {
@@ -234,6 +250,13 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0066",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0067",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0068",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0069",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0071",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0072",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0073",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0075",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0076",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0084",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0085",
@@ -255,6 +278,7 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0137",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0142",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0143",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0145",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0146",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0148",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0149",
@@ -325,7 +349,13 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0176",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0177",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0219",
-              "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0194",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0077",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0078",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0083",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0139",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0140",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0141"
             ]
           }
         }

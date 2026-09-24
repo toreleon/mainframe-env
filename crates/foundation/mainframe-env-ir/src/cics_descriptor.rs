@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 151);
+        assert_eq!(typed.len(), 184);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 112);
+        assert_eq!(unready.len(), 79);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -297,26 +297,29 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
-                CicsPlanOperation::IssueAbend,
-                CicsPlanOperation::GdsIssueAbend,
-                CicsPlanOperation::IssueConfirmation,
-                CicsPlanOperation::GdsIssueConfirmation,
-                CicsPlanOperation::IssueError,
-                CicsPlanOperation::GdsIssueError,
-                CicsPlanOperation::IssuePrepare,
-                CicsPlanOperation::GdsIssuePrepare,
-                CicsPlanOperation::GdsIssueSignal,
-                CicsPlanOperation::IssueSignal,
-                CicsPlanOperation::IssueCopy,
-                CicsPlanOperation::IssueDisconnect,
-                CicsPlanOperation::IssueEndfile,
-                CicsPlanOperation::IssueEndoutput,
-                CicsPlanOperation::IssueEods,
-                CicsPlanOperation::IssueEraseAup,
-                CicsPlanOperation::IssueLoad,
-                CicsPlanOperation::IssuePass,
-                CicsPlanOperation::IssuePrint,
-                CicsPlanOperation::IssueReset,
+                CicsPlanOperation::FetchAny,
+                CicsPlanOperation::FetchChild,
+                CicsPlanOperation::FreeChild,
+                CicsPlanOperation::LinkAcqActivity,
+                CicsPlanOperation::LinkAcqProcess,
+                CicsPlanOperation::LinkActivity,
+                CicsPlanOperation::ExtractAttach,
+                CicsPlanOperation::ExtractAttributes,
+                CicsPlanOperation::GdsExtractAttributes,
+                CicsPlanOperation::ExtractLogonMsg,
+                CicsPlanOperation::ExtractProcess,
+                CicsPlanOperation::GdsExtractProcess,
+                CicsPlanOperation::ExtractTct,
+                CicsPlanOperation::Point,
+                CicsPlanOperation::AllocateConversation,
+                CicsPlanOperation::GdsAllocateConversation,
+                CicsPlanOperation::GdsAssignConversation,
+                CicsPlanOperation::BuildAttach,
+                CicsPlanOperation::ConnectProcess,
+                CicsPlanOperation::GdsConnectProcess,
+                CicsPlanOperation::Converse,
+                CicsPlanOperation::FreeConversation,
+                CicsPlanOperation::GdsFreeConversation,
                 CicsPlanOperation::ChangePassword,
                 CicsPlanOperation::ChangePhrase,
                 CicsPlanOperation::QuerySecurity,
@@ -333,6 +336,16 @@ mod tests {
                 CicsPlanOperation::Asktime,
                 CicsPlanOperation::AsktimeEib,
                 CicsPlanOperation::FormatTime,
+                CicsPlanOperation::ConvertTime,
+                CicsPlanOperation::BifDeedit,
+                CicsPlanOperation::BifDigest,
+                CicsPlanOperation::WaitCics,
+                CicsPlanOperation::Post,
+                CicsPlanOperation::WriteOperator,
+                CicsPlanOperation::ExtractCertificate,
+                CicsPlanOperation::ExtractTcpip,
+                CicsPlanOperation::StartAttach,
+                CicsPlanOperation::StartBrexit,
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,
@@ -377,6 +390,26 @@ mod tests {
                 CicsPlanOperation::IssueReplace,
                 CicsPlanOperation::IssueSend,
                 CicsPlanOperation::IssueWait,
+                CicsPlanOperation::IssueAbend,
+                CicsPlanOperation::GdsIssueAbend,
+                CicsPlanOperation::IssueConfirmation,
+                CicsPlanOperation::GdsIssueConfirmation,
+                CicsPlanOperation::IssueError,
+                CicsPlanOperation::GdsIssueError,
+                CicsPlanOperation::IssuePrepare,
+                CicsPlanOperation::GdsIssuePrepare,
+                CicsPlanOperation::GdsIssueSignal,
+                CicsPlanOperation::IssueSignal,
+                CicsPlanOperation::IssueCopy,
+                CicsPlanOperation::IssueDisconnect,
+                CicsPlanOperation::IssueEndfile,
+                CicsPlanOperation::IssueEndoutput,
+                CicsPlanOperation::IssueEods,
+                CicsPlanOperation::IssueEraseAup,
+                CicsPlanOperation::IssueLoad,
+                CicsPlanOperation::IssuePass,
+                CicsPlanOperation::IssuePrint,
+                CicsPlanOperation::IssueReset,
                 CicsPlanOperation::Route,
                 CicsPlanOperation::DefineCounter,
                 CicsPlanOperation::DefineDCounter,
