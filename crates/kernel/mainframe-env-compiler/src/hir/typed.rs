@@ -5041,6 +5041,57 @@ mod tests {
     }
 
     #[test]
+    fn cics_bts_literals_use_source_character_limits() {
+        for (command, expected) in [
+            (
+                format!(
+                    "DEFINE PROCESS('{}¬') PROCESSTYPE('TYPE') TRANSID('BTS1')",
+                    "P".repeat(35)
+                ),
+                HirCicsOperation::DefineProcess,
+            ),
+            (
+                format!(
+                    "DEFINE ACTIVITY('{}¬') EVENT('DONE') TRANSID('BTS1')",
+                    "A".repeat(15)
+                ),
+                HirCicsOperation::DefineActivity,
+            ),
+            (
+                format!(
+                    "RUN TRANSID('BT01') CHANNEL('{}¬') CHILD(CHILD-TOKEN)",
+                    "C".repeat(15)
+                ),
+                HirCicsOperation::RunTransId,
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BTSCNAME. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-TOKEN PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let selected = hir
+                .statements
+                .iter()
+                .find_map(|statement| match &statement.resolved {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                });
+            assert_eq!(selected.map(|command| command.operation), Some(expected));
+            assert!(selected.unwrap().operands.iter().any(|operand| {
+                matches!(&operand.value, HirCicsValue::Literal(value) if value.contains('¬'))
+            }));
+        }
+        let too_long = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSLONG. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('{}¬') PROCESSTYPE('TYPE') TRANSID('BTS1') END-EXEC. STOP RUN.",
+            "P".repeat(36)
+        );
+        assert!(analyze(&too_long).hir.is_none());
+    }
+
+    #[test]
     fn cics_true_identity_qualifiers_remain_required() {
         for (label, qualifier) in [
             (&["ASKTIME", "ABSTIME"][..], "ABSTIME"),

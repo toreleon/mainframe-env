@@ -23,6 +23,10 @@ checkpoint references, and exact mutation replay. A separate versioned index
 resolves each opaque 52-character activity ID to its process without an
 unbounded scan. A per-run-unit acquisition row retains an epoch tombstone
 across syncpoints so stale UOW owners cannot recreate an old lease identity.
+The process key hex-encodes UTF-8 name bytes, while the pinned IBM PROCESS and
+ACTIVITY limits count source characters and permit `¬`. Consumers must decode
+and validate the name by characters; a fixed 72-hex-character process-name
+bound would reject a valid 36-character name containing `¬`.
 
 The authority exposes `acquired_process_container_scope(run_unit,
 owner_execution, owner_principal)` as a read projection for sibling BTS

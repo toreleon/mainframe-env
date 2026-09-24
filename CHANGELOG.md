@@ -113,6 +113,11 @@ All notable changes to mainframe-env are documented here.
   `INVREQ 16/14` activity-mode condition; RESUME ACQPROCESS retains its separate
   `PROCESSERR 108/14` condition.
 
+- Counted BTS PROCESS, ACTIVITY, and CHANNEL literal limits by source
+  characters so the documented `¬` name character passes provider, compiler,
+  and MCEP validation. A compiled lifecycle route exercises a 36-character
+  process name through RUN completion.
+
 - Added the RUN TRANSID child-token port with the sibling FETCH/FREE method
   signatures and `cics-bts-child-ownership-v1` row shape. Registration and
   terminal completion are owner-checked and versioned; RUN TRANSID task

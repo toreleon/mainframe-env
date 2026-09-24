@@ -8323,10 +8323,11 @@ mod tests {
         server
             .bootstrap_administrator("IBMUSER", b"TESTPASS")
             .unwrap();
-        let parent = published_source_fixture(
-            "BTSFLOW",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 COMP-X PIC S9(9) COMP. 01 MODE-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('ORDER') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. EXEC CICS SYNCPOINT END-EXEC. EXEC CICS ACQUIRE PROCESS('ORDER') PROCESSTYPE('TYPE') END-EXEC. EXEC CICS CHECK ACQPROCESS COMPSTATUS(COMP-X) MODE(MODE-X) END-EXEC. EXEC CICS RUN ACQPROCESS ASYNCHRONOUS END-EXEC. STOP RUN.",
+        let process_name = format!("{}¬", "P".repeat(35));
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 COMP-X PIC S9(9) COMP. 01 MODE-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('{process_name}') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. EXEC CICS SYNCPOINT END-EXEC. EXEC CICS ACQUIRE PROCESS('{process_name}') PROCESSTYPE('TYPE') END-EXEC. EXEC CICS CHECK ACQPROCESS COMPSTATUS(COMP-X) MODE(MODE-X) END-EXEC. EXEC CICS RUN ACQPROCESS ASYNCHRONOUS END-EXEC. STOP RUN."
         );
+        let parent = published_source_fixture("BTSFLOW", &source);
         let child = published_source_fixture(
             "BTSMAIN",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BTSMAIN. PROCEDURE DIVISION. STOP RUN.",
@@ -8391,7 +8392,7 @@ mod tests {
             .racf
             .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Update)
             .unwrap();
-        let lifecycle_resource = BtsLifecycleStore::saf_resource("TYPE", "ORDER").unwrap();
+        let lifecycle_resource = BtsLifecycleStore::saf_resource("TYPE", &process_name).unwrap();
         server
             .racf
             .define_profile("BTSLIFE", &lifecycle_resource, "IBMUSER", None)
@@ -8425,7 +8426,10 @@ mod tests {
             .run_online_exchange(&session, &principal, "BTSFLOW", now_tick)
             .unwrap();
         let authority = BtsLifecycleStore::new(store.as_ref());
-        let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        let process = authority
+            .load_process("TYPE", &process_name)
+            .unwrap()
+            .unwrap();
         assert!(process.pending_uow.is_none());
         assert!(process.activities[&process.root_id].acquired_by.is_some());
         let work = server.claim_jes_work("bts-flow-worker").unwrap().unwrap();
@@ -8433,7 +8437,10 @@ mod tests {
         let outcome = server.process_claimed_jes_work(&work).unwrap();
         assert_eq!(outcome, JesWorkOutcome::Completed);
         server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
-        let completed = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        let completed = authority
+            .load_process("TYPE", &process_name)
+            .unwrap()
+            .unwrap();
         assert_eq!(
             completed.activities[&completed.root_id].completion,
             BtsCompletion::Normal

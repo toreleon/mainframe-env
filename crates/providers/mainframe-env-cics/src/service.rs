@@ -32479,6 +32479,36 @@ mod tests {
                 .condition,
             "NORMAL"
         );
+        let not_sign_name = format!("{}¬", "A".repeat(15));
+        let not_sign_child = request(
+            CicsOperation::DefineActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(not_sign_name.as_bytes())),
+                ("EVENT".into(), argument(b"SAFEEVT")),
+                ("TRANSID".into(), argument(b"BTS1")),
+                ("ACTIVITYID".into(), argument(b"NOT-SIGN-ID")),
+            ]),
+            10,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, not_sign_child.clone(), 10),
+                not_sign_child
+            )
+            .unwrap()
+            .outputs["ACTIVITYID"]
+                .bytes()
+                .len(),
+            52
+        );
+        assert!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .child(&root, &not_sign_name)
+                .is_some()
+        );
         for (operation, sequence) in [
             (CicsOperation::SuspendActivity, 2),
             (CicsOperation::ResumeActivity, 3),
@@ -32634,6 +32664,47 @@ mod tests {
                 response: 16,
                 response2: 22,
             })
+        );
+    }
+
+    #[test]
+    fn bts_define_process_accepts_not_sign_at_source_character_limit() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let name = format!("{}¬", "P".repeat(35));
+        let define = request(
+            CicsOperation::DefineProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(name.as_bytes())),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+                ("TRANSID".into(), argument(b"BTS1")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert!(
+            BtsLifecycleStore::new(store.as_ref())
+                .load_process("TYPE", &name)
+                .unwrap()
+                .is_some()
         );
     }
 

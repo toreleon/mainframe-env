@@ -148,8 +148,19 @@ pub(super) fn invalid_shape(
         };
         match &operand.value {
             CicsOperandValue::Literal(bytes) => {
+                let length = match operand.name {
+                    CicsOperandName::BtsProcess
+                    | CicsOperandName::BtsActivity
+                    | CicsOperandName::BtsChannel => {
+                        let Ok(text) = std::str::from_utf8(bytes) else {
+                            return true;
+                        };
+                        text.chars().count()
+                    }
+                    _ => bytes.len(),
+                };
                 bytes.is_empty()
-                    || bytes.len() > maximum
+                    || length > maximum
                     || operand.name == CicsOperandName::BtsFacilityToken && bytes.len() != 8
             }
             CicsOperandValue::Storage(_) => false,
@@ -306,6 +317,34 @@ mod tests {
         assert_eq!(&bytes[..6], b"MCEP\0\x02");
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
         assert!(encode_cics_effect_plan_version(&plan, limits, 1).is_err());
+    }
+
+    #[test]
+    fn source_character_widths_roundtrip_and_reject_malformed_literals() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::AcquireProcess,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::BtsProcess,
+                    value: CicsOperandValue::Literal(format!("{}¬", "P".repeat(35)).into_bytes()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::BtsProcessType,
+                    value: CicsOperandValue::Literal(b"TYPE".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+        plan.operands[0].value =
+            CicsOperandValue::Literal(format!("{}¬", "P".repeat(36)).into_bytes());
+        assert!(encode_cics_effect_plan(&plan, limits).is_err());
+        plan.operands[0].value = CicsOperandValue::Literal(vec![0xff]);
+        assert!(encode_cics_effect_plan(&plan, limits).is_err());
     }
 
     #[test]

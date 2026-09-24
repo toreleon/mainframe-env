@@ -72,3 +72,28 @@ pub(super) fn statically_known_value_bytes(
         .ok()
         .map(|layout| layout.length)
 }
+
+pub(super) fn statically_known_value_characters(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Option<usize> {
+    if let [literal] = tokens
+        && literal.len() >= 2
+        && let Some(quote) = literal.chars().next()
+        && matches!(quote, '\'' | '"')
+        && literal.ends_with(quote)
+    {
+        let contents = &literal[quote.len_utf8()..literal.len() - quote.len_utf8()];
+        let escaped = format!("{quote}{quote}");
+        return Some(
+            contents
+                .replace(&escaped, &quote.to_string())
+                .chars()
+                .count(),
+        );
+    }
+    semantic
+        .resolve(&tokens.join(" "))
+        .ok()
+        .map(|layout| layout.length)
+}

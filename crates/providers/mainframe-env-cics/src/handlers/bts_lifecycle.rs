@@ -596,12 +596,14 @@ fn validate_identifier(value: &str, max: usize) -> Result<(), HostProblem> {
 }
 
 fn validate_name(value: &str, max: usize, blanks: bool) -> Result<(), HostProblem> {
-    validate_identifier(value, max)?;
-    if value.trim_ascii().is_empty()
-        || value.bytes().any(|byte| {
-            !(byte.is_ascii_alphanumeric()
-                || b"$@#/%&?!:|\"=,;<>.-_".contains(&byte)
-                || blanks && byte == b' ')
+    if value.is_empty()
+        || value.chars().count() > max
+        || value.trim_ascii().is_empty()
+        || value.chars().any(|character| {
+            !(character.is_ascii_alphanumeric()
+                || "$@#/%&?!:|\"=,;<>.-_".contains(character)
+                || character == '¬'
+                || blanks && character == ' ')
         })
     {
         return Err(HostProblem::Malformed);
@@ -627,6 +629,60 @@ mod tests {
     use std::sync::{Arc, Barrier};
 
     static NEXT_SQLITE: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn bts_names_count_source_characters_and_accept_not_sign() {
+        let process_name = format!("{}¬", "P".repeat(35));
+        let activity_name = format!("{}¬", "A".repeat(15));
+        assert!(validate_name(&process_name, 36, true).is_ok());
+        assert!(validate_name(&activity_name, 16, false).is_ok());
+        assert_eq!(
+            validate_name(&format!("{}¬", "P".repeat(36)), 36, true),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate_name(&format!("{}¬", "A".repeat(16)), 16, false),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(validate_name("A Ω", 16, false), Err(HostProblem::Malformed));
+    }
+
+    #[test]
+    fn not_sign_process_identity_survives_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-not-sign-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let name = format!("{}¬", "P".repeat(35));
+        let root = BtsLifecycleStore::root_id("TYPE", &name, "UOW1").unwrap();
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let authority = BtsLifecycleStore::new(&sqlite);
+            authority
+                .define_process(
+                    BtsProcess::new("TYPE", &name, &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                    "UOW1",
+                    "EXEC1",
+                    "USER",
+                )
+                .unwrap();
+            authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        }
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let process = BtsLifecycleStore::new(&sqlite)
+                .load_process("TYPE", &name)
+                .unwrap()
+                .unwrap();
+            assert_eq!(process.name, name);
+            assert_eq!(process.root_id, root);
+            assert!(process.pending_uow.is_none());
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     fn race_for_root(store: Arc<dyn ProviderStateStore>) {
         let authority = BtsLifecycleStore::new(store.as_ref());

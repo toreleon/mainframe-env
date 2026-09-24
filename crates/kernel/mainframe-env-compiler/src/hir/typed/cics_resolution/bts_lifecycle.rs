@@ -227,10 +227,15 @@ pub(super) fn operands(
         let value = cics_value(tokens, semantic)?;
         let valid = match &value {
             HirCicsValue::Literal(text) => {
-                if exact {
-                    text.len() == maximum
+                let length = if matches!(label, "PROCESS" | "ACTIVITY" | "CHANNEL") {
+                    text.chars().count()
                 } else {
-                    (1..=maximum).contains(&text.len())
+                    text.len()
+                };
+                if exact {
+                    length == maximum
+                } else {
+                    (1..=maximum).contains(&length)
                 }
             }
             HirCicsValue::Data(reference) => {

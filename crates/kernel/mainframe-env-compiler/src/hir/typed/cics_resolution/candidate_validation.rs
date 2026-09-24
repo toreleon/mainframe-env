@@ -248,12 +248,22 @@ pub(super) fn validate_candidate(
         else {
             continue;
         };
-        if let Some(bytes) = command_recognition::statically_known_value_bytes(value, semantic)
-            && bytes > limit
-        {
+        let source_characters = descriptor.family == "bts-control"
+            && matches!(name.as_str(), "PROCESS" | "ACTIVITY" | "CHANNEL");
+        let known = if source_characters {
+            command_recognition::statically_known_value_characters(value, semantic)
+        } else {
+            command_recognition::statically_known_value_bytes(value, semantic)
+        };
+        if known.is_some_and(|length| length > limit) {
             return Err(format!(
-                "CICS {} option {name} exceeds its source maximum of {limit} bytes",
-                operation::command_label(descriptor)
+                "CICS {} option {name} exceeds its source maximum of {limit} {}",
+                operation::command_label(descriptor),
+                if source_characters {
+                    "characters"
+                } else {
+                    "bytes"
+                }
             ));
         }
     }
