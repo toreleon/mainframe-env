@@ -2,8 +2,8 @@
 
 use super::{
     ConversationDataReply, ConversationKind, ConversationLedger, ConversationOwner,
-    ConversationProblem, ConversationReplay, ConversationReply, DataCondition,
-    load_conversation_replay,
+    ConversationProblem, ConversationReplay, ConversationReply, ConversationState,
+    ConversationTransmitOutcome, DataCondition, load_conversation_replay,
 };
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
@@ -105,6 +105,31 @@ pub(super) fn invoke(
         if record.data.terminal_error() {
             return Err(condition("TERMERR", 81));
         }
+        if current
+            .exchanges
+            .get(&u32::from_be_bytes(token).to_string())
+            .is_some_and(|exchange| exchange.pending_outbound() != 0)
+        {
+            match service.flush_conversation_send(run, token)? {
+                ConversationTransmitOutcome::Pending => {
+                    return service.response(
+                        run,
+                        CicsDisposition::Suspended,
+                        "NORMAL",
+                        0,
+                        0,
+                        None,
+                        None,
+                        Vec::new(),
+                    );
+                }
+                ConversationTransmitOutcome::Confirmed
+                | ConversationTransmitOutcome::Rejected(_) => continue,
+            }
+        }
+        if record.state == ConversationState::PendReceive {
+            return Err(HostProblem::UnknownOutcome);
+        }
         let mut next = current.clone();
         let Some(received) = next
             .receive_mapped_peer_frame(
@@ -189,7 +214,7 @@ fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
     Ok(())
 }
 
-fn select_token(
+pub(super) fn select_token(
     ledger: &ConversationLedger,
     owner: &ConversationOwner,
     request: &CicsRequest,
@@ -268,7 +293,7 @@ fn maximum(request: &CicsRequest) -> Result<usize, HostProblem> {
     Ok(maximum)
 }
 
-fn parse_signed(value: &BoundedPayload, width: usize) -> Result<i32, HostProblem> {
+pub(super) fn parse_signed(value: &BoundedPayload, width: usize) -> Result<i32, HostProblem> {
     match value.schema() {
         DECIMAL_SCHEMA => std::str::from_utf8(value.bytes())
             .map_err(|_| HostProblem::Malformed)?
@@ -308,6 +333,11 @@ fn reply(token: [u8; 4], received: &ConversationDataReply, retain: bool) -> Conv
             ("LENGTH".into(), length.to_string().into_bytes()),
             ("FLENGTH".into(), length.to_string().into_bytes()),
             (
+                "EIBEOC".into(),
+                vec![u8::from(received.end_of_chain) * 0xff],
+            ),
+            ("EIBFMH".into(), vec![u8::from(received.inbound_fmh) * 0xff]),
+            (
                 "STATE".into(),
                 received.state.cvda().to_string().into_bytes(),
             ),
@@ -315,7 +345,7 @@ fn reply(token: [u8; 4], received: &ConversationDataReply, retain: bool) -> Conv
     }
 }
 
-fn capture_disposition(
+pub(super) fn capture_disposition(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
@@ -361,7 +391,7 @@ fn capture_disposition(
     Ok(())
 }
 
-fn response(
+pub(super) fn response(
     service: &CicsService,
     run: &Run,
     reply: &ConversationReply,

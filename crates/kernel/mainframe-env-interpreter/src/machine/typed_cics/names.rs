@@ -320,16 +320,16 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         CicsPlanOperation::ConnectProcess => CicsOperation::ConnectProcess,
         CicsPlanOperation::FreeConversation => CicsOperation::FreeConversation,
         CicsPlanOperation::ReceiveConversation => CicsOperation::ReceiveConversation,
+        CicsPlanOperation::SendConversation => CicsOperation::SendConversation,
+        CicsPlanOperation::WaitConvid => CicsOperation::WaitConvid,
+        CicsPlanOperation::WaitTerminal => CicsOperation::WaitTerminal,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
         | CicsPlanOperation::GdsFreeConversation
         | CicsPlanOperation::GdsReceiveConversation
-        | CicsPlanOperation::SendConversation
-        | CicsPlanOperation::GdsWaitConversation
-        | CicsPlanOperation::WaitConvid
-        | CicsPlanOperation::WaitTerminal => return None,
+        | CicsPlanOperation::GdsWaitConversation => return None,
         CicsPlanOperation::WaitSignal => CicsOperation::WaitSignal,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
@@ -1132,6 +1132,18 @@ mod conversation_tests {
             host_operation(CicsPlanOperation::ReceiveConversation),
             Some(CicsOperation::ReceiveConversation)
         );
+        assert_eq!(
+            host_operation(CicsPlanOperation::SendConversation),
+            Some(CicsOperation::SendConversation)
+        );
+        assert_eq!(
+            host_operation(CicsPlanOperation::WaitConvid),
+            Some(CicsOperation::WaitConvid)
+        );
+        assert_eq!(
+            host_operation(CicsPlanOperation::WaitTerminal),
+            Some(CicsOperation::WaitTerminal)
+        );
         for operation in [
             CicsPlanOperation::GdsAllocateConversation,
             CicsPlanOperation::GdsAssignConversation,
@@ -1139,10 +1151,7 @@ mod conversation_tests {
             CicsPlanOperation::Converse,
             CicsPlanOperation::GdsFreeConversation,
             CicsPlanOperation::GdsReceiveConversation,
-            CicsPlanOperation::SendConversation,
             CicsPlanOperation::GdsWaitConversation,
-            CicsPlanOperation::WaitConvid,
-            CicsPlanOperation::WaitTerminal,
         ] {
             assert_eq!(host_operation(operation), None);
         }

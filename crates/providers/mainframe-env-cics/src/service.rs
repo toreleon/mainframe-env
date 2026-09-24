@@ -35775,6 +35775,8 @@ mod tests {
             .allocate("MRO1", ConversationKind::Mro, owner.clone())
             .unwrap()
             .token;
+        next.bind_mro_session(token, &owner, ConversationContext::Local, "S001")
+            .unwrap();
         next.stage_mapped_send(
             token,
             &owner,
@@ -35822,6 +35824,60 @@ mod tests {
                 .unwrap()
                 .state,
             ConversationState::Receive
+        );
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: b"REPLY".to_vec(),
+                next_state: ConversationState::Receive,
+                end_of_chain: true,
+                inbound_fmh: false,
+                signal: false,
+            },
+            "wait-terminal-eoc",
+        )
+        .unwrap();
+        let terminal_wait = request(
+            CicsOperation::WaitTerminal,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+            5,
+        );
+        let eoc = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, terminal_wait.clone(), 5),
+                terminal_wait.clone(),
+            )
+            .unwrap();
+        assert_eq!((eoc.condition.as_str(), eoc.response), ("EOC", 6));
+        assert_eq!(eoc.outputs["EIBEOC"].bytes(), &[0xff]);
+        assert_eq!(eoc.disposition, CicsDisposition::Ignored);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, terminal_wait.clone(), 5),
+                terminal_wait,
+            )
+            .unwrap(),
+            eoc
+        );
+        let next_wait = request(
+            CicsOperation::WaitTerminal,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+            6,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, next_wait.clone(), 6),
+                next_wait
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            ledger.exchanges[&u32::from_be_bytes(token).to_string()].inbound[0].data,
+            b"REPLY"
         );
     }
 
@@ -36403,6 +36459,23 @@ mod tests {
             (reply.condition.as_str(), reply.response, reply.response2),
             ("INVREQ", 16, 200)
         );
+        let mut wait = request(
+            CicsOperation::WaitTerminal,
+            BTreeMap::from([("CONVID".into(), cics_literal(&token))]),
+            2,
+        );
+        wait.condition_policy = CicsConditionPolicy::NoHandle;
+        let blocked_wait = cics
+            .invoke(&effect(&invocation.run_unit_id, wait.clone(), 2), wait)
+            .unwrap();
+        assert_eq!(
+            (
+                blocked_wait.condition.as_str(),
+                blocked_wait.response,
+                blocked_wait.response2,
+            ),
+            ("INVREQ", 16, 200)
+        );
         let saved = ConversationLedger::load(store.as_ref()).unwrap();
         assert_eq!(saved.version, next.version);
         assert_eq!(
@@ -36875,6 +36948,972 @@ mod tests {
             assert_eq!(reply.outputs["INTO"].bytes(), b"ITE");
             assert_eq!(reply.outputs["CONVDATA"].bytes()[0], 0xff);
             assert_eq!(reply.outputs["STATE"].bytes(), b"90");
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn conversation_send_and_wait_convid_flush_connect_then_data_once() {
+        struct Carrier(Mutex<Vec<(u64, ConversationDataFrame)>>);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                send_id: u64,
+                frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.lock().unwrap().push((send_id, frame.clone()));
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcMapped, owner)
+            .unwrap()
+            .token;
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRN1")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+                ("SYNCLEVEL".into(), cics_decimal(0)),
+            ]),
+            1,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, connect.clone(), 1),
+            connect,
+        )
+        .unwrap();
+        let saved = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            saved.exchanges[&u32::from_be_bytes(token).to_string()].pending_outbound(),
+            1
+        );
+        let carrier = Arc::new(Carrier(Mutex::new(Vec::new())));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        let send = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"HELLO")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("STATE".into(), cics_option()),
+            ]),
+            2,
+        );
+        let staged = cics
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 2), send)
+            .unwrap();
+        assert_eq!(staged.outputs["STATE"].bytes(), b"90");
+        assert!(carrier.0.lock().unwrap().is_empty());
+        cics.offer_conversation_peer_frame(
+            &invocation.run_unit_id,
+            token,
+            ConversationPeerFrame {
+                data: Vec::new(),
+                next_state: ConversationState::Send,
+                end_of_chain: false,
+                inbound_fmh: false,
+                signal: true,
+            },
+            "send-signal-1",
+        )
+        .unwrap();
+        let invite = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("OPTION.INVITE".into(), cics_option()),
+                ("OPTION.WAIT".into(), cics_option()),
+                ("STATE".into(), cics_option()),
+            ]),
+            3,
+        );
+        let invited = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, invite.clone(), 3),
+                invite.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (invited.condition.as_str(), invited.response),
+            ("SIGNAL", 24)
+        );
+        assert_eq!(invited.disposition, CicsDisposition::Ignored);
+        assert_eq!(invited.outputs["STATE"].bytes(), b"88");
+        let sent = carrier.0.lock().unwrap().clone();
+        assert_eq!(
+            sent.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(sent[0].1.connect.as_ref().unwrap().process, b"TRN1");
+        assert_eq!(sent[1].1.bytes, b"HELLO");
+        assert!(sent[2].1.invite);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, invite.clone(), 3), invite)
+                .unwrap(),
+            invited
+        );
+        assert_eq!(carrier.0.lock().unwrap().len(), 3);
+        let wait = request(
+            CicsOperation::WaitConvid,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("STATE".into(), cics_option()),
+            ]),
+            4,
+        );
+        let waited = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 4),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!(waited.outputs["STATE"].bytes(), b"88");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 4), wait)
+                .unwrap(),
+            waited
+        );
+        assert_eq!(carrier.0.lock().unwrap().len(), 3);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .state,
+            ConversationState::Receive
+        );
+    }
+
+    #[test]
+    fn conversation_send_wait_sqlite_restarts_without_redispatch() {
+        struct Carrier(AtomicUsize);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                _frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-conversation-send-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let send;
+        let wait;
+        let waited;
+        let token;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let (invocation, _) = registered(&cics);
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let initial = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = initial.clone();
+            next.register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+            token = next
+                .allocate("SYS1", ConversationKind::AppcMapped, owner)
+                .unwrap()
+                .token;
+            assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+            let connect = request(
+                CicsOperation::ConnectProcess,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("PROCNAME".into(), cics_literal(b"TRN1")),
+                    ("PROCLENGTH".into(), cics_decimal(4)),
+                    ("SYNCLEVEL".into(), cics_decimal(0)),
+                ]),
+                1,
+            );
+            cics.invoke(
+                &effect(&invocation.run_unit_id, connect.clone(), 1),
+                connect,
+            )
+            .unwrap();
+            send = request(
+                CicsOperation::SendConversation,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("FROM".into(), cics_literal(b"PAY")),
+                    ("LENGTH".into(), cics_decimal(3)),
+                    ("OPTION.INVITE".into(), cics_option()),
+                    ("OPTION.WAIT".into(), cics_option()),
+                    ("STATE".into(), cics_option()),
+                ]),
+                2,
+            );
+            let pending = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), 2),
+                    send.clone(),
+                )
+                .unwrap();
+            assert_eq!(pending.disposition, CicsDisposition::Suspended);
+            let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                ledger.exchanges[&u32::from_be_bytes(token).to_string()].pending_outbound(),
+                2
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let invocation = invocation();
+            let session = SessionId::new("session", 64).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let carrier = Arc::new(Carrier(AtomicUsize::new(0)));
+            cics.install_conversation_transport(carrier.clone())
+                .unwrap();
+            let result = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), 2),
+                    send.clone(),
+                )
+                .unwrap();
+            assert_eq!(result.outputs["STATE"].bytes(), b"88");
+            assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 2), send)
+                    .unwrap(),
+                result
+            );
+            assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+            let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                ledger.exchanges[&u32::from_be_bytes(token).to_string()].pending_outbound(),
+                0
+            );
+            assert_eq!(
+                ledger.conversation(token).unwrap().state,
+                ConversationState::Receive
+            );
+            cics.offer_conversation_peer_frame(
+                &invocation.run_unit_id,
+                token,
+                ConversationPeerFrame {
+                    data: b"SQL".to_vec(),
+                    next_state: ConversationState::Receive,
+                    end_of_chain: true,
+                    inbound_fmh: false,
+                    signal: false,
+                },
+                "sqlite-terminal-eoc",
+            )
+            .unwrap();
+            wait = request(
+                CicsOperation::WaitTerminal,
+                BTreeMap::from([("CONVID".into(), cics_literal(&token))]),
+                3,
+            );
+            waited = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 3),
+                    wait.clone(),
+                )
+                .unwrap();
+            assert_eq!((waited.condition.as_str(), waited.response), ("EOC", 6));
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let invocation = invocation();
+            let session = SessionId::new("session", 64).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 3), wait)
+                    .unwrap(),
+                waited
+            );
+            let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+            assert!(ledger.exchanges[&u32::from_be_bytes(token).to_string()].wait_eoc_observed);
+            assert_eq!(
+                ledger.exchanges[&u32::from_be_bytes(token).to_string()].inbound[0].data,
+                b"SQL"
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn conversation_send_mro_snapshots_attach_and_definite_response() {
+        struct Carrier(Mutex<Vec<ConversationDataFrame>>);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.lock().unwrap().push(frame.clone());
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "MRO1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("MRO1", ConversationKind::Mro, owner.clone())
+            .unwrap()
+            .token;
+        next.bind_mro_session(token, &owner, ConversationContext::Local, "S001")
+            .unwrap();
+        next.set_attach(ConversationAttachHeader {
+            owner: owner.clone(),
+            name: "HEADER1".into(),
+            process: b"PROC".to_vec(),
+            resource: b"RES".to_vec(),
+            return_process: Vec::new(),
+            return_resource: Vec::new(),
+            queue: Vec::new(),
+            iu_type: 0,
+            data_stream: 0,
+            record_format: 4,
+        })
+        .unwrap();
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let carrier = Arc::new(Carrier(Mutex::new(Vec::new())));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        let send = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("SESSION".into(), cics_literal(b"S001")),
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("OPTION.FMH".into(), cics_option()),
+                ("OPTION.DEFRESP".into(), cics_option()),
+                ("OPTION.WAIT".into(), cics_option()),
+                ("STATE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let reply = cics
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert_eq!(reply.outputs["STATE"].bytes(), b"90");
+        let frames = carrier.0.lock().unwrap();
+        assert_eq!(frames.len(), 1);
+        assert!(frames[0].defresp && frames[0].fmh);
+        assert_eq!(frames[0].attach_header.as_ref().unwrap().resource, b"RES");
+        drop(frames);
+        let mut missing = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("SESSION".into(), cics_literal(b"S001")),
+                ("ATTACHID".into(), cics_literal(b"MISSING")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        missing.condition_policy = CicsConditionPolicy::NoHandle;
+        let error = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 2),
+                missing,
+            )
+            .unwrap();
+        assert_eq!((error.condition.as_str(), error.response), ("CBIDERR", 62));
+        assert_eq!(carrier.0.lock().unwrap().len(), 1);
+        let last = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("SESSION".into(), cics_literal(b"S001")),
+                ("FROM".into(), cics_literal(b"END")),
+                ("LENGTH".into(), cics_decimal(3)),
+                ("OPTION.LAST".into(), cics_option()),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            3,
+        );
+        let final_reply = cics
+            .invoke(&effect(&invocation.run_unit_id, last.clone(), 3), last)
+            .unwrap();
+        assert_eq!(final_reply.outputs["STATE"].bytes(), b"86");
+        assert_eq!(carrier.0.lock().unwrap().len(), 2);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .state,
+            ConversationState::PendFree
+        );
+    }
+
+    #[test]
+    fn conversation_send_confirm_requires_sync_level_and_bounded_length() {
+        struct Carrier(Mutex<Vec<ConversationDataFrame>>);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.lock().unwrap().push(frame.clone());
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 2,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcMapped, owner.clone())
+            .unwrap()
+            .token;
+        next.conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                false,
+                b"PROC".to_vec(),
+                Vec::new(),
+                1,
+            )
+            .unwrap();
+        let basic = next
+            .allocate("SYS1", ConversationKind::AppcMapped, owner.clone())
+            .unwrap()
+            .token;
+        next.conversation_mut(basic)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                false,
+                b"PROC".to_vec(),
+                Vec::new(),
+                0,
+            )
+            .unwrap();
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let carrier = Arc::new(Carrier(Mutex::new(Vec::new())));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        let confirmed = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"CONF")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("OPTION.CONFIRM".into(), cics_option()),
+                ("STATE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let reply = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, confirmed.clone(), 1),
+                confirmed,
+            )
+            .unwrap();
+        assert_eq!(reply.outputs["STATE"].bytes(), b"90");
+        assert!(carrier.0.lock().unwrap()[0].confirm);
+        let mut invalid = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&basic)),
+                ("FROM".into(), cics_literal(b"NO")),
+                ("LENGTH".into(), cics_decimal(2)),
+                ("OPTION.CONFIRM".into(), cics_option()),
+            ]),
+            2,
+        );
+        invalid.condition_policy = CicsConditionPolicy::NoHandle;
+        let rejected = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 2),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (rejected.condition.as_str(), rejected.response),
+            ("INVREQ", 16)
+        );
+        assert_eq!(carrier.0.lock().unwrap().len(), 1);
+        let mut oversized = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&basic)),
+                ("FROM".into(), cics_literal(b"NO")),
+                ("FLENGTH".into(), cics_decimal(32_768)),
+            ]),
+            3,
+        );
+        oversized.condition_policy = CicsConditionPolicy::NoHandle;
+        let length_error = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, oversized.clone(), 3),
+                oversized,
+            )
+            .unwrap();
+        assert_eq!(
+            (length_error.condition.as_str(), length_error.response),
+            ("LENGERR", 22)
+        );
+        assert_eq!(carrier.0.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn conversation_send_confirm_records_negative_partner_response_once() {
+        struct Carrier(AtomicUsize);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                assert!(frame.confirm);
+                Ok(ConversationTransmitOutcome::Rejected([0x08, 0x89, 0, 0]))
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcMapped, owner.clone())
+            .unwrap()
+            .token;
+        next.conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                false,
+                b"PROC".to_vec(),
+                Vec::new(),
+                1,
+            )
+            .unwrap();
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let carrier = Arc::new(Carrier(AtomicUsize::new(0)));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        let send = request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("OPTION.CONFIRM".into(), cics_option()),
+            ]),
+            1,
+        );
+        let rejected = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, send.clone(), 1),
+                send.clone(),
+            )
+            .unwrap();
+        assert_eq!(rejected.outputs["EIBERR"].bytes(), &[0xff]);
+        assert_eq!(rejected.outputs["EIBERRCD"].bytes(), &[0x08, 0x89, 0, 0]);
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+                .unwrap(),
+            rejected
+        );
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 1);
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            ledger.exchanges[&u32::from_be_bytes(token).to_string()].negative_responses[&1],
+            [0x08, 0x89, 0, 0]
+        );
+    }
+
+    #[test]
+    fn wait_terminal_principal_synchronous_route_replays_without_facility() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let wait = request(CicsOperation::WaitTerminal, BTreeMap::new(), 1);
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 1),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(first.outputs["EIBEOC"].bytes(), &[0]);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait)
+                .unwrap(),
+            first
+        );
+        assert!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn gds_wait_host_route_confirms_basic_connect_and_returns_indicators() {
+        struct Carrier(Mutex<Vec<ConversationDataFrame>>);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.lock().unwrap().push(frame.clone());
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let initial = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = initial.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcBasic, owner)
+            .unwrap()
+            .token;
+        assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+        let connect = request(
+            CicsOperation::GdsConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRN1")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+                ("SYNCLEVEL".into(), cics_decimal(0)),
+                ("RETCODE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let connected = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, connect.clone(), 1),
+                connect,
+            )
+            .unwrap();
+        assert_eq!(connected.outputs["RETCODE"].bytes(), &[0; 6]);
+        let wait = request(
+            CicsOperation::GdsWaitConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("RETCODE".into(), cics_option()),
+                ("CONVDATA".into(), cics_option()),
+                ("STATE".into(), cics_option()),
+            ]),
+            2,
+        );
+        let pending = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 2),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!(pending.disposition, CicsDisposition::Suspended);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .data
+                .pending_outbound(),
+            1
+        );
+        let carrier = Arc::new(Carrier(Mutex::new(Vec::new())));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        let completed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 2),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (completed.condition.as_str(), completed.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(completed.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(completed.outputs["STATE"].bytes(), b"90");
+        assert_eq!(completed.outputs["CONVDATA"].bytes().len(), 24);
+        assert_eq!(
+            carrier.0.lock().unwrap()[0]
+                .connect
+                .as_ref()
+                .unwrap()
+                .process,
+            b"TRN1"
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 2), wait)
+                .unwrap(),
+            completed
+        );
+        assert_eq!(carrier.0.lock().unwrap().len(), 1);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .data
+                .pending_outbound(),
+            0
+        );
+    }
+
+    #[test]
+    fn gds_wait_sqlite_reconciles_attempted_connect_without_redispatch() {
+        struct Carrier {
+            transmits: AtomicUsize,
+            reconciles: AtomicUsize,
+        }
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                _frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.transmits.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Pending)
+            }
+
+            fn reconcile(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.reconciles.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-gds-wait-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let token;
+        let wait;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let (invocation, _) = registered(&cics);
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let initial = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = initial.clone();
+            next.register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+            token = next
+                .allocate("SYS1", ConversationKind::AppcBasic, owner)
+                .unwrap()
+                .token;
+            assert!(initial.persist(&mut next, store.as_ref()).unwrap());
+            let connect = request(
+                CicsOperation::GdsConnectProcess,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("PROCNAME".into(), cics_literal(b"TRN1")),
+                    ("PROCLENGTH".into(), cics_decimal(4)),
+                    ("SYNCLEVEL".into(), cics_decimal(0)),
+                    ("RETCODE".into(), cics_option()),
+                ]),
+                1,
+            );
+            cics.invoke(
+                &effect(&invocation.run_unit_id, connect.clone(), 1),
+                connect,
+            )
+            .unwrap();
+            wait = request(
+                CicsOperation::GdsWaitConversation,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("RETCODE".into(), cics_option()),
+                    ("CONVDATA".into(), cics_option()),
+                    ("STATE".into(), cics_option()),
+                ]),
+                2,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 2),
+                    wait.clone()
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let invocation = invocation();
+            let session = SessionId::new("session", 64).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let carrier = Arc::new(Carrier {
+                transmits: AtomicUsize::new(0),
+                reconciles: AtomicUsize::new(0),
+            });
+            cics.install_conversation_transport(carrier.clone())
+                .unwrap();
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 2),
+                    wait.clone()
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+            assert_eq!(carrier.transmits.load(Ordering::SeqCst), 1);
+            let confirmed = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 2),
+                    wait.clone(),
+                )
+                .unwrap();
+            assert_eq!(confirmed.outputs["RETCODE"].bytes(), &[0; 6]);
+            assert_eq!(confirmed.outputs["STATE"].bytes(), b"90");
+            assert_eq!(carrier.transmits.load(Ordering::SeqCst), 1);
+            assert_eq!(carrier.reconciles.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 2), wait)
+                    .unwrap(),
+                confirmed
+            );
+            assert_eq!(
+                ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .conversation(token)
+                    .unwrap()
+                    .data
+                    .pending_outbound(),
+                0
+            );
         }
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -37679,7 +38718,7 @@ mod tests {
                 .conversation(token)
                 .unwrap()
                 .sequence,
-            1
+            2
         );
 
         let invalid = request(
@@ -37708,7 +38747,7 @@ mod tests {
                 .conversation(token)
                 .unwrap()
                 .sequence,
-            1
+            2
         );
 
         let allocate = request(
@@ -37882,7 +38921,7 @@ mod tests {
                 .conversation(token)
                 .unwrap()
                 .sequence,
-            1
+            2
         );
 
         let invalid_sync = request(
@@ -38324,7 +39363,7 @@ mod tests {
             .clone();
         assert!(record.released);
         assert_eq!(record.state, ConversationState::Free);
-        assert_eq!(record.sequence, 3);
+        assert_eq!(record.sequence, 6);
         let allocate = request(
             CicsOperation::GdsAllocateConversation,
             BTreeMap::from([

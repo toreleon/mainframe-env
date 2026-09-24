@@ -5,6 +5,7 @@ use super::{
     ConversationState, DataCondition,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub const MAX_EXCHANGE_FRAME_BYTES: usize = 1_048_576;
 pub const MAX_PENDING_PEER_FRAMES: usize = 32;
@@ -100,9 +101,16 @@ impl ConversationOutboundFrame {
 #[serde(deny_unknown_fields)]
 pub struct ConversationExchangeState {
     pub inbound: Vec<ConversationPeerFrame>,
+    /// An EOC on the first retained RU is reported once by WAIT TERMINAL;
+    /// RECEIVE still owns the RU and its data.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub wait_eoc_observed: bool,
     pub outbound: Vec<ConversationOutboundFrame>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pending_sends: Vec<StagedExchangeSend>,
+    /// Negative remote responses to CONFIRM/DEFRESP, keyed by immutable send ID.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub negative_responses: BTreeMap<u64, [u8; 4]>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub next_send_id: u64,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -116,8 +124,14 @@ pub struct ConversationExchangeState {
 impl ConversationExchangeState {
     pub fn validate(&self) -> Result<(), ConversationProblem> {
         if self.inbound.len() > MAX_PENDING_PEER_FRAMES
+            || self.wait_eoc_observed && self.inbound.is_empty()
             || self.outbound.len() > MAX_RECORDED_OUTBOUND_FRAMES
             || self.pending_sends.len() > MAX_RECORDED_OUTBOUND_FRAMES
+            || self.negative_responses.len() > MAX_RECORDED_OUTBOUND_FRAMES
+            || self
+                .negative_responses
+                .keys()
+                .any(|id| *id == 0 || *id > self.last_acked_send_id)
             || self.retained.len() > MAX_EXCHANGE_FRAME_BYTES
             || self.retained.is_empty() && self.retained_meta.is_some()
             || self.last_acked_send_id > self.next_send_id
@@ -236,6 +250,21 @@ impl ConversationExchangeState {
         Ok(send.next_state)
     }
 
+    pub fn record_negative_response(
+        &mut self,
+        send_id: u64,
+        code: [u8; 4],
+    ) -> Result<(), ConversationProblem> {
+        if send_id == 0
+            || send_id > self.last_acked_send_id
+            || self.negative_responses.len() >= MAX_RECORDED_OUTBOUND_FRAMES
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        self.negative_responses.insert(send_id, code);
+        Ok(())
+    }
+
     pub fn offer(&mut self, frame: ConversationPeerFrame) -> Result<(), ConversationProblem> {
         frame.validate()?;
         if self.inbound.len() >= MAX_PENDING_PEER_FRAMES {
@@ -243,6 +272,28 @@ impl ConversationExchangeState {
         }
         self.inbound.push(frame);
         Ok(())
+    }
+
+    pub fn take_signal(&mut self) -> bool {
+        if self.inbound.first().is_some_and(|frame| frame.signal) {
+            self.inbound.remove(0);
+            self.wait_eoc_observed = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Observe one peer indicator without taking application data from RECEIVE.
+    pub fn observe_wait_terminal(&mut self) -> Option<DataCondition> {
+        if self.take_signal() {
+            return Some(DataCondition::Signal);
+        }
+        if self.inbound.first().is_some_and(|frame| frame.end_of_chain) && !self.wait_eoc_observed {
+            self.wait_eoc_observed = true;
+            return Some(DataCondition::EndOfChain);
+        }
+        None
     }
 
     /// Consume a mapped APPC/MRO peer frame from this shared exchange ledger.
@@ -278,6 +329,7 @@ impl ConversationExchangeState {
         };
         if frame.signal {
             self.inbound.remove(0);
+            self.wait_eoc_observed = false;
             return Ok(Some(ConversationDataReply {
                 bytes: Vec::new(),
                 returned_length: 0,
@@ -318,6 +370,7 @@ impl ConversationExchangeState {
         }
         if !retained {
             self.inbound.remove(0);
+            self.wait_eoc_observed = false;
         }
         let condition = if kind == ConversationKind::Mro && frame.inbound_fmh {
             DataCondition::InboundFmh

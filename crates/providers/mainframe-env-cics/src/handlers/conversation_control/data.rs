@@ -27,6 +27,16 @@ pub enum DataCondition {
     Signal,
 }
 
+/// Remote process parameters retained with the initial APPC carrier
+/// frame until a WAIT or later data request confirms transmission.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConversationConnectFrame {
+    pub process: Vec<u8>,
+    pub pip: Vec<u8>,
+    pub sync_level: u8,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConversationDataFrame {
@@ -45,6 +55,10 @@ pub struct ConversationDataFrame {
     pub defresp: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attach_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attach_header: Option<super::ConversationAttachHeader>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connect: Option<ConversationConnectFrame>,
 }
 
 impl ConversationDataFrame {
@@ -62,6 +76,27 @@ impl ConversationDataFrame {
                     || !name.bytes().all(|byte| {
                         byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
                     })
+            })
+            || self.attach_header.as_ref().is_some_and(|header| {
+                header.validate().is_err()
+                    || self.attach_id.as_deref() != Some(header.name.as_str())
+            })
+            || self.connect.as_ref().is_some_and(|connect| {
+                connect.process.is_empty()
+                    || connect.process.len() > super::MAX_PROCESS_BYTES
+                    || connect.pip.len() > super::MAX_PIP_BYTES
+                    || connect.sync_level > 2
+                    || !self.bytes.is_empty()
+                    || self.signal
+                    || self.error_code.is_some()
+                    || self.invite
+                    || self.confirm
+                    || self.defresp
+                    || self.attach_id.is_some()
+                    || self.attach_header.is_some()
+                    || self.fmh
+                    || self.end_of_chain
+                    || !self.end_structured_field
             })
         {
             return Err(ConversationProblem::Length);
@@ -88,6 +123,8 @@ fn is_false(value: &bool) -> bool {
 #[serde(deny_unknown_fields)]
 pub struct ConversationDataState {
     inbound: Vec<ConversationDataFrame>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    wait_eoc_observed: bool,
     outbound: Vec<StagedSend>,
     signal_pending: bool,
     terminal_error: bool,
@@ -110,6 +147,7 @@ fn is_zero(value: &u64) -> bool {
 impl ConversationDataState {
     pub fn is_empty(&self) -> bool {
         self.inbound.is_empty()
+            && !self.wait_eoc_observed
             && self.outbound.is_empty()
             && !self.signal_pending
             && !self.terminal_error
@@ -122,6 +160,9 @@ impl ConversationDataState {
     pub fn validate(&self) -> Result<(), ConversationProblem> {
         if self.inbound.len() + self.outbound.len() > MAX_FRAMES {
             return Err(ConversationProblem::Exhausted);
+        }
+        if self.wait_eoc_observed && self.inbound.is_empty() {
+            return Err(ConversationProblem::Malformed);
         }
         let bytes = self
             .inbound
@@ -148,7 +189,7 @@ impl ConversationDataState {
             || self
                 .inbound
                 .iter()
-                .any(|frame| frame.signal || frame.validate().is_err())
+                .any(|frame| frame.signal || frame.connect.is_some() || frame.validate().is_err())
             || self.outbound.iter().any(|send| {
                 send.frame.signal
                     || !send.frame.end_structured_field
@@ -187,6 +228,54 @@ impl ConversationDataState {
 
     pub fn terminal_error(&self) -> bool {
         self.terminal_error
+    }
+}
+
+impl ConversationRecord {
+    pub fn record_basic_negative_response(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        code: [u8; 4],
+    ) -> Result<(), ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if self.kind != ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        self.next_sequence()?;
+        self.data.peer_error_code = Some(code);
+        Ok(())
+    }
+
+    /// WAIT TERMINAL observes peer control without consuming GDS data.
+    pub fn observe_basic_wait_terminal(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+    ) -> Result<Option<DataCondition>, ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if self.kind != ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        let condition = if self.data.signal_pending {
+            self.data.signal_pending = false;
+            Some(DataCondition::Signal)
+        } else if self
+            .data
+            .inbound
+            .first()
+            .is_some_and(|frame| frame.end_of_chain)
+            && !self.data.wait_eoc_observed
+        {
+            self.data.wait_eoc_observed = true;
+            Some(DataCondition::EndOfChain)
+        } else {
+            None
+        };
+        if condition.is_some() {
+            self.next_sequence()?;
+        }
+        Ok(condition)
     }
 }
 
@@ -283,7 +372,9 @@ impl ConversationRecord {
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
         frame.validate()?;
-        if frame.error_code.is_some() && self.kind != ConversationKind::AppcBasic {
+        if frame.connect.is_some()
+            || frame.error_code.is_some() && self.kind != ConversationKind::AppcBasic
+        {
             return Err(ConversationProblem::WrongKind);
         }
         let digest: [u8; 32] =
@@ -372,6 +463,8 @@ impl ConversationRecord {
             confirm: false,
             defresp: false,
             attach_id: None,
+            attach_header: None,
+            connect: None,
         };
         frame.validate()?;
         let next_state = if last {
@@ -397,6 +490,47 @@ impl ConversationRecord {
         self.next_sequence()?;
         self.data = next;
         Ok(send_id)
+    }
+
+    /// Stage the APPC basic process parameters for GDS WAIT to confirm.
+    pub fn stage_basic_connect(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+    ) -> Result<u64, ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if self.kind != ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if self.state != ConversationState::Send || !self.data.outbound.is_empty() {
+            return Err(ConversationProblem::WrongState);
+        }
+        let frame = ConversationDataFrame {
+            end_structured_field: true,
+            connect: Some(ConversationConnectFrame {
+                process: self.process.clone().ok_or(ConversationProblem::Malformed)?,
+                pip: self.pip.clone(),
+                sync_level: self.sync_level.ok_or(ConversationProblem::Malformed)?,
+            }),
+            ..Default::default()
+        };
+        frame.validate()?;
+        let mut next = self.data.clone();
+        let id = next
+            .next_send_id
+            .checked_add(1)
+            .ok_or(ConversationProblem::Exhausted)?;
+        next.next_send_id = id;
+        next.outbound.push(StagedSend {
+            id,
+            frame,
+            next_state: ConversationState::Send,
+            dispatch_attempted: false,
+        });
+        next.validate()?;
+        self.next_sequence()?;
+        self.data = next;
+        Ok(id)
     }
 
     /// Peer-confirmed completion of the oldest staged SEND. The adapter must
@@ -536,6 +670,9 @@ impl ConversationRecord {
             }
             self.next_sequence()?;
             self.data.inbound.drain(..consumed);
+            if consumed != 0 {
+                self.data.wait_eoc_observed = false;
+            }
             if partial_take != 0 {
                 self.data.inbound[0].bytes.drain(..partial_take);
             }

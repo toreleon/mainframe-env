@@ -687,8 +687,8 @@
     "id": "INT-1601.cics-participant",
     "status": "bounded-ambiguity",
     "owner": "shared-execution-coordinator-and-cics-provider",
-    "mutating_rows": 130,
-    "bounded_effect_rows": 101,
+    "mutating_rows": 134,
+    "bounded_effect_rows": 97,
     "explicit_uow_boundary_rows": 1,
     "bounded_uow_rows": 230,
     "execution_credit": 0,
@@ -758,10 +758,10 @@
   },
   "registry": {
     "shape_commands": 263,
-    "typed_handlers": 162,
+    "typed_handlers": 166,
     "legacy_compatibility_handlers": 0,
-    "advertised_commands": 162,
-    "unready_handlers": 101,
+    "advertised_commands": 166,
+    "unready_handlers": 97,
     "automatic_registration": false,
     "default_handler": null,
     "unready_result": "explicit-unsupported",
@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:3f1057a5747929da7b385d48c15ebb75f1235c254385d002840e6302820b747f"
+    "registry_sha256": "sha256:97d8d917d6dc360820f900a5474e720597bc9cc117c27e3f2ca0346bc92fdd09"
   },
   "counts": {
     "batches": 3,
@@ -806,11 +806,11 @@
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
-    "runtime_backed_commands": 162,
-    "typed_runtime_commands": 162,
+    "runtime_backed_commands": 166,
+    "typed_runtime_commands": 166,
     "legacy_compatibility_commands": 0,
-    "advertised_commands": 162,
-    "unready_commands": 101
+    "advertised_commands": 166,
+    "unready_commands": 97
   },
   "batches": [
     {
@@ -291786,9 +291786,9 @@
           "eibfn": "0404",
           "source_status": "bounded-ambiguity",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "SendConversation",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -296368,11 +296368,11 @@
             },
             {
               "name": "resource-key",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -296388,15 +296388,15 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
@@ -296408,13 +296408,8 @@
             "option-legality",
             "operand-direction",
             "option-bounds",
-            "resource-key",
-            "capability-intent",
             "eib-response",
             "conditions",
-            "effect-class",
-            "cancellation",
-            "audit",
             "recovery"
           ],
           "source_issue_ids": [
@@ -299624,8 +299619,8 @@
               ]
             },
             "resource": {
-              "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "status": "resolved",
+              "scope": "conversation",
               "selectors": [
                 {
                   "option": "CONVID",
@@ -299642,14 +299637,14 @@
               ],
               "ambiguous_selectors": [],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
-              "selector_completeness": "bounded-ambiguity",
+              "selector_authority": "source-bound-runtime",
+              "selector_completeness": "resolved",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "execute",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
@@ -299658,33 +299653,43 @@
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "mutating",
+              "mutating": true,
+              "ir_effects": [
+                "audit",
+                "condition",
+                "memory-read",
+                "memory-write",
+                "security",
+                "suspension",
+                "terminal-read",
+                "terminal-write",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
               "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
+              "durable_effect_intent": true,
               "uow_participation": "bounded-ambiguity",
               "prepare": "bounded-ambiguity",
               "rollback": "bounded-ambiguity",
               "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
               "fenced_reconciliation": null,
               "retention_protected": null
@@ -299692,15 +299697,15 @@
             "registry": {
               "family": "conversation-control",
               "handler_id": "mainframe-env-cics.handlers.conversation-control.send@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "SendConversation",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:7f14b4948926d64158ddd5a83ddcf702fe16c279cddf2c352cf09d83d1146a22"
+              "unready_result": null,
+              "handler_sha256": "sha256:2fcd0b9e42265c06a300492486b39b626e186163a3946e6562d4aeff6521bc67"
             }
           },
-          "row_contract_sha256": "sha256:787c2bc8e17feff31f581f3c636017355ea192c30b4934316b16061429507ff7"
+          "row_contract_sha256": "sha256:7d769ec94b9a0ecf39ab3bd3f0c990cd0a2f766d995a9bafe9ff395d57756236"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0188",
@@ -377607,9 +377612,9 @@
           "eibfn": "2418",
           "source_status": "bounded-ambiguity",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "GdsWaitConversation",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -378045,11 +378050,11 @@
             },
             {
               "name": "resource-key",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -378065,15 +378070,15 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
@@ -378085,11 +378090,6 @@
             "option-legality",
             "operand-direction",
             "option-bounds",
-            "resource-key",
-            "capability-intent",
-            "effect-class",
-            "cancellation",
-            "audit",
             "recovery"
           ],
           "source_issue_ids": [
@@ -378435,8 +378435,8 @@
               ]
             },
             "resource": {
-              "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "status": "resolved",
+              "scope": "conversation",
               "selectors": [
                 {
                   "option": "CONVID",
@@ -378447,14 +378447,14 @@
               ],
               "ambiguous_selectors": [],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
-              "selector_completeness": "bounded-ambiguity",
+              "selector_authority": "source-bound-runtime",
+              "selector_completeness": "resolved",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "execute",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
@@ -378463,33 +378463,42 @@
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "mutating",
+              "mutating": true,
+              "ir_effects": [
+                "audit",
+                "memory-read",
+                "memory-write",
+                "security",
+                "suspension",
+                "terminal-read",
+                "terminal-write",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
               "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
+              "durable_effect_intent": true,
               "uow_participation": "bounded-ambiguity",
               "prepare": "bounded-ambiguity",
               "rollback": "bounded-ambiguity",
               "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
               "fenced_reconciliation": null,
               "retention_protected": null
@@ -378497,15 +378506,15 @@
             "registry": {
               "family": "conversation-control",
               "handler_id": "mainframe-env-cics.handlers.conversation-control.wait@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "GdsWaitConversation",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:cc521868e1b08fcc5b48c9d136adaf7f4eb7395852c8e947ab96a0872e94313c"
+              "unready_result": null,
+              "handler_sha256": "sha256:deee4167341cdaf15029866a5ad83c6b5e52160641ecc12c1434f344ff70c0d1"
             }
           },
-          "row_contract_sha256": "sha256:3e9592b9745db7abd5344ebac595935b2440327128d1322cbd7451b811d6da0e"
+          "row_contract_sha256": "sha256:dc1a365d2140d89038b102b15ca84221249e3feea050d29bf87f60a29517b455"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0232",
@@ -378513,9 +378522,9 @@
           "eibfn": "042C",
           "source_status": "bounded-ambiguity",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "WaitConvid",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -378846,11 +378855,11 @@
             },
             {
               "name": "resource-key",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -378866,15 +378875,15 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
@@ -378886,13 +378895,8 @@
             "option-legality",
             "operand-direction",
             "option-bounds",
-            "resource-key",
-            "capability-intent",
             "eib-response",
             "conditions",
-            "effect-class",
-            "cancellation",
-            "audit",
             "recovery"
           ],
           "source_issue_ids": [
@@ -379204,8 +379208,8 @@
               ]
             },
             "resource": {
-              "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "status": "resolved",
+              "scope": "conversation",
               "selectors": [
                 {
                   "option": "CONVID",
@@ -379216,14 +379220,14 @@
               ],
               "ambiguous_selectors": [],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
-              "selector_completeness": "bounded-ambiguity",
+              "selector_authority": "source-bound-runtime",
+              "selector_completeness": "resolved",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "execute",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
@@ -379232,33 +379236,43 @@
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "mutating",
+              "mutating": true,
+              "ir_effects": [
+                "audit",
+                "condition",
+                "memory-read",
+                "memory-write",
+                "security",
+                "suspension",
+                "terminal-read",
+                "terminal-write",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
               "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
+              "durable_effect_intent": true,
               "uow_participation": "bounded-ambiguity",
               "prepare": "bounded-ambiguity",
               "rollback": "bounded-ambiguity",
               "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
               "fenced_reconciliation": null,
               "retention_protected": null
@@ -379266,15 +379280,15 @@
             "registry": {
               "family": "conversation-control",
               "handler_id": "mainframe-env-cics.handlers.conversation-control.wait-convid@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "WaitConvid",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:55c36205735cdd668c36a629201e089c12472f11e3c51b8e38cc67bdbc3846e1"
+              "unready_result": null,
+              "handler_sha256": "sha256:6f96e4c7e5eeefa966faa4c079424bc8abfa047ccfebdbd62605c910377ed005"
             }
           },
-          "row_contract_sha256": "sha256:0b67c58a52c316c13844b8ae54436b274d3e01caf3bb76719c69f34201e15a7c"
+          "row_contract_sha256": "sha256:bfcb7a375e6092d7d54aaa53f01069206b6c6563e70ad8a6b93a3d753b4e4f5c"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0233",
@@ -383051,9 +383065,9 @@
           "eibfn": "040C",
           "source_status": "bounded-ambiguity",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "typed-runtime",
+          "registration_status": "typed-runtime",
+          "existing_runtime_operation": "WaitTerminal",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -383447,11 +383461,11 @@
             },
             {
               "name": "resource-key",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "capability-intent",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "eib-response",
@@ -383467,15 +383481,15 @@
             },
             {
               "name": "effect-class",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "cancellation",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "audit",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "recovery",
@@ -383486,13 +383500,8 @@
           "bounded_ambiguity_dimensions": [
             "option-legality",
             "option-bounds",
-            "resource-key",
-            "capability-intent",
             "eib-response",
             "conditions",
-            "effect-class",
-            "cancellation",
-            "audit",
             "recovery"
           ],
           "source_issue_ids": [
@@ -383866,8 +383875,8 @@
               ]
             },
             "resource": {
-              "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "status": "resolved",
+              "scope": "conversation",
               "selectors": [
                 {
                   "option": "CONVID",
@@ -383884,14 +383893,14 @@
               ],
               "ambiguous_selectors": [],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
-              "selector_completeness": "bounded-ambiguity",
+              "selector_authority": "source-bound-runtime",
+              "selector_completeness": "resolved",
               "fallback_selector": null,
-              "access_intent": "bounded-ambiguity",
+              "access_intent": "execute",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "route": "host.cics.execute",
               "required": [
                 "host.audit",
@@ -383900,33 +383909,43 @@
               ]
             },
             "effect": {
-              "status": "bounded-ambiguity",
-              "class": "bounded-ambiguity",
-              "mutating": null,
-              "ir_effects": [],
+              "status": "resolved",
+              "class": "mutating",
+              "mutating": true,
+              "ir_effects": [
+                "audit",
+                "condition",
+                "memory-read",
+                "memory-write",
+                "security",
+                "suspension",
+                "terminal-read",
+                "terminal-write",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "bounded-ambiguity"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
-              "status": "bounded-ambiguity",
+              "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": null
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
               "status": "bounded-ambiguity",
-              "durable_effect_intent": null,
+              "durable_effect_intent": true,
               "uow_participation": "bounded-ambiguity",
               "prepare": "bounded-ambiguity",
               "rollback": "bounded-ambiguity",
               "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "bounded-ambiguity",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
               "fenced_reconciliation": null,
               "retention_protected": null
@@ -383934,15 +383953,15 @@
             "registry": {
               "family": "conversation-control",
               "handler_id": "mainframe-env-cics.handlers.conversation-control.wait-terminal@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
+              "readiness": "typed-runtime",
+              "advertised": true,
+              "runtime_operation": "WaitTerminal",
               "legacy_execution_options": [],
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:d9d0aa050a7ca93aa5044c0006705fd51b97d75d4b4db06bbc0fa34fcb0f2f29"
+              "unready_result": null,
+              "handler_sha256": "sha256:e36598d6427c25daeafd5e167bac1036fce1ecc1c16595789ea5a5de44880b1e"
             }
           },
-          "row_contract_sha256": "sha256:b8936dadb842468bf51d48af7f7ab931923be3770954761dc9be804ca0ca5fab"
+          "row_contract_sha256": "sha256:cbb9c115738bac52c350ffcf368196238a03b5495c65bdcde02af9fbcc4ae0e4"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0239",
@@ -447173,5 +447192,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:4eaf4e6f9d2df21c8d7d6060e919f37f77c90302832dece42efdc47da88f6c83"
+  "contract_sha256": "sha256:17d275d3ce8c8fdb0aef89016a6e239f8b0e3107f14563bc630760dfe55df9dc"
 }

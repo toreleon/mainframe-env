@@ -21,14 +21,19 @@ mod gds_assign;
 mod gds_connect_process;
 mod gds_free;
 mod gds_receive;
+mod gds_wait;
 mod ledger;
 mod peer;
 mod receive;
 mod replay;
+mod send;
 mod transport;
+mod wait_convid;
 mod wait_signal;
+mod wait_terminal;
 pub use data::{
-    ConversationDataFrame, ConversationDataReply, ConversationDataState, DataCondition,
+    ConversationConnectFrame, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    DataCondition,
 };
 pub use definitions::{
     ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
@@ -136,6 +141,12 @@ pub(in crate::service) fn invoke(
         CicsOperation::GdsReceiveConversation => {
             gds_receive::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::SendConversation => send::invoke(service, run, request, retention_tick),
+        CicsOperation::WaitConvid => wait_convid::invoke(service, run, request, retention_tick),
+        CicsOperation::GdsWaitConversation => {
+            gds_wait::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::WaitTerminal => wait_terminal::invoke(service, run, request, retention_tick),
         CicsOperation::GdsFreeConversation => {
             gds_free::invoke(service, run, request, retention_tick)
         }
@@ -181,6 +192,10 @@ pub(in crate::service) fn suspends_without_outer_replay(
             CicsOperation::WaitSignal
                 | CicsOperation::ReceiveConversation
                 | CicsOperation::GdsReceiveConversation
+                | CicsOperation::SendConversation
+                | CicsOperation::WaitConvid
+                | CicsOperation::GdsWaitConversation
+                | CicsOperation::WaitTerminal
         )
 }
 
@@ -549,6 +564,13 @@ impl ConversationRecord {
         self.check_owner(owner, context)?;
         if self.kind != ConversationKind::AppcBasic || self.state != ConversationState::Send {
             return Err(ConversationProblem::WrongState);
+        }
+        if let Some((send_id, frame, _)) = self.data.next_outbound() {
+            if frame.connect.is_none() || self.data.pending_outbound() != 1 {
+                return Err(ConversationProblem::WrongState);
+            }
+            self.mark_send_attempted(owner, context, send_id)?;
+            self.acknowledge_send(owner, context, send_id)?;
         }
         self.next_sequence()?;
         self.state = ConversationState::Free;

@@ -452,12 +452,37 @@ impl ConversationLedger {
         Ok(reply)
     }
 
+    pub fn consume_mapped_signal(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+    ) -> Result<bool, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        let Some(exchange) = self.exchange_mut(token) else {
+            return Ok(false);
+        };
+        if !exchange.take_signal() {
+            return Ok(false);
+        }
+        self.conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?
+            .next_sequence()?;
+        Ok(true)
+    }
+
     pub fn stage_mapped_send(
         &mut self,
         token: [u8; 4],
         owner: &ConversationOwner,
         context: super::ConversationContext,
-        frame: ConversationDataFrame,
+        mut frame: ConversationDataFrame,
     ) -> Result<u64, ConversationProblem> {
         let record = self
             .conversation(token)
@@ -474,12 +499,25 @@ impl ConversationLedger {
                 && (record.kind != ConversationKind::AppcMapped
                     || !matches!(record.sync_level, Some(1 | 2)))
             || frame.defresp && record.kind != ConversationKind::Mro
+            || frame.connect.as_ref().is_some_and(|connect| {
+                record.kind != ConversationKind::AppcMapped
+                    || record.process.as_deref() != Some(connect.process.as_slice())
+                    || record.pip != connect.pip
+                    || record.sync_level != Some(connect.sync_level)
+            })
             || frame
                 .attach_id
                 .as_ref()
                 .is_some_and(|name| self.attach(owner, name).is_none())
         {
             return Err(ConversationProblem::WrongState);
+        }
+        if let Some(name) = frame.attach_id.as_deref() {
+            frame.attach_header = Some(
+                self.attach(owner, name)
+                    .ok_or(ConversationProblem::WrongState)?
+                    .clone(),
+            );
         }
         let next_state = if frame.end_of_chain {
             super::ConversationState::PendFree
@@ -502,6 +540,8 @@ impl ConversationLedger {
             record.state = super::ConversationState::PendReceive;
         } else if next_state == super::ConversationState::PendFree {
             record.state = super::ConversationState::PendFree;
+        } else if record.state == super::ConversationState::Allocated {
+            record.state = super::ConversationState::Send;
         }
         Ok(id)
     }
@@ -543,10 +583,18 @@ impl ConversationLedger {
             .conversation_mut(token)
             .ok_or(ConversationProblem::Malformed)?;
         record.next_sequence()?;
-        record.state = match pending_state {
-            Some(super::ConversationState::Receive) => super::ConversationState::PendReceive,
-            Some(super::ConversationState::PendFree) => super::ConversationState::PendFree,
-            _ => confirmed_state,
+        record.state = if record.state == super::ConversationState::Receive
+            && matches!(
+                confirmed_state,
+                super::ConversationState::Send | super::ConversationState::Receive
+            ) {
+            super::ConversationState::Receive
+        } else {
+            match pending_state {
+                Some(super::ConversationState::Receive) => super::ConversationState::PendReceive,
+                Some(super::ConversationState::PendFree) => super::ConversationState::PendFree,
+                _ => confirmed_state,
+            }
         };
         Ok(())
     }

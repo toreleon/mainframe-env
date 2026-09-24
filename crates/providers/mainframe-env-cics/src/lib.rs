@@ -12,12 +12,12 @@ pub use abi::cics_abi_library;
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 pub use service::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
-    CicsConversationTransport, ConversationAttachHeader, ConversationContext,
-    ConversationDataFrame, ConversationDataReply, ConversationDataState, ConversationExchangeState,
-    ConversationKind, ConversationLedger, ConversationOutboundFrame, ConversationOwner,
-    ConversationPartnerDefinition, ConversationPartnerProcessDefinition, ConversationPeerFrame,
-    ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
-    ConversationReply, ConversationState, ConversationSystemDefinition,
+    CicsConversationTransport, ConversationAttachHeader, ConversationConnectFrame,
+    ConversationContext, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    ConversationExchangeState, ConversationKind, ConversationLedger, ConversationOutboundFrame,
+    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationPeerFrame, ConversationProblem, ConversationProfileDefinition, ConversationRecord,
+    ConversationReplay, ConversationReply, ConversationState, ConversationSystemDefinition,
     ConversationTransmitOutcome, DataCondition, GdsAllocateFailure, GdsAssignFailure,
     GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure, GdsReturnCode, GdsWaitFailure,
     MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES,

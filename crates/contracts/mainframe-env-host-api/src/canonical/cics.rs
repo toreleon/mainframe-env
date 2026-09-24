@@ -19,6 +19,10 @@ impl Canonical for CicsOperation {
             Self::GdsReceiveConversation => {
                 out.variant("CicsOperation", "GdsReceiveConversation", 0)
             }
+            Self::SendConversation => out.variant("CicsOperation", "SendConversation", 0),
+            Self::WaitConvid => out.variant("CicsOperation", "WaitConvid", 0),
+            Self::GdsWaitConversation => out.variant("CicsOperation", "GdsWaitConversation", 0),
+            Self::WaitTerminal => out.variant("CicsOperation", "WaitTerminal", 0),
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
             Self::AddSubevent => out.variant("CicsOperation", "AddSubevent", 0),
             Self::Address => out.variant("CicsOperation", "Address", 0),

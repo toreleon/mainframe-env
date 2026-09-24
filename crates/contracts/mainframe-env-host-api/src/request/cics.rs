@@ -27,6 +27,14 @@ pub enum CicsOperation {
     ReceiveConversation,
     /// Receive APPC basic data and indicators with a six-byte GDS RETCODE.
     GdsReceiveConversation,
+    /// Stage mapped APPC or MRO data for carrier-confirmed transmission.
+    SendConversation,
+    /// Confirm accumulated mapped APPC process and SEND transmission.
+    WaitConvid,
+    /// Confirm APPC basic accumulated output with a six-byte GDS RETCODE.
+    GdsWaitConversation,
+    /// Confirm terminal output and observe one peer EOC or SIGNAL indicator.
+    WaitTerminal,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -329,6 +337,10 @@ impl CicsOperation {
             Self::GdsFreeConversation => "GdsFreeConversation",
             Self::ReceiveConversation => "ReceiveConversation",
             Self::GdsReceiveConversation => "GdsReceiveConversation",
+            Self::SendConversation => "SendConversation",
+            Self::WaitConvid => "WaitConvid",
+            Self::GdsWaitConversation => "GdsWaitConversation",
+            Self::WaitTerminal => "WaitTerminal",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -520,6 +532,10 @@ impl CicsOperation {
                 | Self::GdsFreeConversation
                 | Self::ReceiveConversation
                 | Self::GdsReceiveConversation
+                | Self::SendConversation
+                | Self::WaitConvid
+                | Self::GdsWaitConversation
+                | Self::WaitTerminal
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -677,6 +693,9 @@ impl CicsOperation {
             ("FREE", _) => Self::FreeConversation,
             ("GDS", Some("FREE")) => Self::GdsFreeConversation,
             ("GDS", Some("RECEIVE")) => Self::GdsReceiveConversation,
+            ("WAIT", Some("CONVID")) => Self::WaitConvid,
+            ("GDS", Some("WAIT")) => Self::GdsWaitConversation,
+            ("WAIT", Some("TERMINAL")) => Self::WaitTerminal,
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
@@ -783,6 +802,7 @@ impl CicsOperation {
             ("ISSUE", Some("WAIT")) => Self::IssueWait,
             ("SEND", Some("PAGE")) => Self::SendPage,
             ("SEND", Some("PARTNSET")) => Self::SendPartnset,
+            ("SEND", Some("CONVID" | "SESSION")) => Self::SendConversation,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
             ("SPOOLCLOSE", _) => Self::SpoolClose,

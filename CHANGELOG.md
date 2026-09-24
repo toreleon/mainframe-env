@@ -6,6 +6,18 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Routed mapped APPC/MRO SEND, WAIT CONVID, and WAIT TERMINAL through the
+  accepted host ABI and shared conversation-open exchange ledger. CONNECT and
+  SEND frames use durable pre-dispatch markers, read-only reconciliation,
+  source STATE values, and exact replay. WAIT TERMINAL observes EOC or SIGNAL
+  once without consuming the peer data; a principal terminal with completed
+  synchronous output returns normally.
+- Routed APPC basic GDS WAIT through the same carrier boundary and durable
+  basic record, returning source CONVDATA, RETCODE, and STATE. SQLite restart
+  checks an attempted CONNECT by reconciliation without retransmission.
+- Added a confirmed negative partner response to the conversation carrier.
+  SEND CONFIRM persists its four-byte error code by send ID and writes EIBERR
+  and EIBERRCD on first completion and exact reissue.
 - Selected APPC basic GDS RECEIVE through the accepted host ABI and durable
   conversation record. BUFFER and LLID delimiters, CONVDATA, STATE, FLENGTH,
   six-byte RETCODE failures, one-time SIGNAL, exact replay, and SQLite reopen
@@ -24,8 +36,7 @@ All notable changes to mainframe-env are documented here.
   data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
   Extended the shared durable conversation record with bounded peer data,
   staged sends, explicit transmission acknowledgement, partial receive, and
-  GDS return-code contracts. Four data/terminal-wait rows remain unready pending
-  selected host dispatch and acceptance gates.
+  GDS return-code contracts. Their selected routes are described above.
 - Peer conversation frames now carry a monotonic event sequence and digest,
   while staged sends carry distinct acknowledgement IDs. Exact duplicate
   delivery or acknowledgement is idempotent; gaps and conflicting replays fail
@@ -38,7 +49,7 @@ All notable changes to mainframe-env are documented here.
   one-time dispatch and reconciliation for each frame.
 - Added source-shaped GDS `CONVDATA` bytes for APPC basic receive and wait,
   including field-complete, receive, signal, confirm, syncpoint, free, error
-  code, rollback, and zeroed reserved fields. GDS WAIT remains unready.
+  code, rollback, and zeroed reserved fields.
 - A GDS RECEIVE now consumes a pending peer SIGNAL once and preserves CDBSIG
   in that command's CONVDATA reply while clearing the pending ledger bit.
 - Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,
@@ -66,9 +77,8 @@ All notable changes to mainframe-env are documented here.
   conversation data slice. Mapped RECEIVE consumes the shared exchange queue
   and retains NOTRUNCATE remainders there; mapped SEND stages, marks attempted,
   reconciles, and acknowledges on that same durable exchange. Memory and
-  SQLite reopen regressions cover the combined state. The six remaining data
-  and wait application rows retain zero readiness credit until their selected
-  host routes pass.
+  SQLite reopen regressions cover the combined state. Each data/wait row is
+  promoted only with its selected host route and focused gates.
 
 - Versioned the conversation ledger for explicit APPC/MRO peer frames and
   outbound exchange records. Version 1 rows reopen unchanged and upgrade on

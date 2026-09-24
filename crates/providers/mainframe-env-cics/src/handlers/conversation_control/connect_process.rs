@@ -1,8 +1,9 @@
 //! Mapped APPC CONNECT PROCESS over one task-owned conversation.
 
 use super::{
-    ConversationLedger, ConversationOwner, ConversationProblem, ConversationReplay,
-    ConversationReply, ConversationState, build_attach, definitions, load_conversation_replay,
+    ConversationConnectFrame, ConversationDataFrame, ConversationLedger, ConversationOwner,
+    ConversationProblem, ConversationReplay, ConversationReply, ConversationState, build_attach,
+    definitions, load_conversation_replay,
 };
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_host_api::{
@@ -88,6 +89,21 @@ pub(super) fn invoke(
                 sync_level,
             )
             .map_err(map_problem)?;
+        next.stage_mapped_send(
+            token,
+            &owner,
+            super::context(run)?,
+            ConversationDataFrame {
+                end_structured_field: true,
+                connect: Some(ConversationConnectFrame {
+                    process: process.clone(),
+                    pip: pip.clone(),
+                    sync_level,
+                }),
+                ..Default::default()
+            },
+        )
+        .map_err(map_problem)?;
         let reply = ConversationReply {
             condition: "NORMAL".into(),
             response: 0,

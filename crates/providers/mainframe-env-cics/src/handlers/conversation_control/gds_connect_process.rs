@@ -168,6 +168,9 @@ pub(super) fn invoke(
             Err(ConversationProblem::StaleOwner) => return Err(HostProblem::IdempotencyConflict),
             Err(problem) => return response(service, run, &failure_reply(map_problem(problem))),
         }
+        record
+            .stage_basic_connect(&owner, super::context(run)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
         let reply = ConversationReply {
             condition: "NORMAL".into(),
             response: 0,
