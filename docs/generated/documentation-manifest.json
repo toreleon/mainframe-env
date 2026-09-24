@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 199,
+    "markdown_documents": 200,
     "navigation_groups": 5,
     "normative_documents": 49,
     "xtask_commands": 172
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:4177426b81646e4a67908112e74bfd6c0c3194edfb51b2184867004d0f7ea590",
+      "sha256": "sha256:5103d27038afcd19e72ce4751bbddb2e7a7c6e93c545aa60476603b1b72075a6",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1100,6 +1100,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/CIC-906-SAF-AUDIT-UNCERTAINTY.md",
+      "relative_links": 0,
+      "sha256": "sha256:1027ac27c6c75c935692f4e6af111a931f5384b2326606a57e9881404e3fb113",
+      "title": "CIC-906 representative SAF, audit, and uncertainty validation",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
       "relative_links": 64,
       "sha256": "sha256:817db9bfc52c077be93dad07f7d8fe897ec1eb2b55fa8eae7dec2375cbbde58f",
@@ -1197,8 +1205,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 90,
-      "sha256": "sha256:102c3978f5dc2a139d7602ae340ace9d03fb4ef7a86a3471db2e02b5080997ba",
+      "relative_links": 91,
+      "sha256": "sha256:650139fcc4b68f059c91374ddce0e7391a9bb0f07141f9a3d4c395dd4bccf961",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },

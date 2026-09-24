@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a bounded CIC-906 validation receipt for DEFINE COUNTER, BTS LINK
+  ACQPROCESS, and mapped APPC SEND. Focused tests cover typed SAF denial,
+  pre-dispatch audit saturation, outer-receipt uncertainty, owner fencing,
+  selected replay/restart paths, and SEND live cancellation/deadline without
+  expanding the 191 typed application routes or claiming release credit.
 - Integrated exactly seven CIC-905 conversation data/wait rows with the
   existing 184 typed routes, yielding 191 typed and 72 unready application
   commands while retaining the sealed CONVERSE, EXTRACT, CardDemo, and bounded
