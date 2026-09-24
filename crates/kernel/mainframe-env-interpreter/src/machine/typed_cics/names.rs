@@ -66,6 +66,7 @@ pub(super) enum SlotUse {
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
+        CicsOperandName::IssueLength => SlotUse::HalfwordInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::MajorVersion | CicsOperandName::MinorVersion => SlotUse::FullwordInput,
@@ -171,6 +172,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::TimerStatus => SlotUse::FullwordOutput,
+        CicsOutputName::IssueState => SlotUse::FullwordOutput,
+        CicsOutputName::IssueConvData | CicsOutputName::IssueRetCode => SlotUse::Output,
         CicsOutputName::EventName | CicsOutputName::SubEventName => SlotUse::Output,
         CicsOutputName::EventType | CicsOutputName::FireStatus => SlotUse::FullwordOutput,
         CicsOutputName::Commarea
@@ -332,6 +335,26 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::IssueSend => CicsOperation::IssueSend,
         CicsPlanOperation::Route => CicsOperation::Route,
         CicsPlanOperation::IssueWait => CicsOperation::IssueWait,
+        CicsPlanOperation::IssueAbend => CicsOperation::IssueAbend,
+        CicsPlanOperation::GdsIssueAbend => CicsOperation::GdsIssueAbend,
+        CicsPlanOperation::IssueConfirmation => CicsOperation::IssueConfirmation,
+        CicsPlanOperation::GdsIssueConfirmation => CicsOperation::GdsIssueConfirmation,
+        CicsPlanOperation::IssueCopy => CicsOperation::IssueCopy,
+        CicsPlanOperation::IssueDisconnect => CicsOperation::IssueDisconnect,
+        CicsPlanOperation::IssueEndfile => CicsOperation::IssueEndfile,
+        CicsPlanOperation::IssueEndoutput => CicsOperation::IssueEndoutput,
+        CicsPlanOperation::IssueEods => CicsOperation::IssueEods,
+        CicsPlanOperation::IssueEraseAup => CicsOperation::IssueEraseAup,
+        CicsPlanOperation::IssueError => CicsOperation::IssueError,
+        CicsPlanOperation::GdsIssueError => CicsOperation::GdsIssueError,
+        CicsPlanOperation::IssueLoad => CicsOperation::IssueLoad,
+        CicsPlanOperation::IssuePass => CicsOperation::IssuePass,
+        CicsPlanOperation::IssuePrepare => CicsOperation::IssuePrepare,
+        CicsPlanOperation::GdsIssuePrepare => CicsOperation::GdsIssuePrepare,
+        CicsPlanOperation::IssuePrint => CicsOperation::IssuePrint,
+        CicsPlanOperation::IssueReset => CicsOperation::IssueReset,
+        CicsPlanOperation::GdsIssueSignal => CicsOperation::GdsIssueSignal,
+        CicsPlanOperation::IssueSignal => CicsOperation::IssueSignal,
         CicsPlanOperation::Load => CicsOperation::Load,
         CicsPlanOperation::Release => CicsOperation::Release,
         CicsPlanOperation::Link => CicsOperation::Link,
@@ -438,6 +461,15 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::IssueConvid => "CONVID",
+        CicsOperandName::IssueSession => "SESSION",
+        CicsOperandName::IssueTermId => "TERMID",
+        CicsOperandName::IssueCtlChar => "CTLCHAR",
+        CicsOperandName::IssueProgram => "PROGRAM",
+        CicsOperandName::IssueLuName => "LUNAME",
+        CicsOperandName::IssueFrom => "FROM",
+        CicsOperandName::IssueLength => "LENGTH",
+        CicsOperandName::IssueLogMode => "LOGMODE",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -743,6 +775,9 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::IssueState => "STATE",
+        CicsOutputName::IssueConvData => "CONVDATA",
+        CicsOutputName::IssueRetCode => "RETCODE",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",
@@ -987,7 +1022,78 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::WebBrowseQueryParm => "QUERYPARM",
         CicsPlanOption::WebBrowseFormField => "FORMFIELD",
         CicsPlanOption::WebNotruncate => "NOTRUNCATE",
+        CicsPlanOption::IssueWaitOption => "WAIT",
+        CicsPlanOption::IssueEndOutput => "ENDOUTPUT",
+        CicsPlanOption::IssueEndFile => "ENDFILE",
+        CicsPlanOption::IssueConverse => "CONVERSE",
+        CicsPlanOption::IssueLogonLogmode => "LOGONLOGMODE",
+        CicsPlanOption::IssueNoQuiesce => "NOQUIESCE",
         CicsPlanOption::WebNoClientConvert => "NOCLICONVERT",
         CicsPlanOption::WebNoServerConvert => "NOSRVCONVERT",
+    }
+}
+
+#[cfg(test)]
+mod issue_tests {
+    use super::*;
+
+    #[test]
+    fn issue_plans_keep_exact_host_operation_and_wire_names() {
+        let operations = [
+            (CicsPlanOperation::IssueAbend, CicsOperation::IssueAbend),
+            (
+                CicsPlanOperation::GdsIssueAbend,
+                CicsOperation::GdsIssueAbend,
+            ),
+            (
+                CicsPlanOperation::IssueConfirmation,
+                CicsOperation::IssueConfirmation,
+            ),
+            (
+                CicsPlanOperation::GdsIssueConfirmation,
+                CicsOperation::GdsIssueConfirmation,
+            ),
+            (CicsPlanOperation::IssueCopy, CicsOperation::IssueCopy),
+            (
+                CicsPlanOperation::IssueDisconnect,
+                CicsOperation::IssueDisconnect,
+            ),
+            (CicsPlanOperation::IssueEndfile, CicsOperation::IssueEndfile),
+            (
+                CicsPlanOperation::IssueEndoutput,
+                CicsOperation::IssueEndoutput,
+            ),
+            (CicsPlanOperation::IssueEods, CicsOperation::IssueEods),
+            (
+                CicsPlanOperation::IssueEraseAup,
+                CicsOperation::IssueEraseAup,
+            ),
+            (CicsPlanOperation::IssueError, CicsOperation::IssueError),
+            (
+                CicsPlanOperation::GdsIssueError,
+                CicsOperation::GdsIssueError,
+            ),
+            (CicsPlanOperation::IssueLoad, CicsOperation::IssueLoad),
+            (CicsPlanOperation::IssuePass, CicsOperation::IssuePass),
+            (CicsPlanOperation::IssuePrepare, CicsOperation::IssuePrepare),
+            (
+                CicsPlanOperation::GdsIssuePrepare,
+                CicsOperation::GdsIssuePrepare,
+            ),
+            (CicsPlanOperation::IssuePrint, CicsOperation::IssuePrint),
+            (CicsPlanOperation::IssueReset, CicsOperation::IssueReset),
+            (
+                CicsPlanOperation::GdsIssueSignal,
+                CicsOperation::GdsIssueSignal,
+            ),
+            (CicsPlanOperation::IssueSignal, CicsOperation::IssueSignal),
+        ];
+        for (plan, host) in operations {
+            assert_eq!(host_operation(plan), host);
+        }
+        assert_eq!(output(CicsOutputName::IssueState), "STATE");
+        assert_eq!(output(CicsOutputName::IssueRetCode), "RETCODE");
+        assert_eq!(operand(CicsOperandName::IssueConvid), "CONVID");
+        assert_eq!(option(CicsPlanOption::IssueEndFile), "ENDFILE");
     }
 }

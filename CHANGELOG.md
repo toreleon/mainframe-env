@@ -27,6 +27,9 @@ All notable changes to mainframe-env are documented here.
   output, and option checks for the fifteen mapped/device ISSUE forms. GDS
   ISSUE remains excluded from COBOL lowering by its source language contract.
 
+- Bound all twenty ISSUE MCEP operations to distinct host operation names in
+  the interpreter, with exact ISSUE input, output, and option wire names.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

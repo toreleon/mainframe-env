@@ -477,7 +477,10 @@ pub(super) fn execute(
             arguments.insert(name, capacity);
         }
         match output.name {
-            CicsOutputName::Abstime
+            CicsOutputName::IssueState
+            | CicsOutputName::IssueConvData
+            | CicsOutputName::IssueRetCode
+            | CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate
             | CicsOutputName::SecurityControl
