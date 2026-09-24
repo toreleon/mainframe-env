@@ -176,6 +176,14 @@ pub(in crate::service) fn invoke(
         | CicsOperation::GdsIssueSignal => {
             gds_issue_route::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::IssueDisconnect
+        | CicsOperation::IssueEndfile
+        | CicsOperation::IssueEndoutput
+        | CicsOperation::IssueEods
+        | CicsOperation::IssueLoad
+        | CicsOperation::IssuePass
+        | CicsOperation::IssuePrint
+        | CicsOperation::IssueReset => super::issue_device::invoke(service, run, request),
         _ => Err(HostProblem::Unsupported),
     }
 }

@@ -8272,14 +8272,28 @@ mod tests {
             BTreeMap::from([("OPTION.ENDOUTPUT".into(), cics_option())]),
             1,
         );
-        let first = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+        let first = handlers::invoke_extended_control(
+            &service,
+            &mut run,
+            &command,
+            crate::generated::CicsCommandFamily::ConversationControl,
+            100,
+        )
+        .unwrap();
         assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
         let state = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
             .unwrap()
             .unwrap();
         assert_eq!(state.version, 2);
         assert!(state.state.endfile && state.state.endoutput);
-        let replay = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+        let replay = handlers::invoke_extended_control(
+            &service,
+            &mut run,
+            &command,
+            crate::generated::CicsCommandFamily::ConversationControl,
+            100,
+        )
+        .unwrap();
         assert_eq!(replay, first);
         assert_eq!(
             handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)

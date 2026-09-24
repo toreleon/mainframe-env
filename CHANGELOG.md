@@ -97,6 +97,9 @@ All notable changes to mainframe-env are documented here.
   RETCODE and CONVDATA plus numeric STATE; wrong owner, form, state, and sync
   level return GDS codes without changing the ledger. SQLite restart
   reconciles an attempted control once. The five rows remain unregistered.
+- Routed eight physical ISSUE heads from the conversation-control family to
+  the existing durable device handler. A selected ENDFILE family regression
+  verifies atomic state and replay; the device rows remain unregistered.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and
