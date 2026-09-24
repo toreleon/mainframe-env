@@ -70,18 +70,19 @@ pub(in crate::service) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
-    let (terminal, connected) = {
+    let current_session = {
         let state = service.lock()?;
-        let session = state
+        state
             .sessions
             .get(&run.session)
-            .ok_or(HostProblem::NotFound)?;
-        (session.input.terminal_id.clone(), session.connected)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?
     };
-    let terminal = terminal.ok_or_else(not_allocated)?;
-    if !connected {
-        return Err(not_allocated());
-    }
+    let terminal = current_session
+        .input
+        .terminal_id
+        .as_deref()
+        .ok_or_else(not_allocated)?;
     if matches!(
         request.operation,
         CicsOperation::IssueEndfile | CicsOperation::IssueEndoutput | CicsOperation::IssueEods
@@ -97,6 +98,9 @@ pub(in crate::service) fn invoke(
         .map_err(|_| HostProblem::ResourceExhausted)?;
     if let Some(receipt) = load_receipt(service, effect_key, run, mutation.sequence, digest)? {
         return receipt_response(service, run, &receipt);
+    }
+    if !current_session.connected {
+        return Err(not_allocated());
     }
     if service
         .store
@@ -117,6 +121,7 @@ pub(in crate::service) fn invoke(
         AccessIntent::Update,
     )?;
     let mut next = current.clone();
+    let mut disconnected_session = None;
     match request.operation {
         CicsOperation::IssueEndfile => next
             .mark_endfile(request.arguments.contains_key("OPTION.ENDOUTPUT"))
@@ -176,6 +181,20 @@ pub(in crate::service) fn invoke(
             )
             .map_err(|problem| device_condition(request.operation, problem))?;
         }
+        CicsOperation::IssueDisconnect | CicsOperation::IssueReset => {
+            if request.arguments.contains_key("SESSION") {
+                return Err(HostProblem::Unsupported);
+            }
+            next.disconnect()
+                .map_err(|problem| device_condition(request.operation, problem))?;
+            let mut updated = current_session.clone();
+            updated.version = updated
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            updated.connected = false;
+            disconnected_session = Some(updated);
+        }
         _ => return Err(HostProblem::Unsupported),
     }
     let receipt = IssueDeviceReceipt {
@@ -203,11 +222,29 @@ pub(in crate::service) fn invoke(
         },
         expected_version: None,
     });
-    match service
-        .store
-        .mutate_provider_states_atomic(vec![state_write, receipt_write])
-    {
-        Ok(()) => receipt_response(service, run, &receipt),
+    let mut writes = vec![state_write, receipt_write];
+    if let Some(updated) = &disconnected_session {
+        writes.push(ProviderStateMutation::Put(ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: "cics-session".into(),
+                key: run.session.clone(),
+                version: updated.version,
+                payload: super::super::encode_session(updated)?,
+            },
+            expected_version: Some(current_session.version),
+        }));
+    }
+    match service.store.mutate_provider_states_atomic(writes) {
+        Ok(()) => {
+            if let Some(updated) = disconnected_session {
+                service
+                    .lock()
+                    .map_err(|_| HostProblem::UnknownOutcome)?
+                    .sessions
+                    .insert(run.session.clone(), updated);
+            }
+            receipt_response(service, run, &receipt)
+        }
         Err(StoreError::Conflict | StoreError::AlreadyExists) => {
             let saved = load_receipt(service, effect_key, run, mutation.sequence, digest)?
                 .ok_or(HostProblem::IdempotencyConflict)?;
@@ -225,6 +262,8 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             | CicsOperation::IssueEods
             | CicsOperation::IssueLoad
             | CicsOperation::IssuePass
+            | CicsOperation::IssueDisconnect
+            | CicsOperation::IssueReset
     ) || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
     {
         return Err(HostProblem::Malformed);
@@ -246,6 +285,10 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             "LENGTH" if request.operation == CicsOperation::IssuePass => {
                 value.schema() == "mainframe-env.cics.decimal@1"
             }
+            "SESSION" if request.operation == CicsOperation::IssueDisconnect => matches!(
+                value.schema(),
+                "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+            ),
             "OPTION.NOHANDLE" => {
                 value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
             }

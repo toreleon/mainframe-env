@@ -7044,6 +7044,80 @@ mod tests {
     }
 
     #[test]
+    fn issue_disconnect_and_reset_update_session_and_device_atomically_with_replay() {
+        for operation in [CicsOperation::IssueDisconnect, CicsOperation::IssueReset] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = service(store.clone());
+            let (invocation, session) = registered(&service);
+            service
+                .lock()
+                .unwrap()
+                .sessions
+                .get_mut(session.as_str())
+                .unwrap()
+                .input = handlers::TerminalInput::identified("T004".into());
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "T004".into(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: false,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .remove(&invocation.run_unit_id)
+                .unwrap();
+            if operation == CicsOperation::IssueDisconnect {
+                let alternate = request(
+                    operation,
+                    BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+                    2,
+                );
+                assert_eq!(
+                    handlers::invoke_issue_device(&service, &mut run, &alternate),
+                    Err(HostProblem::Unsupported)
+                );
+                assert_eq!(
+                    handlers::IssueDeviceRecord::load(store.as_ref(), "T004")
+                        .unwrap()
+                        .unwrap()
+                        .version,
+                    1
+                );
+            }
+            let command = request(operation, BTreeMap::new(), 1);
+            let response = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert!(!service.lock().unwrap().sessions[session.as_str()].connected);
+            let device = handlers::IssueDeviceRecord::load(store.as_ref(), "T004")
+                .unwrap()
+                .unwrap();
+            assert!(device.state.disconnected);
+            assert_eq!(device.version, 2);
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command),
+                Ok(response)
+            );
+            assert_eq!(
+                handlers::IssueDeviceRecord::load(store.as_ref(), "T004")
+                    .unwrap()
+                    .unwrap()
+                    .version,
+                2
+            );
+        }
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

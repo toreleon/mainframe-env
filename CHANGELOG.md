@@ -46,6 +46,10 @@ All notable changes to mainframe-env are documented here.
   atomically marks the device delivered and disconnects its persisted source
   session; rollback clears the stage without disconnecting.
 
+- Added guarded default-facility ISSUE DISCONNECT and compatibility ISSUE
+  RESET effects with atomic physical-device and terminal-session updates.
+  The source's alternate SESSION form remains pending.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

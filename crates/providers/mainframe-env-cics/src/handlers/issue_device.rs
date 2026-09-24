@@ -437,7 +437,7 @@ impl IssueDeviceRecord {
 
     pub fn disconnect(&mut self) -> Result<(), IssueDeviceProblem> {
         self.active()?;
-        if !self.definition.disconnect_allowed {
+        if self.definition.kind == IssueDeviceKind::Lu61 && !self.definition.disconnect_allowed {
             return Err(IssueDeviceProblem::NotConfigured);
         }
         self.state.disconnected = true;
