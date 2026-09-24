@@ -184,10 +184,18 @@ pub(super) fn operands(
             4,
         ),
     ] {
+        if operation == HirCicsOperation::GdsReceiveConversation && clause == "FLENGTH" {
+            continue;
+        }
         if let Some(tokens) = clauses.get(clause) {
             let value = cics_integer_value(tokens, semantic)?;
+            let maximum = if operation == HirCicsOperation::GdsReceiveConversation {
+                32_767
+            } else {
+                1_048_576
+            };
             match &value {
-                HirCicsValue::Integer(number) if (0..=1_048_576).contains(number) => {}
+                HirCicsValue::Integer(number) if (0..=maximum).contains(number) => {}
                 HirCicsValue::Data(reference)
                     if reference.category == DataCategory::Binary
                         && reference.length == width

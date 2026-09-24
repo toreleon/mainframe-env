@@ -59,12 +59,16 @@ pub(super) fn invalid_shape(
             CicsOperandName::ConversationConvid,
             CicsOperandName::ConversationSession,
         ],
-        CicsPlanOperation::ReceiveConversation | CicsPlanOperation::GdsReceiveConversation => &[
+        CicsPlanOperation::ReceiveConversation => &[
             CicsOperandName::ConversationDataConvid,
             CicsOperandName::ConversationDataSession,
             CicsOperandName::ConversationDataLength,
             CicsOperandName::ConversationDataFullLength,
             CicsOperandName::ConversationDataMaxLength,
+            CicsOperandName::ConversationDataMaxFullLength,
+        ],
+        CicsPlanOperation::GdsReceiveConversation => &[
+            CicsOperandName::ConversationDataConvid,
             CicsOperandName::ConversationDataMaxFullLength,
         ],
         CicsPlanOperation::SendConversation => &[
@@ -155,12 +159,15 @@ pub(super) fn invalid_shape(
         }
         CicsPlanOperation::GdsReceiveConversation => {
             !has(CicsOperandName::ConversationDataConvid)
-                || has(CicsOperandName::ConversationDataSession)
                 || !has(CicsOperandName::ConversationDataMaxFullLength)
                 || !out(CicsOutputName::ConversationDataRetcode)
                 || !out(CicsOutputName::ConversationDataFullLength)
                 || out(CicsOutputName::ConversationDataInto)
                     == out(CicsOutputName::ConversationDataSet)
+                || plan
+                    .options
+                    .contains(&CicsPlanOption::ConversationDataBuffer)
+                    && plan.options.contains(&CicsPlanOption::ConversationDataLlid)
         }
         CicsPlanOperation::SendConversation => {
             !has(CicsOperandName::ConversationDataFrom)
@@ -168,6 +175,16 @@ pub(super) fn invalid_shape(
                     && has(CicsOperandName::ConversationDataSession)
                 || has(CicsOperandName::ConversationDataLength)
                     == has(CicsOperandName::ConversationDataFullLength)
+                || plan
+                    .options
+                    .contains(&CicsPlanOption::ConversationDataInvite)
+                    && plan.options.contains(&CicsPlanOption::ConversationDataLast)
+                || plan
+                    .options
+                    .contains(&CicsPlanOption::ConversationDataConfirm)
+                    && plan
+                        .options
+                        .contains(&CicsPlanOption::ConversationDataDefresp)
         }
         CicsPlanOperation::GdsWaitConversation => !out(CicsOutputName::ConversationDataRetcode),
         CicsPlanOperation::WaitConvid => !has(CicsOperandName::ConversationDataConvid),
@@ -200,6 +217,12 @@ pub(super) fn invalid_shape(
                     | CicsOperandName::ConversationDataMaxFullLength
             );
             if numeric {
+                if plan.operation == CicsPlanOperation::GdsReceiveConversation
+                    && operand.name == CicsOperandName::ConversationDataMaxFullLength
+                    && matches!(operand.value, CicsOperandValue::Integer(value) if !(0..=32_767).contains(&value))
+                {
+                    return true;
+                }
                 !matches!(
                     operand.value,
                     CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
@@ -354,6 +377,148 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
     }
+
+    #[test]
+    fn every_data_wait_form_roundtrips_without_claiming_runtime_readiness() {
+        let text = |name, bytes: &[u8]| CicsNamedOperand {
+            name,
+            value: CicsOperandValue::Literal(bytes.to_vec()),
+        };
+        let number = |name, value| CicsNamedOperand {
+            name,
+            value: CicsOperandValue::Integer(value),
+        };
+        let output = |name, index| CicsOutputBinding {
+            name,
+            target: slot(index),
+        };
+        let cases = [
+            (
+                CicsPlanOperation::GdsReceiveConversation,
+                vec![
+                    text(CicsOperandName::ConversationDataConvid, b"ABCD"),
+                    number(CicsOperandName::ConversationDataMaxFullLength, 16),
+                ],
+                BTreeSet::from([CicsPlanOption::ConversationDataLlid]),
+                vec![
+                    output(CicsOutputName::ConversationDataInto, 1),
+                    output(CicsOutputName::ConversationDataFullLength, 2),
+                    output(CicsOutputName::ConversationDataRetcode, 3),
+                ],
+            ),
+            (
+                CicsPlanOperation::SendConversation,
+                vec![
+                    text(CicsOperandName::ConversationDataFrom, b"DATA"),
+                    number(CicsOperandName::ConversationDataLength, 4),
+                ],
+                BTreeSet::from([CicsPlanOption::ConversationDataInvite]),
+                vec![],
+            ),
+            (
+                CicsPlanOperation::GdsWaitConversation,
+                vec![],
+                BTreeSet::new(),
+                vec![output(CicsOutputName::ConversationDataRetcode, 4)],
+            ),
+            (
+                CicsPlanOperation::WaitConvid,
+                vec![text(CicsOperandName::ConversationDataConvid, b"ABCD")],
+                BTreeSet::new(),
+                vec![output(CicsOutputName::ConversationDataState, 5)],
+            ),
+            (
+                CicsPlanOperation::WaitSignal,
+                vec![],
+                BTreeSet::new(),
+                vec![],
+            ),
+            (
+                CicsPlanOperation::WaitTerminal,
+                vec![text(CicsOperandName::ConversationDataSession, b"A001")],
+                BTreeSet::new(),
+                vec![],
+            ),
+        ];
+        let limits = CicsPlanLimits::default();
+        for (operation, operands, options, outputs) in cases {
+            let plan = CicsEffectPlan {
+                operation,
+                operands,
+                options,
+                outputs,
+                condition: CicsCondition::Default,
+            };
+            let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+            assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+            assert_eq!(
+                encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+        assert_eq!(
+            operation_from_tag(266),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        assert_eq!(operand_from_tag(1608), Err(CicsPlanCodecProblem::Malformed));
+        assert_eq!(option_from_tag(1541), Err(CicsPlanCodecProblem::Malformed));
+        assert_eq!(output_from_tag(1663), Err(CicsPlanCodecProblem::Malformed));
+    }
+
+    #[test]
+    fn gds_receive_rejects_unreviewed_lengths_and_combined_delimiters() {
+        let limits = CicsPlanLimits::default();
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::GdsReceiveConversation,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::ConversationDataConvid,
+                    value: CicsOperandValue::Literal(b"ABCD".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ConversationDataMaxFullLength,
+                    value: CicsOperandValue::Integer(32_767),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::ConversationDataLlid]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::ConversationDataInto,
+                    target: slot(1),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::ConversationDataFullLength,
+                    target: slot(2),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::ConversationDataRetcode,
+                    target: slot(3),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        assert!(encode_cics_effect_plan(&plan, limits).is_ok());
+        plan.options.insert(CicsPlanOption::ConversationDataBuffer);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.options.remove(&CicsPlanOption::ConversationDataBuffer);
+        plan.operands.push(CicsNamedOperand {
+            name: CicsOperandName::ConversationDataLength,
+            value: CicsOperandValue::Integer(1),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.operands.pop();
+        plan.operands[1].value = CicsOperandValue::Integer(32_768);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
 }
 
 pub(super) fn option_allowed(operation: CicsPlanOperation, option: CicsPlanOption) -> bool {
@@ -402,10 +567,15 @@ pub(super) const fn output_allowed(operation: CicsPlanOperation, output: CicsOut
                 | CicsPlanOperation::WaitConvid,
             CicsOutputName::ConversationDataState
         ) | (
-            CicsPlanOperation::ReceiveConversation | CicsPlanOperation::GdsReceiveConversation,
+            CicsPlanOperation::ReceiveConversation,
             CicsOutputName::ConversationDataInto
                 | CicsOutputName::ConversationDataSet
                 | CicsOutputName::ConversationDataLength
+                | CicsOutputName::ConversationDataFullLength
+        ) | (
+            CicsPlanOperation::GdsReceiveConversation,
+            CicsOutputName::ConversationDataInto
+                | CicsOutputName::ConversationDataSet
                 | CicsOutputName::ConversationDataFullLength
         ) | (
             CicsPlanOperation::GdsReceiveConversation | CicsPlanOperation::GdsWaitConversation,
