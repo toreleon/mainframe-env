@@ -171,7 +171,7 @@ fn header(
     Ok(header)
 }
 
-fn parse_halfword(schema: &str, bytes: &[u8]) -> Result<u16, HostProblem> {
+pub(super) fn parse_halfword(schema: &str, bytes: &[u8]) -> Result<u16, HostProblem> {
     match schema {
         "mainframe-env.cics.decimal@1" => {
             let text = std::str::from_utf8(bytes).map_err(|_| HostProblem::Malformed)?;

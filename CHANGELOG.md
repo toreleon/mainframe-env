@@ -48,6 +48,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added mapped APPC CONNECT PROCESS over the task-owned conversation ledger.
+  It validates CONVID ownership, process and PIP lengths, synchronization
+  level, PARTNER process selection, and the DPL principal restriction before
+  the durable `Allocated` to `Send` transition. The selected COBOL route
+  reaches the provider with EIBFN `0432`; isolated readiness is 156 typed,
+  0 legacy, and 107 unready.
+
 - Split mapped and basic APPC PIP bounds to the source limits of 32,763 and
   763 bytes, respectively. A separately versioned PARTNER process definition
   now retains the 1–64-byte remote TPNAME/XTPNAME without changing earlier

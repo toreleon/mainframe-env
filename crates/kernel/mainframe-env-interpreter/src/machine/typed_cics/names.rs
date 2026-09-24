@@ -317,9 +317,9 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
     Some(match operation {
         CicsPlanOperation::AllocateConversation => CicsOperation::AllocateConversation,
         CicsPlanOperation::BuildAttach => CicsOperation::BuildAttach,
+        CicsPlanOperation::ConnectProcess => CicsOperation::ConnectProcess,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
-        | CicsPlanOperation::ConnectProcess
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
         | CicsPlanOperation::FreeConversation

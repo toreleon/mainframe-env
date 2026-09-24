@@ -107,6 +107,9 @@ pub(in crate::service) fn invoke(
         CicsOperation::WaitSignal => wait_signal::invoke(service, run, request, retention_tick),
         CicsOperation::GdsAssignConversation => gds_assign::invoke(service, run, request),
         CicsOperation::BuildAttach => build_attach::invoke(service, run, request, retention_tick),
+        CicsOperation::ConnectProcess => {
+            connect_process::invoke(service, run, request, retention_tick)
+        }
         _ => Err(HostProblem::Unsupported),
     }
 }
