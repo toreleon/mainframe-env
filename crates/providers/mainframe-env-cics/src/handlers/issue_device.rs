@@ -41,6 +41,9 @@ pub struct IssueDeviceDefinition {
     pub programs: Vec<String>,
     /// Installed Communications Server application names allowed for PASS.
     pub applications: Vec<String>,
+    /// CINIT X'0D' logon mode, when retained for LOGONLOGMODE.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logon_logmode: Option<String>,
     /// TYPETERM DISCREQ or RELREQ capability.
     pub disconnect_allowed: bool,
     /// Communications Server AUTH=PASS capability.
@@ -58,6 +61,8 @@ pub struct IssueDeviceState {
     pub pass_target: Option<String>,
     pub pass_data: Vec<u8>,
     pub pass_logmode: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pass_use_logon_mode: bool,
     pub pass_noquiesce: bool,
     pub disconnected: bool,
     pub print_count: u32,
@@ -81,6 +86,10 @@ pub enum IssueDeviceProblem {
     Disconnected,
     Length,
     Capacity,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 fn valid_name(name: &str, maximum: usize) -> bool {
@@ -107,6 +116,10 @@ impl IssueDeviceDefinition {
             || !valid_names(&self.printers, 4)
             || !valid_names(&self.programs, 8)
             || !valid_names(&self.applications, 8)
+            || self
+                .logon_logmode
+                .as_ref()
+                .is_some_and(|name| !valid_name(name, 8))
             || matches!(
                 self.kind,
                 IssueDeviceKind::Display3270 | IssueDeviceKind::Printer3270
@@ -241,12 +254,15 @@ impl IssueDeviceRecord {
             || self.state.pass_target.is_none()
                 && (!self.state.pass_data.is_empty()
                     || self.state.pass_logmode.is_some()
+                    || self.state.pass_use_logon_mode
                     || self.state.pass_noquiesce)
             || self
                 .state
                 .pass_logmode
                 .as_ref()
                 .is_some_and(|name| !valid_name(name, 8))
+            || self.state.pass_use_logon_mode
+                && self.state.pass_logmode != self.definition.logon_logmode
             || (self.state.endfile || self.state.endoutput)
                 && self.definition.kind != IssueDeviceKind::Entry3740
             || self.state.eods && self.definition.kind != IssueDeviceKind::Interpreter3650
@@ -325,6 +341,7 @@ impl IssueDeviceRecord {
         application: &str,
         data: &[u8],
         logmode: Option<&str>,
+        use_logon_mode: bool,
         noquiesce: bool,
     ) -> Result<(), IssueDeviceProblem> {
         self.active()?;
@@ -339,12 +356,24 @@ impl IssueDeviceRecord {
         {
             return Err(IssueDeviceProblem::NotConfigured);
         }
-        if data.len() > MAX_PASS_BYTES || logmode.is_some_and(|name| !valid_name(name, 8)) {
+        if data.len() > MAX_PASS_BYTES
+            || logmode.is_some_and(|name| !valid_name(name, 8))
+            || logmode.is_some() && use_logon_mode
+        {
             return Err(IssueDeviceProblem::Length);
         }
+        let selected_logmode = if use_logon_mode {
+            self.definition
+                .logon_logmode
+                .as_deref()
+                .ok_or(IssueDeviceProblem::NotConfigured)?
+        } else {
+            logmode.unwrap_or("")
+        };
         self.state.pass_target = Some(application.into());
         self.state.pass_data = data.to_vec();
-        self.state.pass_logmode = logmode.map(str::to_owned);
+        self.state.pass_logmode = (!selected_logmode.is_empty()).then(|| selected_logmode.into());
+        self.state.pass_use_logon_mode = use_logon_mode;
         self.state.pass_noquiesce = noquiesce;
         Ok(())
     }
@@ -391,6 +420,7 @@ mod tests {
             printers: vec![],
             programs: vec![],
             applications: vec![],
+            logon_logmode: None,
             disconnect_allowed: true,
             pass_allowed: false,
         }
@@ -425,6 +455,26 @@ mod tests {
     }
 
     #[test]
+    fn optional_saved_mode_fields_preserve_v1_canonical_reopen() {
+        let store = MemoryStore::new(Default::default());
+        let record =
+            IssueDeviceRecord::new(definition("T005", IssueDeviceKind::Entry3740)).unwrap();
+        let bytes = record.encode().unwrap();
+        assert!(
+            !bytes
+                .windows(b"logon_logmode".len())
+                .any(|w| w == b"logon_logmode")
+        );
+        assert!(
+            !bytes
+                .windows(b"pass_use_logon_mode".len())
+                .any(|w| w == b"pass_use_logon_mode")
+        );
+        record.install(&store).unwrap();
+        assert_eq!(IssueDeviceRecord::load(&store, "T005"), Ok(Some(record)));
+    }
+
+    #[test]
     fn sqlite_reopen_preserves_load_and_pass_with_exact_bounds() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-cics-issue-device-{}-{:?}",
@@ -437,6 +487,7 @@ mod tests {
         let mut definition = definition("T003", IssueDeviceKind::Interpreter3650);
         definition.programs.push("PROG1".into());
         definition.applications.push("APPL1".into());
+        definition.logon_logmode = Some("LOGON0".into());
         definition.pass_allowed = true;
         let initial = IssueDeviceRecord::new(definition).unwrap();
         initial.install(&first).unwrap();
@@ -444,11 +495,11 @@ mod tests {
         next.load_program("PROG1", true).unwrap();
         next.mark_eods().unwrap();
         assert_eq!(
-            next.prepare_pass("APPL1", &[1; MAX_PASS_BYTES + 1], None, false),
+            next.prepare_pass("APPL1", &[1; MAX_PASS_BYTES + 1], None, false, false),
             Err(IssueDeviceProblem::Length)
         );
         assert!(next.state.pass_target.is_none());
-        next.prepare_pass("APPL1", &[2; MAX_PASS_BYTES], Some("MODE1"), true)
+        next.prepare_pass("APPL1", &[2; MAX_PASS_BYTES], Some("MODE1"), false, true)
             .unwrap();
         assert!(initial.persist(&mut next, &first).unwrap());
         drop(first);

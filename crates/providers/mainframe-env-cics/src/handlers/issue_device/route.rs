@@ -142,6 +142,39 @@ pub(in crate::service) fn invoke(
             next.load_program(&name, request.arguments.contains_key("OPTION.CONVERSE"))
                 .map_err(|problem| device_condition(request.operation, problem))?;
         }
+        CicsOperation::IssuePass => {
+            let application = text_argument(request, "LUNAME")?
+                .ok_or(HostProblem::Malformed)?
+                .trim_end()
+                .to_ascii_uppercase();
+            if !valid_name(&application, 8) {
+                return Err(condition("INVREQ", 16, 0));
+            }
+            let from = request.arguments.get("FROM").map(|value| value.bytes());
+            let length = text_argument(request, "LENGTH")?
+                .map(|value| {
+                    value
+                        .parse::<i64>()
+                        .map_err(|_| condition("LENGERR", 22, 0))
+                })
+                .transpose()?
+                .unwrap_or(0);
+            let length = usize::try_from(length).map_err(|_| condition("LENGERR", 22, 0))?;
+            if length > MAX_PASS_BYTES || from.is_some_and(|data| length > data.len()) {
+                return Err(condition("LENGERR", 22, 0));
+            }
+            let data = from.map_or(&[][..], |bytes| &bytes[..length]);
+            let logmode =
+                text_argument(request, "LOGMODE")?.map(|value| value.trim_end().to_owned());
+            next.prepare_pass(
+                &application,
+                data,
+                logmode.as_deref(),
+                request.arguments.contains_key("OPTION.LOGONLOGMODE"),
+                request.arguments.contains_key("OPTION.NOQUIESCE"),
+            )
+            .map_err(|problem| device_condition(request.operation, problem))?;
+        }
         _ => return Err(HostProblem::Unsupported),
     }
     let receipt = IssueDeviceReceipt {
@@ -190,6 +223,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             | CicsOperation::IssueEndoutput
             | CicsOperation::IssueEods
             | CicsOperation::IssueLoad
+            | CicsOperation::IssuePass
     ) || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
     {
         return Err(HostProblem::Malformed);
@@ -201,6 +235,16 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
                 value.schema(),
                 "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
             ),
+            "LUNAME" | "LOGMODE" if request.operation == CicsOperation::IssuePass => matches!(
+                value.schema(),
+                "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+            ),
+            "FROM" if request.operation == CicsOperation::IssuePass => {
+                value.schema() == "mainframe-env.cics.storage-value@1"
+            }
+            "LENGTH" if request.operation == CicsOperation::IssuePass => {
+                value.schema() == "mainframe-env.cics.decimal@1"
+            }
             "OPTION.NOHANDLE" => {
                 value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
             }
@@ -213,6 +257,11 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             "OPTION.CONVERSE" if request.operation == CicsOperation::IssueLoad => {
                 value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
             }
+            "OPTION.LOGONLOGMODE" | "OPTION.NOQUIESCE"
+                if request.operation == CicsOperation::IssuePass =>
+            {
+                value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
+            }
             _ => false,
         };
         if !valid {
@@ -222,7 +271,23 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     if request.operation == CicsOperation::IssueLoad && !request.arguments.contains_key("PROGRAM") {
         return Err(HostProblem::Malformed);
     }
+    if request.operation == CicsOperation::IssuePass
+        && (!request.arguments.contains_key("LUNAME")
+            || request.arguments.contains_key("FROM") != request.arguments.contains_key("LENGTH")
+            || request.arguments.contains_key("LOGMODE")
+                && request.arguments.contains_key("OPTION.LOGONLOGMODE"))
+    {
+        return Err(HostProblem::Malformed);
+    }
     Ok(())
+}
+
+fn text_argument(request: &CicsRequest, name: &str) -> Result<Option<String>, HostProblem> {
+    request
+        .arguments
+        .get(name)
+        .map(|value| String::from_utf8(value.bytes().to_vec()).map_err(|_| HostProblem::Malformed))
+        .transpose()
 }
 
 fn reject_dpl_principal(run: &Run) -> Result<(), HostProblem> {

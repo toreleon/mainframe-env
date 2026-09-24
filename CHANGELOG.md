@@ -38,6 +38,10 @@ All notable changes to mainframe-env are documented here.
   EODS/LOAD ISSUE commands. Device state and an exact owner-bound replay
   receipt commit atomically after SAF, with bounded receipt retention.
 
+- Added source-bounded ISSUE PASS staging with 255-byte user data, halfword
+  LENGTH, explicit/default/saved logon mode selection, and NOQUIESCE state.
+  PASS delivery remains tied to task completion.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

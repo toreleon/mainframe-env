@@ -6779,6 +6779,7 @@ mod tests {
             printers: vec![],
             programs: vec![],
             applications: vec![],
+            logon_logmode: None,
             disconnect_allowed: true,
             pass_allowed: false,
         })
@@ -6843,6 +6844,7 @@ mod tests {
             printers: vec![],
             programs: vec![],
             applications: vec![],
+            logon_logmode: None,
             disconnect_allowed: true,
             pass_allowed: false,
         })
@@ -6874,6 +6876,88 @@ mod tests {
                         && resource == "CICS.ISSUE.DEVICE.T002"
                         && *intent == AccessIntent::Update
                 })
+        );
+    }
+
+    #[test]
+    fn issue_pass_selects_saved_logon_mode_and_bounds_data_before_commit() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("T003".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "T003".into(),
+            kind: handlers::IssueDeviceKind::Interpreter3650,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec!["APPL1".into()],
+            logon_logmode: Some("LOGON0".into()),
+            disconnect_allowed: true,
+            pass_allowed: true,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let data = BoundedPayload::new(
+            "mainframe-env.cics.storage-value@1",
+            b"ABC".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let length = BoundedPayload::new(
+            "mainframe-env.cics.decimal@1",
+            b"2".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let command = request(
+            CicsOperation::IssuePass,
+            BTreeMap::from([
+                ("LUNAME".into(), cics_literal(b"APPL1")),
+                ("FROM".into(), data),
+                ("LENGTH".into(), length),
+                ("OPTION.LOGONLOGMODE".into(), cics_option()),
+                ("OPTION.NOQUIESCE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let response = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        let record = handlers::IssueDeviceRecord::load(store.as_ref(), "T003")
+            .unwrap()
+            .unwrap();
+        assert_eq!(record.state.pass_target.as_deref(), Some("APPL1"));
+        assert_eq!(record.state.pass_data, b"AB");
+        assert_eq!(record.state.pass_logmode.as_deref(), Some("LOGON0"));
+        assert!(record.state.pass_use_logon_mode && record.state.pass_noquiesce);
+        let mut malformed = command.clone();
+        malformed.mutation = request(CicsOperation::IssuePass, BTreeMap::new(), 2).mutation;
+        malformed
+            .arguments
+            .insert("LOGMODE".into(), cics_literal(b"MODE1"));
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &malformed),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "T003")
+                .unwrap()
+                .unwrap()
+                .version,
+            record.version
         );
     }
 
