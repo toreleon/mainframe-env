@@ -24420,7 +24420,7 @@ mod tests {
     fn compiled_converse_consumes_explicit_mro_peer_frame_and_sets_eib_flags() {
         let artifact = published_source_fixture(
             "CVCONV",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVCONV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 INTO-X PIC X(16).\n01 TO-LEN PIC S9(4) COMP VALUE 16.\n01 STATE-X PIC S9(9) COMP.\n01 CONV-FN PIC X(2).\n01 EOC-X PIC X.\n01 RESP-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CONVERSE FROM('REQUEST') FROMLENGTH(7) INTO(INTO-X) TOLENGTH(TO-LEN) STATE(STATE-X) RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO CONV-FN.\nMOVE EIBEOC TO EOC-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CVCONV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SET-PTR POINTER.\n01 OBSERVED-X PIC X(8).\n01 TO-LEN PIC S9(4) COMP VALUE 16.\n01 STATE-X PIC S9(9) COMP.\n01 CONV-FN PIC X(2).\n01 EOC-X PIC X.\n01 RESP-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(8).\nPROCEDURE DIVISION.\nEXEC CICS CONVERSE FROM('REQUEST') FROMLENGTH(7) SET(SET-PTR) TOLENGTH(TO-LEN) STATE(STATE-X) RESP(RESP-X) END-EXEC.\nSET ADDRESS OF LINK-X TO SET-PTR.\nMOVE LINK-X TO OBSERVED-X.\nMOVE EIBFN TO CONV-FN.\nMOVE EIBEOC TO EOC-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -24529,7 +24529,7 @@ mod tests {
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
         assert_eq!(
-            &restored.variable("INTO-X").unwrap().bytes()[..8],
+            restored.variable("OBSERVED-X").unwrap().bytes(),
             b"RESPONSE"
         );
         assert_eq!(restored.variable("TO-LEN").unwrap().bytes(), &[0, 8]);
