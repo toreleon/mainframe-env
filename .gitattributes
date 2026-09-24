@@ -1,0 +1,6 @@
+# Parallel feature branches add changelog fragments; union is a safe fallback for
+# legacy branches that still append independent Markdown entries directly.
+CHANGELOG.md merge=union
+
+# Install the repository-local driver with tools/setup_git_merge_drivers.py.
+docs/generated/documentation-manifest.json merge=mainframe-env-doc-manifest

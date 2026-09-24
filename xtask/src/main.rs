@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod changelog;
 mod docs;
 mod evidence_seal;
 mod jcl_catalog;
@@ -162,6 +163,7 @@ enum EvidenceCommand {
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
     Versions(CheckArgs),
+    Changelog(CheckArgs),
     Docs(CheckArgs),
     Architecture(CheckArgs),
     ArchitectureFast(CheckArgs),
@@ -278,10 +280,23 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
     }
     match command {
         XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
+        XtaskCommand::Changelog(args) => checked!(
+            "changelog",
+            args,
+            changelog::run(root, args.check).and_then(|()| {
+                if args.check {
+                    Ok(())
+                } else {
+                    docs::run(root, false, &Cli::command())
+                }
+            })
+        ),
         XtaskCommand::Docs(args) => checked!(
             "docs",
             args,
-            check_versions(root).and_then(|()| docs::run(root, args.check, &Cli::command()))
+            check_versions(root)
+                .and_then(|()| changelog::validate(root))
+                .and_then(|()| docs::run(root, args.check, &Cli::command()))
         ),
         XtaskCommand::ArchitectureFast(args) => {
             checked!("architecture-fast", args, check_architecture_fast(root))

@@ -1,18 +1,18 @@
 {
   "counts": {
-    "markdown_documents": 193,
+    "markdown_documents": 194,
     "navigation_groups": 5,
     "normative_documents": 40,
-    "xtask_commands": 182
+    "xtask_commands": 191
   },
   "documents": [
     {
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:bc5c128b7d7d94e55da0e2fefa61bd93ad8b877266109f0216856cfd4cffeaa4",
+      "sha256": "sha256:f1a2d40b9ba62e6ce682bb5e8bfadeb7e2c65f3b2866e52c1b2d3fd904f7b874",
       "title": "Repository Guidelines",
-      "xtask_commands": 1
+      "xtask_commands": 3
     },
     {
       "normative": false,
@@ -25,10 +25,10 @@
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 7,
-      "sha256": "sha256:da1ed546ed6c2f41d2e3e6a346f9ca8410c445d37b3cb2f198c83b571ec8bebc",
+      "relative_links": 8,
+      "sha256": "sha256:60a16f955a260d2c664dae09f57c2c78ee0a1062e03f0587f5eb2275816ce619",
       "title": "Contributing to mainframe-env",
-      "xtask_commands": 4
+      "xtask_commands": 6
     },
     {
       "normative": false,
@@ -45,6 +45,14 @@
       "sha256": "sha256:4308b9ccfd35791b26fb65e95d6f7847545dc31ca72ec76614b5612d084b04bd",
       "title": "Security policy",
       "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "changes/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:5c0f1f281a794938be5599bf79dd8507766a11bf46687c43ac92d3a4e8c9884b",
+      "title": "Changelog fragments",
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -813,10 +821,10 @@
       "path": "docs/delivery/VERSIONING-AND-RELEASES.md",
       "relative_links": 0,
       "scope": "version authorities, release gates, artifacts, and publication",
-      "sha256": "sha256:6e3885c2664892f2a88f6c5814af551cfe3b2f8e2b2d466ec9c7f86628773243",
+      "sha256": "sha256:510f81ffeb3347d6c8a614090ba44496719dd235415b2f4fc8e26191396c977e",
       "status": "Accepted by repository owner",
       "title": "Versioning, Phase Commits, and Release Gates",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "applies_from": "mainframe-env 0.1.0",
@@ -1706,9 +1714,9 @@
       "normative": false,
       "path": "xtask/README.md",
       "relative_links": 0,
-      "sha256": "sha256:cf6960b4003d8c377715a59d7b367d1cd56b3d32dffcbb3c476964867599624b",
+      "sha256": "sha256:8fc22e749f9635c2c50ace94439b4cf328d67c996a9aeea673d81ad56bf0e81c",
       "title": "xtask",
-      "xtask_commands": 7
+      "xtask_commands": 9
     }
   ],
   "navigation": [

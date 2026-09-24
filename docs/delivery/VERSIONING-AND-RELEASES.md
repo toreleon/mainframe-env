@@ -146,9 +146,11 @@ affected validation and then one new full candidate gate.
 - the final cutover/default-authority state is correct; and
 - the generated final gate reports `MAINFRAME-ENV 0.1 = PASS`.
 
-The final release commit changes the version to `0.1.0`, finalizes changelog and
-release notes, regenerates the release manifest, and receives the annotated tag
-`mainframe-env-v0.1.0` after the gate passes.
+The final release commit changes the version to `0.1.0`, consumes the reviewed
+`changes/unreleased/` fragments with `cargo xtask changelog`, finalizes release
+notes, regenerates the release manifest, and receives the annotated tag
+`mainframe-env-v0.1.0` after the gate passes. Parallel feature branches do not
+edit `CHANGELOG.md` directly.
 
 ## 4. Release artifacts
 
