@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:bab5e16c88ab3e423c09e36415874997650f49692dac30d7068ec5890f6e609e",
+      "sha256": "sha256:5a6d69bad26b1fb4baef34c2c54c41f154bd0830b9fd3f52ea7aeb18b0f225c9",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -609,7 +609,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:28fd33e20bda77796c51533421f036916ff1f1c50f320fc83fa47f511e81ab55",
+      "sha256": "sha256:201cf7656f941ead6975c21971513049cfceda1e549ab9da8853a2e6eaf80608",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -1302,7 +1302,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:5c89a8ab444cc87a3602298ecea5810e91fb79b0ec2ab28a5a4b47cc0fb2fd9e",
+      "sha256": "sha256:6dc65ba345c10069d0aa9851ec23fdbe3a61aa642a23399d83a4c7fc9ef287c9",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },

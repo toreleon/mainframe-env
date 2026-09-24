@@ -558,6 +558,10 @@ All notable changes to mainframe-env are documented here.
   The child checkout registered 157 typed, 0 legacy, and 106 unready rows;
   the combined registry registers 167 typed, 0 legacy, and 96 unready rows.
   Licensed differential evidence remains pending.
+- Added an atomic store archive contract for private BTS container replay
+  rows. It fences same-key outer receipts and updates the durable replay
+  capacity count in the archive transaction; provider retention selection
+  remains in progress.
 
 - Added the shared versioned BTS process/activity authority for the pending
   lifecycle slice, with UOW-scoped acquisition epochs, atomic pending DEFINE

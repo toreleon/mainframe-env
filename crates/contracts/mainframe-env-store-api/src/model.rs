@@ -933,6 +933,21 @@ pub struct ProviderStateArchiveDeletion {
     pub rows: Vec<ProviderRetentionRow>,
 }
 
+/// Archive private CICS container replay rows while CAS-replacing their shared
+/// capacity row in the same transaction. The ordinary deletion API does not
+/// admit this namespace, so a crash cannot leave live counts out of sync.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderStateArchiveDeletionWithCapacity {
+    /// Fully decoded, epoch-fenced replay archive plan.
+    pub deletion: ProviderStateArchiveDeletion,
+    /// Same-key outer CICS receipts that must remain live and exact.
+    pub outer_receipts: Vec<ProviderStateRecord>,
+    /// Exact capacity row observed with that plan.
+    pub capacity_source: ProviderStateRecord,
+    /// Version-incrementing replacement with only its replay count reduced.
+    pub capacity_replacement: ProviderStateWrite,
+}
+
 /// Provider-owned, epoch-fenced dependency inventory for core lifecycle retention.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoreRetentionDependencySnapshot {

@@ -180,19 +180,19 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3630,
+      "max_production_lines": 3592,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/postgres.rs",
-      "max_production_lines": 2340,
+      "max_production_lines": 2238,
       "responsibility": "The PostgreSQL adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, and atomic transactions.",
       "split_boundary": "Extract PostgreSQL retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 2173,
+      "max_production_lines": 2098,
       "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
       "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
