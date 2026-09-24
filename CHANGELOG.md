@@ -126,6 +126,10 @@ All notable changes to mainframe-env are documented here.
 - Registered CIC-905 ISSUE DISCONNECT and RESET rows 0115 and 0133. Compiled
   COBOL and public routes select default or alternate LU6.1 facilities with
   exact replay; the integrated registry is 198 typed and 65 unready.
+- Registered CIC-905 ISSUE PRINT row 0129. The public provider selects the
+  first available configured printer, commits one screen image to terminal
+  and printer, and replays exactly. Compiled COBOL and backend regressions
+  pass; the integrated registry is 199 typed and 64 unready.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

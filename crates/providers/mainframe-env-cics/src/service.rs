@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 200);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 201);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -13112,14 +13112,13 @@ mod tests {
         unavailable
             .persist(&mut next_unavailable, store.as_ref())
             .unwrap();
-        let mut run = service
-            .lock()
-            .unwrap()
-            .runs
-            .remove(&invocation.run_unit_id)
-            .unwrap();
         let command = request(CicsOperation::IssuePrint, BTreeMap::new(), 1);
-        let response = handlers::invoke_terminal_control(&service, &mut run, &command).unwrap();
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command.clone(),
+            )
+            .unwrap();
         assert_eq!(response.condition, "NORMAL");
         let printed = handlers::IssueDeviceRecord::load(store.as_ref(), "T006")
             .unwrap()
@@ -13143,9 +13142,18 @@ mod tests {
                 })
         );
         assert_eq!(
-            handlers::invoke_terminal_control(&service, &mut run, &command),
+            service.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command
+            ),
             Ok(response)
         );
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
         assert_eq!(
             handlers::IssueDeviceRecord::load(store.as_ref(), "T006")
                 .unwrap()

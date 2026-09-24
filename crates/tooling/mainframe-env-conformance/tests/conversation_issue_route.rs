@@ -65,6 +65,13 @@ fn compiled_issue_device_markers_select_exact_host_operations_and_companion_flag
             None,
         ),
         (
+            "ISSUE PRINT",
+            CicsPlanOperation::IssuePrint,
+            CicsOperation::IssuePrint,
+            None,
+            None,
+        ),
+        (
             "ISSUE LOAD PROGRAM('APP1') CONVERSE",
             CicsPlanOperation::IssueLoad,
             CicsOperation::IssueLoad,
