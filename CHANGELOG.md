@@ -66,6 +66,9 @@ All notable changes to mainframe-env are documented here.
   atomically marks the device delivered and disconnects its persisted source
   session; rollback clears the stage without disconnecting.
 
+- Verified staged ISSUE PASS across SQLite restart: restored task completion
+  transfers once, disconnects the source, and preserves exact stage replay.
+
 - Added guarded default-facility ISSUE DISCONNECT and compatibility ISSUE
   RESET effects with atomic physical-device and terminal-session updates.
   The source's alternate SESSION form remains pending.

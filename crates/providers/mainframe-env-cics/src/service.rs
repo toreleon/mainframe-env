@@ -7141,6 +7141,97 @@ mod tests {
     }
 
     #[test]
+    fn issue_pass_task_end_survives_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-pass-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let invocation = invocation_for("issue-pass-restart", BTreeMap::new());
+        let session = SessionId::new("issue-pass-session", 64).unwrap();
+        let command = request(
+            CicsOperation::IssuePass,
+            BTreeMap::from([("LUNAME".into(), cics_literal(b"APPL1"))]),
+            1,
+        );
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "T000".into(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec!["APPL1".into()],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: true,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            let staged = handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                .unwrap()
+                .unwrap();
+            assert_eq!(staged.state.pass_target.as_deref(), Some("APPL1"));
+            assert!(!staged.state.pass_delivered);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 2)
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service
+                .complete_terminal_run(&session, invocation.principal.id(), 3)
+                .unwrap();
+            let delivered = handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                .unwrap()
+                .unwrap();
+            assert!(delivered.state.pass_delivered && delivered.state.disconnected);
+            assert_eq!(delivered.version, 3);
+            assert!(!service.lock().unwrap().sessions[session.as_str()].connected);
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            assert_eq!(
+                handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                    .unwrap()
+                    .unwrap()
+                    .version,
+                3
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn issue_disconnect_and_reset_update_session_and_device_atomically_with_replay() {
         for operation in [CicsOperation::IssueDisconnect, CicsOperation::IssueReset] {
             let store = Arc::new(MemoryStore::new(Default::default()));
