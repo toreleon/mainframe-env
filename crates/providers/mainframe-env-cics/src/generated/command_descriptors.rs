@@ -108,6 +108,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::GdsAssignConversation,
+        syntax: "GDS ASSIGN",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Cancel,
         syntax: "CANCEL",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0016",

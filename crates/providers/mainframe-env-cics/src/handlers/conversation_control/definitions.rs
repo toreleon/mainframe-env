@@ -1,9 +1,11 @@
 //! Durable APPC/MRO partner and profile resource definitions.
 
 use super::{
-    ConversationKind, ConversationLedger, ConversationProblem, ConversationSystemDefinition,
+    ConversationKind, ConversationLedger, ConversationOwner, ConversationProblem,
+    ConversationSystemDefinition,
 };
 use crate::service::{CicsService, store_error};
+use mainframe_env_execution_api::RunUnitId;
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -162,6 +164,57 @@ pub(super) fn load_profile(
 }
 
 impl CicsService {
+    /// Trusted ingress installs the principal APPC/MRO facility for one live
+    /// task. Reissuing the same installation returns its durable token.
+    pub fn install_conversation_principal_for_run(
+        &self,
+        run_unit: &RunUnitId,
+        sysid: &str,
+        kind: ConversationKind,
+    ) -> Result<[u8; 4], HostProblem> {
+        let state = self.lock()?;
+        let run = state.runs.get(run_unit).ok_or(HostProblem::NotFound)?;
+        let owner = ConversationOwner {
+            execution: run.invocation.execution_id.as_str().into(),
+            run_unit: run.invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(run.invocation.attempt),
+        };
+        for _ in 0..MAX_REGISTRATION_RETRIES {
+            let current = ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
+            if let Some(existing) = current.conversations.values().find(|record| {
+                record.owner.execution == owner.execution
+                    && record.owner.run_unit == owner.run_unit
+                    && record.principal_facility
+                    && !record.released
+            }) {
+                return if existing.owner == owner
+                    && existing.system == sysid
+                    && existing.kind == kind
+                {
+                    Ok(existing.token)
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            let mut next = current.clone();
+            let principal = next.install_principal(sysid, kind, owner.clone()).map_err(
+                |problem| match problem {
+                    ConversationProblem::Exhausted => HostProblem::ResourceExhausted,
+                    ConversationProblem::WrongState => HostProblem::IdempotencyConflict,
+                    ConversationProblem::WrongKind => HostProblem::Unsupported,
+                    _ => HostProblem::Malformed,
+                },
+            )?;
+            if current
+                .persist(&mut next, self.store.as_ref())
+                .map_err(store_error)?
+            {
+                return Ok(principal.token);
+            }
+        }
+        Err(HostProblem::UnknownOutcome)
+    }
+
     /// Inspect one retained PARTNER definition through the same validated
     /// reader used by allocation commands.
     pub fn conversation_partner(
