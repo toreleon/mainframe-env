@@ -5264,6 +5264,19 @@ mod tests {
     }
 
     #[test]
+    fn cics_gds_receive_is_recognized_but_rejected_for_cobol() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGDS. PROCEDURE DIVISION. EXEC CICS GDS RECEIVE END-EXEC. STOP RUN.",
+        );
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("not applicable to COBOL")
+        }));
+    }
+
+    #[test]
     fn cics_non_cobol_application_forms_fail_closed() {
         for command in ["CICSMESSAGE", "GETMAIN64", "FREEMAIN64"] {
             let source = format!(

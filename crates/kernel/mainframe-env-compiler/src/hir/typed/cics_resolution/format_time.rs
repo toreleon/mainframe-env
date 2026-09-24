@@ -265,6 +265,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::ConversationInto
         | HirCicsOutputName::ConversationSet
         | HirCicsOutputName::ConversationToLength
-        | HirCicsOutputName::ConversationToFullLength => Ok(()),
+        | HirCicsOutputName::ConversationToFullLength
+        | HirCicsOutputName::ConversationDataInto
+        | HirCicsOutputName::ConversationDataSet
+        | HirCicsOutputName::ConversationDataLength
+        | HirCicsOutputName::ConversationDataFullLength
+        | HirCicsOutputName::ConversationDataRetcode
+        | HirCicsOutputName::ConversationDataConvData
+        | HirCicsOutputName::ConversationDataState => Ok(()),
     }
 }

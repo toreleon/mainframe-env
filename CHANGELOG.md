@@ -4,6 +4,78 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Integrated exactly seven CIC-905 conversation data/wait rows with the
+  existing 184 typed routes, yielding 191 typed and 72 unready application
+  commands while retaining the sealed CONVERSE, EXTRACT, CardDemo, and bounded
+  CIC-906 routes. The shared ledger uses the pinned `dfha80c` conversation
+  STATE table (`ALLOCATED=82` through `SYNCSEND=94`).
+- Routed mapped APPC/MRO SEND, WAIT CONVID, and WAIT TERMINAL through the
+  accepted host ABI and shared conversation-open exchange ledger. CONNECT and
+  SEND frames use durable pre-dispatch markers, read-only reconciliation,
+  source STATE values, and exact replay. WAIT TERMINAL observes EOC or SIGNAL
+  once without consuming the peer data; a principal terminal with completed
+  synchronous output returns normally.
+- Routed APPC basic GDS WAIT through the same carrier boundary and durable
+  basic record, returning source CONVDATA, RETCODE, and STATE. SQLite restart
+  checks an attempted CONNECT by reconciliation without retransmission.
+- Added a confirmed negative partner response to the conversation carrier.
+  SEND CONFIRM persists its four-byte error code by send ID and writes EIBERR
+  and EIBERRCD on first completion and exact reissue.
+- Selected APPC basic GDS RECEIVE through the accepted host ABI and durable
+  conversation record. BUFFER and LLID delimiters, CONVDATA, STATE, FLENGTH,
+  six-byte RETCODE failures, one-time SIGNAL, exact replay, and SQLite reopen
+  have focused direct-provider coverage; this assembler/C-only row has no
+  COBOL runtime alias.
+- Selected mapped APPC/MRO RECEIVE through the accepted host ABI, typed COBOL
+  interpreter, and durable peer exchange. The route handles NOTRUNCATE,
+  truncation, EOC, SIGNAL, MRO FMH, STATE, length outputs, and exact replay.
+  Memory, SQLite reopen, pointer lifetime, and a compiled online provider
+  route now cover the promoted application row `0161`.
+- The shared conversation record can now bind an MRO alternate facility's
+  trusted symbolic SESSION name. MRO RECEIVE resolves that name under the
+  existing owner and lease and gives INBFMH precedence over EOC.
+- Reserved distinct MCEP v2 identities for the seven CIC-905 conversation
+  data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
+  Extended the shared durable conversation record with bounded peer data,
+  staged sends, explicit transmission acknowledgement, partial receive, and
+  GDS return-code contracts. Their selected routes are described above.
+- Peer conversation frames now carry a monotonic event sequence and digest,
+  while staged sends carry distinct acknowledgement IDs. Exact duplicate
+  delivery or acknowledgement is idempotent; gaps and conflicting replays fail
+  without advancing the shared durable conversation record.
+- Added a transport-neutral send confirmation and read-only reconciliation
+  boundary. The shared conversation row retains a pre-dispatch marker, and a
+  restarted flush reconciles the same send ID without transmitting it again.
+  The adapter alone grants no application row readiness; the seven selected
+  routes have their own registrations and regressions.
+- A confirmed flush now drains every staged frame in send-ID order, retaining
+  one-time dispatch and reconciliation for each frame.
+- Added source-shaped GDS `CONVDATA` bytes for APPC basic receive and wait,
+  including field-complete, receive, signal, confirm, syncpoint, free, error
+  code, rollback, and zeroed reserved fields.
+- A GDS RECEIVE now consumes a pending peer SIGNAL once and preserves CDBSIG
+  in that command's CONVDATA reply while clearing the pending ledger bit.
+- Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,
+  `MAXFLENGTH` is bounded to 32,767, and BUFFER/LLID cannot be combined.
+- The typed SEND plan now admits the pinned APPC/MRO control-only INVITE form
+  without FROM or a data length; an orphan data length still fails closed.
+- Reused the committed offline CICS CVDA pin for conversation STATE and bound
+  all 13 IBM fullword codes, including PENDRECEIVE, in the shared state type.
+- Added a durable principal signal facility for the six LU classes named by
+  WAIT SIGNAL. Ordered peer events, one-time consumption, lease fencing, task
+  cleanup, and SQLite reopen are covered.
+- Registered the source-bounded WAIT SIGNAL row through typed COBOL, the host
+  ABI, the durable provider, and online suspend/resume. Exact replay survives
+  outer receipt failure; Memory and SQLite tests cover event consumption.
+- Bound WAIT SIGNAL's six-byte EIBRCODE to the pinned terminal-control SIGNAL,
+  NOTALLOC, and TERMERR bytes and the corresponding EIBRESP byte.
+- Trusted principal ingress can now persist an ordered terminal failure;
+  WAIT SIGNAL returns TERMERR after restart and rejects later signals.
+- Added the pinned one-byte EIBSIG update and made source-defined SIGNAL and
+  EOC default conditions ignorable, while INBFMH retains its failure default.
+
 ### Changed
 
 - Added a bounded CIC-906 PostgreSQL BTS LINK subprocess restart selector with

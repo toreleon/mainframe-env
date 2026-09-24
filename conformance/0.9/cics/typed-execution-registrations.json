@@ -88,6 +88,48 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0030"
     },
     {
+      "operation": "ReceiveConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0161"
+    },
+    {
+      "operation": "GdsReceiveConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0162"
+    },
+    {
+      "operation": "SendConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0187"
+    },
+    {
+      "operation": "GdsWaitConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0231"
+    },
+    {
+      "operation": "WaitConvid",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0232"
+    },
+    {
+      "operation": "WaitTerminal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0238"
+    },
+    {
       "operation": "AsktimeEib",
       "interface": "api",
       "family": "time",
@@ -856,6 +898,13 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0234"
+    },
+    {
+      "operation": "WaitSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0237"
     },
     {
       "operation": "WaitJournalName",

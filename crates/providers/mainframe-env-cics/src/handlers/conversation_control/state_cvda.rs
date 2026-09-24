@@ -7,22 +7,7 @@ use mainframe_env_host_api::{CicsResponse, HostProblem};
 const STATE_SCHEMA: &str = "mainframe-env.cics.cvda@1";
 
 pub(super) fn bytes(state: ConversationState) -> Vec<u8> {
-    let value: i32 = match state {
-        ConversationState::Allocated => 82,
-        ConversationState::ConfFree => 83,
-        ConversationState::ConfReceive => 84,
-        ConversationState::ConfSend => 85,
-        ConversationState::Free => 86,
-        ConversationState::PendFree => 87,
-        ConversationState::PendReceive => 88,
-        ConversationState::Receive => 89,
-        ConversationState::Rollback => 90,
-        ConversationState::Send => 91,
-        ConversationState::SyncFree => 92,
-        ConversationState::SyncReceive => 93,
-        ConversationState::SyncSend => 94,
-    };
-    value.to_be_bytes().to_vec()
+    state.cvda().to_be_bytes().to_vec()
 }
 
 pub(super) fn insert_output(

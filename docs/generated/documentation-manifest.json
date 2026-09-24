@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:5c360eee25251fb4dbb4e415f278ea6cdeebda744912ddb0244cad127053d448",
+      "sha256": "sha256:751c8b39d78c6eda316a03d09bebcb2c37d326fee21ce86bfdf5e95f1fb095c1",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:f5dc4ce7af371ae45a2d0e0da251f5040e1ab8282aca4432e589e630661eca2c",
+      "sha256": "sha256:4251639af133995505cca70a3d3c92add7bc380169a41bda33b236825bd9ffe5",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -833,7 +833,7 @@
       "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md",
       "relative_links": 1,
       "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
-      "sha256": "sha256:a136cbbfe1ee5fadd8a4f3d1f5bd756066494457b824e0881ae04272375fe9e2",
+      "sha256": "sha256:6fdb627d819b8df702dbeddbbff33625c3af8d70bd05f17e8194eab409b4bfc7",
       "status": "Proposed for v0.9 development",
       "title": "ADR-0020: Persist explicit conversation peer frames with protocol state",
       "xtask_commands": 0
@@ -1198,7 +1198,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 89,
-      "sha256": "sha256:85da23311bc5838453f0e5f7ad30ee4d4fe7d540567cf547a0f40086f87530b2",
+      "sha256": "sha256:6c2e4c42cf10e729a47d712a3ab8c153d91e2b5d86ff4a5106eaaaa70b97eb73",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },

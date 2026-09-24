@@ -20,11 +20,18 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         CicsPlanOperation::BuildAttach => CicsOperation::BuildAttach,
         CicsPlanOperation::ConnectProcess => CicsOperation::ConnectProcess,
         CicsPlanOperation::Converse => CicsOperation::Converse,
+        CicsPlanOperation::ReceiveConversation => CicsOperation::ReceiveConversation,
+        CicsPlanOperation::SendConversation => CicsOperation::SendConversation,
+        CicsPlanOperation::WaitConvid => CicsOperation::WaitConvid,
+        CicsPlanOperation::WaitSignal => CicsOperation::WaitSignal,
+        CicsPlanOperation::WaitTerminal => CicsOperation::WaitTerminal,
         CicsPlanOperation::FreeConversation => CicsOperation::FreeConversation,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::GdsConnectProcess
-        | CicsPlanOperation::GdsFreeConversation => return None,
+        | CicsPlanOperation::GdsFreeConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::GdsWaitConversation => return None,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,

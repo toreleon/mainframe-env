@@ -41,6 +41,12 @@ SHA-256 identities are recorded in the [0.9 status ledger](../delivery/coverage-
    licensed APPC execution. Source condition policy, EIB flags, and output
    bounds remain command-level responsibilities. The ledger row is capped at
    4 MiB, each frame at 1 MiB, and each per-conversation queue at 32 frames.
+6. RECEIVE and SEND use that same exchange row. SEND stages numbered frames;
+   WAIT and explicit carrier confirmation advance them in order. An attempted
+   send is reconciled by its ID after an uncertain outcome and is never
+   transmitted again under that ID. GDS data and principal signal events stay
+   under the same owner and lease in this ledger. Mapped, basic, and terminal
+   indicators retain their source-specific presentation and replay behavior.
 
 ## Consequences
 
@@ -54,4 +60,5 @@ SHA-256 identities are recorded in the [0.9 status ledger](../delivery/coverage-
   predating this addition needs a pre-upgrade snapshot for rollback after a
   pending frame is written.
 - The same authority can be consumed by later SEND, RECEIVE and GDS siblings
-  without adding their command rows or tags to this slice.
+  through their own command rows and reserved tags. The selected data and wait
+  slice adds exactly seven rows while preserving CONVERSE and EXTRACT authority.

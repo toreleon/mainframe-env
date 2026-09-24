@@ -2,6 +2,15 @@ use super::{CicsOutputName, CicsPlanOperation};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => {
+            super::conversation_data_shape::output_allowed(operation, output)
+        }
         CicsPlanOperation::FetchAny => matches!(
             output,
             CicsOutputName::BtsAny

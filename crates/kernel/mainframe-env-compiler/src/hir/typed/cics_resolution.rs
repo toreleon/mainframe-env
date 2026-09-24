@@ -23,6 +23,7 @@ mod certificate_control;
 mod clause_parser;
 mod command_recognition;
 mod conversation_control;
+mod conversation_data;
 mod conversation_open;
 mod convert_time;
 mod counter_control;
@@ -430,6 +431,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if conversation_open::is_conversation(operation) => {
             conversation_open::allowed_clauses(operation)
         }
+        operation if conversation_data::is_data_wait(operation) => {
+            conversation_data::allowed_clauses(operation)
+        }
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -582,6 +586,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if conversation_open::is_conversation(operation) => {
             conversation_open::allowed_options(operation)
         }
+        operation if conversation_data::is_data_wait(operation) => {
+            conversation_data::allowed_options(operation)
+        }
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::StartAttach => &["NOHANDLE"],
         HirCicsOperation::StartBrexit => &["BREXIT", "NOHANDLE"],
@@ -675,6 +682,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     program_control::validate(operation, &clauses, &raw_options)?;
     conversation_open::validate(&clauses, &raw_options, operation)?;
+    conversation_data::validate(&clauses, &raw_options, operation)?;
     file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
@@ -811,6 +819,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Signoff => &[][..],
         operation if conversation_open::is_conversation(operation) => {
             conversation_open::required_clauses(operation)
+        }
+        operation if conversation_data::is_data_wait(operation) => {
+            conversation_data::required_clauses(operation)
         }
         HirCicsOperation::VerifyPhrase => &["PHRASE", "PHRASELEN", "USERID"][..],
         HirCicsOperation::Syncpoint => &[][..],
@@ -981,6 +992,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(conversation_control::operands(
         &clauses, operation, semantic,
     )?);
+    operands.extend(conversation_data::operands(&clauses, operation, semantic)?);
     operands.extend(security_control::operands(&clauses, operation, semantic)?);
     operands.extend(conversation_open::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
@@ -1053,6 +1065,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(conversation_control::outputs(
         &clauses, operation, semantic,
     )?);
+    outputs.extend(conversation_data::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(bts_child_link::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_open::outputs(&clauses, operation, semantic)?);
@@ -1084,6 +1097,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         })
         .map(|option| {
             conversation_open::option(operation, option)
+                .or_else(|| conversation_data::option(operation, option))
                 .or_else(|| bts_child_link::option(operation, option))
                 .or_else(|| counter_control::option(operation, option))
                 .or_else(|| event_control::option(operation, option))

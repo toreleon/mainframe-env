@@ -112,9 +112,10 @@ pub(super) fn suspension(
         CicsOperation::Converse => ("cics-converse", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
-            ("cics-event", true)
-        }
+        CicsOperation::WaitEvent
+        | CicsOperation::WaitExternal
+        | CicsOperation::WaitCics
+        | CicsOperation::WaitSignal => ("cics-event", true),
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         operation if operation.is_counter() => ("cics-counter", true),
@@ -200,6 +201,9 @@ pub(super) fn execute(
     }
     if plan.operation == CicsPlanOperation::ExtractLogonMsg {
         retrieve::release_logon_message_set(machine);
+    }
+    if plan.operation == CicsPlanOperation::ReceiveConversation {
+        retrieve::release_conversation_receive_set(machine);
     }
     if matches!(
         plan.operation,
@@ -516,6 +520,30 @@ pub(super) fn execute(
             tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
         }
         match output.name {
+            CicsOutputName::ConversationDataInto => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "INTO.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::ConversationDataSet => {
+                arguments.extend(retrieve::allocation_arguments(
+                    machine,
+                    &target,
+                    plan.operation,
+                )?);
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::LogonSet | CicsOutputName::PipList => {
                 let capacity = retrieve::allocation_capacity(machine, &target)?;
                 arguments.insert(
@@ -704,6 +732,11 @@ pub(super) fn execute(
             | CicsOutputName::WebConverseStatusLength
             | CicsOutputName::WebConverseMediaType
             | CicsOutputName::WebConverseBodyCharset
+            | CicsOutputName::ConversationDataLength
+            | CicsOutputName::ConversationDataFullLength
+            | CicsOutputName::ConversationDataRetcode
+            | CicsOutputName::ConversationDataConvData
+            | CicsOutputName::ConversationDataState
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

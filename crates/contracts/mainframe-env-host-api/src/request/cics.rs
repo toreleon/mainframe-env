@@ -25,6 +25,18 @@ pub enum CicsOperation {
     GdsFreeConversation,
     /// Send and receive one explicit mapped APPC or MRO peer frame.
     Converse,
+    /// Consume one task-owned mapped APPC or MRO peer frame.
+    ReceiveConversation,
+    /// Receive APPC basic data and indicators with a six-byte GDS RETCODE.
+    GdsReceiveConversation,
+    /// Stage mapped APPC or MRO data for carrier-confirmed transmission.
+    SendConversation,
+    /// Confirm accumulated mapped APPC process and SEND transmission.
+    WaitConvid,
+    /// Confirm APPC basic accumulated output with a six-byte GDS RETCODE.
+    GdsWaitConversation,
+    /// Confirm terminal output and observe one peer EOC or SIGNAL indicator.
+    WaitTerminal,
     Abend,
     /// Fetch the next completed child token owned by this parent task.
     FetchAny,
@@ -284,6 +296,8 @@ pub enum CicsOperation {
     WaitExternal,
     /// Wait on one or more MVS-format ECBs, including hand-posted events.
     WaitCics,
+    /// Suspend the principal supported logical unit until a SIGNAL arrives.
+    WaitSignal,
     Syncpoint,
     /// Typed CICS web-service-control command InvokeService.
     InvokeService,
@@ -372,6 +386,12 @@ impl CicsOperation {
             Self::FreeConversation => "FreeConversation",
             Self::GdsFreeConversation => "GdsFreeConversation",
             Self::Converse => "Converse",
+            Self::ReceiveConversation => "ReceiveConversation",
+            Self::GdsReceiveConversation => "GdsReceiveConversation",
+            Self::SendConversation => "SendConversation",
+            Self::WaitConvid => "WaitConvid",
+            Self::GdsWaitConversation => "GdsWaitConversation",
+            Self::WaitTerminal => "WaitTerminal",
             Self::Abend => "Abend",
             Self::FetchAny => "FetchAny",
             Self::FetchChild => "FetchChild",
@@ -511,6 +531,7 @@ impl CicsOperation {
             Self::WaitEvent => "WaitEvent",
             Self::WaitExternal => "WaitExternal",
             Self::WaitCics => "WaitCics",
+            Self::WaitSignal => "WaitSignal",
             Self::Syncpoint => "Syncpoint",
             Self::InvokeService => "InvokeService",
             Self::SoapFaultAdd => "SoapFaultAdd",
@@ -593,6 +614,12 @@ impl CicsOperation {
                 | Self::FreeConversation
                 | Self::GdsFreeConversation
                 | Self::Converse
+                | Self::ReceiveConversation
+                | Self::GdsReceiveConversation
+                | Self::SendConversation
+                | Self::WaitConvid
+                | Self::GdsWaitConversation
+                | Self::WaitTerminal
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -719,6 +746,7 @@ impl CicsOperation {
                 | Self::WaitEvent
                 | Self::WaitExternal
                 | Self::WaitCics
+                | Self::WaitSignal
         )
     }
 
@@ -758,6 +786,10 @@ impl CicsOperation {
             ("FREE", _) => Self::FreeConversation,
             ("GDS", Some("FREE")) => Self::GdsFreeConversation,
             ("CONVERSE", _) => Self::Converse,
+            ("GDS", Some("RECEIVE")) => Self::GdsReceiveConversation,
+            ("WAIT", Some("CONVID")) => Self::WaitConvid,
+            ("GDS", Some("WAIT")) => Self::GdsWaitConversation,
+            ("WAIT", Some("TERMINAL")) => Self::WaitTerminal,
             ("ABEND", _) => Self::Abend,
             ("EXTRACT", Some("ATTACH")) => Self::ExtractAttach,
             ("EXTRACT", Some("ATTRIBUTES")) => Self::ExtractAttributes,
@@ -864,6 +896,7 @@ impl CicsOperation {
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
             ("RECEIVE", Some("PARTN")) => Self::ReceivePartn,
+            ("RECEIVE", _) => Self::ReceiveConversation,
             ("RETRIEVE", Some("REATTACH")) => Self::RetrieveReattachEvent,
             ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
             ("RETRIEVE", _) => Self::Retrieve,
@@ -887,6 +920,7 @@ impl CicsOperation {
             ("ISSUE", Some("WAIT")) => Self::IssueWait,
             ("SEND", Some("PAGE")) => Self::SendPage,
             ("SEND", Some("PARTNSET")) => Self::SendPartnset,
+            ("SEND", Some("CONVID" | "SESSION")) => Self::SendConversation,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
             ("SPOOLCLOSE", _) => Self::SpoolClose,
@@ -908,6 +942,7 @@ impl CicsOperation {
             ("WAIT", Some("EVENT")) => Self::WaitEvent,
             ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
             ("WAITCICS", _) => Self::WaitCics,
+            ("WAIT", Some("SIGNAL")) => Self::WaitSignal,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,

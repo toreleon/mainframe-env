@@ -12,6 +12,7 @@ mod certificate;
 mod codec_tags;
 mod condition_handlers;
 mod conversation_control;
+mod conversation_data_shape;
 mod conversation_open;
 mod counter_control;
 mod diagnostics;
@@ -178,7 +179,8 @@ fn encode_cics_effect_plan_version(
             || (130..=139).contains(&operation_tag(plan.operation))
             || (154..=164).contains(&operation_tag(plan.operation))
             || (231..=238).contains(&operation_tag(plan.operation))
-            || (222..=230).contains(&operation_tag(plan.operation)))
+            || (222..=230).contains(&operation_tag(plan.operation))
+            || (259..=265).contains(&operation_tag(plan.operation)))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -254,7 +256,8 @@ pub fn decode_cics_effect_plan(
             || (130..=139).contains(&operation_tag)
             || (154..=164).contains(&operation_tag)
             || (231..=238).contains(&operation_tag)
-            || (222..=230).contains(&operation_tag))
+            || (222..=230).contains(&operation_tag)
+            || (259..=265).contains(&operation_tag))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -465,6 +468,15 @@ fn validate_operation_shape(
         | CicsPlanOperation::FreeConversation
         | CicsPlanOperation::GdsFreeConversation => {
             conversation_open::invalid_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => {
+            conversation_data_shape::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::Address => address::invalid_shape(plan, inputs, outputs),

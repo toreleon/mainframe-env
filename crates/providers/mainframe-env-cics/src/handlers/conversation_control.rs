@@ -13,6 +13,7 @@ mod allocate;
 mod build_attach;
 mod connect_process;
 mod converse;
+mod data;
 mod definitions;
 mod exchange;
 mod free;
@@ -21,10 +22,22 @@ mod gds_allocate;
 mod gds_assign;
 mod gds_connect_process;
 mod gds_free;
+mod gds_receive;
+mod gds_wait;
 mod ledger;
 mod peer;
+mod receive;
 mod replay;
+mod send;
 mod state_cvda;
+mod transport;
+mod wait_convid;
+mod wait_signal;
+mod wait_terminal;
+pub use data::{
+    ConversationConnectFrame, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    DataCondition,
+};
 pub use definitions::{
     ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
     ConversationProfileDefinition,
@@ -35,16 +48,70 @@ pub use exchange::{
     MAX_PENDING_PEER_FRAMES, MAX_RECORDED_OUTBOUND_FRAMES,
 };
 pub use gds::{
-    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
+    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure,
+    GdsReturnCode, GdsWaitFailure,
 };
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
-    ConversationSystemDefinition,
+    ConversationSystemDefinition, SignalFacilityRecord, SignalLuType,
 };
 pub use replay::{
     CONVERSATION_REPLAY_NAMESPACE, ConversationReplay, ConversationReply, load_conversation_replay,
     prune_conversation_replays,
 };
+pub use transport::{CicsConversationTransport, ConversationTransmitOutcome};
+
+impl CicsService {
+    pub(in crate::service) fn conversation_transport(
+        &self,
+    ) -> Result<Option<std::sync::Arc<dyn CicsConversationTransport>>, HostProblem> {
+        Ok(self.lock()?.conversation_transport.clone())
+    }
+
+    pub fn install_conversation_transport(
+        &self,
+        transport: std::sync::Arc<dyn CicsConversationTransport>,
+    ) -> Result<(), HostProblem> {
+        let mut state = self.lock()?;
+        if let Some(existing) = state.conversation_transport.as_ref() {
+            return if std::sync::Arc::ptr_eq(existing, &transport) {
+                Ok(())
+            } else {
+                Err(HostProblem::IdempotencyConflict)
+            };
+        }
+        state.conversation_transport = Some(transport);
+        Ok(())
+    }
+}
+
+pub(in crate::service) fn release_task(
+    service: &CicsService,
+    run: &Run,
+) -> Result<(), HostProblem> {
+    let owner = ConversationOwner {
+        execution: run.invocation.execution_id.as_str().into(),
+        run_unit: run.invocation.run_unit_id.as_str().into(),
+        lease_epoch: u64::from(run.invocation.attempt),
+    };
+    for _ in 0..32 {
+        let current = ConversationLedger::load(service.store.as_ref())
+            .map_err(crate::service::store_error)?;
+        let mut next = current.clone();
+        next.release_task(&owner)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if next == current {
+            return Ok(());
+        }
+        if current
+            .persist(&mut next, service.store.as_ref())
+            .map_err(|error| crate::service::mutation_problem(crate::service::store_error(error)))?
+        {
+            return Ok(());
+        }
+    }
+    Err(HostProblem::UnknownOutcome)
+}
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
@@ -60,6 +127,7 @@ pub(in crate::service) fn invoke(
             gds_allocate::invoke(service, run, request, retention_tick)
         }
         CicsOperation::GdsAssignConversation => gds_assign::invoke(service, run, request),
+        CicsOperation::WaitSignal => wait_signal::invoke(service, run, request, retention_tick),
         CicsOperation::BuildAttach => build_attach::invoke(service, run, request, retention_tick),
         CicsOperation::ConnectProcess => {
             connect_process::invoke(service, run, request, retention_tick)
@@ -71,6 +139,18 @@ pub(in crate::service) fn invoke(
         CicsOperation::GdsFreeConversation => {
             gds_free::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::ReceiveConversation => {
+            receive::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::GdsReceiveConversation => {
+            gds_receive::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::SendConversation => send::invoke(service, run, request, retention_tick),
+        CicsOperation::GdsWaitConversation => {
+            gds_wait::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::WaitConvid => wait_convid::invoke(service, run, request, retention_tick),
+        CicsOperation::WaitTerminal => wait_terminal::invoke(service, run, request, retention_tick),
         CicsOperation::Converse => converse::invoke(service, run, request, retention_tick),
         _ => Err(HostProblem::Unsupported),
     }
@@ -112,6 +192,7 @@ pub const MAX_PROCESS_BYTES: usize = 64;
 pub const MAX_PIP_BYTES: usize = 32_763;
 /// APPC basic PIP limit from GDS CONNECT PROCESS.
 pub const MAX_BASIC_PIP_BYTES: usize = 763;
+const MAX_CONVERSATION_RECORD_BYTES: usize = 384 * 1024;
 
 /// The session protocol selected at allocation, independent of its carrier.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -142,6 +223,27 @@ pub enum ConversationState {
     SyncReceive,
     SyncSend,
     Rollback,
+}
+
+impl ConversationState {
+    /// Fullword conversation STATE CVDA from the pinned dfha80c table.
+    pub const fn cvda(self) -> i32 {
+        match self {
+            Self::Allocated => 82,
+            Self::ConfFree => 83,
+            Self::ConfReceive => 84,
+            Self::ConfSend => 85,
+            Self::Free => 86,
+            Self::PendFree => 87,
+            Self::PendReceive => 88,
+            Self::Receive => 89,
+            Self::Rollback => 90,
+            Self::Send => 91,
+            Self::SyncFree => 92,
+            Self::SyncReceive => 93,
+            Self::SyncSend => 94,
+        }
+    }
 }
 
 /// The invocation that owns a conversation. Its lease epoch fences resumed
@@ -189,6 +291,12 @@ pub struct ConversationRecord {
     /// canonical v1 records, whose default is recovered by the v2 reader.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub processing_profile: Option<String>,
+    /// Trusted TCTTE selector for an MRO alternate facility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mro_session_name: Option<String>,
+    /// Peer and local data share this allocation's durable owner and CAS lifecycle.
+    #[serde(default, skip_serializing_if = "ConversationDataState::is_empty")]
+    pub data: ConversationDataState,
 }
 
 /// Local/DPL invocation context supplied by the trusted host boundary.
@@ -258,6 +366,8 @@ impl ConversationRecord {
             indicators: ConversationIndicators::default(),
             sequence: 0,
             processing_profile: Some(processing_profile.into()),
+            mro_session_name: None,
+            data: ConversationDataState::default(),
         };
         record.validate()?;
         Ok(record)
@@ -266,7 +376,7 @@ impl ConversationRecord {
     /// Decode an existing provider row. Unknown schema versions, malformed
     /// lengths and impossible state combinations cannot become live sessions.
     pub fn decode(bytes: &[u8]) -> Result<Self, ConversationProblem> {
-        if bytes.len() > 2048 {
+        if bytes.len() > MAX_CONVERSATION_RECORD_BYTES {
             return Err(ConversationProblem::Length);
         }
         let record: Self =
@@ -278,7 +388,7 @@ impl ConversationRecord {
     pub fn encode(&self) -> Result<Vec<u8>, ConversationProblem> {
         self.validate()?;
         let encoded = serde_json::to_vec(self).map_err(|_| ConversationProblem::Malformed)?;
-        if encoded.len() > 2048 {
+        if encoded.len() > MAX_CONVERSATION_RECORD_BYTES {
             return Err(ConversationProblem::Length);
         }
         Ok(encoded)
@@ -297,11 +407,20 @@ impl ConversationRecord {
     pub fn validate(&self) -> Result<(), ConversationProblem> {
         if !matches!(self.version, 1 | CONVERSATION_RECORD_VERSION)
             || self.version == 1 && self.processing_profile.is_some()
+            || self.version == 1 && (self.mro_session_name.is_some() || !self.data.is_empty())
             || self.version == CONVERSATION_RECORD_VERSION && self.processing_profile.is_none()
             || self.processing_profile.as_ref().is_some_and(|profile| {
                 profile.is_empty()
                     || profile.len() > 8
                     || !profile.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+                    })
+            })
+            || self.mro_session_name.as_ref().is_some_and(|name| {
+                self.kind != ConversationKind::Mro
+                    || name.is_empty()
+                    || name.len() > 4
+                    || !name.bytes().all(|byte| {
                         byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
                     })
             })
@@ -319,6 +438,7 @@ impl ConversationRecord {
             || self.pip.len() > pip_limit(self.kind)
             || self.sync_level.is_some_and(|level| level > 2)
             || (self.released && self.state != ConversationState::Free)
+            || (self.released && !self.data.is_empty())
             || (self.process.is_none() && self.sync_level.is_some())
             || (!matches!(
                 self.kind,
@@ -338,6 +458,7 @@ impl ConversationRecord {
             return Err(ConversationProblem::Malformed);
         }
         validate_pip(&self.pip, self.kind)?;
+        self.data.validate()?;
         Ok(())
     }
 
@@ -462,6 +583,13 @@ impl ConversationRecord {
         if self.kind != ConversationKind::AppcBasic || self.state != ConversationState::Send {
             return Err(ConversationProblem::WrongState);
         }
+        if let Some((send_id, frame, _)) = self.data.next_outbound() {
+            if frame.connect.is_none() || self.data.pending_outbound() != 1 {
+                return Err(ConversationProblem::WrongState);
+            }
+            self.mark_send_attempted(owner, context, send_id)?;
+            self.acknowledge_send(owner, context, send_id)?;
+        }
         self.next_sequence()?;
         self.state = ConversationState::Free;
         self.indicators.free_required = true;
@@ -489,9 +617,13 @@ impl ConversationRecord {
         {
             return Err(ConversationProblem::WrongState);
         }
+        if self.data.pending_outbound() != 0 {
+            return Err(ConversationProblem::WrongState);
+        }
         self.next_sequence()?;
         self.state = ConversationState::Free;
         self.released = true;
+        self.data = ConversationDataState::default();
         Ok(())
     }
 
@@ -786,5 +918,12 @@ mod tests {
         assert!(!String::from_utf8_lossy(&bytes).contains("processing_profile"));
         assert_eq!(legacy.effective_processing_profile(), "DFHCICSA");
         assert_eq!(ConversationRecord::decode(&bytes), Ok(legacy));
+        let mut impossible =
+            ConversationRecord::allocate(*b"C008", "SYS1", ConversationKind::Mro, owner(3), false)
+                .unwrap();
+        impossible.version = 1;
+        impossible.processing_profile = None;
+        impossible.mro_session_name = Some("S001".into());
+        assert_eq!(impossible.validate(), Err(ConversationProblem::Malformed));
     }
 }

@@ -12521,7 +12521,7 @@ mod tests {
         )
         .unwrap()
     }
-    fn binary() -> Vec<u8> {
+    pub(super) fn binary() -> Vec<u8> {
         let mut b = ModuleBuilder::new(IrLimits::default());
         let s = b.add_storage("msg", 5, None).unwrap();
         let r = b.add_region().unwrap();
