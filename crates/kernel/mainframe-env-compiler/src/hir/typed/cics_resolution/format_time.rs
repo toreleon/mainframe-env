@@ -218,5 +218,9 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SecurityLangInUse
         | HirCicsOutputName::SecurityNatLangInUse
         | HirCicsOutputName::Assign(_) => Ok(()),
+        HirCicsOutputName::BtsAny
+        | HirCicsOutputName::BtsCompStatus
+        | HirCicsOutputName::BtsChannel
+        | HirCicsOutputName::BtsAbcode => Ok(()),
     }
 }

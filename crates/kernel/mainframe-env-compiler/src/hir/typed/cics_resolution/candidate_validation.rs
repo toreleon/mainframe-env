@@ -100,6 +100,14 @@ pub(super) fn validate_candidate(
                 ));
             }
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
+                if matches!(
+                    descriptor.label_tokens,
+                    ["FETCH", "ANY"] | ["FETCH", "CHILD"]
+                ) && *name == "COMPSTATUS"
+                    && has_value
+                {
+                    continue;
+                }
                 if web_control::reviewed_ambiguous_shape(descriptor, name, has_value) {
                     continue;
                 }

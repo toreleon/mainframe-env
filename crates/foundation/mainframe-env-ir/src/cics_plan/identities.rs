@@ -4,6 +4,18 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Fetch one eligible parent-owned child task.
+    FetchAny,
+    /// Fetch one child task by its opaque token.
+    FetchChild,
+    /// Release one parent-owned child token.
+    FreeChild,
+    /// Link to the UOW-acquired BTS activity.
+    LinkAcqActivity,
+    /// Link to the UOW-acquired BTS process root.
+    LinkAcqProcess,
+    /// Link to a named child of the current activity.
+    LinkActivity,
     /// Change a standard RACF password under one SAF effect.
     ChangePassword,
     /// Change a length-selected password or phrase under one SAF effect.
@@ -310,6 +322,14 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    /// Opaque sixteen-byte child token.
+    BtsChild,
+    /// Name of a current activity's child.
+    BtsActivity,
+    /// Input event for a dormant BTS activity.
+    BtsInputEvent,
+    /// Fullword wait limit in milliseconds.
+    BtsTimeout,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
@@ -834,6 +854,12 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    /// Return immediately when a child is not finished.
+    BtsNoSuspend,
+    /// Select the activity acquired by this unit of work.
+    BtsAcqActivity,
+    /// Select the process acquired by this unit of work.
+    BtsAcqProcess,
     /// BasicAuth token syntax.
     SecurityBasicAuth,
     /// JSON Web Token syntax.

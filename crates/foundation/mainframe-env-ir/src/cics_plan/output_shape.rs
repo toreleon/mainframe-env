@@ -2,6 +2,23 @@ use super::{CicsOutputName, CicsPlanOperation};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        CicsPlanOperation::FetchAny => matches!(
+            output,
+            CicsOutputName::BtsAny
+                | CicsOutputName::BtsCompStatus
+                | CicsOutputName::BtsChannel
+                | CicsOutputName::BtsAbcode
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::FetchChild => matches!(
+            output,
+            CicsOutputName::BtsCompStatus
+                | CicsOutputName::BtsChannel
+                | CicsOutputName::BtsAbcode
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Asktime => matches!(
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2

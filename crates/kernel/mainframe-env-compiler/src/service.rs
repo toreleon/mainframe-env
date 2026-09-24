@@ -434,6 +434,63 @@ mod tests {
         bundle_in_format(source, SourceFormat::Free)
     }
 
+    #[test]
+    fn bts_child_link_six_rows_lower_with_reserved_tags_and_reject_conflicting_wait() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-X PIC X(16). 01 ANY-X PIC X(16). 01 CHANNEL-X PIC X(16). 01 AB-X PIC X(4). 01 STATUS-X PIC S9(9) COMP. 01 TIMEOUT-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FETCH ANY(ANY-X) COMPSTATUS(STATUS-X) CHANNEL(CHANNEL-X) ABCODE(AB-X) NOSUSPEND END-EXEC. EXEC CICS FETCH CHILD(CHILD-X) COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X) END-EXEC. EXEC CICS FREE CHILD(CHILD-X) END-EXEC. EXEC CICS LINK ACQACTIVITY END-EXEC. EXEC CICS LINK ACQPROCESS END-EXEC. EXEC CICS LINK ACTIVITY('SUBTASK') INPUTEVENT('GO') END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let hir = analysis.hir.unwrap();
+        let plans = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            plans.iter().map(|plan| plan.operation).collect::<Vec<_>>(),
+            vec![
+                CicsPlanOperation::FetchAny,
+                CicsPlanOperation::FetchChild,
+                CicsPlanOperation::FreeChild,
+                CicsPlanOperation::LinkAcqActivity,
+                CicsPlanOperation::LinkAcqProcess,
+                CicsPlanOperation::LinkActivity,
+            ]
+        );
+        for (plan, tag) in plans.iter().zip(216..=221) {
+            let bytes = encode_cics_effect_plan(plan, CicsPlanLimits::default()).unwrap();
+            assert_eq!(u16::from_be_bytes([bytes[6], bytes[7]]), tag);
+        }
+        assert!(
+            plans[0]
+                .options
+                .contains(&mainframe_env_ir::CicsPlanOption::BtsNoSuspend)
+        );
+        assert!(
+            plans[1]
+                .operands
+                .iter()
+                .any(|operand| operand.name == CicsOperandName::BtsTimeout)
+        );
+        let invalid = source.replace(
+            "COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X)",
+            "COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X) NOSUSPEND",
+        );
+        let rejected = CobolCompiler::default().analyze(&bundle(&invalid));
+        assert!(!rejected.diagnostics.is_empty());
+    }
+
     fn bundle_in_format(source: &str, format: SourceFormat) -> SourceBundle {
         bundle_with_options(source, format, BTreeMap::new())
     }
@@ -1789,6 +1846,12 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::FetchAny => crate::HirCicsOperation::FetchAny,
+                CicsPlanOperation::FetchChild => crate::HirCicsOperation::FetchChild,
+                CicsPlanOperation::FreeChild => crate::HirCicsOperation::FreeChild,
+                CicsPlanOperation::LinkAcqActivity => crate::HirCicsOperation::LinkAcqActivity,
+                CicsPlanOperation::LinkAcqProcess => crate::HirCicsOperation::LinkAcqProcess,
+                CicsPlanOperation::LinkActivity => crate::HirCicsOperation::LinkActivity,
                 CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
                 CicsPlanOperation::QuerySecurity => crate::HirCicsOperation::QuerySecurity,
                 CicsPlanOperation::VerifyPassword => crate::HirCicsOperation::VerifyPassword,

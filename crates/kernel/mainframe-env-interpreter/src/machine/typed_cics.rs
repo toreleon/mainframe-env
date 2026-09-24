@@ -393,6 +393,7 @@ pub(super) fn execute(
                         | CicsOperandName::WebReceiveMaxLength
                         | CicsOperandName::WebReceiveStatusLength
                         | CicsOperandName::WebPortNumber
+                        | CicsOperandName::BtsTimeout
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -498,6 +499,10 @@ pub(super) fn execute(
             | CicsOutputName::SecurityNatLangInUse
             | CicsOutputName::TimerStatus
             | CicsOutputName::EventName
+            | CicsOutputName::BtsAny
+            | CicsOutputName::BtsCompStatus
+            | CicsOutputName::BtsChannel
+            | CicsOutputName::BtsAbcode
             | CicsOutputName::SubEventName
             | CicsOutputName::EventType
             | CicsOutputName::FireStatus
@@ -670,6 +675,18 @@ pub(super) fn execute(
             "DELAY.ID".into(),
             payload(
                 "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::FetchAny | CicsPlanOperation::FetchChild
+    ) {
+        arguments.insert(
+            "FETCH.ID".into(),
+            payload(
+                "mainframe-env.cics.fetch-id@1",
                 format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
             )?,
         );

@@ -96,6 +96,7 @@ EXPECTED_FAMILIES = {
     "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "bts-control": "BtsControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
     "document-control": "DocumentControl",
@@ -494,6 +495,12 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0258",
     ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
+    ("FetchAny", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0077"),
+    ("FetchChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0078"),
+    ("FreeChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0083"),
+    ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
+    ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
+    ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
 ]
 
 CONTRACT_BATCHES = (
@@ -698,6 +705,7 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "FetchAny", "FetchChild", "FreeChild", "LinkAcqActivity", "LinkAcqProcess", "LinkActivity",
         "Abend",
         "AddSubevent",
         "Address",
@@ -915,6 +923,12 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "FetchAny": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FetchChild": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FreeChild": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "LinkAcqActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkAcqProcess": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
     "SignalEvent": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "RetrieveReattachEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "RetrieveSubevent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
@@ -1637,6 +1651,12 @@ def _load_typed_execution_registrations(
         "RetrieveSubevent",
         "TestEvent",
         "SignalEvent",
+        "FetchAny",
+        "FetchChild",
+        "FreeChild",
+        "LinkAcqActivity",
+        "LinkAcqProcess",
+        "LinkActivity",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -1957,6 +1977,9 @@ def load_catalog(
                 "DocumentSet",
                 "Enq",
                 "ExtractWeb",
+                "FetchAny",
+                "FetchChild",
+                "FreeChild",
                 "Freemain",
                 "Freemain64",
                 "Getmain",
@@ -1975,6 +1998,9 @@ def load_catalog(
                 "IssueSend",
                 "IssueWait",
                 "Load",
+                "LinkAcqActivity",
+                "LinkAcqProcess",
+                "LinkActivity",
                 "Release",
                 "Route",
                 "PopHandle",

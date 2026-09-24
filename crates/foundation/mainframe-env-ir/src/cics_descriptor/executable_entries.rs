@@ -3,7 +3,7 @@ mod security_entries;
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 151] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 157] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1142,4 +1142,52 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 151] = [
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[7],
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[8],
     security_entries::SECURITY_EXECUTABLE_DESCRIPTORS[9],
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::FetchAny,
+        namespace: "cics.bts",
+        name: "fetch-any",
+        major: 1,
+        effects: BTS_FETCH_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::FetchChild,
+        namespace: "cics.bts",
+        name: "fetch-child",
+        major: 1,
+        effects: BTS_FETCH_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::FreeChild,
+        namespace: "cics.bts",
+        name: "free-child",
+        major: 1,
+        effects: EVENT_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::LinkAcqActivity,
+        namespace: "cics.bts",
+        name: "link-acqactivity",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::LinkAcqProcess,
+        namespace: "cics.bts",
+        name: "link-acqprocess",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::LinkActivity,
+        namespace: "cics.bts",
+        name: "link-activity",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];

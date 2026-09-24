@@ -180,6 +180,10 @@ impl PlanContext<'_> {
     ) -> Result<CicsNamedOperand, CicsPlanProblem> {
         Ok(CicsNamedOperand {
             name: match operand.name {
+                HirCicsOperandName::BtsChild => CicsOperandName::BtsChild,
+                HirCicsOperandName::BtsActivity => CicsOperandName::BtsActivity,
+                HirCicsOperandName::BtsInputEvent => CicsOperandName::BtsInputEvent,
+                HirCicsOperandName::BtsTimeout => CicsOperandName::BtsTimeout,
                 HirCicsOperandName::Abcode => CicsOperandName::Abcode,
                 HirCicsOperandName::ResClass => CicsOperandName::ResClass,
                 HirCicsOperandName::ResId => CicsOperandName::ResId,
@@ -513,6 +517,10 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Mmddyyyy => CicsOutputName::Mmddyyyy,
                 HirCicsOutputName::Resp => CicsOutputName::Resp,
                 HirCicsOutputName::TimerStatus => CicsOutputName::TimerStatus,
+                HirCicsOutputName::BtsAny => CicsOutputName::BtsAny,
+                HirCicsOutputName::BtsCompStatus => CicsOutputName::BtsCompStatus,
+                HirCicsOutputName::BtsChannel => CicsOutputName::BtsChannel,
+                HirCicsOutputName::BtsAbcode => CicsOutputName::BtsAbcode,
                 HirCicsOutputName::EventName => CicsOutputName::EventName,
                 HirCicsOutputName::SubEventName => CicsOutputName::SubEventName,
                 HirCicsOutputName::EventType => CicsOutputName::EventType,
@@ -639,6 +647,12 @@ impl PlanContext<'_> {
 
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
+        HirCicsOperation::FetchAny => CicsPlanOperation::FetchAny,
+        HirCicsOperation::FetchChild => CicsPlanOperation::FetchChild,
+        HirCicsOperation::FreeChild => CicsPlanOperation::FreeChild,
+        HirCicsOperation::LinkAcqActivity => CicsPlanOperation::LinkAcqActivity,
+        HirCicsOperation::LinkAcqProcess => CicsPlanOperation::LinkAcqProcess,
+        HirCicsOperation::LinkActivity => CicsPlanOperation::LinkActivity,
         HirCicsOperation::Abend => CicsPlanOperation::Abend,
         HirCicsOperation::QuerySecurity => CicsPlanOperation::QuerySecurity,
         HirCicsOperation::VerifyPassword => CicsPlanOperation::VerifyPassword,
@@ -795,6 +809,9 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
 
 const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
+        HirCicsOption::BtsNoSuspend => CicsPlanOption::BtsNoSuspend,
+        HirCicsOption::BtsAcqActivity => CicsPlanOption::BtsAcqActivity,
+        HirCicsOption::BtsAcqProcess => CicsPlanOption::BtsAcqProcess,
         HirCicsOption::SecurityBasicAuth => CicsPlanOption::SecurityBasicAuth,
         HirCicsOption::SecurityJwt => CicsPlanOption::SecurityJwt,
         HirCicsOption::SecurityKerberos => CicsPlanOption::SecurityKerberos,

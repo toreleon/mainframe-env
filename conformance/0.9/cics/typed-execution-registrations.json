@@ -898,6 +898,48 @@
       "family": "event-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
+    },
+    {
+      "operation": "FetchAny",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0077"
+    },
+    {
+      "operation": "FetchChild",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0078"
+    },
+    {
+      "operation": "FreeChild",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0083"
+    },
+    {
+      "operation": "LinkAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0139"
+    },
+    {
+      "operation": "LinkAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0140"
+    },
+    {
+      "operation": "LinkActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0141"
     }
   ]
 }

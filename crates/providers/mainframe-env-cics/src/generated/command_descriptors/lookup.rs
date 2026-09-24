@@ -157,5 +157,11 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[150],
         CicsOperation::WriteTemporaryStorage => &CICS_COMMAND_DESCRIPTORS[151],
         CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[152],
+        CicsOperation::FetchAny => &CICS_COMMAND_DESCRIPTORS[153],
+        CicsOperation::FetchChild => &CICS_COMMAND_DESCRIPTORS[154],
+        CicsOperation::FreeChild => &CICS_COMMAND_DESCRIPTORS[155],
+        CicsOperation::LinkAcqActivity => &CICS_COMMAND_DESCRIPTORS[156],
+        CicsOperation::LinkAcqProcess => &CICS_COMMAND_DESCRIPTORS[157],
+        CicsOperation::LinkActivity => &CICS_COMMAND_DESCRIPTORS[158],
     }
 }

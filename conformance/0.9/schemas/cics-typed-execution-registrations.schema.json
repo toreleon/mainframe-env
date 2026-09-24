@@ -22,8 +22,8 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 128,
-      "maxItems": 128,
+      "minItems": 134,
+      "maxItems": 134,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -165,7 +165,13 @@
               "RetrieveReattachEvent",
               "RetrieveSubevent",
               "TestEvent",
-              "SignalEvent"
+              "SignalEvent",
+              "FetchAny",
+              "FetchChild",
+              "FreeChild",
+              "LinkAcqActivity",
+              "LinkAcqProcess",
+              "LinkActivity"
             ]
           },
           "interface": {
@@ -190,7 +196,8 @@
               "time",
               "transform-control",
               "web-control",
-              "web-service-control"
+              "web-service-control",
+              "bts-control"
             ]
           },
           "mutating": {
@@ -325,7 +332,13 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0176",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0177",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0219",
-              "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0194",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0077",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0078",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0083",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0139",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0140",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0141"
             ]
           }
         }

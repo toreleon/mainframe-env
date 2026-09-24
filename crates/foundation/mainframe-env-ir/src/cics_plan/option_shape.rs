@@ -2,6 +2,21 @@ use super::{CicsEffectPlan, CicsPlanOperation, CicsPlanOption};
 
 pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
     plan.options.iter().any(|option| match plan.operation {
+        CicsPlanOperation::FetchAny | CicsPlanOperation::FetchChild => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::BtsNoSuspend
+        ),
+        CicsPlanOperation::FreeChild | CicsPlanOperation::LinkActivity => {
+            !matches!(option, CicsPlanOption::NoHandle)
+        }
+        CicsPlanOperation::LinkAcqActivity => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::BtsAcqActivity
+        ),
+        CicsPlanOperation::LinkAcqProcess => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::BtsAcqProcess
+        ),
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

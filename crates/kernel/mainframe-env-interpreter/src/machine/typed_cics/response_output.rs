@@ -11,6 +11,30 @@ pub(in crate::machine) fn write_output(
     if web_service_control::write_output(machine, operation, name, target, value)? {
         return Ok(());
     }
+    if name == "COMPSTATUS"
+        && matches!(
+            operation,
+            CicsOperation::FetchAny | CicsOperation::FetchChild
+        )
+    {
+        if value.schema() != "mainframe-env.cics.cvda@1" {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let code = match value.bytes() {
+            b"NORMAL" => 0,
+            b"ABEND" => 1,
+            b"SECERROR" => 2,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        };
+        return write_target(
+            machine,
+            target,
+            &CobolValue::Decimal(Decimal {
+                coefficient: code,
+                scale: 0,
+            }),
+        );
+    }
     if matches!(name, "SET" | "ENTRY")
         && let Some(load_base) = load_base
     {

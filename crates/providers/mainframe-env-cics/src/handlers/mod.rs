@@ -1,5 +1,7 @@
 mod bms_map;
+mod bts_child_link;
 pub mod bts_lifecycle;
+mod bts_link;
 mod condition;
 mod counter_control;
 mod diagnostics;
@@ -61,6 +63,20 @@ pub(super) fn assert_descriptor(
     debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
 }
 
+fn bts_live(service: &CicsService, run: &Run, retention_tick: u64) -> Result<(), HostProblem> {
+    if run.invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    let tick = match &service.replay_clock {
+        Some(clock) => clock.now_tick()?,
+        None => retention_tick.saturating_sub(1),
+    };
+    if tick >= run.invocation.deadline_tick {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
+}
+
 pub(super) fn authorize_and_describe(
     service: &CicsService,
     run: &mut Run,
@@ -117,6 +133,8 @@ pub use bms_map::{BmsFieldDefinition, BmsMapDefinition};
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
+pub use bts_child_link::CicsBtsChildCompletion;
+pub use bts_link::CicsBtsLinkContext;
 pub(super) use condition::respond as condition;
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
@@ -207,6 +225,14 @@ pub(super) fn invoke_extended_control(
                 event_control::invoke(service, run, request)
             }
         }
+        crate::generated::CicsCommandFamily::BtsControl => match request.operation {
+            mainframe_env_host_api::CicsOperation::FetchAny
+            | mainframe_env_host_api::CicsOperation::FetchChild
+            | mainframe_env_host_api::CicsOperation::FreeChild => {
+                bts_child_link::invoke_child(service, run, request, retention_tick)
+            }
+            _ => bts_link::invoke(service, run, request, retention_tick),
+        },
         crate::generated::CicsCommandFamily::Diagnostics => {
             invoke_diagnostics(service, run, request)
         }
@@ -252,6 +278,8 @@ pub(super) fn invoke_interval_or_spool_control(
 }
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    bts_child_link::release_task(service, run)?;
+    bts_link::release_task(service, run)?;
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
     document_control::release_task(service, run)?;

@@ -17,6 +17,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
 mod assign_validation;
+mod bts_child_link;
 mod candidate_validation;
 mod clause_parser;
 mod command_recognition;
@@ -315,7 +316,11 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let transform_shape = transform_control::shape(operation);
     let web_shape = web_service_control::shape(operation);
     let event_shape = event_control::shape(operation);
-    let command_shape = transform_shape.as_ref().or(event_shape.as_ref());
+    let bts_shape = bts_child_link::shape(operation);
+    let command_shape = transform_shape
+        .as_ref()
+        .or(event_shape.as_ref())
+        .or(bts_shape.as_ref());
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
         HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
@@ -643,6 +648,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
     transform_control::validate_constraints(&clauses, operation)?;
     event_control::validate_constraints(operation, &raw_options)?;
+    bts_child_link::validate(&clauses, &raw_options, operation)?;
     web_service_control::validate(&clauses, operation)?;
     for required in match operation {
         HirCicsOperation::Address => &["COMMAREA"][..],
@@ -905,6 +911,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(document_control::operands(&clauses, operation, semantic)?);
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
     operands.extend(event_control::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_child_link::operands(&clauses, operation, semantic)?);
     operands.extend(web_service_control::operands(
         &clauses, operation, semantic,
     )?);
@@ -957,6 +964,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_child_link::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;
@@ -982,6 +990,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         })
         .map(|option| {
             counter_control::option(operation, option)
+                .or_else(|| bts_child_link::option(operation, option))
                 .or_else(|| event_control::option(operation, option))
                 .or_else(|| diagnostics::option(operation, option))
                 .or_else(|| {

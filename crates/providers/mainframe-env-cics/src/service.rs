@@ -2,7 +2,6 @@
 mod handlers;
 #[path = "handlers/task_identity.rs"]
 mod task_identity;
-
 use crate::generated::CicsCommandFamily;
 #[cfg(test)]
 use crate::generated::{CICS_COMMAND_DESCRIPTORS, command_descriptor};
@@ -1764,6 +1763,7 @@ impl CicsService {
             | CicsCommandFamily::WebServiceControl
             | CicsCommandFamily::WebControl
             | CicsCommandFamily::EventControl
+            | CicsCommandFamily::BtsControl
             | CicsCommandFamily::Diagnostics
             | CicsCommandFamily::SecurityControl => handlers::invoke_extended_control(
                 self,
@@ -3880,6 +3880,10 @@ mod tests {
         descriptor: CapabilityDescriptor,
         seen: ProgramLinkTrace,
     }
+    struct FailingBtsProgramAuthority {
+        descriptor: CapabilityDescriptor,
+        calls: Arc<AtomicUsize>,
+    }
 
     #[derive(Default)]
     struct DatasetTrace {
@@ -4007,7 +4011,15 @@ mod tests {
                         if self.deny_command && class == "FACILITY"
                             || self.deny_transform && class == "TRANSFORM"
                             || self.deny_journal && class == "JOURNAL"
-                            || self.deny_event && matches!(class.as_str(), "BTSEVENT" | "EVENT")
+                            || self.deny_event
+                                && matches!(
+                                    class.as_str(),
+                                    "BTSEVENT"
+                                        | "EVENT"
+                                        | "BTSCHILD"
+                                        | "BTSACTIVITY"
+                                        | "BTSPROCESS"
+                                )
                             || self.deny_counter && class == "COUNTER"
                             || self.deny_diagnostic && class == "CICSDIAG"
                             || self.deny_web && class == "URIMAP"
@@ -4048,6 +4060,19 @@ mod tests {
             EffectResult {
                 sequence: effect.sequence,
                 outcome,
+            }
+        }
+    }
+
+    impl HostProvider for FailingBtsProgramAuthority {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            EffectResult {
+                sequence: effect.sequence,
+                outcome: Err(HostProblem::ProviderFailure),
             }
         }
     }
@@ -4736,6 +4761,971 @@ mod tests {
 
     fn service(store: Arc<dyn ProviderStateStore>) -> Arc<CicsService> {
         CicsService::open(authorities(), store, CicsLimits::default()).unwrap()
+    }
+
+    #[test]
+    fn bts_child_and_link_stop_on_live_cancellation_and_deadline() {
+        for operation in [CicsOperation::FetchAny, CicsOperation::LinkAcqProcess] {
+            for cancelled in [true, false] {
+                let store = Arc::new(MemoryStore::new(Default::default()));
+                let clock = Arc::new(TestCicsClock::fixed(if cancelled { 1 } else { 100 }));
+                let cics = CicsService::open_with_replay_clock(
+                    authorities(),
+                    store.clone(),
+                    CicsLimits::default(),
+                    clock,
+                )
+                .unwrap();
+                let probe = mainframe_env_execution_api::CancellationProbe::new();
+                let invocation = invocation_for(
+                    if cancelled {
+                        "bts-live-cancel"
+                    } else {
+                        "bts-live-deadline"
+                    },
+                    BTreeMap::new(),
+                )
+                .with_cancellation_probe(probe.clone());
+                let session = SessionId::new(
+                    if cancelled {
+                        "bts-live-cancel"
+                    } else {
+                        "bts-live-deadline"
+                    },
+                    64,
+                )
+                .unwrap();
+                cics.create_session(&session, 24, 80).unwrap();
+                cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                    .unwrap();
+                let arguments = if operation == CicsOperation::FetchAny {
+                    BTreeMap::from([
+                        ("ANY".into(), argument(b"CHILD-X")),
+                        ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                    ])
+                } else {
+                    BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())])
+                };
+                let call = request(operation, arguments, 1);
+                if cancelled {
+                    probe.request();
+                }
+                assert_eq!(
+                    cics.invoke(&effect(&invocation.run_unit_id, call.clone(), 1), call),
+                    Err(if cancelled {
+                        HostProblem::Cancelled
+                    } else {
+                        HostProblem::TimedOut
+                    })
+                );
+                assert!(
+                    store
+                        .list_provider_state("cics-bts-child-ownership-v1", 8)
+                        .unwrap()
+                        .is_empty()
+                );
+                assert!(
+                    store
+                        .list_provider_state("cics-bts-link-frame-v1", 8)
+                        .unwrap()
+                        .is_empty()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn bts_child_fetch_free_replay_and_durable_owner_row() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let fetch = |sequence| {
+            request(
+                CicsOperation::FetchAny,
+                BTreeMap::from([
+                    ("ANY".into(), argument(b"ANY-X")),
+                    ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                    ("CHANNEL".into(), argument(b"CHANNEL-X")),
+                    ("ABCODE".into(), argument(b"AB-X")),
+                    ("OPTION.NOSUSPEND".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let empty = fetch(1);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, empty.clone(), 1), empty),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 52
+            })
+        );
+        let token = *b"1234567890ABCDEF";
+        cics.register_bts_child(&invocation.run_unit_id, token, Some("REPLY"))
+            .unwrap();
+        let pending = fetch(2);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, pending.clone(), 2),
+                pending
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTFINISHED".into(),
+                response: 113,
+                response2: 52
+            })
+        );
+        cics.complete_bts_child(
+            &invocation.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Abend,
+            Some("B001"),
+        )
+        .unwrap();
+        let ready = fetch(3);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, ready.clone(), 3),
+                ready.clone(),
+            )
+            .unwrap();
+        assert_eq!(result.outputs["ANY"].bytes(), &token);
+        assert_eq!(result.outputs["COMPSTATUS"].bytes(), b"ABEND");
+        assert_eq!(result.outputs["CHANNEL"].bytes(), b"REPLY           ");
+        assert_eq!(result.outputs["ABCODE"].bytes(), b"B001");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, ready.clone(), 3), ready)
+                .unwrap(),
+            result
+        );
+        let no_more = fetch(4);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, no_more.clone(), 4),
+                no_more
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 1
+            })
+        );
+        let free = request(
+            CicsOperation::FreeChild,
+            BTreeMap::from([("CHILD".into(), argument(&token))]),
+            5,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, free.clone(), 5), free)
+            .unwrap();
+        let child = request(
+            CicsOperation::FetchChild,
+            BTreeMap::from([
+                ("CHILD".into(), argument(&token)),
+                ("COMPSTATUS".into(), argument(b"STATUS-X")),
+            ]),
+            6,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, child.clone(), 6), child),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 50
+            })
+        );
+        let row = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        assert!(row.version >= 3);
+        assert!(
+            service(store)
+                .store
+                .get_provider_state(
+                    "cics-bts-child-ownership-v1",
+                    invocation.run_unit_id.as_str()
+                )
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn bts_fetch_timeout_uses_stable_statement_identity_across_reissue() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let token = *b"1234567890ABCDEF";
+        cics.register_bts_child(&invocation.run_unit_id, token, None)
+            .unwrap();
+        let wait_id = format!("{}:7", invocation.run_unit_id.as_str());
+        let make = |sequence| {
+            request(
+                CicsOperation::FetchChild,
+                BTreeMap::from([
+                    ("CHILD".into(), argument(&token)),
+                    ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                    ("TIMEOUT".into(), cics_decimal(10)),
+                    (
+                        "FETCH.ID".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.fetch-id@1",
+                            wait_id.as_bytes().to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                ]),
+                sequence,
+            )
+        };
+        let first = make(1);
+        let response = cics
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Suspended);
+        let row = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        state["waits"][&wait_id] = serde_json::json!(0);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: row.namespace,
+                    key: row.key,
+                    version: row.version + 1,
+                    payload: serde_json::to_vec(&state).unwrap(),
+                },
+                Some(row.version),
+            )
+            .unwrap();
+        let second = make(2);
+        let expired = HostProblem::Condition {
+            name: "NOTFINISHED".into(),
+            response: 113,
+            response2: 53,
+        };
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, second.clone(), 2),
+                second.clone()
+            ),
+            Err(expired.clone())
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second),
+            Err(expired)
+        );
+        let saved = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&saved.payload).unwrap();
+        assert!(state["waits"].as_object().unwrap().is_empty());
+        let invalid = request(
+            CicsOperation::FetchChild,
+            BTreeMap::from([
+                ("CHILD".into(), argument(&token)),
+                ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                ("TIMEOUT".into(), cics_decimal(4_080_001)),
+                (
+                    "FETCH.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.fetch-id@1",
+                        wait_id.into_bytes(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 241
+            })
+        );
+    }
+
+    #[test]
+    fn bts_child_saf_denial_precedes_fetch_mutation_and_is_audited() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, security) = event_authorities(true);
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let token = *b"1234567890ABCDEF";
+        cics.register_bts_child(&invocation.run_unit_id, token, None)
+            .unwrap();
+        cics.complete_bts_child(
+            &invocation.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Normal,
+            None,
+        )
+        .unwrap();
+        let before = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let fetch = request(
+            CicsOperation::FetchChild,
+            BTreeMap::from([
+                ("CHILD".into(), argument(&token)),
+                ("COMPSTATUS".into(), argument(b"STATUS-X")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, fetch.clone(), 1), fetch),
+            Err(HostProblem::Unauthorized)
+        );
+        let after = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(before, after);
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == AuditDecision::Deny)
+        );
+        assert!(
+            security
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| class == "BTSCHILD"
+                    && resource.starts_with("CICS.BTS.CHILD.")
+                    && *intent == AccessIntent::Update)
+        );
+        assert!(
+            cics.lock().unwrap().runs[&invocation.run_unit_id]
+                .trace
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::FetchChild
+                    && entry.outcome.contains("Unauthorized"))
+        );
+    }
+
+    #[test]
+    fn bts_child_ownership_recovers_after_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-child-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let token = *b"1234567890ABCDEF";
+        let invocation = invocation_for("bts-sqlite", BTreeMap::new());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = service(store);
+            let session = SessionId::new("bts-sqlite-first", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.register_bts_child(&invocation.run_unit_id, token, Some("REPLY"))
+                .unwrap();
+            cics.complete_bts_child(
+                &invocation.run_unit_id,
+                token,
+                CicsBtsChildCompletion::SecurityError,
+                None,
+            )
+            .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = service(store);
+            let session = SessionId::new("bts-sqlite-second", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let fetch = request(
+                CicsOperation::FetchChild,
+                BTreeMap::from([
+                    ("CHILD".into(), argument(&token)),
+                    ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                    ("CHANNEL".into(), argument(b"CHANNEL-X")),
+                ]),
+                1,
+            );
+            let response = cics
+                .invoke(&effect(&invocation.run_unit_id, fetch.clone(), 1), fetch)
+                .unwrap();
+            assert_eq!(response.outputs["COMPSTATUS"].bytes(), b"SECERROR");
+            assert_eq!(response.outputs["CHANNEL"].bytes(), b"REPLY           ");
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn bts_fetch_reconciles_outer_receipt_gap_without_refetching_channel() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let token = *b"1234567890ABCDEF";
+        cics.register_bts_child(&invocation.run_unit_id, token, Some("REPLY"))
+            .unwrap();
+        cics.complete_bts_child(
+            &invocation.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Normal,
+            None,
+        )
+        .unwrap();
+        let fetch = request(
+            CicsOperation::FetchChild,
+            BTreeMap::from([
+                ("CHILD".into(), argument(&token)),
+                ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                ("CHANNEL".into(), argument(b"CHANNEL-X")),
+            ]),
+            1,
+        );
+        cics.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, fetch.clone(), 1),
+                fetch.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let version = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap()
+            .version;
+        let replay = cics
+            .invoke(&effect(&invocation.run_unit_id, fetch.clone(), 1), fetch)
+            .unwrap();
+        assert_eq!(replay.outputs["CHANNEL"].bytes(), b"REPLY           ");
+        assert_eq!(
+            store
+                .get_provider_state(
+                    "cics-bts-child-ownership-v1",
+                    invocation.run_unit_id.as_str()
+                )
+                .unwrap()
+                .unwrap()
+                .version,
+            version
+        );
+        let again = request(
+            CicsOperation::FetchChild,
+            BTreeMap::from([
+                ("CHILD".into(), argument(&token)),
+                ("COMPSTATUS".into(), argument(b"STATUS-X")),
+                ("CHANNEL".into(), argument(b"CHANNEL-X")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, again.clone(), 2), again),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 51
+            })
+        );
+    }
+
+    #[test]
+    fn bts_parent_end_frees_pending_child_without_losing_replay_authority() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let token = *b"1234567890ABCDEF";
+        cics.register_bts_child(&invocation.run_unit_id, token, Some("REPLY"))
+            .unwrap();
+        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&cics, &run).unwrap();
+        cics.complete_bts_child(
+            &invocation.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Normal,
+            None,
+        )
+        .unwrap();
+        let row = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let child = state["children"]
+            .as_object()
+            .unwrap()
+            .values()
+            .next()
+            .unwrap();
+        assert_eq!(child["freed"], true);
+        assert!(child["reply_channel"].is_null());
+    }
+
+    #[test]
+    fn bts_link_requires_selected_installed_process_program() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let authority = handlers::bts_lifecycle::BtsLifecycleStore::new(store.as_ref());
+        let root = handlers::bts_lifecycle::BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let process = handlers::bts_lifecycle::BtsProcess::new(
+            "TYPE",
+            "PROC",
+            &root,
+            "BTSRUN",
+            "MENU",
+            "IBMUSER",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap();
+        authority
+            .define_process(
+                process,
+                invocation.run_unit_id.as_str(),
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let link = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, link.clone(), 1),
+                link.clone()
+            ),
+            Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 1
+            })
+        );
+        cics.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
+        let linked = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, link.clone(), 1),
+                link.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (linked.condition.as_str(), linked.response, linked.response2),
+            ("NORMAL", 0, 0)
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link)
+                .unwrap(),
+            linked
+        );
+        let process = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert!(process.row_version >= 3);
+        assert_eq!(
+            process.activities[&root].mode,
+            handlers::bts_lifecycle::BtsMode::Dormant
+        );
+    }
+
+    #[test]
+    fn bts_named_child_and_acquired_activity_use_shared_tree_and_uow_lease() {
+        use handlers::bts_lifecycle::{
+            BtsActivity, BtsActivityIndex, BtsCompletion, BtsLifecycleStore, BtsMode, BtsProcess,
+        };
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (named, _) = registered(&cics);
+        cics.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let setup = |name: &str, owner: &Invocation, active_root: bool| {
+            let root = BtsLifecycleStore::root_id("TYPE", name).unwrap();
+            let child = BtsLifecycleStore::child_id("TYPE", name, 1).unwrap();
+            let mut process = BtsProcess::new(
+                "TYPE",
+                name,
+                &root,
+                "BTSRUN",
+                "MENU",
+                "IBMUSER",
+                owner.run_unit_id.as_str(),
+            )
+            .unwrap();
+            if active_root {
+                process.activities.get_mut(&root).unwrap().mode = BtsMode::Active;
+            }
+            process.activities.insert(
+                child.clone(),
+                BtsActivity {
+                    id: child.clone(),
+                    name: "CHILD".into(),
+                    parent_id: Some(root.clone()),
+                    completion_event: None,
+                    program: "BTSRUN".into(),
+                    transid: "MENU".into(),
+                    userid: "IBMUSER".into(),
+                    mode: BtsMode::Initial,
+                    completion: BtsCompletion::Incomplete,
+                    suspended: false,
+                    activation_epoch: 0,
+                    checkpoint: None,
+                    acquired_by: None,
+                    abcode: None,
+                    abprogram: None,
+                },
+            );
+            process.next_child_sequence = 2;
+            authority
+                .define_process(
+                    process,
+                    owner.run_unit_id.as_str(),
+                    owner.execution_id.as_str(),
+                    owner.principal.id().as_str(),
+                )
+                .unwrap();
+            (root, child)
+        };
+        let (root, child) = setup("PROC", &named, true);
+        let index = BtsActivityIndex {
+            schema_version: "mainframe-env.cics.bts-activity-index@1".into(),
+            activity_id: child.clone(),
+            process_type: "TYPE".into(),
+            process_name: "PROC".into(),
+            parent_id: Some(root.clone()),
+            pending_uow: Some(named.run_unit_id.as_str().into()),
+            row_version: 0,
+        };
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-bts-activity-index-v1".into(),
+                    key: child.clone(),
+                    version: 1,
+                    payload: serde_json::to_vec(&index).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        cics.bind_bts_link_context(
+            &named.run_unit_id,
+            CicsBtsLinkContext {
+                active_activity_id: Some(root.clone()),
+            },
+        )
+        .unwrap();
+        let missing = request(
+            CicsOperation::LinkActivity,
+            BTreeMap::from([("ACTIVITY".into(), cics_literal(b"WRONG"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&named.run_unit_id, missing.clone(), 1), missing),
+            Err(HostProblem::Condition {
+                name: "ACTIVITYERR".into(),
+                response: 109,
+                response2: 8
+            })
+        );
+        let invalid = request(
+            CicsOperation::LinkActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+                ("INPUTEVENT".into(), cics_literal(b"GO")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&named.run_unit_id, invalid.clone(), 2), invalid),
+            Err(HostProblem::Condition {
+                name: "ACTIVITYERR".into(),
+                response: 109,
+                response2: 14
+            })
+        );
+        let link = request(
+            CicsOperation::LinkActivity,
+            BTreeMap::from([("ACTIVITY".into(), cics_literal(b"CHILD"))]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&named.run_unit_id, link.clone(), 3), link)
+                .unwrap()
+                .response,
+            0
+        );
+        let process = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert_eq!(process.activities[&child].mode, BtsMode::Dormant);
+        assert_eq!(process.activities[&root].mode, BtsMode::Active);
+        cics.bind_event_activity(&named.run_unit_id, &child, None, None)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), cics_literal(b"GO"))]),
+            5,
+        );
+        cics.invoke(&effect(&named.run_unit_id, define.clone(), 5), define)
+            .unwrap();
+        let relink = request(
+            CicsOperation::LinkActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+                ("INPUTEVENT".into(), cics_literal(b"GO")),
+            ]),
+            6,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&named.run_unit_id, relink.clone(), 6), relink)
+                .unwrap()
+                .response,
+            0
+        );
+        let repeat = request(
+            CicsOperation::LinkActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+                ("INPUTEVENT".into(), cics_literal(b"GO")),
+            ]),
+            7,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&named.run_unit_id, repeat.clone(), 7), repeat),
+            Err(HostProblem::Condition {
+                name: "EVENTERR".into(),
+                response: 111,
+                response2: 7
+            })
+        );
+
+        let creator = registered_counter_run(&cics, "bts-creator");
+        let (root2, child2) = setup("PROC2", &creator, false);
+        authority
+            .finish_uow(
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        let index = BtsActivityIndex {
+            schema_version: "mainframe-env.cics.bts-activity-index@1".into(),
+            activity_id: child2.clone(),
+            process_type: "TYPE".into(),
+            process_name: "PROC2".into(),
+            parent_id: Some(root2),
+            pending_uow: None,
+            row_version: 0,
+        };
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-bts-activity-index-v1".into(),
+                    key: child2.clone(),
+                    version: 1,
+                    payload: serde_json::to_vec(&index).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let acquirer = registered_counter_run(&cics, "bts-acquirer");
+        authority
+            .acquire(
+                acquirer.run_unit_id.as_str(),
+                acquirer.execution_id.as_str(),
+                acquirer.principal.id().as_str(),
+                "TYPE",
+                "PROC2",
+                &child2,
+            )
+            .unwrap();
+        let acquired = request(
+            CicsOperation::LinkAcqActivity,
+            BTreeMap::from([("OPTION.ACQACTIVITY".into(), cics_option())]),
+            4,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&acquirer.run_unit_id, acquired.clone(), 4),
+                acquired
+            )
+            .unwrap()
+            .response,
+            0
+        );
+        let process = authority.load_process("TYPE", "PROC2").unwrap().unwrap();
+        assert_eq!(process.activities[&child2].mode, BtsMode::Dormant);
+        assert_eq!(
+            process.activities[&child2].acquired_by.as_deref(),
+            Some(acquirer.run_unit_id.as_str())
+        );
+    }
+
+    #[test]
+    fn bts_link_post_dispatch_failure_is_fenced_without_redispatch() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let providers = vec![
+            Arc::new(Authority {
+                descriptor: descriptor("host.security.authorize"),
+            }) as Arc<dyn HostProvider>,
+            Arc::new(FailingBtsProgramAuthority {
+                descriptor: descriptor("host.program.invoke"),
+                calls: calls.clone(),
+            }) as Arc<dyn HostProvider>,
+        ];
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ));
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        cics.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let process = BtsProcess::new(
+            "TYPE",
+            "PROC",
+            &root,
+            "BTSRUN",
+            "MENU",
+            "IBMUSER",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap();
+        authority
+            .define_process(
+                process,
+                invocation.run_unit_id.as_str(),
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let link = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            1,
+        );
+        for _ in 0..2 {
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, link.clone(), 1),
+                    link.clone()
+                ),
+                Err(HostProblem::UnknownOutcome)
+            );
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let persisted = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert_eq!(persisted.activities[&root].mode, BtsMode::Active);
+        assert_eq!(persisted.replays.len(), 1);
+        assert!(
+            store
+                .get_provider_state("cics-bts-link-frame-v1", invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_some()
+        );
+        let second = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second),
+            Err(HostProblem::Condition {
+                name: "PROCESSBUSY".into(),
+                response: 106,
+                response2: 13
+            })
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn bts_link_saf_denial_leaves_shared_process_initial_and_audits() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, security) = event_authorities(true);
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let process = BtsProcess::new(
+            "TYPE",
+            "PROC",
+            &root,
+            "BTSRUN",
+            "MENU",
+            "IBMUSER",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap();
+        authority
+            .define_process(
+                process,
+                invocation.run_unit_id.as_str(),
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let link = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101
+            })
+        );
+        let state = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert_eq!(state.activities[&root].mode, BtsMode::Initial);
+        assert!(state.replays.is_empty());
+        assert!(security.lock().unwrap().iter().any(|(class,_,intent)|class=="BTSPROCESS" && *intent==AccessIntent::Execute));
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == AuditDecision::Deny)
+        );
     }
 
     fn registered(service: &CicsService) -> (Invocation, SessionId) {
