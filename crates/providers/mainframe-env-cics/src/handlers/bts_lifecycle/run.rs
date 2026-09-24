@@ -262,6 +262,60 @@ impl<'a> BtsLifecycleStore<'a> {
         Ok(found)
     }
 
+    fn asynchronous_coalescing_target(
+        &self,
+        process: &BtsProcess,
+        activity_id: &str,
+        owner_run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+    ) -> Result<Option<BtsRunRecord>, HostProblem> {
+        let activity = process
+            .activities
+            .get(activity_id)
+            .ok_or(HostProblem::NotFound)?;
+        if activity.mode != BtsMode::Active {
+            return Ok(None);
+        }
+        let mut seen = BTreeSet::new();
+        let mut found = None;
+        for replay in process.replays.values() {
+            if replay.owner_run_unit != owner_run_unit
+                || replay.owner_execution != owner_execution
+                || replay.owner_principal != owner_principal
+            {
+                continue;
+            }
+            let Some(bytes) = replay.outputs.get("BTS.RUNID") else {
+                continue;
+            };
+            let id = std::str::from_utf8(bytes).map_err(|_| HostProblem::InfrastructureFailure)?;
+            if !seen.insert(id) {
+                continue;
+            }
+            let saved = self
+                .load_run(id)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if !saved.synchronous
+                && saved.input_event != "DFHINITIAL"
+                && saved.state != BtsRunState::Finished
+                && saved.owner_run_unit == owner_run_unit
+                && saved.owner_execution == owner_execution
+                && saved.owner_principal == owner_principal
+                && saved.process_type == process.process_type
+                && saved.process_name == process.name
+                && saved.activity_id == activity_id
+                && saved.activation_epoch == activity.activation_epoch
+            {
+                if found.is_some() {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                found = Some(saved);
+            }
+        }
+        Ok(found)
+    }
+
     /// Move an INITIAL or DORMANT activity to ACTIVE with its exact outbox row
     /// and a reattachment input event in one store transaction.
     #[allow(clippy::too_many_arguments)]
@@ -345,8 +399,6 @@ impl<'a> BtsLifecycleStore<'a> {
                 if saved.owner_run_unit != owner_run_unit
                     || saved.owner_execution != owner_execution
                     || saved.owner_principal != owner_principal
-                    || saved.statement_id != statement_id
-                    || saved.request_shape_digest != request_shape_digest
                     || saved.process_type != process_type
                     || saved.process_name != process_name
                     || saved.activity_id != activity_id
@@ -395,6 +447,54 @@ impl<'a> BtsLifecycleStore<'a> {
                     &process,
                     Some(old_version),
                 )?]) {
+                    Ok(()) => return Ok(saved),
+                    Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                    Err(error) => return Err(store_error(error)),
+                }
+            }
+            if !synchronous
+                && let Some(event) = input_event
+                && let Some(saved) = self.asynchronous_coalescing_target(
+                    &process,
+                    activity_id,
+                    owner_run_unit,
+                    owner_execution,
+                    owner_principal,
+                )?
+            {
+                if process.replays.len() >= MAX_REPLAYS {
+                    return Err(HostProblem::ResourceExhausted);
+                }
+                let event_write = super::super::event_control::prepare_run_input_event(
+                    self.store,
+                    activity_id,
+                    event,
+                )?;
+                let old_version = process.row_version;
+                process.epoch = process
+                    .epoch
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                process.replays.insert(
+                    effect_key.into(),
+                    BtsReplay {
+                        owner_execution: owner_execution.into(),
+                        owner_run_unit: owner_run_unit.into(),
+                        owner_principal: owner_principal.into(),
+                        request_digest,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        outputs: BTreeMap::from([(
+                            "BTS.RUNID".into(),
+                            saved.run_id.as_bytes().to_vec(),
+                        )]),
+                    },
+                );
+                match self.store.mutate_provider_states_atomic(vec![
+                    put_process(&key, &process, Some(old_version))?,
+                    event_write,
+                ]) {
                     Ok(()) => return Ok(saved),
                     Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
                     Err(error) => return Err(store_error(error)),
@@ -621,8 +721,11 @@ fn legacy_run_id(run_unit: &str, execution: &str, statement_id: &str) -> String 
 mod tests {
     use super::*;
     use crate::service::handlers::event_control::{self, EventKind, EventRecord};
-    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::WorkStore;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_SQLITE: AtomicU64 = AtomicU64::new(1);
 
     fn published_process<'a>(authority: &BtsLifecycleStore<'a>) -> String {
         let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
@@ -753,14 +856,16 @@ mod tests {
             BtsMode::Dormant
         );
         let mut pool = event_control::ActivityState::default();
-        pool.events.insert(
-            "READY".into(),
-            EventRecord {
-                kind: EventKind::Input,
-                fired: false,
-                parent: None,
-            },
-        );
+        for event in ["READY", "OTHER"] {
+            pool.events.insert(
+                event.into(),
+                EventRecord {
+                    kind: EventKind::Input,
+                    fired: false,
+                    parent: None,
+                },
+            );
+        }
         memory
             .mutate_provider_states_atomic(vec![
                 event_control::activity_mutation(&root, &pool).unwrap(),
@@ -801,6 +906,96 @@ mod tests {
                 .mode,
             BtsMode::Active
         );
+        let coalesced = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                Some("OTHER"),
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:44",
+                "run-second",
+                [4; 32],
+                [4; 32],
+                1001,
+                5,
+            )
+            .unwrap();
+        assert_eq!(coalesced.run_id, run.run_id);
+        assert_eq!(coalesced.activation_epoch, run.activation_epoch);
+        assert_eq!(authority.load_run_outbox().unwrap().pending.len(), 1);
+        let events = event_control::load_activity_from_store(&memory, &root).unwrap();
+        assert!(events.events["READY"].fired);
+        assert!(events.events["OTHER"].fired);
+        assert_eq!(events.reattach.len(), 2);
+        let reopened = BtsLifecycleStore::new(&memory);
+        assert_eq!(
+            reopened
+                .start_run(
+                    "TYPE",
+                    "ORDER",
+                    &root,
+                    Some("OTHER"),
+                    false,
+                    None,
+                    "UOW2",
+                    "EXEC2",
+                    "USER",
+                    "UOW2:44",
+                    "run-second",
+                    [4; 32],
+                    [4; 32],
+                    2000,
+                    5,
+                )
+                .unwrap()
+                .run_id,
+            run.run_id
+        );
+        assert_eq!(
+            reopened.start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                Some("OTHER"),
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:44",
+                "run-second",
+                [5; 32],
+                [4; 32],
+                2000,
+                5,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(matches!(
+            reopened.start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                Some("READY"),
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:45",
+                "run-same",
+                [6; 32],
+                [6; 32],
+                2000,
+                5,
+            ),
+            Err(HostProblem::Condition { name, response: 111, response2: 7 }) if name == "EVENTERR"
+        ));
     }
 
     #[test]
@@ -1013,5 +1208,126 @@ mod tests {
             .unwrap();
         assert_ne!(second.run_id, first.run_id);
         assert_eq!(second.activation_epoch, 2);
+    }
+
+    #[test]
+    fn coalesced_input_events_and_one_outbox_survive_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-run-coalesce-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let (root, first_id) = {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let authority = BtsLifecycleStore::new(&sqlite);
+            let root = published_process(&authority);
+            authority
+                .mutate_process(
+                    "TYPE",
+                    "ORDER",
+                    "UOW2",
+                    "EXEC2",
+                    "USER",
+                    "dormant",
+                    [1; 32],
+                    |process| {
+                        process.start(&root, None, true)?;
+                        process.finish(&root, 1, 1, BtsCompletion::Incomplete, None, None)?;
+                        Ok(BtsReply::normal())
+                    },
+                )
+                .unwrap();
+            let mut pool = event_control::ActivityState::default();
+            for event in ["FIRST", "SECOND"] {
+                pool.events.insert(
+                    event.into(),
+                    EventRecord {
+                        kind: EventKind::Input,
+                        fired: false,
+                        parent: None,
+                    },
+                );
+            }
+            sqlite
+                .mutate_provider_states_atomic(vec![
+                    event_control::activity_mutation(&root, &pool).unwrap(),
+                ])
+                .unwrap();
+            let first = authority
+                .start_run(
+                    "TYPE",
+                    "ORDER",
+                    &root,
+                    Some("FIRST"),
+                    false,
+                    None,
+                    "UOW2",
+                    "EXEC2",
+                    "USER",
+                    "UOW2:43",
+                    "first",
+                    [2; 32],
+                    [2; 32],
+                    1000,
+                    5,
+                )
+                .unwrap();
+            let second = authority
+                .start_run(
+                    "TYPE",
+                    "ORDER",
+                    &root,
+                    Some("SECOND"),
+                    false,
+                    None,
+                    "UOW2",
+                    "EXEC2",
+                    "USER",
+                    "UOW2:44",
+                    "second",
+                    [3; 32],
+                    [3; 32],
+                    1001,
+                    5,
+                )
+                .unwrap();
+            assert_eq!(first.run_id, second.run_id);
+            (root, first.run_id)
+        };
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let authority = BtsLifecycleStore::new(&sqlite);
+            assert_eq!(authority.load_run_outbox().unwrap().pending.len(), 1);
+            let events = event_control::load_activity_from_store(&sqlite, &root).unwrap();
+            assert!(events.events["FIRST"].fired);
+            assert!(events.events["SECOND"].fired);
+            assert_eq!(events.reattach.len(), 2);
+            assert_eq!(
+                authority
+                    .start_run(
+                        "TYPE",
+                        "ORDER",
+                        &root,
+                        Some("SECOND"),
+                        false,
+                        None,
+                        "UOW2",
+                        "EXEC2",
+                        "USER",
+                        "UOW2:44",
+                        "second",
+                        [3; 32],
+                        [3; 32],
+                        2000,
+                        5,
+                    )
+                    .unwrap()
+                    .run_id,
+                first_id
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

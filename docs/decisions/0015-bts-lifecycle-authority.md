@@ -150,6 +150,12 @@ A reissued synchronous statement in the same activation returns the existing
 RUN row, including its terminal result, and records the new effect key in the
 process replay map. Exact retries survive RESET; changed request bytes under
 that key conflict. Only a fresh effect after RESET allocates new work.
+Multiple asynchronous RUN requests from the same UOW with distinct input
+events can use one active activation. Each accepted event and replay key is
+committed with the process CAS and event pool, without a second outbox entry.
+A fired event reports `EVENTERR 111/7`; exact retries return the retained
+activation. Memory and SQLite reopen regressions cover the event queue and
+single work identity. Source: the same baseline C RUN topic, lines 119–126.
 
 Terminal parent completion deletes settled descendants, their activity
 indexes, and direct-child completion events atomically with the parent RUN

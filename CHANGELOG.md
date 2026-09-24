@@ -25,6 +25,10 @@ All notable changes to mainframe-env are documented here.
   continuation reuses its current activation and saves the new effect key for
   durable exact replay.
 
+- Distinct INPUTEVENTs from asynchronous RUN requests in the same UOW now
+  coalesce into one active worker while each event and exact request replay
+  commits atomically. Repeating a fired event retains EVENTERR 111/7.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.
