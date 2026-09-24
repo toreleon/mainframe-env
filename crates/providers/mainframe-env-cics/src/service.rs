@@ -7353,6 +7353,30 @@ mod tests {
                 response2: 0,
             })
         );
+        let unknown = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([
+                ("TERMID".into(), cics_literal(b"T005")),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            5,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &unknown),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let version = service.lock().unwrap().sessions[target_session.as_str()].version;
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &unknown)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[target_session.as_str()].version,
+            version
+        );
     }
 
     #[test]

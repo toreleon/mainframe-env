@@ -71,7 +71,6 @@ pub(in crate::service) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
-    check_request_live(service, run)?;
     let current_session = {
         let state = service.lock()?;
         state
@@ -104,6 +103,7 @@ pub(in crate::service) fn invoke(
     if let Some(receipt) = load_receipt(service, effect_key, run, mutation.sequence, digest)? {
         return receipt_response(service, run, &receipt);
     }
+    check_request_live(service, run)?;
     let already_disconnected = !current_session.connected
         && matches!(
             request.operation,

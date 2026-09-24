@@ -3,6 +3,7 @@
 use super::super::super::issue_device::{IssueDeviceKind, IssueDeviceRecord};
 use super::*;
 use mainframe_env_host_api::AccessIntent;
+use std::sync::atomic::Ordering;
 
 pub(in crate::service::handlers::terminal_control) fn eraseaup(
     service: &CicsService,
@@ -14,6 +15,7 @@ pub(in crate::service::handlers::terminal_control) fn eraseaup(
     if let Some(response) = receipt_for_request(service, run, request)? {
         return Ok(response);
     }
+    check_request_live(service, run)?;
     // The source permits immediate return without WAIT. That asynchronous
     // form needs a retained pending terminal-control operation; fail closed
     // until it can join the existing terminal IO completion boundary.
@@ -106,7 +108,7 @@ pub(in crate::service::handlers::terminal_control) fn eraseaup(
     state.keyboard_unlocked = true;
     state.last_page = next.screen.clone();
     let receipt = base_receipt(run, request)?;
-    commit(
+    let response = commit(
         service,
         run,
         request,
@@ -114,7 +116,8 @@ pub(in crate::service::handlers::terminal_control) fn eraseaup(
         Some(&next),
         &state,
         &receipt,
-    )
+    )?;
+    after_commit(service, run, response)
 }
 
 fn validate_eraseaup(request: &CicsRequest) -> Result<(), HostProblem> {
@@ -146,6 +149,7 @@ pub(in crate::service::handlers::terminal_control) fn copy(
     if let Some(response) = receipt_for_request(service, run, request)? {
         return Ok(response);
     }
+    check_request_live(service, run)?;
     if !request.arguments.contains_key("OPTION.WAIT") || request.arguments.contains_key("CTLCHAR") {
         return Err(HostProblem::Unsupported);
     }
@@ -232,7 +236,7 @@ pub(in crate::service::handlers::terminal_control) fn copy(
     target_state.alternate_screen = source_state.alternate_screen;
     target_state.last_page = next.screen.clone();
     let receipt = base_receipt(run, request)?;
-    commit(
+    let response = commit(
         service,
         run,
         request,
@@ -240,7 +244,48 @@ pub(in crate::service::handlers::terminal_control) fn copy(
         Some(&next),
         &target_state,
         &receipt,
-    )
+    )?;
+    after_commit(service, run, response)
+}
+
+fn check_request_live(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    if run.invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    if request_expired(service, run)? {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
+}
+
+fn request_expired(service: &CicsService, run: &Run) -> Result<bool, HostProblem> {
+    service
+        .replay_clock
+        .as_ref()
+        .map(|clock| {
+            clock
+                .now_tick()
+                .map(|tick| tick >= run.invocation.deadline_tick)
+        })
+        .transpose()
+        .map(|expired| expired.unwrap_or(false))
+}
+
+fn after_commit(
+    service: &CicsService,
+    run: &Run,
+    response: CicsResponse,
+) -> Result<CicsResponse, HostProblem> {
+    if run.invocation.cancellation_requested()
+        || request_expired(service, run)?
+        || service
+            .replay_unknown_after_persist
+            .swap(false, Ordering::SeqCst)
+    {
+        Err(HostProblem::UnknownOutcome)
+    } else {
+        Ok(response)
+    }
 }
 
 fn validate_copy(request: &CicsRequest) -> Result<(), HostProblem> {
