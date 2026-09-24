@@ -55,6 +55,9 @@ All notable changes to mainframe-env are documented here.
   EODS/LOAD ISSUE commands. Device state and an exact owner-bound replay
   receipt commit atomically after SAF, with bounded receipt retention.
 
+- Added selected-provider 3650 LOAD/EODS regression coverage for CONVERSE,
+  replay, NONVAL, NOSTART, TERMERR, and DPL principal INVREQ/200.
+
 - Verified that an ENDFILE effect with an unknown post-commit outcome replays
   after SQLite service restart without advancing the physical device twice.
 

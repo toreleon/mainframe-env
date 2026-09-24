@@ -6922,6 +6922,145 @@ mod tests {
     }
 
     #[test]
+    fn issue_load_and_eods_route_3650_effects_and_reject_dpl_principal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("T008".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "T008".into(),
+            kind: handlers::IssueDeviceKind::Interpreter3650,
+            control_unit: None,
+            printers: vec![],
+            programs: vec!["PROG1".into()],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let load = request(
+            CicsOperation::IssueLoad,
+            BTreeMap::from([
+                ("PROGRAM".into(), cics_literal(b"PROG1")),
+                ("OPTION.CONVERSE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let response = handlers::invoke_issue_device(&service, &mut run, &load).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        let loaded = handlers::IssueDeviceRecord::load(store.as_ref(), "T008")
+            .unwrap()
+            .unwrap();
+        assert_eq!(loaded.state.loaded_program.as_deref(), Some("PROG1"));
+        assert!(loaded.state.loaded_converse);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &load),
+            Ok(response)
+        );
+        let invalid = request(
+            CicsOperation::IssueLoad,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"NOPE"))]),
+            2,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &invalid),
+            Err(HostProblem::Condition {
+                name: "NONVAL".into(),
+                response: 9,
+                response2: 0,
+            })
+        );
+        let eods = request(CicsOperation::IssueEods, BTreeMap::new(), 3);
+        let eods_response = handlers::invoke_issue_device(&service, &mut run, &eods).unwrap();
+        assert_eq!(eods_response.condition, "NORMAL");
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &eods),
+            Ok(eods_response)
+        );
+        let after = handlers::IssueDeviceRecord::load(store.as_ref(), "T008")
+            .unwrap()
+            .unwrap();
+        assert!(after.state.eods);
+        assert_eq!(after.version, 3);
+        let mut dpl_run = run.clone();
+        dpl_run.invocation.bindings.insert(
+            "cics.execution-context".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.execution-context@1",
+                b"dpl-synconreturn".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let dpl_eods = request(CicsOperation::IssueEods, BTreeMap::new(), 4);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut dpl_run, &dpl_eods),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "T008")
+                .unwrap()
+                .unwrap()
+                .version,
+            3
+        );
+        let current = handlers::IssueDeviceRecord::load(store.as_ref(), "T008")
+            .unwrap()
+            .unwrap();
+        let mut failed = current.clone();
+        failed.state.disconnected = true;
+        current.persist(&mut failed, store.as_ref()).unwrap();
+        let stopped_load = request(
+            CicsOperation::IssueLoad,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"PROG1"))]),
+            5,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &stopped_load),
+            Err(HostProblem::Condition {
+                name: "NOSTART".into(),
+                response: 10,
+                response2: 0,
+            })
+        );
+        let terminal_error = request(CicsOperation::IssueEods, BTreeMap::new(), 6);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &terminal_error),
+            Err(HostProblem::Condition {
+                name: "TERMERR".into(),
+                response: 81,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "T008")
+                .unwrap()
+                .unwrap()
+                .version,
+            4
+        );
+    }
+
+    #[test]
     fn issue_device_saf_denial_precedes_durable_mutation() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let (host, seen) = command_authorities(true);
