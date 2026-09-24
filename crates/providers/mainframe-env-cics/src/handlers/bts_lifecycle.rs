@@ -475,11 +475,15 @@ mod removal;
 mod repository;
 mod run;
 mod store;
+mod transid;
 mod transitions;
 pub use context::BtsActivityContext;
 pub(in crate::service) use participant::settle_recorded_uow;
 pub use run::{BTS_RUN_WORK_GENERATION, BtsRunRecord, BtsRunState};
 pub use store::BtsLifecycleStore;
+pub use transid::{
+    BTS_TRANSID_WORK_GENERATION, BtsTransidContainer, BtsTransidRecord, BtsTransidState,
+};
 
 fn put_process(
     key: &str,

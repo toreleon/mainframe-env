@@ -115,6 +115,17 @@ authority and the sibling's token row. The sibling's current channel-name
 validator accepts fewer characters than pinned RUN TRANSID; its validator
 must be widened when the modules are joined.
 
+RUN TRANSID also owns a separate `cics-bts-transid-run-v1` request and
+`cics-bts-transid-outbox-v1` pending index. The request captures a deterministic
+16-byte child token, inherited principal, local transaction and program, and
+the bounded channel-container snapshot at issue time. A worker claim advances
+its lease epoch; a stale claim cannot finish it. Terminal completion writes
+the sibling token outcome first, then closes the request and outbox atomically,
+so a crash in between can retry the idempotent completion. A request retained
+before token registration may be recovered only when the parent run remains
+available, otherwise it stays unresolved rather than asserting task start.
+These are child task records, not process/activity lifecycle rows.
+
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed
 identities, and excess state. There is no prior BTS process row to migrate.

@@ -106,6 +106,12 @@ All notable changes to mainframe-env are documented here.
   terminal completion are owner-checked and versioned; RUN TRANSID task
   admission and public command readiness remain pending.
 
+- Added a versioned RUN TRANSID request and bounded work outbox. The local
+  child token, transaction, inherited principal, and issue-time channel
+  snapshot are retained for exact replay; work claims fence completion by
+  lease epoch and deliver the result through the child-token port. Server
+  attach and public command routing remain pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

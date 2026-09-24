@@ -144,7 +144,9 @@ impl CicsService {
         Ok(load(self, parent.as_str())?
             .children
             .get(&token_key(&token))
-            .is_some_and(|child| child.reply_channel == reply_channel))
+            .is_some_and(|child| {
+                child.reply_channel == reply_channel || child.freed && child.reply_channel.is_none()
+            }))
     }
 }
 
