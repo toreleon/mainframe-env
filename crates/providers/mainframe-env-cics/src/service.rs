@@ -31216,6 +31216,101 @@ mod tests {
     }
 
     #[test]
+    fn bts_run_outbox_readmits_work_after_provider_reopen() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess, BtsRunState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:44",
+                "run", [1; 32], [1; 32], 1_000, 4,
+            )
+            .unwrap();
+        assert!(store.get_work(&run.work_id).unwrap().is_none());
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        assert_eq!(service.recover_bts_run_work().unwrap(), 1);
+        let queued = store.get_work(&run.work_id).unwrap().unwrap();
+        assert_eq!(queued, run.work_record().unwrap());
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(reopened.recover_bts_run_work().unwrap(), 1);
+        assert_eq!(store.get_work(&run.work_id).unwrap(), Some(queued));
+        let first = store
+            .claim("worker-1", Some(BTS_RUN_WORK_GENERATION), 1_001, 30_000)
+            .unwrap()
+            .unwrap();
+        let promoted = reopened.promote_bts_run_work(&first).unwrap().unwrap();
+        assert_eq!(promoted.state, BtsRunState::Attached);
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .checkpoint
+                .as_ref()
+                .unwrap()
+                .owner_lease_epoch,
+            first.lease_epoch,
+        );
+        store
+            .release(
+                &first.work_id,
+                first.lease_id.as_deref().unwrap(),
+                first.lease_epoch,
+                1_002,
+                1_002,
+            )
+            .unwrap();
+        let second = store
+            .claim("worker-2", Some(BTS_RUN_WORK_GENERATION), 1_002, 30_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            reopened.complete_bts_run_work(&first, BtsCompletion::Normal, None, None),
+            Err(HostProblem::IdempotencyConflict),
+        );
+        reopened.promote_bts_run_work(&second).unwrap().unwrap();
+        reopened
+            .complete_bts_run_work(&second, BtsCompletion::Normal, None, None)
+            .unwrap();
+        assert_eq!(
+            authority.load_run(&run.run_id).unwrap().unwrap().state,
+            BtsRunState::Finished
+        );
+        assert_eq!(reopened.recover_bts_run_work().unwrap(), 0);
+    }
+
+    #[test]
     fn bts_context_routes_events_to_the_fenced_activity_identity() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
 

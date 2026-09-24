@@ -48,7 +48,9 @@ impl CicsService {
         replay_clock: Arc<dyn CicsReplayClock>,
     ) -> Result<Arc<Self>, HostProblem> {
         delay::validate_store(store.as_ref(), limits)?;
-        Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))
+        let service = Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))?;
+        service.recover_bts_run_work()?;
+        Ok(service)
     }
 
     fn durable_tick(&self) -> Result<u64, HostProblem> {

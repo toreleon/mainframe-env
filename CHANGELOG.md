@@ -79,6 +79,12 @@ All notable changes to mainframe-env are documented here.
   their process and event rows in one atomic store mutation. This remains
   shared authority work; public lifecycle command registration is pending.
 
+- Added a versioned BTS RUN outbox and server work generation. Activation,
+  input event, request record, and pending-work index commit atomically;
+  restart re-admits missing work, leases fence checkpoints, and selected
+  online programs complete the lifecycle row. Public RUN registration remains
+  pending while source options and failure paths are finished.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

@@ -67,6 +67,16 @@ store mutation. Rollback and DELETE remove it, RESET clears its fired state,
 and forced CANCEL fires it with the process transition. Composite memberships
 and reattachment queues change in the same event-row mutation.
 
+RUN uses a versioned `cics-bts-run-request-v1` record and bounded
+`cics-bts-run-outbox-v1` pending index. Moving an activity to ACTIVE, firing
+its named dormant input event, saving the exact request, and indexing work are
+one atomic provider-state transaction. The CICS runtime admits work from the
+outbox on reopen; the server claims `cics-bts-run-v1` work, advances the
+checkpoint lease epoch, and starts the selected program in a separate run
+unit. Completion updates the process, completion event, request, and outbox
+in one transaction. A terminal work row with a still-pending RUN returns an
+unknown outcome for explicit reconciliation.
+
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed
 identities, and excess state. There is no prior BTS process row to migrate.

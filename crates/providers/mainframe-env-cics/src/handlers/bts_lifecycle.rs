@@ -430,10 +430,12 @@ mod children;
 mod context;
 mod participant;
 mod removal;
+mod run;
 mod store;
 mod transitions;
 pub use context::BtsActivityContext;
 pub(in crate::service) use participant::settle_recorded_uow;
+pub use run::{BTS_RUN_WORK_GENERATION, BtsRunRecord, BtsRunState};
 pub use store::BtsLifecycleStore;
 
 fn put_process(

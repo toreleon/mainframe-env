@@ -1,3 +1,4 @@
+use mainframe_env_cics::bts_lifecycle::{BTS_RUN_WORK_GENERATION, BtsRunRecord};
 use mainframe_env_cics::{
     CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService, CicsStartTask,
 };
@@ -38,6 +39,15 @@ pub(crate) fn claim_durable_work(
     if start.is_some() {
         return Ok(start);
     }
+    let bts = store.claim(
+        worker,
+        Some(BTS_RUN_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )?;
+    if bts.is_some() {
+        return Ok(bts);
+    }
     store.claim(
         worker,
         Some(CICS_DELAY_WORK_GENERATION),
@@ -66,6 +76,7 @@ pub(crate) fn heartbeat_durable_work(
 
 pub(crate) enum CicsWorkOutcome {
     Start(CicsStartTask),
+    BtsRun(Option<BtsRunRecord>),
     Delay,
 }
 
@@ -78,6 +89,7 @@ pub(crate) fn process_cics_work(
         CICS_START_WORK_GENERATION => Some(CicsWorkOutcome::Start(
             cics.promote_start_work(work, now_tick)?,
         )),
+        BTS_RUN_WORK_GENERATION => Some(CicsWorkOutcome::BtsRun(cics.promote_bts_run_work(work)?)),
         CICS_DELAY_WORK_GENERATION => {
             cics.promote_delay_work(work, now_tick)?;
             Some(CicsWorkOutcome::Delay)

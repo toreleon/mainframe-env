@@ -268,6 +268,25 @@ pub(super) fn fire_atomic(state: &mut ActivityState, event: &str) -> Result<bool
     Ok(true)
 }
 
+/// Prepare a RUN reattachment event for the same store transaction that moves
+/// its lifecycle activity to ACTIVE. A previously fired input is EVENTERR 7.
+pub(in crate::service) fn prepare_run_input_event(
+    store: &dyn ProviderStateStore,
+    activity: &str,
+    event: &str,
+) -> Result<ProviderStateMutation, HostProblem> {
+    let event = event_name(event).map_err(|_| event_error(6))?;
+    let mut state = load_activity_from_store(store, activity)?;
+    let record = state.events.get(&event).ok_or_else(|| event_error(7))?;
+    if !matches!(record.kind, EventKind::Input) || record.fired {
+        return Err(event_error(7));
+    }
+    if !fire_atomic(&mut state, &event)? {
+        return Err(event_error(7));
+    }
+    activity_mutation(activity, &state)
+}
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,

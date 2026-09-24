@@ -7992,6 +7992,91 @@ mod tests {
         (server, store, clock)
     }
 
+    #[test]
+    fn bts_run_work_launches_selected_online_program_and_completes_lifecycle() {
+        use mainframe_env_cics::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess, BtsRunState,
+        };
+
+        let now_tick = session_tick().unwrap();
+        let (server, store, _) = worker_test_server(now_tick);
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let artifact = published_source_fixture(
+            "BTSWORK",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSWORK. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let reference = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "BTSWORK".into(),
+                    artifact: reference,
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("BTS1".into(), "BTSWORK".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSWORK".into(),
+                    map: "BTSWORK".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "BTSWORK", "BTS1", "IBMUSER", "UOW1")
+                    .unwrap(),
+                "UOW1",
+                "EXEC1",
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow("UOW1", "EXEC1", "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "IBMUSER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "IBMUSER", "UOW2:1",
+                "run", [3; 32], [3; 32], now_tick, 4,
+            )
+            .unwrap();
+        server.cics.recover_bts_run_work().unwrap();
+        let work = server.claim_jes_work("bts-worker").unwrap().unwrap();
+        assert_eq!(work.required_generation, BTS_RUN_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Completed);
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .completion,
+            BtsCompletion::Normal,
+        );
+        assert_eq!(
+            authority.load_run(&run.run_id).unwrap().unwrap().state,
+            BtsRunState::Finished
+        );
+    }
+
     async fn wait_for_worker_health(server: &ProductServer, expected: usize) {
         for _ in 0..4_000 {
             if server.metrics().jes_worker_healthy == expected {

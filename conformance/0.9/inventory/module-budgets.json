@@ -291,6 +291,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/context.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/participant.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/removal.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/run.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/run/worker.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/store.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/transitions.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
