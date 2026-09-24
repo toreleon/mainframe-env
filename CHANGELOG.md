@@ -27,7 +27,8 @@ All notable changes to mainframe-env are documented here.
 
 - Added bounded two-phase ISSUE control intent to the shared APPC record.
   Dispatch is marked before carrier I/O, confirmed outcomes alone change
-  state, and SQLite restart retains an attempted control. This internal
+  state, and SQLite restart retains an attempted control. Canonical v1
+  records upgrade with their effective profile on the first staged intent. This internal
   protocol work leaves all ISSUE catalog rows unregistered.
 
 - Verified default ISSUE DISCONNECT and compatibility RESET against two

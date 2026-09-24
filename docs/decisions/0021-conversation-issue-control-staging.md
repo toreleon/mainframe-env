@@ -19,7 +19,8 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
 1. The existing `ConversationRecord` retains at most one bounded ISSUE
    control intent. Its effect key, stable control ID, flow, and pre-dispatch
    marker are stored in the same `cics-conversation-v1` provider row. Older
-   canonical records omit the optional field and reopen without conversion.
+   canonical records omit the optional field and reopen without conversion;
+   staging upgrades a v1 record and retains its effective profile.
 2. Owner lease, DPL principal, mapped versus basic form, state, and sync
    level are checked before staging. Staging leaves source-visible state
    unchanged. Competing protocol changes and FREE fail while a control is

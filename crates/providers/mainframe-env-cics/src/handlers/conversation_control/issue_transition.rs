@@ -4,8 +4,8 @@
 //! confirmed partner result applies the source transition in the same ledger.
 
 use super::{
-    ConversationContext, ConversationKind, ConversationOwner, ConversationProblem,
-    ConversationRecord, ConversationState, GdsIssueFlow,
+    CONVERSATION_RECORD_VERSION, ConversationContext, ConversationKind, ConversationOwner,
+    ConversationProblem, ConversationRecord, ConversationState, GdsIssueFlow,
 };
 use serde::{Deserialize, Serialize};
 
@@ -110,8 +110,14 @@ impl ConversationRecord {
                 ConversationProblem::Malformed,
             ));
         }
+        let migrated_profile =
+            (self.version == 1).then(|| self.effective_processing_profile().to_owned());
         self.next_sequence()
             .map_err(IssueValidationProblem::Protocol)?;
+        if let Some(profile) = migrated_profile {
+            self.version = CONVERSATION_RECORD_VERSION;
+            self.processing_profile = Some(profile);
+        }
         let id = self.sequence;
         self.pending_issue = Some(IssuePendingControl {
             flow,
@@ -608,5 +614,30 @@ mod tests {
             assert!(record.pending_issue.is_none());
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn staging_issue_upgrades_a_canonical_v1_conversation_record() {
+        let mut legacy = connected(ConversationKind::AppcMapped, 2);
+        legacy.version = 1;
+        legacy.processing_profile = None;
+        let old_bytes = legacy.encode().unwrap();
+        assert!(!String::from_utf8_lossy(&old_bytes).contains("pending_issue"));
+        let mut reopened = ConversationRecord::decode(&old_bytes).unwrap();
+        reopened
+            .stage_issue(
+                &owner(),
+                ConversationContext::Local,
+                false,
+                GdsIssueFlow::Prepare,
+                "prepare-legacy",
+            )
+            .unwrap();
+        assert_eq!(reopened.version, CONVERSATION_RECORD_VERSION);
+        assert_eq!(reopened.processing_profile.as_deref(), Some("DFHCICSA"));
+        assert_eq!(
+            ConversationRecord::decode(&reopened.encode().unwrap()),
+            Ok(reopened)
+        );
     }
 }

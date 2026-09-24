@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:53915931d26ae924a6dd42180b8203ffb61edbf214867cc7be827bf1adf76afd",
+      "sha256": "sha256:c60c2669453ae437ede7a5cd1d36b3e0cd83f88657aab82d34077e6c404ee5e4",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -845,7 +845,7 @@
       "path": "docs/decisions/0021-conversation-issue-control-staging.md",
       "relative_links": 2,
       "scope": "CIC-905 mapped and GDS ISSUE controls",
-      "sha256": "sha256:84f9f6220379fae04f60b49838f94764c923c9d9f3eb22640eb5372dc120bc90",
+      "sha256": "sha256:c1076a868a4bc1b6ec057c98c03b713b4b02ba97ad59b91c69b4fd50fc1006b4",
       "status": "Proposed for v0.9 development",
       "title": "ADR-0021: Stage ISSUE controls in the shared conversation ledger",
       "xtask_commands": 0
@@ -1210,7 +1210,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 90,
-      "sha256": "sha256:138e3e165021a879ed1fb948f4ccb6c3049dd351ed737de1ec5d6c82890da3e4",
+      "sha256": "sha256:85e57dc3ab2f341535d5174f01df632347af018ad29b2027fc0e0f1a0bd6fb03",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
