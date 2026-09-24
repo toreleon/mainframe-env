@@ -114,6 +114,9 @@ All notable changes to mainframe-env are documented here.
   commands, with root read/write versus descendant read-only access, owner and
   UOW fencing, and an explicit root requirement for ACQPROCESS.
 
+- ACQUIRE PROCESS now resolves its process type before the named process, so
+  missing types and missing processes report their distinct PROCESSERR codes.
+
 - Corrected complete-root SUSPEND ACQPROCESS to return the SUSPEND
   `INVREQ 16/14` activity-mode condition; RESUME ACQPROCESS retains its separate
   `PROCESSERR 108/14` condition.

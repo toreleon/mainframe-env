@@ -54,6 +54,11 @@ digest, and selected process/activity identity in the acquisition row in the
 same atomic transition. A retry with the same key and request returns the
 saved result after reopen or UOW release; changed request bytes conflict.
 An already-held acquisition with another key returns `INVREQ 16/22`.
+The public ACQUIRE PROCESS route resolves the installed process type before
+the process row, preserving `PROCESSERR 108/9` for an unknown type and
+`PROCESSERR 108/5` for a missing process. Source: baseline A catalog row
+`0003`, `dfhp4_acquire.html` SHA-256
+`646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a`.
 Duplicate process names return `PROCESSERR 108/2`. The effect survives an
 acquisition epoch tombstone, including rollback, until its replay window is
 explicitly retired.

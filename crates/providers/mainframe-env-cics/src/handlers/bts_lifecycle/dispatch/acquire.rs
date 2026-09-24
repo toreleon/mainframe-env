@@ -11,15 +11,25 @@ pub(super) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
     let authority = BtsLifecycleStore::new(service.store.as_ref());
-    let (process_type, process_name, activity_id, operation) = match request.operation {
+    let (process_type, process_name, activity_id, operation, definition) = match request.operation {
         CicsOperation::AcquireProcess => {
             let process_type = argument_name(request, "PROCESSTYPE", 8)?;
             let process_name = argument_name(request, "PROCESS", 36)?;
+            let definition = authority
+                .load_process_type(&process_type)?
+                .filter(|definition| definition.enabled)
+                .ok_or_else(|| condition("PROCESSERR", 108, 9))?;
             let process = authority
                 .load_process(&process_type, &process_name)?
                 .ok_or_else(|| condition("PROCESSERR", 108, 5))?;
             let root = process.root_id;
-            (process_type, process_name, root, "ACQUIRE PROCESS")
+            (
+                process_type,
+                process_name,
+                root,
+                "ACQUIRE PROCESS",
+                definition,
+            )
         }
         CicsOperation::AcquireActivityId => {
             let id = argument_name(request, "ACTIVITYID", 52)?;
@@ -30,19 +40,20 @@ pub(super) fn invoke(
                 .load_activity_index(&id)?
                 .filter(|index| index.parent_id.is_some())
                 .ok_or_else(|| condition("ACTIVITYERR", 109, 8))?;
+            let definition = authority
+                .load_process_type(&index.process_type)?
+                .filter(|definition| definition.enabled)
+                .ok_or_else(|| condition("PROCESSERR", 108, 9))?;
             (
                 index.process_type,
                 index.process_name,
                 id,
                 "ACQUIRE ACTIVITYID",
+                definition,
             )
         }
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let definition = authority
-        .load_process_type(&process_type)?
-        .filter(|definition| definition.enabled)
-        .ok_or_else(|| condition("PROCESSERR", 108, 9))?;
     if let Some(current) = authority.active_context(
         run.invocation.run_unit_id.as_str(),
         run.invocation.execution_id.as_str(),

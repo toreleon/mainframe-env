@@ -32868,6 +32868,47 @@ mod tests {
     }
 
     #[test]
+    fn bts_acquire_process_distinguishes_missing_type_from_missing_process() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcessTypeDefinition};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        for (sequence, process_type, response2) in [(1, b"UNKNOWN".as_slice(), 9), (2, b"TYPE", 5)]
+        {
+            let acquire = request(
+                CicsOperation::AcquireProcess,
+                BTreeMap::from([
+                    ("PROCESS".into(), argument(b"MISSING")),
+                    ("PROCESSTYPE".into(), argument(process_type)),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, acquire.clone(), sequence),
+                    acquire
+                ),
+                Err(HostProblem::Condition {
+                    name: "PROCESSERR".into(),
+                    response: 108,
+                    response2,
+                })
+            );
+        }
+        assert!(
+            BtsLifecycleStore::new(store.as_ref())
+                .load_acquisition(invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
     fn bts_define_process_accepts_not_sign_at_source_character_limit() {
         use handlers::bts_lifecycle::{
             BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
