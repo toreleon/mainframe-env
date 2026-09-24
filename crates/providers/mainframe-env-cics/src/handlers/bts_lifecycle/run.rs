@@ -360,8 +360,14 @@ impl CicsService {
             if record.state == BtsRunState::Finished {
                 continue;
             }
-            enqueue_exact(work.as_ref(), &record)?;
-            enqueued += 1;
+            match enqueue_exact(work.as_ref(), &record) {
+                Ok(()) => enqueued += 1,
+                // The exact work identity is already terminal while the
+                // lifecycle request is pending. Keep its outbox entry for
+                // owner reconciliation and recover independent RUN work.
+                Err(HostProblem::UnknownOutcome) => continue,
+                Err(problem) => return Err(problem),
+            }
         }
         Ok(enqueued)
     }

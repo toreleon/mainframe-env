@@ -117,7 +117,8 @@ outbox on reopen; the server claims `cics-bts-run-v1` work, advances the
 checkpoint lease epoch, and starts the selected program in a separate run
 unit. Completion updates the process, completion event, request, and outbox
 in one transaction. A terminal work row with a still-pending RUN returns an
-unknown outcome for explicit reconciliation.
+unknown outcome for exact owner reconciliation. Startup recovery leaves that
+outbox entry pending and continues admitting independent RUN work.
 
 RUN TRANSID issues a child token through the sibling `CicsService` registration
 and completion signatures. This checkout carries a compatible child-token

@@ -31799,6 +31799,85 @@ mod tests {
     }
 
     #[test]
+    fn bts_terminal_run_work_does_not_block_independent_recovery() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsRunState};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let start = |name: &str, defining_uow: &str, running_uow: &str, marker: u8| {
+            let root = BtsLifecycleStore::root_id("TYPE", name, defining_uow).unwrap();
+            authority
+                .define_process(
+                    BtsProcess::new("TYPE", name, &root, "MAIN", "BTS1", "USER", defining_uow)
+                        .unwrap(),
+                    defining_uow,
+                    defining_uow,
+                    "USER",
+                )
+                .unwrap();
+            authority
+                .finish_uow(defining_uow, defining_uow, "USER", true)
+                .unwrap();
+            authority
+                .acquire(running_uow, running_uow, "USER", "TYPE", name, &root)
+                .unwrap();
+            authority
+                .start_run(
+                    "TYPE",
+                    name,
+                    &root,
+                    None,
+                    false,
+                    None,
+                    running_uow,
+                    running_uow,
+                    "USER",
+                    &format!("{running_uow}:44"),
+                    "run",
+                    [marker; 32],
+                    [marker; 32],
+                    1_000,
+                    4,
+                )
+                .unwrap()
+        };
+        let cancelled = start("ORDER", "UOW1", "UOW2", 1);
+        store.enqueue(cancelled.work_record().unwrap()).unwrap();
+        assert_eq!(
+            store
+                .request_cancellation(&cancelled.work_id)
+                .unwrap()
+                .state,
+            WorkState::Cancelled
+        );
+        let pending = start("OTHER", "UOW3", "UOW4", 2);
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(
+            store.get_work(&pending.work_id).unwrap().unwrap().state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            reopened.enqueue_bts_run_work(&cancelled),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            authority
+                .load_run(&cancelled.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsRunState::Pending
+        );
+    }
+
+    #[test]
     fn bts_nocheck_collision_fails_before_syncpoint_intent() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
 

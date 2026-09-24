@@ -85,6 +85,10 @@ All notable changes to mainframe-env are documented here.
   online programs complete the lifecycle row. Public RUN registration remains
   pending while source options and failure paths are finished.
 
+- Preserved CICS runtime startup when one BTS RUN work item is terminal but
+  its lifecycle request remains pending. Other RUN work recovers; an exact
+  retry of the unresolved request still reports an unknown outcome.
+
 - Retained exact DEFINE PROCESS and ACQUIRE effect identities in the BTS
   acquisition row. Same-key retries survive reopen and reject changed inputs;
   a held acquisition reports source INVREQ rather than losing its replay
