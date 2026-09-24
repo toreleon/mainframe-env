@@ -54,6 +54,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Added a bounded 0.9 CardDemo host comparison that retains immutable CD-008,
+  recognizes the CD-024 SQL INCLUDE/cursor preprocessing delta, and binds
+  exact host, resource, and online observations to a clean candidate commit
+  and tree. It grants no CardDemo-full or licensed completion credit.
+
+- Preserved compact and source-sized CICS forms reached by the pinned CardDemo
+  corpus: `RETRIEVE INTO` without `LENGTH`, unseparated six-byte `FORMATTIME`
+  outputs, and same-area `LENGTH OF` on file `READ`/browse. Typed requests stay
+  bounded by the destination area; no application-name dispatch was added.
+
 - Restored the frozen CIC-901 source descriptor hash by keeping later transform
   and spool family admissions in the typed registry. The three accepted IBM
   source maps and their corpus bindings remain unchanged.

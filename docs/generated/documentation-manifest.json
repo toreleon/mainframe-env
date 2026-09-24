@@ -3,7 +3,7 @@
     "markdown_documents": 199,
     "navigation_groups": 5,
     "normative_documents": 49,
-    "xtask_commands": 170
+    "xtask_commands": 171
   },
   "documents": [
     {
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:3c2fd97141e07577815156f6904912cac165af41a375c6bc6c5b0d00b62d692b",
+      "sha256": "sha256:0eaf1619574b5c7d0da3e110a1c692cd92634fb3d80cffcfb2b8bdff818ebffd",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1198,7 +1198,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 89,
-      "sha256": "sha256:4602b70141e254f9ce2654c0bb29a464958a9e012cda0114be241a30ada5c237",
+      "sha256": "sha256:85da23311bc5838453f0e5f7ad30ee4d4fe7d540567cf547a0f40086f87530b2",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
@@ -1582,9 +1582,9 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 0,
-      "sha256": "sha256:703b73496ea5fa2d24b205df0377b37dd576de76d217283da658ee16fff0b7ff",
+      "sha256": "sha256:c2eae35405b61ce84000117820ec7bd2d030ff1fd7fba4bb6daed0cc42049438",
       "title": "CardDemo operator compatibility",
-      "xtask_commands": 5
+      "xtask_commands": 6
     },
     {
       "normative": false,

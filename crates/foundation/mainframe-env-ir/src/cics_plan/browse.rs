@@ -50,6 +50,10 @@ pub(super) fn invalid_shape(
         || reading != outputs.contains(&CicsOutputName::Into)
         || match length {
             Some(CicsOperandValue::Storage(slot)) if reading => length_output != Some(slot),
+            Some(CicsOperandValue::LengthOf(slot)) if reading => {
+                length_output.is_some()
+                    || output_target(&plan.outputs, CicsOutputName::Into) != Some(slot)
+            }
             Some(_) => true,
             None => length_output.is_some(),
         }

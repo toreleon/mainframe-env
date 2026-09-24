@@ -137,10 +137,11 @@ pub(super) fn validate_constraints(
         }
         HirCicsOperation::Retrieve
             if clauses.contains_key("INTO") == clauses.contains_key("SET")
-                || !clauses.contains_key("LENGTH") =>
+                || (clauses.contains_key("SET") && !clauses.contains_key("LENGTH")) =>
         {
             return Err(ResolutionFailure::Invalid(
-                "typed CICS RETRIEVE requires exactly one of INTO or SET plus LENGTH".into(),
+                "typed CICS RETRIEVE requires exactly one of INTO or SET; SET requires LENGTH"
+                    .into(),
             ));
         }
         _ => {}
@@ -381,7 +382,10 @@ fn retrieve_operands(
             }
         }
     }
-    let reference = complete_data_reference(&clauses["LENGTH"], semantic)?;
+    let Some(length) = clauses.get("LENGTH") else {
+        return Ok(Vec::new());
+    };
+    let reference = complete_data_reference(length, semantic)?;
     require_numeric(&reference)?;
     require_writable(&reference)?;
     Ok(clauses

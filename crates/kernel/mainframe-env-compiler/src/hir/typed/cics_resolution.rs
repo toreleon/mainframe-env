@@ -793,7 +793,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WriteOperator => &["TEXT"][..],
         HirCicsOperation::ExtractCertificate => &["CERTIFICATE"][..],
         HirCicsOperation::ExtractTcpip => &[][..],
-        HirCicsOperation::Retrieve => &["LENGTH"][..],
+        HirCicsOperation::Retrieve => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
@@ -1056,8 +1056,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(bts_child_link::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_open::outputs(&clauses, operation, semantic)?);
-    if operation == HirCicsOperation::Retrieve {
-        let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
+    if operation == HirCicsOperation::Retrieve
+        && let Some(length) = clauses.get("LENGTH")
+    {
+        let target = complete_data_reference(length, semantic)?;
         require_writable(&target)?;
         outputs.push(HirCicsOutputBinding {
             name: HirCicsOutputName::Length,

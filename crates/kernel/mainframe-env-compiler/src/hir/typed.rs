@@ -2342,12 +2342,36 @@ mod tests {
         let compact = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMTC. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(6). 01 TIME-X PIC X(6). PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) YYMMDD(DATE-X) TIME(TIME-X) END-EXEC. STOP RUN.",
         );
-        assert!(compact.hir.is_none());
-        assert!(compact.diagnostics.iter().any(|diagnostic| {
-            diagnostic
-                .public_message()
-                .contains("FORMATTIME output has an invalid field length")
+        let compact_hir = compact
+            .hir
+            .unwrap_or_else(|| panic!("compact FORMATTIME: {:?}", compact.diagnostics));
+        let compact_command = compact_hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("compact FORMATTIME remains typed");
+        assert!(
+            compact_command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Time && output.target.length == 6
+            })
+        );
+        assert!(compact_command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Yymmdd && output.target.length == 6
         }));
+        for separator in ["DATESEP('-')", "TIMESEP(':')"] {
+            let separated = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(6). 01 TIME-X PIC X(6). PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) {separator} YYMMDD(DATE-X) TIME(TIME-X) END-EXEC. STOP RUN."
+            ));
+            assert!(separated.hir.is_none(), "{separator}");
+            assert!(separated.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("FORMATTIME output has an invalid field length")
+            }));
+        }
         assert_eq!(
             command
                 .outputs
@@ -5618,6 +5642,36 @@ mod tests {
     }
 
     #[test]
+    fn cics_retrieve_into_without_length_remains_typed() {
+        // The pinned CardDemo MQ trigger program uses this form. IBM CICS TS
+        // 6.x RETRIEVE requires LENGTH with SET, but permits INTO alone.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RETINTO. DATA DIVISION. WORKING-STORAGE SECTION. 01 MSG-X PIC X(684). PROCEDURE DIVISION. EXEC CICS RETRIEVE INTO(MSG-X) NOHANDLE END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RETRIEVE INTO: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RETRIEVE INTO");
+        assert_eq!(command.operation, HirCicsOperation::Retrieve);
+        assert!(command.operands.is_empty());
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Into && output.target.qualified_name == "MSG-X"
+        }));
+        assert!(
+            !command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+    }
+
+    #[test]
     fn cics_start_may_defer_request_identity_generation_to_runtime() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. GENREQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) PROTECT NOCHECK END-EXEC. STOP RUN.";
         let analysis = analyze(source);
@@ -6785,7 +6839,32 @@ mod tests {
                 .any(|output| output.name == HirCicsOutputName::Length)
         );
 
-        for invalid in ["LENGTH(8)", "LENGTH(LENGTH OF REC-X)"] {
+        let sized = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READCAP. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(LENGTH OF REC-X) END-EXEC. STOP RUN.",
+        );
+        let sized_hir = sized
+            .hir
+            .unwrap_or_else(|| panic!("READ capacity: {:?}", sized.diagnostics));
+        let read = sized_hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ capacity");
+        assert!(read.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::LengthOf(_))
+        }));
+        assert!(
+            !read
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+
+        for invalid in ["LENGTH(8)", "LENGTH(LENGTH OF KEY-X)"] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) {invalid} END-EXEC. STOP RUN."
             ));
@@ -6802,7 +6881,8 @@ mod tests {
         for command in [
             "STARTBR DATASET('TRANSACT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
             "RESETBR DATASET('TRANSACT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
-            "READNEXT DATASET('TRANSACT') INTO(REC-X) RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "READNEXT DATASET('TRANSACT') INTO(REC-X) LENGTH(LENGTH OF REC-X) RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "READPREV DATASET('TRANSACT') INTO(REC-X) LENGTH(LENGTH OF REC-X) RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
             "ENDBR DATASET('TRANSACT') RESP(RESP-X) RESP2(RESP2-X)",
         ] {
             let source = format!(
@@ -6825,6 +6905,15 @@ mod tests {
                 "{command}"
             );
         }
+        let mismatched = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBROW. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READPREV DATASET('TRANSACT') INTO(REC-X) LENGTH(LENGTH OF KEY-X) RIDFLD(KEY-X) END-EXEC. STOP RUN.",
+        );
+        assert!(mismatched.hir.is_none());
+        assert!(mismatched.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("LENGTH OF must name the INTO data area")
+        }));
     }
 
     #[test]

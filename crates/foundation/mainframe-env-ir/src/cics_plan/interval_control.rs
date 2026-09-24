@@ -163,22 +163,20 @@ pub(super) fn invalid_shape(
             let set_form = outputs.contains(&CicsOutputName::SetPointer);
             into_form == set_form
                 || if into_form {
-                    *inputs != BTreeSet::from([CicsOperandName::Length])
+                    !inputs.is_subset(&BTreeSet::from([CicsOperandName::Length]))
+                        || outputs.contains(&CicsOutputName::Length)
+                            != inputs.contains(&CicsOperandName::Length)
+                        || match operand_value(plan, CicsOperandName::Length) {
+                            Some(CicsOperandValue::Storage(slot)) => {
+                                output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
+                            }
+                            Some(_) => true,
+                            None => false,
+                        }
                 } else {
-                    !inputs.is_empty()
+                    !inputs.is_empty() || !outputs.contains(&CicsOutputName::Length)
                 }
                 || !outputs.is_subset(&allowed_outputs)
-                || !outputs.contains(&CicsOutputName::Length)
-                || if into_form {
-                    match operand_value(plan, CicsOperandName::Length) {
-                        Some(CicsOperandValue::Storage(slot)) => {
-                            output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
-                        }
-                        Some(_) | None => true,
-                    }
-                } else {
-                    operand_value(plan, CicsOperandName::Length).is_some()
-                }
                 || scheduling_options
         }
         CicsPlanOperation::StartBrexit => {
