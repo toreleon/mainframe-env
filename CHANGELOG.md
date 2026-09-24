@@ -130,6 +130,10 @@ All notable changes to mainframe-env are documented here.
   first available configured printer, commits one screen image to terminal
   and printer, and replays exactly. Compiled COBOL and backend regressions
   pass; the integrated registry is 199 typed and 64 unready.
+- Registered CIC-905 ISSUE PASS row 0126 through compiled COBOL and the public
+  source route. Task-end delivery is atomic and target claims are once-only;
+  Memory, SQLite, and isolated PostgreSQL restart/race tests pass. The
+  integrated registry is 200 typed and 63 unready.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

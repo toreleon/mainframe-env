@@ -2,7 +2,14 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 48] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 49] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::ChangePassword,
+        syntax: "CHANGE PASSWORD",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0020",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::ChangePhrase,
         syntax: "CHANGE PHRASE",

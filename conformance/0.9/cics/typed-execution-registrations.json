@@ -585,6 +585,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0125"
     },
     {
+      "operation": "IssuePass",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0126"
+    },
+    {
       "operation": "IssuePrint",
       "interface": "api",
       "family": "conversation-control",

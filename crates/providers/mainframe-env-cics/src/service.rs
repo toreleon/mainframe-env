@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 201);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 202);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -10738,19 +10738,27 @@ mod tests {
             .unwrap()
             .install(store.as_ref())
             .unwrap();
-            let mut run = service
-                .lock()
-                .unwrap()
-                .runs
-                .get(&invocation.run_unit_id)
-                .unwrap()
-                .clone();
             let command = request(
                 CicsOperation::IssuePass,
                 BTreeMap::from([("LUNAME".into(), cics_literal(b"APPL1"))]),
                 1,
             );
-            handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command.clone(),
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command
+                    )
+                    .unwrap(),
+                response
+            );
             let staged = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
                 .unwrap()
                 .unwrap();
@@ -10862,14 +10870,16 @@ mod tests {
             .unwrap()
             .install(store.as_ref())
             .unwrap();
-            let mut run = service
-                .lock()
-                .unwrap()
-                .runs
-                .get(&invocation.run_unit_id)
-                .unwrap()
-                .clone();
-            handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command.clone()
+                    )
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
             let staged = handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
                 .unwrap()
                 .unwrap();
