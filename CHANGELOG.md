@@ -31,6 +31,10 @@ All notable changes to mainframe-env are documented here.
   records upgrade with their effective profile on the first staged intent. This internal
   protocol work leaves all ISSUE catalog rows unregistered.
 
+- Verified that concurrent PostgreSQL providers stage one ISSUE control in
+  the shared ledger, then retain its attempt marker and confirmed transition
+  across restart. No transport or partner result is inferred from the CAS.
+
 - Verified default ISSUE DISCONNECT and compatibility RESET against two
   concurrent PostgreSQL providers and restart replay. Each device and source
   session advances once; both catalog rows remain unregistered.

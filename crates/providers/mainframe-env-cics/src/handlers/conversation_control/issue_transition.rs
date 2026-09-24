@@ -208,7 +208,8 @@ fn issue_state_valid(record: &ConversationRecord, flow: GdsIssueFlow) -> bool {
 mod tests {
     use super::super::{ConversationLedger, ConversationSystemDefinition};
     use super::*;
-    use mainframe_env_store::SqliteStateStore;
+    use mainframe_env_store::{PostgresStateStore, SqliteStateStore};
+    use std::sync::{Arc, Barrier};
 
     fn owner() -> ConversationOwner {
         ConversationOwner {
@@ -638,6 +639,122 @@ mod tests {
         assert_eq!(
             ConversationRecord::decode(&reopened.encode().unwrap()),
             Ok(reopened)
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn pending_issue_postgres_cas_race_and_restart_confirm_once() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let first = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let initial = ConversationLedger::load(&first).unwrap();
+        let mut installed = initial.clone();
+        installed
+            .register_system(ConversationSystemDefinition {
+                sysid: "I905".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        let token = installed
+            .allocate("I905", ConversationKind::AppcMapped, owner())
+            .unwrap()
+            .token;
+        installed
+            .conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner(),
+                ConversationContext::Local,
+                false,
+                b"PROGRAM".to_vec(),
+                Vec::new(),
+                2,
+            )
+            .unwrap();
+        assert!(initial.persist(&mut installed, &first).unwrap());
+        drop(first);
+        let gate = Arc::new(Barrier::new(2));
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let store = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+            let gate = gate.clone();
+            workers.push(std::thread::spawn(move || {
+                let current = ConversationLedger::load(&store).unwrap();
+                let mut next = current.clone();
+                next.conversation_mut(token)
+                    .unwrap()
+                    .stage_issue(
+                        &owner(),
+                        ConversationContext::Local,
+                        false,
+                        GdsIssueFlow::Prepare,
+                        "prepare-pg",
+                    )
+                    .unwrap();
+                gate.wait();
+                current.persist(&mut next, &store).unwrap()
+            }));
+        }
+        let outcomes = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(outcomes.iter().filter(|outcome| **outcome).count(), 1);
+        let store = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let current = ConversationLedger::load(&store).unwrap();
+        let pending = current
+            .conversation(token)
+            .unwrap()
+            .pending_issue
+            .as_ref()
+            .unwrap();
+        assert_eq!(pending.effect_key, "prepare-pg");
+        assert!(!pending.attempted);
+        let id = pending.id;
+        let mut attempted = current.clone();
+        attempted
+            .conversation_mut(token)
+            .unwrap()
+            .mark_issue_attempted(&owner(), ConversationContext::Local, "prepare-pg", id)
+            .unwrap();
+        assert!(current.persist(&mut attempted, &store).unwrap());
+        drop(store);
+        let reopened = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let current = ConversationLedger::load(&reopened).unwrap();
+        assert!(
+            current
+                .conversation(token)
+                .unwrap()
+                .pending_issue
+                .as_ref()
+                .unwrap()
+                .attempted
+        );
+        let mut confirmed = current.clone();
+        assert_eq!(
+            confirmed.conversation_mut(token).unwrap().confirm_issue(
+                &owner(),
+                ConversationContext::Local,
+                "prepare-pg",
+                id
+            ),
+            Ok(ConversationState::SyncReceive)
+        );
+        assert!(current.persist(&mut confirmed, &reopened).unwrap());
+        let final_state = ConversationLedger::load(&reopened).unwrap();
+        assert!(
+            final_state
+                .conversation(token)
+                .unwrap()
+                .pending_issue
+                .is_none()
+        );
+        assert_eq!(
+            final_state.conversation(token).unwrap().state,
+            ConversationState::SyncReceive
         );
     }
 }

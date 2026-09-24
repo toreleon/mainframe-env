@@ -41,6 +41,7 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
   conversation result.
 - Unknown outcomes retain enough identity to reconcile without a second
   control transmission. Task cleanup refuses to discard an attempted intent.
-- The current record-level tests prove staging, SQLite reopen, and confirmed
-  transitions. Provider routing, partner consumption, and selected compiled
-  execution remain separate acceptance gates.
+- Record-level tests prove staging, SQLite reopen, and confirmed transitions.
+  An isolated PostgreSQL race proves one staged CAS winner and restart of the
+  attempted control. Provider routing, partner consumption, and selected
+  compiled execution remain separate acceptance gates.
