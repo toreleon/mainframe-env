@@ -11,6 +11,7 @@ mod release_attestation;
 mod release_licenses;
 mod topic_manifests;
 mod work_package_seal;
+mod zosmf_contracts;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
@@ -175,6 +176,7 @@ enum XtaskCommand {
     AbiLibraries(CheckArgs),
     ProgramRegistry(CheckArgs),
     RouteRegistries(CheckArgs),
+    ZosmfContracts(CheckArgs),
     Dehardcoding(CheckArgs),
     LedgerConsistency(CheckArgs),
     MigrationRollback(CheckArgs),
@@ -351,6 +353,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             } else {
                 generate_route_registries(root)
             }
+        ),
+        XtaskCommand::ZosmfContracts(args) => checked!(
+            "zosmf-contracts",
+            args,
+            zosmf_contracts::run(root, args.check)
         ),
         XtaskCommand::Dehardcoding(args) => {
             checked!("dehardcoding", args, check_dehardcoding(root))
@@ -8070,6 +8077,35 @@ fn check_schemas(root: &Path) -> TaskResult {
         compile_draft_2020_12_schema(&value, file)?;
     }
     validate_0_2_schema_artifacts(root)?;
+    let zosmf_normalization_path = root.join("conformance/0.11/catalogs/zosmf-normalization.json");
+    let zosmf_normalization_schema =
+        root.join("conformance/0.11/schemas/zosmf-normalization.schema.json");
+    validate_schema_instance(
+        &json(&zosmf_normalization_schema)?,
+        &json(&zosmf_normalization_path)?,
+        &zosmf_normalization_path,
+    )?;
+    for (artifact, schema) in [
+        (
+            "conformance/0.11/generated/zosmf-contracts.json",
+            "conformance/0.11/schemas/zosmf-generated-contracts.schema.json",
+        ),
+        (
+            "conformance/0.11/generated/zosmf-collision-report.json",
+            "conformance/0.11/schemas/zosmf-collision-report.schema.json",
+        ),
+        (
+            "conformance/0.11/generated/zosmf-closure-report.json",
+            "conformance/0.11/schemas/zosmf-closure-report.schema.json",
+        ),
+    ] {
+        let artifact_path = root.join(artifact);
+        validate_schema_instance(
+            &json(&root.join(schema))?,
+            &json(&artifact_path)?,
+            &artifact_path,
+        )?;
+    }
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(

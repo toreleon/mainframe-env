@@ -24,6 +24,14 @@ All notable changes to mainframe-env are documented here.
   reads. Missing and empty queues return exact QIDERR 44/0 and QZERO 23/0;
   SET, SYSID, NOSUSPEND, and TDQUEUE definition modes remain fail-closed.
 
+- Added the ZMF-1101 z/OSMF 3.2 normalization authority for all 27 pinned
+  service families and 189 direct-guide headings. Deterministic generation now
+  emits route, operation, schema/error, backend-ownership, collision, and
+  closure contracts while preserving the existing 23 official routes, keeping
+  all seven `/mainframe-env/*` routes outside official coverage, and withholding
+  every candidate operation whose backend or detailed payload contract is not
+  accepted.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,

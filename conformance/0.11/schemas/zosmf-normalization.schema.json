@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/zosmf-normalization@1",
+  "title": "mainframe-env z/OSMF 3.2 source and operation normalization authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "work_package",
+    "baseline",
+    "authority",
+    "families",
+    "headings",
+    "operations",
+    "legacy_official_routes",
+    "publication_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.zosmf-normalization@1"},
+    "target_version": {"const": "0.11.0"},
+    "work_package": {"const": "ZMF-1101"},
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "product", "manifest", "topic_manifest_sha256", "toc_sha256", "topic_count"],
+      "properties": {
+        "id": {"const": "ibm-zosmf-3.2-2026-07-27"},
+        "product": {"const": "SSLTBW_3.2.0"},
+        "manifest": {"const": "conformance/0.2/manifests/zosmf-topics.json"},
+        "topic_manifest_sha256": {"$ref": "#/$defs/prefixed_sha256"},
+        "toc_sha256": {"$ref": "#/$defs/prefixed_sha256"},
+        "topic_count": {"const": 395}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["official_catalog", "official_route_bindings", "custom_route_catalog", "family_count", "heading_count", "source_locator_count", "policy", "generated_coverage_credit"],
+      "properties": {
+        "official_catalog": {"const": "conformance/0.2/catalogs/zosmf.json"},
+        "official_route_bindings": {"const": "conformance/0.2/routes/official-route-bindings.json"},
+        "custom_route_catalog": {"const": "conformance/0.2/routes/custom-routes.json"},
+        "family_count": {"const": 27},
+        "heading_count": {"const": 189},
+        "source_locator_count": {"const": 216},
+        "policy": {"const": "source-proven-normalization-with-explicit-pending-dispositions"},
+        "generated_coverage_credit": {"const": 0}
+      }
+    },
+    "families": {
+      "type": "array",
+      "minItems": 27,
+      "maxItems": 27,
+      "items": {"$ref": "#/$defs/family"}
+    },
+    "headings": {
+      "type": "array",
+      "minItems": 189,
+      "maxItems": 189,
+      "items": {"$ref": "#/$defs/heading"}
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/operation"}
+    },
+    "legacy_official_routes": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "items": {"$ref": "#/$defs/legacy_route"}
+    },
+    "publication_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existing_official_route_count", "custom_route_count", "new_official_routes_advertised", "custom_routes_can_count_as_official", "missing_backend_blocks_publication", "identity_only_schema_blocks_publication", "licensed_differential"],
+      "properties": {
+        "existing_official_route_count": {"const": 23},
+        "custom_route_count": {"const": 7},
+        "new_official_routes_advertised": {"const": 0},
+        "custom_routes_can_count_as_official": {"const": false},
+        "missing_backend_blocks_publication": {"const": true},
+        "identity_only_schema_blocks_publication": {"const": true},
+        "licensed_differential": {"const": "pending"}
+      }
+    }
+  },
+  "$defs": {
+    "token": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.+:@_-]*$", "maxLength": 300},
+    "row_id": {"type": "string", "pattern": "^ibm-zosmf-3\\.2-2026-07-27:(rest-service-families|direct-guide-operation-headings):[0-9]{4}$"},
+    "prefixed_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "locator", "topic_path", "sha256", "bytes", "disposition"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/row_id"},
+        "locator": {"type": "string", "pattern": "^topic:SSLTBW_3\\.2\\.0/[^;]+;topic-id:[^;]+;heading:.+$"},
+        "topic_path": {"type": "string", "pattern": "^SSLTBW_3\\.2\\.0/.+\\.html?$"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1, "maximum": 67108864},
+        "disposition": {
+          "enum": ["family-overview", "family-endpoint", "context-reference", "operation-group", "operation-bundle", "concrete-operation", "schema-reference", "error-reference"]
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "capability_version", "acceptance", "prerequisite_slice"],
+      "properties": {
+        "owner": {"type": "string", "minLength": 1, "maxLength": 160},
+        "capability_version": {"type": "string", "pattern": "^mainframe-env\\.[a-z0-9.-]+@1(?::[a-z0-9-]+)?$"},
+        "acceptance": {"enum": ["accepted", "partial", "missing", "unresolved"]},
+        "prerequisite_slice": {"type": "string", "pattern": "^ZMF-11(01|02|03|04)\\.[a-z0-9.-]+$"}
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "source", "heading_row_ids", "normalized_operation_ids", "backend", "state_model"],
+      "properties": {
+        "id": {"$ref": "#/$defs/token"},
+        "label": {"type": "string", "minLength": 1, "maxLength": 180},
+        "source": {"$ref": "#/$defs/source"},
+        "heading_row_ids": {"type": "array", "items": {"$ref": "#/$defs/row_id"}, "uniqueItems": true},
+        "normalized_operation_ids": {"type": "array", "items": {"$ref": "#/$defs/token"}, "uniqueItems": true},
+        "backend": {"$ref": "#/$defs/backend"},
+        "state_model": {"$ref": "#/$defs/token"}
+      }
+    },
+    "heading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "family_id", "label", "source", "normalized_operation_ids"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/row_id"},
+        "family_id": {"$ref": "#/$defs/token"},
+        "label": {"type": "string", "minLength": 1, "maxLength": 220},
+        "source": {"$ref": "#/$defs/source"},
+        "normalized_operation_ids": {"type": "array", "items": {"$ref": "#/$defs/token"}, "uniqueItems": true},
+        "reference_role": {"enum": ["context", "schema", "error"]}
+      }
+    },
+    "route_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "plain_text_line"],
+      "properties": {
+        "row_id": {"$ref": "#/$defs/row_id"},
+        "plain_text_line": {"type": "integer", "minimum": 1, "maximum": 10000}
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "source_uri", "normalized_path", "query_contract", "source_evidence"],
+      "properties": {
+        "method": {"enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]},
+        "source_uri": {"type": "string", "pattern": "^/zosmf/", "maxLength": 500},
+        "normalized_path": {"type": "string", "pattern": "^/zosmf/", "maxLength": 500},
+        "query_contract": {"type": "string", "minLength": 1, "maxLength": 500},
+        "source_evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/route_evidence"}, "uniqueItems": true}
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authentication", "intent", "saf_resource"],
+      "properties": {
+        "authentication": {"const": "required"},
+        "intent": {"enum": ["read", "update", "authenticate", "terminate-session", "change-credential"]},
+        "saf_resource": {"const": "operation-specific-pending-normalization"}
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "response", "error", "resolution"],
+      "properties": {
+        "request": {"type": "string", "pattern": "^mainframe-env\\.zosmf\\..+\\.request@1$"},
+        "response": {"type": "string", "pattern": "^mainframe-env\\.zosmf\\..+\\.response@1$"},
+        "error": {"type": "string", "pattern": "^mainframe-env\\.zosmf\\.error\\..+@1$"},
+        "resolution": {"enum": ["existing-gateway-dto", "identity-only-pending-detail"]}
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "existing_route_ids", "new_route_advertised"],
+      "properties": {
+        "state": {"enum": ["legacy-accepted-route", "withheld"]},
+        "existing_route_ids": {"type": "array", "items": {"type": "string", "pattern": "^(GET|POST|PUT|DELETE) /zosmf/"}, "uniqueItems": true},
+        "new_route_advertised": {"const": false}
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "gate"],
+      "properties": {
+        "id": {"$ref": "#/$defs/token"},
+        "gate": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]}
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "family_id", "source_row_ids", "routes", "dispatch_discriminator", "authorization", "state_model", "failure_model", "backend", "schemas", "publication", "mandatory_obligations"],
+      "properties": {
+        "id": {"$ref": "#/$defs/token"},
+        "label": {"type": "string", "minLength": 1, "maxLength": 220},
+        "family_id": {"$ref": "#/$defs/token"},
+        "source_row_ids": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/row_id"}, "uniqueItems": true},
+        "routes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/route"}},
+        "dispatch_discriminator": {"type": "string", "minLength": 1, "maxLength": 160},
+        "authorization": {"$ref": "#/$defs/authorization"},
+        "state_model": {"$ref": "#/$defs/token"},
+        "failure_model": {"type": "string", "pattern": "^mainframe-env\\.zosmf\\.error\\..+@1$"},
+        "backend": {"$ref": "#/$defs/backend"},
+        "schemas": {"$ref": "#/$defs/schemas"},
+        "publication": {"$ref": "#/$defs/publication"},
+        "mandatory_obligations": {"type": "array", "minItems": 5, "items": {"$ref": "#/$defs/obligation"}, "uniqueItems": true}
+      }
+    },
+    "legacy_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "handler", "normalized_operation_ids", "disposition", "official_coverage_credit_added"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^(GET|POST|PUT|DELETE) /zosmf/"},
+        "handler": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "normalized_operation_ids": {"type": "array", "items": {"$ref": "#/$defs/token"}, "uniqueItems": true},
+        "disposition": {"enum": ["mapped-existing-operation", "preserved-prior-contract-unmapped-to-0.11-source"]},
+        "official_coverage_credit_added": {"const": 0}
+      }
+    }
+  }
+}

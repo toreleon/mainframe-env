@@ -1,0 +1,277 @@
+{
+  "counts": {
+    "blocked": 13,
+    "classified": 1,
+    "route_keys": 310,
+    "shared_dispatch": 14,
+    "source_alias_groups": 5
+  },
+  "generated_coverage_credit": 0,
+  "new_route_publication_allowed": false,
+  "normalization_sha256": "sha256:94a3a8250a5bedf183474b8a163dcd324d0ab115f0d2607a2166ebd14ee35770",
+  "official_custom_namespaces_disjoint": true,
+  "schema_version": "mainframe-env.zosmf-collision-report@1",
+  "shared_dispatch": [
+    {
+      "discriminators": [
+        "zos-data-set-and-file-rest-interface.delete-a-partitioned-data-set-member=none",
+        "zos-data-set-and-file-rest-interface.delete-a-sequential-and-partitioned-data-set=none"
+      ],
+      "method": "DELETE",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "zos-data-set-and-file-rest-interface.delete-a-partitioned-data-set-member",
+        "zos-data-set-and-file-rest-interface.delete-a-sequential-and-partitioned-data-set"
+      ],
+      "path": "/zosmf/restfiles/ds/{dsn}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "cloud-provisioning-services.get-a-published-software-service-template=none",
+        "cloud-provisioning-services.get-prompt-variables-for-a-published-software-service-template=none"
+      ],
+      "method": "GET",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "cloud-provisioning-services.get-a-published-software-service-template",
+        "cloud-provisioning-services.get-prompt-variables-for-a-published-software-service-template"
+      ],
+      "path": "/zosmf/provisioning/rest/{version}/psc/{existing_entry_name}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "cloud-provisioning-services.get-an-approval-for-a-software-services-template=none",
+        "cloud-provisioning-services.list-the-approvals-for-a-software-services-template=none"
+      ],
+      "method": "GET",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "cloud-provisioning-services.get-an-approval-for-a-software-services-template",
+        "cloud-provisioning-services.list-the-approvals-for-a-software-services-template"
+      ],
+      "path": "/zosmf/provisioning/rest/{version}/scc/{object_id}/approvals",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "storage-management-services.get-a-storage-group-definition=none",
+        "storage-management-services.get-an-scds-activation-result=none"
+      ],
+      "method": "GET",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "storage-management-services.get-a-storage-group-definition",
+        "storage-management-services.get-an-scds-activation-result"
+      ],
+      "path": "/zosmf/storage/rest/{version}/storagegroups/{stg_name}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "notification-services.send-a-notification-and-mail-from-a-zosmf-task-or-zosmf-user=none",
+        "notification-services.send-a-notification-from-a-zosmf-task-when-the-content-is-the-message-from-the-bundle-file=none"
+      ],
+      "method": "POST",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "notification-services.send-a-notification-and-mail-from-a-zosmf-task-or-zosmf-user",
+        "notification-services.send-a-notification-from-a-zosmf-task-when-the-content-is-the-message-from-the-bundle-file"
+      ],
+      "path": "/zosmf/notifications/new",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "cloud-provisioning-services.add-an-approval-for-a-software-services-template=none",
+        "cloud-provisioning-services.approve-an-approval-record-for-a-software-services-template=none",
+        "cloud-provisioning-services.batch-approve-approval-records-for-a-software-services-template=none",
+        "cloud-provisioning-services.reject-the-use-of-a-user-id-with-a-software-services-template=none"
+      ],
+      "method": "POST",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "cloud-provisioning-services.add-an-approval-for-a-software-services-template",
+        "cloud-provisioning-services.approve-an-approval-record-for-a-software-services-template",
+        "cloud-provisioning-services.batch-approve-approval-records-for-a-software-services-template",
+        "cloud-provisioning-services.reject-the-use-of-a-user-id-with-a-software-services-template"
+      ],
+      "path": "/zosmf/provisioning/rest/{version}/scc/{object_id}/approvals",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "cloud-provisioning-services.resume-an-action-workflow=none",
+        "cloud-provisioning-services.retry-an-action-workflow=none"
+      ],
+      "method": "POST",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "cloud-provisioning-services.resume-an-action-workflow",
+        "cloud-provisioning-services.retry-an-action-workflow"
+      ],
+      "path": "/zosmf/provisioning/rest/{version}/scr/{object_id}/actions/{action_id}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "zos-data-set-and-file-rest-interface.copy-a-data-set-or-member=body.request=copy",
+        "zos-data-set-and-file-rest-interface.delete-a-backup-version-of-a-data-set=body.request=hdelete",
+        "zos-data-set-and-file-rest-interface.migrate-a-data-set=body.request=hmigrate",
+        "zos-data-set-and-file-rest-interface.recall-a-migrated-data-set=body.request=hrecall",
+        "zos-data-set-and-file-rest-interface.rename-a-data-set-or-member=body.request=rename",
+        "zos-data-set-and-file-rest-interface.write-data-to-a-zos-data-set-or-member=none"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "zos-data-set-and-file-rest-interface.copy-a-data-set-or-member",
+        "zos-data-set-and-file-rest-interface.delete-a-backup-version-of-a-data-set",
+        "zos-data-set-and-file-rest-interface.migrate-a-data-set",
+        "zos-data-set-and-file-rest-interface.recall-a-migrated-data-set",
+        "zos-data-set-and-file-rest-interface.rename-a-data-set-or-member",
+        "zos-data-set-and-file-rest-interface.write-data-to-a-zos-data-set-or-member"
+      ],
+      "path": "/zosmf/restfiles/ds/{dsn}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "zos-data-set-and-file-rest-interface.chmod=body.request=chmod",
+        "zos-data-set-and-file-rest-interface.chown=body.request=chown",
+        "zos-data-set-and-file-rest-interface.chtag=body.request=chtag",
+        "zos-data-set-and-file-rest-interface.copy=body.request=copy",
+        "zos-data-set-and-file-rest-interface.extattr=body.request=extattr",
+        "zos-data-set-and-file-rest-interface.getfacl=body.request=getfacl",
+        "zos-data-set-and-file-rest-interface.move=body.request=move",
+        "zos-data-set-and-file-rest-interface.setfacl=body.request=setfacl"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "zos-data-set-and-file-rest-interface.chmod",
+        "zos-data-set-and-file-rest-interface.chown",
+        "zos-data-set-and-file-rest-interface.chtag",
+        "zos-data-set-and-file-rest-interface.copy",
+        "zos-data-set-and-file-rest-interface.extattr",
+        "zos-data-set-and-file-rest-interface.getfacl",
+        "zos-data-set-and-file-rest-interface.move",
+        "zos-data-set-and-file-rest-interface.setfacl"
+      ],
+      "path": "/zosmf/restfiles/fs/{file_path_name}",
+      "resolution": "typed-request-discriminator"
+    },
+    {
+      "discriminators": [
+        "zos-data-set-and-file-rest-interface.mount-a-zos-unix-file-system=none",
+        "zos-data-set-and-file-rest-interface.unmount-a-unix-file-system=none"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "zos-data-set-and-file-rest-interface.mount-a-zos-unix-file-system",
+        "zos-data-set-and-file-rest-interface.unmount-a-unix-file-system"
+      ],
+      "path": "/zosmf/restfiles/mfs/{file_system_name}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "zos-jobs-rest-interface.cancel-a-job=none",
+        "zos-jobs-rest-interface.change-the-job-class=none",
+        "zos-jobs-rest-interface.hold-a-job=none",
+        "zos-jobs-rest-interface.release-a-job=none"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "zos-jobs-rest-interface.cancel-a-job",
+        "zos-jobs-rest-interface.change-the-job-class",
+        "zos-jobs-rest-interface.hold-a-job",
+        "zos-jobs-rest-interface.release-a-job"
+      ],
+      "path": "/zosmf/restjobs/jobs/{correlator}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "zos-jobs-rest-interface.cancel-a-job=none",
+        "zos-jobs-rest-interface.change-the-job-class=none",
+        "zos-jobs-rest-interface.hold-a-job=none",
+        "zos-jobs-rest-interface.release-a-job=none"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "zos-jobs-rest-interface.cancel-a-job",
+        "zos-jobs-rest-interface.change-the-job-class",
+        "zos-jobs-rest-interface.hold-a-job",
+        "zos-jobs-rest-interface.release-a-job"
+      ],
+      "path": "/zosmf/restjobs/jobs/{jobname}/{jobid}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "storage-management-services.activate-an-scds=none",
+        "storage-management-services.validate-an-scds=none"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "storage-management-services.activate-an-scds",
+        "storage-management-services.validate-an-scds"
+      ],
+      "path": "/zosmf/storage/rest/{version}/cds/{scds_name}",
+      "resolution": "blocked-pending-typed-discriminator"
+    },
+    {
+      "discriminators": [
+        "wlm-resource-pooling-services.construct-a-wlm-service-definition=none",
+        "wlm-resource-pooling-services.construct-a-wlm-service-definition-with-remove-and-install=none"
+      ],
+      "method": "PUT",
+      "new_route_publication_allowed": false,
+      "operation_ids": [
+        "wlm-resource-pooling-services.construct-a-wlm-service-definition",
+        "wlm-resource-pooling-services.construct-a-wlm-service-definition-with-remove-and-install"
+      ],
+      "path": "/zosmf/zwlm/rest/policy/inspolicy",
+      "resolution": "blocked-pending-typed-discriminator"
+    }
+  ],
+  "source_aliases": [
+    {
+      "method": "GET",
+      "operation_id": "mvs-subsystem-services.list-mvs-subsystems",
+      "path": "/zosmf/rest/mvssubs",
+      "source_variant_count": 2
+    },
+    {
+      "method": "GET",
+      "operation_id": "zos-console-services.get-the-detect-result-for-unsolicited-messages",
+      "path": "/zosmf/restconsoles/consoles/{name}/detections/{key}",
+      "source_variant_count": 2
+    },
+    {
+      "method": "GET",
+      "operation_id": "zos-console-services.get-a-command-response",
+      "path": "/zosmf/restconsoles/consoles/{name}/solmsgs/{key}",
+      "source_variant_count": 2
+    },
+    {
+      "method": "GET",
+      "operation_id": "zos-data-set-and-file-rest-interface.list-zos-unix-filesystems",
+      "path": "/zosmf/restfiles/mfs",
+      "source_variant_count": 3
+    },
+    {
+      "method": "PUT",
+      "operation_id": "zos-console-services.issue-a-command-from-a-system-console",
+      "path": "/zosmf/restconsoles/consoles/{name}",
+      "source_variant_count": 2
+    }
+  ],
+  "target_version": "0.11.0"
+}
