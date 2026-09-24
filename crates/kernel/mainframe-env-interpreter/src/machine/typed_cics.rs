@@ -322,6 +322,7 @@ pub(super) fn execute(
                 if matches!(
                     operand.name,
                     CicsOperandName::Length
+                        | CicsOperandName::IssueLength
                         | CicsOperandName::ControlCursor
                         | CicsOperandName::DestIdLength
                         | CicsOperandName::Subaddress
@@ -1077,6 +1078,161 @@ mod tests {
                 assert_eq!(result.is_ok(), length == expected, "{name} width {length}");
             }
         }
+    }
+
+    #[test]
+    fn issue_pass_halfword_length_reaches_host_as_decimal() {
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let from = builder.add_storage("FROM-X", 3, None).unwrap();
+        let length = builder.add_storage("LENGTH-X", 2, None).unwrap();
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        for (name, category, picture, width, digits, signed) in [
+            ("FROM-X", "alphanumeric", "X(3)", 3, 0, 0),
+            ("LENGTH-X", "binary", "S9(4)", 2, 4, 1),
+        ] {
+            builder
+                .add_operation(
+                    block,
+                    OperationIdentity::new(super::super::NAMESPACE, "define", 1).unwrap(),
+                    Vec::new(),
+                    0,
+                    BTreeMap::from([
+                        ("name".into(), Attribute::Text(name.into())),
+                        ("simple_name".into(), Attribute::Text(name.into())),
+                        ("category".into(), Attribute::Text(category.into())),
+                        ("picture".into(), Attribute::Text(picture.into())),
+                        ("digits".into(), Attribute::Integer(digits)),
+                        ("scale".into(), Attribute::Integer(0)),
+                        ("signed".into(), Attribute::Integer(signed)),
+                        ("sign_separate".into(), Attribute::Integer(0)),
+                        ("section".into(), Attribute::Text("working".into())),
+                        ("offset".into(), Attribute::Integer(0)),
+                        ("length".into(), Attribute::Integer(width)),
+                        ("element_length".into(), Attribute::Integer(width)),
+                        ("occurs".into(), Attribute::Integer(1)),
+                        ("parent".into(), Attribute::Text(String::new())),
+                        ("condition_values".into(), Attribute::Text(String::new())),
+                    ]),
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                )
+                .unwrap();
+        }
+        let from_slot = CicsStorageSlot {
+            storage: from,
+            qualified_layout_name: "FROM-X".into(),
+        };
+        let length_slot = CicsStorageSlot {
+            storage: length,
+            qualified_layout_name: "LENGTH-X".into(),
+        };
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::IssuePass,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::IssueLuName,
+                    value: CicsOperandValue::Literal(b"APPL1".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::IssueFrom,
+                    value: CicsOperandValue::Storage(from_slot.clone()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::IssueLength,
+                    value: CicsOperandValue::Storage(length_slot.clone()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let descriptor = cics_executable_descriptor(CicsPlanOperation::IssuePass);
+        builder
+            .add_operation(
+                block,
+                descriptor.identity(),
+                Vec::new(),
+                0,
+                BTreeMap::from([(
+                    PLAN_ATTRIBUTE.into(),
+                    Attribute::Bytes(
+                        encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap(),
+                    ),
+                )]),
+                descriptor.effects.to_vec(),
+                vec![
+                    StorageReference {
+                        storage: from,
+                        offset: 0,
+                        length: 3,
+                    },
+                    StorageReference {
+                        storage: length,
+                        offset: 0,
+                        length: 2,
+                    },
+                ],
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(super::super::NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let module = builder.finish().unwrap();
+        let validation = super::super::validate_module(&module);
+        assert!(validation.is_ok(), "{validation:?}");
+        let bytes = mainframe_env_ir::encode_binary(&module, CodecLimits::default()).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            &bytes,
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        write_resolved(
+            &mut machine,
+            &from_slot,
+            &CobolValue::Bytes(b"ABC".to_vec()),
+        )
+        .unwrap();
+        write_resolved(
+            &mut machine,
+            &length_slot,
+            &CobolValue::Decimal(Decimal {
+                coefficient: 3,
+                scale: 0,
+            }),
+        )
+        .unwrap();
+        let operation = machine
+            .operations
+            .iter()
+            .find(|value| value.identity == descriptor.identity())
+            .unwrap()
+            .clone();
+        let Step::Effect(effect) = execute(&mut machine, &operation).unwrap() else {
+            panic!("ISSUE PASS must emit a typed host effect");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("ISSUE PASS must use the CICS host boundary");
+        };
+        assert_eq!(request.operation, CicsOperation::IssuePass);
+        assert_eq!(request.arguments["FROM"].bytes(), b"ABC");
+        assert_eq!(
+            request.arguments["LENGTH"].schema(),
+            "mainframe-env.cics.decimal@1"
+        );
+        assert_eq!(request.arguments["LENGTH"].bytes(), b"3");
     }
 
     /// Issue #207: compact FORMATTIME output leaves a wider field's suffix unchanged.
