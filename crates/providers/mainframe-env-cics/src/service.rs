@@ -7633,6 +7633,134 @@ mod tests {
     }
 
     #[test]
+    fn issue_copy_unknown_outcome_replays_after_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-copy-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let target_invocation = invocation_for("copy-target-restart", BTreeMap::new());
+        let source_invocation = invocation_for("copy-source-restart", BTreeMap::new());
+        let target_session = SessionId::new("copy-target-restart", 64).unwrap();
+        let source_session = SessionId::new("copy-source-restart", 64).unwrap();
+        let command = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([
+                ("TERMID".into(), cics_literal(b"T001")),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            1,
+        );
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(
+                    target_invocation.clone(),
+                    &target_session,
+                    "MENU",
+                    24,
+                    80,
+                    "csrf-target",
+                    1,
+                    100,
+                )
+                .unwrap();
+            service
+                .launch_terminal(
+                    source_invocation,
+                    &source_session,
+                    "MENU",
+                    24,
+                    80,
+                    "csrf-source",
+                    1,
+                    100,
+                )
+                .unwrap();
+            let current = service.lock().unwrap().sessions[source_session.as_str()].clone();
+            let mut source = current.clone();
+            source.version += 1;
+            source.screen = b"RAW\0BUFFER".to_vec();
+            service
+                .persist_session(source_session.as_str(), &source, Some(current.version))
+                .unwrap();
+            service
+                .lock()
+                .unwrap()
+                .sessions
+                .insert(source_session.as_str().into(), source);
+            for terminal in ["T000", "T001"] {
+                handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                    terminal: terminal.into(),
+                    kind: handlers::IssueDeviceKind::Display3270,
+                    control_unit: Some("CU1".into()),
+                    printers: vec![],
+                    programs: vec![],
+                    applications: vec![],
+                    logon_logmode: None,
+                    disconnect_allowed: true,
+                    pass_allowed: false,
+                })
+                .unwrap()
+                .install(store.as_ref())
+                .unwrap();
+            }
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&target_invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            let state = service.lock().unwrap();
+            let copied = &state.sessions[target_session.as_str()];
+            assert_eq!(copied.screen, b"RAW\0BUFFER");
+            assert_eq!(copied.version, 2);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .restore_terminal_run(
+                    target_invocation.clone(),
+                    &target_session,
+                    "MENU",
+                    vec![],
+                    2,
+                )
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&target_invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            let state = service.lock().unwrap();
+            let copied = &state.sessions[target_session.as_str()];
+            assert_eq!(copied.screen, b"RAW\0BUFFER");
+            assert_eq!(copied.version, 2);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn issue_print_selects_first_available_printer_and_replays_exact_effect() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

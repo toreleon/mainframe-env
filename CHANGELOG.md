@@ -77,11 +77,13 @@ All notable changes to mainframe-env are documented here.
   to nulls, resets their modified tags, positions the cursor, and restores
   the keyboard through the existing durable terminal authority.
 
-- Added the synchronous default ISSUE COPY route over the existing BMS
+- Added the default ISSUE COPY route over the existing BMS
   authority. It copies the complete 3270 buffer between sessions on the same
   installed control unit with source-read and target-update SAF checks and an
-  atomic target/receipt commit. Asynchronous and CCC-specific forms remain
-  pending.
+  atomic target/receipt commit. CCC-specific forms remain pending.
+
+- Verified default ISSUE COPY receipt recovery after SQLite restart, with a
+  null-inclusive buffer and no duplicate target-session transition.
 
 - Added ISSUE PRINT selection of the first available installed printer, with
   printer availability and the exact printed image retained in the physical
