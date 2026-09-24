@@ -85,6 +85,9 @@ All notable changes to mainframe-env are documented here.
 - Proved paired mapped ISSUE SIGNAL delivery through the sealed partner
   peer-frame ledger. Carrier confirmation follows the partner commit, and the
   partner consumes the SIGNAL once through the existing exchange path.
+- Added paired carrier regressions for mapped ISSUE CONFIRMATION and ERROR.
+  The partner's pending SEND CONFIRM is reconciled before the issuer completes;
+  ERROR persists the source four-byte negative response by send ID.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

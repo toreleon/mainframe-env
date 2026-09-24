@@ -8922,6 +8922,243 @@ mod tests {
     }
 
     #[test]
+    fn mapped_issue_confirmation_and_error_complete_partner_send_before_source_receipt() {
+        struct AwaitingConfirmCarrier {
+            response: Arc<Mutex<Option<ConversationTransmitOutcome>>>,
+        }
+
+        impl CicsConversationTransport for AwaitingConfirmCarrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                frame: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                assert!(frame.confirm);
+                Ok(ConversationTransmitOutcome::Pending)
+            }
+
+            fn reconcile(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Ok(self
+                    .response
+                    .lock()
+                    .unwrap()
+                    .unwrap_or(ConversationTransmitOutcome::Pending))
+            }
+        }
+
+        struct RespondingIssueCarrier {
+            target: Arc<CicsService>,
+            target_run: Run,
+            target_token: [u8; 4],
+            response: Arc<Mutex<Option<ConversationTransmitOutcome>>>,
+        }
+
+        impl CicsConversationTransport for RespondingIssueCarrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                flow: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                let response = match flow {
+                    GdsIssueFlow::Confirmation => ConversationTransmitOutcome::Confirmed,
+                    GdsIssueFlow::Error => {
+                        ConversationTransmitOutcome::Rejected([0x08, 0x89, 0, 0])
+                    }
+                    _ => return Err(HostProblem::Unsupported),
+                };
+                *self.response.lock().unwrap() = Some(response);
+                assert_eq!(
+                    self.target
+                        .flush_conversation_send(&self.target_run, self.target_token)?,
+                    ConversationTransmitOutcome::Confirmed
+                );
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        for (operation, flow) in [
+            (CicsOperation::IssueConfirmation, GdsIssueFlow::Confirmation),
+            (CicsOperation::IssueError, GdsIssueFlow::Error),
+        ] {
+            let source_store = Arc::new(MemoryStore::new(Default::default()));
+            let source = service(source_store.clone());
+            let target_store = Arc::new(MemoryStore::new(Default::default()));
+            let target = service(target_store.clone());
+            for service in [&source, &target] {
+                service
+                    .register_conversation_system(ConversationSystemDefinition {
+                        sysid: "SYS1".into(),
+                        kind: ConversationKind::AppcMapped,
+                        capacity: 2,
+                        enabled: true,
+                    })
+                    .unwrap();
+            }
+            let (source_invocation, _) = registered(&source);
+            let (target_invocation, _) = registered(&target);
+            let source_token = source
+                .install_conversation_principal_for_run(
+                    &source_invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcMapped,
+                )
+                .unwrap();
+            let target_token = target
+                .install_conversation_principal_for_run(
+                    &target_invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcMapped,
+                )
+                .unwrap();
+            let source_owner = ConversationOwner {
+                execution: source_invocation.execution_id.as_str().into(),
+                run_unit: source_invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(source_invocation.attempt),
+            };
+            let target_owner = ConversationOwner {
+                execution: target_invocation.execution_id.as_str().into(),
+                run_unit: target_invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(target_invocation.attempt),
+            };
+            let current = ConversationLedger::load(source_store.as_ref()).unwrap();
+            let mut next = current.clone();
+            let source_record = next.conversation_mut(source_token).unwrap();
+            source_record
+                .connect(
+                    &source_owner,
+                    ConversationContext::Local,
+                    false,
+                    b"PROC".to_vec(),
+                    vec![],
+                    1,
+                )
+                .unwrap();
+            source_record.state = ConversationState::ConfReceive;
+            assert!(current.persist(&mut next, source_store.as_ref()).unwrap());
+            let current = ConversationLedger::load(target_store.as_ref()).unwrap();
+            let mut next = current.clone();
+            next.conversation_mut(target_token)
+                .unwrap()
+                .connect(
+                    &target_owner,
+                    ConversationContext::Local,
+                    false,
+                    b"PROC".to_vec(),
+                    vec![],
+                    1,
+                )
+                .unwrap();
+            let send_id = next
+                .stage_mapped_send(
+                    target_token,
+                    &target_owner,
+                    ConversationContext::Local,
+                    ConversationDataFrame {
+                        bytes: b"CONFIRM".to_vec(),
+                        end_structured_field: true,
+                        confirm: true,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            assert!(current.persist(&mut next, target_store.as_ref()).unwrap());
+            let response = Arc::new(Mutex::new(None));
+            target
+                .install_conversation_transport(Arc::new(AwaitingConfirmCarrier {
+                    response: response.clone(),
+                }))
+                .unwrap();
+            let target_run = target.lock().unwrap().runs[&target_invocation.run_unit_id].clone();
+            assert_eq!(
+                target
+                    .flush_conversation_send(&target_run, target_token)
+                    .unwrap(),
+                ConversationTransmitOutcome::Pending
+            );
+            source
+                .install_conversation_transport(Arc::new(RespondingIssueCarrier {
+                    target: target.clone(),
+                    target_run,
+                    target_token,
+                    response,
+                }))
+                .unwrap();
+            let mut source_run =
+                source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
+            let command = request(
+                operation,
+                BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
+                1,
+            );
+            assert_eq!(
+                handlers::invoke_extended_control(
+                    &source,
+                    &mut source_run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+            let control_id = ConversationLedger::load(source_store.as_ref())
+                .unwrap()
+                .conversation(source_token)
+                .unwrap()
+                .pending_issue
+                .as_ref()
+                .unwrap()
+                .id;
+            assert_eq!(
+                source
+                    .flush_issue_control(&mut source_run, source_token, "outer-1", control_id)
+                    .unwrap(),
+                ConversationTransmitOutcome::Confirmed
+            );
+            let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
+            let exchange = partner.exchange(target_token).unwrap();
+            assert_eq!(exchange.last_acked_send_id, send_id);
+            assert_eq!(exchange.pending_outbound(), 0);
+            assert_eq!(
+                exchange.negative_responses.get(&send_id).copied(),
+                (flow == GdsIssueFlow::Error).then_some([0x08, 0x89, 0, 0])
+            );
+            assert!(
+                ConversationLedger::load(source_store.as_ref())
+                    .unwrap()
+                    .conversation(source_token)
+                    .unwrap()
+                    .pending_issue
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn mapped_issue_route_restarts_with_pending_and_final_receipt_on_sqlite() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-issue-route-{}-{:?}",
