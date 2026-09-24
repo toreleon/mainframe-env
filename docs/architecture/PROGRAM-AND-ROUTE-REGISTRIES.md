@@ -27,3 +27,12 @@ and `cargo xtask dehardcoding --check` reject stale generation, denominator or
 namespace drift, production application identities, and reintroduced string
 dispatch. Generated catalog/route presence grants zero official compatibility
 coverage credit.
+
+From ZMF-1101, `cargo xtask zosmf-contracts --check` separately derives the
+z/OSMF 3.2 route, operation, schema/error, backend-ownership, collision, and
+closure artifacts from `conformance/0.11/catalogs/zosmf-normalization.json`.
+This candidate registry is not router registration: only the frozen 23-route
+binding file feeds `official_routes::register`. The generated closure must keep
+new advertised routes at zero, preserve the seven-route custom namespace with
+zero official credit, and withhold any operation whose backend or detailed
+schema contract is not accepted.

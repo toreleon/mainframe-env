@@ -23,6 +23,7 @@ The structural/source gate is:
 python3 -B conformance/0.11/tools/verify_zosmf_sources.py \
   --archive-root '/absolute/path/to/ibm-docs-archive'
 python3 -B -m unittest discover -s conformance/0.11/tools/tests -p 'test_*.py' -v
+cargo xtask zosmf-contracts --check
 ```
 
 The archive check is offline and accepts only the committed SHA-256 identities
@@ -30,3 +31,9 @@ under `raw/html/sha256` and `raw/toc/sha256`. It never downloads or republishes
 IBM content. The repository's Draft 2020-12 validator compiles
 `schemas/zosmf-normalization.schema.json` and validates the catalog through
 `cargo xtask schemas --check`.
+
+The generator emits a schema-validated contract bundle plus collision and
+closure reports under `generated/`, and compact read-only metadata in the
+existing z/OSMF gateway. These artifacts never feed router registration. A
+shared method/path is either associated with a frozen request discriminator or
+reported as a blocker; it is never resolved by silently dropping an operation.

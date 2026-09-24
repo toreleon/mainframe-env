@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 187,
+    "markdown_documents": 189,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 167
+    "xtask_commands": 174
   },
   "documents": [
     {
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:932b2633f560eee31ef23894723f53937a11774b52de1219f6bff67d93a7a7c4",
+      "sha256": "sha256:a9d86bfb31dc71fdec985bd72c6521ddce69875ac80ab477afee6ab0ed82b1fe",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -53,6 +53,14 @@
       "sha256": "sha256:d31301d3acfd15036218d6b4754bd199373900201499e41c7ae0f63689dfb1af",
       "title": "MAINFRAME-ENV 0.1 exit report",
       "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "conformance/0.11/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:21a280a38d439d60c09f49196a0901d15ac700b0e6bef68d02c9ce3b454cc146",
+      "title": "z/OSMF 3.2 normalization authority",
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -194,7 +202,7 @@
       "normative": false,
       "path": "crates/gateways/mainframe-env-zosmf/README.md",
       "relative_links": 0,
-      "sha256": "sha256:996a52a522dfba5b76e69837f4369e22bf2c59b64b4718c36a427e5b1bab619d",
+      "sha256": "sha256:fc497b640c7f5f7aaaa328fa09b2d59fec0f18a73bcc64c49b2b4cbee072ffe9",
       "title": "mainframe-env-zosmf",
       "xtask_commands": 0
     },
@@ -501,10 +509,10 @@
       "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
       "relative_links": 0,
       "scope": "generated common-program and route registries",
-      "sha256": "sha256:2a56f3eedf0c7b7e9d851897ed041855abad1d17746e67b136d96186ea0bb5ce",
+      "sha256": "sha256:cc2cc6c3a288b235ae8b6634ce81e7b76bda1e00431c20fb2ef9903cffcb16ce",
       "status": "Frozen for mainframe-env 0.2.0",
       "title": "Generated common-program and route registries",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
       "applies_from": "mainframe-env 0.8.3 development",
@@ -1000,6 +1008,14 @@
       "relative_links": 5,
       "sha256": "sha256:2a91b82dfbc4d2db4c6dc15dfe5f17bbc2fb24e223ed8fbcd2598daf43816c7a",
       "title": "mainframe-env 0.8.0 review — JES2 execution and real utility semantics",
+      "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.11.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:66ce9a2923671daceac81cee4e54e369799cdaf446fe46b8ebca3bf7c13b8c1a",
+      "title": "mainframe-env 0.11.0 implementation status",
       "xtask_commands": 4
     },
     {
