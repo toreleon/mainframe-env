@@ -388,6 +388,9 @@ pub(super) fn invoke_child(
 }
 
 pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    if super::selected_link_return(run) {
+        return Ok(());
+    }
     let parent = run.invocation.run_unit_id.as_str();
     if service
         .store

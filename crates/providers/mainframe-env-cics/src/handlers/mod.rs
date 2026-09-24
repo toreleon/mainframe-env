@@ -77,6 +77,12 @@ fn bts_live(service: &CicsService, run: &Run, retention_tick: u64) -> Result<(),
     Ok(())
 }
 
+/// A selected program LINK retains its caller's run unit on nested RETURN.
+fn selected_link_return(run: &Run) -> bool {
+    run.invocation.parent_execution_id.is_some()
+        && run.invocation.bindings.contains_key("cobol.call.arguments")
+}
+
 pub(super) fn authorize_and_describe(
     service: &CicsService,
     run: &mut Run,

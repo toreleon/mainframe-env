@@ -575,6 +575,9 @@ fn active_activity(service: &CicsService, run: &Run) -> Result<Option<String>, H
 }
 
 pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    if super::selected_link_return(run) {
+        return Ok(());
+    }
     let key = run.invocation.run_unit_id.as_str();
     if let Some(row) = service
         .store
@@ -586,11 +589,10 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
             .delete_provider_state(CONTEXT_NS, key, row.version)
             .map_err(store_error)?;
     }
-    if run.invocation.parent_execution_id.is_none()
-        && let Some(row) = service
-            .store
-            .get_provider_state(FRAME_NS, key)
-            .map_err(store_error)?
+    if let Some(row) = service
+        .store
+        .get_provider_state(FRAME_NS, key)
+        .map_err(store_error)?
     {
         service
             .store

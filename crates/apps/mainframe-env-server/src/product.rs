@@ -18825,11 +18825,11 @@ mod tests {
         );
         let child = published_source_fixture(
             "BTSRUN",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSRUN. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('GO') END-EXEC. EXEC CICS LINK ACTIVITY('GRAND') END-EXEC. GOBACK.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSRUN. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('GO') END-EXEC. EXEC CICS LINK ACTIVITY('GRAND') END-EXEC. EXEC CICS DEFINE INPUT EVENT('AFTER') END-EXEC. GOBACK.",
         );
         let grandchild = published_source_fixture(
             "BTSGRND",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSGRND. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('PING') END-EXEC. GOBACK.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSGRND. PROCEDURE DIVISION. EXEC CICS DEFINE INPUT EVENT('PING') END-EXEC. EXEC CICS RETURN END-EXEC.",
         );
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
@@ -18943,6 +18943,11 @@ mod tests {
                 10_000,
             )
             .unwrap();
+        let child_token = *b"BTSCHILD00000001";
+        server
+            .cics
+            .register_bts_child(&invocation.run_unit_id, child_token, Some("REPLY"))
+            .unwrap();
         let authority = BtsLifecycleStore::new(server.store.as_ref());
         let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
         let grandchild_id = BtsLifecycleStore::child_id("TYPE", "PROC", 1).unwrap();
@@ -18955,6 +18960,24 @@ mod tests {
             .permit(
                 "BTSEVENT",
                 &format!("CICS.BTS.{root}.GO"),
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile(
+                "BTSEVENT",
+                &format!("CICS.BTS.{root}.AFTER"),
+                "IBMUSER",
+                None,
+            )
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "BTSEVENT",
+                &format!("CICS.BTS.{root}.AFTER"),
                 "IBMUSER",
                 AccessIntent::Update,
             )
@@ -19073,6 +19096,7 @@ mod tests {
             .unwrap();
         let event: serde_json::Value = serde_json::from_slice(&event.payload).unwrap();
         assert!(event["events"].get("GO").is_some());
+        assert!(event["events"].get("AFTER").is_some());
         let grandchild_event = server
             .store
             .get_provider_state("cics-event-activity-v1", &grandchild_id)
@@ -19084,6 +19108,22 @@ mod tests {
         let completed = authority.load_process("TYPE", "PROC").unwrap().unwrap();
         assert_eq!(completed.activities[&root].mode, BtsMode::Dormant);
         assert_eq!(completed.activities[&grandchild_id].mode, BtsMode::Dormant);
+        let children = server
+            .store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let children: serde_json::Value = serde_json::from_slice(&children.payload).unwrap();
+        assert!(
+            children["children"]
+                .as_object()
+                .unwrap()
+                .values()
+                .all(|child| child["freed"] == false)
+        );
         assert!(
             server
                 .store
