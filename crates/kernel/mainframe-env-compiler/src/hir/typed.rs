@@ -5061,13 +5061,18 @@ mod tests {
         }
 
         let qualified = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(PT-X) ESMAPPNAME('APP') END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PT-X PIC X(8). 01 APP-X PIC X(8). PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(PT-X) ESMAPPNAME(APP-X) END-EXEC. STOP RUN.",
         );
-        assert!(qualified.hir.is_none());
-        assert!(qualified.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("REQUEST PASSTICKET") && message.contains("handler is unready")
-        }));
+        let hir = qualified
+            .hir
+            .unwrap_or_else(|| panic!("qualified PASSTICKET: {:?}", qualified.diagnostics));
+        assert!(hir.statements.iter().any(|statement| matches!(
+            statement.resolved.as_ref(),
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::RequestPassTicket,
+                ..
+            }))
+        )));
 
         let omitted = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. PROCEDURE DIVISION. EXEC CICS REQUEST ESMAPPNAME('APP') END-EXEC. STOP RUN.",

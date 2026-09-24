@@ -217,6 +217,16 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SecurityEncryptLength
         | HirCicsOutputName::SecurityLangInUse
         | HirCicsOutputName::SecurityNatLangInUse
-        | HirCicsOutputName::Assign(_) => Ok(()),
+        | HirCicsOutputName::Assign(_)
+        | HirCicsOutputName::ConversationState
+        | HirCicsOutputName::ConversationConvid
+        | HirCicsOutputName::ConversationRetcode
+        | HirCicsOutputName::ConversationPrinConvid
+        | HirCicsOutputName::ConversationPrinSysid
+        | HirCicsOutputName::ConversationConvData
+        | HirCicsOutputName::ConversationInto
+        | HirCicsOutputName::ConversationSet
+        | HirCicsOutputName::ConversationToLength
+        | HirCicsOutputName::ConversationToFullLength => Ok(()),
     }
 }

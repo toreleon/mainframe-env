@@ -120,7 +120,9 @@ pub(super) fn resolve(
         if name == "INTO"
             && matches!(
                 operation,
-                HirCicsOperation::WebReceive | HirCicsOperation::WebConverse
+                HirCicsOperation::WebReceive
+                    | HirCicsOperation::WebConverse
+                    | HirCicsOperation::Converse
             )
         {
             continue;

@@ -20,6 +20,7 @@ mod assign_validation;
 mod candidate_validation;
 mod clause_parser;
 mod command_recognition;
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -411,6 +412,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebRetrieve => web_control::RETRIEVE_CLAUSES,
         HirCicsOperation::WebReceive => web_control::RECEIVE_CLAUSES,
         HirCicsOperation::WebConverse => web_control::CONVERSE_CLAUSES,
+        operation if conversation_control::is_conversation(operation) => {
+            conversation_control::allowed_clauses(operation)
+        }
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -547,6 +551,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebRetrieve => &["NOHANDLE"],
         HirCicsOperation::WebReceive => &["NOTRUNCATE", "NOHANDLE"],
         HirCicsOperation::WebConverse => &["NOTRUNCATE", "NOHANDLE"],
+        operation if conversation_control::is_conversation(operation) => {
+            conversation_control::allowed_options(operation)
+        }
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -630,6 +637,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         )));
     }
     program_control::validate(operation, &clauses, &raw_options)?;
+    conversation_control::validate(&clauses, &raw_options, operation)?;
     file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
@@ -750,6 +758,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::VerifyToken => &["TOKEN", "TOKENLEN"][..],
         HirCicsOperation::Signon => &["USERID"][..],
         HirCicsOperation::Signoff => &[][..],
+        operation if conversation_control::is_conversation(operation) => {
+            conversation_control::required_clauses(operation)
+        }
         HirCicsOperation::VerifyPhrase => &["PHRASE", "PHRASELEN", "USERID"][..],
         HirCicsOperation::Syncpoint => &[][..],
         HirCicsOperation::WaitJournalName
@@ -911,6 +922,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
+    operands.extend(conversation_control::operands(
+        &clauses, operation, semantic,
+    )?);
     operands.extend(security_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
@@ -956,6 +970,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(conversation_control::outputs(
+        &clauses, operation, semantic,
+    )?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
@@ -981,7 +998,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
         })
         .map(|option| {
-            counter_control::option(operation, option)
+            conversation_control::option(operation, option)
+                .or_else(|| counter_control::option(operation, option))
                 .or_else(|| event_control::option(operation, option))
                 .or_else(|| diagnostics::option(operation, option))
                 .or_else(|| {
