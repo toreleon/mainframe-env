@@ -336,6 +336,9 @@ pub struct BtsAcquisitionEffect {
     pub process_type: String,
     pub process_name: String,
     pub activity_id: String,
+    /// Repository-name reservation, present for catalog-backed DEFINE.
+    #[serde(default)]
+    pub repository_resource: Option<String>,
 }
 
 impl BtsAcquisition {
@@ -386,6 +389,13 @@ impl BtsAcquisition {
                     || validate_name(&effect.process_type, 8, true).is_err()
                     || validate_name(&effect.process_name, 36, true).is_err()
                     || validate_activity_id(&effect.activity_id).is_err()
+                    || effect
+                        .repository_resource
+                        .as_deref()
+                        .is_some_and(|resource| {
+                            effect.operation != "DEFINE PROCESS"
+                                || validate_identifier(resource, 44).is_err()
+                        })
             })
         {
             return Err(HostProblem::InfrastructureFailure);
@@ -454,6 +464,7 @@ mod children;
 mod context;
 mod participant;
 mod removal;
+mod repository;
 mod run;
 mod store;
 mod transitions;

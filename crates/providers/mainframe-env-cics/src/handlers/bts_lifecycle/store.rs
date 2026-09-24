@@ -144,7 +144,14 @@ impl<'a> BtsLifecycleStore<'a> {
         owner_execution: &str,
         owner_principal: &str,
     ) -> Result<(), HostProblem> {
-        self.define_process_inner(process, run_unit, owner_execution, owner_principal, None)
+        self.define_process_inner(
+            process,
+            run_unit,
+            owner_execution,
+            owner_principal,
+            None,
+            None,
+        )
     }
 
     /// Atomically retain the DEFINE effect so a crash-gap retry is exact.
@@ -164,6 +171,30 @@ impl<'a> BtsLifecycleStore<'a> {
             owner_execution,
             owner_principal,
             Some((effect_key, request_digest)),
+            None,
+        )
+    }
+
+    /// Reserve a process name across all process types mapped to one repository.
+    #[allow(clippy::too_many_arguments)]
+    pub fn define_process_in_repository_exact(
+        &self,
+        process: BtsProcess,
+        repository_resource: &str,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        effect_key: &str,
+        request_digest: [u8; 32],
+    ) -> Result<(), HostProblem> {
+        validate_identifier(effect_key, 256)?;
+        self.define_process_inner(
+            process,
+            run_unit,
+            owner_execution,
+            owner_principal,
+            Some((effect_key, request_digest)),
+            Some(repository_resource),
         )
     }
 
@@ -174,6 +205,7 @@ impl<'a> BtsLifecycleStore<'a> {
         owner_execution: &str,
         owner_principal: &str,
         effect: Option<(&str, [u8; 32])>,
+        repository_resource: Option<&str>,
     ) -> Result<(), HostProblem> {
         validate_identifier(run_unit, 256)?;
         if process.pending_uow.as_deref() != Some(run_unit) || process.row_version != 0 {
@@ -202,6 +234,7 @@ impl<'a> BtsLifecycleStore<'a> {
                     && saved.process_type == process.process_type
                     && saved.process_name == process.name
                     && saved.activity_id == process.root_id
+                    && saved.repository_resource.as_deref() == repository_resource
                 {
                     Ok(())
                 } else {
@@ -236,6 +269,7 @@ impl<'a> BtsLifecycleStore<'a> {
             process_type: process.process_type.clone(),
             process_name: process.name.clone(),
             activity_id: process.root_id.clone(),
+            repository_resource: repository_resource.map(str::to_owned),
         });
         let key = Self::process_key(&process.process_type, &process.name)?;
         let root_index = BtsActivityIndex {
@@ -247,22 +281,34 @@ impl<'a> BtsLifecycleStore<'a> {
             pending_uow: Some(run_unit.into()),
             row_version: 0,
         };
-        match self.store.mutate_provider_states_atomic(vec![
+        let mut writes = vec![
             put_process(&key, &process, None)?,
             put_acquisition(run_unit, &acquisition)?,
             put_activity_index(&root_index, None)?,
-        ]) {
+        ];
+        if let Some(repository) = repository_resource {
+            writes.push(self.reserve_process_name(repository, &process, run_unit)?);
+        }
+        match self.store.mutate_provider_states_atomic(writes) {
             Ok(()) => Ok(()),
-            Err(StoreError::AlreadyExists | StoreError::Conflict)
-                if self
-                    .load_process(&process.process_type, &process.name)?
-                    .is_some() =>
-            {
-                Err(HostProblem::Condition {
-                    name: "PROCESSERR".into(),
-                    response: 108,
-                    response2: 2,
-                })
+            Err(error @ (StoreError::AlreadyExists | StoreError::Conflict)) => {
+                let reserved = repository_resource
+                    .map(|repository| self.process_name_reserved(repository, &process.name))
+                    .transpose()?
+                    .unwrap_or(false);
+                if reserved
+                    || self
+                        .load_process(&process.process_type, &process.name)?
+                        .is_some()
+                {
+                    Err(HostProblem::Condition {
+                        name: "PROCESSERR".into(),
+                        response: 108,
+                        response2: 2,
+                    })
+                } else {
+                    Err(store_error(error))
+                }
             }
             Err(error) => Err(store_error(error)),
         }
@@ -410,6 +456,7 @@ impl<'a> BtsLifecycleStore<'a> {
                     process_type: process_type.into(),
                     process_name: process_name.into(),
                     activity_id: activity_id.into(),
+                    repository_resource: None,
                 });
             let expected = process.row_version;
             process.epoch = process
@@ -576,6 +623,20 @@ impl<'a> BtsLifecycleStore<'a> {
             current.activity_id = None;
             let key = Self::process_key(&process_type, &process_name)?;
             let mut writes = vec![put_acquisition(run_unit, &current)?];
+            if process.pending_uow.as_deref() == Some(run_unit)
+                && let Some(repository) = current
+                    .effect
+                    .as_ref()
+                    .filter(|effect| {
+                        effect.operation == "DEFINE PROCESS"
+                            && effect.process_type == process_type
+                            && effect.process_name == process_name
+                            && effect.activity_id == activity_id
+                    })
+                    .and_then(|effect| effect.repository_resource.as_deref())
+            {
+                writes.push(self.settle_process_name(repository, &process, run_unit, commit)?);
+            }
             writes.extend(self.settle_pending_children(&mut process, run_unit, commit)?);
             if process.pending_uow.as_deref() == Some(run_unit) && !commit {
                 writes.push(ProviderStateMutation::Delete {

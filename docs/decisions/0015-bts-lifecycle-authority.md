@@ -41,6 +41,15 @@ Duplicate process names return `PROCESSERR 108/2`. The effect survives an
 acquisition epoch tombstone, including rollback, until its replay window is
 explicitly retired.
 
+The `cics-bts-repository-name-v1` row reserves a name against the underlying
+repository resource, so two process types sharing one repository cannot each
+publish the same process name. Normal DEFINE reserves it in the same atomic
+write as the pending process and acquisition; syncpoint publishes the
+reservation or rollback deletes it with the process. Its row is a uniqueness
+index. The `cics-bts-process-v1` row remains the only process/activity state
+authority. The additive acquisition effect field identifies the repository
+for settlement and old rows without that field remain readable.
+
 The CICS syncpoint path settles BTS child definitions and its one acquisition
 before finalizing the UOW. Reconciliation reuses the durable UOW owner metadata
 and BTS owner rows to finish an interrupted settlement. Each step is

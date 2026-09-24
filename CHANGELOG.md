@@ -90,6 +90,11 @@ All notable changes to mainframe-env are documented here.
   a held acquisition reports source INVREQ rather than losing its replay
   identity after UOW settlement. Public command registration remains pending.
 
+- Added a versioned repository-name reservation to the shared BTS authority.
+  Process names are unique across process types mapped to the same repository;
+  reservation, definition, and rollback or publication move atomically. Public
+  command registration remains pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline
