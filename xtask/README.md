@@ -17,6 +17,11 @@ routes, and replacing selector-specific conformance tests.
 relative links and anchors, command examples, normative metadata, package
 topology, and public version truth.
 
+`cargo xtask changelog --check` validates isolated TOML fragments under
+`changes/unreleased/`. `cargo xtask changelog` is reserved for release or batch
+integration: it consumes the fragments into the Unreleased changelog and then
+regenerates the documentation manifest.
+
 Verify with `cargo test -p xtask`, `cargo xtask conformance`, and (when the
 pinned checkout is available) `cargo xtask carddemo-corpus --check`.
 `cargo xtask carddemo-source --check` additionally replays all pinned COBOL
