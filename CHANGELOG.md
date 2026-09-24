@@ -30,6 +30,10 @@ All notable changes to mainframe-env are documented here.
 - Bound all twenty ISSUE MCEP operations to distinct host operation names in
   the interpreter, with exact ISSUE input, output, and option wire names.
 
+- Added a versioned, bounded device-definition/state record for 3270, 3740,
+  and 3650 ISSUE effects, with CAS and SQLite reopen checks. Conversation
+  ownership remains with the shared APPC/MRO protocol ledger.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

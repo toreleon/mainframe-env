@@ -1,0 +1,458 @@
+//! Durable definitions and device-specific effects for CIC-905 ISSUE forms.
+//!
+//! This record owns only physical terminal/3740/3650 facilities. APPC, MRO,
+//! and LU6.1 conversation ownership belongs to the shared protocol ledger.
+
+use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
+pub const ISSUE_DEVICE_NAMESPACE: &str = "cics-issue-device-v1";
+const MAX_ROW_BYTES: usize = 64 * 1024;
+const MAX_NAMES: usize = 64;
+const MAX_PASS_BYTES: usize = 255;
+const MAX_PRINT_BYTES: usize = 32_767;
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum IssueDeviceKind {
+    Display3270,
+    Printer3270,
+    Entry3740,
+    Interpreter3650,
+    Lu61,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssueDeviceDefinition {
+    pub terminal: String,
+    pub kind: IssueDeviceKind,
+    /// The physical control-unit identity required for 3270 buffer copying.
+    pub control_unit: Option<String>,
+    /// Printer terminals in source-defined preference order.
+    pub printers: Vec<String>,
+    /// Installed 3650 application names.
+    pub programs: Vec<String>,
+    /// Installed Communications Server application names allowed for PASS.
+    pub applications: Vec<String>,
+    /// TYPETERM DISCREQ or RELREQ capability.
+    pub disconnect_allowed: bool,
+    /// Communications Server AUTH=PASS capability.
+    pub pass_allowed: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssueDeviceState {
+    pub endfile: bool,
+    pub endoutput: bool,
+    pub eods: bool,
+    pub loaded_program: Option<String>,
+    pub loaded_converse: bool,
+    pub pass_target: Option<String>,
+    pub pass_data: Vec<u8>,
+    pub pass_logmode: Option<String>,
+    pub pass_noquiesce: bool,
+    pub disconnected: bool,
+    pub print_count: u32,
+    pub last_print: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssueDeviceRecord {
+    schema_version: u16,
+    pub version: u64,
+    pub definition: IssueDeviceDefinition,
+    pub state: IssueDeviceState,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IssueDeviceProblem {
+    Malformed,
+    WrongDevice,
+    NotConfigured,
+    Disconnected,
+    Length,
+    Capacity,
+}
+
+fn valid_name(name: &str, maximum: usize) -> bool {
+    !name.is_empty()
+        && name.len() <= maximum
+        && name.bytes().all(|byte| {
+            byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+        })
+}
+
+fn valid_names(names: &[String], maximum: usize) -> bool {
+    names.len() <= MAX_NAMES
+        && names.iter().all(|name| valid_name(name, maximum))
+        && names.iter().collect::<BTreeSet<_>>().len() == names.len()
+}
+
+impl IssueDeviceDefinition {
+    pub fn validate(&self) -> Result<(), IssueDeviceProblem> {
+        if !valid_name(&self.terminal, 4)
+            || self
+                .control_unit
+                .as_ref()
+                .is_some_and(|name| !valid_name(name, 8))
+            || !valid_names(&self.printers, 4)
+            || !valid_names(&self.programs, 8)
+            || !valid_names(&self.applications, 8)
+            || matches!(
+                self.kind,
+                IssueDeviceKind::Display3270 | IssueDeviceKind::Printer3270
+            ) && self.control_unit.is_none()
+            || self.kind != IssueDeviceKind::Display3270 && !self.printers.is_empty()
+            || self.kind != IssueDeviceKind::Interpreter3650 && !self.programs.is_empty()
+            || self.pass_allowed && self.applications.is_empty()
+        {
+            return Err(IssueDeviceProblem::Malformed);
+        }
+        Ok(())
+    }
+}
+
+impl IssueDeviceRecord {
+    pub fn new(definition: IssueDeviceDefinition) -> Result<Self, IssueDeviceProblem> {
+        let record = Self {
+            schema_version: 1,
+            version: 1,
+            definition,
+            state: IssueDeviceState::default(),
+        };
+        record.validate()?;
+        Ok(record)
+    }
+
+    pub fn load(
+        store: &dyn ProviderStateStore,
+        terminal: &str,
+    ) -> Result<Option<Self>, StoreError> {
+        let Some(row) = store.get_provider_state(ISSUE_DEVICE_NAMESPACE, terminal)? else {
+            return Ok(None);
+        };
+        if row.version == 0 || row.payload.len() > MAX_ROW_BYTES {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        let record: Self =
+            serde_json::from_slice(&row.payload).map_err(|_| StoreError::IncompatibleVersion)?;
+        if record.version != row.version
+            || record.definition.terminal != terminal
+            || record.validate().is_err()
+            || record
+                .encode()
+                .map_err(|_| StoreError::IncompatibleVersion)?
+                != row.payload
+        {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        Ok(Some(record))
+    }
+
+    pub fn persist(
+        &self,
+        next: &mut Self,
+        store: &dyn ProviderStateStore,
+    ) -> Result<bool, StoreError> {
+        if self.definition != next.definition {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        next.version = self
+            .version
+            .checked_add(1)
+            .ok_or(StoreError::CapacityExceeded)?;
+        let payload = next.encode().map_err(|_| StoreError::CapacityExceeded)?;
+        match store.put_provider_state(
+            ProviderStateRecord {
+                namespace: ISSUE_DEVICE_NAMESPACE.into(),
+                key: self.definition.terminal.clone(),
+                version: next.version,
+                payload,
+            },
+            Some(self.version),
+        ) {
+            Ok(()) => Ok(true),
+            Err(StoreError::Conflict) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn install(&self, store: &dyn ProviderStateStore) -> Result<(), StoreError> {
+        if self.version != 1 {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        let payload = self.encode().map_err(|_| StoreError::CapacityExceeded)?;
+        store.put_provider_state(
+            ProviderStateRecord {
+                namespace: ISSUE_DEVICE_NAMESPACE.into(),
+                key: self.definition.terminal.clone(),
+                version: self.version,
+                payload,
+            },
+            None,
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), IssueDeviceProblem> {
+        self.definition.validate()?;
+        if self.schema_version != 1
+            || self.version == 0
+            || self.state.pass_data.len() > MAX_PASS_BYTES
+            || self.state.last_print.len() > MAX_PRINT_BYTES
+            || self.state.loaded_program.as_ref().is_some_and(|name| {
+                !self.definition.programs.contains(name)
+                    || self.definition.kind != IssueDeviceKind::Interpreter3650
+            })
+            || self.state.loaded_converse && self.state.loaded_program.is_none()
+            || self.state.pass_target.as_ref().is_some_and(|name| {
+                !self.definition.pass_allowed || !self.definition.applications.contains(name)
+            })
+            || self.state.pass_target.is_none()
+                && (!self.state.pass_data.is_empty()
+                    || self.state.pass_logmode.is_some()
+                    || self.state.pass_noquiesce)
+            || self
+                .state
+                .pass_logmode
+                .as_ref()
+                .is_some_and(|name| !valid_name(name, 8))
+            || (self.state.endfile || self.state.endoutput)
+                && self.definition.kind != IssueDeviceKind::Entry3740
+            || self.state.eods && self.definition.kind != IssueDeviceKind::Interpreter3650
+            || self.state.print_count > 0 && self.definition.kind != IssueDeviceKind::Display3270
+        {
+            return Err(IssueDeviceProblem::Malformed);
+        }
+        Ok(())
+    }
+
+    fn encode(&self) -> Result<Vec<u8>, IssueDeviceProblem> {
+        self.validate()?;
+        let payload = serde_json::to_vec(self).map_err(|_| IssueDeviceProblem::Malformed)?;
+        if payload.len() > MAX_ROW_BYTES {
+            return Err(IssueDeviceProblem::Capacity);
+        }
+        Ok(payload)
+    }
+
+    fn active(&self) -> Result<(), IssueDeviceProblem> {
+        if self.state.disconnected {
+            Err(IssueDeviceProblem::Disconnected)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn mark_endfile(&mut self, also_endoutput: bool) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Entry3740 {
+            return Err(IssueDeviceProblem::WrongDevice);
+        }
+        self.state.endfile = true;
+        self.state.endoutput |= also_endoutput;
+        Ok(())
+    }
+
+    pub fn mark_endoutput(&mut self, also_endfile: bool) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Entry3740 {
+            return Err(IssueDeviceProblem::WrongDevice);
+        }
+        self.state.endoutput = true;
+        self.state.endfile |= also_endfile;
+        Ok(())
+    }
+
+    pub fn mark_eods(&mut self) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Interpreter3650 {
+            return Err(IssueDeviceProblem::WrongDevice);
+        }
+        self.state.eods = true;
+        Ok(())
+    }
+
+    pub fn load_program(
+        &mut self,
+        program: &str,
+        converse: bool,
+    ) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Interpreter3650 {
+            return Err(IssueDeviceProblem::WrongDevice);
+        }
+        if !self.definition.programs.iter().any(|name| name == program) {
+            return Err(IssueDeviceProblem::NotConfigured);
+        }
+        self.state.loaded_program = Some(program.into());
+        self.state.loaded_converse = converse;
+        Ok(())
+    }
+
+    pub fn prepare_pass(
+        &mut self,
+        application: &str,
+        data: &[u8],
+        logmode: Option<&str>,
+        noquiesce: bool,
+    ) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if !self.definition.pass_allowed || !self.definition.disconnect_allowed {
+            return Err(IssueDeviceProblem::NotConfigured);
+        }
+        if !self
+            .definition
+            .applications
+            .iter()
+            .any(|name| name == application)
+        {
+            return Err(IssueDeviceProblem::NotConfigured);
+        }
+        if data.len() > MAX_PASS_BYTES || logmode.is_some_and(|name| !valid_name(name, 8)) {
+            return Err(IssueDeviceProblem::Length);
+        }
+        self.state.pass_target = Some(application.into());
+        self.state.pass_data = data.to_vec();
+        self.state.pass_logmode = logmode.map(str::to_owned);
+        self.state.pass_noquiesce = noquiesce;
+        Ok(())
+    }
+
+    pub fn disconnect(&mut self) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if !self.definition.disconnect_allowed {
+            return Err(IssueDeviceProblem::NotConfigured);
+        }
+        self.state.disconnected = true;
+        Ok(())
+    }
+
+    pub fn record_print(&mut self, bytes: &[u8]) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Display3270
+            || self.definition.printers.is_empty()
+        {
+            return Err(IssueDeviceProblem::NotConfigured);
+        }
+        if bytes.len() > MAX_PRINT_BYTES {
+            return Err(IssueDeviceProblem::Length);
+        }
+        self.state.print_count = self
+            .state
+            .print_count
+            .checked_add(1)
+            .ok_or(IssueDeviceProblem::Capacity)?;
+        self.state.last_print = bytes.to_vec();
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+
+    fn definition(terminal: &str, kind: IssueDeviceKind) -> IssueDeviceDefinition {
+        IssueDeviceDefinition {
+            terminal: terminal.into(),
+            kind,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            disconnect_allowed: true,
+            pass_allowed: false,
+        }
+    }
+
+    #[test]
+    fn end_markers_are_device_specific_and_stale_cas_cannot_replace_them() {
+        let store = MemoryStore::new(Default::default());
+        let initial =
+            IssueDeviceRecord::new(definition("T001", IssueDeviceKind::Entry3740)).unwrap();
+        initial.install(&store).unwrap();
+        let current = IssueDeviceRecord::load(&store, "T001").unwrap().unwrap();
+        let mut next = current.clone();
+        next.mark_endfile(true).unwrap();
+        assert!(current.persist(&mut next, &store).unwrap());
+        assert!(next.state.endfile && next.state.endoutput);
+        let mut stale = current.clone();
+        stale.mark_endoutput(false).unwrap();
+        assert!(!current.persist(&mut stale, &store).unwrap());
+        assert_eq!(
+            IssueDeviceRecord::load(&store, "T001")
+                .unwrap()
+                .unwrap()
+                .state,
+            next.state
+        );
+
+        let mut wrong =
+            IssueDeviceRecord::new(definition("T002", IssueDeviceKind::Entry3740)).unwrap();
+        assert_eq!(wrong.mark_eods(), Err(IssueDeviceProblem::WrongDevice));
+        assert!(!wrong.state.eods);
+    }
+
+    #[test]
+    fn sqlite_reopen_preserves_load_and_pass_with_exact_bounds() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-issue-device-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let first = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let mut definition = definition("T003", IssueDeviceKind::Interpreter3650);
+        definition.programs.push("PROG1".into());
+        definition.applications.push("APPL1".into());
+        definition.pass_allowed = true;
+        let initial = IssueDeviceRecord::new(definition).unwrap();
+        initial.install(&first).unwrap();
+        let mut next = initial.clone();
+        next.load_program("PROG1", true).unwrap();
+        next.mark_eods().unwrap();
+        assert_eq!(
+            next.prepare_pass("APPL1", &[1; MAX_PASS_BYTES + 1], None, false),
+            Err(IssueDeviceProblem::Length)
+        );
+        assert!(next.state.pass_target.is_none());
+        next.prepare_pass("APPL1", &[2; MAX_PASS_BYTES], Some("MODE1"), true)
+            .unwrap();
+        assert!(initial.persist(&mut next, &first).unwrap());
+        drop(first);
+        let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let record = IssueDeviceRecord::load(&reopened, "T003").unwrap().unwrap();
+        assert_eq!(record.state.loaded_program.as_deref(), Some("PROG1"));
+        assert!(record.state.loaded_converse && record.state.eods);
+        assert_eq!(record.state.pass_data, vec![2; MAX_PASS_BYTES]);
+        assert_eq!(record.state.pass_logmode.as_deref(), Some("MODE1"));
+        drop(reopened);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn printer_requires_a_configured_peer_and_keeps_bounded_image() {
+        let mut definition = definition("T004", IssueDeviceKind::Display3270);
+        definition.control_unit = Some("CU1".into());
+        let mut device = IssueDeviceRecord::new(definition.clone()).unwrap();
+        assert_eq!(
+            device.record_print(b"SCREEN"),
+            Err(IssueDeviceProblem::NotConfigured)
+        );
+        definition.printers.push("P001".into());
+        device = IssueDeviceRecord::new(definition).unwrap();
+        device.record_print(b"SCREEN").unwrap();
+        assert_eq!(device.state.print_count, 1);
+        assert_eq!(device.state.last_print, b"SCREEN");
+        assert_eq!(
+            device.record_print(&vec![0; MAX_PRINT_BYTES + 1]),
+            Err(IssueDeviceProblem::Length)
+        );
+        assert_eq!(device.state.print_count, 1);
+    }
+}

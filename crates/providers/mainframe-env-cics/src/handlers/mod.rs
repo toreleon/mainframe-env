@@ -11,6 +11,7 @@ mod handle_state;
 mod host_boundary;
 mod interval;
 mod interval_control;
+mod issue_device;
 mod journal_control;
 mod limits;
 mod program_control;
