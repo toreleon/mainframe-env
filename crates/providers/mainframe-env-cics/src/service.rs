@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 197);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 198);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8592,6 +8592,82 @@ mod tests {
             assert!(saved.state.loaded_converse);
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn registered_issue_eraseaup_public_route_clears_field_and_restores_keyboard() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "ISSUEMS".into(),
+                map: "ISSUE".into(),
+                line: 1,
+                column: 1,
+                rows: 1,
+                columns: 4,
+                fields: vec![BmsFieldDefinition {
+                    name: "OPEN".into(),
+                    row: 1,
+                    column: 1,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        let (invocation, session) = registered(&service);
+        {
+            let mut state = service.lock().unwrap();
+            let terminal = state.sessions.get_mut(session.as_str()).unwrap();
+            terminal.mapset = Some("ISSUEMS".into());
+            terminal.map = Some("ISSUE".into());
+            terminal
+                .field_values
+                .insert("OPEN".into(), b"DATA".to_vec());
+            terminal.field_protection.insert("OPEN".into(), false);
+            terminal.field_modified.insert("OPEN".into(), true);
+        }
+        let command = request(
+            CicsOperation::IssueEraseAup,
+            BTreeMap::from([("OPTION.WAIT".into(), cics_option())]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command
+                )
+                .unwrap(),
+            first
+        );
+        let state = service.lock().unwrap();
+        let terminal = &state.sessions[session.as_str()];
+        assert_eq!(terminal.field_values["OPEN"], [0; 4]);
+        assert_eq!(terminal.field_modified["OPEN"], false);
+        drop(state);
+        assert!(
+            service
+                .terminal_control_snapshot(&session)
+                .unwrap()
+                .keyboard_unlocked
+        );
     }
 
     #[test]

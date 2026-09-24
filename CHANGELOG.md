@@ -119,6 +119,10 @@ All notable changes to mainframe-env are documented here.
   PROGRAM and CONVERSE to the public 3650 provider; Memory and SQLite restart
   tests preserve one load and exact replay. The integrated registry is 195
   typed and 68 unready.
+- Registered CIC-905 ISSUE ERASEAUP row 0121 through the public terminal/BMS
+  route and compiled COBOL WAIT plan. It clears unprotected fields and MDTs,
+  positions the cursor, restores the keyboard, and replays the saved result.
+  The integrated registry is 196 typed and 67 unready.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

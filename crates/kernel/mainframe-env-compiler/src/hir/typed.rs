@@ -6263,21 +6263,18 @@ mod tests {
             )
         ));
 
-        for (command, expected_label) in [("ISSUE ERASEAUP", "ISSUE ERASEAUP")] {
-            let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALT. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
-            );
-            let analysis = analyze(&source);
-            assert!(analysis.hir.is_none(), "{command}");
-            assert!(
-                analysis.diagnostics.iter().any(|diagnostic| {
-                    let message = diagnostic.public_message();
-                    message.contains(expected_label) && message.contains("handler is unready")
-                }),
-                "{command}: {:?}",
-                analysis.diagnostics
-            );
-        }
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALT. PROCEDURE DIVISION. EXEC CICS ISSUE ERASEAUP END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("ISSUE ERASEAUP: {:?}", analysis.diagnostics));
+        assert!(hir.statements.iter().any(|statement| matches!(
+            statement.resolved,
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::IssueEraseAup,
+                ..
+            }))
+        )));
         let page = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPAGE. PROCEDURE DIVISION. EXEC CICS SEND PAGE RETAIN END-EXEC. STOP RUN.",
         );
