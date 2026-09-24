@@ -13,6 +13,8 @@ const RUN_SCHEMA: &str = "mainframe-env.cics.bts-transid-run@1";
 const OUTBOX_SCHEMA: &str = "mainframe-env.cics.bts-transid-outbox@1";
 const MAX_PENDING: usize = 4096;
 const MAX_RUN_BYTES: usize = 1_048_576;
+const MAX_CONTAINERS: usize = 256;
+const MAX_CONTAINER_BYTES: usize = 65_536;
 const LIFETIME_TICKS: u64 = 86_400_000;
 
 /// Work generation for local child tasks issued by RUN TRANSID.
@@ -106,11 +108,10 @@ impl BtsTransidRecord {
                 .as_deref()
                 .is_some_and(|name| !valid_channel_name(name))
             || self.channel.is_none() && !self.containers.is_empty()
-            || self.containers.len() > 256
-            || self
-                .containers
-                .iter()
-                .any(|(name, data)| name.is_empty() || name.len() > 16 || data.bytes.len() > 65_536)
+            || self.containers.len() > MAX_CONTAINERS
+            || self.containers.iter().any(|(name, data)| {
+                name.is_empty() || name.len() > 16 || data.bytes.len() > MAX_CONTAINER_BYTES
+            })
             || self.scheduled_tick == 0
             || self.state == BtsTransidState::Pending && self.lease_epoch != 0
             || self.state == BtsTransidState::Attached && self.lease_epoch == 0
@@ -278,6 +279,21 @@ impl<'a> BtsLifecycleStore<'a> {
                 } else {
                     Err(HostProblem::IdempotencyConflict)
                 };
+            }
+            if channel.is_some_and(|name| !valid_channel_name(name))
+                || containers
+                    .keys()
+                    .any(|name| name.is_empty() || name.len() > 16)
+                || scheduled_tick == 0
+            {
+                return Err(HostProblem::Malformed);
+            }
+            if containers.len() > MAX_CONTAINERS
+                || containers
+                    .values()
+                    .any(|data| data.bytes.len() > MAX_CONTAINER_BYTES)
+            {
+                return Err(HostProblem::ResourceExhausted);
             }
             let mut outbox = self.load_transid_outbox()?;
             if outbox.pending.len() >= MAX_PENDING {
@@ -806,6 +822,118 @@ mod tests {
             Ok(finished)
         );
         assert!(reopened.load_transid_outbox().unwrap().pending.is_empty());
+    }
+
+    #[test]
+    fn transid_snapshot_bounds_reject_new_work_but_keep_issue_time_replay() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let saved = authority
+            .start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "first",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                BTreeMap::from([(
+                    "MESSAGE".into(),
+                    BtsTransidContainer {
+                        character: true,
+                        bytes: b"issue-time".to_vec(),
+                    },
+                )]),
+                1_000,
+                4,
+            )
+            .unwrap();
+        let too_many = (0..=MAX_CONTAINERS)
+            .map(|number| {
+                (
+                    format!("C{number:03}"),
+                    BtsTransidContainer {
+                        character: false,
+                        bytes: vec![number as u8],
+                    },
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(
+            authority.start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "first",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                too_many.clone(),
+                1_001,
+                4,
+            ),
+            Ok(saved.clone())
+        );
+        assert_eq!(
+            authority.start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "second",
+                [2; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                too_many,
+                1_001,
+                4,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            authority.start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "third",
+                [3; 32],
+                "BT01",
+                "CHILD",
+                Some("REPLY"),
+                BTreeMap::from([(
+                    "OVERSIZE".into(),
+                    BtsTransidContainer {
+                        character: true,
+                        bytes: vec![0; MAX_CONTAINER_BYTES + 1],
+                    },
+                )]),
+                1_001,
+                4,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            authority.start_transid(
+                "UOW1",
+                "EXEC1",
+                "USER",
+                "fourth",
+                [4; 32],
+                "BT01",
+                "CHILD",
+                Some("BAD SPACE"),
+                BTreeMap::new(),
+                1_001,
+                4,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            authority.load_transid_outbox().unwrap().pending,
+            BTreeSet::from([saved.run_id])
+        );
     }
 
     #[test]

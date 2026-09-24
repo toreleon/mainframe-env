@@ -153,6 +153,10 @@ are passed as invocation bindings. The in-flight parent is temporarily outside
 the service's live-run map during command dispatch, so token registration uses
 the authenticated `Run` directly while writing the sibling-compatible row;
 the public `register_bts_child` signature retains its live-parent guard.
+The isolated snapshot reader currently uses the older global transform-container
+map; integration must read the container lane's run-unit-scoped channel rows
+before the `CHANNEL` option is sealed. Neither channel row is a process or
+activity lifecycle authority.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed

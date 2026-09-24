@@ -126,6 +126,10 @@ All notable changes to mainframe-env are documented here.
   independent work recovers, and its exact reconciliation reports an unknown
   outcome.
 
+- Checked new RUN TRANSID channel snapshots against the container-count and
+  payload limits before admission. Exact retries retain the original
+  issue-time copy when the current channel has changed.
+
 - Added the bounded BTS lifecycle host, IR, compiler, interpreter, and CICS
   dispatch scaffolding, plus an installed process-type/transaction catalog and
   selected RUN and RUN TRANSID worker admission. The candidate generated
