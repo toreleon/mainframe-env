@@ -136,6 +136,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::FreeConversation,
+        syntax: "FREE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0081",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Cancel,
         syntax: "CANCEL",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0016",

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod allocate;
 mod data;
 mod definitions;
+mod free;
 mod gds;
 mod gds_allocate;
 mod gds_assign;
@@ -114,6 +115,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::GdsConnectProcess => {
             gds_connect_process::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::FreeConversation => free::invoke(service, run, request, retention_tick),
         _ => Err(HostProblem::Unsupported),
     }
 }
