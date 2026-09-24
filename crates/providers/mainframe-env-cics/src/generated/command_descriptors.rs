@@ -80,6 +80,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::GdsAllocateConversation,
+        syntax: "GDS ALLOCATE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0008",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::AsktimeEib,
         syntax: "ASKTIME",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0009",

@@ -127,6 +127,17 @@ pub(super) fn validate(
     if !is_conversation(operation) {
         return Ok(());
     }
+    if matches!(
+        operation,
+        HirCicsOperation::GdsAllocateConversation
+            | HirCicsOperation::GdsAssignConversation
+            | HirCicsOperation::GdsConnectProcess
+            | HirCicsOperation::GdsFreeConversation
+    ) {
+        return Err(ResolutionFailure::Invalid(
+            "CICS GDS commands are available to assembler and C programs only".into(),
+        ));
+    }
     let has = |name: &str| clauses.contains_key(name);
     let xor = |a: &str, b: &str| has(a) != has(b);
     let invalid = match operation {
@@ -466,5 +477,21 @@ mod tests {
         assert!(!valid_attach_number("DATASTR", 0xd1));
         assert!(valid_attach_number("RECFM", 4));
         assert!(!valid_attach_number("RECFM", 3));
+    }
+
+    #[test]
+    fn cobol_rejects_all_basic_gds_conversation_commands() {
+        for operation in [
+            HirCicsOperation::GdsAllocateConversation,
+            HirCicsOperation::GdsAssignConversation,
+            HirCicsOperation::GdsConnectProcess,
+            HirCicsOperation::GdsFreeConversation,
+        ] {
+            assert!(matches!(
+                validate(&Clauses::new(), &[], operation),
+                Err(ResolutionFailure::Invalid(message))
+                    if message.contains("assembler and C programs only")
+            ));
+        }
     }
 }

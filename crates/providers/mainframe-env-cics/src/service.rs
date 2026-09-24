@@ -5399,6 +5399,7 @@ mod tests {
             ("ADDRESS", CicsOperation::Address),
             ("ADDRESS SET", CicsOperation::AddressSet),
             ("ALLOCATE", CicsOperation::AllocateConversation),
+            ("GDS ALLOCATE", CicsOperation::GdsAllocateConversation),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6701,7 +6702,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 154);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 155);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -35812,5 +35813,95 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn gds_allocate_uses_basic_mode_and_six_byte_return_codes() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        cics.register_conversation_profile(ConversationProfileDefinition {
+            name: "BASIC1".into(),
+            kind: ConversationKind::AppcBasic,
+            maximum_data_bytes: 2048,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let arguments = BTreeMap::from([
+            ("SYSID".into(), cics_literal(b"SYS1")),
+            ("MODENAME".into(), cics_literal(b"BASIC1")),
+            ("CONVID".into(), argument(b"TOKEN-X")),
+            ("RETCODE".into(), argument(b"RETURN-X")),
+            ("OPTION.NOQUEUE".into(), cics_option()),
+        ]);
+        let allocate = request(CicsOperation::GdsAllocateConversation, arguments.clone(), 1);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate.clone(),
+            )
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        assert_eq!(result.outputs["CONVID"].bytes(), &[0, 0, 0, 1]);
+        assert_eq!(result.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation([0, 0, 0, 1])
+                .unwrap()
+                .kind,
+            ConversationKind::AppcBasic
+        );
+        let replayed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        assert_eq!(replayed.outputs, result.outputs);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .len(),
+            1
+        );
+
+        let busy = request(CicsOperation::GdsAllocateConversation, arguments.clone(), 2);
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, busy.clone(), 2), busy)
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        assert_eq!(result.outputs["RETCODE"].bytes(), &[1, 4, 4, 0, 0, 0]);
+        assert!(!result.outputs.contains_key("CONVID"));
+
+        let mut unknown_mode = arguments.clone();
+        unknown_mode.insert("MODENAME".into(), cics_literal(b"ABSENT"));
+        let unknown_mode = request(CicsOperation::GdsAllocateConversation, unknown_mode, 3);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, unknown_mode.clone(), 3),
+                unknown_mode,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["RETCODE"].bytes(), &[1, 4, 8, 0, 0, 0]);
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+
+        let mut restricted = arguments;
+        restricted.insert("MODENAME".into(), cics_literal(b"SNASVCMG"));
+        let restricted = request(CicsOperation::GdsAllocateConversation, restricted, 4);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, restricted.clone(), 4),
+                restricted,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["RETCODE"].bytes(), &[1, 4, 12, 0, 0, 0]);
     }
 }

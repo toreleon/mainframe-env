@@ -6,6 +6,9 @@ impl Canonical for CicsOperation {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
             Self::AllocateConversation => out.variant("CicsOperation", "AllocateConversation", 0),
+            Self::GdsAllocateConversation => {
+                out.variant("CicsOperation", "GdsAllocateConversation", 0)
+            }
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
             Self::AddSubevent => out.variant("CicsOperation", "AddSubevent", 0),
             Self::Address => out.variant("CicsOperation", "Address", 0),

@@ -202,7 +202,7 @@ fn selector(
     Ok((sysid, profile))
 }
 
-fn name(bytes: &[u8], max: usize) -> Result<String, HostProblem> {
+pub(super) fn name(bytes: &[u8], max: usize) -> Result<String, HostProblem> {
     let value = bytes.trim_ascii_end();
     if value.is_empty()
         || value.len() > max
