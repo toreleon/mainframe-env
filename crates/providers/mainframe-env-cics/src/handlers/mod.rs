@@ -1,8 +1,8 @@
 mod bms_map;
 mod condition;
-mod conversation_control;
+mod conversation_extract;
 #[cfg(test)]
-pub(in crate::service) use conversation_control::{ExtractMetadata, LuName, publish_metadata};
+pub(in crate::service) use conversation_extract::{ExtractMetadata, LuName, publish_metadata};
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -236,7 +236,7 @@ pub(super) fn invoke_extended_control(
             security_control::invoke(service, run, request, retention_tick)
         }
         crate::generated::CicsCommandFamily::ConversationControl => {
-            conversation_control::invoke(service, run, request)
+            conversation_extract::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

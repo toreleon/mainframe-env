@@ -35671,5 +35671,5 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
-    include!("handlers/conversation_control/tests.rs");
+    include!("handlers/conversation_extract/tests.rs");
 }
