@@ -3,7 +3,9 @@ use mainframe_env_diagnostics::{
 };
 use mainframe_env_execution_api::{
     AuditRecord, ExecutionOutcome, Invocation, InvocationLimits, LifecycleEvent,
-    LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum,
+    LifecycleEventKind, Machine, MachineDrive, MachineResume, ParticipantContractProblem, Quantum,
+    TransactionParticipantContract, TransactionParticipantDescriptor,
+    read_transaction_participant_contract,
 };
 use mainframe_env_host_api::{
     EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_audit_resource_digest,
@@ -125,6 +127,25 @@ impl ExecutionCoordinator {
             audit_sink: None,
             limits,
         }
+    }
+
+    /// Return the additive participant contract consumed by this coordinator.
+    ///
+    /// The descriptor does not select or dispatch a provider. Host effects
+    /// continue through the existing scoped service and durable effect journal.
+    pub fn transaction_participant_contract(
+        &self,
+    ) -> Result<&'static TransactionParticipantContract, ParticipantContractProblem> {
+        read_transaction_participant_contract(1)
+    }
+
+    /// Resolve one declared participant without changing capability readiness.
+    pub fn transaction_participant_descriptor(
+        &self,
+        provider_id: &str,
+    ) -> Result<&'static TransactionParticipantDescriptor, ParticipantContractProblem> {
+        self.transaction_participant_contract()?
+            .participant(provider_id)
     }
 
     pub fn execute<M>(
@@ -1198,6 +1219,30 @@ mod tests {
             ),
             ExecutionOutcome::TimedOut
         );
+    }
+
+    #[test]
+    fn coordinator_exposes_one_validated_participant_authority() {
+        let coordinator = ExecutionCoordinator::local(CoordinatorLimits::default());
+        let contract = coordinator.transaction_participant_contract().unwrap();
+        assert_eq!(contract.validate(), Ok(()));
+        assert_eq!(
+            coordinator
+                .transaction_participant_descriptor("cics")
+                .unwrap()
+                .status,
+            mainframe_env_execution_api::ParticipantStatus::Accepted
+        );
+        for provider in ["db2", "ims", "mq"] {
+            let descriptor = coordinator
+                .transaction_participant_descriptor(provider)
+                .unwrap();
+            assert_eq!(
+                descriptor.status,
+                mainframe_env_execution_api::ParticipantStatus::Pending
+            );
+            assert!(descriptor.capabilities.is_none());
+        }
     }
     struct CpuMachine {
         drives: usize,

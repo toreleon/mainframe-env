@@ -1,0 +1,523 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/0.16/transaction-participant.schema.json",
+  "title": "mainframe-env transaction participant contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "contract_version",
+    "work_package",
+    "status",
+    "authority",
+    "vocabulary",
+    "ordering",
+    "obligations",
+    "compatibility",
+    "participants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.transaction-participant-contract@1"
+    },
+    "contract_id": {
+      "const": "mainframe-env.transaction-participant@1"
+    },
+    "contract_version": {
+      "const": 1
+    },
+    "work_package": {
+      "const": "INT-1601.participant-schema"
+    },
+    "status": {
+      "const": "early-additive-prerequisite"
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "vocabulary": {
+      "$ref": "#/$defs/vocabulary"
+    },
+    "ordering": {
+      "$ref": "#/$defs/ordering"
+    },
+    "obligations": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "uniqueItems": true,
+      "prefixItems": [
+        { "const": "INT-1601.owner" },
+        { "const": "INT-1601.modes" },
+        { "const": "INT-1601.prepare" },
+        { "const": "INT-1601.completion" },
+        { "const": "INT-1601.compensation" },
+        { "const": "INT-1601.outcomes" },
+        { "const": "INT-1601.idempotency" },
+        { "const": "INT-1601.ordering" },
+        { "const": "INT-1601.fencing" },
+        { "const": "INT-1601.deadline-cancellation" },
+        { "const": "INT-1601.security-audit" },
+        { "const": "INT-1601.recovery-schema" },
+        { "const": "INT-1601.retention" },
+        { "const": "INT-1601.compatibility" }
+      ],
+      "items": false
+    },
+    "compatibility": {
+      "$ref": "#/$defs/compatibility"
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        { "$ref": "#/$defs/cics-participant" },
+        { "$ref": "#/$defs/db2-participant" },
+        { "$ref": "#/$defs/ims-participant" },
+        { "$ref": "#/$defs/mq-participant" }
+      ],
+      "items": false
+    }
+  },
+  "$defs": {
+    "mode": {
+      "enum": [
+        "local",
+        "distributed-owned",
+        "distributed-subordinate"
+      ]
+    },
+    "prepare": {
+      "enum": [
+        "not-applicable",
+        "durable-intent-only",
+        "provider-prepare"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "committed",
+        "rolled-back",
+        "failed",
+        "heuristic-commit",
+        "heuristic-rollback",
+        "heuristic-mixed",
+        "in-doubt",
+        "unknown-outcome"
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinator",
+        "canonical_effect",
+        "store",
+        "single_authority",
+        "public_runtime_change",
+        "universal_two_phase_commit",
+        "exactly_once"
+      ],
+      "properties": {
+        "coordinator": {
+          "const": "mainframe-env.execution-coordinator@1"
+        },
+        "canonical_effect": {
+          "const": "mainframe-env.effect-canonical@1"
+        },
+        "store": {
+          "const": "mainframe-env.store@2"
+        },
+        "single_authority": {
+          "const": true
+        },
+        "public_runtime_change": {
+          "const": false
+        },
+        "universal_two_phase_commit": {
+          "const": false
+        },
+        "exactly_once": {
+          "const": false
+        }
+      }
+    },
+    "vocabulary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modes", "prepare", "outcomes"],
+      "properties": {
+        "modes": {
+          "const": [
+            "local",
+            "distributed-owned",
+            "distributed-subordinate"
+          ]
+        },
+        "prepare": {
+          "const": [
+            "not-applicable",
+            "durable-intent-only",
+            "provider-prepare"
+          ]
+        },
+        "outcomes": {
+          "const": [
+            "committed",
+            "rolled-back",
+            "failed",
+            "heuristic-commit",
+            "heuristic-rollback",
+            "heuristic-mixed",
+            "in-doubt",
+            "unknown-outcome"
+          ]
+        }
+      }
+    },
+    "ordering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effect",
+        "locks",
+        "store_transaction_across_dispatch",
+        "resource_lock_key",
+        "late_owner_fenced"
+      ],
+      "properties": {
+        "effect": {
+          "const": [
+            "observe-deadline-and-cancellation",
+            "validate-request-capability-and-context",
+            "persist-canonical-effect-intent",
+            "authorize-typed-resource-and-intent",
+            "apply-participant-mutation",
+            "persist-audit-and-result-or-unknown"
+          ]
+        },
+        "locks": {
+          "const": [
+            "coordinator-intent-cas",
+            "participant-state-fence",
+            "canonical-resource-locks",
+            "participant-uow-replay-publication",
+            "coordinator-result-cas"
+          ]
+        },
+        "store_transaction_across_dispatch": {
+          "const": false
+        },
+        "resource_lock_key": {
+          "const": "provider-id/resource-identity"
+        },
+        "late_owner_fenced": {
+          "const": true
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "writer_version",
+        "read_versions",
+        "unknown_version",
+        "change_policy",
+        "coordinator_schema_owner",
+        "participant_schema_owner"
+      ],
+      "properties": {
+        "writer_version": { "const": 1 },
+        "read_versions": { "const": [1] },
+        "unknown_version": { "const": "reject" },
+        "change_policy": {
+          "const": "additive-only-until-version-bump"
+        },
+        "coordinator_schema_owner": {
+          "const": "execution-and-store-maintainers"
+        },
+        "participant_schema_owner": {
+          "const": "owning-provider-maintainer"
+        }
+      }
+    },
+    "participant-base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_id", "status", "dependency", "capabilities"],
+      "properties": {
+        "provider_id": { "type": "string" },
+        "status": { "enum": ["accepted", "pending"] },
+        "dependency": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "capabilities": {}
+      }
+    },
+    "pending-participant": {
+      "allOf": [
+        { "$ref": "#/$defs/participant-base" },
+        {
+          "type": "object",
+          "properties": {
+            "status": { "const": "pending" },
+            "capabilities": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "db2-participant": {
+      "allOf": [
+        { "$ref": "#/$defs/pending-participant" },
+        {
+          "type": "object",
+          "properties": {
+            "provider_id": { "const": "db2" },
+            "dependency": { "const": "v0.13-owned-participant-binding" }
+          }
+        }
+      ]
+    },
+    "ims-participant": {
+      "allOf": [
+        { "$ref": "#/$defs/pending-participant" },
+        {
+          "type": "object",
+          "properties": {
+            "provider_id": { "const": "ims" },
+            "dependency": { "const": "v0.14-owned-participant-binding" }
+          }
+        }
+      ]
+    },
+    "mq-participant": {
+      "allOf": [
+        { "$ref": "#/$defs/pending-participant" },
+        {
+          "type": "object",
+          "properties": {
+            "provider_id": { "const": "mq" },
+            "dependency": { "const": "v0.15-owned-participant-binding" }
+          }
+        }
+      ]
+    },
+    "context-rejection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "response", "response2"],
+      "properties": {
+        "condition": { "const": "INVREQ" },
+        "response": { "const": 16 },
+        "response2": { "const": 200 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "mode",
+        "syncpoint_owner",
+        "explicit_syncpoint",
+        "rejection"
+      ],
+      "properties": {
+        "context_id": {
+          "enum": [
+            "local",
+            "dpl-synconreturn",
+            "dpl-without-synconreturn",
+            "dpl-executionset-subset"
+          ]
+        },
+        "mode": { "$ref": "#/$defs/mode" },
+        "syncpoint_owner": { "enum": ["participant", "upstream-host"] },
+        "explicit_syncpoint": { "enum": ["supported", "rejected"] },
+        "rejection": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/context-rejection" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "explicit_syncpoint": { "const": "supported" } },
+            "required": ["explicit_syncpoint"]
+          },
+          "then": {
+            "properties": {
+              "syncpoint_owner": { "const": "participant" },
+              "rejection": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "syncpoint_owner": { "const": "upstream-host" },
+              "rejection": { "$ref": "#/$defs/context-rejection" }
+            }
+          }
+        }
+      ]
+    },
+    "compensation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["automatic", "after_commit", "scope"],
+      "properties": {
+        "automatic": { "const": false },
+        "after_commit": { "const": false },
+        "scope": { "const": "service-specific-explicit-only" }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reported", "not_produced", "collapse_to_success"],
+      "properties": {
+        "reported": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/outcome" }
+        },
+        "not_produced": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/outcome" }
+        },
+        "collapse_to_success": { "const": false }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "lifetime", "replay", "reuse_after_prune", "exactly_once"],
+      "properties": {
+        "scope": { "const": "execution-run-unit-effect-sequence" },
+        "lifetime": { "const": "retention-policy-idempotency-ticks" },
+        "replay": { "const": "exact-canonical-request-and-result" },
+        "reuse_after_prune": { "const": "new-operation" },
+        "exactly_once": { "const": false }
+      }
+    },
+    "fencing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect_lease_epoch", "participant_row_cas", "stale_owner_rejected"],
+      "properties": {
+        "effect_lease_epoch": { "const": true },
+        "participant_row_cas": { "const": true },
+        "stale_owner_rejected": { "const": true }
+      }
+    },
+    "deadline-cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finite_deadline", "live_cancellation_probe", "pre_dispatch_stop", "post_dispatch_uncertainty"],
+      "properties": {
+        "finite_deadline": { "const": true },
+        "live_cancellation_probe": { "const": true },
+        "pre_dispatch_stop": { "const": true },
+        "post_dispatch_uncertainty": { "const": "unknown-outcome" }
+      }
+    },
+    "security-audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_and_delegation_propagated", "typed_resource_authorization_before_mutation", "deny_and_failure_audited", "shared_store_atomic_publication"],
+      "properties": {
+        "principal_and_delegation_propagated": { "const": true },
+        "typed_resource_authorization_before_mutation": { "const": true },
+        "deny_and_failure_audited": { "const": true },
+        "shared_store_atomic_publication": { "const": true }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinator_owner", "participant_owner", "reconciliation", "automatic_redispatch"],
+      "properties": {
+        "coordinator_owner": { "const": "execution-coordinator-effect-journal" },
+        "participant_owner": { "const": "cics-uow-and-replay-rows" },
+        "reconciliation": { "const": "service-specific-fenced-observation" },
+        "automatic_redispatch": { "const": false }
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "canonical_effect", "uow_namespace", "uow_write", "uow_read", "undo_namespace", "undo_read_write", "replay_namespace", "replay_write"],
+      "properties": {
+        "request": { "const": "mainframe-env.cics.request@1" },
+        "canonical_effect": { "const": "mainframe-env.effect-canonical@1" },
+        "uow_namespace": { "const": "cics-uow" },
+        "uow_write": { "const": "MECU2" },
+        "uow_read": { "const": ["MECU1", "MECU2"] },
+        "undo_namespace": { "const": "cics-uow-undo" },
+        "undo_read_write": { "const": "MECUNDO1" },
+        "replay_namespace": { "const": "cics-effect-replay-v1" },
+        "replay_write": { "const": "MECER003" }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "watermark", "protect_live_checkpoint_audit_replay", "deadline_is_lower_bound"],
+      "properties": {
+        "target": { "const": "cics-unit-of-work" },
+        "watermark": { "const": "idempotency" },
+        "protect_live_checkpoint_audit_replay": { "const": true },
+        "deadline_is_lower_bound": { "const": true }
+      }
+    },
+    "cics-capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transaction_owner", "supported_modes", "rejected_modes", "contexts", "prepare", "provider_prepare", "commit", "rollback", "compensation", "outcomes", "idempotency", "ordering", "fencing", "deadline_cancellation", "security_audit", "recovery", "schemas", "retention"],
+      "properties": {
+        "transaction_owner": { "const": "cics-task-or-dpl-mirror" },
+        "supported_modes": { "const": ["local", "distributed-owned"] },
+        "rejected_modes": { "const": ["distributed-subordinate"] },
+        "contexts": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/context" }
+        },
+        "prepare": { "const": "durable-intent-only" },
+        "provider_prepare": { "const": false },
+        "commit": { "const": true },
+        "rollback": { "const": true },
+        "compensation": { "$ref": "#/$defs/compensation" },
+        "outcomes": { "$ref": "#/$defs/outcomes" },
+        "idempotency": { "$ref": "#/$defs/idempotency" },
+        "ordering": { "const": "shared-v1" },
+        "fencing": { "$ref": "#/$defs/fencing" },
+        "deadline_cancellation": { "$ref": "#/$defs/deadline-cancellation" },
+        "security_audit": { "$ref": "#/$defs/security-audit" },
+        "recovery": { "$ref": "#/$defs/recovery" },
+        "schemas": { "$ref": "#/$defs/schemas" },
+        "retention": { "$ref": "#/$defs/retention" }
+      }
+    },
+    "cics-participant": {
+      "allOf": [
+        { "$ref": "#/$defs/participant-base" },
+        {
+          "type": "object",
+          "properties": {
+            "provider_id": { "const": "cics" },
+            "status": { "const": "accepted" },
+            "dependency": { "const": "accepted-v0.9-cics-boundary" },
+            "capabilities": { "$ref": "#/$defs/cics-capabilities" }
+          }
+        }
+      ]
+    }
+  }
+}

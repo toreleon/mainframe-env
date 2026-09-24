@@ -130,7 +130,7 @@ ADR-0009.
 | Package | Owns |
 |---|---|
 | `mainframe-env-compiler-api` | compiler stages, requests/results, legality, artifact descriptors |
-| `mainframe-env-execution-api` | invocation, context, limits, outcomes, events, lifecycle identity |
+| `mainframe-env-execution-api` | invocation, context, limits, outcomes, events, lifecycle identity, and the additive provider-neutral transaction participant descriptor |
 | `mainframe-env-host-api` | dataset, program, JES/spool, terminal, security, clock, audit, and typed CICS requests/results |
 | `mainframe-env-store-api` | execution, event, work, checkpoint, session, artifact metadata, idempotency stores |
 
