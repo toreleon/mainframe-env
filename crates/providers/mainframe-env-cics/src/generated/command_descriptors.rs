@@ -644,6 +644,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::GdsIssueAbend,
+        syntax: "GDS ISSUE ABEND",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueAbort,
         syntax: "ISSUE ABORT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0110",
@@ -749,6 +756,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::GdsIssuePrepare,
+        syntax: "GDS ISSUE PREPARE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssuePrint,
         syntax: "ISSUE PRINT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0129",
@@ -794,6 +808,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         operation: CicsOperation::IssueSignal,
         syntax: "ISSUE SIGNAL",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::GdsIssueSignal,
+        syntax: "GDS ISSUE SIGNAL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
         family: CicsCommandFamily::ConversationControl,
         mutating: true,
     },
@@ -1098,27 +1119,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::Diagnostics,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::EnterTraceId,
-        syntax: "ENTER TRACEID",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
-        family: CicsCommandFamily::Diagnostics,
-        mutating: true,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::SetFileStatus,
-        syntax: "SET FILE",
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224",
-        family: CicsCommandFamily::FileControl,
-        mutating: true,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::Start,
-        syntax: "START",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0205",
-        family: CicsCommandFamily::IntervalControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1173,6 +1173,9 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[51],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[52],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[53],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[54],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[55],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[56],
 ];
 
 mod lookup;

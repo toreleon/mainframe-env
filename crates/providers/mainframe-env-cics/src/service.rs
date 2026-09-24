@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 207);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 210);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9363,6 +9363,168 @@ mod tests {
     }
 
     #[test]
+    fn gds_issue_signal_reaches_basic_wait_terminal_once_before_source_confirmation() {
+        struct PeerCarrier {
+            target: Arc<CicsService>,
+            target_token: [u8; 4],
+            target_owner: ConversationOwner,
+        }
+
+        impl CicsConversationTransport for PeerCarrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                flow: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                assert_eq!(flow, GdsIssueFlow::Signal);
+                self.target.accept_conversation_peer_frame(
+                    self.target_token,
+                    &self.target_owner,
+                    ConversationContext::Local,
+                    1,
+                    ConversationDataFrame {
+                        signal: true,
+                        ..Default::default()
+                    },
+                )?;
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        let source_store = Arc::new(MemoryStore::new(Default::default()));
+        let source = service(source_store.clone());
+        let target_store = Arc::new(MemoryStore::new(Default::default()));
+        let target = service(target_store.clone());
+        for service in [&source, &target] {
+            service
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+        }
+        let (source_invocation, _) = registered(&source);
+        let (target_invocation, _) = registered(&target);
+        let source_token = source
+            .install_conversation_principal_for_run(
+                &source_invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            )
+            .unwrap();
+        let target_token = target
+            .install_conversation_principal_for_run(
+                &target_invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            )
+            .unwrap();
+        let target_owner = ConversationOwner {
+            execution: target_invocation.execution_id.as_str().into(),
+            run_unit: target_invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(target_invocation.attempt),
+        };
+        let source_owner = ConversationOwner {
+            execution: source_invocation.execution_id.as_str().into(),
+            run_unit: source_invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(source_invocation.attempt),
+        };
+        for (store, token, owner, receiving) in [
+            (&source_store, source_token, &source_owner, true),
+            (&target_store, target_token, &target_owner, false),
+        ] {
+            let current = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = current.clone();
+            let record = next.conversation_mut(token).unwrap();
+            record
+                .connect(
+                    owner,
+                    ConversationContext::Local,
+                    true,
+                    b"PROC".to_vec(),
+                    vec![],
+                    0,
+                )
+                .unwrap();
+            if receiving {
+                record
+                    .peer_offered_data(owner, ConversationContext::Local)
+                    .unwrap();
+            }
+            assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        }
+        source
+            .install_conversation_transport(Arc::new(PeerCarrier {
+                target: target.clone(),
+                target_token,
+                target_owner,
+            }))
+            .unwrap();
+        let command = request(
+            CicsOperation::GdsIssueSignal,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&source_token)),
+                ("RETCODE".into(), argument(b"RETCODE-X")),
+                ("CONVDATA".into(), argument(b"CONVDATA-X")),
+            ]),
+            1,
+        );
+        let response = source
+            .invoke(
+                &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                command,
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!(response.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(
+            ConversationLedger::load(target_store.as_ref())
+                .unwrap()
+                .conversation(target_token)
+                .unwrap()
+                .gds_convdata(false)
+                .unwrap()[4],
+            0xff
+        );
+        let wait = request(CicsOperation::WaitTerminal, BTreeMap::new(), 1);
+        let observed = target
+            .invoke(
+                &effect(&target_invocation.run_unit_id, wait.clone(), 1),
+                wait,
+            )
+            .unwrap();
+        assert_eq!(
+            (observed.condition.as_str(), observed.response),
+            ("SIGNAL", 24)
+        );
+        assert_eq!(
+            ConversationLedger::load(target_store.as_ref())
+                .unwrap()
+                .conversation(target_token)
+                .unwrap()
+                .gds_convdata(false)
+                .unwrap()[4],
+            0
+        );
+    }
+
+    #[test]
     fn mapped_issue_confirmation_and_error_complete_partner_send_before_source_receipt() {
         struct AwaitingConfirmCarrier {
             response: Arc<Mutex<Option<ConversationTransmitOutcome>>>,
@@ -9831,13 +9993,20 @@ mod tests {
                 1,
             );
             let invoke = |run: &mut Run| {
-                handlers::invoke_extended_control(
-                    &service,
-                    run,
-                    &command,
-                    crate::generated::CicsCommandFamily::ConversationControl,
-                    100,
-                )
+                if operation.supported() {
+                    service.invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command.clone(),
+                    )
+                } else {
+                    handlers::invoke_extended_control(
+                        &service,
+                        run,
+                        &command,
+                        crate::generated::CicsCommandFamily::ConversationControl,
+                        100,
+                    )
+                }
             };
             let first = invoke(&mut run).unwrap();
             assert_eq!(
@@ -10288,27 +10457,16 @@ mod tests {
                     delivered: delivered.clone(),
                 }))
                 .unwrap();
-            let mut run = source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
             let mut arguments = BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]);
             if kind == ConversationKind::AppcBasic {
                 arguments.insert("RETCODE".into(), argument(b"RETCODE-X"));
                 arguments.insert("CONVDATA".into(), argument(b"CONVDATA-X"));
             }
             let command = request(operation, arguments, 1);
-            let response = if kind == ConversationKind::AppcMapped {
-                source.invoke(
-                    &effect(&source_invocation.run_unit_id, command.clone(), 1),
-                    command.clone(),
-                )
-            } else {
-                handlers::invoke_extended_control(
-                    &source,
-                    &mut run,
-                    &command,
-                    crate::generated::CicsCommandFamily::ConversationControl,
-                    100,
-                )
-            };
+            let response = source.invoke(
+                &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                command,
+            );
             assert_eq!(response.unwrap().disposition, CicsDisposition::Complete);
             assert_eq!(delivered.load(Ordering::SeqCst), 1);
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();

@@ -1066,12 +1066,7 @@ impl CicsOperation {
     pub const fn supported(self) -> bool {
         !matches!(
             self,
-            Self::GdsIssueAbend
-                | Self::GdsIssueConfirmation
-                | Self::GdsIssueError
-                | Self::GdsIssuePrepare
-                | Self::GdsIssueSignal
-                | Self::IssueCopy
+            Self::GdsIssueConfirmation | Self::GdsIssueError | Self::IssueCopy
         )
     }
 }
@@ -1159,7 +1154,7 @@ mod issue_tests {
     use super::CicsOperation;
 
     #[test]
-    fn exact_issue_heads_are_distinct_with_mapped_controls_admitted() {
+    fn exact_issue_heads_are_distinct_with_17_executable_rows() {
         let heads = [
             ("ISSUE ABEND", CicsOperation::IssueAbend),
             ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
@@ -1201,6 +1196,9 @@ mod issue_tests {
                         | CicsOperation::IssueError
                         | CicsOperation::IssuePrepare
                         | CicsOperation::IssueSignal
+                        | CicsOperation::GdsIssueAbend
+                        | CicsOperation::GdsIssuePrepare
+                        | CicsOperation::GdsIssueSignal
                         | CicsOperation::IssueEndoutput
                         | CicsOperation::IssueEods
                         | CicsOperation::IssueLoad

@@ -2,7 +2,28 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 54] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 57] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::EnterTraceId,
+        syntax: "ENTER TRACEID",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
+        family: CicsCommandFamily::Diagnostics,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::SetFileStatus,
+        syntax: "SET FILE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224",
+        family: CicsCommandFamily::FileControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::Start,
+        syntax: "START",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0205",
+        family: CicsCommandFamily::IntervalControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::StartAttach,
         syntax: "START ATTACH",

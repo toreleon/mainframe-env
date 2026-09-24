@@ -515,6 +515,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0108"
     },
     {
+      "operation": "GdsIssueAbend",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0109"
+    },
+    {
       "operation": "IssueAbort",
       "interface": "api",
       "family": "terminal-control",
@@ -620,6 +627,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0127"
     },
     {
+      "operation": "GdsIssuePrepare",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0128"
+    },
+    {
       "operation": "IssuePrint",
       "interface": "api",
       "family": "conversation-control",
@@ -667,6 +681,13 @@
       "family": "conversation-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
+    },
+    {
+      "operation": "GdsIssueSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0135"
     },
     {
       "operation": "IssueWait",

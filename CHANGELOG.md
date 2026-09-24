@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Registered APPC basic GDS ISSUE ABEND, PREPARE, and SIGNAL with six-byte
+  return codes, CONVDATA, and STATE on the shared ledger. Partner ABEND and
+  PREPARE commit before source confirmation; SIGNAL is observed once by the
+  partner's WAIT TERMINAL path. COBOL rejects these assembler/C-only heads.
 - Registered mapped APPC ISSUE ABEND, CONFIRMATION, ERROR, PREPARE, and SIGNAL
   with their shared owner-fenced control carrier. Public provider calls and
   selected compiled COBOL plans now reach the same durable ledger; partner
