@@ -146,7 +146,16 @@ RUN TRANSID also owns a separate `cics-bts-transid-run-v1` request and
 `cics-bts-transid-outbox-v1` pending index. The request captures a deterministic
 16-byte child token, inherited principal, local transaction and program, and
 the bounded channel-container snapshot at issue time. A worker claim advances
-its lease epoch; a stale claim cannot finish it. Terminal completion writes
+its lease epoch; a stale claim cannot finish it.
+The request row also retains the source channel's read-only flag and forwards
+it through the child invocation's channel binding; first-version rows without
+the field remain readable. This is issue-time metadata from the sibling
+channel authority, not another channel state authority. The selected CHANNEL
+route still requires that task-owned snapshot to be wired before sealing.
+Source: baseline C catalog row `0186`, `dfhp4_runtransid.html` SHA-256
+`b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
+
+Terminal completion writes
 the sibling token outcome first, then closes the request and outbox atomically,
 so a crash in between can reconcile the retained child outcome after restart.
 The outbox reader checks that token outcome before readmitting pending work.

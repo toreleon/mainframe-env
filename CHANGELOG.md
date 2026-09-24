@@ -149,6 +149,10 @@ All notable changes to mainframe-env are documented here.
   remain readable; new base64 snapshots fit the bounded request and invocation
   payloads at the aggregate byte limit.
 
+- Retained the source channel's read-only flag in the RUN TRANSID request row
+  and passed it through the child invocation binding. Older request rows
+  default to writable when the flag is absent.
+
 - Added the bounded BTS lifecycle host, IR, compiler, interpreter, and CICS
   dispatch scaffolding, plus an installed process-type/transaction catalog and
   selected RUN and RUN TRANSID worker admission. The candidate generated

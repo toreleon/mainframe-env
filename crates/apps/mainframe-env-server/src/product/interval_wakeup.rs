@@ -690,6 +690,19 @@ fn bts_transid_invocation(
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
         bindings.insert(
+            "cics.channel.readonly".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.channel-readonly@1",
+                if task.source_channel_read_only {
+                    b"true".to_vec()
+                } else {
+                    b"false".to_vec()
+                },
+                limits,
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+        bindings.insert(
             "cics.bts-child-channel-snapshot".into(),
             BoundedPayload::new(
                 "mainframe-env.cics.bts-child-channel-snapshot@1",
@@ -762,7 +775,7 @@ mod tests {
             ),
         ]);
         let task = BtsLifecycleStore::new(&store)
-            .start_transid(
+            .start_transid_with_channel_access(
                 "UOW1",
                 "EXEC1",
                 "USER",
@@ -771,6 +784,7 @@ mod tests {
                 "BT01",
                 "CHILD",
                 Some("INPUT"),
+                true,
                 containers.clone(),
                 1_000,
                 4,
@@ -780,6 +794,10 @@ mod tests {
         let artifact = ArtifactRef::new("artifact:none", InvocationLimits::default()).unwrap();
         let invocation = bts_transid_invocation(&work, &task, artifact).unwrap();
         assert_eq!(invocation.bindings["cics.channel"].bytes(), b"INPUT");
+        assert_eq!(
+            invocation.bindings["cics.channel.readonly"].bytes(),
+            b"true"
+        );
         let retained: BTreeMap<String, BtsTransidContainer> =
             serde_json::from_slice(invocation.bindings["cics.bts-child-channel-snapshot"].bytes())
                 .unwrap();

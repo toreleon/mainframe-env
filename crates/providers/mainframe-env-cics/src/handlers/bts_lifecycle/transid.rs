@@ -96,6 +96,8 @@ pub struct BtsTransidRecord {
     pub transaction: String,
     pub program: String,
     pub channel: Option<String>,
+    #[serde(default)]
+    pub source_channel_read_only: bool,
     pub containers: BTreeMap<String, BtsTransidContainer>,
     pub scheduled_tick: u64,
     pub priority: u8,
@@ -152,7 +154,8 @@ impl BtsTransidRecord {
                 .channel
                 .as_deref()
                 .is_some_and(|name| !valid_channel_name(name))
-            || self.channel.is_none() && !self.containers.is_empty()
+            || self.channel.is_none()
+                && (self.source_channel_read_only || !self.containers.is_empty())
             || self.containers.len() > MAX_CONTAINERS
             || self.containers.iter().any(|(name, data)| {
                 name.is_empty()
@@ -306,6 +309,39 @@ impl<'a> BtsLifecycleStore<'a> {
         scheduled_tick: u64,
         priority: u8,
     ) -> Result<BtsTransidRecord, HostProblem> {
+        self.start_transid_with_channel_access(
+            parent_run_unit,
+            parent_execution,
+            parent_principal,
+            effect_key,
+            request_digest,
+            transaction,
+            program,
+            channel,
+            false,
+            containers,
+            scheduled_tick,
+            priority,
+        )
+    }
+
+    /// Retain the channel authority's issue-time access metadata with its copy.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_transid_with_channel_access(
+        &self,
+        parent_run_unit: &str,
+        parent_execution: &str,
+        parent_principal: &str,
+        effect_key: &str,
+        request_digest: [u8; 32],
+        transaction: &str,
+        program: &str,
+        channel: Option<&str>,
+        source_channel_read_only: bool,
+        containers: BTreeMap<String, BtsTransidContainer>,
+        scheduled_tick: u64,
+        priority: u8,
+    ) -> Result<BtsTransidRecord, HostProblem> {
         validate_identifier(parent_run_unit, 256)?;
         validate_identifier(parent_execution, 256)?;
         validate_identifier(parent_principal, 256)?;
@@ -329,6 +365,7 @@ impl<'a> BtsLifecycleStore<'a> {
                 };
             }
             if channel.is_some_and(|name| !valid_channel_name(name))
+                || channel.is_none() && source_channel_read_only
                 || containers
                     .keys()
                     .any(|name| name.is_empty() || name.len() > 16)
@@ -368,6 +405,7 @@ impl<'a> BtsLifecycleStore<'a> {
                 transaction: transaction.into(),
                 program: program.into(),
                 channel: channel.map(str::to_owned),
+                source_channel_read_only,
                 containers: containers.clone(),
                 scheduled_tick,
                 priority,
@@ -913,6 +951,9 @@ mod tests {
             .unwrap()
             .unwrap();
         let mut old: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        old.as_object_mut()
+            .unwrap()
+            .remove("source_channel_read_only");
         let container = old["containers"]["MESSAGE"].as_object_mut().unwrap();
         container.remove("ccsid");
         container.remove("read_only");
@@ -928,6 +969,7 @@ mod tests {
             )
             .unwrap();
         let loaded = authority.load_transid(&record.run_id).unwrap().unwrap();
+        assert!(!loaded.source_channel_read_only);
         assert_eq!(loaded.containers["MESSAGE"].ccsid, None);
         assert!(!loaded.containers["MESSAGE"].read_only);
         assert_eq!(loaded.containers["MESSAGE"].bytes, b"saved");
@@ -1162,7 +1204,7 @@ mod tests {
         let first = {
             let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
             BtsLifecycleStore::new(&sqlite)
-                .start_transid(
+                .start_transid_with_channel_access(
                     "UOW1",
                     "EXEC1",
                     "USER",
@@ -1171,6 +1213,7 @@ mod tests {
                     "BT01",
                     "CHILD",
                     Some("INPUT"),
+                    true,
                     BTreeMap::from([(
                         "MESSAGE".into(),
                         BtsTransidContainer {
@@ -1188,6 +1231,7 @@ mod tests {
         {
             let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
             let reopened = BtsLifecycleStore::new(&sqlite);
+            assert!(first.source_channel_read_only);
             assert_eq!(
                 reopened.load_transid(&first.run_id).unwrap(),
                 Some(first.clone())
