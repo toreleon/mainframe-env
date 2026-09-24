@@ -30,7 +30,8 @@ pub use definitions::{
 };
 pub use exchange::{
     ConversationExchangeState, ConversationOutboundFrame, ConversationPeerFrame,
-    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_RECORDED_OUTBOUND_FRAMES,
+    ConversationPendingAttempt, ConversationPendingConverse, MAX_EXCHANGE_FRAME_BYTES,
+    MAX_PENDING_PEER_FRAMES, MAX_RECORDED_OUTBOUND_FRAMES,
 };
 pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
@@ -390,15 +391,7 @@ impl ConversationRecord {
         context: ConversationContext,
         next: ConversationState,
     ) -> Result<(), ConversationProblem> {
-        self.check_owner(owner, context)?;
-        if self.kind == ConversationKind::AppcBasic {
-            return Err(ConversationProblem::WrongKind);
-        }
-        if self.state != ConversationState::Send
-            && !(self.kind == ConversationKind::Mro && self.state == ConversationState::Allocated)
-        {
-            return Err(ConversationProblem::WrongState);
-        }
+        self.check_converse_start(owner, context)?;
         if !matches!(
             next,
             ConversationState::Send
@@ -412,6 +405,23 @@ impl ConversationRecord {
         }
         self.next_sequence()?;
         self.state = next;
+        Ok(())
+    }
+
+    pub fn check_converse_start(
+        &self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+    ) -> Result<(), ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if self.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if self.state != ConversationState::Send
+            && !(self.kind == ConversationKind::Mro && self.state == ConversationState::Allocated)
+        {
+            return Err(ConversationProblem::WrongState);
+        }
         Ok(())
     }
 

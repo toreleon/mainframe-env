@@ -45,8 +45,8 @@ impl ConversationSystemDefinition {
     }
 }
 
-/// Task-local attach FMH fields. The header is retained until task cleanup and
-/// is consumed only when a later SEND/CONVERSE names its ATTACHID.
+/// Task-local attach FMH fields. A SEND/CONVERSE snapshots the selected header
+/// into its outbound frame; BUILD ATTACH may later replace these fields.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConversationAttachHeader {
@@ -176,33 +176,54 @@ impl ConversationLedger {
         replay: &super::ConversationReplay,
         store: &dyn ProviderStateStore,
     ) -> Result<bool, StoreError> {
+        self.persist_with_replays(next, std::slice::from_ref(replay), store)
+    }
+
+    /// A resumed CONVERSE can have several coordinator effect identities for
+    /// the same staged send. Commit one protocol result and every exact reply
+    /// alias atomically, so no resumption can dispatch that send twice.
+    pub fn persist_with_replays(
+        &self,
+        next: &mut Self,
+        replays: &[super::ConversationReplay],
+        store: &dyn ProviderStateStore,
+    ) -> Result<bool, StoreError> {
+        if replays.is_empty() || replays.len() > super::exchange::MAX_CONVERSE_ATTEMPTS {
+            return Err(StoreError::InvalidTransition);
+        }
+        let mut keys = std::collections::BTreeSet::new();
+        if replays
+            .iter()
+            .any(|replay| !keys.insert(&replay.effect_key))
+        {
+            return Err(StoreError::InvalidTransition);
+        }
         next.schema_version = LEDGER_VERSION;
         next.version = self
             .version
             .checked_add(1)
             .ok_or(StoreError::CapacityExceeded)?;
         let state_payload = next.encode().map_err(|_| StoreError::CapacityExceeded)?;
-        let replay_payload = replay.encode()?;
-        let writes = vec![
-            ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: CONVERSATION_STATE_NAMESPACE.into(),
-                    key: KEY.into(),
-                    version: next.version,
-                    payload: state_payload,
-                },
-                expected_version: (self.version != 0).then_some(self.version),
+        let mut writes = vec![ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: CONVERSATION_STATE_NAMESPACE.into(),
+                key: KEY.into(),
+                version: next.version,
+                payload: state_payload,
             },
-            ProviderStateWrite {
+            expected_version: (self.version != 0).then_some(self.version),
+        }];
+        for replay in replays {
+            writes.push(ProviderStateWrite {
                 record: ProviderStateRecord {
                     namespace: super::CONVERSATION_REPLAY_NAMESPACE.into(),
                     key: replay.effect_key.clone(),
                     version: 1,
-                    payload: replay_payload,
+                    payload: replay.encode()?,
                 },
                 expected_version: None,
-            },
-        ];
+            });
+        }
         match store.put_provider_states_atomic(writes) {
             Ok(()) => Ok(true),
             Err(StoreError::Conflict) => Ok(false),
@@ -336,12 +357,25 @@ impl ConversationLedger {
         if record.released || record.kind == ConversationKind::AppcBasic {
             return Err(ConversationProblem::WrongKind);
         }
+        if record.kind == ConversationKind::Mro && frame.signal {
+            return Err(ConversationProblem::Malformed);
+        }
         self.exchanges.entry(key).or_default().offer(frame)
     }
 
     pub fn exchange_mut(&mut self, token: [u8; 4]) -> Option<&mut ConversationExchangeState> {
         self.exchanges
             .get_mut(&u32::from_be_bytes(token).to_string())
+    }
+
+    pub fn exchange(&self, token: [u8; 4]) -> Option<&ConversationExchangeState> {
+        self.exchanges.get(&u32::from_be_bytes(token).to_string())
+    }
+
+    pub fn ensure_exchange(&mut self, token: [u8; 4]) -> &mut ConversationExchangeState {
+        self.exchanges
+            .entry(u32::from_be_bytes(token).to_string())
+            .or_default()
     }
 
     pub fn remove_exchange(&mut self, token: [u8; 4]) {
@@ -460,9 +494,26 @@ impl ConversationLedger {
         }
         for (key, exchange) in &self.exchanges {
             exchange.validate()?;
-            if !self.conversations.get(key).is_some_and(|record| {
-                !record.released && record.kind != ConversationKind::AppcBasic
-            }) {
+            let Some(record) = self.conversations.get(key) else {
+                return Err(ConversationProblem::Malformed);
+            };
+            if record.released
+                || record.kind == ConversationKind::AppcBasic
+                || exchange.pending_converse.as_ref().is_some_and(|pending| {
+                    pending.owner_epoch != record.owner.lease_epoch
+                        || pending
+                            .outbound
+                            .attach_header
+                            .as_ref()
+                            .is_some_and(|header| header.owner != record.owner)
+                })
+                || exchange.outbound.iter().any(|frame| {
+                    frame
+                        .attach_header
+                        .as_ref()
+                        .is_some_and(|header| header.owner != record.owner)
+                })
+            {
                 return Err(ConversationProblem::Malformed);
             }
         }
@@ -808,6 +859,58 @@ mod tests {
         );
         assert!(
             super::super::load_conversation_replay(&store, "alloc-effect")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn multiple_converse_replays_commit_with_state_or_not_at_all() {
+        let store = MemoryStore::new(Default::default());
+        let initial = ConversationLedger::load(&store).unwrap();
+        let mut installed = initial.clone();
+        installed
+            .register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::Mro,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        assert!(initial.persist(&mut installed, &store).unwrap());
+        let current = ConversationLedger::load(&store).unwrap();
+        let existing = replay([0, 0, 0, 1]);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: super::super::CONVERSATION_REPLAY_NAMESPACE.into(),
+                    key: existing.effect_key.clone(),
+                    version: 1,
+                    payload: existing.encode().unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let mut alias = existing.clone();
+        alias.effect_key = "continuation-effect".into();
+        alias.mutation_sequence = 2;
+        let mut next = current.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS2".into(),
+            kind: ConversationKind::Mro,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        assert!(
+            !current
+                .persist_with_replays(&mut next, &[alias, existing], &store)
+                .unwrap()
+        );
+        let reopened = ConversationLedger::load(&store).unwrap();
+        assert!(!reopened.systems.contains_key("SYS2"));
+        assert!(
+            super::super::load_conversation_replay(&store, "continuation-effect")
                 .unwrap()
                 .is_none()
         );

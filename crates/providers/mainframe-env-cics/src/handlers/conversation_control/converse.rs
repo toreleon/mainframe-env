@@ -2,8 +2,9 @@
 
 use super::{
     ConversationKind, ConversationLedger, ConversationOutboundFrame, ConversationOwner,
-    ConversationProblem, ConversationReplay, ConversationReply, MAX_EXCHANGE_FRAME_BYTES,
-    definitions, load_conversation_replay,
+    ConversationPendingAttempt, ConversationPendingConverse, ConversationProblem,
+    ConversationReplay, ConversationReply, MAX_EXCHANGE_FRAME_BYTES, definitions,
+    load_conversation_replay,
 };
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
@@ -64,9 +65,6 @@ pub(super) fn invoke(
             &format!("CICS.ATTACH.{name}"),
             AccessIntent::Read,
         )?;
-        if initial.attach(&owner, &name).is_none() {
-            return Err(condition("CBIDERR", 62, 0));
-        }
         Some(name)
     } else {
         None
@@ -91,6 +89,7 @@ pub(super) fn invoke(
     let outbound = ConversationOutboundFrame {
         data,
         attach_id,
+        attach_header: None,
         fmh: request.arguments.contains_key("OPTION.FMH"),
         definite_response: request.arguments.contains_key("OPTION.DEFRESP"),
     };
@@ -104,6 +103,15 @@ pub(super) fn invoke(
     let effect_key = mutation.idempotency_key.as_str();
     let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
         .map_err(|_| HostProblem::ResourceExhausted)?;
+    let mut semantic_request = request.clone();
+    semantic_request.mutation = None;
+    let semantic_digest = canonical_request_digest(&HostRequest::Cics(semantic_request))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    let attempt = ConversationPendingAttempt {
+        effect_key: effect_key.into(),
+        mutation_sequence: mutation.sequence,
+        request_digest: digest,
+    };
     let principal = run.invocation.principal.id().as_str().to_owned();
     for _ in 0..MAX_CAS_RETRIES {
         super::deadline(service, run)?;
@@ -125,21 +133,96 @@ pub(super) fn invoke(
         let current = ConversationLedger::load(service.store.as_ref()).map_err(store_error)?;
         let mut next = current.clone();
         let record = next
-            .conversation_mut(token)
+            .conversation(token)
             .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
         if record.system != system || record.kind != kind {
             return Err(HostProblem::IdempotencyConflict);
         }
         record
-            .check_owner(&owner, super::context(run)?)
+            .check_converse_start(&owner, super::context(run)?)
             .map_err(map_problem)?;
-        let Some(exchange) = next.exchange_mut(token) else {
-            return suspended(service, run);
-        };
-        if !exchange.retained.is_empty() {
+        if next
+            .exchange(token)
+            .is_some_and(|exchange| !exchange.retained.is_empty())
+        {
             return Err(HostProblem::Unsupported);
         }
+        if next
+            .exchange(token)
+            .and_then(|exchange| exchange.pending_converse.as_ref())
+            .is_none()
+        {
+            let mut staged_outbound = outbound.clone();
+            if let Some(name) = &staged_outbound.attach_id {
+                staged_outbound.attach_header = Some(
+                    next.attach(&owner, name)
+                        .cloned()
+                        .ok_or_else(|| condition("CBIDERR", 62, 0))?,
+                );
+            }
+            let pending = ConversationPendingConverse {
+                owner_principal: principal.clone(),
+                owner_epoch: owner.lease_epoch,
+                semantic_digest,
+                attempts: vec![attempt.clone()],
+                outbound: staged_outbound,
+            };
+            next.ensure_exchange(token)
+                .stage_converse(pending)
+                .map_err(|problem| match problem {
+                    ConversationProblem::Exhausted => HostProblem::ResourceExhausted,
+                    ConversationProblem::WrongState => HostProblem::Unsupported,
+                    _ => HostProblem::Malformed,
+                })?;
+            let peer_ready = !next
+                .exchange(token)
+                .ok_or(HostProblem::InfrastructureFailure)?
+                .inbound
+                .is_empty();
+            if current
+                .persist(&mut next, service.store.as_ref())
+                .map_err(|error| mutation_problem(store_error(error)))?
+            {
+                if super::deadline(service, run).is_err() {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+                if !peer_ready {
+                    return suspended(service, run);
+                }
+            }
+            continue;
+        }
+        let exchange = next
+            .exchange_mut(token)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let pending = exchange
+            .pending_converse
+            .as_mut()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let added_attempt = pending
+            .accept_attempt(
+                attempt.clone(),
+                &principal,
+                owner.lease_epoch,
+                semantic_digest,
+            )
+            .map_err(|problem| match problem {
+                ConversationProblem::Exhausted => HostProblem::ResourceExhausted,
+                _ => HostProblem::IdempotencyConflict,
+            })?;
         let Some(frame) = exchange.inbound.first().cloned() else {
+            if added_attempt {
+                if current
+                    .persist(&mut next, service.store.as_ref())
+                    .map_err(|error| mutation_problem(store_error(error)))?
+                {
+                    if super::deadline(service, run).is_err() {
+                        return Err(HostProblem::UnknownOutcome);
+                    }
+                    return suspended(service, run);
+                }
+                continue;
+            }
             return suspended(service, run);
         };
         if kind == ConversationKind::Mro && frame.signal {
@@ -201,9 +284,15 @@ pub(super) fn invoke(
         let exchange = next
             .exchange_mut(token)
             .ok_or(HostProblem::InfrastructureFailure)?;
+        let attempts = exchange
+            .pending_converse
+            .as_ref()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .attempts
+            .clone();
         exchange.inbound.remove(0);
         exchange
-            .record_outbound(outbound.clone())
+            .complete_pending_converse()
             .map_err(|problem| match problem {
                 ConversationProblem::Exhausted => HostProblem::ResourceExhausted,
                 _ => HostProblem::Malformed,
@@ -211,21 +300,24 @@ pub(super) fn invoke(
         if overlong && notruncate {
             exchange.retained = frame.data[received_len..].to_vec();
         }
-        let replay = ConversationReplay {
-            schema_version: 1,
-            effect_key: effect_key.into(),
-            owner_execution: owner.execution.clone(),
-            owner_run_unit: owner.run_unit.clone(),
-            owner_principal: principal.clone(),
-            owner_epoch: owner.lease_epoch,
-            mutation_sequence: mutation.sequence,
-            request_digest: digest,
-            deadline_tick: retention_tick,
-            retain_until_tick: retention_tick,
-            reply: reply.clone(),
-        };
+        let replays: Vec<ConversationReplay> = attempts
+            .into_iter()
+            .map(|attempt| ConversationReplay {
+                schema_version: 1,
+                effect_key: attempt.effect_key,
+                owner_execution: owner.execution.clone(),
+                owner_run_unit: owner.run_unit.clone(),
+                owner_principal: principal.clone(),
+                owner_epoch: owner.lease_epoch,
+                mutation_sequence: attempt.mutation_sequence,
+                request_digest: attempt.request_digest,
+                deadline_tick: retention_tick,
+                retain_until_tick: retention_tick,
+                reply: reply.clone(),
+            })
+            .collect();
         if current
-            .persist_with_replay(&mut next, &replay, service.store.as_ref())
+            .persist_with_replays(&mut next, &replays, service.store.as_ref())
             .map_err(|error| mutation_problem(store_error(error)))?
         {
             if super::deadline(service, run).is_err() {

@@ -37043,6 +37043,53 @@ mod tests {
             )
             .unwrap();
         assert_eq!(waiting.disposition, CicsDisposition::Suspended);
+        let key = u32::from_be_bytes(token).to_string();
+        let staged = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            staged.exchanges[&key]
+                .pending_converse
+                .as_ref()
+                .unwrap()
+                .outbound
+                .data,
+            b"REQUEST"
+        );
+        assert!(staged.exchanges[&key].outbound.is_empty());
+        let waiting_again = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, converse.clone(), 3),
+                converse.clone(),
+            )
+            .unwrap();
+        assert_eq!(waiting_again.disposition, CicsDisposition::Suspended);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref()).unwrap().version,
+            staged.version
+        );
+        let competing = request(CicsOperation::Converse, converse.arguments.clone(), 4);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, competing.clone(), 4),
+                competing
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let premature_free = request(
+            CicsOperation::FreeConversation,
+            BTreeMap::from([("CONVID".into(), cics_literal(&token))]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, premature_free.clone(), 5),
+                premature_free,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
         cics.offer_conversation_peer_frame(
             &invocation.run_unit_id,
             token,
@@ -37077,9 +37124,9 @@ mod tests {
         let ledger = ConversationLedger::load(store.as_ref()).unwrap();
         let record = ledger.conversation(token).unwrap();
         assert_eq!(record.state, ConversationState::Receive);
-        let key = u32::from_be_bytes(token).to_string();
         assert!(ledger.exchanges[&key].inbound.is_empty());
         assert_eq!(ledger.exchanges[&key].outbound.len(), 1);
+        assert!(ledger.exchanges[&key].pending_converse.is_none());
         assert_eq!(ledger.exchanges[&key].outbound[0].data, b"REQUEST");
     }
 
@@ -37291,12 +37338,35 @@ mod tests {
         let key = u32::from_be_bytes(token).to_string();
         let outbound = &ledger.exchanges[&key].outbound[0];
         assert_eq!(outbound.attach_id.as_deref(), Some("HEADER1"));
+        assert_eq!(outbound.attach_header.as_ref().unwrap().process, b"TRN1");
         assert!(outbound.fmh);
         assert!(outbound.definite_response);
         assert_eq!(outbound.data, b"REQUEST");
         assert_eq!(
             ledger.conversation(token).unwrap().state,
             ConversationState::Receive
+        );
+        let rebuild = request(
+            CicsOperation::BuildAttach,
+            BTreeMap::from([
+                ("ATTACHID".into(), cics_literal(b"HEADER1")),
+                ("PROCESS".into(), cics_literal(b"TRN2")),
+            ]),
+            4,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, rebuild.clone(), 4),
+            rebuild,
+        )
+        .unwrap();
+        let revised = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            revised.exchanges[&key].outbound[0]
+                .attach_header
+                .as_ref()
+                .unwrap()
+                .process,
+            b"TRN1"
         );
     }
 

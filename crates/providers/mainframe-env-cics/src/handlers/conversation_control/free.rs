@@ -89,7 +89,7 @@ pub(super) fn invoke(
         let current = ConversationLedger::load(service.store.as_ref()).map_err(store_error)?;
         let mut next = current.clone();
         let record = next
-            .conversation_mut(token)
+            .conversation(token)
             .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
         if record.system != system {
             return Err(HostProblem::IdempotencyConflict);
@@ -97,6 +97,18 @@ pub(super) fn invoke(
         if record.released {
             return Err(condition("NOTALLOC", 61, 0));
         }
+        record
+            .check_owner(&owner, super::context(run)?)
+            .map_err(map_problem)?;
+        if next
+            .exchange(token)
+            .is_some_and(|exchange| exchange.pending_converse.is_some())
+        {
+            return Err(condition("INVREQ", 16, 0));
+        }
+        let record = next
+            .conversation_mut(token)
+            .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
         record
             .release(&owner, super::context(run)?, false)
             .map_err(map_problem)?;

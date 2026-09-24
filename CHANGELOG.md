@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- CONVERSE now stages its bounded outbound frame and MRO attach-header snapshot
+  durably before waiting for a peer. The compiled continuation resumes with a
+  later effect sequence; one CAS result records the peer response and exact
+  replays for its bounded effect aliases. FREE rejects a pending exchange.
+
 - Kept the APPC CONVERSE SESSION compatibility synonym and rejected symbolic
   MRO SESSION in CONVERSE and FREE until a TCTTE name authority is installed.
   An MRO token supplied in SESSION can no longer alias CONVID or mutate the

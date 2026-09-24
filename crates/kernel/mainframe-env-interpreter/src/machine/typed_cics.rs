@@ -103,6 +103,7 @@ pub(super) fn suspension(
 ) -> MachineDrive<EffectRequest> {
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::Converse => ("cics-converse", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),

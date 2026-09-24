@@ -587,7 +587,8 @@ impl ProductServer {
             current_version,
         )?;
         match suspension.kind.as_str() {
-            "cics-delay" | "cics-enqueue" | "cics-event" | "cics-retrieve" | "cics-scheduler" => {
+            "cics-converse" | "cics-delay" | "cics-enqueue" | "cics-event" | "cics-retrieve"
+            | "cics-scheduler" => {
                 return Ok(());
             }
             "cics-terminal" => {}

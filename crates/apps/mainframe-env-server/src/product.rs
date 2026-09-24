@@ -6316,7 +6316,7 @@ mod tests {
         CicsEventPostMode, CicsJavaStatus, CicsMonitorAction, CicsMonitorPointDefinition,
         CicsPartitionDefinition, CicsPartitionSetDefinition, CicsProgramDefinition,
         ConversationKind, ConversationLedger, ConversationOwner, ConversationPeerFrame,
-        ConversationState, ConversationSystemDefinition,
+        ConversationState, ConversationSystemDefinition, load_conversation_replay,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -24574,6 +24574,7 @@ mod tests {
         )
         .unwrap();
         let token;
+        let first_effect_key;
         {
             let store: Arc<dyn PlatformStore> =
                 Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 262_144).unwrap());
@@ -24657,6 +24658,28 @@ mod tests {
                 )
                 .unwrap();
             server
+                .run_online_exchange(&session, &principal, "CVSQL", 2)
+                .unwrap();
+            let staged = ConversationLedger::load(server.store.as_ref()).unwrap();
+            let key = u32::from_be_bytes(token).to_string();
+            assert_eq!(
+                staged.exchanges[&key]
+                    .pending_converse
+                    .as_ref()
+                    .unwrap()
+                    .outbound
+                    .data,
+                b"PING"
+            );
+            first_effect_key = staged.exchanges[&key]
+                .pending_converse
+                .as_ref()
+                .unwrap()
+                .attempts[0]
+                .effect_key
+                .clone();
+            assert!(staged.exchanges[&key].outbound.is_empty());
+            server
                 .cics
                 .offer_conversation_peer_frame(
                     &invocation.run_unit_id,
@@ -24672,14 +24695,23 @@ mod tests {
                 )
                 .unwrap();
             server
-                .run_online_exchange(&session, &principal, "CVSQL", 2)
+                .run_online_exchange(&session, &principal, "CVSQL", 3)
                 .unwrap();
-            assert!(
-                server
-                    .online_machine_continuation(&session)
-                    .unwrap()
-                    .is_some()
-            );
+            let continuation = server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .unwrap();
+            let mut restored = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation,
+                CodecLimits::default(),
+            )
+            .unwrap();
+            restored
+                .restore_checkpoint(&continuation.checkpoint)
+                .unwrap();
+            assert_eq!(&restored.variable("INTO-X").unwrap().bytes()[..4], b"PONG");
+            assert_eq!(restored.variable("TO-LEN").unwrap().bytes(), &[0, 4]);
         }
         let reopened = SqliteStateStore::open(&url, 8 * 1024 * 1024, 262_144).unwrap();
         let ledger = ConversationLedger::load(&reopened).unwrap();
@@ -24690,6 +24722,12 @@ mod tests {
         let key = u32::from_be_bytes(token).to_string();
         assert_eq!(ledger.exchanges[&key].outbound[0].data, b"PING");
         assert!(ledger.exchanges[&key].inbound.is_empty());
+        assert!(ledger.exchanges[&key].pending_converse.is_none());
+        assert!(
+            load_conversation_replay(&reopened, &first_effect_key)
+                .unwrap()
+                .is_some()
+        );
         drop(reopened);
         std::fs::remove_dir_all(directory).unwrap();
     }

@@ -22,11 +22,19 @@ SHA-256 identities are recorded in the [0.9 status ledger](../delivery/coverage-
    with response bytes, next protocol state and EOC/FMH/SIGNAL indicators.
    The frame and an owner-fenced event replay receipt use one provider-state
    CAS transaction. There is no implicit or generic success frame.
-3. CONVERSE consumes that frame and records its outbound application data and
-   selected structured attach header in the same CAS transaction as the
-   conversation state and exact command replay receipt. NOTRUNCATE retains
-   the remainder for a later RECEIVE sibling. FREE removes exchange state.
-4. The frame contract does not represent MQ delivery, an acknowledgement, or
+3. CONVERSE first stages one outbound application frame and a snapshot of its
+   selected structured attach header in this ledger. A CAS write makes the
+   frame visible before the command suspends for a peer. Reissuing the same
+   effect does not stage it again, and FREE cannot discard a pending frame.
+4. The compiled continuation may have a new coordinator effect sequence. A
+   bounded pending record admits only a later sequence from the same effect
+   stream, principal, lease, and mutation-free request digest. Completion
+   consumes one explicit peer frame, moves the pending send to outbound
+   history, advances protocol state, and writes exact replay receipts for all
+   accepted effect identities in one CAS transaction. NOTRUNCATE retains the
+   remainder for a later RECEIVE sibling. FREE removes completed exchange
+   state.
+5. The frame contract does not represent MQ delivery, an acknowledgement, or
    licensed APPC execution. Source condition policy, EIB flags, and output
    bounds remain command-level responsibilities. The ledger row is capped at
    4 MiB, each frame at 1 MiB, and each per-conversation queue at 32 frames.
@@ -38,5 +46,9 @@ SHA-256 identities are recorded in the [0.9 status ledger](../delivery/coverage-
 - Peer frames and outbound records are durable, task-owned, replay-fenced and
   transport neutral. They do not claim a remote system received or executed
   a process unless its adapter explicitly supplies the corresponding frame.
+- A pending send survives suspension and SQLite reopen without a terminal
+  reply. Older canonical version 2 rows omit its optional field; a reader
+  predating this addition needs a pre-upgrade snapshot for rollback after a
+  pending frame is written.
 - The same authority can be consumed by later SEND, RECEIVE and GDS siblings
   without adding their command rows or tags to this slice.

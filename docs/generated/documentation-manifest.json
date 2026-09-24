@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:2818963275ddaeabad07182fdeaf9ba62ee7bd8fcb3a128f108b6187704e9b02",
+      "sha256": "sha256:3c9f0682ed31fbee7e42e251ca0c6cf2fcd7f2ce23b012209c72e2f9921be4d8",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -773,7 +773,7 @@
       "path": "docs/decisions/0015-conversation-peer-exchange-ledger.md",
       "relative_links": 1,
       "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
-      "sha256": "sha256:fa1b98c6b360277f0b0cdfd9da3d419a072841051aefc651a6283ffca3979e66",
+      "sha256": "sha256:35936128ec8f57b85f377966d2d6d39e80c828b44ceb0b2f28ab95cba85daa7a",
       "status": "Proposed for v0.9 development",
       "title": "ADR-0015: Persist explicit conversation peer frames with protocol state",
       "xtask_commands": 0
@@ -1122,7 +1122,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 85,
-      "sha256": "sha256:f8ad74fa898ecc186ca474426bb9d5578d51dde0244804297dc3380c94dbbb11",
+      "sha256": "sha256:72993089b4d54367b208fd4f4408b97965ac7571425b3511046be5ff227aebd5",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
