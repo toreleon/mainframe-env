@@ -284,7 +284,9 @@ impl<'a> BtsLifecycleStore<'a> {
             .activities
             .get(activity_id)
             .ok_or(HostProblem::NotFound)?;
-        if activity.mode != BtsMode::Active {
+        let deferred =
+            activity.suspended && matches!(activity.mode, BtsMode::Initial | BtsMode::Dormant);
+        if activity.mode != BtsMode::Active && !deferred {
             return Ok(None);
         }
         let mut seen = BTreeSet::new();
@@ -307,8 +309,12 @@ impl<'a> BtsLifecycleStore<'a> {
                 .load_run(id)?
                 .ok_or(HostProblem::InfrastructureFailure)?;
             if !saved.synchronous
-                && saved.input_event != "DFHINITIAL"
-                && saved.state != BtsRunState::Finished
+                && if deferred {
+                    saved.state == BtsRunState::Deferred
+                } else {
+                    saved.input_event != "DFHINITIAL"
+                        && matches!(saved.state, BtsRunState::Pending | BtsRunState::Attached)
+                }
                 && saved.owner_run_unit == owner_run_unit
                 && saved.owner_execution == owner_execution
                 && saved.owner_principal == owner_principal
@@ -464,6 +470,10 @@ impl<'a> BtsLifecycleStore<'a> {
             }
             if !synchronous
                 && let Some(event) = input_event
+                && process
+                    .activities
+                    .get(activity_id)
+                    .is_some_and(|activity| activity.mode != BtsMode::Initial)
                 && let Some(saved) = self.asynchronous_coalescing_target(
                     &process,
                     activity_id,
@@ -513,12 +523,54 @@ impl<'a> BtsLifecycleStore<'a> {
             if process.replays.len() >= MAX_REPLAYS || process.replays.contains_key(effect_key) {
                 return Err(HostProblem::IdempotencyConflict);
             }
+            if !synchronous
+                && process
+                    .activities
+                    .get(activity_id)
+                    .is_some_and(|activity| activity.suspended)
+                && self
+                    .asynchronous_coalescing_target(
+                        &process,
+                        activity_id,
+                        owner_run_unit,
+                        owner_execution,
+                        owner_principal,
+                    )?
+                    .is_some()
+            {
+                return Err(HostProblem::Condition {
+                    name: if activity_id == process.root_id {
+                        "PROCESSERR".into()
+                    } else {
+                        "ACTIVITYERR".into()
+                    },
+                    response: if activity_id == process.root_id {
+                        108
+                    } else {
+                        109
+                    },
+                    response2: 14,
+                });
+            }
             let mut outbox = self.load_run_outbox()?;
             if outbox.pending.len() + outbox.deferred.len() >= MAX_PENDING_RUNS {
                 return Err(HostProblem::ResourceExhausted);
             }
             let old_version = process.row_version;
+            let old_mode = process
+                .activities
+                .get(activity_id)
+                .ok_or(HostProblem::NotFound)?
+                .mode;
+            let deferred = !synchronous && process.activities[activity_id].suspended;
             let ticket = process.start(activity_id, input_event, synchronous)?;
+            if deferred {
+                process
+                    .activities
+                    .get_mut(activity_id)
+                    .expect("validated activity")
+                    .mode = old_mode;
+            }
             let mut record = BtsRunRecord {
                 schema_version: RUN_SCHEMA.into(),
                 run_id: run_id.clone(),
@@ -542,7 +594,11 @@ impl<'a> BtsLifecycleStore<'a> {
                 facility_token,
                 scheduled_tick,
                 priority,
-                state: BtsRunState::Pending,
+                state: if deferred {
+                    BtsRunState::Deferred
+                } else {
+                    BtsRunState::Pending
+                },
                 completion: None,
                 abcode: None,
                 row_version: 0,
@@ -575,7 +631,11 @@ impl<'a> BtsLifecycleStore<'a> {
             );
             writes.push(put_process(&key, &process, Some(old_version))?);
             writes.push(put_run(&record, None)?);
-            outbox.pending.insert(run_id.clone());
+            if deferred {
+                outbox.deferred.insert(run_id.clone());
+            } else {
+                outbox.pending.insert(run_id.clone());
+            }
             writes.push(put_outbox(&outbox)?);
             match self.store.mutate_provider_states_atomic(writes) {
                 Ok(()) => {
@@ -1380,5 +1440,68 @@ mod tests {
         let decoded: BtsRunRecord = serde_json::from_slice(&encoded).unwrap();
         decoded.validate().unwrap();
         assert_eq!(decoded.work_record(), Err(HostProblem::IdempotencyConflict));
+    }
+
+    #[test]
+    fn suspended_async_run_reserves_one_deferred_activation_without_work() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let root = published_process(&authority);
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "suspend",
+                [1; 32],
+                |process| {
+                    process.set_suspended(&root, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let deferred = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                "run", [2; 32], [2; 32], 1000, 5,
+            )
+            .unwrap();
+        assert_eq!(deferred.state, BtsRunState::Deferred);
+        assert_eq!(deferred.activation_epoch, 1);
+        let outbox = authority.load_run_outbox().unwrap();
+        assert!(outbox.pending.is_empty());
+        assert_eq!(outbox.deferred, BTreeSet::from([deferred.run_id.clone()]));
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .mode,
+            BtsMode::Initial
+        );
+        assert_eq!(
+            enqueue_exact(&memory, &deferred),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert_eq!(memory.get_work(&deferred.work_id).unwrap(), None);
+        assert_eq!(
+            authority
+                .start_run(
+                    "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:42",
+                    "run", [2; 32], [2; 32], 2000, 5,
+                )
+                .unwrap(),
+            deferred
+        );
+        assert!(matches!(
+            authority.start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:43",
+                "run-again", [3; 32], [3; 32], 2000, 5,
+            ),
+            Err(HostProblem::Condition { name, response: 108, response2: 14 }) if name == "PROCESSERR"
+        ));
     }
 }

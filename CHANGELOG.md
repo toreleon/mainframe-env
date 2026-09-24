@@ -33,6 +33,10 @@ All notable changes to mainframe-env are documented here.
   Retained v1 outboxes without the field remain readable; deferred records
   cannot be enqueued or promoted as work.
 
+- Asynchronous RUN against a suspended activity now reserves a deferred
+  activation and exact replay without admitting worker work. Its event and
+  process transition commit together; RESUME release remains pending.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

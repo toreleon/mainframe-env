@@ -166,6 +166,14 @@ while suspended. Source: baseline C SUSPEND rows `0215`–`0217`,
 `ddae8c6a987bb1f1341ef0f34040a150a60fa6b449c6ef8de16c7abf480049cd`;
 baseline B RESUME rows `0172`–`0174`, `dfhp4_resume.html` SHA-256
 `350da29cf791bb80915ba22880a6919b1f313e89cf858440013031a993f2eb7f`.
+An asynchronous RUN issued while suspended now reserves the next activation
+epoch but retains the activity's prior INITIAL or DORMANT mode. It records a
+DEFERRED request, fires a named dormant input event, and indexes the request
+outside the runnable outbox in one CAS batch. Exact retries return the same
+deferred row; no work conversion or worker promotion is allowed. RESUME must
+atomically release this reservation before the path is sealed. Source: the
+same SUSPEND topic and baseline C RUN topic `dfhp4_run.html` SHA-256
+`2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`.
 
 Terminal parent completion deletes settled descendants, their activity
 indexes, and direct-child completion events atomically with the parent RUN

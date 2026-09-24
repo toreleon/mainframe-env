@@ -121,7 +121,7 @@ pub(super) fn invoke(
         tick,
         run.invocation.priority,
     )?;
-    if record.state != BtsRunState::Finished {
+    if matches!(record.state, BtsRunState::Pending | BtsRunState::Attached) {
         service
             .enqueue_bts_run_work(&record)
             .map_err(|_| HostProblem::UnknownOutcome)?;
