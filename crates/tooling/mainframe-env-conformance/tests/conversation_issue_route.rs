@@ -20,13 +20,45 @@ use mainframe_env_source::{
 use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
-fn compiled_issue_endfile_selects_its_3740_host_operation_and_endoutput_flag() {
-    let source = b"IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ISSUE ENDFILE ENDOUTPUT RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+fn compiled_issue_device_markers_select_exact_host_operations_and_companion_flags() {
+    for (command, plan, host, flag) in [
+        (
+            "ISSUE ENDFILE ENDOUTPUT",
+            CicsPlanOperation::IssueEndfile,
+            CicsOperation::IssueEndfile,
+            Some((CicsPlanOption::IssueEndOutput, "OPTION.ENDOUTPUT")),
+        ),
+        (
+            "ISSUE ENDOUTPUT ENDFILE",
+            CicsPlanOperation::IssueEndoutput,
+            CicsOperation::IssueEndoutput,
+            Some((CicsPlanOption::IssueEndFile, "OPTION.ENDFILE")),
+        ),
+        (
+            "ISSUE EODS",
+            CicsPlanOperation::IssueEods,
+            CicsOperation::IssueEods,
+            None,
+        ),
+    ] {
+        compiled_case(command, plan, host, flag);
+    }
+}
+
+fn compiled_case(
+    command: &str,
+    expected_plan: CicsPlanOperation,
+    expected_host: CicsOperation,
+    flag: Option<(CicsPlanOption, &str)>,
+) {
+    let source = format!(
+        "IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN."
+    );
     let source_limits = SourceLimits::default();
     let path = LogicalPath::new("ISSUEEF.cbl", source_limits.max_path_bytes).unwrap();
     let file = SourceFile::input(
         "ISSUEEF.cbl",
-        source.to_vec(),
+        source.into_bytes(),
         SourceFormat::Free,
         SourceEncoding::Utf8,
         source_limits,
@@ -49,7 +81,7 @@ fn compiled_issue_endfile_selects_its_3740_host_operation_and_endoutput_flag() {
         })
         .unwrap()
     else {
-        panic!("ISSUE ENDFILE did not publish");
+        panic!("{command} did not publish");
     };
     let binary = artifact.payload();
     let module = decode_binary(binary, CodecLimits::default()).unwrap();
@@ -65,9 +97,12 @@ fn compiled_issue_endfile_selects_its_3740_host_operation_and_endoutput_flag() {
             ),
             _ => None,
         })
-        .unwrap_or_else(|| panic!("typed ISSUE ENDFILE plan: {module:?}"));
-    assert_eq!(plan.operation, CicsPlanOperation::IssueEndfile);
-    assert!(plan.options.contains(&CicsPlanOption::IssueEndOutput));
+        .unwrap_or_else(|| panic!("typed {command} plan: {module:?}"));
+    assert_eq!(plan.operation, expected_plan);
+    assert_eq!(plan.options.len(), usize::from(flag.is_some()));
+    if let Some((option, _)) = flag {
+        assert!(plan.options.contains(&option));
+    }
 
     let limits = InvocationLimits::default();
     let invocation = Invocation::new(
@@ -100,14 +135,16 @@ fn compiled_issue_endfile_selects_its_3740_host_operation_and_endoutput_flag() {
         match machine.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap()) {
             MachineDrive::Continue => continue,
             MachineDrive::HostCall(effect) => break effect,
-            other => panic!("ISSUE ENDFILE did not dispatch: {other:?}"),
+            other => panic!("{command} did not dispatch: {other:?}"),
         }
     };
     let HostRequest::Cics(request) = effect.request else {
-        panic!("ISSUE ENDFILE selected a non-CICS host request");
+        panic!("{command} selected a non-CICS host request");
     };
-    assert_eq!(request.operation, CicsOperation::IssueEndfile);
-    assert!(request.arguments.contains_key("OPTION.ENDOUTPUT"));
+    assert_eq!(request.operation, expected_host);
+    if let Some((_, name)) = flag {
+        assert!(request.arguments.contains_key(name));
+    }
     assert!(request.arguments.contains_key("RESP"));
     assert!(request.arguments.contains_key("RESP2"));
 }

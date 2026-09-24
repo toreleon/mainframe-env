@@ -111,6 +111,10 @@ All notable changes to mainframe-env are documented here.
   route and typed compiled COBOL. ENDOUTPUT sets both durable markers;
   source conditions, exact replay, and backend tests pass. The integrated
   registry is 192 typed and 71 unready, with nineteen ISSUE rows pending.
+- Registered CIC-905 ISSUE ENDOUTPUT and EODS rows 0118–0119. The paired
+  ENDFILE option sets both 3740 markers; EODS sets the 3650 marker. Public
+  provider replay and compiled COBOL routes pass; the integrated registry is
+  194 typed and 69 unready.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and
