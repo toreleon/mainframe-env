@@ -65,6 +65,11 @@ All notable changes to mainframe-env are documented here.
   device authority. Printer and display state join the replay receipt in one
   atomic commit after SAF.
 
+- Added cancellation and deadline checks around physical ISSUE device
+  mutations. A cancellation, deadline, or injected unknown outcome after an
+  atomic commit reports unknown outcome; exact receipt replay recovers the
+  committed result without repeating the transition.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

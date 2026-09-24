@@ -6,6 +6,7 @@ use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, CicsUnitOfWorkOutcome,
     HostProblem, HostRequest, canonical_request_digest,
 };
+use std::sync::atomic::Ordering;
 
 const RECEIPT_NAMESPACE: &str = "cics-issue-device-receipt-v1";
 const MAX_RECEIPTS_PER_SCAN: usize = 4096;
@@ -70,6 +71,7 @@ pub(in crate::service) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
+    check_request_live(service, run)?;
     let current_session = {
         let state = service.lock()?;
         state
@@ -295,6 +297,14 @@ pub(in crate::service) fn invoke(
                     .sessions
                     .insert(run.session.clone(), updated);
             }
+            if run.invocation.cancellation_requested()
+                || request_expired(service, run)?
+                || service
+                    .replay_unknown_after_persist
+                    .swap(false, Ordering::SeqCst)
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
             receipt_response(service, run, &receipt)
         }
         Err(StoreError::Conflict | StoreError::AlreadyExists) => {
@@ -304,6 +314,29 @@ pub(in crate::service) fn invoke(
         }
         Err(error) => Err(super::super::super::mutation_problem(store_error(error))),
     }
+}
+
+fn check_request_live(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    if run.invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    if request_expired(service, run)? {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
+}
+
+fn request_expired(service: &CicsService, run: &Run) -> Result<bool, HostProblem> {
+    service
+        .replay_clock
+        .as_ref()
+        .map(|clock| {
+            clock
+                .now_tick()
+                .map(|tick| tick >= run.invocation.deadline_tick)
+        })
+        .transpose()
+        .map(|expired| expired.unwrap_or(false))
 }
 
 fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {

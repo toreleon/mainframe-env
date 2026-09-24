@@ -6822,6 +6822,25 @@ mod tests {
             handlers::invoke_issue_device(&service, &mut run, &malformed),
             Err(HostProblem::Malformed)
         );
+        let unknown = request(CicsOperation::IssueEndoutput, BTreeMap::new(), 3);
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &unknown),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &unknown)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap()
+                .version,
+            3
+        );
     }
 
     #[test]
