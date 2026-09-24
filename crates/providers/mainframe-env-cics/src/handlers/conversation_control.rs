@@ -6,9 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
+mod definitions;
 mod gds;
 mod ledger;
 mod replay;
+pub use definitions::{ConversationPartnerDefinition, ConversationProfileDefinition};
 pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
 };
