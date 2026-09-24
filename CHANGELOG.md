@@ -37,8 +37,9 @@ All notable changes to mainframe-env are documented here.
 
 - Restored `SESSION` as the source-defined `CONVID` synonym on the four mapped
   ISSUE ABEND, CONFIRMATION, ERROR, and PREPARE rows. Only those ISSUE registry
-  option shapes and the matching COBOL clause checks changed; readiness stays
-  unready.
+  option shapes and the matching COBOL clause checks changed. Their APPC
+  selector is exactly four bytes, while the LU6.1 SIGNAL/DISCONNECT selector
+  retains its one to four byte source range; readiness stays unready.
 
 - Bound all twenty ISSUE MCEP operations to distinct host operation names in
   the interpreter, with exact ISSUE input, output, and option wire names.

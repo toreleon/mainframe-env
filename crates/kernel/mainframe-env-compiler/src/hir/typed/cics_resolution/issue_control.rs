@@ -105,6 +105,7 @@ pub(super) fn operands(
     ] {
         if let Some(tokens) = clauses.get(clause) {
             let value = cics_value(tokens, semantic)?;
+            let min = issue_text_minimum(clause, operation, min);
             let valid = match &value {
                 HirCicsValue::Literal(text) => (min..=max).contains(&text.len()),
                 HirCicsValue::Data(reference) => {
@@ -150,6 +151,22 @@ pub(super) fn operands(
     Ok(result)
 }
 
+fn issue_text_minimum(clause: &str, operation: HirCicsOperation, default: usize) -> usize {
+    if clause == "SESSION"
+        && matches!(
+            operation,
+            HirCicsOperation::IssueAbend
+                | HirCicsOperation::IssueConfirmation
+                | HirCicsOperation::IssueError
+                | HirCicsOperation::IssuePrepare
+        )
+    {
+        4
+    } else {
+        default
+    }
+}
+
 pub(super) fn outputs(
     clauses: &Clauses,
     operation: HirCicsOperation,
@@ -187,5 +204,19 @@ mod tests {
             assert!(allowed_clauses(operation).contains(&"SESSION"));
         }
         assert!(!allowed_clauses(HirCicsOperation::IssueCopy).contains(&"SESSION"));
+        for operation in [
+            HirCicsOperation::IssueAbend,
+            HirCicsOperation::IssueConfirmation,
+            HirCicsOperation::IssueError,
+            HirCicsOperation::IssuePrepare,
+        ] {
+            assert_eq!(issue_text_minimum("SESSION", operation, 1), 4);
+        }
+        for operation in [
+            HirCicsOperation::IssueSignal,
+            HirCicsOperation::IssueDisconnect,
+        ] {
+            assert_eq!(issue_text_minimum("SESSION", operation, 1), 1);
+        }
     }
 }
