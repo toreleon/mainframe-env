@@ -27,6 +27,11 @@ All notable changes to mainframe-env are documented here.
   output, and option checks for the fifteen mapped/device ISSUE forms. GDS
   ISSUE remains excluded from COBOL lowering by its source language contract.
 
+- Restored `SESSION` as the source-defined `CONVID` synonym on the four mapped
+  ISSUE ABEND, CONFIRMATION, ERROR, and PREPARE rows. Only those ISSUE registry
+  option shapes and the matching COBOL clause checks changed; readiness stays
+  unready.
+
 - Bound all twenty ISSUE MCEP operations to distinct host operation names in
   the interpreter, with exact ISSUE input, output, and option wire names.
 

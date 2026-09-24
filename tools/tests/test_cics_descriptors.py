@@ -16,6 +16,41 @@ SPEC.loader.exec_module(cics_descriptors)
 
 
 class CicsDescriptorTests(unittest.TestCase):
+    def test_mapped_issue_session_alias_is_limited_to_source_defined_rows(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        rows = {
+            row["label"]: cics_descriptors._registry_row_material(
+                row, row["source_dimensions"], row["contract"]
+            )
+            for batch in contracts["batches"]
+            for row in batch["commands"]
+            if row["label"].startswith("ISSUE ")
+        }
+        for label in (
+            "ISSUE ABEND",
+            "ISSUE CONFIRMATION",
+            "ISSUE ERROR",
+            "ISSUE PREPARE",
+        ):
+            session = next(
+                option for option in rows[label]["options"]
+                if option["name"] == "SESSION"
+            )
+            self.assertEqual(
+                (
+                    session["value_shape"],
+                    session["direction"],
+                    session["source_max_value_bytes"],
+                ),
+                ("value", "input", 4),
+            )
+        self.assertIn(
+            "SESSION", [option["name"] for option in rows["ISSUE SIGNAL"]["options"]]
+        )
+        self.assertNotIn(
+            "SESSION", [option["name"] for option in rows["ISSUE COPY"]["options"]]
+        )
+
     def test_spoolwrite_page_choice_uses_verified_syntax(self):
         contracts = cics_descriptors.build_contracts(ROOT)
         row = next(

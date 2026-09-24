@@ -4434,6 +4434,28 @@ def _registry_row_material(
             "source_max_value_bytes": 0,
         }
         top_level_names.add(paired_end_flag)
+    mapped_issue_session_alias = command["official_row"] in {
+        f"{OFFICIAL_BASELINE}:api-commands:0108",
+        f"{OFFICIAL_BASELINE}:api-commands:0112",
+        f"{OFFICIAL_BASELINE}:api-commands:0122",
+        f"{OFFICIAL_BASELINE}:api-commands:0127",
+    }
+    if mapped_issue_session_alias:
+        # The verified APPC mapped topics explicitly accept SESSION as a
+        # compatibility synonym for CONVID although the syntax diagrams show
+        # only CONVID. Pins: ABEND 10103ed20eb91c32428d3df3f68549f3eb3130945ac963255a6265401105a025;
+        # CONFIRMATION 0f5198ab73872d2df8bb881133d595efa765e002e35b27f7eaf3dcf675e30be6;
+        # ERROR 8853c7ca2c430e58b70372fc952f9bb0f01b0d87a64cbe4d4a33da2c76fd829a;
+        # PREPARE c8249eedcf48c0dfe8569da500889418578d8a84cdd1ccd47bd449129dd9886b.
+        # This registry-only correction adds no execution credit.
+        option_entries["SESSION"] = {
+            "name": "SESSION",
+            "value_shape": "value",
+            "directions": ["input"],
+            "direction_status": "resolved",
+            "source_max_value_bytes": 4,
+        }
+        top_level_names.add("SESSION")
     if (
         not recognition["recognition_heads"]
         or len({tuple(head) for head in recognition["recognition_heads"]})

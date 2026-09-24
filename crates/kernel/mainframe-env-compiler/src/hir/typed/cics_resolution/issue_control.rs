@@ -34,7 +34,7 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         HirCicsOperation::IssueAbend
         | HirCicsOperation::IssueConfirmation
         | HirCicsOperation::IssueError
-        | HirCicsOperation::IssuePrepare => &["CONVID", "STATE", "RESP", "RESP2"],
+        | HirCicsOperation::IssuePrepare => &["CONVID", "SESSION", "STATE", "RESP", "RESP2"],
         HirCicsOperation::IssueSignal => &["CONVID", "SESSION", "STATE", "RESP", "RESP2"],
         HirCicsOperation::IssueCopy => &["TERMID", "CTLCHAR", "RESP", "RESP2"],
         HirCicsOperation::IssueDisconnect => &["SESSION", "RESP", "RESP2"],
@@ -169,4 +169,23 @@ pub(super) fn outputs(
         name: HirCicsOutputName::IssueState,
         target,
     }])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mapped_issue_session_alias_is_source_limited() {
+        for operation in [
+            HirCicsOperation::IssueAbend,
+            HirCicsOperation::IssueConfirmation,
+            HirCicsOperation::IssueError,
+            HirCicsOperation::IssuePrepare,
+            HirCicsOperation::IssueSignal,
+        ] {
+            assert!(allowed_clauses(operation).contains(&"SESSION"));
+        }
+        assert!(!allowed_clauses(HirCicsOperation::IssueCopy).contains(&"SESSION"));
+    }
 }
