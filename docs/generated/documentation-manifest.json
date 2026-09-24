@@ -3,7 +3,7 @@
     "markdown_documents": 199,
     "navigation_groups": 5,
     "normative_documents": 49,
-    "xtask_commands": 171
+    "xtask_commands": 172
   },
   "documents": [
     {
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:751c8b39d78c6eda316a03d09bebcb2c37d326fee21ce86bfdf5e95f1fb095c1",
+      "sha256": "sha256:4177426b81646e4a67908112e74bfd6c0c3194edfb51b2184867004d0f7ea590",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1197,8 +1197,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 89,
-      "sha256": "sha256:6c2e4c42cf10e729a47d712a3ab8c153d91e2b5d86ff4a5106eaaaa70b97eb73",
+      "relative_links": 90,
+      "sha256": "sha256:102c3978f5dc2a139d7602ae340ace9d03fb4ef7a86a3471db2e02b5080997ba",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
@@ -1630,9 +1630,9 @@
       "normative": false,
       "path": "docs/runbooks/cics-licensed-pilot.md",
       "relative_links": 0,
-      "sha256": "sha256:cf0079cf3411b7e91d936f29b405716accee28f25dc45aecf211bd7af765da11",
+      "sha256": "sha256:104f5432499b52a4a6cebab3e42d86d1e96d6416a8e14ed04abbe7451e42765c",
       "title": "Licensed CICS file/UOW pilot handoff",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
