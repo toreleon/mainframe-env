@@ -36510,4 +36510,108 @@ mod tests {
                 .is_err()
         );
     }
+
+    #[test]
+    fn wait_signal_cancel_and_deadline_preserve_pending_event() {
+        for cancelled in [true, false] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let clock = Arc::new(TestCicsClock::fixed(if cancelled { 1 } else { 100 }));
+            let cics = CicsService::open_with_replay_clock(
+                authorities(),
+                store.clone(),
+                Default::default(),
+                clock,
+            )
+            .unwrap();
+            let probe = mainframe_env_execution_api::CancellationProbe::new();
+            let invocation = invocation_for(
+                if cancelled {
+                    "signal-cancel"
+                } else {
+                    "signal-deadline"
+                },
+                BTreeMap::new(),
+            )
+            .with_cancellation_probe(probe.clone());
+            let session = SessionId::new(
+                if cancelled {
+                    "signal-cancel"
+                } else {
+                    "signal-deadline"
+                },
+                64,
+            )
+            .unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4)
+                .unwrap();
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            cics.post_principal_signal(&owner, 1).unwrap();
+            if cancelled {
+                probe.request();
+            }
+            let wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait),
+                Err(if cancelled {
+                    HostProblem::Cancelled
+                } else {
+                    HostProblem::TimedOut
+                })
+            );
+            assert!(
+                ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .signal_pending(&owner)
+                    .unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn wait_signal_rejects_dpl_function_shipping_principal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let invocation = invocation_for(
+            "signal-dpl",
+            BTreeMap::from([(
+                "cics.execution-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.execution-context@1",
+                    b"dpl-synconreturn".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let session = SessionId::new("signal-dpl", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        assert_eq!(
+            cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4),
+            Err(HostProblem::Unauthorized)
+        );
+        let mut wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+        wait.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait)
+            .unwrap();
+        assert_eq!(
+            (result.condition.as_str(), result.response),
+            ("NOTALLOC", 61)
+        );
+        assert!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .signal_facilities
+                .is_empty()
+        );
+    }
 }
