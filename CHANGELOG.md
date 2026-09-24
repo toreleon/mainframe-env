@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added GDS ASSIGN over the durable principal-facility record installed by a
+  trusted task ingress. It returns optional four-byte principal CONVID/SYSID
+  and the six-byte GDS RETCODE, including the no-facility and wrong-kind cases.
+  The isolated registry is 154 typed, 0 legacy, and 109 unready.
+
 - Added the source-bounded APPC basic GDS ALLOCATE host route. It selects an
   installed MODENAME or PARTNER, allocates a task-owned conversation in the
   durable session ledger, returns a four-byte CONVID and six-byte RETCODE, and

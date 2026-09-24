@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:5fd5e3c1681e891bac28b5b6072a57ce4a916667bbd86b3940d944a823eaa5c1",
+      "sha256": "sha256:0555f54583c5b1d5acd42f09030c070349c7ebef366b582761bd3d381e7ac0ac",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:9f829232d3deb47df9031fc461a478764d99eed47eb4e2bd4e2b12c40e420786",
+      "sha256": "sha256:5c7fbf1cec54dec8b54cfef1459a45eba88cdcb7e39a58a670be94d00381eec7",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -1110,7 +1110,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 84,
-      "sha256": "sha256:f604ecaf0b899870f1f21c969c7b51b94ff5890e3f2e06aca5467b4ec451becc",
+      "sha256": "sha256:2583486a65871e34a7388070dba7a8ceaae5ae1e4253ab7a9b5cce31d442abf1",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 1
     },

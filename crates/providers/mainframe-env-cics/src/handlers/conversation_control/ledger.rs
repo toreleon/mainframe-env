@@ -282,6 +282,30 @@ impl ConversationLedger {
         Ok(record)
     }
 
+    /// A trusted APPC/MRO ingress installs the task's one principal facility.
+    /// EXEC CICS ALLOCATE always creates an alternate facility instead.
+    pub fn install_principal(
+        &mut self,
+        sysid: &str,
+        kind: ConversationKind,
+        owner: ConversationOwner,
+    ) -> Result<ConversationRecord, ConversationProblem> {
+        if self.conversations.values().any(|record| {
+            record.owner.execution == owner.execution
+                && record.owner.run_unit == owner.run_unit
+                && record.principal_facility
+                && !record.released
+        }) {
+            return Err(ConversationProblem::WrongState);
+        }
+        let mut record = self.allocate(sysid, kind, owner)?;
+        record.principal_facility = true;
+        self.conversation_mut(record.token)
+            .ok_or(ConversationProblem::Malformed)?
+            .principal_facility = true;
+        Ok(record)
+    }
+
     pub fn conversation(&self, token: [u8; 4]) -> Option<&ConversationRecord> {
         self.conversations
             .get(&u32::from_be_bytes(token).to_string())
@@ -364,6 +388,16 @@ impl ConversationLedger {
             if key != &u32::from_be_bytes(record.token).to_string()
                 || !self.systems.contains_key(&record.system)
             {
+                return Err(ConversationProblem::Malformed);
+            }
+        }
+        let mut principals = std::collections::BTreeSet::new();
+        for record in self
+            .conversations
+            .values()
+            .filter(|record| record.principal_facility && !record.released)
+        {
+            if !principals.insert((&record.owner.execution, &record.owner.run_unit)) {
                 return Err(ConversationProblem::Malformed);
             }
         }
@@ -476,6 +510,42 @@ mod tests {
     }
 
     #[test]
+    fn principal_is_unique_per_task_and_survives_reopen() {
+        let store = MemoryStore::new(Default::default());
+        let mut initial = ConversationLedger::default();
+        initial
+            .register_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 3,
+                enabled: true,
+            })
+            .unwrap();
+        let principal = initial
+            .install_principal("SYS1", ConversationKind::AppcBasic, owner())
+            .unwrap();
+        assert!(principal.principal_facility);
+        assert_eq!(
+            initial.install_principal("SYS1", ConversationKind::AppcBasic, owner()),
+            Err(ConversationProblem::WrongState)
+        );
+        assert!(
+            !initial
+                .allocate("SYS1", ConversationKind::AppcBasic, owner())
+                .unwrap()
+                .principal_facility
+        );
+        let mut persisted = initial.clone();
+        assert!(
+            ConversationLedger::default()
+                .persist(&mut persisted, &store)
+                .unwrap()
+        );
+        let reopened = ConversationLedger::load(&store).unwrap();
+        assert_eq!(reopened.conversation(principal.token), Some(&principal));
+    }
+
+    #[test]
     fn attach_header_is_task_owned_and_task_cleanup_releases_all() {
         let mut ledger = ConversationLedger::default();
         ledger
@@ -531,7 +601,7 @@ mod tests {
         assert!(initial.persist(&mut installed, &first).unwrap());
         let mut allocated = installed.clone();
         let token = allocated
-            .allocate("SYS1", ConversationKind::AppcMapped, owner())
+            .install_principal("SYS1", ConversationKind::AppcBasic, owner())
             .unwrap()
             .token;
         assert!(
@@ -543,6 +613,7 @@ mod tests {
         let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
         let current = ConversationLedger::load(&reopened).unwrap();
         assert_eq!(current.conversation(token).unwrap().owner, owner());
+        assert!(current.conversation(token).unwrap().principal_facility);
         let saved = super::super::load_conversation_replay(&reopened, "alloc-effect")
             .unwrap()
             .unwrap();

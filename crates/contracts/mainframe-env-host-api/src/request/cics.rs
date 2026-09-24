@@ -11,6 +11,8 @@ pub enum CicsOperation {
     AllocateConversation,
     /// Allocate one task-owned APPC basic conversation with GDS return codes.
     GdsAllocateConversation,
+    /// Read this task's principal APPC basic facility with GDS return codes.
+    GdsAssignConversation,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -303,6 +305,7 @@ impl CicsOperation {
         match self {
             Self::AllocateConversation => "AllocateConversation",
             Self::GdsAllocateConversation => "GdsAllocateConversation",
+            Self::GdsAssignConversation => "GdsAssignConversation",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -635,6 +638,7 @@ impl CicsOperation {
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ALLOCATE", _) => Self::AllocateConversation,
             ("GDS", Some("ALLOCATE")) => Self::GdsAllocateConversation,
+            ("GDS", Some("ASSIGN")) => Self::GdsAssignConversation,
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,

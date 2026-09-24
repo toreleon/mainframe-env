@@ -12,6 +12,7 @@ mod allocate;
 mod definitions;
 mod gds;
 mod gds_allocate;
+mod gds_assign;
 mod ledger;
 mod replay;
 pub use definitions::{ConversationPartnerDefinition, ConversationProfileDefinition};
@@ -40,6 +41,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::GdsAllocateConversation => {
             gds_allocate::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::GdsAssignConversation => gds_assign::invoke(service, run, request),
         _ => Err(HostProblem::Unsupported),
     }
 }

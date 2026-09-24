@@ -5400,6 +5400,7 @@ mod tests {
             ("ADDRESS SET", CicsOperation::AddressSet),
             ("ALLOCATE", CicsOperation::AllocateConversation),
             ("GDS ALLOCATE", CicsOperation::GdsAllocateConversation),
+            ("GDS ASSIGN", CicsOperation::GdsAssignConversation),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6702,7 +6703,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 155);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 156);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -35903,5 +35904,105 @@ mod tests {
             )
             .unwrap();
         assert_eq!(result.outputs["RETCODE"].bytes(), &[1, 4, 12, 0, 0, 0]);
+    }
+
+    #[test]
+    fn gds_assign_reports_only_the_live_task_principal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 2,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let arguments = BTreeMap::from([
+            ("PRINCONVID".into(), argument(b"PRIN-TOKEN")),
+            ("PRINSYSID".into(), argument(b"PRIN-SYS")),
+            ("RETCODE".into(), argument(b"RETURN-X")),
+        ]);
+        let absent = request(CicsOperation::GdsAssignConversation, arguments.clone(), 1);
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, absent.clone(), 1), absent)
+            .unwrap();
+        assert_eq!(result.outputs["RETCODE"].bytes(), &[4, 0, 0, 0, 0, 0]);
+        assert!(!result.outputs.contains_key("PRINCONVID"));
+        let token = cics
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            )
+            .unwrap();
+        assert_eq!(token, [0, 0, 0, 1]);
+        assert_eq!(
+            cics.install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            ),
+            Ok(token)
+        );
+        let assign = request(CicsOperation::GdsAssignConversation, arguments, 2);
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, assign.clone(), 2), assign)
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        assert_eq!(result.outputs["RETCODE"].bytes(), &[0; 6]);
+        assert_eq!(result.outputs["PRINCONVID"].bytes(), token);
+        assert_eq!(result.outputs["PRINSYSID"].bytes(), b"SYS1");
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversations
+                .len(),
+            1
+        );
+        let other = registered_counter_run(&cics, "other-principal");
+        let other_assign = request(
+            CicsOperation::GdsAssignConversation,
+            BTreeMap::from([("RETCODE".into(), argument(b"OTHER-RETURN"))]),
+            1,
+        );
+        let other_result = cics
+            .invoke(
+                &effect(&other.run_unit_id, other_assign.clone(), 1),
+                other_assign,
+            )
+            .unwrap();
+        assert_eq!(other_result.outputs["RETCODE"].bytes(), &[4, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn gds_assign_distinguishes_mro_and_mapped_principals() {
+        for (kind, expected) in [
+            (ConversationKind::Mro, [3, 0, 0, 0, 0, 0]),
+            (ConversationKind::AppcMapped, [3, 4, 0, 0, 0, 0]),
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let cics = service(store);
+            cics.register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+            let (invocation, _) = registered(&cics);
+            cics.install_conversation_principal_for_run(&invocation.run_unit_id, "SYS1", kind)
+                .unwrap();
+            let assign = request(
+                CicsOperation::GdsAssignConversation,
+                BTreeMap::from([("RETCODE".into(), argument(b"RETURN-X"))]),
+                1,
+            );
+            let result = cics
+                .invoke(&effect(&invocation.run_unit_id, assign.clone(), 1), assign)
+                .unwrap();
+            assert_eq!(result.outputs["RETCODE"].bytes(), expected);
+            assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        }
     }
 }
