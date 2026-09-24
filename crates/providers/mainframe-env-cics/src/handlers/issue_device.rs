@@ -319,7 +319,9 @@ impl IssueDeviceRecord {
             || self.state.lu61_owner_run_unit.is_some()
                 && self.definition.kind != IssueDeviceKind::Lu61
             || self.state.lu61_signal_pending
-                && (self.definition.kind != IssueDeviceKind::Lu61 || self.state.disconnected)
+                && (self.definition.kind != IssueDeviceKind::Lu61
+                    || self.state.disconnected
+                    || self.state.lu61_owner_run_unit.is_none())
             || self
                 .state
                 .lu61_owner_run_unit
@@ -760,6 +762,9 @@ mod tests {
         assert!(
             !String::from_utf8_lossy(&initial.encode().unwrap()).contains("lu61_signal_pending")
         );
+        let mut ownerless = initial.clone();
+        ownerless.state.lu61_signal_pending = true;
+        assert_eq!(ownerless.validate(), Err(IssueDeviceProblem::Malformed));
         initial.install(&store).unwrap();
         let mut owned = initial.clone();
         owned.assign_lu61_owner("run-3").unwrap();
