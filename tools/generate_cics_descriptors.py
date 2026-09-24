@@ -4416,6 +4416,24 @@ def _registry_row_material(
             })
         top_level_names.update(selected_values | {"NOTRUNCATE"})
         recognition["recognition_heads"] = [["WEB", "CONVERSE"]]
+    paired_end_flag = {
+        f"{OFFICIAL_BASELINE}:api-commands:0117": "ENDOUTPUT",
+        f"{OFFICIAL_BASELINE}:api-commands:0118": "ENDFILE",
+    }.get(command["official_row"])
+    if paired_end_flag is not None:
+        # The source-b syntax projection binds the companion as a head token
+        # but loses its flag shape. The selected CICS TS 6.x HTML pins are
+        # dfhp4_issueendfile.html sha256:2d173fcd208f67e81db2eb208524d7c3143f741d84bdd97ca59c99b01b19e224
+        # and dfhp4_issueendoutput.html sha256:34a567cd30e7f4b816c8186a837b7f5af707949aa0f32bc1014deaab4b84ef56.
+        # This registry-only correction adds no source or execution credit.
+        option_entries[paired_end_flag] = {
+            "name": paired_end_flag,
+            "value_shape": "flag",
+            "directions": ["none"],
+            "direction_status": "resolved",
+            "source_max_value_bytes": 0,
+        }
+        top_level_names.add(paired_end_flag)
     if (
         not recognition["recognition_heads"]
         or len({tuple(head) for head in recognition["recognition_heads"]})
