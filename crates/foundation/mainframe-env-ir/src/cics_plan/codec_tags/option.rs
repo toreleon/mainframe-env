@@ -8,6 +8,8 @@ pub(in crate::cics_plan) const fn option_tag(value: CicsPlanOption) -> u16 {
         | CicsPlanOption::IssueConverse
         | CicsPlanOption::IssueLogonLogmode
         | CicsPlanOption::IssueNoQuiesce => issue::option_tag(value),
+        CicsPlanOption::BtsSynchronous => 636,
+        CicsPlanOption::BtsAsynchronous => 637,
         CicsPlanOption::SecurityBasicAuth => 380,
         CicsPlanOption::SecurityJwt => 381,
         CicsPlanOption::SecurityKerberos => 382,
@@ -145,6 +147,8 @@ pub(in crate::cics_plan) fn option_from_tag(
 ) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
         1404..=1531 => issue::option_from_tag(value),
+        636 => Ok(CicsPlanOption::BtsSynchronous),
+        637 => Ok(CicsPlanOption::BtsAsynchronous),
         380 => Ok(CicsPlanOption::SecurityBasicAuth),
         381 => Ok(CicsPlanOption::SecurityJwt),
         382 => Ok(CicsPlanOption::SecurityKerberos),

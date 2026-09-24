@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 208);
+        assert_eq!(typed.len(), 231);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 55);
+        assert_eq!(unready.len(), 32);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -297,6 +297,29 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::AcquireActivityId,
+                CicsPlanOperation::AcquireProcess,
+                CicsPlanOperation::CancelAcqActivity,
+                CicsPlanOperation::CancelAcqProcess,
+                CicsPlanOperation::CancelActivity,
+                CicsPlanOperation::CheckAcqActivity,
+                CicsPlanOperation::CheckAcqProcess,
+                CicsPlanOperation::CheckActivity,
+                CicsPlanOperation::DefineActivity,
+                CicsPlanOperation::DefineProcess,
+                CicsPlanOperation::DeleteActivity,
+                CicsPlanOperation::ResetAcqProcess,
+                CicsPlanOperation::ResetActivity,
+                CicsPlanOperation::ResumeAcqActivity,
+                CicsPlanOperation::ResumeAcqProcess,
+                CicsPlanOperation::ResumeActivity,
+                CicsPlanOperation::RunAcqActivity,
+                CicsPlanOperation::RunAcqProcess,
+                CicsPlanOperation::RunActivity,
+                CicsPlanOperation::RunTransId,
+                CicsPlanOperation::SuspendAcqActivity,
+                CicsPlanOperation::SuspendAcqProcess,
+                CicsPlanOperation::SuspendActivity,
                 CicsPlanOperation::FetchAny,
                 CicsPlanOperation::FetchChild,
                 CicsPlanOperation::FreeChild,

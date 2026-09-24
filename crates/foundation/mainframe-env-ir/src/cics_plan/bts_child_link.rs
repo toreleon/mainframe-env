@@ -12,7 +12,7 @@ pub(super) fn invalid_shape(
     let valid = match plan.operation {
         CicsPlanOperation::FetchAny => {
             outputs.contains(&CicsOutputName::BtsAny)
-                && outputs.contains(&CicsOutputName::BtsCompStatus)
+                && outputs.contains(&CicsOutputName::BtsChildCompStatus)
                 && inputs.is_subset(&BTreeSet::from([CicsOperandName::BtsTimeout]))
                 && plan.options.is_subset(&BTreeSet::from([
                     CicsPlanOption::NoHandle,
@@ -20,7 +20,7 @@ pub(super) fn invalid_shape(
                 ]))
         }
         CicsPlanOperation::FetchChild => {
-            outputs.contains(&CicsOutputName::BtsCompStatus)
+            outputs.contains(&CicsOutputName::BtsChildCompStatus)
                 && inputs.contains(&CicsOperandName::BtsChild)
                 && inputs.is_subset(&BTreeSet::from([
                     CicsOperandName::BtsChild,
@@ -38,17 +38,17 @@ pub(super) fn invalid_shape(
                     .is_subset(&BTreeSet::from([CicsPlanOption::NoHandle]))
         }
         CicsPlanOperation::LinkActivity => {
-            inputs.contains(&CicsOperandName::BtsActivity)
+            inputs.contains(&CicsOperandName::BtsLinkActivity)
                 && inputs.is_subset(&BTreeSet::from([
-                    CicsOperandName::BtsActivity,
-                    CicsOperandName::BtsInputEvent,
+                    CicsOperandName::BtsLinkActivity,
+                    CicsOperandName::BtsLinkInputEvent,
                 ]))
                 && plan
                     .options
                     .is_subset(&BTreeSet::from([CicsPlanOption::NoHandle]))
         }
         CicsPlanOperation::LinkAcqActivity => {
-            inputs.is_subset(&BTreeSet::from([CicsOperandName::BtsInputEvent]))
+            inputs.is_subset(&BTreeSet::from([CicsOperandName::BtsLinkInputEvent]))
                 && plan.options.is_subset(&BTreeSet::from([
                     CicsPlanOption::NoHandle,
                     CicsPlanOption::BtsAcqActivity,
@@ -56,7 +56,7 @@ pub(super) fn invalid_shape(
                 && plan.options.contains(&CicsPlanOption::BtsAcqActivity)
         }
         CicsPlanOperation::LinkAcqProcess => {
-            inputs.is_subset(&BTreeSet::from([CicsOperandName::BtsInputEvent]))
+            inputs.is_subset(&BTreeSet::from([CicsOperandName::BtsLinkInputEvent]))
                 && plan.options.is_subset(&BTreeSet::from([
                     CicsPlanOption::NoHandle,
                     CicsPlanOption::BtsAcqProcess,

@@ -50,7 +50,10 @@ pub(super) fn invoke(
         let Some(record) = state.events.get(&name).cloned() else {
             return Err(event_error(4));
         };
-        if matches!(record.kind, EventKind::Timer { .. }) {
+        if matches!(
+            record.kind,
+            EventKind::Timer { .. } | EventKind::Activity { .. }
+        ) {
             return Err(invalid_kind());
         }
         if let Some(parent_name) = record.parent {

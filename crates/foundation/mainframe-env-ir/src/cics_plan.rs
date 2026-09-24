@@ -7,10 +7,12 @@ mod address;
 mod assign;
 mod browse;
 mod bts_child_link;
+mod bts_lifecycle;
 mod certificate;
 mod codec_problem;
 mod codec_tags;
 mod condition_handlers;
+mod condition_validation;
 mod conversation_control;
 mod conversation_data_shape;
 mod conversation_open;
@@ -55,6 +57,7 @@ use codec_tags::{
     option_from_tag, option_tag, output_from_tag, output_tag, require_order,
 };
 use condition_handlers::{valid_aid_handlers, valid_condition_handlers, valid_condition_list};
+use condition_validation::validate_condition;
 
 /// Stable wire identity for a typed CICS effect plan.
 pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@2";
@@ -179,6 +182,7 @@ fn encode_cics_effect_plan_version(
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag(plan.operation))
             || (130..=139).contains(&operation_tag(plan.operation))
+            || (165..=187).contains(&operation_tag(plan.operation))
             || (154..=164).contains(&operation_tag(plan.operation))
             || (231..=238).contains(&operation_tag(plan.operation))
             || (222..=230).contains(&operation_tag(plan.operation))
@@ -257,6 +261,7 @@ pub fn decode_cics_effect_plan(
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag)
             || (130..=139).contains(&operation_tag)
+            || (165..=187).contains(&operation_tag)
             || (154..=164).contains(&operation_tag)
             || (231..=238).contains(&operation_tag)
             || (222..=230).contains(&operation_tag)
@@ -449,6 +454,31 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
+        CicsPlanOperation::AcquireActivityId
+        | CicsPlanOperation::AcquireProcess
+        | CicsPlanOperation::CancelAcqActivity
+        | CicsPlanOperation::CancelAcqProcess
+        | CicsPlanOperation::CancelActivity
+        | CicsPlanOperation::CheckAcqActivity
+        | CicsPlanOperation::CheckAcqProcess
+        | CicsPlanOperation::CheckActivity
+        | CicsPlanOperation::DefineActivity
+        | CicsPlanOperation::DefineProcess
+        | CicsPlanOperation::DeleteActivity
+        | CicsPlanOperation::ResetAcqProcess
+        | CicsPlanOperation::ResetActivity
+        | CicsPlanOperation::ResumeAcqActivity
+        | CicsPlanOperation::ResumeAcqProcess
+        | CicsPlanOperation::ResumeActivity
+        | CicsPlanOperation::RunAcqActivity
+        | CicsPlanOperation::RunAcqProcess
+        | CicsPlanOperation::RunActivity
+        | CicsPlanOperation::RunTransId
+        | CicsPlanOperation::SuspendAcqActivity
+        | CicsPlanOperation::SuspendAcqProcess
+        | CicsPlanOperation::SuspendActivity => {
+            bts_lifecycle::invalid_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::FetchAny | CicsPlanOperation::FetchChild | CicsPlanOperation::FreeChild
         | CicsPlanOperation::LinkAcqActivity | CicsPlanOperation::LinkAcqProcess
         | CicsPlanOperation::LinkActivity => bts_child_link::invalid_shape(plan, inputs, outputs),
@@ -863,30 +893,6 @@ pub(super) fn operand_value(
         .map(|operand| &operand.value)
 }
 
-fn validate_condition(
-    plan: &CicsEffectPlan,
-    limits: CicsPlanLimits,
-) -> Result<(), CicsPlanCodecProblem> {
-    let response = output_target(&plan.outputs, CicsOutputName::Resp);
-    let response2 = output_target(&plan.outputs, CicsOutputName::Resp2);
-    let no_handle = plan.options.contains(&CicsPlanOption::NoHandle);
-    match &plan.condition {
-        CicsCondition::Default if !no_handle && response.is_none() => Ok(()),
-        CicsCondition::NoHandle if no_handle => Ok(()),
-        CicsCondition::Respond {
-            response: expected,
-            response2: expected2,
-        } if !no_handle && response == Some(expected) && response2 == expected2.as_ref() => {
-            validate_slot(expected, limits)?;
-            if let Some(expected2) = expected2 {
-                validate_slot(expected2, limits)?;
-            }
-            Ok(())
-        }
-        _ => Err(CicsPlanCodecProblem::Malformed),
-    }
-}
-
 pub(super) fn output_target(
     outputs: &[CicsOutputBinding],
     name: CicsOutputName,
@@ -1165,7 +1171,7 @@ mod tests {
                         target: slot(1, "ANY-X"),
                     },
                     CicsOutputBinding {
-                        name: CicsOutputName::BtsCompStatus,
+                        name: CicsOutputName::BtsChildCompStatus,
                         target: slot(2, "STATUS-X"),
                     },
                 ],
@@ -1179,7 +1185,7 @@ mod tests {
                 }],
                 options: BTreeSet::new(),
                 outputs: vec![CicsOutputBinding {
-                    name: CicsOutputName::BtsCompStatus,
+                    name: CicsOutputName::BtsChildCompStatus,
                     target: slot(2, "STATUS-X"),
                 }],
                 condition: CicsCondition::Default,
@@ -1211,7 +1217,7 @@ mod tests {
             CicsEffectPlan {
                 operation: CicsPlanOperation::LinkActivity,
                 operands: vec![CicsNamedOperand {
-                    name: CicsOperandName::BtsActivity,
+                    name: CicsOperandName::BtsLinkActivity,
                     value: CicsOperandValue::Literal(b"CHILD".to_vec()),
                 }],
                 options: BTreeSet::new(),

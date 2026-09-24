@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
@@ -486,7 +487,7 @@ def publish(cache: Path, target: CacheTarget, body: bytes, counts: Counter[str])
     with tempfile.TemporaryDirectory(prefix=".import-", dir=cache) as staging:
         staged = docs_api.write_retrieved(Path(staging) / target.key, body)
         try:
-            destination.hardlink_to(staged)
+            os.link(staged, destination)
         except FileExistsError:
             if existing_matches(destination, target, body):
                 counts["already_present"] += 1

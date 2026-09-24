@@ -13,6 +13,10 @@ pub enum CicsPlanOption {
     IssueLogonLogmode,
     /// PASS skips session quiescing.
     IssueNoQuiesce,
+    /// Run the BTS target synchronously.
+    BtsSynchronous,
+    /// Run the BTS target asynchronously.
+    BtsAsynchronous,
     /// Return immediately when a child is not finished.
     BtsNoSuspend,
     /// Select the activity acquired by this unit of work.

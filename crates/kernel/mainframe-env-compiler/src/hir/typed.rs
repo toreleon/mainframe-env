@@ -5186,27 +5186,83 @@ mod tests {
 
     #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
-        for (command, expected_label) in [
-            ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
+        for (command, expected_operation) in [
+            (
+                "ACQUIRE ACTIVITYID('A1')",
+                HirCicsOperation::AcquireActivityId,
+            ),
             (
                 "ACQUIRE PROCESS('P1') PROCESSTYPE('PTYPE')",
-                "ACQUIRE PROCESS",
+                HirCicsOperation::AcquireProcess,
             ),
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDISC. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );
             let analysis = analyze(&source);
-            assert!(analysis.hir.is_none(), "{command}");
-            assert!(
-                analysis.diagnostics.iter().any(|diagnostic| {
-                    let message = diagnostic.public_message();
-                    message.contains(expected_label) && message.contains("handler is unready")
-                }),
-                "{command}: {:?}",
-                analysis.diagnostics
-            );
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let selected = hir
+                .statements
+                .iter()
+                .find_map(|statement| match &statement.resolved {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command.operation),
+                    _ => None,
+                });
+            assert_eq!(selected, Some(expected_operation));
         }
+    }
+
+    #[test]
+    fn cics_bts_literals_use_source_character_limits() {
+        for (command, expected) in [
+            (
+                format!(
+                    "DEFINE PROCESS('{}¬') PROCESSTYPE('TYPE') TRANSID('BTS1')",
+                    "P".repeat(35)
+                ),
+                HirCicsOperation::DefineProcess,
+            ),
+            (
+                format!(
+                    "DEFINE ACTIVITY('{}¬') EVENT('DONE') TRANSID('BTS1')",
+                    "A".repeat(15)
+                ),
+                HirCicsOperation::DefineActivity,
+            ),
+            (
+                format!(
+                    "RUN TRANSID('BT01') CHANNEL('{}¬') CHILD(CHILD-TOKEN)",
+                    "C".repeat(15)
+                ),
+                HirCicsOperation::RunTransId,
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BTSCNAME. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-TOKEN PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let selected = hir
+                .statements
+                .iter()
+                .find_map(|statement| match &statement.resolved {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                });
+            assert_eq!(selected.map(|command| command.operation), Some(expected));
+            assert!(selected.unwrap().operands.iter().any(|operand| {
+                matches!(&operand.value, HirCicsValue::Literal(value) if value.contains('¬'))
+            }));
+        }
+        let too_long = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSLONG. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('{}¬') PROCESSTYPE('TYPE') TRANSID('BTS1') END-EXEC. STOP RUN.",
+            "P".repeat(36)
+        );
+        assert!(analyze(&too_long).hir.is_none());
     }
 
     #[test]
@@ -5234,10 +5290,13 @@ mod tests {
             );
         }
 
-        let qualified = analyze(
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. DATA DIVISION. WORKING-STORAGE SECTION. 01 APP-X PIC X(8) VALUE 'APP1'. 01 TICKET-X PIC X(8). 01 ESM-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(TICKET-X) ESMAPPNAME(APP-X) ESMRESP(ESM-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PT-X PIC X(8). 01 APP-X PIC X(8) VALUE 'APP'. PROCEDURE DIVISION. EXEC CICS REQUEST PASSTICKET(PT-X) ESMAPPNAME(APP-X) END-EXEC. STOP RUN.",
-        );
-        assert!(qualified.hir.is_some(), "{:?}", qualified.diagnostics);
+        ] {
+            let qualified = analyze(source);
+            assert!(qualified.hir.is_some(), "{:?}", qualified.diagnostics);
+        }
 
         let omitted = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPASS. PROCEDURE DIVISION. EXEC CICS REQUEST ESMAPPNAME('APP') END-EXEC. STOP RUN.",

@@ -152,6 +152,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
 fn event_type(kind: &EventKind) -> &'static str {
     match kind {
         EventKind::Input => "INPUT",
+        EventKind::Activity { .. } => "ACTIVITY",
         EventKind::Composite { .. } => "COMPOSITE",
         EventKind::Timer { .. } => "TIMER",
     }

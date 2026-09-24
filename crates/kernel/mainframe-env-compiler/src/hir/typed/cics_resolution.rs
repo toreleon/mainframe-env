@@ -6,10 +6,10 @@ use super::{
 };
 use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
-    CICS_APPLICATION_AID_NAMES, CicsApplicationCobolApplicability,
-    CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
-    CicsApplicationHandlerReadiness, CicsApplicationOptionValueShape,
-    CicsApplicationRegistryDescriptor, cics_application_registry_candidates_for_tokens,
+    CicsApplicationCobolApplicability, CicsApplicationConditionLabelOperand,
+    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
+    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
+    cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
 type Clauses = BTreeMap<String, Vec<String>>;
@@ -17,11 +17,13 @@ mod abend;
 mod address;
 mod assign_validation;
 mod bts_child_link;
+mod bts_lifecycle;
 mod builtin_function;
 mod candidate_validation;
 mod certificate_control;
 mod clause_parser;
 mod command_recognition;
+use command_recognition::{is_aid_name, is_single_condition_label};
 mod conversation_control;
 mod conversation_data;
 mod conversation_open;
@@ -230,16 +232,6 @@ fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -
     command_recognition::option_value_shape(descriptor, name).is_some()
         || (descriptor.condition_clauses.is_some() && is_condition_name(name))
         || (descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name))
-}
-
-fn is_aid_name(name: &str) -> bool {
-    CICS_APPLICATION_AID_NAMES.binary_search(&name).is_ok()
-}
-
-fn is_single_condition_label(tokens: &[String]) -> bool {
-    matches!(tokens, [label] if !label.is_empty() && label.chars().all(|character| {
-        character.is_ascii_alphanumeric() || character == '-'
-    }))
 }
 
 fn compatibility_alias_target(
@@ -500,6 +492,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if counter_control::is_counter(operation) => {
             counter_control::allowed_clauses(operation)
         }
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_clauses(operation),
         op if outboard::is_issue(op) => outboard::allowed_clauses(op),
         op if issue_control::is_issue(op) => issue_control::allowed_clauses(op),
         HirCicsOperation::SpoolClose
@@ -644,6 +637,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operation if counter_control::is_counter(operation) => {
             counter_control::allowed_options(operation)
         }
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_options(operation),
         op if outboard::is_issue(op) => outboard::allowed_options(op),
         op if issue_control::is_issue(op) => issue_control::allowed_options(op),
         HirCicsOperation::SpoolClose
@@ -705,6 +699,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     route::validate_constraints(&clauses, &raw_options, operation)?;
+    bts_lifecycle::validate_constraints(operation, &clauses, &raw_options)?;
     security_control::validate(&clauses, operation, semantic)?;
     conversation_control::validate(&clauses, operation)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
@@ -850,6 +845,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
         operation if counter_control::is_counter(operation) => counter_control::required(operation),
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::required(operation),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -1009,6 +1005,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     )?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_lifecycle::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
     operands.extend(conversation_control::operands(
         &clauses, operation, semantic,
@@ -1081,6 +1078,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_lifecycle::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_control::outputs(
@@ -1121,6 +1119,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             conversation_open::option(operation, option)
                 .or_else(|| conversation_data::option(operation, option))
                 .or_else(|| bts_child_link::option(operation, option))
+                .or_else(|| bts_lifecycle::option(operation, option))
                 .or_else(|| counter_control::option(operation, option))
                 .or_else(|| event_control::option(operation, option))
                 .or_else(|| diagnostics::option(operation, option))

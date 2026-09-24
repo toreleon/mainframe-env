@@ -408,7 +408,12 @@ pub(super) fn invoke_extended_control(
             | mainframe_env_host_api::CicsOperation::FreeChild => {
                 bts_child_link::invoke_child(service, run, request, retention_tick)
             }
-            _ => bts_link::invoke(service, run, request, retention_tick),
+            mainframe_env_host_api::CicsOperation::LinkAcqActivity
+            | mainframe_env_host_api::CicsOperation::LinkAcqProcess
+            | mainframe_env_host_api::CicsOperation::LinkActivity => {
+                bts_link::invoke(service, run, request, retention_tick)
+            }
+            _ => bts_lifecycle::invoke(service, run, request),
         },
         crate::generated::CicsCommandFamily::Diagnostics => {
             invoke_diagnostics(service, run, request)

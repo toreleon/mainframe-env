@@ -528,9 +528,8 @@ impl CicsService {
         Ok(())
     }
 
-    /// Stop after a mutating CICS result is durably replayable but before the
-    /// caller observes it. This models the exact process-crash gap shared by
-    /// file, queue, program, and unit-of-work operations.
+    /// Stop after a mutating CICS result is durable but before observation,
+    /// modeling the process-crash gap across UOW participants.
     #[cfg(feature = "fault-injection")]
     pub fn inject_mutation_fault_once(&self, operation: CicsOperation) -> Result<(), HostProblem> {
         if !operation.is_mutating() {
@@ -1779,8 +1778,8 @@ impl CicsService {
             | CicsCommandFamily::JournalControl
             | CicsCommandFamily::WebServiceControl
             | CicsCommandFamily::WebControl
-            | CicsCommandFamily::EventControl
             | CicsCommandFamily::BtsControl
+            | CicsCommandFamily::EventControl
             | CicsCommandFamily::Diagnostics
             | CicsCommandFamily::SecurityControl
             | CicsCommandFamily::BuiltinFunctionControl
@@ -1822,6 +1821,7 @@ impl CicsService {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
+        handlers::bts_lifecycle::settle_recorded_uow(self, &existing)?;
         if existing.finalized {
             return Ok(());
         }
@@ -1859,8 +1859,7 @@ impl CicsService {
             .map_err(store_error)
     }
 
-    /// Resolve an outer CICS effect from the durable provider replay ledger
-    /// without dispatching the mutation again.
+    /// Resolve an outer CICS effect from the durable provider replay ledger.
     pub fn reconciled_effect_result_digest(
         &self,
         key: &IdempotencyKey,
@@ -3861,6 +3860,13 @@ mod tests {
         seen: CommandSecurityTrace,
     }
 
+    struct DenyExactSecurityClass {
+        descriptor: CapabilityDescriptor,
+        denied_class: &'static str,
+        denied_resource: Option<&'static str>,
+        seen: CommandSecurityTrace,
+    }
+
     struct TracedProgramAuthority {
         descriptor: CapabilityDescriptor,
         seen: ProgramLinkTrace,
@@ -4019,6 +4025,48 @@ mod tests {
                 }
                 HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
                     Ok(HostResult::Security(self.principal_decision.clone()))
+                }
+                _ => Err(HostProblem::Unsupported),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
+    impl HostProvider for DenyExactSecurityClass {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Security(SecurityRequest::Authorize {
+                    class,
+                    resource,
+                    intent,
+                    ..
+                }) => {
+                    self.seen.lock().unwrap().push((
+                        class.clone(),
+                        resource.as_str().into(),
+                        intent,
+                    ));
+                    Ok(HostResult::Security(
+                        if class == self.denied_class
+                            && self
+                                .denied_resource
+                                .is_none_or(|name| resource.as_str() == name)
+                        {
+                            SecurityDecision::Deny
+                        } else {
+                            SecurityDecision::Allow
+                        },
+                    ))
+                }
+                HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
+                    Ok(HostResult::Security(SecurityDecision::Allow))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -4316,6 +4364,28 @@ mod tests {
             Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
             HostLimits::default(),
         ))
+    }
+
+    fn deny_exact_class_authorities(
+        denied_class: &'static str,
+        denied_resource: Option<&'static str>,
+    ) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(DenyExactSecurityClass {
+            descriptor: descriptor("host.security.authorize"),
+            denied_class,
+            denied_resource,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
     }
 
     fn command_authorities(deny_command: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
@@ -5320,7 +5390,12 @@ mod tests {
         let cics = service(store.clone());
         let (invocation, _) = registered(&cics);
         let authority = handlers::bts_lifecycle::BtsLifecycleStore::new(store.as_ref());
-        let root = handlers::bts_lifecycle::BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let root = handlers::bts_lifecycle::BtsLifecycleStore::root_id(
+            "TYPE",
+            "PROC",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap();
         let process = handlers::bts_lifecycle::BtsProcess::new(
             "TYPE",
             "PROC",
@@ -5415,7 +5490,9 @@ mod tests {
             BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
             sequence,
         );
-        let root = BtsLifecycleStore::root_id("TYPE", &process_name).unwrap();
+        let root =
+            BtsLifecycleStore::root_id("TYPE", &process_name, invocation.run_unit_id.as_str())
+                .unwrap();
         {
             let store = make_store();
             let artifacts = make_artifacts(&store);
@@ -5648,7 +5725,9 @@ mod tests {
             sequence,
         );
         let replay_key = format!("outer-{sequence}");
-        let root = BtsLifecycleStore::root_id("TYPE", &process_name).unwrap();
+        let root =
+            BtsLifecycleStore::root_id("TYPE", &process_name, invocation.run_unit_id.as_str())
+                .unwrap();
         let seen: ProgramLinkTrace = Arc::new(Mutex::new(Vec::new()));
         let host = invoke_authorities(false, seen.clone());
         let store = Arc::new(PostgresStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
@@ -5828,8 +5907,9 @@ mod tests {
         register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
         let authority = BtsLifecycleStore::new(store.as_ref());
         let setup = |name: &str, owner: &Invocation, active_root: bool| {
-            let root = BtsLifecycleStore::root_id("TYPE", name).unwrap();
-            let child = BtsLifecycleStore::child_id("TYPE", name, 1).unwrap();
+            let root =
+                BtsLifecycleStore::root_id("TYPE", name, owner.run_unit_id.as_str()).unwrap();
+            let child = BtsLifecycleStore::child_id("TYPE", name, &root, 1).unwrap();
             let mut process = BtsProcess::new(
                 "TYPE",
                 name,
@@ -5849,7 +5929,7 @@ mod tests {
                     id: child.clone(),
                     name: "CHILD".into(),
                     parent_id: Some(root.clone()),
-                    completion_event: None,
+                    completion_event: Some("DONE".into()),
                     program: "BTSRUN".into(),
                     transid: "MENU".into(),
                     userid: "IBMUSER".into(),
@@ -5859,6 +5939,7 @@ mod tests {
                     activation_epoch: 0,
                     checkpoint: None,
                     acquired_by: None,
+                    pending_uow: Some(owner.run_unit_id.as_str().into()),
                     abcode: None,
                     abprogram: None,
                 },
@@ -6016,21 +6097,13 @@ mod tests {
 
         let creator = registered_counter_run(&cics, "bts-creator");
         let (root2, child2) = setup("PROC2", &creator, false);
-        authority
-            .finish_uow(
-                creator.run_unit_id.as_str(),
-                creator.execution_id.as_str(),
-                creator.principal.id().as_str(),
-                true,
-            )
-            .unwrap();
         let index = BtsActivityIndex {
             schema_version: "mainframe-env.cics.bts-activity-index@1".into(),
             activity_id: child2.clone(),
             process_type: "TYPE".into(),
             process_name: "PROC2".into(),
             parent_id: Some(root2),
-            pending_uow: None,
+            pending_uow: Some(creator.run_unit_id.as_str().into()),
             row_version: 0,
         };
         store
@@ -6042,6 +6115,14 @@ mod tests {
                     payload: serde_json::to_vec(&index).unwrap(),
                 },
                 None,
+            )
+            .unwrap();
+        authority
+            .finish_uow(
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+                true,
             )
             .unwrap();
         let acquirer = registered_counter_run(&cics, "bts-acquirer");
@@ -6100,7 +6181,8 @@ mod tests {
         cics.bind_artifact_store(store.clone()).unwrap();
         register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
         let authority = BtsLifecycleStore::new(store.as_ref());
-        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "PROC", invocation.run_unit_id.as_str()).unwrap();
         let process = BtsProcess::new(
             "TYPE",
             "PROC",
@@ -6167,7 +6249,8 @@ mod tests {
         let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
         let (invocation, _) = registered(&cics);
         let authority = BtsLifecycleStore::new(store.as_ref());
-        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "PROC", invocation.run_unit_id.as_str()).unwrap();
         let process = BtsProcess::new(
             "TYPE",
             "PROC",
@@ -8194,7 +8277,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 210);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 233);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -40530,6 +40613,2486 @@ mod tests {
     }
 
     #[test]
+    fn bts_async_run_admits_fenced_worker_and_persists_completion() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess,
+            BtsProcessTypeDefinition, BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire(run_unit, execution, "IBMUSER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let command = request(
+            CicsOperation::RunAcqProcess,
+            BTreeMap::from([
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+                ("OPTION.ASYNCHRONOUS".into(), cics_option()),
+                (
+                    "BTS.RUN.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.bts-run-id@1",
+                        format!("{run_unit}:100").into_bytes(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            1,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        let run_rows = store
+            .list_provider_state("cics-bts-run-request-v1", 2)
+            .unwrap();
+        assert_eq!(run_rows.len(), 1);
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        let promoted = cics.promote_bts_run_work(&work).unwrap().unwrap();
+        assert_eq!(promoted.activity_id, root);
+        assert_eq!(promoted.userid, "IBMUSER");
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .completion,
+            BtsCompletion::Normal
+        );
+        assert_eq!(cics.recover_bts_run_work().unwrap(), 0);
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        let next_root = BtsLifecycleStore::root_id("TYPE", "NEXT", run_unit).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE", "NEXT", &next_root, "MAIN", "BTS1", "IBMUSER", run_unit,
+                )
+                .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire(run_unit, execution, "IBMUSER", "TYPE", "NEXT", &next_root)
+            .unwrap();
+        let sync = request(
+            CicsOperation::RunAcqProcess,
+            BTreeMap::from([
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+                ("OPTION.SYNCHRONOUS".into(), cics_option()),
+                (
+                    "BTS.RUN.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.bts-run-id@1",
+                        format!("{run_unit}:101").into_bytes(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            2,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, sync.clone(), 2),
+                sync.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.disposition, CicsDisposition::Suspended);
+        let child = store
+            .claim("worker-2", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&child).unwrap().unwrap();
+        cics.complete_bts_run_work(&child, BtsCompletion::Normal, None, None)
+            .unwrap();
+        let reissue = request(CicsOperation::RunAcqProcess, sync.arguments.clone(), 3);
+        let completed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, reissue.clone(), 3),
+                reissue,
+            )
+            .unwrap();
+        assert_eq!(completed.disposition, CicsDisposition::Complete);
+    }
+
+    #[test]
+    fn bts_suspended_async_run_returns_without_admitting_work() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsMode, BtsProcess,
+            BtsProcessTypeDefinition, BtsRunState, BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire(run_unit, execution, "IBMUSER", "TYPE", "ORDER", &root)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "suspend",
+                [1; 32],
+                |process| {
+                    process.set_suspended(&root, true)?;
+                    Ok(handlers::bts_lifecycle::BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let command = request(
+            CicsOperation::RunAcqProcess,
+            BTreeMap::from([
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+                ("OPTION.ASYNCHRONOUS".into(), cics_option()),
+                (
+                    "BTS.RUN.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.bts-run-id@1",
+                        format!("{run_unit}:100").into_bytes(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let rows = store
+            .list_provider_state("cics-bts-run-request-v1", 2)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let record: handlers::bts_lifecycle::BtsRunRecord =
+            serde_json::from_slice(&rows[0].payload).unwrap();
+        assert_eq!(record.state, BtsRunState::Deferred);
+        assert!(store.get_work(&record.work_id).unwrap().is_none());
+        assert_eq!(cics.recover_bts_run_work().unwrap(), 0);
+        let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(process.activities[&root].mode, BtsMode::Initial);
+        assert!(process.activities[&root].suspended);
+        let resume = request(
+            CicsOperation::ResumeAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, resume.clone(), 2),
+                resume.clone()
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let released = authority.load_run(&record.run_id).unwrap().unwrap();
+        assert_eq!(released.state, BtsRunState::Pending);
+        let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(process.activities[&root].mode, BtsMode::Active);
+        assert!(!process.activities[&root].suspended);
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&work).unwrap().unwrap();
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, resume.clone(), 2), resume)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+    }
+
+    #[test]
+    fn bts_resume_acquired_process_admits_fired_event_work() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcess, BtsProcessTypeDefinition, BtsRunState,
+            BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "EVENTS", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "EVENTS", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire(run_unit, execution, "IBMUSER", "TYPE", "EVENTS", &root)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "EVENTS",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "activate",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 1, "checkpoint")?;
+                    Ok(handlers::bts_lifecycle::BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "EVENTS", &root, 1, 1)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        cics.post_input_event(&root, "READY").unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "EVENTS",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "dormant",
+                [2; 32],
+                |process| {
+                    process.finish(
+                        &root,
+                        1,
+                        1,
+                        handlers::bts_lifecycle::BtsCompletion::Incomplete,
+                        None,
+                        None,
+                    )?;
+                    process.set_suspended(&root, true)?;
+                    Ok(handlers::bts_lifecycle::BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let resume = request(
+            CicsOperation::ResumeAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, resume.clone(), 2),
+                resume.clone()
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let rows = store
+            .list_provider_state("cics-bts-run-request-v1", 2)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let record: handlers::bts_lifecycle::BtsRunRecord =
+            serde_json::from_slice(&rows[0].payload).unwrap();
+        assert_eq!(record.state, BtsRunState::Pending);
+        assert_eq!(record.input_event, "READY");
+        assert!(store.get_work(&record.work_id).unwrap().is_some());
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, resume.clone(), 2), resume)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-bts-run-request-v1", 2)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn bts_run_transid_issues_token_and_completes_child_via_fenced_work() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransactionDefinition,
+            BtsTransidState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BT01", "CHILD", true, false).unwrap(),
+        )
+        .unwrap();
+        let (parent, _) = registered(&cics);
+        let command = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT01")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            1,
+        );
+        let result = cics
+            .invoke(&effect(&parent.run_unit_id, command.clone(), 1), command)
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        let token: [u8; 16] = result.outputs["CHILD"].bytes().try_into().unwrap();
+        assert_ne!(token, [0; 16]);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let rows = store
+            .list_provider_state("cics-bts-transid-run-v1", 2)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let record: handlers::bts_lifecycle::BtsTransidRecord =
+            serde_json::from_slice(&rows[0].payload).unwrap();
+        assert_eq!(record.token, token);
+        assert!(record.channel.is_none());
+        assert!(record.containers.is_empty());
+        let work = store
+            .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cics.promote_bts_transid_work(&work).unwrap().unwrap().state,
+            BtsTransidState::Attached
+        );
+        cics.complete_bts_transid_work(&work, CicsBtsChildCompletion::Normal, None)
+            .unwrap();
+        assert_eq!(
+            authority
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Finished
+        );
+        let child = store
+            .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&child.payload).unwrap();
+        assert_eq!(value["children"].as_object().unwrap().len(), 1);
+        assert_eq!(
+            value["children"]
+                .as_object()
+                .unwrap()
+                .values()
+                .next()
+                .unwrap()["completion"],
+            "Normal"
+        );
+    }
+
+    #[test]
+    fn bts_run_transid_conditions_precede_child_admission() {
+        use handlers::bts_lifecycle::BtsTransactionDefinition;
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BT02", "CHILD", false, false).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BT03", "CHILD", true, true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BT04", "CHILD", true, false).unwrap(),
+        )
+        .unwrap();
+        let (parent, _) = registered(&cics);
+        for (transid, channel, sequence, name, response, response2) in [
+            ("NONE", "INPUT", 1, "TRANSIDERR", 28, 1),
+            ("BT02", "INPUT", 2, "DISABLED", 84, 50),
+            ("BT03", "INPUT", 3, "TRANSIDERR", 28, 11),
+            ("BT04", "BAD NAME", 4, "CHANNELERR", 122, 1),
+        ] {
+            let command = request(
+                CicsOperation::RunTransId,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(transid.as_bytes())),
+                    ("CHANNEL".into(), argument(channel.as_bytes())),
+                    ("CHILD".into(), argument(b"CHILD-X")),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&parent.run_unit_id, command.clone(), sequence),
+                    command
+                ),
+                Err(HostProblem::Condition {
+                    name: name.into(),
+                    response,
+                    response2,
+                })
+            );
+        }
+        cics.put_transform_container(
+            "INPUT",
+            "MESSAGE",
+            CicsTransformContainerMode::Char,
+            b"another-task-data".to_vec(),
+        )
+        .unwrap();
+        let channel_request = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT04")),
+                ("CHANNEL".into(), argument(b"INPUT")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&parent.run_unit_id, channel_request.clone(), 5),
+                channel_request,
+            ),
+            Err(HostProblem::Unsupported)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-bts-transid-run-v1", 1)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn bts_run_transid_issue_denial_is_audited_before_child_admission() {
+        use handlers::bts_lifecycle::BtsTransactionDefinition;
+
+        let (host, seen) = deny_exact_class_authorities("TCICSTRN", Some("CICS.BT01"));
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            host,
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BT01", "CHILD", true, false).unwrap(),
+        )
+        .unwrap();
+        let (parent, _) = registered(&cics);
+        let command = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT01")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&parent.run_unit_id, command.clone(), 1), command),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            })
+        );
+        assert!(seen.lock().unwrap().contains(&(
+            "TCICSTRN".into(),
+            "CICS.BT01".into(),
+            AccessIntent::Execute
+        )));
+        assert!(
+            store
+                .list_provider_state("cics-bts-transid-run-v1", 1)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .list_provider_state("cics-bts-child-ownership-v1", 1)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            !store
+                .audit_records(&parent.execution_id, 0, 64)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn bts_child_attach_denial_retains_security_completion_without_abcode() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransactionDefinition,
+            BtsTransidState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        first
+            .register_bts_transaction(
+                BtsTransactionDefinition::new("BT01", "CHILD", true, false).unwrap(),
+            )
+            .unwrap();
+        let (parent, _) = registered(&first);
+        let command = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT01")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            1,
+        );
+        first
+            .invoke(&effect(&parent.run_unit_id, command.clone(), 1), command)
+            .unwrap();
+        let row = store
+            .list_provider_state("cics-bts-transid-run-v1", 1)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let record = BtsLifecycleStore::new(store.as_ref())
+            .load_transid(&row.key)
+            .unwrap()
+            .unwrap();
+        drop(first);
+
+        let (host, seen) = deny_exact_class_authorities("TCICSTRN", Some("CICS.BT01"));
+        let reopened = CicsService::open_with_runtime(
+            host,
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        let claimed = store
+            .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_001, 30_000)
+            .unwrap()
+            .unwrap();
+        reopened.promote_bts_transid_work(&claimed).unwrap();
+        let child_invocation = invocation_for("bts-denied-child", BTreeMap::new());
+        let child_session = SessionId::new("bts-denied-child-session", 64).unwrap();
+        assert_eq!(
+            reopened.launch_background_task(child_invocation, &child_session, "BT01"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(seen.lock().unwrap().contains(&(
+            "TCICSTRN".into(),
+            "CICS.BT01".into(),
+            AccessIntent::Execute
+        )));
+        reopened
+            .complete_bts_transid_work(&claimed, CicsBtsChildCompletion::SecurityError, None)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .bts_child_outcome(&parent.run_unit_id, record.token)
+                .unwrap(),
+            Some((CicsBtsChildCompletion::SecurityError, None))
+        );
+        let finished = BtsLifecycleStore::new(store.as_ref())
+            .load_transid(&record.run_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(finished.state, BtsTransidState::Finished);
+        assert_eq!(finished.abcode, None);
+    }
+
+    #[test]
+    fn bts_transid_restart_reconciles_completed_child_before_work_readmission() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransidState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (parent, _) = registered(&first);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let record = authority
+            .start_transid(
+                parent.run_unit_id.as_str(),
+                parent.execution_id.as_str(),
+                "IBMUSER",
+                "child",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                None,
+                BTreeMap::new(),
+                1_000,
+                4,
+            )
+            .unwrap();
+        first.register_bts_transid_child(&record).unwrap();
+        first.enqueue_bts_transid_work(&record).unwrap();
+        let claimed = store
+            .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        first.promote_bts_transid_work(&claimed).unwrap();
+        first
+            .complete_bts_child(
+                &parent.run_unit_id,
+                record.token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            )
+            .unwrap();
+        drop(first);
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(reopened.recover_bts_transid_work().unwrap(), 0);
+        assert_eq!(
+            authority
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Finished
+        );
+    }
+
+    #[test]
+    fn bts_transid_child_result_reconciles_after_sqlite_process_reopen() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransidState,
+        };
+
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bts-transid-child-reopen-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let run_id = {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (parent, _) = registered(&cics);
+            let record = BtsLifecycleStore::new(store.as_ref())
+                .start_transid(
+                    parent.run_unit_id.as_str(),
+                    parent.execution_id.as_str(),
+                    "IBMUSER",
+                    "child",
+                    [1; 32],
+                    "BT01",
+                    "CHILD",
+                    None,
+                    BTreeMap::new(),
+                    1_000,
+                    4,
+                )
+                .unwrap();
+            cics.register_bts_transid_child(&record).unwrap();
+            cics.enqueue_bts_transid_work(&record).unwrap();
+            let work = store
+                .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_000, 30_000)
+                .unwrap()
+                .unwrap();
+            cics.promote_bts_transid_work(&work).unwrap();
+            cics.complete_bts_child(
+                &parent.run_unit_id,
+                record.token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            )
+            .unwrap();
+            record.run_id
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_001)),
+            )
+            .unwrap();
+            assert_eq!(cics.recover_bts_transid_work().unwrap(), 0);
+            assert_eq!(
+                BtsLifecycleStore::new(store.as_ref())
+                    .load_transid(&run_id)
+                    .unwrap()
+                    .unwrap()
+                    .state,
+                BtsTransidState::Finished
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn bts_transid_cancelled_work_without_child_outcome_stays_unknown() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsTransidState};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (parent, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let record = authority
+            .start_transid(
+                parent.run_unit_id.as_str(),
+                parent.execution_id.as_str(),
+                "IBMUSER",
+                "child",
+                [1; 32],
+                "BT01",
+                "CHILD",
+                None,
+                BTreeMap::new(),
+                1_000,
+                4,
+            )
+            .unwrap();
+        cics.register_bts_transid_child(&record).unwrap();
+        cics.enqueue_bts_transid_work(&record).unwrap();
+        let cancelled = store.request_cancellation(&record.work_id).unwrap();
+        assert_eq!(cancelled.state, WorkState::Cancelled);
+        assert_eq!(
+            cics.reconcile_bts_transid_work(&record.run_id),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            authority
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Pending
+        );
+    }
+
+    #[test]
+    fn bts_transid_unresolved_child_does_not_block_other_work_on_reopen() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsTransidState};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (parent, _) = registered(&first);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let start = |key: &str, digest: [u8; 32]| {
+            authority
+                .start_transid(
+                    parent.run_unit_id.as_str(),
+                    parent.execution_id.as_str(),
+                    "IBMUSER",
+                    key,
+                    digest,
+                    "BT01",
+                    "CHILD",
+                    None,
+                    BTreeMap::new(),
+                    1_000,
+                    4,
+                )
+                .unwrap()
+        };
+        let cancelled = start("cancelled", [1; 32]);
+        first.register_bts_transid_child(&cancelled).unwrap();
+        first.enqueue_bts_transid_work(&cancelled).unwrap();
+        assert_eq!(
+            store
+                .request_cancellation(&cancelled.work_id)
+                .unwrap()
+                .state,
+            WorkState::Cancelled
+        );
+        let pending = start("pending", [2; 32]);
+        first.register_bts_transid_child(&pending).unwrap();
+        drop(first);
+
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(
+            store.get_work(&pending.work_id).unwrap().unwrap().state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            reopened.reconcile_bts_transid_work(&cancelled.run_id),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            authority
+                .load_transid(&cancelled.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Pending
+        );
+    }
+
+    #[test]
+    fn bts_run_outbox_readmits_work_after_provider_reopen() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess, BtsRunState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:44",
+                "run", [1; 32], [1; 32], 1_000, 4,
+            )
+            .unwrap();
+        assert!(store.get_work(&run.work_id).unwrap().is_none());
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        assert_eq!(service.recover_bts_run_work().unwrap(), 1);
+        let queued = store.get_work(&run.work_id).unwrap().unwrap();
+        assert_eq!(queued, run.work_record().unwrap());
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(reopened.recover_bts_run_work().unwrap(), 1);
+        assert_eq!(store.get_work(&run.work_id).unwrap(), Some(queued));
+        let first = store
+            .claim("worker-1", Some(BTS_RUN_WORK_GENERATION), 1_001, 30_000)
+            .unwrap()
+            .unwrap();
+        let promoted = reopened.promote_bts_run_work(&first).unwrap().unwrap();
+        assert_eq!(promoted.state, BtsRunState::Attached);
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .checkpoint
+                .as_ref()
+                .unwrap()
+                .owner_lease_epoch,
+            first.lease_epoch,
+        );
+        store
+            .release(
+                &first.work_id,
+                first.lease_id.as_deref().unwrap(),
+                first.lease_epoch,
+                1_002,
+                1_002,
+            )
+            .unwrap();
+        let second = store
+            .claim("worker-2", Some(BTS_RUN_WORK_GENERATION), 1_002, 30_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            reopened.complete_bts_run_work(&first, BtsCompletion::Normal, None, None),
+            Err(HostProblem::IdempotencyConflict),
+        );
+        reopened.promote_bts_run_work(&second).unwrap().unwrap();
+        reopened
+            .complete_bts_run_work(&second, BtsCompletion::Normal, None, None)
+            .unwrap();
+        assert_eq!(
+            authority.load_run(&run.run_id).unwrap().unwrap().state,
+            BtsRunState::Finished
+        );
+        assert_eq!(reopened.recover_bts_run_work().unwrap(), 0);
+    }
+
+    #[test]
+    fn bts_parent_completion_deletes_settled_child_and_index_atomically() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsChildDefinition, BtsCompletion, BtsLifecycleStore,
+            BtsProcess,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:44",
+                "run", [1; 32], [1; 32], 1_000, 4,
+            )
+            .unwrap();
+        let child = authority
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: "USER".into(),
+                },
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "define-child",
+                [2; 32],
+            )
+            .unwrap();
+        authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();
+        assert!(authority.load_activity_index(&child).unwrap().is_some());
+        cics.enqueue_bts_run_work(&run).unwrap();
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&work).unwrap();
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+        let completed = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(completed.activities.len(), 1);
+        assert_eq!(
+            completed.activities[&root].completion,
+            BtsCompletion::Normal
+        );
+        assert!(authority.load_activity_index(&child).unwrap().is_none());
+        let pool = store
+            .get_provider_state("cics-event-activity-v1", &root)
+            .unwrap();
+        assert!(pool.is_none_or(|row| {
+            serde_json::from_slice::<serde_json::Value>(&row.payload).unwrap()["events"]
+                .get("DONE")
+                .is_none()
+        }));
+        cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None)
+            .unwrap();
+    }
+
+    #[test]
+    fn bts_parent_completion_with_active_child_preserves_both_rows() {
+        use handlers::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsChildDefinition, BtsCompletion, BtsLifecycleStore, BtsMode,
+            BtsProcess, BtsRunState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap(),
+                "UOW1",
+                "EXEC1",
+                "USER",
+            )
+            .unwrap();
+        authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let parent_run = authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &root,
+                None,
+                false,
+                None,
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "UOW2:44",
+                "parent-run",
+                [1; 32],
+                [1; 32],
+                1_000,
+                4,
+            )
+            .unwrap();
+        let child = authority
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: "USER".into(),
+                },
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "define-child",
+                [2; 32],
+            )
+            .unwrap();
+        authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();
+        authority
+            .acquire("UOW3", "EXEC3", "USER", "TYPE", "ORDER", &child)
+            .unwrap();
+        authority
+            .start_run(
+                "TYPE",
+                "ORDER",
+                &child,
+                None,
+                false,
+                None,
+                "UOW3",
+                "EXEC3",
+                "USER",
+                "UOW3:45",
+                "child-run",
+                [3; 32],
+                [3; 32],
+                1_000,
+                4,
+            )
+            .unwrap();
+        authority.finish_uow("UOW3", "EXEC3", "USER", true).unwrap();
+        cics.enqueue_bts_run_work(&parent_run).unwrap();
+        let work = store
+            .claim("worker", Some(BTS_RUN_WORK_GENERATION), 1_000, 30_000)
+            .unwrap()
+            .unwrap();
+        cics.promote_bts_run_work(&work).unwrap();
+        assert_eq!(
+            cics.complete_bts_run_work(&work, BtsCompletion::Normal, None, None),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(process.activities[&root].mode, BtsMode::Active);
+        assert_eq!(process.activities[&child].mode, BtsMode::Active);
+        assert!(authority.load_activity_index(&child).unwrap().is_some());
+        assert_eq!(
+            authority
+                .load_run(&parent_run.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsRunState::Attached
+        );
+    }
+
+    #[test]
+    fn bts_run_outbox_admits_exact_work_after_sqlite_process_reopen() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsRunState};
+
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bts-run-reopen-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let (run_id, work_id, root) = {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+            authority
+                .define_process(
+                    BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1")
+                        .unwrap(),
+                    "UOW1",
+                    "EXEC1",
+                    "USER",
+                )
+                .unwrap();
+            authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+            authority
+                .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+                .unwrap();
+            let record = authority
+                .start_run(
+                    "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:44",
+                    "run", [1; 32], [1; 32], 1_000, 4,
+                )
+                .unwrap();
+            assert!(store.get_work(&record.work_id).unwrap().is_none());
+            (record.run_id, record.work_id, root)
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_001)),
+            )
+            .unwrap();
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            let record = authority.load_run(&run_id).unwrap().unwrap();
+            assert_eq!(record.state, BtsRunState::Pending);
+            assert_eq!(record.activity_id, root);
+            assert_eq!(
+                store.get_work(&work_id).unwrap(),
+                Some(record.work_record().unwrap())
+            );
+            assert_eq!(cics.recover_bts_run_work().unwrap(), 1);
+            assert_eq!(
+                store.get_work(&work_id).unwrap(),
+                Some(record.work_record().unwrap())
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn bts_terminal_run_work_does_not_block_independent_recovery() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsRunState};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let start = |name: &str, defining_uow: &str, running_uow: &str, marker: u8| {
+            let root = BtsLifecycleStore::root_id("TYPE", name, defining_uow).unwrap();
+            authority
+                .define_process(
+                    BtsProcess::new("TYPE", name, &root, "MAIN", "BTS1", "USER", defining_uow)
+                        .unwrap(),
+                    defining_uow,
+                    defining_uow,
+                    "USER",
+                )
+                .unwrap();
+            authority
+                .finish_uow(defining_uow, defining_uow, "USER", true)
+                .unwrap();
+            authority
+                .acquire(running_uow, running_uow, "USER", "TYPE", name, &root)
+                .unwrap();
+            authority
+                .start_run(
+                    "TYPE",
+                    name,
+                    &root,
+                    None,
+                    false,
+                    None,
+                    running_uow,
+                    running_uow,
+                    "USER",
+                    &format!("{running_uow}:44"),
+                    "run",
+                    [marker; 32],
+                    [marker; 32],
+                    1_000,
+                    4,
+                )
+                .unwrap()
+        };
+        let cancelled = start("ORDER", "UOW1", "UOW2", 1);
+        store.enqueue(cancelled.work_record().unwrap()).unwrap();
+        assert_eq!(
+            store
+                .request_cancellation(&cancelled.work_id)
+                .unwrap()
+                .state,
+            WorkState::Cancelled
+        );
+        let pending = start("OTHER", "UOW3", "UOW4", 2);
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(
+            store.get_work(&pending.work_id).unwrap().unwrap().state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            reopened.enqueue_bts_run_work(&cancelled),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            authority
+                .load_run(&cancelled.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsRunState::Pending
+        );
+    }
+
+    #[test]
+    fn bts_nocheck_collision_fails_before_syncpoint_intent() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let first_root = BtsLifecycleStore::root_id("TYPE1", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process_in_repository_exact(
+                BtsProcess::new(
+                    "TYPE1",
+                    "ORDER",
+                    &first_root,
+                    "MAIN",
+                    "BTS1",
+                    "IBMUSER",
+                    "UOW1",
+                )
+                .unwrap(),
+                "BTS.REPO",
+                "UOW1",
+                "EXEC1",
+                "IBMUSER",
+                "first",
+                [1; 32],
+            )
+            .unwrap();
+        authority
+            .finish_uow("UOW1", "EXEC1", "IBMUSER", true)
+            .unwrap();
+
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE2", "ORDER", run_unit).unwrap();
+        authority
+            .define_process_nocheck_exact(
+                BtsProcess::new("TYPE2", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                "BTS.REPO",
+                run_unit,
+                invocation.execution_id.as_str(),
+                "IBMUSER",
+                "nocheck",
+                [2; 32],
+            )
+            .unwrap();
+        let sync = request(CicsOperation::Syncpoint, BTreeMap::new(), 1);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, sync.clone(), 1), sync),
+            Err(HostProblem::Condition {
+                name: "PROCESSERR".into(),
+                response: 108,
+                response2: 2,
+            })
+        );
+        assert!(store.list_provider_state("cics-uow", 1).unwrap().is_empty());
+        authority
+            .finish_uow(run_unit, invocation.execution_id.as_str(), "IBMUSER", false)
+            .unwrap();
+        assert!(authority.load_process("TYPE2", "ORDER").unwrap().is_none());
+    }
+
+    #[test]
+    fn bts_child_port_retains_exact_token_and_terminal_outcome() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (parent, _) = registered(&cics);
+        let token = [7; 16];
+        cics.register_bts_child(&parent.run_unit_id, token, Some("REPLY"))
+            .unwrap();
+        cics.register_bts_child(&parent.run_unit_id, [8; 16], Some("A.B"))
+            .unwrap();
+        assert!(
+            cics.bts_child_registered(&parent.run_unit_id, token, Some("REPLY"))
+                .unwrap()
+        );
+        assert_eq!(
+            cics.register_bts_child(&parent.run_unit_id, token, Some("REPLY")),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        cics.complete_bts_child(
+            &parent.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Abend,
+            Some("ASRA"),
+        )
+        .unwrap();
+        cics.complete_bts_child(
+            &parent.run_unit_id,
+            token,
+            CicsBtsChildCompletion::Abend,
+            Some("ASRA"),
+        )
+        .unwrap();
+        assert_eq!(
+            cics.complete_bts_child(
+                &parent.run_unit_id,
+                token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let row = store
+            .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(
+            value["children"]["07070707070707070707070707070707"]["completion"],
+            "Abend"
+        );
+        assert_eq!(
+            value["children"]["07070707070707070707070707070707"]["abcode"],
+            "ASRA"
+        );
+    }
+
+    #[test]
+    fn bts_named_child_lifecycle_uses_fenced_parent_scope() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcess, BtsProcessTypeDefinition, BtsReply,
+            BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 1, "checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ORDER", &root, 1, 1)
+            .unwrap();
+        let define = request(
+            CicsOperation::DefineActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(b"CHILD")),
+                ("TRANSID".into(), argument(b"BTS1")),
+                ("ACTIVITYID".into(), argument(b"OUT-ID")),
+            ]),
+            1,
+        );
+        let id = cics
+            .invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap()
+            .outputs["ACTIVITYID"]
+            .bytes()
+            .to_vec();
+        assert_eq!(id.len(), 52);
+        let check = request(
+            CicsOperation::CheckActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(b"CHILD")),
+                ("MODE".into(), argument(b"MODE")),
+            ]),
+            7,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, check.clone(), 7), check)
+                .unwrap()
+                .outputs["MODE"]
+                .bytes(),
+            b"INITIAL"
+        );
+        let pool = store
+            .get_provider_state("cics-event-activity-v1", &root)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+        assert!(value["events"].get("CHILD").is_some());
+        let runner = request(
+            CicsOperation::DefineActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(b"RUNNER")),
+                ("TRANSID".into(), argument(b"BTS1")),
+                ("ACTIVITYID".into(), argument(b"RUN-ID")),
+            ]),
+            8,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, runner.clone(), 8), runner)
+            .unwrap();
+        let run = request(
+            CicsOperation::RunActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(b"RUNNER")),
+                ("OPTION.ASYNCHRONOUS".into(), cics_option()),
+                (
+                    "BTS.RUN.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.bts-run-id@1",
+                        format!("{}:101", invocation.run_unit_id.as_str()).into_bytes(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            9,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, run.clone(), 9), run)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let not_sign_name = format!("{}¬", "A".repeat(15));
+        let not_sign_child = request(
+            CicsOperation::DefineActivity,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(not_sign_name.as_bytes())),
+                ("EVENT".into(), argument(b"SAFEEVT")),
+                ("TRANSID".into(), argument(b"BTS1")),
+                ("ACTIVITYID".into(), argument(b"NOT-SIGN-ID")),
+            ]),
+            10,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, not_sign_child.clone(), 10),
+                not_sign_child
+            )
+            .unwrap()
+            .outputs["ACTIVITYID"]
+                .bytes()
+                .len(),
+            52
+        );
+        assert!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .child(&root, &not_sign_name)
+                .is_some()
+        );
+        for (operation, sequence) in [
+            (CicsOperation::SuspendActivity, 2),
+            (CicsOperation::ResumeActivity, 3),
+            (CicsOperation::CancelActivity, 4),
+            (CicsOperation::ResetActivity, 5),
+            (CicsOperation::DeleteActivity, 6),
+        ] {
+            let command = request(
+                operation,
+                BTreeMap::from([("ACTIVITY".into(), argument(b"CHILD"))]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), sequence),
+                    command
+                )
+                .unwrap()
+                .condition,
+                "NORMAL"
+            );
+            let pool = store
+                .get_provider_state("cics-event-activity-v1", &root)
+                .unwrap()
+                .unwrap();
+            let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+            match operation {
+                CicsOperation::CancelActivity => {
+                    assert_eq!(value["events"]["CHILD"]["fired"], true)
+                }
+                CicsOperation::ResetActivity => {
+                    assert_eq!(value["events"]["CHILD"]["fired"], false)
+                }
+                CicsOperation::DeleteActivity => assert!(value["events"].get("CHILD").is_none()),
+                _ => {}
+            }
+            if operation == CicsOperation::CancelActivity {
+                for check_sequence in [11, 12] {
+                    let check = request(
+                        CicsOperation::CheckActivity,
+                        BTreeMap::from([
+                            ("ACTIVITY".into(), argument(b"CHILD")),
+                            ("COMPSTATUS".into(), argument(b"STATUS")),
+                        ]),
+                        check_sequence,
+                    );
+                    let checked = cics
+                        .invoke(
+                            &effect(&invocation.run_unit_id, check.clone(), check_sequence),
+                            check,
+                        )
+                        .unwrap();
+                    assert_eq!(checked.outputs["COMPSTATUS"].bytes(), b"FORCED");
+                }
+                let pool = store
+                    .get_provider_state("cics-event-activity-v1", &root)
+                    .unwrap()
+                    .unwrap();
+                let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+                assert!(value["events"].get("CHILD").is_none());
+            }
+        }
+        for (operation, sequence) in [
+            (CicsOperation::CancelActivity, 13),
+            (CicsOperation::CheckActivity, 14),
+            (CicsOperation::DeleteActivity, 15),
+        ] {
+            let mut arguments =
+                BTreeMap::from([("ACTIVITY".into(), argument(not_sign_name.as_bytes()))]);
+            if operation == CicsOperation::CheckActivity {
+                arguments.insert("COMPSTATUS".into(), argument(b"STATUS"));
+            }
+            let command = request(operation, arguments, sequence);
+            let result = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), sequence),
+                    command,
+                )
+                .unwrap();
+            assert_eq!(result.condition, "NORMAL");
+            if operation == CicsOperation::CheckActivity {
+                assert_eq!(result.outputs["COMPSTATUS"].bytes(), b"FORCED");
+                let pool = store
+                    .get_provider_state("cics-event-activity-v1", &root)
+                    .unwrap()
+                    .unwrap();
+                let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+                assert!(value["events"].get("SAFEEVT").is_none());
+            }
+        }
+        assert!(
+            authority
+                .load_activity_index(std::str::from_utf8(&id).unwrap())
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .child(&root, "CHILD")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn bts_define_acquire_and_check_use_one_durable_process_row() {
+        use handlers::bts_lifecycle::{BtsProcessTypeDefinition, BtsTransactionDefinition};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (creator, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(b"ORDER")),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+                ("TRANSID".into(), argument(b"BTS1")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&creator.run_unit_id, define.clone(), 1), define)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let authority = handlers::bts_lifecycle::BtsLifecycleStore::new(store.as_ref());
+        let pending = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(
+            pending.pending_uow.as_deref(),
+            Some(creator.run_unit_id.as_str())
+        );
+        let root = pending.root_id;
+        let sync = request(CicsOperation::Syncpoint, BTreeMap::new(), 2);
+        cics.invoke(&effect(&creator.run_unit_id, sync.clone(), 2), sync)
+            .unwrap();
+        assert!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .pending_uow
+                .is_none()
+        );
+
+        let other = registered_counter_run(&cics, "bts-acquirer");
+        let acquire = request(
+            CicsOperation::AcquireProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(b"ORDER")),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+            ]),
+            3,
+        );
+        let result = cics
+            .invoke(&effect(&other.run_unit_id, acquire.clone(), 3), acquire)
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        assert_eq!(
+            authority
+                .load_acquisition(other.run_unit_id.as_str())
+                .unwrap()
+                .unwrap()
+                .activity_id
+                .as_deref(),
+            Some(root.as_str())
+        );
+        let check = request(
+            CicsOperation::CheckAcqProcess,
+            BTreeMap::from([
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+                ("COMPSTATUS".into(), argument(b"COMP")),
+                ("MODE".into(), argument(b"MODE")),
+                ("SUSPSTATUS".into(), argument(b"SUSP")),
+            ]),
+            4,
+        );
+        let checked = cics
+            .invoke(&effect(&other.run_unit_id, check.clone(), 4), check)
+            .unwrap();
+        assert_eq!(checked.outputs["COMPSTATUS"].bytes(), b"INCOMPLETE");
+        assert_eq!(checked.outputs["MODE"].bytes(), b"INITIAL");
+        assert_eq!(checked.outputs["SUSPSTATUS"].bytes(), b"NOTSUSPENDED");
+        let second = request(
+            CicsOperation::AcquireProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(b"ORDER")),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+            ]),
+            5,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&other.run_unit_id, second.clone(), 5), second),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 22,
+            })
+        );
+    }
+
+    #[test]
+    fn bts_acquire_process_distinguishes_missing_type_from_missing_process() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcessTypeDefinition};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        for (sequence, process_type, response2) in [(1, b"UNKNOWN".as_slice(), 9), (2, b"TYPE", 5)]
+        {
+            let acquire = request(
+                CicsOperation::AcquireProcess,
+                BTreeMap::from([
+                    ("PROCESS".into(), argument(b"MISSING")),
+                    ("PROCESSTYPE".into(), argument(process_type)),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, acquire.clone(), sequence),
+                    acquire
+                ),
+                Err(HostProblem::Condition {
+                    name: "PROCESSERR".into(),
+                    response: 108,
+                    response2,
+                })
+            );
+        }
+        assert!(
+            BtsLifecycleStore::new(store.as_ref())
+                .load_acquisition(invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn bts_define_process_accepts_not_sign_at_source_character_limit() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let name = format!("{}¬", "P".repeat(35));
+        let define = request(
+            CicsOperation::DefineProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(name.as_bytes())),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+                ("TRANSID".into(), argument(b"BTS1")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert!(
+            BtsLifecycleStore::new(store.as_ref())
+                .load_process("TYPE", &name)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn bts_acquired_root_and_descendant_public_forms_use_the_held_uow() {
+        use handlers::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsMode, BtsProcess, BtsProcessTypeDefinition,
+            BtsReply, BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "SETUP").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", "SETUP")
+                    .unwrap(),
+                "SETUP",
+                "SETUP-EXEC",
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow("SETUP", "SETUP-EXEC", "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire("BUILDER", "BUILD-EXEC", "IBMUSER", "TYPE", "ORDER", &root)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "BUILDER",
+                "BUILD-EXEC",
+                "IBMUSER",
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let mut children = Vec::new();
+        for (name, event, key, digest) in [
+            ("FIRST", "DONE1", "child-one", [2; 32]),
+            ("SECOND", "DONE2", "child-two", [3; 32]),
+        ] {
+            children.push(
+                authority
+                    .define_child(
+                        "TYPE",
+                        "ORDER",
+                        &root,
+                        &BtsChildDefinition {
+                            name: name.into(),
+                            completion_event: event.into(),
+                            program: "MAIN".into(),
+                            transid: "BTS1".into(),
+                            userid: "IBMUSER".into(),
+                        },
+                        "BUILDER",
+                        "BUILD-EXEC",
+                        "IBMUSER",
+                        key,
+                        digest,
+                    )
+                    .unwrap(),
+            );
+        }
+        authority
+            .finish_uow("BUILDER", "BUILD-EXEC", "IBMUSER", true)
+            .unwrap();
+
+        let first = registered_counter_run(&cics, "bts-acq-first");
+        let acquire = request(
+            CicsOperation::AcquireActivityId,
+            BTreeMap::from([("ACTIVITYID".into(), argument(children[0].as_bytes()))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&first.run_unit_id, acquire.clone(), 1), acquire)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let check = request(
+            CicsOperation::CheckAcqActivity,
+            BTreeMap::from([
+                ("OPTION.ACQACTIVITY".into(), cics_option()),
+                ("MODE".into(), argument(b"MODE")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&first.run_unit_id, check.clone(), 2), check)
+                .unwrap()
+                .outputs["MODE"]
+                .bytes(),
+            b"INITIAL"
+        );
+        for (operation, sequence) in [
+            (CicsOperation::SuspendAcqActivity, 3),
+            (CicsOperation::ResumeAcqActivity, 4),
+            (CicsOperation::CancelAcqActivity, 5),
+        ] {
+            let command = request(
+                operation,
+                BTreeMap::from([("OPTION.ACQACTIVITY".into(), cics_option())]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&first.run_unit_id, command.clone(), sequence),
+                    command
+                )
+                .unwrap()
+                .condition,
+                "NORMAL"
+            );
+        }
+
+        let second = registered_counter_run(&cics, "bts-acq-second");
+        let acquire = request(
+            CicsOperation::AcquireActivityId,
+            BTreeMap::from([("ACTIVITYID".into(), argument(children[1].as_bytes()))]),
+            6,
+        );
+        cics.invoke(&effect(&second.run_unit_id, acquire.clone(), 6), acquire)
+            .unwrap();
+        let run = request(
+            CicsOperation::RunAcqActivity,
+            BTreeMap::from([
+                ("OPTION.ACQACTIVITY".into(), cics_option()),
+                ("OPTION.ASYNCHRONOUS".into(), cics_option()),
+                (
+                    "BTS.RUN.ID".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.bts-run-id@1",
+                        format!("{}:200", second.run_unit_id.as_str()).into_bytes(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            7,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&second.run_unit_id, run.clone(), 7), run)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&children[1]]
+                .mode,
+            BtsMode::Active
+        );
+
+        let other_root = BtsLifecycleStore::root_id("TYPE", "OTHER", "SETUP-OTHER").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "OTHER",
+                    &other_root,
+                    "MAIN",
+                    "BTS1",
+                    "IBMUSER",
+                    "SETUP-OTHER",
+                )
+                .unwrap(),
+                "SETUP-OTHER",
+                "SETUP-OTHER-EXEC",
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow("SETUP-OTHER", "SETUP-OTHER-EXEC", "IBMUSER", true)
+            .unwrap();
+        let acquirer = registered_counter_run(&cics, "bts-acq-root");
+        let acquire = request(
+            CicsOperation::AcquireProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(b"OTHER")),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+            ]),
+            8,
+        );
+        cics.invoke(&effect(&acquirer.run_unit_id, acquire.clone(), 8), acquire)
+            .unwrap();
+        for (operation, sequence) in [
+            (CicsOperation::SuspendAcqProcess, 9),
+            (CicsOperation::ResumeAcqProcess, 10),
+            (CicsOperation::ResetAcqProcess, 11),
+            (CicsOperation::CancelAcqProcess, 12),
+        ] {
+            let command = request(
+                operation,
+                BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&acquirer.run_unit_id, command.clone(), sequence),
+                    command
+                )
+                .unwrap()
+                .condition,
+                "NORMAL"
+            );
+        }
+        for (operation, sequence, name, response, response2) in [
+            (CicsOperation::SuspendAcqProcess, 13, "INVREQ", 16, 14),
+            (CicsOperation::ResumeAcqProcess, 14, "PROCESSERR", 108, 14),
+        ] {
+            let command = request(
+                operation,
+                BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(
+                    &effect(&acquirer.run_unit_id, command.clone(), sequence),
+                    command
+                ),
+                Err(HostProblem::Condition {
+                    name: name.into(),
+                    response,
+                    response2,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn bts_define_denial_is_audited_before_process_mutation() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
+        };
+
+        let (host, seen) = deny_exact_class_authorities("BTSREPO", None);
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        cics.register_bts_process_type(
+            BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineProcess,
+            BTreeMap::from([
+                ("PROCESS".into(), argument(b"ORDER")),
+                ("PROCESSTYPE".into(), argument(b"TYPE")),
+                ("TRANSID".into(), argument(b"BTS1")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            })
+        );
+        assert!(seen.lock().unwrap().contains(&(
+            "BTSREPO".into(),
+            "BTS.REPO".into(),
+            AccessIntent::Update
+        )));
+        assert!(
+            BtsLifecycleStore::new(store.as_ref())
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            !store
+                .audit_records(&invocation.execution_id, 0, 64)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn bts_public_nocheck_defers_duplicate_to_syncpoint() {
+        use handlers::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        for process_type in ["TYPE1", "TYPE2"] {
+            cics.register_bts_process_type(
+                BtsProcessTypeDefinition::new(process_type, "BTS.REPO", true).unwrap(),
+            )
+            .unwrap();
+        }
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BTS1", "MAIN", true, false).unwrap(),
+        )
+        .unwrap();
+        let (first, _) = registered(&cics);
+        let define = |process_type: &'static [u8], sequence| {
+            request(
+                CicsOperation::DefineProcess,
+                BTreeMap::from([
+                    ("PROCESS".into(), argument(b"ORDER")),
+                    ("PROCESSTYPE".into(), argument(process_type)),
+                    ("TRANSID".into(), argument(b"BTS1")),
+                    ("OPTION.NOCHECK".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let first_define = define(b"TYPE1", 1);
+        assert_eq!(
+            cics.invoke(
+                &effect(&first.run_unit_id, first_define.clone(), 1),
+                first_define
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let first_sync = request(CicsOperation::Syncpoint, BTreeMap::new(), 2);
+        cics.invoke(
+            &effect(&first.run_unit_id, first_sync.clone(), 2),
+            first_sync,
+        )
+        .unwrap();
+        let second = registered_counter_run(&cics, "bts-nocheck-second");
+        let second_define = define(b"TYPE2", 3);
+        assert_eq!(
+            cics.invoke(
+                &effect(&second.run_unit_id, second_define.clone(), 3),
+                second_define
+            )
+            .unwrap()
+            .condition,
+            "NORMAL"
+        );
+        assert!(authority.load_process("TYPE2", "ORDER").unwrap().is_some());
+        let second_sync = request(CicsOperation::Syncpoint, BTreeMap::new(), 4);
+        assert_eq!(
+            cics.invoke(
+                &effect(&second.run_unit_id, second_sync.clone(), 4),
+                second_sync
+            ),
+            Err(HostProblem::Condition {
+                name: "PROCESSERR".into(),
+                response: 108,
+                response2: 2,
+            })
+        );
+        assert!(
+            authority
+                .load_process("TYPE2", "ORDER")
+                .unwrap()
+                .unwrap()
+                .pending_uow
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn bts_context_routes_events_to_the_fenced_activity_identity() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 1, "checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ORDER", &root, 1, 1)
+            .unwrap();
+
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert!(
+            store
+                .get_provider_state("cics-event-activity-v1", &root)
+                .unwrap()
+                .is_some()
+        );
+        cics.post_input_event(&root, "READY").unwrap();
+        cics.close_bts_activity_context(&invocation.run_unit_id)
+            .unwrap();
+        let after_close = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"LATER"))]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, after_close.clone(), 2),
+                after_close
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            })
+        );
+        assert!(
+            store
+                .get_provider_state("cics-event-activity-v1", "CURRENT")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
     fn define_input_event_requires_activity_and_replays_after_reopen() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let cics = service(store.clone());
@@ -49729,7 +52292,8 @@ mod tests {
         );
 
         let authority = BtsLifecycleStore::new(store.as_ref());
-        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "PROC", invocation.run_unit_id.as_str()).unwrap();
         authority
             .define_process(
                 BtsProcess::new(

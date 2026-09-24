@@ -1,7 +1,10 @@
-use super::{CicsOutputName, CicsPlanOperation};
+use super::{CicsOutputName, CicsPlanOperation, bts_lifecycle};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        operation if bts_lifecycle::is_bts(operation) => {
+            bts_lifecycle::allowed_output(operation, output)
+        }
         CicsPlanOperation::ReceiveConversation
         | CicsPlanOperation::GdsReceiveConversation
         | CicsPlanOperation::SendConversation
@@ -14,7 +17,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         CicsPlanOperation::FetchAny => matches!(
             output,
             CicsOutputName::BtsAny
-                | CicsOutputName::BtsCompStatus
+                | CicsOutputName::BtsChildCompStatus
                 | CicsOutputName::BtsChannel
                 | CicsOutputName::BtsAbcode
                 | CicsOutputName::Resp
@@ -22,7 +25,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         ),
         CicsPlanOperation::FetchChild => matches!(
             output,
-            CicsOutputName::BtsCompStatus
+            CicsOutputName::BtsChildCompStatus
                 | CicsOutputName::BtsChannel
                 | CicsOutputName::BtsAbcode
                 | CicsOutputName::Resp

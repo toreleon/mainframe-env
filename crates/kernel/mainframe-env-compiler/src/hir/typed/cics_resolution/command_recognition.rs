@@ -2,7 +2,9 @@
 
 use super::{builtin_function, compatibility_alias_target, journal_control, task_wait};
 use crate::SemanticModel;
-use mainframe_env_ir::{CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor};
+use mainframe_env_ir::{
+    CICS_APPLICATION_AID_NAMES, CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
+};
 
 pub(super) fn clause_tokens(
     body: &[String],
@@ -74,4 +76,39 @@ pub(super) fn statically_known_value_bytes(
         .resolve(&tokens.join(" "))
         .ok()
         .map(|layout| layout.length)
+}
+
+pub(super) fn statically_known_value_characters(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Option<usize> {
+    if let [literal] = tokens
+        && literal.len() >= 2
+        && let Some(quote) = literal.chars().next()
+        && matches!(quote, '\'' | '"')
+        && literal.ends_with(quote)
+    {
+        let contents = &literal[quote.len_utf8()..literal.len() - quote.len_utf8()];
+        let escaped = format!("{quote}{quote}");
+        return Some(
+            contents
+                .replace(&escaped, &quote.to_string())
+                .chars()
+                .count(),
+        );
+    }
+    semantic
+        .resolve(&tokens.join(" "))
+        .ok()
+        .map(|layout| layout.length)
+}
+
+pub(super) fn is_aid_name(name: &str) -> bool {
+    CICS_APPLICATION_AID_NAMES.binary_search(&name).is_ok()
+}
+
+pub(super) fn is_single_condition_label(tokens: &[String]) -> bool {
+    matches!(tokens, [label] if !label.is_empty() && label.chars().all(|character| {
+        character.is_ascii_alphanumeric() || character == '-'
+    }))
 }

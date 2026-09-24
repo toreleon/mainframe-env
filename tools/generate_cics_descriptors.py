@@ -26,7 +26,7 @@ LOOKUP_OUTPUT_PATH = Path(
 PROVIDER_TAIL_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
 )
-PROVIDER_INLINE_OPERATIONS = 153
+PROVIDER_INLINE_OPERATIONS = 149
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -565,6 +565,29 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0258",
     ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
+    ("AcquireActivityId", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0002"),
+    ("AcquireProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0003"),
+    ("CancelAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0017"),
+    ("CancelAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0018"),
+    ("CancelActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0019"),
+    ("CheckAcqActivity", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0023"),
+    ("CheckAcqProcess", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0024"),
+    ("CheckActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0025"),
+    ("DefineActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0032"),
+    ("DefineProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0037"),
+    ("DeleteActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0041"),
+    ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
+    ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
+    ("ResumeAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0172"),
+    ("ResumeAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0173"),
+    ("ResumeActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0174"),
+    ("RunAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0183"),
+    ("RunAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0184"),
+    ("RunActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0185"),
+    ("RunTransId", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0186"),
+    ("SuspendAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0215"),
+    ("SuspendAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0216"),
+    ("SuspendActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0217"),
     ("FetchAny", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0077"),
     ("FetchChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0078"),
     ("FreeChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0083"),
@@ -775,6 +798,29 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "AcquireActivityId",
+        "AcquireProcess",
+        "CancelAcqActivity",
+        "CancelAcqProcess",
+        "CancelActivity",
+        "CheckAcqActivity",
+        "CheckAcqProcess",
+        "CheckActivity",
+        "DefineActivity",
+        "DefineProcess",
+        "DeleteActivity",
+        "ResetAcqProcess",
+        "ResetActivity",
+        "ResumeAcqActivity",
+        "ResumeAcqProcess",
+        "ResumeActivity",
+        "RunAcqActivity",
+        "RunAcqProcess",
+        "RunActivity",
+        "RunTransId",
+        "SuspendAcqActivity",
+        "SuspendAcqProcess",
+        "SuspendActivity",
         "FetchAny", "FetchChild", "FreeChild", "LinkAcqActivity", "LinkAcqProcess", "LinkActivity",
         "Abend",
         "AddSubevent",
@@ -1516,6 +1562,35 @@ TYPED_RUNTIME_IR_EFFECTS = {
 }
 
 
+_BTS_READ_EFFECTS = frozenset({"memory-read", "memory-write", "condition"})
+_BTS_MUTATE_EFFECTS = _BTS_READ_EFFECTS | {"transaction"}
+_BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_READ_EFFECTS
+        for name in ("CheckAcqActivity", "CheckAcqProcess")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_RUN_EFFECTS
+        for name in ("RunAcqActivity", "RunAcqProcess", "RunActivity", "RunTransId")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_MUTATE_EFFECTS
+        for name in (
+            "AcquireActivityId", "AcquireProcess", "CancelAcqActivity", "CancelAcqProcess",
+            "CancelActivity", "CheckActivity", "DefineActivity", "DefineProcess",
+            "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
+            "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
+            "SuspendAcqProcess", "SuspendActivity",
+        )
+    }
+)
+
+
 class DescriptorError(ValueError):
     """The descriptor authority is malformed or its generated source is stale."""
 
@@ -1880,6 +1955,29 @@ def _load_typed_execution_registrations(
         "RetrieveSubevent",
         "TestEvent",
         "SignalEvent",
+        "AcquireActivityId",
+        "AcquireProcess",
+        "CancelAcqActivity",
+        "CancelAcqProcess",
+        "CancelActivity",
+        "CheckAcqActivity",
+        "CheckAcqProcess",
+        "CheckActivity",
+        "DefineActivity",
+        "DefineProcess",
+        "DeleteActivity",
+        "ResetAcqProcess",
+        "ResetActivity",
+        "ResumeAcqActivity",
+        "ResumeAcqProcess",
+        "ResumeActivity",
+        "RunAcqActivity",
+        "RunAcqProcess",
+        "RunActivity",
+        "RunTransId",
+        "SuspendAcqActivity",
+        "SuspendAcqProcess",
+        "SuspendActivity",
         "FetchAny",
         "FetchChild",
         "FreeChild",
@@ -2451,7 +2549,7 @@ def _load_source_batch(
             f"{batch_id} source projection must cover exactly rows {start:04d}-{end:04d}"
         )
     rows_by_id: dict[str, dict[str, Any]] = {}
-    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands, strict=True), start):
+    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands), start):
         row = _object(raw_row, f"{batch_id} source row {offset:04d}")
         identity = {
             "official_row": row.get("official_row"),
@@ -4824,8 +4922,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
                 source_status = "not-projected"
             else:
                 projected_commands += 1
+                if len(source_row["dimensions"]) != len(SOURCE_DIMENSIONS):
+                    raise DescriptorError(
+                        f"{command['official_row']} source dimension count differs"
+                    )
                 for raw_dimension, (source_name, contract_name, candidate_kind) in zip(
-                    source_row["dimensions"], SOURCE_DIMENSIONS, strict=True
+                    source_row["dimensions"], SOURCE_DIMENSIONS
                 ):
                     dimension = _object(raw_dimension, f"{command['official_row']} {source_name}")
                     projection_state = _text(

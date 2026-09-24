@@ -1,6 +1,6 @@
 # ADR-0019: Shared BTS lifecycle authority
 
-Status: **Proposed for the incremental CIC-904.bts-lifecycle slice**
+Status: **Superseded by ADR-0021 after lifecycle and child/LINK integration**
 Owner: **CICS provider and execution maintainers**
 Scope: **shared BTS process/activity state for 23 lifecycle application rows**
 Applies from: **mainframe-env 0.9.0 development**

@@ -8000,6 +8000,461 @@ mod tests {
         (server, store, clock)
     }
 
+    #[test]
+    fn bts_run_work_launches_selected_online_program_and_completes_lifecycle() {
+        use mainframe_env_cics::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess,
+            BtsProcessTypeDefinition, BtsRunState, BtsTransactionDefinition,
+        };
+
+        let now_tick = session_tick().unwrap();
+        let (server, store, _) = worker_test_server(now_tick);
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let artifact = published_source_fixture(
+            "BTSWORK",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSWORK. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let reference = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "BTSWORK".into(),
+                    artifact: reference,
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("BTS1".into(), "BTSWORK".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSWORK".into(),
+                    map: "BTSWORK".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_bts_process_type(
+                BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+            )
+            .unwrap();
+        server
+            .cics
+            .register_bts_transaction(
+                BtsTransactionDefinition::new("BTS1", "BTSWORK", true, false).unwrap(),
+            )
+            .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "BTSWORK", "BTS1", "IBMUSER", "UOW1")
+                    .unwrap(),
+                "UOW1",
+                "EXEC1",
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow("UOW1", "EXEC1", "IBMUSER", true)
+            .unwrap();
+        authority
+            .acquire("UOW2", "EXEC2", "IBMUSER", "TYPE", "ORDER", &root)
+            .unwrap();
+        let run = authority
+            .start_run(
+                "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "IBMUSER", "UOW2:1",
+                "run", [3; 32], [3; 32], now_tick, 4,
+            )
+            .unwrap();
+        server.cics.recover_bts_run_work().unwrap();
+        let work = server.claim_jes_work("bts-worker").unwrap().unwrap();
+        assert_eq!(work.required_generation, BTS_RUN_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Completed);
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .completion,
+            BtsCompletion::Normal,
+        );
+        assert_eq!(
+            authority.load_run(&run.run_id).unwrap().unwrap().state,
+            BtsRunState::Finished
+        );
+    }
+
+    #[test]
+    fn bts_transid_work_launches_local_child_and_completes_token() {
+        use mainframe_env_cics::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransactionDefinition,
+            BtsTransidState,
+        };
+
+        let now_tick = session_tick().unwrap();
+        let (server, store, _) = worker_test_server(now_tick);
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let artifact = published_source_fixture(
+            "BTSCHILD",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSCHILD. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let reference = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "BTSCHILD".into(),
+                    artifact: reference.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("BT01".into(), "BTSCHILD".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSCHLD".into(),
+                    map: "BTSCHLD".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_bts_transaction(
+                BtsTransactionDefinition::new("BT01", "BTSCHILD", true, false).unwrap(),
+            )
+            .unwrap();
+        let parent = server
+            .cics_invocation("IBMUSER", "BT01", Some(reference))
+            .unwrap();
+        let parent_session = SessionId::new("bts-transid-parent", 64).unwrap();
+        server
+            .cics
+            .launch_background_task(parent.clone(), &parent_session, "BT01")
+            .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let record = authority
+            .start_transid(
+                parent.run_unit_id.as_str(),
+                parent.execution_id.as_str(),
+                "IBMUSER",
+                "run-transid",
+                [1; 32],
+                "BT01",
+                "BTSCHILD",
+                Some("INPUT"),
+                BTreeMap::new(),
+                now_tick,
+                4,
+            )
+            .unwrap();
+        server.cics.register_bts_transid_child(&record).unwrap();
+        server.cics.enqueue_bts_transid_work(&record).unwrap();
+        let work = server.claim_jes_work("bts-child-worker").unwrap().unwrap();
+        assert_eq!(work.required_generation, BTS_TRANSID_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Completed);
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        assert_eq!(
+            authority
+                .load_transid(&record.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Finished
+        );
+        let row = store
+            .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(
+            value["children"]
+                .as_object()
+                .unwrap()
+                .values()
+                .next()
+                .unwrap()["completion"],
+            "Normal"
+        );
+    }
+
+    #[test]
+    fn compiled_bts_run_transid_issues_child_and_selected_worker_completes_it() {
+        use mainframe_env_cics::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsTransactionDefinition,
+        };
+
+        let now_tick = session_tick().unwrap();
+        let (server, store, _) = worker_test_server(now_tick);
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let parent = published_source_fixture(
+            "BTSPARNT",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSPARNT. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-TOKEN PIC X(16). PROCEDURE DIVISION. EXEC CICS RUN TRANSID('BT01') CHILD(CHILD-TOKEN) END-EXEC. STOP RUN.",
+        );
+        let child = published_source_fixture(
+            "BTSCHILD",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSCHILD. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let parent_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(parent.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let child_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(child.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let online_program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    online_program("BTSPARNT", &parent, parent_ref.clone()),
+                    online_program("BTSCHILD", &child, child_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("BP01".into(), "BTSPARNT".into()),
+                    ("BT01".into(), "BTSCHILD".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSPARNT".into(),
+                    map: "BTSPARNT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_bts_transaction(
+                BtsTransactionDefinition::new("BT01", "BTSCHILD", true, false).unwrap(),
+            )
+            .unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "BP01", Some(parent_ref))
+            .unwrap();
+        let session = SessionId::new("bts-transid-compiled-parent", 64).unwrap();
+        server
+            .cics
+            .launch_background_task(invocation.clone(), &session, "BP01")
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, now_tick)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "BTSPARNT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "BTSPARNT", now_tick)
+            .unwrap();
+        assert_eq!(
+            store
+                .list_provider_state("cics-bts-transid-run-v1", 2)
+                .unwrap()
+                .len(),
+            1
+        );
+        let work = server
+            .claim_jes_work("bts-compiled-child")
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.required_generation, BTS_TRANSID_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Completed);
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let row = store
+            .get_provider_state(
+                "cics-bts-child-ownership-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(
+            state["children"]
+                .as_object()
+                .unwrap()
+                .values()
+                .next()
+                .unwrap()["completion"],
+            "Normal"
+        );
+    }
+
+    #[test]
+    fn compiled_bts_process_lifecycle_defines_acquires_checks_and_runs() {
+        use mainframe_env_cics::bts_lifecycle::{
+            BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcessTypeDefinition,
+            BtsTransactionDefinition,
+        };
+
+        let now_tick = session_tick().unwrap();
+        let (server, store, _) = worker_test_server(now_tick);
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let process_name = format!("{}¬", "P".repeat(35));
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 COMP-X PIC S9(9) COMP. 01 MODE-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('{process_name}') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. EXEC CICS SYNCPOINT END-EXEC. EXEC CICS ACQUIRE PROCESS('{process_name}') PROCESSTYPE('TYPE') END-EXEC. EXEC CICS CHECK ACQPROCESS COMPSTATUS(COMP-X) MODE(MODE-X) END-EXEC. EXEC CICS RUN ACQPROCESS ASYNCHRONOUS END-EXEC. STOP RUN."
+        );
+        let parent = published_source_fixture("BTSFLOW", &source);
+        let child = published_source_fixture(
+            "BTSMAIN",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSMAIN. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let parent_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(parent.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let child_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(child.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let online_program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    online_program("BTSFLOW", &parent, parent_ref.clone()),
+                    online_program("BTSMAIN", &child, child_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("BP01".into(), "BTSFLOW".into()),
+                    ("BT01".into(), "BTSMAIN".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BTSFLOW".into(),
+                    map: "BTSFLOW".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_bts_process_type(
+                BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+            )
+            .unwrap();
+        server
+            .cics
+            .register_bts_transaction(
+                BtsTransactionDefinition::new("BT01", "BTSMAIN", true, false).unwrap(),
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("BTSREPO", "BTS.REPO", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Update)
+            .unwrap();
+        let lifecycle_resource = BtsLifecycleStore::saf_resource("TYPE", &process_name).unwrap();
+        server
+            .racf
+            .define_profile("BTSLIFE", &lifecycle_resource, "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "BTSLIFE",
+                &lifecycle_resource,
+                "IBMUSER",
+                AccessIntent::Read,
+            )
+            .unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "BP01", Some(parent_ref))
+            .unwrap();
+        let session = SessionId::new("bts-flow-parent", 64).unwrap();
+        server
+            .cics
+            .launch_background_task(invocation.clone(), &session, "BP01")
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, now_tick)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "BTSFLOW", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "BTSFLOW", now_tick)
+            .unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let process = authority
+            .load_process("TYPE", &process_name)
+            .unwrap()
+            .unwrap();
+        assert!(process.pending_uow.is_none());
+        assert!(process.activities[&process.root_id].acquired_by.is_some());
+        let work = server.claim_jes_work("bts-flow-worker").unwrap().unwrap();
+        assert_eq!(work.required_generation, BTS_RUN_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Completed);
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let completed = authority
+            .load_process("TYPE", &process_name)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            completed.activities[&completed.root_id].completion,
+            BtsCompletion::Normal
+        );
+    }
+
     async fn wait_for_worker_health(server: &ProductServer, expected: usize) {
         for _ in 0..4_000 {
             if server.metrics().jes_worker_healthy == expected {
@@ -19759,8 +20214,9 @@ mod tests {
             .register_bts_child(&invocation.run_unit_id, child_token, Some("REPLY"))
             .unwrap();
         let authority = BtsLifecycleStore::new(server.store.as_ref());
-        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
-        let grandchild_id = BtsLifecycleStore::child_id("TYPE", "PROC", 1).unwrap();
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "PROC", invocation.run_unit_id.as_str()).unwrap();
+        let grandchild_id = BtsLifecycleStore::child_id("TYPE", "PROC", &root, 1).unwrap();
         server
             .racf
             .define_profile("BTSEVENT", &format!("CICS.BTS.{root}.GO"), "IBMUSER", None)
@@ -19829,7 +20285,7 @@ mod tests {
                 id: grandchild_id.clone(),
                 name: "GRAND".into(),
                 parent_id: Some(root.clone()),
-                completion_event: None,
+                completion_event: Some("DONE".into()),
                 program: "BTSGRND".into(),
                 transid: "BT00".into(),
                 userid: "IBMUSER".into(),
@@ -19839,6 +20295,7 @@ mod tests {
                 activation_epoch: 0,
                 checkpoint: None,
                 acquired_by: None,
+                pending_uow: Some(invocation.run_unit_id.as_str().into()),
                 abcode: None,
                 abprogram: None,
             },

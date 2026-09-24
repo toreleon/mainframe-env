@@ -99,8 +99,8 @@ pub(super) fn operands(
     let mut values = Vec::new();
     for (name, identity, numeric) in [
         ("CHILD", HirCicsOperandName::BtsChild, false),
-        ("ACTIVITY", HirCicsOperandName::BtsActivity, false),
-        ("INPUTEVENT", HirCicsOperandName::BtsInputEvent, false),
+        ("ACTIVITY", HirCicsOperandName::BtsLinkActivity, false),
+        ("INPUTEVENT", HirCicsOperandName::BtsLinkInputEvent, false),
         ("TIMEOUT", HirCicsOperandName::BtsTimeout, true),
     ] {
         if let Some(value) = clauses.get(name) {
@@ -131,7 +131,7 @@ pub(super) fn outputs(
     let mut outputs = Vec::new();
     for (name, identity, length, binary) in [
         ("ANY", HirCicsOutputName::BtsAny, 16, false),
-        ("COMPSTATUS", HirCicsOutputName::BtsCompStatus, 4, true),
+        ("COMPSTATUS", HirCicsOutputName::BtsChildCompStatus, 4, true),
         ("CHANNEL", HirCicsOutputName::BtsChannel, 16, false),
         ("ABCODE", HirCicsOutputName::BtsAbcode, 4, false),
     ] {

@@ -111,6 +111,9 @@ pub(super) fn suspension(
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Converse => ("cics-converse", true),
         CicsOperation::Delay => ("cics-delay", true),
+        CicsOperation::RunAcqActivity
+        | CicsOperation::RunAcqProcess
+        | CicsOperation::RunActivity => ("cics-bts-run", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::WaitEvent
         | CicsOperation::WaitExternal
@@ -634,7 +637,14 @@ pub(super) fn execute(
             | CicsOutputName::ConversationToFullLength => {
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::Abstime
+            CicsOutputName::BtsActivityId
+            | CicsOutputName::BtsCompStatus
+            | CicsOutputName::BtsMode
+            | CicsOutputName::BtsSuspStatus
+            | CicsOutputName::BtsAbCode
+            | CicsOutputName::BtsAbProgram
+            | CicsOutputName::BtsChildToken
+            | CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate
             | CicsOutputName::SecurityControl
@@ -656,7 +666,7 @@ pub(super) fn execute(
             | CicsOutputName::TimerStatus
             | CicsOutputName::EventName
             | CicsOutputName::BtsAny
-            | CicsOutputName::BtsCompStatus
+            | CicsOutputName::BtsChildCompStatus
             | CicsOutputName::BtsChannel
             | CicsOutputName::BtsAbcode
             | CicsOutputName::SubEventName
@@ -847,6 +857,20 @@ pub(super) fn execute(
             "DELAY.ID".into(),
             payload(
                 "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
+        );
+    }
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::RunAcqActivity
+            | CicsPlanOperation::RunAcqProcess
+            | CicsPlanOperation::RunActivity
+    ) {
+        arguments.insert(
+            "BTS.RUN.ID".into(),
+            payload(
+                "mainframe-env.cics.bts-run-id@1",
                 format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
             )?,
         );

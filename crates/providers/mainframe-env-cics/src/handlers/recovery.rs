@@ -99,6 +99,14 @@ fn syncpoint(
             _ => return Err(HostProblem::IdempotencyConflict),
         }
     } else {
+        if outcome == CicsUnitOfWorkOutcome::Committed {
+            super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref())
+                .preflight_pending_definition(
+                    run.invocation.run_unit_id.as_str(),
+                    run.invocation.execution_id.as_str(),
+                    run.invocation.principal.id().as_str(),
+                )?;
+        }
         service
             .store
             .put_provider_state(
@@ -128,6 +136,12 @@ fn syncpoint(
     syncpoint_db2(service, run, outcome)?;
     syncpoint_ims(service, run, outcome)?;
     syncpoint_mq(service, run, outcome)?;
+    super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref()).finish_run_uow(
+        run.invocation.run_unit_id.as_str(),
+        run.invocation.execution_id.as_str(),
+        run.invocation.principal.id().as_str(),
+        outcome == CicsUnitOfWorkOutcome::Committed,
+    )?;
     super::release_uow_enqueues(service, run)?;
     if outcome == CicsUnitOfWorkOutcome::RolledBack {
         rollback_run(service, run)?;

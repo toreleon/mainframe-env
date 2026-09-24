@@ -116,6 +116,7 @@ pub(super) fn validate_machine_slot(
         slot_use,
         SlotUse::Output
             | SlotUse::ExactOutput(_)
+            | SlotUse::BtsExactOutput(_)
             | SlotUse::CounterNumber
             | SlotUse::AbstimeOutput
             | SlotUse::FormatTextOutput(_)
@@ -135,6 +136,26 @@ pub(super) fn validate_machine_slot(
         LayoutCategory::Condition | LayoutCategory::Rename
     ) {
         return Err(invalid_plan("plan output is not writable storage"));
+    }
+    if let SlotUse::BtsTextInput(maximum) = slot_use
+        && (!(1..=maximum).contains(&layout.length)
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan("BTS text input has an invalid storage shape"));
+    }
+    if let SlotUse::BtsExactInput(expected) | SlotUse::BtsExactOutput(expected) = slot_use
+        && (layout.length != expected
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "BTS fixed-width field has an invalid storage shape",
+        ));
     }
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));

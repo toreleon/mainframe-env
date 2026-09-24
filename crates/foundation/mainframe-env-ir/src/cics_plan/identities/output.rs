@@ -9,10 +9,17 @@ pub enum CicsOutputName {
     IssueConvData,
     /// Six-byte GDS return code.
     IssueRetCode,
+    BtsActivityId,
+    BtsCompStatus,
+    BtsMode,
+    BtsSuspStatus,
+    BtsAbCode,
+    BtsAbProgram,
+    BtsChildToken,
     /// Opaque token selected by FETCH ANY.
     BtsAny,
     /// Child completion CVDA.
-    BtsCompStatus,
+    BtsChildCompStatus,
     /// Reply channel name fetched from a child.
     BtsChannel,
     /// Four-character child abend code.

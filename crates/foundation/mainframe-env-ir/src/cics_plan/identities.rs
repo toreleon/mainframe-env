@@ -6,6 +6,30 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// BTS process and activity lifecycle commands, catalog rows 0002–0217.
+    AcquireActivityId,
+    AcquireProcess,
+    CancelAcqActivity,
+    CancelAcqProcess,
+    CancelActivity,
+    CheckAcqActivity,
+    CheckAcqProcess,
+    CheckActivity,
+    DefineActivity,
+    DefineProcess,
+    DeleteActivity,
+    ResetAcqProcess,
+    ResetActivity,
+    ResumeAcqActivity,
+    ResumeAcqProcess,
+    ResumeActivity,
+    RunAcqActivity,
+    RunAcqProcess,
+    RunActivity,
+    RunTransId,
+    SuspendAcqActivity,
+    SuspendAcqProcess,
+    SuspendActivity,
     /// Fetch one eligible parent-owned child task.
     FetchAny,
     /// Fetch one child task by its opaque token.
@@ -443,12 +467,23 @@ pub enum CicsOperandName {
     IssueLength,
     /// Optional PASS logon mode.
     IssueLogMode,
+    BtsActivityId,
+    BtsProcess,
+    BtsProcessType,
+    BtsActivity,
+    BtsEvent,
+    BtsInputEvent,
+    BtsTransId,
+    BtsProgram,
+    BtsUserId,
+    BtsFacilityToken,
+    BtsChannel,
     /// Opaque sixteen-byte child token.
     BtsChild,
     /// Name of a current activity's child.
-    BtsActivity,
+    BtsLinkActivity,
     /// Input event for a dormant BTS activity.
-    BtsInputEvent,
+    BtsLinkInputEvent,
     /// Fullword wait limit in milliseconds.
     BtsTimeout,
     /// Task-local attach-header identifier.

@@ -1257,6 +1257,167 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
     },
     {
+      "operation": "AcquireActivityId",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0002"
+    },
+    {
+      "operation": "AcquireProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0003"
+    },
+    {
+      "operation": "CancelAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0017"
+    },
+    {
+      "operation": "CancelAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0018"
+    },
+    {
+      "operation": "CancelActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0019"
+    },
+    {
+      "operation": "CheckAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0023"
+    },
+    {
+      "operation": "CheckAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0024"
+    },
+    {
+      "operation": "CheckActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0025"
+    },
+    {
+      "operation": "DefineActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0032"
+    },
+    {
+      "operation": "DefineProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0037"
+    },
+    {
+      "operation": "DeleteActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0041"
+    },
+    {
+      "operation": "ResetAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0169"
+    },
+    {
+      "operation": "ResetActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0170"
+    },
+    {
+      "operation": "ResumeAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0172"
+    },
+    {
+      "operation": "ResumeAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0173"
+    },
+    {
+      "operation": "ResumeActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0174"
+    },
+    {
+      "operation": "RunAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0183"
+    },
+    {
+      "operation": "RunAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0184"
+    },
+    {
+      "operation": "RunActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0185"
+    },
+    {
+      "operation": "RunTransId",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0186"
+    },
+    {
+      "operation": "SuspendAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0215"
+    },
+    {
+      "operation": "SuspendAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0216"
+    },
+    {
+      "operation": "SuspendActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
+    },
+    {
       "operation": "FetchAny",
       "interface": "api",
       "family": "bts-control",

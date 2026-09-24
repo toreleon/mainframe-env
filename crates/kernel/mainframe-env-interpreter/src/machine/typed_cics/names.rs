@@ -28,6 +28,9 @@ pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Optio
 
 #[derive(Clone, Copy)]
 pub(super) enum SlotUse {
+    BtsTextInput(usize),
+    BtsExactInput(usize),
+    BtsExactOutput(usize),
     Input,
     HalfwordInput,
     FullwordInput,
@@ -68,6 +71,20 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::BtsActivityId => SlotUse::BtsTextInput(52),
+        CicsOperandName::BtsProcess => SlotUse::BtsTextInput(36),
+        CicsOperandName::BtsProcessType
+        | CicsOperandName::BtsProgram
+        | CicsOperandName::BtsUserId => SlotUse::BtsTextInput(8),
+        CicsOperandName::BtsTransId => SlotUse::BtsTextInput(4),
+        CicsOperandName::BtsActivity
+        | CicsOperandName::BtsEvent
+        | CicsOperandName::BtsInputEvent
+        | CicsOperandName::BtsLinkActivity
+        | CicsOperandName::BtsLinkInputEvent
+        | CicsOperandName::BtsChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::BtsFacilityToken => SlotUse::BtsExactInput(8),
+        CicsOperandName::BtsChild => SlotUse::BtsExactInput(16),
         CicsOperandName::BtsTimeout => SlotUse::FullwordInput,
         CicsOperandName::ConversationMaxProcLen => SlotUse::HalfwordInput,
         CicsOperandName::ConversationAttachId
@@ -206,10 +223,17 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::BtsActivityId => SlotUse::BtsExactOutput(52),
+        CicsOutputName::BtsAbCode => SlotUse::BtsExactOutput(4),
+        CicsOutputName::BtsAbProgram => SlotUse::BtsExactOutput(8),
+        CicsOutputName::BtsChildToken => SlotUse::BtsExactOutput(16),
+        CicsOutputName::BtsCompStatus | CicsOutputName::BtsMode | CicsOutputName::BtsSuspStatus => {
+            SlotUse::FullwordOutput
+        }
         CicsOutputName::BtsAny | CicsOutputName::BtsChannel | CicsOutputName::BtsAbcode => {
             SlotUse::Output
         }
-        CicsOutputName::BtsCompStatus => SlotUse::FullwordOutput,
+        CicsOutputName::BtsChildCompStatus => SlotUse::FullwordOutput,
         CicsOutputName::AttachIuType
         | CicsOutputName::AttachDataStream
         | CicsOutputName::AttachRecordFormat
@@ -387,9 +411,20 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::IssueFrom => "FROM",
         CicsOperandName::IssueLength => "LENGTH",
         CicsOperandName::IssueLogMode => "LOGMODE",
-        CicsOperandName::BtsChild => "CHILD",
+        CicsOperandName::BtsActivityId => "ACTIVITYID",
+        CicsOperandName::BtsProcess => "PROCESS",
+        CicsOperandName::BtsProcessType => "PROCESSTYPE",
         CicsOperandName::BtsActivity => "ACTIVITY",
+        CicsOperandName::BtsEvent => "EVENT",
         CicsOperandName::BtsInputEvent => "INPUTEVENT",
+        CicsOperandName::BtsTransId => "TRANSID",
+        CicsOperandName::BtsProgram => "PROGRAM",
+        CicsOperandName::BtsUserId => "USERID",
+        CicsOperandName::BtsFacilityToken => "FACILITYTOKN",
+        CicsOperandName::BtsChannel => "CHANNEL",
+        CicsOperandName::BtsChild => "CHILD",
+        CicsOperandName::BtsLinkActivity => "ACTIVITY",
+        CicsOperandName::BtsLinkInputEvent => "INPUTEVENT",
         CicsOperandName::BtsTimeout => "TIMEOUT",
         CicsOperandName::ConversationAttachId => "ATTACHID",
         CicsOperandName::ConversationConvid => "CONVID",
@@ -752,8 +787,15 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::IssueState => "STATE",
         CicsOutputName::IssueConvData => "CONVDATA",
         CicsOutputName::IssueRetCode => "RETCODE",
-        CicsOutputName::BtsAny => "ANY",
+        CicsOutputName::BtsActivityId => "ACTIVITYID",
         CicsOutputName::BtsCompStatus => "COMPSTATUS",
+        CicsOutputName::BtsMode => "MODE",
+        CicsOutputName::BtsSuspStatus => "SUSPSTATUS",
+        CicsOutputName::BtsAbCode => "ABCODE",
+        CicsOutputName::BtsAbProgram => "ABPROGRAM",
+        CicsOutputName::BtsChildToken => "CHILD",
+        CicsOutputName::BtsAny => "ANY",
+        CicsOutputName::BtsChildCompStatus => "COMPSTATUS",
         CicsOutputName::BtsChannel => "CHANNEL",
         CicsOutputName::BtsAbcode => "ABCODE",
         CicsOutputName::AttachProcess => "PROCESS",
@@ -916,6 +958,8 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::BtsSynchronous => "SYNCHRONOUS",
+        CicsPlanOption::BtsAsynchronous => "ASYNCHRONOUS",
         CicsPlanOption::BtsNoSuspend => "NOSUSPEND",
         CicsPlanOption::BtsAcqActivity => "ACQACTIVITY",
         CicsPlanOption::BtsAcqProcess => "ACQPROCESS",

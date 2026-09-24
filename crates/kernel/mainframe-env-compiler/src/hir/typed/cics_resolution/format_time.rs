@@ -232,6 +232,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SecurityEncryptLength
         | HirCicsOutputName::SecurityLangInUse
         | HirCicsOutputName::SecurityNatLangInUse
+        | HirCicsOutputName::BtsActivityId
+        | HirCicsOutputName::BtsCompStatus
+        | HirCicsOutputName::BtsMode
+        | HirCicsOutputName::BtsSuspStatus
+        | HirCicsOutputName::BtsAbCode
+        | HirCicsOutputName::BtsAbProgram
+        | HirCicsOutputName::BtsChildToken
         | HirCicsOutputName::AttachProcess
         | HirCicsOutputName::AttachResource
         | HirCicsOutputName::AttachReturnProcess
@@ -255,7 +262,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::TctTermId
         | HirCicsOutputName::Assign(_) => Ok(()),
         HirCicsOutputName::BtsAny
-        | HirCicsOutputName::BtsCompStatus
+        | HirCicsOutputName::BtsChildCompStatus
         | HirCicsOutputName::BtsChannel
         | HirCicsOutputName::BtsAbcode => Ok(()),
         HirCicsOutputName::ConversationConvid

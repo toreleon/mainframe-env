@@ -136,6 +136,36 @@ pub(in crate::machine) fn write_output(
             }),
         );
     }
+    if matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS")
+        && matches!(
+            operation,
+            CicsOperation::CheckAcqActivity
+                | CicsOperation::CheckAcqProcess
+                | CicsOperation::CheckActivity
+        )
+    {
+        if value.schema() != "mainframe-env.cics.cvda@1" {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let code = match (name, value.bytes()) {
+            ("COMPSTATUS", b"INCOMPLETE")
+            | ("MODE", b"INITIAL")
+            | ("SUSPSTATUS", b"NOTSUSPENDED") => 0,
+            ("COMPSTATUS", b"NORMAL") | ("MODE", b"ACTIVE") | ("SUSPSTATUS", b"SUSPENDED") => 1,
+            ("COMPSTATUS", b"ABEND") | ("MODE", b"DORMANT") => 2,
+            ("COMPSTATUS", b"FORCED") | ("MODE", b"CANCELLING") => 3,
+            ("MODE", b"COMPLETE") => 4,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        };
+        return write_target(
+            machine,
+            target,
+            &CobolValue::Decimal(Decimal {
+                coefficient: code,
+                scale: 0,
+            }),
+        );
+    }
     if matches!(name, "EVENTTYPE" | "FIRESTATUS") {
         if value.schema() != "mainframe-env.cics.cvda@1" {
             return Err(MachineProblem::UnexpectedHostResult);

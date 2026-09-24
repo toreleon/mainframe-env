@@ -102,6 +102,42 @@ impl CicsService {
         })
     }
 
+    /// The provider holds this authenticated run outside the live-run map
+    /// while dispatching RUN TRANSID. It writes the same child-ownership row.
+    pub(in crate::service) fn register_bts_child_inflight(
+        &self,
+        run: &Run,
+        token: [u8; 16],
+        reply_channel: Option<&str>,
+    ) -> Result<(), HostProblem> {
+        if token == [0; 16] {
+            return Err(HostProblem::Unauthorized);
+        }
+        let reply_channel = reply_channel.map(channel_name).transpose()?;
+        change(self, run.invocation.run_unit_id.as_str(), |state| {
+            let key = token_key(&token);
+            if state.children.contains_key(&key) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if state.children.len() == MAX_CHILDREN {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            state.children.insert(
+                key,
+                Child {
+                    token,
+                    reply_channel: reply_channel.clone(),
+                    completion: None,
+                    abcode: None,
+                    fetched: false,
+                    channel_fetched: false,
+                    freed: false,
+                },
+            );
+            Ok(())
+        })
+    }
+
     /// Record terminal child outcome from the shared BTS lifecycle authority.
     pub fn complete_bts_child(
         &self,
@@ -136,6 +172,38 @@ impl CicsService {
             }
             Ok(())
         })
+    }
+    /// Reconcile a crash after registration using the sibling row's exact token.
+    #[allow(dead_code)] // Consumed by the RUN TRANSID outbox route in the next feature.
+    pub(crate) fn bts_child_registered(
+        &self,
+        parent: &RunUnitId,
+        token: [u8; 16],
+        reply_channel: Option<&str>,
+    ) -> Result<bool, HostProblem> {
+        let reply_channel = reply_channel.map(channel_name).transpose()?;
+        Ok(load(self, parent.as_str())?
+            .children
+            .get(&token_key(&token))
+            .is_some_and(|child| {
+                child.reply_channel == reply_channel || child.freed && child.reply_channel.is_none()
+            }))
+    }
+
+    /// Read the sibling token outcome for crash-gap reconciliation.
+    pub(in crate::service) fn bts_child_outcome(
+        &self,
+        parent: &RunUnitId,
+        token: [u8; 16],
+    ) -> Result<Option<(CicsBtsChildCompletion, Option<String>)>, HostProblem> {
+        let state = load(self, parent.as_str())?;
+        let child = state
+            .children
+            .get(&token_key(&token))
+            .ok_or(HostProblem::NotFound)?;
+        Ok(child
+            .completion
+            .map(|completion| (completion, child.abcode.clone())))
     }
 }
 
@@ -574,15 +642,38 @@ fn normal_condition() -> String {
 fn channel_name(value: &str) -> Result<String, HostProblem> {
     let value = value.trim_end_matches(' ');
     if value.is_empty()
-        || value.len() > 16
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'@' | b'#'))
+        || value.chars().count() > 16
+        || value.chars().any(|character| {
+            !(character.is_ascii_alphanumeric()
+                || matches!(
+                    character,
+                    '$' | '@'
+                        | '#'
+                        | '.'
+                        | '/'
+                        | '-'
+                        | '_'
+                        | '%'
+                        | '&'
+                        | '?'
+                        | '!'
+                        | ':'
+                        | '|'
+                        | '"'
+                        | '='
+                        | '¬'
+                        | ','
+                        | ';'
+                        | '<'
+                        | '>'
+                ))
+        })
     {
         return Err(HostProblem::Malformed);
     }
     Ok(value.into())
 }
+
 fn valid_abcode(value: &str) -> Result<String, HostProblem> {
     if value.len() != 4 || !value.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
         return Err(HostProblem::Malformed);

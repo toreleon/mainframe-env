@@ -8,6 +8,8 @@ pub(in crate::cics_plan) const fn option_tag(value: CicsPlanOption) -> u16 {
         | CicsPlanOption::IssueConverse
         | CicsPlanOption::IssueLogonLogmode
         | CicsPlanOption::IssueNoQuiesce => issue::option_tag(value),
+        CicsPlanOption::BtsSynchronous => 636,
+        CicsPlanOption::BtsAsynchronous => 637,
         CicsPlanOption::BtsNoSuspend => 1020,
         CicsPlanOption::BtsAcqActivity => 1021,
         CicsPlanOption::BtsAcqProcess => 1022,
@@ -169,6 +171,8 @@ pub(in crate::cics_plan) fn option_from_tag(
 ) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
         1404..=1531 => issue::option_from_tag(value),
+        636 => Ok(CicsPlanOption::BtsSynchronous),
+        637 => Ok(CicsPlanOption::BtsAsynchronous),
         1020 => Ok(CicsPlanOption::BtsNoSuspend),
         1021 => Ok(CicsPlanOption::BtsAcqActivity),
         1022 => Ok(CicsPlanOption::BtsAcqProcess),

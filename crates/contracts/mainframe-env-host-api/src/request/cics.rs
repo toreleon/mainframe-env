@@ -4,9 +4,34 @@ use super::{HostLimits, HostProblem, Mutation};
 use mainframe_env_execution_api::BoundedPayload;
 use std::collections::BTreeMap;
 
+mod parse;
+
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    AcquireActivityId,
+    AcquireProcess,
+    CancelAcqActivity,
+    CancelAcqProcess,
+    CancelActivity,
+    CheckAcqActivity,
+    CheckAcqProcess,
+    CheckActivity,
+    DefineActivity,
+    DefineProcess,
+    DeleteActivity,
+    ResetAcqProcess,
+    ResetActivity,
+    ResumeAcqActivity,
+    ResumeAcqProcess,
+    ResumeActivity,
+    RunAcqActivity,
+    RunAcqProcess,
+    RunActivity,
+    RunTransId,
+    SuspendAcqActivity,
+    SuspendAcqProcess,
+    SuspendActivity,
     /// Allocate one task-owned mapped APPC or MRO conversation.
     AllocateConversation,
     /// Allocate one task-owned APPC basic conversation with GDS return codes.
@@ -399,6 +424,29 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::AcquireActivityId => "AcquireActivityId",
+            Self::AcquireProcess => "AcquireProcess",
+            Self::CancelAcqActivity => "CancelAcqActivity",
+            Self::CancelAcqProcess => "CancelAcqProcess",
+            Self::CancelActivity => "CancelActivity",
+            Self::CheckAcqActivity => "CheckAcqActivity",
+            Self::CheckAcqProcess => "CheckAcqProcess",
+            Self::CheckActivity => "CheckActivity",
+            Self::DefineActivity => "DefineActivity",
+            Self::DefineProcess => "DefineProcess",
+            Self::DeleteActivity => "DeleteActivity",
+            Self::ResetAcqProcess => "ResetAcqProcess",
+            Self::ResetActivity => "ResetActivity",
+            Self::ResumeAcqActivity => "ResumeAcqActivity",
+            Self::ResumeAcqProcess => "ResumeAcqProcess",
+            Self::ResumeActivity => "ResumeActivity",
+            Self::RunAcqActivity => "RunAcqActivity",
+            Self::RunAcqProcess => "RunAcqProcess",
+            Self::RunActivity => "RunActivity",
+            Self::RunTransId => "RunTransId",
+            Self::SuspendAcqActivity => "SuspendAcqActivity",
+            Self::SuspendAcqProcess => "SuspendAcqProcess",
+            Self::SuspendActivity => "SuspendActivity",
             Self::AllocateConversation => "AllocateConversation",
             Self::GdsAllocateConversation => "GdsAllocateConversation",
             Self::GdsAssignConversation => "GdsAssignConversation",
@@ -640,7 +688,28 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::FetchAny
+            Self::AcquireActivityId
+                | Self::AcquireProcess
+                | Self::CancelAcqActivity
+                | Self::CancelAcqProcess
+                | Self::CancelActivity
+                | Self::CheckActivity
+                | Self::DefineActivity
+                | Self::DefineProcess
+                | Self::DeleteActivity
+                | Self::ResetAcqProcess
+                | Self::ResetActivity
+                | Self::ResumeAcqActivity
+                | Self::ResumeAcqProcess
+                | Self::ResumeActivity
+                | Self::RunAcqActivity
+                | Self::RunAcqProcess
+                | Self::RunActivity
+                | Self::RunTransId
+                | Self::SuspendAcqActivity
+                | Self::SuspendAcqProcess
+                | Self::SuspendActivity
+                | Self::FetchAny
                 | Self::FetchChild
                 | Self::FreeChild
                 | Self::LinkAcqActivity
@@ -824,242 +893,6 @@ impl CicsOperation {
                 | Self::ResetBrowse
                 | Self::EndBrowse
         )
-    }
-
-    #[must_use]
-    pub fn from_tokens(tokens: &[String]) -> Option<Self> {
-        let words: Vec<String> = tokens
-            .iter()
-            .map(|token| token.to_ascii_uppercase())
-            .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
-            .collect();
-        let first = words.first()?.as_str();
-        let second = words
-            .get(1)
-            .map(|word| word.split('(').next().unwrap_or(word));
-        Some(match (first, second) {
-            ("ALLOCATE", _) => Self::AllocateConversation,
-            ("GDS", Some("ALLOCATE")) => Self::GdsAllocateConversation,
-            ("GDS", Some("ASSIGN")) => Self::GdsAssignConversation,
-            ("GDS", Some("ISSUE")) => match words.get(2).map(String::as_str) {
-                Some("ABEND") => Self::GdsIssueAbend,
-                Some("CONFIRMATION") => Self::GdsIssueConfirmation,
-                Some("ERROR") => Self::GdsIssueError,
-                Some("PREPARE") => Self::GdsIssuePrepare,
-                Some("SIGNAL") => Self::GdsIssueSignal,
-                _ => return None,
-            },
-            ("BUILD", Some("ATTACH")) => Self::BuildAttach,
-            ("CONNECT", Some("PROCESS")) => Self::ConnectProcess,
-            ("GDS", Some("CONNECT")) => Self::GdsConnectProcess,
-            ("FREE", Some("CHILD")) => Self::FreeChild,
-            ("FREE", _) => Self::FreeConversation,
-            ("GDS", Some("FREE")) => Self::GdsFreeConversation,
-            ("CONVERSE", _) => Self::Converse,
-            ("GDS", Some("RECEIVE")) => Self::GdsReceiveConversation,
-            ("WAIT", Some("CONVID")) => Self::WaitConvid,
-            ("GDS", Some("WAIT")) => Self::GdsWaitConversation,
-            ("WAIT", Some("TERMINAL")) => Self::WaitTerminal,
-            ("ABEND", _) => Self::Abend,
-            ("EXTRACT", Some("ATTACH")) => Self::ExtractAttach,
-            ("EXTRACT", Some("ATTRIBUTES")) => Self::ExtractAttributes,
-            ("EXTRACT", Some("LOGONMSG")) => Self::ExtractLogonMsg,
-            ("EXTRACT", Some("PROCESS")) => Self::ExtractProcess,
-            ("EXTRACT", Some("TCT")) => Self::ExtractTct,
-            ("GDS", Some("EXTRACT")) if words.get(2).is_some_and(|word| word == "ATTRIBUTES") => {
-                Self::GdsExtractAttributes
-            }
-            ("GDS", Some("EXTRACT")) if words.get(2).is_some_and(|word| word == "PROCESS") => {
-                Self::GdsExtractProcess
-            }
-            ("POINT", _) => Self::Point,
-            ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
-            ("ADDRESS", Some("SET")) => Self::AddressSet,
-            ("ADDRESS", _) => Self::Address,
-            ("ASKTIME", _)
-                if words
-                    .iter()
-                    .any(|word| word == "ABSTIME" || word.starts_with("ABSTIME(")) =>
-            {
-                Self::Asktime
-            }
-            ("ASKTIME", _) => Self::AsktimeEib,
-            ("BIF", Some("DEEDIT")) => Self::BifDeedit,
-            ("BIF", Some("DIGEST")) => Self::BifDigest,
-            ("ASSIGN", _) => Self::Assign,
-            ("CANCEL", _) => Self::Cancel,
-            ("FETCH", Some("ANY")) => Self::FetchAny,
-            ("FETCH", Some("CHILD")) => Self::FetchChild,
-            ("LINK", Some("ACQACTIVITY")) => Self::LinkAcqActivity,
-            ("LINK", Some("ACQPROCESS")) => Self::LinkAcqProcess,
-            ("LINK", Some("ACTIVITY")) => Self::LinkActivity,
-            ("CHANGE", Some("TASK")) => Self::ChangeTask,
-            ("CHANGE", Some("PASSWORD")) => Self::ChangePassword,
-            ("CHANGE", Some("PHRASE")) => Self::ChangePhrase,
-            ("DELAY", _) => Self::Delay,
-            ("POST", _) => Self::Post,
-            ("WRITE", Some("OPERATOR")) => Self::WriteOperator,
-            ("EXTRACT", Some("CERTIFICATE")) => Self::ExtractCertificate,
-            ("EXTRACT", Some("TCPIP")) => Self::ExtractTcpip,
-            ("DEQ", _) => Self::Deq,
-            ("DEFINE", Some("COUNTER")) => Self::DefineCounter,
-            ("DEFINE", Some("DCOUNTER")) => Self::DefineDCounter,
-            ("DELETE", Some("COUNTER")) => Self::DeleteCounter,
-            ("DELETE", Some("DCOUNTER")) => Self::DeleteDCounter,
-            ("GET", Some("COUNTER")) => Self::GetCounter,
-            ("GET", Some("DCOUNTER")) => Self::GetDCounter,
-            ("QUERY", Some("COUNTER")) => Self::QueryCounter,
-            ("QUERY", Some("DCOUNTER")) => Self::QueryDCounter,
-            ("REWIND", Some("COUNTER")) => Self::RewindCounter,
-            ("REWIND", Some("DCOUNTER")) => Self::RewindDCounter,
-            ("UPDATE", Some("COUNTER")) => Self::UpdateCounter,
-            ("UPDATE", Some("DCOUNTER")) => Self::UpdateDCounter,
-            ("DELETE", _) => Self::Delete,
-            ("DEFINE", Some("INPUT")) => Self::DefineInputEvent,
-            ("DEFINE", Some("COMPOSITE")) => Self::DefineCompositeEvent,
-            ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
-            ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,
-            ("DOCUMENT", Some("INSERT")) => Self::DocumentInsert,
-            ("DOCUMENT", Some("RETRIEVE")) => Self::DocumentRetrieve,
-            ("DOCUMENT", Some("SET")) => Self::DocumentSet,
-            ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
-            ("DELETEQ", Some("TS")) => Self::DeleteTemporaryStorage,
-            ("READQ", Some("TS")) => Self::ReadTemporaryStorage,
-            ("WRITEQ", Some("TS")) => Self::WriteTemporaryStorage,
-            ("ENQ", _) => Self::Enq,
-            ("ENDBR", _) => Self::EndBrowse,
-            ("FORMATTIME", _) => Self::FormatTime,
-            ("CONVERTTIME", _) => Self::ConvertTime,
-            ("FREEMAIN", _) => Self::Freemain,
-            ("FREEMAIN64", _) => Self::Freemain64,
-            ("GETMAIN", _) => Self::Getmain,
-            ("GETMAIN64", _) => Self::Getmain64,
-            ("HANDLE", Some("ABEND")) => Self::HandleAbend,
-            ("HANDLE", Some("AID")) => Self::HandleAid,
-            ("HANDLE", Some("CONDITION")) => Self::HandleCondition,
-            ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
-            ("INQUIRE", _) => Self::Inquire,
-            ("INVOKE", Some("APPLICATION")) => Self::InvokeApplication,
-            ("INVOKE", Some("SERVICE")) => Self::InvokeService,
-            ("SOAPFAULT", Some("ADD")) => Self::SoapFaultAdd,
-            ("SOAPFAULT", Some("CREATE")) => Self::SoapFaultCreate,
-            ("SOAPFAULT", Some("DELETE")) => Self::SoapFaultDelete,
-            ("WSACONTEXT", Some("BUILD")) => Self::WsaContextBuild,
-            ("WSACONTEXT", Some("DELETE")) => Self::WsaContextDelete,
-            ("WSACONTEXT", Some("GET")) => Self::WsaContextGet,
-            ("WSAEPR", Some("CREATE")) => Self::WsaEprCreate,
-            ("LOAD", _) => Self::Load,
-            ("RELEASE", _) => Self::Release,
-            ("LINK", _) => Self::Link,
-            ("POP", Some("HANDLE")) => Self::PopHandle,
-            ("PUSH", Some("HANDLE")) => Self::PushHandle,
-            ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
-            ("QUERY", Some("SECURITY")) => Self::QuerySecurity,
-            ("REQUEST", Some("PASSTICKET")) => Self::RequestPassTicket,
-            ("REQUEST", Some("ENCRYPTPTKT")) => Self::RequestEncryptPassTicket,
-            ("SIGNON", _) => Self::Signon,
-            ("SIGNOFF", _) => Self::Signoff,
-            ("READ", _) => Self::Read,
-            ("READQ", Some("TD")) => Self::ReadTransientData,
-            ("REMOVE", Some("SUBEVENT")) => Self::RemoveSubevent,
-            ("READNEXT", _) => Self::ReadNext,
-            ("READPREV", _) => Self::ReadPrev,
-            ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
-            ("RECEIVE", Some("PARTN")) => Self::ReceivePartn,
-            ("RECEIVE", _) => Self::ReceiveConversation,
-            ("RETRIEVE", Some("REATTACH")) => Self::RetrieveReattachEvent,
-            ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
-            ("RETRIEVE", _) => Self::Retrieve,
-            ("TEST", Some("EVENT")) => Self::TestEvent,
-            ("SIGNAL", Some("EVENT")) => Self::SignalEvent,
-            ("RETURN", _) => Self::Return,
-            ("RESETBR", _) => Self::ResetBrowse,
-            ("REWRITE", _) => Self::Rewrite,
-            ("SEND", Some("MAP")) => Self::SendMap,
-            ("SEND", Some("CONTROL")) => Self::SendControl,
-            ("ISSUE", Some("ABORT")) => Self::IssueAbort,
-            ("ISSUE", Some("ABEND")) => Self::IssueAbend,
-            ("ISSUE", Some("CONFIRMATION")) => Self::IssueConfirmation,
-            ("ISSUE", Some("ERROR")) => Self::IssueError,
-            ("ISSUE", Some("PREPARE")) => Self::IssuePrepare,
-            ("ISSUE", Some("SIGNAL")) => Self::IssueSignal,
-            ("ISSUE", Some("COPY")) => Self::IssueCopy,
-            ("ISSUE", Some("DISCONNECT")) => Self::IssueDisconnect,
-            ("ISSUE", Some("ENDFILE")) => Self::IssueEndfile,
-            ("ISSUE", Some("ENDOUTPUT")) => Self::IssueEndoutput,
-            ("ISSUE", Some("EODS")) => Self::IssueEods,
-            ("ISSUE", Some("ERASEAUP")) => Self::IssueEraseAup,
-            ("ISSUE", Some("LOAD")) => Self::IssueLoad,
-            ("ISSUE", Some("PASS")) => Self::IssuePass,
-            ("ISSUE", Some("PRINT")) => Self::IssuePrint,
-            ("ISSUE", Some("RESET")) => Self::IssueReset,
-            ("ISSUE", Some("ADD")) => Self::IssueAdd,
-            ("ISSUE", Some("END")) => Self::IssueEnd,
-            ("ISSUE", Some("ERASE")) => Self::IssueErase,
-            ("ISSUE", Some("NOTE")) => Self::IssueNote,
-            ("ISSUE", Some("QUERY")) => Self::IssueQuery,
-            ("ISSUE", Some("RECEIVE")) => Self::IssueReceive,
-            ("ISSUE", Some("REPLACE")) => Self::IssueReplace,
-            ("ISSUE", Some("SEND")) => Self::IssueSend,
-            ("ROUTE", _) => Self::Route,
-            ("ISSUE", Some("WAIT")) => Self::IssueWait,
-            ("SEND", Some("PAGE")) => Self::SendPage,
-            ("SEND", Some("PARTNSET")) => Self::SendPartnset,
-            ("SEND", Some("CONVID" | "SESSION")) => Self::SendConversation,
-            ("SEND", _) => Self::SendText,
-            ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
-            ("SPOOLCLOSE", _) => Self::SpoolClose,
-            ("SPOOLOPEN", Some("INPUT")) => Self::SpoolOpenInput,
-            ("SPOOLOPEN", Some("OUTPUT")) => Self::SpoolOpenOutput,
-            ("SPOOLREAD", _) => Self::SpoolRead,
-            ("SPOOLWRITE", _) => Self::SpoolWrite,
-            ("ENTER", Some("TRACENUM")) => Self::EnterTraceNum,
-            ("MONITOR", _) => Self::Monitor,
-            ("DUMP", Some("TRANSACTION")) => Self::DumpTransaction,
-            ("DUMP", _) => Self::Dump,
-            ("TRACE", _) => Self::Trace,
-            ("ENTER", Some("TRACEID")) => Self::EnterTraceId,
-            ("START", Some("ATTACH")) => Self::StartAttach,
-            ("START", Some("BREXIT")) => Self::StartBrexit,
-            ("START", _) => Self::Start,
-            ("STARTBR", _) => Self::StartBrowse,
-            ("SUSPEND", _) => Self::Suspend,
-            ("WAIT", Some("EVENT")) => Self::WaitEvent,
-            ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
-            ("WAITCICS", _) => Self::WaitCics,
-            ("WAIT", Some("SIGNAL")) => Self::WaitSignal,
-            ("SYNCPOINT", _) => Self::Syncpoint,
-            ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
-            ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,
-            ("TRANSFORM", Some("JSONTODATA")) => Self::TransformJsonToData,
-            ("TRANSFORM", Some("XMLTODATA")) => Self::TransformXmlToData,
-            ("WEB", Some("PARSE")) => Self::WebParseUrl,
-            ("WEB", Some("OPEN")) => Self::WebOpen,
-            ("WEB", Some("CLOSE")) => Self::WebClose,
-            ("WEB", Some("EXTRACT")) => Self::WebExtract,
-            ("EXTRACT", Some("WEB")) => Self::ExtractWeb,
-            ("WEB", Some("READ")) => Self::WebRead,
-            ("WEB", Some("STARTBROWSE")) => Self::WebStartBrowse,
-            ("WEB", Some("READNEXT")) => Self::WebReadNext,
-            ("WEB", Some("ENDBROWSE")) => Self::WebEndBrowse,
-            ("WEB", Some("WRITE")) => Self::WebWrite,
-            ("WEB", Some("SEND")) => Self::WebSend,
-            ("WEB", Some("RETRIEVE")) => Self::WebRetrieve,
-            ("WEB", Some("RECEIVE")) => Self::WebReceive,
-            ("WEB", Some("CONVERSE")) => Self::WebConverse,
-            ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
-            ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
-            ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,
-            ("WRITE", Some("JOURNALNUM")) => Self::WriteJournalNum,
-            ("UNLOCK", _) => Self::Unlock,
-            ("VERIFY", Some("PASSWORD")) => Self::VerifyPassword,
-            ("VERIFY", Some("PHRASE")) => Self::VerifyPhrase,
-            ("VERIFY", Some("TOKEN")) => Self::VerifyToken,
-            ("WRITE", _) => Self::Write,
-            ("WRITEQ", Some("TD")) => Self::WriteTransientData,
-            ("XCTL", _) => Self::Xctl,
-            _ => return None,
-        })
     }
 
     #[must_use]

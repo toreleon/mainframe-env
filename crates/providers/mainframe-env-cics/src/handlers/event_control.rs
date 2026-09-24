@@ -1,13 +1,16 @@
 //! Durable BTS activity event authority and its explicit execution context.
 
 use super::super::{CicsService, Run, store_error};
+use super::bts_lifecycle::{BtsLifecycleStore, BtsMode};
 use mainframe_env_execution_api::RunUnitId;
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
     HostRequest, canonical_request_digest,
 };
-use mainframe_env_store_api::{ProviderStateRecord, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -20,6 +23,7 @@ const MAX_QUEUE: usize = 256;
 const MAX_REPLAYS: usize = 512;
 const MAX_CAS_ATTEMPTS: usize = 8;
 
+pub(in crate::service) mod activity_completion;
 mod composite;
 mod delete;
 mod retrieve;
@@ -49,6 +53,9 @@ pub(super) struct EventRecord {
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum EventKind {
     Input,
+    Activity {
+        child_id: String,
+    },
     Composite {
         all: bool,
         children: Vec<String>,
@@ -181,7 +188,25 @@ impl CicsService {
     /// again. A composite child is queued under its parent instead of directly
     /// reattaching the activity.
     pub fn post_input_event(&self, activity: &str, event: &str) -> Result<(), HostProblem> {
-        let activity = activity_scope(activity)?;
+        let activity = if activity.len() == 52 {
+            let authority = BtsLifecycleStore::new(self.store.as_ref());
+            let index = authority
+                .load_activity_index(activity)?
+                .ok_or_else(|| event_error(4))?;
+            let process = authority
+                .load_process(&index.process_type, &index.process_name)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if process
+                .activities
+                .get(activity)
+                .is_none_or(|subject| subject.mode != BtsMode::Active)
+            {
+                return Err(event_error(4));
+            }
+            activity.to_string()
+        } else {
+            event_name(activity)?
+        };
         let event = event_name(event)?;
         for _ in 0..MAX_CAS_ATTEMPTS {
             let mut state = load_activity(self, &activity)?;
@@ -242,6 +267,37 @@ pub(super) fn fire_atomic(state: &mut ActivityState, event: &str) -> Result<bool
         state.reattach.push_back(event.into());
     }
     Ok(true)
+}
+
+/// Prepare a RUN reattachment event for the same store transaction that moves
+/// its lifecycle activity to ACTIVE. A previously fired input is EVENTERR 7.
+pub(in crate::service) fn prepare_run_input_event(
+    store: &dyn ProviderStateStore,
+    activity: &str,
+    event: &str,
+) -> Result<ProviderStateMutation, HostProblem> {
+    let event = event_name(event).map_err(|_| event_error(6))?;
+    let mut state = load_activity_from_store(store, activity)?;
+    let record = state.events.get(&event).ok_or_else(|| event_error(7))?;
+    if !matches!(record.kind, EventKind::Input) || record.fired {
+        return Err(event_error(7));
+    }
+    if !fire_atomic(&mut state, &event)? {
+        return Err(event_error(7));
+    }
+    activity_mutation(activity, &state)
+}
+
+/// Fence the current event queue in the same CAS batch as RESUME. The first
+/// queued event can trigger one reattachment and the worker retrieves all
+/// events retained in this snapshot.
+pub(in crate::service) fn prepare_resume_event_fence(
+    store: &dyn ProviderStateStore,
+    activity: &str,
+) -> Result<(Vec<String>, ProviderStateMutation), HostProblem> {
+    let state = load_activity_from_store(store, activity)?;
+    let queued = state.reattach.iter().cloned().collect();
+    Ok((queued, activity_mutation(activity, &state)?))
 }
 
 pub(in crate::service) fn invoke(
@@ -405,6 +461,54 @@ fn event_error(response2: i32) -> HostProblem {
 }
 
 pub(super) fn context(service: &CicsService, run: &Run) -> Result<EventContext, HostProblem> {
+    let authority = BtsLifecycleStore::new(service.store.as_ref());
+    let run_unit = run.invocation.run_unit_id.as_str();
+    if let Some(binding) = authority.active_context(
+        run_unit,
+        run.invocation.execution_id.as_str(),
+        run.invocation.principal.id().as_str(),
+    )? {
+        let acquisition = authority.load_acquisition(run_unit)?;
+        let (acquired_process, acquired_activity) = if let Some(acquisition) = acquisition {
+            if acquisition.owner_execution != binding.owner_execution
+                || acquisition.owner_principal != binding.owner_principal
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if let Some(id) = acquisition.activity_id {
+                let process = authority
+                    .load_process(
+                        acquisition
+                            .process_type
+                            .as_deref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                        acquisition
+                            .process_name
+                            .as_deref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                if id == process.root_id {
+                    (Some(id), None)
+                } else {
+                    (None, Some(id))
+                }
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        return Ok(EventContext {
+            activity: binding.activity_id,
+            acquired_process,
+            acquired_activity,
+            local_utc_offset_minutes: 0,
+        });
+    }
+    if authority.has_context_row(run_unit)? {
+        return Err(outside_activity());
+    }
     if let Some(activity) = super::bts_link::nested_activity_scope(service, run)? {
         return Ok(EventContext {
             activity,
@@ -450,8 +554,14 @@ pub(super) fn load_activity(
     service: &CicsService,
     activity: &str,
 ) -> Result<ActivityState, HostProblem> {
-    let Some(row) = service
-        .store
+    load_activity_from_store(service.store.as_ref(), activity)
+}
+
+pub(in crate::service) fn load_activity_from_store(
+    store: &dyn ProviderStateStore,
+    activity: &str,
+) -> Result<ActivityState, HostProblem> {
+    let Some(row) = store
         .get_provider_state(ACTIVITY_NAMESPACE, activity)
         .map_err(store_error)?
     else {
@@ -465,6 +575,30 @@ pub(super) fn load_activity(
     state.version = row.version;
     validate_activity(&state)?;
     Ok(state)
+}
+
+pub(in crate::service) fn activity_mutation(
+    activity: &str,
+    state: &ActivityState,
+) -> Result<ProviderStateMutation, HostProblem> {
+    validate_activity(state)?;
+    let payload = serde_json::to_vec(state).map_err(|_| HostProblem::ResourceExhausted)?;
+    if payload.len() > MAX_ACTIVITY_BYTES {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let version = state
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok(ProviderStateMutation::Put(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: ACTIVITY_NAMESPACE.into(),
+            key: activity.into(),
+            version,
+            payload,
+        },
+        expected_version: (state.version != 0).then_some(state.version),
+    }))
 }
 
 pub(super) fn persist_activity(

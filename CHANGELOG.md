@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Merged the 23 BTS lifecycle routes with the SAF/audit integration branch,
+  retaining the child-token and LINK routes on one process/activity authority.
+  That BTS/SAF checkpoint had 214 typed and 49 unready rows; the combined
+  ISSUE/BTS candidate has 231 typed and 32 unready.
+  New activity IDs bind the defining UOW or root incarnation; retained
+  key-only candidate IDs remain opaque and are not rewritten.
+
 - Registered APPC basic GDS ISSUE ABEND, PREPARE, and SIGNAL with six-byte
   return codes, CONVDATA, and STATE on the shared ledger. Partner ABEND and
   PREPARE commit before source confirmation; SIGNAL is observed once by the
@@ -96,6 +103,46 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Terminal BTS parent completion now deletes settled descendants, their
+  activity indexes, and completion-event pools in the same provider-state
+  mutation. A live descendant leaves completion unresolved for explicit
+  reconciliation, preserving the parent and child rows.
+
+- RESET and DELETE now preserve a subtree with live descendants until their
+  RUN work can be reconciled. They also retain pending descendants owned by
+  another UOW, while the defining UOW can still delete its own INITIAL child.
+
+- Parent CHECK ACTIVITY now consumes a completed child's completion event in
+  an atomic process/event transition. An incomplete child retains the event;
+  RESET ACTIVITY restores a consumed event as NOTFIRED.
+
+- New BTS RUN work identities now include the exact effect key, allowing a
+  later execution of the same source statement after RESET. Retained
+  statement-only IDs remain readable for exact retries. A synchronous
+  continuation reuses its current activation and saves the new effect key for
+  durable exact replay.
+
+- Distinct INPUTEVENTs from asynchronous RUN requests in the same UOW now
+  coalesce into one active worker while each event and exact request replay
+  commits atomically. Repeating a fired event retains EVENTERR 111/7.
+
+- Added an additive deferred BTS RUN state and bounded deferred outbox index.
+  Retained v1 outboxes without the field remain readable; deferred records
+  cannot be enqueued or promoted as work.
+
+- Asynchronous RUN against a suspended activity now reserves a deferred
+  activation and exact replay without admitting worker work. Its event and
+  process transition commit together.
+
+- RESUME now atomically releases a deferred RUN into the pending outbox, or
+  creates one work row for fired events queued on a suspended dormant activity.
+  Exact retries and SQLite reopen retain the same work identity.
+
+- CANCEL, RESET, and DELETE now retire affected deferred BTS RUN records and
+  their outbox entries in the same atomic batch as the activity transition.
+
+- DEFINE ACTIVITY and DEFINE PROCESS rollback now retire deferred BTS RUN
+  reservations atomically with pending child or process deletion.
 - Added a separate confirmed ISSUE control dispatch and read-only reconcile
   path to the shared conversation carrier. A durable attempt marker precedes
   transport I/O, and only confirmation commits the control state and replay.
@@ -517,6 +564,119 @@ All notable changes to mainframe-env are documented here.
   publication or rollback, checkpoint references, and durable exact replay.
   This does not yet register BTS lifecycle commands; the application split
   remains 151 typed, 0 legacy, and 112 unready.
+
+- Added bounded BTS child activity definition and lifecycle transitions to the
+  shared authority, including incarnation-scoped IDs, atomic index cleanup on
+  reset/delete, UOW publication or rollback, and stale checkpoint rejection.
+  Public command registration remains pending.
+
+- Added a durable BTS active-run context bound to the process/activity and
+  coordinator checkpoint epochs, with restart reads, lease takeover fencing,
+  and a retained closed state for replay protection. Public command routing
+  remains pending.
+
+- Connected BTS pending process/child publication and UOW acquisition release
+  to the CICS syncpoint and uncertain-outcome reconciliation paths. The
+  participant is idempotent and owner-fenced; command routing remains pending.
+
+- Bound existing BTS event commands to the shared 52-character lifecycle
+  activity identity when a fenced active context is present. RUN input-event
+  delivery accepts that exact indexed activity, while closed contexts cannot
+  fall back to a legacy event binding.
+
+- Added activity completion events to the existing BTS event pool and made
+  child definition, rollback, reset, delete, and forced cancellation update
+  their process and event rows in one atomic store mutation. This remains
+  shared authority work; public lifecycle command registration is pending.
+
+- Added a versioned BTS RUN outbox and server work generation. Activation,
+  input event, request record, and pending-work index commit atomically;
+  restart re-admits missing work, leases fence checkpoints, and selected
+  online programs complete the lifecycle row. Public RUN registration remains
+  pending while source options and failure paths are finished.
+
+- Preserved CICS runtime startup when one BTS RUN work item is terminal but
+  its lifecycle request remains pending. Other RUN work recovers; an exact
+  retry of the unresolved request still reports an unknown outcome.
+
+- Retained exact DEFINE PROCESS and ACQUIRE effect identities in the BTS
+  acquisition row. Same-key retries survive reopen and reject changed inputs;
+  a held acquisition reports source INVREQ rather than losing its replay
+  identity after UOW settlement. Public command registration remains pending.
+
+- Added a versioned repository-name reservation to the shared BTS authority.
+  Process names are unique across process types mapped to the same repository;
+  reservation, definition, and rollback or publication move atomically. Public
+  command registration remains pending.
+
+- Added durable DEFINE PROCESS NOCHECK acquisition state. Repository-name
+  reservation occurs at syncpoint, while known duplicates are reported by a
+  commit preflight before UOW intent is recorded. Rollback and reopen retain
+  exact replay and leave an existing process unchanged. Public command routing
+  remains pending.
+
+- Exposed the held BTS acquisition's process-container scope to sibling
+  commands, with root read/write versus descendant read-only access, owner and
+  UOW fencing, and an explicit root requirement for ACQPROCESS.
+
+- ACQUIRE PROCESS now resolves its process type before the named process, so
+  missing types and missing processes report their distinct PROCESSERR codes.
+
+- Corrected complete-root SUSPEND ACQPROCESS to return the SUSPEND
+  `INVREQ 16/14` activity-mode condition; RESUME ACQPROCESS retains its separate
+  `PROCESSERR 108/14` condition.
+
+- Counted BTS PROCESS, ACTIVITY, and CHANNEL literal limits by source
+  characters so the documented `¬` name character passes provider, compiler,
+  and MCEP validation. A compiled lifecycle route exercises a 36-character
+  process name through RUN completion.
+
+- Added the RUN TRANSID child-token port with the sibling FETCH/FREE method
+  signatures and `cics-bts-child-ownership-v1` row shape. Registration and
+  terminal completion are owner-checked and versioned; RUN TRANSID task
+  admission and public command readiness remain pending.
+
+- Added a versioned RUN TRANSID request and bounded work outbox. The local
+  child token, transaction, inherited principal, and issue-time channel
+  snapshot are retained for exact replay; work claims fence completion by
+  lease epoch and deliver the result through the child-token port. Server
+  attach and public command routing remain pending.
+
+- Reconciled RUN TRANSID restart against the retained child-token result
+  before readmitting work. SQLite reopen preserves its channel snapshot and
+  outbox; terminal work without a child result remains unresolved while
+  independent work recovers, and its exact reconciliation reports an unknown
+  outcome.
+
+- Checked new RUN TRANSID channel snapshots against the container-count and
+  payload limits before admission. Exact retries retain the original
+  issue-time copy when the current channel has changed.
+
+- Extended the versioned RUN TRANSID child snapshot to retain optional CCSID
+  and read-only metadata from the task-owned channel port. Existing v1 rows
+  remain readable; new base64 snapshots fit the bounded request and invocation
+  payloads at the aggregate byte limit.
+
+- Retained the source channel's read-only flag in the RUN TRANSID request row
+  and passed it through the child invocation binding. Older request rows
+  default to writable when the flag is absent.
+
+- Removed RUN TRANSID CHANNEL's name-global transform-container copy. The
+  option now fails before child admission until the task-owned BTS channel
+  snapshot port is reconciled; RUN TRANSID without CHANNEL still starts a
+  local child.
+
+- Added the bounded BTS lifecycle host, IR, compiler, interpreter, and CICS
+  dispatch scaffolding, plus an installed process-type/transaction catalog and
+  selected RUN and RUN TRANSID worker admission. The candidate generated
+  registry is 174 typed, 0 legacy, and 89 unready; acceptance gates and
+  child-task failure reconciliation remain in progress.
+
+- Bound ACQUIRE PROCESS to its PROCESS and PROCESSTYPE form and compiled CHECK
+  CVDA outputs to exact binary receivers. Compiled COBOL now exercises DEFINE
+  PROCESS NOCHECK, ACQUIRE, CHECK, RUN, and RUN TRANSID through selected server
+  workers. The CICS contract and registration schemas advance to the isolated
+  174/89 candidate and 151 exact registrations.
 
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
