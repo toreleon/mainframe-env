@@ -58,6 +58,9 @@ All notable changes to mainframe-env are documented here.
 - Added selected-provider 3650 LOAD/EODS regression coverage for CONVERSE,
   replay, NONVAL, NOSTART, TERMERR, and DPL principal INVREQ/200.
 
+- Verified ENDOUTPUT with its ENDFILE companion sets both 3740 markers once,
+  replays exactly, and rejects the opposite flag without mutation.
+
 - Verified that an ENDFILE effect with an unknown post-commit outcome replays
   after SQLite service restart without advancing the physical device twice.
 

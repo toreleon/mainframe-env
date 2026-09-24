@@ -6922,6 +6922,72 @@ mod tests {
     }
 
     #[test]
+    fn issue_endoutput_with_endfile_sets_both_3740_markers_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("T009".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "T009".into(),
+            kind: handlers::IssueDeviceKind::Entry3740,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let command = request(
+            CicsOperation::IssueEndoutput,
+            BTreeMap::from([("OPTION.ENDFILE".into(), cics_option())]),
+            1,
+        );
+        let response = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        let marked = handlers::IssueDeviceRecord::load(store.as_ref(), "T009")
+            .unwrap()
+            .unwrap();
+        assert!(marked.state.endfile && marked.state.endoutput);
+        assert_eq!(marked.version, 2);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &command),
+            Ok(response)
+        );
+        let wrong_flag = request(
+            CicsOperation::IssueEndoutput,
+            BTreeMap::from([("OPTION.ENDOUTPUT".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &wrong_flag),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "T009")
+                .unwrap()
+                .unwrap()
+                .version,
+            2
+        );
+    }
+
+    #[test]
     fn issue_load_and_eods_route_3650_effects_and_reject_dpl_principal() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());
