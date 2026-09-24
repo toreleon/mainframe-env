@@ -212,6 +212,78 @@ fn conversation_extract_reads_shared_ledger_and_positions_owned_lu() {
 }
 
 #[test]
+fn conversation_extract_attach_reads_received_mro_header_and_reports_missing_header() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-mro-attach", BTreeMap::new());
+    let session = SessionId::new("extract-mro-attach", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    let (mapped, _, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let metadata_row = store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    let metadata: handlers::ExtractMetadata = serde_json::from_slice(&metadata_row.payload).unwrap();
+    let mro = metadata.session_names["M1"];
+    let before = ConversationLedger::load(store.as_ref()).unwrap();
+    let mut next = before.clone();
+    next.conversation_mut(mapped).unwrap().principal_facility = false;
+    next.conversation_mut(mro).unwrap().principal_facility = true;
+    assert!(before.persist(&mut next, store.as_ref()).unwrap());
+    let arguments = BTreeMap::from([
+        ("PROCESS".into(), argument(b"PROC-X")),
+        ("PROCESS.MAXLENGTH".into(), cics_decimal(8)),
+        ("RESOURCE".into(), argument(b"RES-X")),
+        ("RESOURCE.MAXLENGTH".into(), cics_decimal(8)),
+        ("RPROCESS".into(), argument(b"RPROC-X")),
+        ("RPROCESS.MAXLENGTH".into(), cics_decimal(8)),
+        ("RRESOURCE".into(), argument(b"RRES-X")),
+        ("RRESOURCE.MAXLENGTH".into(), cics_decimal(8)),
+        ("QUEUE".into(), argument(b"QUEUE-X")),
+        ("QUEUE.MAXLENGTH".into(), cics_decimal(8)),
+        ("IUTYPE".into(), argument(b"IU-X")),
+        ("DATASTR".into(), argument(b"DATA-X")),
+        ("RECFM".into(), argument(b"RECFM-X")),
+    ]);
+    let response = extract_call(
+        &cics,
+        &invocation.run_unit_id,
+        CicsOperation::ExtractAttach,
+        arguments.clone(),
+        1,
+    );
+    for (name, expected) in [
+        ("PROCESS", b"TRNX".as_slice()),
+        ("RESOURCE", b"RES1".as_slice()),
+        ("RPROCESS", b"RTRN".as_slice()),
+        ("RRESOURCE", b"RRES".as_slice()),
+        ("QUEUE", b"QUEUE".as_slice()),
+        ("IUTYPE", b"1".as_slice()),
+        ("DATASTR", b"0".as_slice()),
+        ("RECFM", b"4".as_slice()),
+    ] {
+        assert_eq!(response.outputs[name].bytes(), expected, "{name}");
+    }
+    let mut missing: handlers::ExtractMetadata = serde_json::from_slice(&metadata_row.payload).unwrap();
+    missing.received_attach = None;
+    handlers::publish_metadata(&cics, missing, Some(metadata_row.version)).unwrap();
+    let mut command = request(CicsOperation::ExtractAttach, arguments, 2);
+    command.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(),
+        response2_field: Some("RESP2-X".into()),
+    };
+    let response = cics
+        .invoke(&effect(&invocation.run_unit_id, command.clone(), 2), command)
+        .unwrap();
+    assert_eq!((response.condition.as_str(), response.response), ("CBIDERR", 62));
+}
+
+#[test]
 fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
     let store = Arc::new(MemoryStore::new(Default::default()));
     let cics = service(store.clone());
