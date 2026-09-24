@@ -19,6 +19,10 @@ All notable changes to mainframe-env are documented here.
   command-specific operand and flag shapes in the assigned MCEP v2 ranges.
   These plans remain unregistered pending device and selected-route execution.
 
+- Distinguished all twenty ISSUE host operations by their exact command heads
+  and canonical request identities while keeping them explicitly unsupported
+  until their provider routes and catalog registrations are executable.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

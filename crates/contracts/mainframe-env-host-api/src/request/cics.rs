@@ -192,6 +192,16 @@ pub enum CicsOperation {
     GdsIssuePrepare,
     GdsIssueSignal,
     IssueSignal,
+    IssueCopy,
+    IssueDisconnect,
+    IssueEndfile,
+    IssueEndoutput,
+    IssueEods,
+    IssueEraseAup,
+    IssueLoad,
+    IssuePass,
+    IssuePrint,
+    IssueReset,
     /// Complete and dispatch the active BMS logical message.
     SendPage,
     /// Associate a registered partition set or return the terminal to base state.
@@ -414,6 +424,16 @@ impl CicsOperation {
             Self::GdsIssuePrepare => "GdsIssuePrepare",
             Self::GdsIssueSignal => "GdsIssueSignal",
             Self::IssueSignal => "IssueSignal",
+            Self::IssueCopy => "IssueCopy",
+            Self::IssueDisconnect => "IssueDisconnect",
+            Self::IssueEndfile => "IssueEndfile",
+            Self::IssueEndoutput => "IssueEndoutput",
+            Self::IssueEods => "IssueEods",
+            Self::IssueEraseAup => "IssueEraseAup",
+            Self::IssueLoad => "IssueLoad",
+            Self::IssuePass => "IssuePass",
+            Self::IssuePrint => "IssuePrint",
+            Self::IssueReset => "IssueReset",
             Self::SendPage => "SendPage",
             Self::SendPartnset => "SendPartnset",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
@@ -602,6 +622,16 @@ impl CicsOperation {
                 | Self::GdsIssuePrepare
                 | Self::GdsIssueSignal
                 | Self::IssueSignal
+                | Self::IssueCopy
+                | Self::IssueDisconnect
+                | Self::IssueEndfile
+                | Self::IssueEndoutput
+                | Self::IssueEods
+                | Self::IssueEraseAup
+                | Self::IssueLoad
+                | Self::IssuePass
+                | Self::IssuePrint
+                | Self::IssueReset
                 | Self::SendPage
                 | Self::SendText
                 | Self::SendPartnset
@@ -765,6 +795,16 @@ impl CicsOperation {
             ("ISSUE", Some("ERROR")) => Self::IssueError,
             ("ISSUE", Some("PREPARE")) => Self::IssuePrepare,
             ("ISSUE", Some("SIGNAL")) => Self::IssueSignal,
+            ("ISSUE", Some("COPY")) => Self::IssueCopy,
+            ("ISSUE", Some("DISCONNECT")) => Self::IssueDisconnect,
+            ("ISSUE", Some("ENDFILE")) => Self::IssueEndfile,
+            ("ISSUE", Some("ENDOUTPUT")) => Self::IssueEndoutput,
+            ("ISSUE", Some("EODS")) => Self::IssueEods,
+            ("ISSUE", Some("ERASEAUP")) => Self::IssueEraseAup,
+            ("ISSUE", Some("LOAD")) => Self::IssueLoad,
+            ("ISSUE", Some("PASS")) => Self::IssuePass,
+            ("ISSUE", Some("PRINT")) => Self::IssuePrint,
+            ("ISSUE", Some("RESET")) => Self::IssueReset,
             ("ISSUE", Some("ADD")) => Self::IssueAdd,
             ("ISSUE", Some("END")) => Self::IssueEnd,
             ("ISSUE", Some("ERASE")) => Self::IssueErase,
@@ -843,6 +883,16 @@ impl CicsOperation {
                 | Self::GdsIssuePrepare
                 | Self::GdsIssueSignal
                 | Self::IssueSignal
+                | Self::IssueCopy
+                | Self::IssueDisconnect
+                | Self::IssueEndfile
+                | Self::IssueEndoutput
+                | Self::IssueEods
+                | Self::IssueEraseAup
+                | Self::IssueLoad
+                | Self::IssuePass
+                | Self::IssuePrint
+                | Self::IssueReset
         )
     }
 }
@@ -923,4 +973,55 @@ pub struct CicsResponse {
     pub payload: BoundedPayload,
     pub outputs: BTreeMap<String, BoundedPayload>,
     pub unit_of_work: Option<CicsUnitOfWorkOutcome>,
+}
+
+#[cfg(test)]
+mod issue_tests {
+    use super::CicsOperation;
+
+    #[test]
+    fn exact_issue_heads_are_distinct_and_pending() {
+        let heads = [
+            ("ISSUE ABEND", CicsOperation::IssueAbend),
+            ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
+            ("ISSUE CONFIRMATION", CicsOperation::IssueConfirmation),
+            (
+                "GDS ISSUE CONFIRMATION",
+                CicsOperation::GdsIssueConfirmation,
+            ),
+            ("ISSUE COPY", CicsOperation::IssueCopy),
+            ("ISSUE DISCONNECT", CicsOperation::IssueDisconnect),
+            ("ISSUE ENDFILE", CicsOperation::IssueEndfile),
+            ("ISSUE ENDOUTPUT", CicsOperation::IssueEndoutput),
+            ("ISSUE EODS", CicsOperation::IssueEods),
+            ("ISSUE ERASEAUP", CicsOperation::IssueEraseAup),
+            ("ISSUE ERROR", CicsOperation::IssueError),
+            ("GDS ISSUE ERROR", CicsOperation::GdsIssueError),
+            ("ISSUE LOAD", CicsOperation::IssueLoad),
+            ("ISSUE PASS", CicsOperation::IssuePass),
+            ("ISSUE PREPARE", CicsOperation::IssuePrepare),
+            ("GDS ISSUE PREPARE", CicsOperation::GdsIssuePrepare),
+            ("ISSUE PRINT", CicsOperation::IssuePrint),
+            ("ISSUE RESET", CicsOperation::IssueReset),
+            ("GDS ISSUE SIGNAL", CicsOperation::GdsIssueSignal),
+            ("ISSUE SIGNAL", CicsOperation::IssueSignal),
+        ];
+        for (head, expected) in heads {
+            let tokens = head
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert_eq!(CicsOperation::from_tokens(&tokens), Some(expected));
+            assert!(!expected.supported());
+            assert!(expected.is_mutating());
+        }
+        assert_eq!(
+            CicsOperation::from_tokens(&["ISSUE".into(), "ABORT".into()]),
+            Some(CicsOperation::IssueAbort)
+        );
+        assert_eq!(
+            CicsOperation::from_tokens(&["GDS".into(), "ISSUE".into(), "COPY".into()]),
+            None
+        );
+    }
 }
