@@ -74,6 +74,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::SendControl => bms::invoke_control(service, run, request),
         CicsOperation::SendPage => bms::invoke_page(service, run, request),
         CicsOperation::IssueEraseAup => bms::issue_eraseaup(service, run, request),
+        CicsOperation::IssueCopy => bms::issue_copy(service, run, request),
         CicsOperation::Route => bms::invoke_route(service, run, request),
         CicsOperation::IssueAbort
         | CicsOperation::IssueAdd

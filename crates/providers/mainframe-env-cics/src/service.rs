@@ -7220,6 +7220,109 @@ mod tests {
     }
 
     #[test]
+    fn issue_copy_default_wait_moves_exact_buffer_with_shared_control_unit() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (target_run, target_session) = registered(&service);
+        let source_run = invocation_for("copy-source", BTreeMap::new());
+        let source_session = SessionId::new("copy-source-session", 64).unwrap();
+        service.create_session(&source_session, 24, 80).unwrap();
+        service
+            .register_run(source_run, &source_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        {
+            let mut state = service.lock().unwrap();
+            let target = state.sessions.get_mut(target_session.as_str()).unwrap();
+            target.input = handlers::TerminalInput::identified("T004".into());
+            let source = state.sessions.get_mut(source_session.as_str()).unwrap();
+            source.input = handlers::TerminalInput::identified("T005".into());
+            source.screen = b"RAW\0\0-3270-DATA".to_vec();
+            source.field_values.insert("FIELD".into(), b"DATA".to_vec());
+            source.field_protection.insert("FIELD".into(), true);
+        }
+        for terminal in ["T004", "T005"] {
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.into(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+        }
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&target_run.run_unit_id)
+            .unwrap();
+        let incomplete = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([("TERMID".into(), cics_literal(b"T005"))]),
+            1,
+        );
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &incomplete),
+            Err(HostProblem::Unsupported)
+        );
+        let command = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([
+                ("TERMID".into(), cics_literal(b"T005")),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            2,
+        );
+        let response = handlers::invoke_terminal_control(&service, &mut run, &command).unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        let state = service.lock().unwrap();
+        let target = &state.sessions[target_session.as_str()];
+        assert_eq!(target.screen, b"RAW\0\0-3270-DATA");
+        assert_eq!(target.field_values["FIELD"], b"DATA");
+        assert_eq!(target.field_protection["FIELD"], true);
+        drop(state);
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &command),
+            Ok(response)
+        );
+        let ccc = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([
+                ("TERMID".into(), cics_literal(b"T005")),
+                ("CTLCHAR".into(), enqueue_value(&[0])),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            3,
+        );
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &ccc),
+            Err(HostProblem::Unsupported)
+        );
+        let missing_source = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([
+                ("TERMID".into(), cics_literal(b"T999")),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            4,
+        );
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &missing_source),
+            Err(HostProblem::Condition {
+                name: "NOTALLOC".into(),
+                response: 61,
+                response2: 0,
+            })
+        );
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

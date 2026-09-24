@@ -1,5 +1,6 @@
 //! 3270 ISSUE controls over the existing durable terminal and BMS authority.
 
+use super::super::super::issue_device::{IssueDeviceKind, IssueDeviceRecord};
 use super::*;
 use mainframe_env_host_api::AccessIntent;
 
@@ -123,6 +124,141 @@ fn validate_eraseaup(request: &CicsRequest) -> Result<(), HostProblem> {
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
+                "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.WAIT" | "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+pub(in crate::service::handlers::terminal_control) fn copy(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_copy(request)?;
+    if let Some(response) = receipt_for_request(service, run, request)? {
+        return Ok(response);
+    }
+    if !request.arguments.contains_key("OPTION.WAIT") || request.arguments.contains_key("CTLCHAR") {
+        return Err(HostProblem::Unsupported);
+    }
+    let source_id = std::str::from_utf8(request.arguments["TERMID"].bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .trim_end()
+        .to_ascii_uppercase();
+    if source_id.is_empty()
+        || source_id.len() > 4
+        || !source_id.bytes().all(|byte| {
+            byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+        })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let (current, source_key, source) = {
+        let state = service.lock()?;
+        let current = state
+            .sessions
+            .get(&run.session)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let (source_key, source) = state
+            .sessions
+            .iter()
+            .find(|(_, session)| {
+                session.input.terminal_id.as_deref() == Some(source_id.as_str())
+                    && session.connected
+            })
+            .map(|(key, session)| (key.clone(), session.clone()))
+            .ok_or_else(|| condition("NOTALLOC", 61))?;
+        (current, source_key, source)
+    };
+    if !current.connected {
+        return Err(condition("NOTALLOC", 61));
+    }
+    let target_id = current
+        .input
+        .terminal_id
+        .as_deref()
+        .ok_or_else(|| condition("NOTALLOC", 61))?;
+    let target_definition = IssueDeviceRecord::load(service.store.as_ref(), target_id)
+        .map_err(store_error)?
+        .ok_or_else(|| condition("NOTALLOC", 61))?;
+    let source_definition = IssueDeviceRecord::load(service.store.as_ref(), &source_id)
+        .map_err(store_error)?
+        .ok_or_else(|| condition("NOTALLOC", 61))?;
+    if target_definition.definition.kind != IssueDeviceKind::Display3270
+        || source_definition.definition.kind != IssueDeviceKind::Display3270
+        || target_definition.definition.control_unit != source_definition.definition.control_unit
+    {
+        return Err(condition("TERMERR", 81));
+    }
+    service.authorize(
+        run,
+        "FACILITY",
+        &format!("CICS.ISSUE.DEVICE.{source_id}"),
+        AccessIntent::Read,
+    )?;
+    service.authorize(
+        run,
+        "FACILITY",
+        &format!("CICS.ISSUE.DEVICE.{target_id}"),
+        AccessIntent::Update,
+    )?;
+    if source.screen.len() > service.limits.max_screen_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let source_state = read_state(service, &source_key)?;
+    let mut target_state = read_state(service, &run.session)?;
+    let mut next = current.clone();
+    next.version = next
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    next.screen = source.screen;
+    next.mapset = source.mapset;
+    next.map = source.map;
+    next.field_values = source.field_values;
+    next.field_protection = source.field_protection;
+    next.field_modified = source.field_modified;
+    target_state.cursor = source_state.cursor;
+    target_state.keyboard_unlocked = source_state.keyboard_unlocked;
+    target_state.alternate_screen = source_state.alternate_screen;
+    target_state.last_page = next.screen.clone();
+    let receipt = base_receipt(run, request)?;
+    commit(
+        service,
+        run,
+        request,
+        Some(&current),
+        Some(&next),
+        &target_state,
+        &receipt,
+    )
+}
+
+fn validate_copy(request: &CicsRequest) -> Result<(), HostProblem> {
+    if request.operation != CicsOperation::IssueCopy
+        || !request.arguments.contains_key("TERMID")
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "TERMID" => !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                ),
+                "CTLCHAR" => {
+                    value.schema() != "mainframe-env.cics.storage-value@1"
+                        || value.bytes().len() != 1
+                }
                 "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
                 "OPTION.WAIT" | "OPTION.NOHANDLE" => {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()

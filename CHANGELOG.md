@@ -54,6 +54,12 @@ All notable changes to mainframe-env are documented here.
   to nulls, resets their modified tags, positions the cursor, and restores
   the keyboard through the existing durable terminal authority.
 
+- Added the synchronous default ISSUE COPY route over the existing BMS
+  authority. It copies the complete 3270 buffer between sessions on the same
+  installed control unit with source-read and target-update SAF checks and an
+  atomic target/receipt commit. Asynchronous and CCC-specific forms remain
+  pending.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

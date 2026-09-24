@@ -13,6 +13,7 @@ mod control;
 mod issue;
 mod page;
 mod route;
+pub(super) use issue::copy as issue_copy;
 pub(super) use issue::eraseaup as issue_eraseaup;
 
 const STATE_NAMESPACE: &str = "cics-terminal-bms-v1";
