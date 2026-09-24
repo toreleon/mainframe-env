@@ -469,6 +469,7 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
 
 mod cancel;
 mod catalog;
+mod checked;
 mod children;
 mod container_scope;
 mod context;

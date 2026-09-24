@@ -15,6 +15,10 @@ All notable changes to mainframe-env are documented here.
   RUN work can be reconciled. They also retain pending descendants owned by
   another UOW, while the defining UOW can still delete its own INITIAL child.
 
+- Parent CHECK ACTIVITY now consumes a completed child's completion event in
+  an atomic process/event transition. An incomplete child retains the event;
+  RESET ACTIVITY restores a consumed event as NOTFIRED.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

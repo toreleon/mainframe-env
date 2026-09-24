@@ -32645,6 +32645,12 @@ mod tests {
                 .bytes(),
             b"INITIAL"
         );
+        let pool = store
+            .get_provider_state("cics-event-activity-v1", &root)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+        assert!(value["events"].get("CHILD").is_some());
         let runner = request(
             CicsOperation::DefineActivity,
             BTreeMap::from([
@@ -32744,6 +32750,59 @@ mod tests {
                 }
                 CicsOperation::DeleteActivity => assert!(value["events"].get("CHILD").is_none()),
                 _ => {}
+            }
+            if operation == CicsOperation::CancelActivity {
+                for check_sequence in [11, 12] {
+                    let check = request(
+                        CicsOperation::CheckActivity,
+                        BTreeMap::from([
+                            ("ACTIVITY".into(), argument(b"CHILD")),
+                            ("COMPSTATUS".into(), argument(b"STATUS")),
+                        ]),
+                        check_sequence,
+                    );
+                    let checked = cics
+                        .invoke(
+                            &effect(&invocation.run_unit_id, check.clone(), check_sequence),
+                            check,
+                        )
+                        .unwrap();
+                    assert_eq!(checked.outputs["COMPSTATUS"].bytes(), b"FORCED");
+                }
+                let pool = store
+                    .get_provider_state("cics-event-activity-v1", &root)
+                    .unwrap()
+                    .unwrap();
+                let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+                assert!(value["events"].get("CHILD").is_none());
+            }
+        }
+        for (operation, sequence) in [
+            (CicsOperation::CancelActivity, 13),
+            (CicsOperation::CheckActivity, 14),
+            (CicsOperation::DeleteActivity, 15),
+        ] {
+            let mut arguments =
+                BTreeMap::from([("ACTIVITY".into(), argument(not_sign_name.as_bytes()))]);
+            if operation == CicsOperation::CheckActivity {
+                arguments.insert("COMPSTATUS".into(), argument(b"STATUS"));
+            }
+            let command = request(operation, arguments, sequence);
+            let result = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), sequence),
+                    command,
+                )
+                .unwrap();
+            assert_eq!(result.condition, "NORMAL");
+            if operation == CicsOperation::CheckActivity {
+                assert_eq!(result.outputs["COMPSTATUS"].bytes(), b"FORCED");
+                let pool = store
+                    .get_provider_state("cics-event-activity-v1", &root)
+                    .unwrap()
+                    .unwrap();
+                let value: serde_json::Value = serde_json::from_slice(&pool.payload).unwrap();
+                assert!(value["events"].get("SAFEEVT").is_none());
             }
         }
         assert!(

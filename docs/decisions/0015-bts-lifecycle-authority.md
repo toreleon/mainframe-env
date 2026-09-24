@@ -117,6 +117,18 @@ exact child ID. DEFINE ACTIVITY creates it with the child and index in one
 store mutation. Rollback and DELETE remove it, RESET clears its fired state,
 and forced CANCEL fires it with the process transition. Composite memberships
 and reattachment queues change in the same event-row mutation.
+Parent CHECK ACTIVITY now consumes a completed child's event once. The event
+edit and a process-version fence share one atomic mutation, so RESET or a
+new completion cannot race an old acknowledgement. CHECK of an incomplete
+child retains its event; CHECK ACQACTIVITY does not consume a parent event.
+RESET ACTIVITY recreates an acknowledged event with NOTFIRED status.
+The event acknowledgement survives SQLite reopen, and explicit DELETE or
+terminal parent cleanup accepts an already-consumed completion event.
+Source: baseline A catalog rows `0023`, `0025`,
+`dfhp4_checkactivity.html` SHA-256
+`b186b17e08692ee0297f716ed472b262d945be7d762fec2d57459a793daa9c61`;
+baseline B row `0170`, `dfhp4_resetactivity.html` SHA-256
+`23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52`.
 
 RUN uses a versioned `cics-bts-run-request-v1` record and bounded
 `cics-bts-run-outbox-v1` pending index. Moving an activity to ACTIVE, firing

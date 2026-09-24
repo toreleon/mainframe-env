@@ -41,8 +41,22 @@ pub(in crate::service) fn reset(
     child_id: &str,
 ) -> Result<Option<ProviderStateMutation>, HostProblem> {
     let mut state = load_activity_from_store(store, parent_id)?;
-    if state.version == 0 {
-        return Ok(None);
+    if !state.events.contains_key(event) {
+        let event = event_name(event).map_err(|_| event_error(6))?;
+        if state.events.len() >= MAX_EVENTS {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        state.events.insert(
+            event,
+            EventRecord {
+                kind: EventKind::Activity {
+                    child_id: child_id.into(),
+                },
+                fired: false,
+                parent: None,
+            },
+        );
+        return Ok(Some(activity_mutation(parent_id, &state)?));
     }
     let record = activity_record(&state, event, child_id)?;
     let composite_parent = record.parent.clone();
@@ -84,31 +98,65 @@ pub(in crate::service) fn delete_many(
     if state.version == 0 {
         return Ok(None);
     }
+    let mut changed = false;
     for (event, child_id) in children {
-        let record = activity_record(&state, event, child_id)?;
-        if let Some(parent) = record.parent.clone() {
-            let composite = state
-                .events
-                .get_mut(&parent)
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            let EventKind::Composite {
-                children,
-                fired_queue,
-                ..
-            } = &mut composite.kind
-            else {
-                return Err(HostProblem::InfrastructureFailure);
-            };
-            children.retain(|name| name != event);
-            fired_queue.retain(|name| name != event);
-            state.events.remove(event);
-            composite::reevaluate(&mut state, &parent)?;
-        } else {
-            state.events.remove(event);
+        if !state.events.contains_key(event) {
+            continue;
         }
-        state.reattach.retain(|name| name != event);
+        remove_record(&mut state, event, child_id)?;
+        changed = true;
     }
+    if changed {
+        Ok(Some(activity_mutation(parent_id, &state)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// A parent CHECK consumes a completed child's event once. Repeated CHECKs
+/// still return the child's retained completion status without an event write.
+pub(in crate::service) fn acknowledge(
+    store: &dyn ProviderStateStore,
+    parent_id: &str,
+    event: &str,
+    child_id: &str,
+) -> Result<Option<ProviderStateMutation>, HostProblem> {
+    let mut state = load_activity_from_store(store, parent_id)?;
+    if !state.events.contains_key(event) {
+        return Ok(None);
+    }
+    remove_record(&mut state, event, child_id)?;
     Ok(Some(activity_mutation(parent_id, &state)?))
+}
+
+fn remove_record(
+    state: &mut ActivityState,
+    event: &str,
+    child_id: &str,
+) -> Result<(), HostProblem> {
+    let record = activity_record(state, event, child_id)?;
+    if let Some(parent) = record.parent.clone() {
+        let composite = state
+            .events
+            .get_mut(&parent)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let EventKind::Composite {
+            children,
+            fired_queue,
+            ..
+        } = &mut composite.kind
+        else {
+            return Err(HostProblem::InfrastructureFailure);
+        };
+        children.retain(|name| name != event);
+        fired_queue.retain(|name| name != event);
+        state.events.remove(event);
+        composite::reevaluate(state, &parent)?;
+    } else {
+        state.events.remove(event);
+    }
+    state.reattach.retain(|name| name != event);
+    Ok(())
 }
 
 pub(in crate::service) fn post_many(

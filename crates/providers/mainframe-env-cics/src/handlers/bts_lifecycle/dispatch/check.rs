@@ -9,14 +9,14 @@ pub(super) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
-    let (process, activity_id) = match request.operation {
+    let (process, activity_id, parent_check) = match request.operation {
         CicsOperation::CheckAcqActivity => {
             let (_, process, id) = acquisition(service, run, false)?;
-            (process, id)
+            (process, id, None)
         }
         CicsOperation::CheckAcqProcess => {
             let (_, process, id) = acquisition(service, run, true)?;
-            (process, id)
+            (process, id, None)
         }
         CicsOperation::CheckActivity => {
             let context = active_context(service, run)?;
@@ -35,7 +35,7 @@ pub(super) fn invoke(
                 })
                 .ok_or_else(|| condition("ACTIVITYERR", 109, 8))?;
             let id = child.id.clone();
-            (process, id)
+            (process, id, Some((context, name)))
         }
         _ => return Err(HostProblem::InfrastructureFailure),
     };
@@ -45,10 +45,15 @@ pub(super) fn invoke(
         &BtsLifecycleStore::saf_resource(&process.process_type, &process.name)?,
         AccessIntent::Read,
     )?;
-    let activity = process
-        .activities
-        .get(&activity_id)
-        .ok_or(HostProblem::InfrastructureFailure)?;
+    let activity = if let Some((context, name)) = parent_check {
+        BtsLifecycleStore::new(service.store.as_ref()).checked_child_and_ack(&context, &name)?
+    } else {
+        process
+            .activities
+            .get(&activity_id)
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .clone()
+    };
     let mut outputs = BTreeMap::new();
     for (name, value) in [
         ("COMPSTATUS", completion(activity.completion)),
