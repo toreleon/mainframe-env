@@ -49,5 +49,6 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
 - The internal mapped provider path can stage and replay an ISSUE intent.
   Its separate control-ID carrier call saves the attempt marker first, uses a
   read-only reconciliation after uncertain dispatch, and commits the final
-  receipt only on a confirmed result. Partner ingress and public command
-  routing remain acceptance gates.
+  receipt only on a confirmed result. The internal mapped command route now
+  invokes this carrier on staging and exact retry. Public command registration
+  and selected compiled execution remain acceptance gates.

@@ -5,8 +5,8 @@
 
 use super::{
     ConversationLedger, ConversationOwner, ConversationProblem, ConversationReplay,
-    ConversationReply, GdsIssueFlow, IssueRequestIdentity, IssueValidationProblem,
-    load_conversation_replay,
+    ConversationReply, ConversationTransmitOutcome, GdsIssueFlow, IssueRequestIdentity,
+    IssueValidationProblem, load_conversation_replay,
 };
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
@@ -118,7 +118,13 @@ pub(super) fn invoke(
             if pending.flow != flow || pending.matches_request(effect_key, &identity).is_err() {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            return suspended(service, run);
+            match service.flush_issue_control(run, token, effect_key, pending.id)? {
+                ConversationTransmitOutcome::Confirmed => continue,
+                ConversationTransmitOutcome::Pending => return suspended(service, run),
+                ConversationTransmitOutcome::Rejected(_) => {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+            }
         }
         record
             .stage_issue_request(
@@ -137,7 +143,18 @@ pub(super) fn invoke(
             if super::deadline(service, run).is_err() {
                 return Err(HostProblem::UnknownOutcome);
             }
-            return suspended(service, run);
+            let control_id = next
+                .conversation(token)
+                .and_then(|record| record.pending_issue.as_ref())
+                .ok_or(HostProblem::InfrastructureFailure)?
+                .id;
+            match service.flush_issue_control(run, token, effect_key, control_id)? {
+                ConversationTransmitOutcome::Confirmed => continue,
+                ConversationTransmitOutcome::Pending => return suspended(service, run),
+                ConversationTransmitOutcome::Rejected(_) => {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+            }
         }
     }
     Err(HostProblem::UnknownOutcome)

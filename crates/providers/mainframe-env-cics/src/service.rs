@@ -8878,21 +8878,7 @@ mod tests {
             )
             .unwrap()
             .disposition,
-            CicsDisposition::Suspended
-        );
-        let control_id = ConversationLedger::load(source_store.as_ref())
-            .unwrap()
-            .conversation(source_token)
-            .unwrap()
-            .pending_issue
-            .as_ref()
-            .unwrap()
-            .id;
-        assert_eq!(
-            source
-                .flush_issue_control(&mut run, source_token, "outer-1", control_id)
-                .unwrap(),
-            ConversationTransmitOutcome::Confirmed
+            CicsDisposition::Complete
         );
         assert_eq!(sent.load(Ordering::SeqCst), 1);
         assert_eq!(
@@ -9123,21 +9109,7 @@ mod tests {
                 )
                 .unwrap()
                 .disposition,
-                CicsDisposition::Suspended
-            );
-            let control_id = ConversationLedger::load(source_store.as_ref())
-                .unwrap()
-                .conversation(source_token)
-                .unwrap()
-                .pending_issue
-                .as_ref()
-                .unwrap()
-                .id;
-            assert_eq!(
-                source
-                    .flush_issue_control(&mut source_run, source_token, "outer-1", control_id)
-                    .unwrap(),
-                ConversationTransmitOutcome::Confirmed
+                CicsDisposition::Complete
             );
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
             let exchange = partner.exchange(target_token).unwrap();

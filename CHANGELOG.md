@@ -88,6 +88,10 @@ All notable changes to mainframe-env are documented here.
 - Added paired carrier regressions for mapped ISSUE CONFIRMATION and ERROR.
   The partner's pending SEND CONFIRM is reconciled before the issuer completes;
   ERROR persists the source four-byte negative response by send ID.
+- Connected the internal mapped ISSUE staging route to confirmed control
+  dispatch. A same-key resume reconciles an attempted control; a confirmed
+  carrier result returns the saved command reply. Public ISSUE rows remain
+  unregistered.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and
