@@ -23,7 +23,10 @@ impl ProductServer {
     ) -> Result<Option<JesWorkOutcome>, HostProblem> {
         Ok(match process_cics_work(&self.cics, work, now_tick)? {
             Some(CicsWorkOutcome::Start(task)) => {
-                Some(self.launch_started_task(work, &task, now_tick)?)
+                Some(self.launch_started_task(work, &task, now_tick, None)?)
+            }
+            Some(CicsWorkOutcome::Bridge(task)) => {
+                Some(self.launch_bridge_task(work, &task, now_tick)?)
             }
             Some(CicsWorkOutcome::Delay) => {
                 self.wake_delayed_online_task(work, now_tick)?;
@@ -45,32 +48,68 @@ impl ProductServer {
         })
     }
 
-    fn launch_started_task(
+    pub(super) fn launch_started_task(
         &self,
         work: &WorkRecord,
         task: &CicsStartTask,
         now_tick: u64,
+        selected: Option<(&str, &str)>,
     ) -> Result<JesWorkOutcome, HostProblem> {
         let transaction = normalize_online_name(&task.transaction, 16)?;
-        let Some(program) = self
-            .online_transactions
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .get(&transaction)
-            .cloned()
-        else {
-            return Ok(JesWorkOutcome::Completed);
+        let (program, artifact) = if let Some((program, artifact)) = selected {
+            (
+                normalize_online_name(program, 128)?,
+                ArtifactRef::new(artifact, InvocationLimits::default())
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            )
+        } else {
+            let Some(program) = self
+                .online_transactions
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .get(&transaction)
+                .cloned()
+            else {
+                return Ok(JesWorkOutcome::Completed);
+            };
+            let Some(artifact) = self
+                .online_programs
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .get(&program)
+                .cloned()
+            else {
+                return Ok(JesWorkOutcome::Completed);
+            };
+            (program, artifact)
         };
-        let Some(artifact) = self
-            .online_programs
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .get(&program)
-            .cloned()
-        else {
-            return Ok(JesWorkOutcome::Completed);
-        };
-        let invocation = started_task_invocation(work, task, artifact)?;
+        let mut invocation = started_task_invocation(work, task, artifact)?;
+        if work.required_generation == mainframe_env_cics::CICS_BRIDGE_START_WORK_GENERATION {
+            let bridge = self.cics.bridge_runtime(&task.request_id)?;
+            if bridge.run_unit != invocation.run_unit_id.as_str()
+                || bridge.principal != invocation.principal.id().as_str()
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            invocation.bindings.insert(
+                "cics.bridge-request".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.bridge-request@1",
+                    task.request_id.as_bytes().to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            );
+            invocation.bindings.insert(
+                "cics.start-code".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.start-code@1",
+                    bridge.start_code.to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            );
+        }
         let principal = invocation.principal.id().clone();
         let terminal = match task.terminal.as_deref() {
             Some(terminal) => match self.cics.resolve_start_terminal(terminal)? {
@@ -251,7 +290,7 @@ impl ProductServer {
     }
 }
 
-fn started_task_invocation(
+pub(super) fn started_task_invocation(
     work: &WorkRecord,
     task: &CicsStartTask,
     artifact: ArtifactRef,

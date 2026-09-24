@@ -1,11 +1,10 @@
 mod bms_map;
-#[allow(
-    dead_code,
-    reason = "START BREXIT bridge adapter is not yet dispatched"
-)]
 mod bridge_abi;
 mod bridge_definition;
+mod bridge_profile;
+mod bridge_runtime;
 mod bridge_start;
+mod bridge_terminal;
 mod builtin_function;
 mod condition;
 mod document_control;
@@ -25,6 +24,7 @@ mod program_control;
 mod queue_control;
 mod recovery;
 mod spool_control;
+mod start_brexit;
 mod start_task;
 mod storage_control;
 mod task_context;
@@ -91,11 +91,10 @@ pub use bms_map::{BmsFieldDefinition, BmsMapDefinition};
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
+pub use bridge_abi::{BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply};
 pub use bridge_definition::{CicsBridgeExitDefault, CicsBridgeExitSelection};
-#[allow(
-    unused_imports,
-    reason = "bridge worker is the next START BREXIT slice"
-)]
+pub use bridge_profile::{CicsBridgeAbiProfile, CicsBridgeAbiSelection};
+pub use bridge_runtime::CicsBridgeRuntime;
 pub use bridge_start::{CICS_BRIDGE_START_WORK_GENERATION, CicsBridgeStartIntent};
 pub(super) use condition::respond as condition;
 pub(super) use document_control::{
@@ -121,6 +120,8 @@ pub(super) fn validate_owned_stores(
     operator_control::validate_active_operator_commands(store, limits)?;
     network_context::validate_store(store, limits)?;
     bridge_definition::validate_store(store, limits)?;
+    bridge_profile::validate_store(store, limits)?;
+    bridge_runtime::validate_store(store, limits)?;
     bridge_start::validate_store(store, limits)?;
     Ok(())
 }

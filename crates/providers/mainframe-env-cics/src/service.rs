@@ -1724,7 +1724,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 84);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 85);
         handlers::verify_descriptor(&request, descriptor);
         match descriptor.family {
             CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
@@ -6558,7 +6558,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 82);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 85);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -6570,7 +6570,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 10);
+        assert_eq!(families.len(), 16);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
@@ -10275,6 +10275,32 @@ mod tests {
             assert!(matches!(
                 cics.schedule_bridge_start(
                     "NX00",
+                    "MONI",
+                    None,
+                    "ISSUER",
+                    None,
+                    None,
+                    None,
+                    "bridge-without-profile",
+                    digest,
+                    4,
+                ),
+                Err(HostProblem::Condition {
+                    response: 16,
+                    response2: 12,
+                    ..
+                })
+            ));
+            cics.register_bridge_abi_profiles(&[CicsBridgeAbiProfile {
+                exit: "BRXIT".into(),
+                version: 7,
+                bind_code: *b"XY",
+            }])
+            .unwrap();
+            assert!(matches!(
+                cics.schedule_bridge_start(
+                    "NX00",
+                    "MONI",
                     None,
                     "ISSUER",
                     None,
@@ -10293,6 +10319,7 @@ mod tests {
             first = cics
                 .schedule_bridge_start(
                     "NX00",
+                    "MONI",
                     None,
                     "ISSUER",
                     None,
@@ -10304,13 +10331,43 @@ mod tests {
                 )
                 .unwrap();
             assert_eq!(first.transaction, "NX00");
+            assert_eq!(first.target_program, "TARGET");
+            assert!(first.target_artifact.starts_with("sha256:"));
             assert_eq!(first.exit, "BRXIT");
             assert_eq!(first.principal, "ISSUER");
             assert_eq!(first.data, b"ABC");
+            let init = BrxaInitFrame::new(
+                0x0030_0000,
+                4096,
+                std::num::NonZeroU32::new(7).unwrap(),
+                *b"MONI",
+                *b"NX00",
+                *b"ISSUER  ",
+                b"ABC",
+            )
+            .unwrap();
+            let bind = init.bind(init.bytes(), *b"XY").unwrap();
+            let runtime = CicsBridgeRuntime::new(
+                first.request_id.clone(),
+                format!("run-cics-bridge-{}", first.request_id),
+                "ISSUER".into(),
+                "BRXIT".into(),
+                first.exit_artifact.clone(),
+                7,
+                *b"XY",
+                0x0030_0000,
+                4096,
+                bind.bytes().to_vec(),
+                *b"TD",
+            )
+            .unwrap();
+            cics.register_bridge_runtime(runtime.clone()).unwrap();
+            cics.register_bridge_runtime(runtime).unwrap();
             clock.tick.store(2_000, Ordering::SeqCst);
             assert_eq!(
                 cics.schedule_bridge_start(
                     "NX00",
+                    "MONI",
                     None,
                     "ISSUER",
                     None,
@@ -10326,6 +10383,7 @@ mod tests {
             assert_eq!(
                 cics.schedule_bridge_start(
                     "NX00",
+                    "MONI",
                     None,
                     "ISSUER",
                     None,
@@ -10354,6 +10412,10 @@ mod tests {
         .unwrap();
         cics.bind_artifact_store(store.clone()).unwrap();
         cics.recover_bridge_starts().unwrap();
+        assert_eq!(
+            cics.bridge_runtime(&first.request_id).unwrap().start_code,
+            *b"TD"
+        );
         let row = store
             .get_provider_state("cics-bridge-start-v1", &first.request_id)
             .unwrap()

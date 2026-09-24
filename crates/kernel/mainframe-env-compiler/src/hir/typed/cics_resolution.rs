@@ -6,11 +6,10 @@ use super::{
 };
 use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
-    CICS_APPLICATION_AID_NAMES, CICS_APPLICATION_CONDITION_NAMES,
-    CicsApplicationCobolApplicability, CicsApplicationConditionLabelOperand,
-    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
-    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
-    cics_application_registry_candidates_for_tokens,
+    CICS_APPLICATION_AID_NAMES, CicsApplicationCobolApplicability,
+    CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
+    CicsApplicationHandlerReadiness, CicsApplicationOptionValueShape,
+    CicsApplicationRegistryDescriptor, cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
 type Clauses = BTreeMap<String, Vec<String>>;
@@ -31,6 +30,7 @@ mod journal_control;
 mod legacy_compatibility;
 mod numeric_value;
 mod operation;
+use operation::is_condition_name;
 mod operator_control;
 mod output_bindings;
 mod program_control;
@@ -290,6 +290,8 @@ fn validate_candidate(
             (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
                 if descriptor.runtime_operation == Some("ExtractTcpip")
                     && matches!(*name, "CLNTIPFAMILY" | "SRVRIPFAMILY" | "SSLTYPE") => {}
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("StartBrexit") && *name == "BRDATA" => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
                 return Err(format!(
                     "CICS {} option {name} has a source-bounded operand shape",
@@ -454,12 +456,6 @@ fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -
     option_value_shape(descriptor, name).is_some()
         || (descriptor.condition_clauses.is_some() && is_condition_name(name))
         || (descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name))
-}
-
-fn is_condition_name(name: &str) -> bool {
-    CICS_APPLICATION_CONDITION_NAMES
-        .binary_search(&name)
-        .is_ok()
 }
 
 fn is_aid_name(name: &str) -> bool {
@@ -722,6 +718,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
         ],
         HirCicsOperation::StartAttach => &["TRANSID", "RESP", "RESP2"],
+        HirCicsOperation::StartBrexit => interval_control::BREXIT_CLAUSES,
         HirCicsOperation::Retrieve => &[
             "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
         ],
@@ -790,6 +787,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentSet => document_control::ALLOWED_OPTIONS,
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::StartAttach => &["NOHANDLE"],
+        HirCicsOperation::StartBrexit => &["BREXIT", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Post => &["AFTER", "AT", "NOHANDLE"],
@@ -928,7 +926,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::DocumentRetrieve => &["DOCTOKEN", "INTO", "LENGTH"][..],
         HirCicsOperation::DocumentSet => &["DOCTOKEN", "LENGTH"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
-        HirCicsOperation::Start | HirCicsOperation::StartAttach => &["TRANSID"][..],
+        HirCicsOperation::Start | HirCicsOperation::StartAttach | HirCicsOperation::StartBrexit => {
+            &["TRANSID"][..]
+        }
         HirCicsOperation::Post => &["SET"][..],
         HirCicsOperation::WriteOperator => &["TEXT"][..],
         HirCicsOperation::ExtractCertificate => &["CERTIFICATE"][..],
@@ -1165,6 +1165,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
             ) && is_condition_name(option))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
+                && !(operation == HirCicsOperation::StartBrexit && option.as_str() == "BREXIT")
         })
         .map(|option| operation::resolve_option(option))
         .collect::<BTreeSet<_>>();

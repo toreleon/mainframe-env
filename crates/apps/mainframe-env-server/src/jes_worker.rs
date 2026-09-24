@@ -1,6 +1,7 @@
 use mainframe_env_cics::{
-    CICS_DELAY_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
-    CICS_START_WORK_GENERATION, CicsService, CicsStartTask,
+    CICS_BRIDGE_START_WORK_GENERATION, CICS_DELAY_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION,
+    CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsBridgeStartIntent, CicsService,
+    CicsStartTask,
 };
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{PlatformStore, StoreError, WorkRecord};
@@ -38,6 +39,15 @@ pub(crate) fn claim_durable_work(
     )?;
     if start.is_some() {
         return Ok(start);
+    }
+    let bridge = store.claim(
+        worker,
+        Some(CICS_BRIDGE_START_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )?;
+    if bridge.is_some() {
+        return Ok(bridge);
     }
     let delay = store.claim(
         worker,
@@ -85,6 +95,7 @@ pub(crate) fn heartbeat_durable_work(
 
 pub(crate) enum CicsWorkOutcome {
     Start(CicsStartTask),
+    Bridge(CicsBridgeStartIntent),
     Delay,
     Post(bool),
     OperatorTimeout(bool),
@@ -98,6 +109,9 @@ pub(crate) fn process_cics_work(
     Ok(match work.required_generation.as_str() {
         CICS_START_WORK_GENERATION => Some(CicsWorkOutcome::Start(
             cics.promote_start_work(work, now_tick)?,
+        )),
+        CICS_BRIDGE_START_WORK_GENERATION => Some(CicsWorkOutcome::Bridge(
+            cics.promote_bridge_start(work, now_tick)?,
         )),
         CICS_DELAY_WORK_GENERATION => {
             cics.promote_delay_work(work, now_tick)?;

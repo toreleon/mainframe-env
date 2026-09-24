@@ -3,7 +3,7 @@
 use super::*;
 
 /// Complete registry of executable typed CICS operations.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 82] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 83] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -656,6 +656,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 82] = [
         operation: CicsPlanOperation::StartAttach,
         namespace: "cics.interval",
         name: "start-attach",
+        major: 1,
+        effects: START_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::StartBrexit,
+        namespace: "cics.interval",
+        name: "start-brexit",
         major: 1,
         effects: START_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

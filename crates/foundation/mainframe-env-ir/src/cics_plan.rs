@@ -44,7 +44,6 @@ pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@2";
 const MAGIC: &[u8; 4] = b"MCEP";
 const LEGACY_VERSION: u16 = 1;
 const VERSION: u16 = 2;
-
 /// Resource limits for CICS effect-plan encoding and decoding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CicsPlanLimits {
@@ -759,6 +758,7 @@ fn validate_operation_shape(
         CicsPlanOperation::Cancel
         | CicsPlanOperation::Delay
         | CicsPlanOperation::Start
+        | CicsPlanOperation::StartBrexit
         | CicsPlanOperation::Retrieve => {
             interval_control::invalid_shape(plan, inputs, outputs, scheduling_options)
         }
@@ -3841,6 +3841,41 @@ mod tests {
         });
         assert_eq!(
             encode_cics_effect_plan(&invalid, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn start_brexit_uses_reserved_tags_and_requires_paired_data_length() {
+        let limits = CicsPlanLimits::default();
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::StartBrexit,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::TransId,
+                    value: CicsOperandValue::Literal(b"NX00".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::BrExit,
+                    value: CicsOperandValue::Literal(b"BRXIT".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(&bytes[4..8], &[0, 2, 0, 163]);
+        assert_eq!(operand_tag(CicsOperandName::BrExit), 653);
+        assert_eq!(operand_tag(CicsOperandName::BrData), 654);
+        assert_eq!(operand_tag(CicsOperandName::BrDataLength), 655);
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+        plan.operands.push(CicsNamedOperand {
+            name: CicsOperandName::BrDataLength,
+            value: CicsOperandValue::Integer(4),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

@@ -1260,6 +1260,7 @@ dependencies = [
  "mainframe-env-encoding",
  "mainframe-env-execution-api",
  "mainframe-env-host-api",
+ "mainframe-env-ir",
  "mainframe-env-racf",
  "mainframe-env-source",
  "mainframe-env-store",

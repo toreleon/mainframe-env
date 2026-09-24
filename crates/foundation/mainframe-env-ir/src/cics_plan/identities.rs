@@ -139,6 +139,8 @@ pub enum CicsPlanOperation {
     Start,
     /// Start one noncancelable facility-less local task immediately.
     StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     /// Consume one expired interval-control START data record.
     Retrieve,
     /// Create one bounded transaction-owned document.
@@ -182,6 +184,12 @@ pub enum CicsOperandName {
     Commarea,
     /// `TRANSID(...)` next-transaction name.
     TransId,
+    /// `BREXIT(...)` override for a transaction's bridge exit default.
+    BrExit,
+    /// `BRDATA(...)` initial data passed to the bridge exit.
+    BrData,
+    /// `BRDATALENGTH(...)` selected initial data length.
+    BrDataLength,
     /// `TERMID(...)` principal facility for a started task.
     TermId,
     /// `RTRANSID(...)` metadata passed to a started task.

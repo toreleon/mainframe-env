@@ -6,9 +6,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Registered typed CICS `START BREXIT` row `0207` with reserved MCEP v2 tags.
+  The local worker now invokes the exact installed exit for BRXA Init, Bind,
+  bounded BMS callbacks, and Term or Abend, and recovers durable admission and
+  callback state. Target and exit artifacts are fixed at admission; deployment
+  ABI constants are bound to the installed exit artifact.
+
 - Recognize the source-defined bare `START BREXIT` discriminator when a
-  transaction supplies its default exit, while keeping row `0207` unready
-  until its BRXA execution path is connected.
+  transaction supplies its default exit.
 
 - Versioned the typed CICS effect-plan codec as `MCEP` v2 with big-endian `u16`
   operation, operand, option, and output tags. Existing tag numbers and
@@ -35,7 +40,7 @@ All notable changes to mainframe-env are documented here.
 - Added a checked BRXA Bind transition that carries the validated Init image
   forward, preserves its BRDATA pointer, accepts only source-listed Bind fields,
   and caps facility keep time at one week. The Bind command code remains an
-  explicit reviewed input; execution dispatch remains closed.
+  explicit deployment input.
 
 - Added a durable START BREXIT admission record and private work generation.
   Admission freezes the local transaction, selected installed exit artifact,
@@ -57,8 +62,7 @@ All notable changes to mainframe-env are documented here.
 - Added immutable `START BREXIT` default exit definitions over installed local
   programs. Explicit BREXIT names override the transaction default; a missing
   default returns PGMIDERR 27/0. Canonical rows survive SQLite reopen and
-  malformed rows fail during CICS open. The command row remains unready until
-  BRXA invocation and terminal interception are connected.
+  malformed rows fail during CICS open.
 
 - Completed the typed `EXTRACT TCPIP` route for row `0074`. It returns the
   task's trusted IPv4/IPv6 addresses, DNS names supplied by ingress, service,

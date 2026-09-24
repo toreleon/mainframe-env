@@ -1,5 +1,11 @@
 use super::super::{HirCicsOperation, HirCicsOption, Resolution, ResolutionFailure};
-use mainframe_env_ir::CicsApplicationRegistryDescriptor;
+use mainframe_env_ir::{CICS_APPLICATION_CONDITION_NAMES, CicsApplicationRegistryDescriptor};
+
+pub(super) fn is_condition_name(name: &str) -> bool {
+    CICS_APPLICATION_CONDITION_NAMES
+        .binary_search(&name)
+        .is_ok()
+}
 
 pub(super) fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
     descriptor.label_tokens.join(" ")
@@ -75,6 +81,7 @@ pub(super) fn resolve(
         ["WAITCICS"] => HirCicsOperation::WaitCics,
         ["START"] => HirCicsOperation::Start,
         ["START", "ATTACH"] => HirCicsOperation::StartAttach,
+        ["START", "BREXIT"] => HirCicsOperation::StartBrexit,
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         ["DOCUMENT", "CREATE"] => HirCicsOperation::DocumentCreate,
         ["DOCUMENT", "DELETE"] => HirCicsOperation::DocumentDelete,

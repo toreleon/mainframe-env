@@ -13,6 +13,7 @@ mainframe-env-source.workspace = true
 mainframe-env-execution-api.workspace = true
 mainframe-env-encoding.workspace = true
 mainframe-env-host-api.workspace = true
+mainframe-env-ir.workspace = true
 mainframe-env-store-api.workspace = true
 sha2.workspace = true
 ring.workspace = true

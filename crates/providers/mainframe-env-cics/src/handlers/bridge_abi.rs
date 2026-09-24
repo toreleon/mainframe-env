@@ -1,8 +1,8 @@
-//! Source-pinned BRXA Init COMMAREA layout for the local 3270 bridge.
+//! Source-pinned BRXA COMMAREA layouts for the local 3270 bridge.
 //!
 //! The 6.2/6.1 BRARC topic fixes the three area lengths and offsets. It does
 //! not publish `brxa_current_version_no`, so construction requires a reviewed
-//! version supplied by the eventual bridge adapter. No guessed version or Bind
+//! version supplied by the deployment profile. No guessed version or Bind
 //! command code is embedded here.
 
 use mainframe_env_host_api::HostProblem;
@@ -23,13 +23,13 @@ const COMMAND_EYE: &[u8; 8] = b">BRCOMMA";
 /// One Init call image. The caller must supply the selected exit program's
 /// virtual address of DFHCOMMAREA and its reviewed BRXA version constant.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::service) struct BrxaInitFrame {
+pub struct BrxaInitFrame {
     bytes: Vec<u8>,
 }
 
 /// Source-defined Init fields that the bridge exit may return.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::service) struct BrxaInitReply {
+pub struct BrxaInitReply {
     pub start_code: [u8; 2],
     pub load_ads_descriptor: bool,
     pub facility_like: [u8; 4],
@@ -41,13 +41,13 @@ pub(in crate::service) struct BrxaInitReply {
 
 /// Bind follows a validated Init image and retains its BRDATA pointer.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::service) struct BrxaBindFrame {
+pub struct BrxaBindFrame {
     bytes: Vec<u8>,
 }
 
 /// Source-defined Bind fields the bridge exit may return.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::service) struct BrxaBindReply {
+pub struct BrxaBindReply {
     pub start_code: [u8; 2],
     pub load_ads_descriptor: bool,
     pub facility_keep_time: u32,
@@ -55,10 +55,223 @@ pub(in crate::service) struct BrxaBindReply {
     pub user_abend_code: [u8; 4],
 }
 
+/// Source-defined Term or Abend notification after the target finishes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BrxaEndFrame {
+    bytes: Vec<u8>,
+}
+
+/// One bounded BMS callback image. All pointers address the selected exit's
+/// DFHCOMMAREA; external GETMAIN pointers are intentionally unsupported.
+pub struct BrxaBmsFrame {
+    bytes: Vec<u8>,
+    output_at: Option<usize>,
+}
+
+impl BrxaBmsFrame {
+    pub fn new(
+        bound: &[u8],
+        commarea_address: u32,
+        capacity: usize,
+        eibfn: [u8; 2],
+        mapset: Option<&str>,
+        map: Option<&str>,
+        from: &[u8],
+        receive: bool,
+    ) -> Result<Self, HostProblem> {
+        if bound.len() < DATA_AT
+            || capacity > 32_767
+            || bound.len() > capacity
+            || &bound[..8] != HEADER_EYE
+            || &bound[TRANSACTION_AT..TRANSACTION_AT + 8] != TRANSACTION_EYE
+            || &bound[COMMAND_AT..COMMAND_AT + 8] != COMMAND_EYE
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let command_at = bound.len();
+        let from_at = command_at
+            .checked_add(108)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let output_at = from_at
+            .checked_add(from.len())
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let output_len = if receive {
+            capacity.saturating_sub(output_at).min(4096)
+        } else {
+            0
+        };
+        if output_at > capacity || receive && output_len == 0 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let total = output_at + output_len;
+        let pointer = |offset: usize| -> Result<[u8; 4], HostProblem> {
+            if offset >= 1 << 20 {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            let address = commarea_address
+                .checked_add(u32::try_from(offset).map_err(|_| HostProblem::ResourceExhausted)?)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            if address >> 20 != commarea_address >> 20 {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            Ok(address.to_be_bytes())
+        };
+        pointer(total - 1)?;
+        let mut bytes = vec![0; total];
+        bytes[..bound.len()].copy_from_slice(bound);
+        bytes[0x18..0x1c].copy_from_slice(&pointer(command_at)?);
+        bytes[0x1c..0x20].copy_from_slice(&108u32.to_be_bytes());
+        let command = &mut bytes[command_at..from_at];
+        command[..8].copy_from_slice(COMMAND_EYE);
+        let code = format!("{:02X}{:02X}", eibfn[0], eibfn[1]);
+        command[8..12].copy_from_slice(code.as_bytes());
+        command[12..16].fill(b' ');
+        for (value, start) in [(mapset, 0x30), (map, 0x38)] {
+            command[start..start + 7].fill(b' ');
+            if let Some(value) = value {
+                if value.is_empty()
+                    || value.len() > 7
+                    || !value
+                        .bytes()
+                        .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+                {
+                    return Err(HostProblem::Malformed);
+                }
+                command[start..start + value.len()].copy_from_slice(value.as_bytes());
+            }
+        }
+        command[0x44..0x46].copy_from_slice(&(-2i16).to_be_bytes());
+        command[0x4a] = b'N';
+        for index in [0x4b, 0x4c, 0x4d, 0x4e, 0x4f] {
+            command[index] = b'N';
+        }
+        command[0x26] = 0x7d;
+        if !from.is_empty() {
+            command[0x10..0x14].copy_from_slice(&pointer(from_at)?);
+            command[0x14..0x18].copy_from_slice(
+                &u32::try_from(from.len())
+                    .map_err(|_| HostProblem::ResourceExhausted)?
+                    .to_be_bytes(),
+            );
+            bytes[from_at..output_at].copy_from_slice(from);
+        }
+        Ok(Self {
+            bytes,
+            output_at: receive.then_some(output_at),
+        })
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn validate_reply(
+        &self,
+        returned: &[u8],
+        commarea_address: u32,
+    ) -> Result<Vec<u8>, HostProblem> {
+        let command_at = u32::from_be_bytes(
+            self.bytes[0x18..0x1c]
+                .try_into()
+                .map_err(|_| HostProblem::Malformed)?,
+        )
+        .checked_sub(commarea_address)
+        .ok_or(HostProblem::Malformed)? as usize;
+        if returned.len() != self.bytes.len()
+            || self
+                .bytes
+                .iter()
+                .zip(returned)
+                .enumerate()
+                .any(|(index, (expected, actual))| {
+                    expected != actual
+                        && !self.output_at.is_some_and(|at| index >= at)
+                        && !(command_at + 0x18..command_at + 0x20).contains(&index)
+                        && !(command_at + 0x24..command_at + 0x26).contains(&index)
+                        && index != command_at + 0x26
+                        && !(command_at + 0x0c..command_at + 0x10).contains(&index)
+                })
+            || returned[command_at + 0x0c..command_at + 0x10] != *b"    "
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let command = &returned[command_at..command_at + 108];
+        if command[0x20..0x24] != [0; 4] {
+            return Err(HostProblem::ProviderFailure);
+        }
+        let Some(output_at) = self.output_at else {
+            return Ok(Vec::new());
+        };
+        let pointer = u32::from_be_bytes(
+            command[0x18..0x1c]
+                .try_into()
+                .map_err(|_| HostProblem::Malformed)?,
+        )
+        .checked_sub(commarea_address)
+        .ok_or(HostProblem::Malformed)? as usize;
+        let length = u32::from_be_bytes(
+            command[0x1c..0x20]
+                .try_into()
+                .map_err(|_| HostProblem::Malformed)?,
+        ) as usize;
+        let end = pointer.checked_add(length).ok_or(HostProblem::Malformed)?;
+        if pointer < output_at || end > returned.len() {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(returned[pointer..end].to_vec())
+    }
+}
+
+impl BrxaEndFrame {
+    pub fn new(bound: &[u8], abend: bool) -> Result<Self, HostProblem> {
+        if bound.len() < DATA_AT
+            || &bound[..8] != HEADER_EYE
+            || &bound[TRANSACTION_AT..TRANSACTION_AT + 8] != TRANSACTION_EYE
+            || &bound[COMMAND_AT..COMMAND_AT + 8] != COMMAND_EYE
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut bytes = bound.to_vec();
+        bytes[COMMAND_AT + 0x08..COMMAND_AT + 0x0a].copy_from_slice(b"XM");
+        bytes[COMMAND_AT + 0x0a..COMMAND_AT + 0x0c].copy_from_slice(if abend {
+            b"AB"
+        } else {
+            b"TM"
+        });
+        bytes[COMMAND_AT + 0x0c..COMMAND_AT + 0x10].fill(b' ');
+        Ok(Self { bytes })
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn validate_reply(&self, returned: &[u8]) -> Result<(), HostProblem> {
+        if returned.len() != self.bytes.len()
+            || self
+                .bytes
+                .iter()
+                .zip(returned)
+                .enumerate()
+                .any(|(index, (expected, actual))| {
+                    expected != actual
+                        && index != TRANSACTION_AT + 0x38
+                        && !(TRANSACTION_AT + 0x39..TRANSACTION_AT + 0x3c).contains(&index)
+                        && !(COMMAND_AT + 0x0c..COMMAND_AT + 0x10).contains(&index)
+                })
+            || returned[COMMAND_AT + 0x0c..COMMAND_AT + 0x10] != *b"    "
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl BrxaInitFrame {
     /// Build only the documented Init call; the value of `version` is not
     /// inferred from the BRARC topic.
-    pub(in crate::service) fn new(
+    pub fn new(
         commarea_address: u32,
         commarea_capacity: usize,
         version: NonZeroU32,
@@ -117,16 +330,13 @@ impl BrxaInitFrame {
         Ok(Self { bytes })
     }
 
-    pub(in crate::service) fn bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Reject changes outside the BRARC Init writable-field list. In
     /// particular, an exit cannot replace CICS-owned area pointers or BRDATA.
-    pub(in crate::service) fn validate_reply(
-        &self,
-        returned: &[u8],
-    ) -> Result<BrxaInitReply, HostProblem> {
+    pub fn validate_reply(&self, returned: &[u8]) -> Result<BrxaInitReply, HostProblem> {
         if returned.len() != self.bytes.len()
             || self
                 .bytes
@@ -163,7 +373,7 @@ impl BrxaInitFrame {
     /// Preserve a validated Init result when advancing to Bind. The committed
     /// BRARC topic does not supply the Bind command code, so the caller must
     /// provide one from separately reviewed authority.
-    pub(in crate::service) fn bind(
+    pub fn bind(
         &self,
         init_reply: &[u8],
         bind_code: [u8; 2],
@@ -183,16 +393,13 @@ impl BrxaInitFrame {
 }
 
 impl BrxaBindFrame {
-    pub(in crate::service) fn bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Accept only the fields BRARC identifies as writable on Bind. Values
     /// above one week are capped to the source-defined facility keep limit.
-    pub(in crate::service) fn validate_reply(
-        &self,
-        returned: &[u8],
-    ) -> Result<BrxaBindReply, HostProblem> {
+    pub fn validate_reply(&self, returned: &[u8]) -> Result<BrxaBindReply, HostProblem> {
         if returned.len() != self.bytes.len()
             || self
                 .bytes
@@ -404,5 +611,75 @@ mod tests {
             ),
             Err(HostProblem::ResourceExhausted)
         );
+    }
+
+    #[test]
+    fn bms_callback_accepts_only_its_checked_output_area() {
+        let init = frame();
+        let bind = init.bind(init.bytes(), *b"XY").unwrap();
+        let base = 0x0030_0000u32;
+        let send = BrxaBmsFrame::new(
+            bind.bytes(),
+            base,
+            4096,
+            [0x04, 0x02],
+            None,
+            None,
+            b"HELLO",
+            false,
+        )
+        .unwrap();
+        let command_at = bind.bytes().len();
+        assert_eq!(
+            &send.bytes()[0x18..0x1c],
+            &(base + command_at as u32).to_be_bytes()
+        );
+        assert_eq!(&send.bytes()[command_at + 8..command_at + 12], b"0402");
+        assert_eq!(send.validate_reply(send.bytes(), base), Ok(Vec::new()));
+        let mut changed = send.bytes().to_vec();
+        changed[0x10] ^= 1;
+        assert_eq!(
+            send.validate_reply(&changed, base),
+            Err(HostProblem::Malformed)
+        );
+
+        let receive = BrxaBmsFrame::new(
+            bind.bytes(),
+            base,
+            4096,
+            [0x04, 0x04],
+            Some("MAPSET"),
+            Some("MAP"),
+            b"",
+            true,
+        )
+        .unwrap();
+        let output_at = command_at + 108;
+        let mut returned = receive.bytes().to_vec();
+        returned[output_at..output_at + 3].copy_from_slice(b"ABC");
+        returned[command_at + 0x18..command_at + 0x1c]
+            .copy_from_slice(&(base + output_at as u32).to_be_bytes());
+        returned[command_at + 0x1c..command_at + 0x20].copy_from_slice(&3u32.to_be_bytes());
+        assert_eq!(receive.validate_reply(&returned, base), Ok(b"ABC".to_vec()));
+        returned[command_at + 0x18..command_at + 0x1c]
+            .copy_from_slice(&(base + DATA_AT as u32).to_be_bytes());
+        assert_eq!(
+            receive.validate_reply(&returned, base),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn term_and_abend_reject_unreviewed_exit_mutation() {
+        let init = frame();
+        let bind = init.bind(init.bytes(), *b"XY").unwrap();
+        for (abend, command) in [(false, b"TM"), (true, b"AB")] {
+            let end = BrxaEndFrame::new(bind.bytes(), abend).unwrap();
+            assert_eq!(&end.bytes()[COMMAND_AT + 0x0a..COMMAND_AT + 0x0c], command);
+            assert_eq!(end.validate_reply(end.bytes()), Ok(()));
+            let mut changed = end.bytes().to_vec();
+            changed[TRANSACTION_AT + 0x34] ^= 1;
+            assert_eq!(end.validate_reply(&changed), Err(HostProblem::Malformed));
+        }
     }
 }

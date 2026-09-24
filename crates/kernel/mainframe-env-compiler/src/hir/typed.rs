@@ -5634,29 +5634,28 @@ mod tests {
     }
 
     #[test]
-    fn cics_start_brexit_bare_discriminator_reaches_unready_boundary() {
-        for command in [
-            "START BREXIT TRANSID('NX00')",
-            "START BREXIT('BRXIT') TRANSID('NX00')",
+    fn cics_start_brexit_resolves_default_and_explicit_exit() {
+        for (command, operands) in [
+            ("START BREXIT TRANSID('NX00')", 1),
+            ("START BREXIT('BRXIT') TRANSID('NX00')", 2),
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BRSTART. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );
             let analysis = analyze(&source);
-            assert!(analysis.hir.is_none(), "{command}");
-            assert!(
-                analysis
-                    .diagnostics
-                    .iter()
-                    .any(|diagnostic| diagnostic.public_message().contains("handler is unready")),
-                "{command}: {:?}",
-                analysis.diagnostics
-            );
-            assert!(!analysis.diagnostics.iter().any(|diagnostic| {
-                diagnostic
-                    .public_message()
-                    .contains("requires a parenthesized operand")
-            }));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let resolved = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed START BREXIT");
+            assert_eq!(resolved.operation, HirCicsOperation::StartBrexit);
+            assert_eq!(resolved.operands.len(), operands);
         }
         let invalid = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADBR. PROCEDURE DIVISION. EXEC CICS START BREXIT() TRANSID('NX00') END-EXEC. STOP RUN.",

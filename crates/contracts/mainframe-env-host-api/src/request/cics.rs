@@ -121,6 +121,8 @@ pub enum CicsOperation {
     Start,
     /// Start one noncancelable local task immediately without copied data.
     StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
@@ -225,6 +227,7 @@ impl CicsOperation {
             Self::SpoolWrite => "SpoolWrite",
             Self::Start => "Start",
             Self::StartAttach => "StartAttach",
+            Self::StartBrexit => "StartBrexit",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
@@ -303,6 +306,7 @@ impl CicsOperation {
                 | Self::SpoolWrite
                 | Self::Start
                 | Self::StartAttach
+                | Self::StartBrexit
                 | Self::Retrieve
                 | Self::WaitEvent
                 | Self::WaitExternal
@@ -389,6 +393,7 @@ impl CicsOperation {
             ("SPOOLREAD", _) => Self::SpoolRead,
             ("SPOOLWRITE", _) => Self::SpoolWrite,
             ("START", Some("ATTACH")) => Self::StartAttach,
+            ("START", Some("BREXIT")) => Self::StartBrexit,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

@@ -1,10 +1,9 @@
 //! Durable, replayable admission for local START BREXIT work.
 //!
-//! Admission fixes the target and exit artifact before a worker can run. The
-//! bridge callback ABI and terminal interception are separate execution work;
-//! no public CICS command dispatch reaches this queue until they are bound.
+//! Admission fixes the target and exit artifact before the bridge worker runs.
 
 use super::super::{CicsLimits, CicsService, store_error};
+use super::transaction_definition::installed_program_artifact;
 use mainframe_env_execution_api::{
     ArtifactRef, ExecutionId, IdempotencyKey, InvocationLimits, PrincipalId, Selector,
 };
@@ -31,10 +30,18 @@ pub struct CicsBridgeStartIntent {
     pub request_id: String,
     /// Local target transaction.
     pub transaction: String,
+    /// Exact target program and executable selected at admission.
+    pub target_program: String,
+    pub target_artifact: String,
+    /// Transaction that issued START BREXIT.
+    pub bridge_transaction: String,
     /// User-written exit program.
     pub exit: String,
     /// Exact installed exit generation selected at admission.
     pub exit_artifact: String,
+    /// Deployment supplied BRXA version and Bind command code.
+    pub abi_version: u32,
+    pub bind_code: [u8; 2],
     /// Principal under which the started transaction runs.
     pub principal: String,
     /// Copied initial data addressed to the bridge exit.
@@ -51,12 +58,11 @@ pub struct CicsBridgeStartIntent {
 impl CicsService {
     /// Record a bounded bridge launch with exact replay after interrupted enqueue.
     ///
-    /// This is kept outside CICS request dispatch until the BRXA callback and
-    /// terminal interception can consume the resulting work generation.
-    #[allow(dead_code, reason = "START BREXIT dispatch is the next bridge slice")]
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::service) fn schedule_bridge_start(
         &self,
         transaction: &str,
+        bridge_transaction: &str,
         explicit_exit: Option<&str>,
         issuer_principal: &str,
         user: Option<&str>,
@@ -82,6 +88,18 @@ impl CicsService {
         PrincipalId::new(principal, InvocationLimits::default())
             .map_err(|_| HostProblem::Malformed)?;
         let selection = self.resolve_bridge_exit(transaction, explicit_exit)?;
+        let target_program = self.local_transaction_program(transaction)?;
+        let target_artifact = installed_program_artifact(self, &target_program)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if bridge_transaction.is_empty()
+            || bridge_transaction.len() > 4
+            || !bridge_transaction
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let abi = self.resolve_bridge_abi(&selection.exit, selection.artifact.as_str())?;
         let tick = self
             .replay_clock
             .as_ref()
@@ -95,8 +113,13 @@ impl CicsService {
             schema: SCHEMA.into(),
             request_id,
             transaction: selection.transaction,
+            target_program,
+            target_artifact: target_artifact.as_str().into(),
+            bridge_transaction: bridge_transaction.into(),
             exit: selection.exit,
             exit_artifact: selection.artifact.as_str().into(),
+            abi_version: abi.version,
+            bind_code: abi.bind_code,
             principal: principal.into(),
             data,
             priority,
@@ -142,8 +165,7 @@ impl CicsService {
     }
 
     /// Repair an interrupted enqueue after opening the durable runtime.
-    #[allow(dead_code, reason = "START BREXIT worker is the next bridge slice")]
-    pub(in crate::service) fn recover_bridge_starts(&self) -> Result<(), HostProblem> {
+    pub fn recover_bridge_starts(&self) -> Result<(), HostProblem> {
         let work_store = self
             .work_store
             .as_ref()
@@ -163,8 +185,7 @@ impl CicsService {
     }
 
     /// Decode one claimed bridge request without replacing its immutable intent.
-    #[allow(dead_code, reason = "START BREXIT worker is the next bridge slice")]
-    pub(in crate::service) fn promote_bridge_start(
+    pub fn promote_bridge_start(
         &self,
         work: &WorkRecord,
         now_tick: u64,
@@ -311,8 +332,13 @@ fn replayed(
     let admitted = decode(row, limits)?;
     if admitted.request_id != candidate.request_id
         || admitted.transaction != candidate.transaction
+        || admitted.target_program != candidate.target_program
+        || admitted.target_artifact != candidate.target_artifact
+        || admitted.bridge_transaction != candidate.bridge_transaction
         || admitted.exit != candidate.exit
         || admitted.exit_artifact != candidate.exit_artifact
+        || admitted.abi_version != candidate.abi_version
+        || admitted.bind_code != candidate.bind_code
         || admitted.principal != candidate.principal
         || admitted.data != candidate.data
         || admitted.priority != candidate.priority
@@ -359,6 +385,19 @@ fn validate(intent: &CicsBridgeStartIntent, limits: CicsLimits) -> Result<(), Ho
         || intent.request_id != request_id(&intent.producer_key, &intent.producer_digest)
         || intent.transaction.is_empty()
         || intent.transaction.len() > 4
+        || intent.target_program.is_empty()
+        || intent.target_program.len() > 128
+        || !intent
+            .target_program
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+        || intent.target_artifact.len() != 71
+        || !intent.target_artifact.starts_with("sha256:")
+        || !intent.target_artifact[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || intent.bridge_transaction.is_empty()
+        || intent.bridge_transaction.len() > 4
         || intent.exit.is_empty()
         || intent.exit.len() > 8
         || !intent
@@ -369,6 +408,13 @@ fn validate(intent: &CicsBridgeStartIntent, limits: CicsLimits) -> Result<(), Ho
             .exit
             .bytes()
             .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+        || !intent
+            .bridge_transaction
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+        || intent.abi_version == 0
+        || intent.bind_code.contains(&0)
+        || matches!(&intent.bind_code, b"IN" | b"TM" | b"AB")
         || intent.exit_artifact.len() != 71
         || !intent.exit_artifact.starts_with("sha256:")
         || !intent.exit_artifact[7..]

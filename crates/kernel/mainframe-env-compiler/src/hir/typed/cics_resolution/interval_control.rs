@@ -5,6 +5,16 @@ use super::super::{
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{DataCategory, SemanticModel};
 
+pub(super) const BREXIT_CLAUSES: &[&str] = &[
+    "BREXIT",
+    "TRANSID",
+    "BRDATA",
+    "BRDATALENGTH",
+    "USERID",
+    "RESP",
+    "RESP2",
+];
+
 pub(super) fn bare_brexit_discriminator(row: &str, name: &str) -> bool {
     // The required command word has an optional operand when TRANSID names a
     // transaction with a default exit (pinned api-commands:0207).
@@ -98,6 +108,13 @@ pub(super) fn validate_constraints(
                 ));
             }
         }
+        HirCicsOperation::StartBrexit
+            if clauses.contains_key("BRDATA") != clauses.contains_key("BRDATALENGTH") =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS START BREXIT requires BRDATA and BRDATALENGTH together".into(),
+            ));
+        }
         HirCicsOperation::Retrieve
             if clauses.contains_key("INTO") == clauses.contains_key("SET")
                 || !clauses.contains_key("LENGTH") =>
@@ -123,6 +140,7 @@ pub(super) fn operands(
         HirCicsOperation::Start | HirCicsOperation::StartAttach => {
             start_operands(clauses, semantic)
         }
+        HirCicsOperation::StartBrexit => start_brexit_operands(clauses, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
@@ -269,6 +287,56 @@ fn start_operands(
                 value: bounded_name(value, semantic, max, "START", clause)?,
             });
         }
+    }
+    Ok(operands)
+}
+
+fn start_brexit_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::TransId,
+        value: bounded_name(&clauses["TRANSID"], semantic, 4, "START BREXIT", "TRANSID")?,
+    }];
+    for (clause, name) in [
+        ("BREXIT", HirCicsOperandName::BrExit),
+        ("USERID", HirCicsOperandName::UserId),
+    ] {
+        if let Some(value) = clauses.get(clause) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: bounded_name(value, semantic, 8, "START BREXIT", clause)?,
+            });
+        }
+    }
+    if let Some(value) = clauses.get("BRDATA") {
+        let HirCicsValue::Data(data) = cics_value(value, semantic)? else {
+            return Err(ResolutionFailure::Invalid(
+                "CICS START BREXIT BRDATA requires a data area".into(),
+            ));
+        };
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::BrData,
+            value: HirCicsValue::Data(data),
+        });
+        let length = cics_integer_value(&clauses["BRDATALENGTH"], semantic)?;
+        if let HirCicsValue::Data(reference) = &length
+            && (reference.length != 4
+                || !matches!(
+                    reference.usage,
+                    crate::CobolUsage::Binary | crate::CobolUsage::NativeBinary
+                )
+                || reference.scale != 0)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS START BREXIT BRDATALENGTH requires a fullword binary value".into(),
+            ));
+        }
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::BrDataLength,
+            value: length,
+        });
     }
     Ok(operands)
 }

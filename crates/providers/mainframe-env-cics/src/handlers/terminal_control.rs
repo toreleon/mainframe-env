@@ -53,9 +53,17 @@ pub(in crate::service) const fn valid_aid(aid: u8) -> bool {
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    if run.invocation.bindings.contains_key("cics.bridge-request")
+        && matches!(
+            request.operation,
+            CicsOperation::SendMap | CicsOperation::SendText | CicsOperation::ReceiveMap
+        )
+    {
+        return super::bridge_terminal::invoke(service, run, request);
+    }
     match request.operation {
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
@@ -125,7 +133,7 @@ fn validate_purge_message_context(run: &Run) -> Result<(), HostProblem> {
     }
 }
 
-fn send(
+pub(super) fn send(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
@@ -292,7 +300,7 @@ fn length_problem(operation: CicsOperation) -> HostProblem {
     }
 }
 
-fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
+pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const SEND_MAP_ALLOWED: &[&str] = &[
         "FROM",
         "LENGTH",
@@ -365,7 +373,7 @@ fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
     }
 }
 
-fn receive(
+pub(super) fn receive(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
@@ -461,7 +469,7 @@ fn receive(
     Ok(response)
 }
 
-fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
+pub(super) fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "FROM",
         "INTO",
@@ -518,7 +526,7 @@ fn receive_from(request: &CicsRequest) -> Result<Option<Vec<u8>>, HostProblem> {
     Ok(Some(input))
 }
 
-fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
+pub(super) fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
     let map = argument_text(request, "MAP")?
         .trim_end()
         .to_ascii_uppercase();

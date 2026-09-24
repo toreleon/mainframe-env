@@ -260,6 +260,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
     ("StartAttach", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0206"),
+    ("StartBrexit", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0207"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
@@ -617,6 +618,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Unlock",
         "Start",
         "StartAttach",
+        "StartBrexit",
         "Retrieve",
         "TransformDataToJson",
         "TransformDataToXml",
@@ -903,6 +905,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "StartAttach": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
+    "StartBrexit": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
     "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
     "TransformDataToJson": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
@@ -1148,6 +1153,7 @@ def _load_typed_execution_registrations(
         "SpoolWrite",
         "Start",
         "StartAttach",
+        "StartBrexit",
         "Suspend",
         "TransformDataToJson",
         "TransformDataToXml",
@@ -1495,6 +1501,8 @@ def load_catalog(
                 "SpoolRead",
                 "SpoolWrite",
                 "Start",
+                "StartAttach",
+                "StartBrexit",
                 "Suspend",
                 "WaitEvent",
                 "WaitExternal",

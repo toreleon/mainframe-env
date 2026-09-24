@@ -158,6 +158,7 @@ impl From<SaturationLevel> for ProductCapacityStatus {
 }
 
 mod artifact;
+mod bridge_start;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 mod continuation;
@@ -2123,6 +2124,7 @@ impl ProductServer {
         let context = match exchange.as_ref() {
             Some(state) => {
                 let mut invocation = self.online_exchange_invocation(state)?;
+                self.restore_bridge_binding(&mut invocation)?;
                 continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
                 self.cics.restore_terminal_run(
                     invocation.clone(),
@@ -2623,7 +2625,6 @@ impl ProductServer {
             Err(HostProblem::Unauthorized)
         }
     }
-
     pub fn bootstrap_identity(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
         let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
             .map_err(|_| HostProblem::Malformed)?;
@@ -2634,11 +2635,11 @@ impl ProductServer {
         let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
         self.racf.add_user(principal.as_str(), &reference)
     }
-
     pub fn start_background_workers(self: &Arc<Self>) -> Result<(), HostProblem> {
         if self.jes_workers_stopping.load(Ordering::SeqCst) {
             return Err(HostProblem::InfrastructureFailure);
         }
+        self.cics.recover_bridge_starts()?;
         if self
             .jes_workers_started
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -2663,7 +2664,6 @@ impl ProductServer {
         }
         Ok(())
     }
-
     async fn jes_worker_loop(server: Weak<Self>, worker: String, ordinal: usize) {
         loop {
             let Some(product) = server.upgrade() else {
@@ -10725,6 +10725,150 @@ mod tests {
                     record.capability.as_str() == "host.cics.execute"
                         && record.decision == mainframe_env_execution_api::AuditDecision::Success
                 })
+        );
+    }
+
+    #[test]
+    fn compiled_start_brexit_calls_selected_exit_and_runs_target() {
+        let starter = published_source_fixture(
+            "BRSTART",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. BRSTART.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESP-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START BREXIT('BREXIT') TRANSID('BRGT') RESP(RESP-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "BRTARGET",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. BRTARGET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 USER-X PIC X(8).\n01 MSG-X PIC X(5) VALUE 'HELLO'.\n01 LEN-X PIC S9(4) COMP VALUE 5.\nPROCEDURE DIVISION.\nEXEC CICS ASSIGN USERID(USER-X) END-EXEC.\nEXEC CICS SEND TEXT FROM(MSG-X) LENGTH(LEN-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let exit = published_source_fixture(
+            "BREXIT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. BREXIT.\nDATA DIVISION.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(4096).\nPROCEDURE DIVISION USING DFHCOMMAREA.\nGOBACK.\n",
+        );
+        let reference = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = reference(&starter);
+        let build = |name: &str, artifact: &PublishedArtifact| OnlineProgramDefinition {
+            name: name.into(),
+            artifact: reference(artifact),
+            payload: artifact.payload().to_vec(),
+            manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+            semantic_identity: artifact.semantic_id().to_reference(),
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    build("BRSTART", &starter),
+                    build("BRTARGET", &target),
+                    build("BREXIT", &exit),
+                ],
+                transactions: BTreeMap::from([
+                    ("BRS0".into(), "BRSTART".into()),
+                    ("BRGT".into(), "BRTARGET".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "BRSTART".into(),
+                    map: "BRSTART".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .register_bridge_abi_profiles(&[mainframe_env_cics::CicsBridgeAbiProfile {
+                exit: "BREXIT".into(),
+                version: 7, // Synthetic test profile, not an IBM version claim.
+                bind_code: *b"XY",
+            }])
+            .unwrap();
+        let session = SessionId::new("bridge-issuer", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        server
+            .cics
+            .launch_terminal(
+                server
+                    .cics_invocation("IBMUSER", "BRS0", Some(starter_ref))
+                    .unwrap(),
+                &session,
+                "BRS0",
+                24,
+                80,
+                "bridge-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "BRSTART", 2)
+            .unwrap();
+        let work = server
+            .claim_jes_work("bridge-worker")
+            .unwrap()
+            .expect("bridge work");
+        assert_eq!(
+            work.required_generation,
+            mainframe_env_cics::CICS_BRIDGE_START_WORK_GENERATION
+        );
+        let intent = server
+            .cics
+            .promote_bridge_start(&work, server.jes_tick().unwrap())
+            .unwrap();
+        assert!(
+            server
+                .artifacts
+                .get_artifact(
+                    &ArtifactRef::new(&intent.exit_artifact, InvocationLimits::default()).unwrap()
+                )
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(intent.target_program, "BRTARGET");
+        server
+            .online_transactions
+            .lock()
+            .unwrap()
+            .insert("BRGT".into(), "BRSTART".into());
+        assert!(matches!(
+            server.process_claimed_jes_work(&work).unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        assert_eq!(
+            server
+                .store
+                .get_execution(&work.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        assert_eq!(
+            server
+                .store
+                .list_provider_state("cobol-call-replay@1", 16)
+                .unwrap()
+                .len(),
+            4
+        );
+        assert!(matches!(
+            server
+                .launch_bridge_task(&work, &intent, server.jes_tick().unwrap())
+                .unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        assert_eq!(
+            server
+                .store
+                .list_provider_state("cobol-call-replay@1", 16)
+                .unwrap()
+                .len(),
+            4
         );
     }
 

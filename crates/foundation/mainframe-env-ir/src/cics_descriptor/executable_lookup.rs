@@ -88,5 +88,6 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::ExtractCertificate => &CICS_EXECUTABLE_DESCRIPTORS[79],
         CicsPlanOperation::ExtractTcpip => &CICS_EXECUTABLE_DESCRIPTORS[80],
         CicsPlanOperation::StartAttach => &CICS_EXECUTABLE_DESCRIPTORS[81],
+        CicsPlanOperation::StartBrexit => &CICS_EXECUTABLE_DESCRIPTORS[82],
     }
 }

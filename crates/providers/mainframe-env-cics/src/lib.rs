@@ -20,9 +20,11 @@ pub use retention::{
     describe_cics_undo_row, describe_cics_uow_row,
 };
 pub use service::{
-    BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION,
+    BmsFieldDefinition, BmsMapDefinition, BrxaBindFrame, BrxaBindReply, BrxaEndFrame,
+    BrxaInitFrame, BrxaInitReply, CICS_BRIDGE_START_WORK_GENERATION, CICS_DELAY_WORK_GENERATION,
     CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsApplicationEntryDefinition, CicsBridgeExitDefault, CicsBridgeExitSelection,
+    CicsApplicationEntryDefinition, CicsBridgeAbiProfile, CicsBridgeAbiSelection,
+    CicsBridgeExitDefault, CicsBridgeExitSelection, CicsBridgeRuntime, CicsBridgeStartIntent,
     CicsCertificateName, CicsClientCertificate, CicsContinuation, CicsDocumentTemplateDefinition,
     CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
     CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsOperatorMessageView,

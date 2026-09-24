@@ -195,6 +195,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::Post => post::invoke(service, run, request),
         CicsOperation::Start => start(service, run, request, false),
         CicsOperation::StartAttach => start_attach::invoke(service, run, request),
+        CicsOperation::StartBrexit => super::start_brexit::invoke(service, run, request),
         CicsOperation::Retrieve => retrieve::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
@@ -407,7 +408,7 @@ fn start(
     Ok(response)
 }
 
-fn validate_start_principal(
+pub(in crate::service::handlers) fn validate_start_principal(
     service: &CicsService,
     run: &mut Run,
     user: &str,
@@ -532,7 +533,11 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
     }
 }
 
-fn name_argument(request: &CicsRequest, name: &str, max: usize) -> Result<String, HostProblem> {
+pub(in crate::service::handlers) fn name_argument(
+    request: &CicsRequest,
+    name: &str,
+    max: usize,
+) -> Result<String, HostProblem> {
     let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
     let text = std::str::from_utf8(value.bytes())
         .map_err(|_| HostProblem::Malformed)?
@@ -545,7 +550,7 @@ fn name_argument(request: &CicsRequest, name: &str, max: usize) -> Result<String
     }
 }
 
-fn optional_name_argument(
+pub(in crate::service::handlers) fn optional_name_argument(
     request: &CicsRequest,
     name: &str,
     max: usize,
@@ -557,7 +562,10 @@ fn optional_name_argument(
         .transpose()
 }
 
-fn optional_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, HostProblem> {
+pub(in crate::service::handlers) fn optional_decimal(
+    request: &CicsRequest,
+    name: &str,
+) -> Result<Option<i64>, HostProblem> {
     request
         .arguments
         .get(name)

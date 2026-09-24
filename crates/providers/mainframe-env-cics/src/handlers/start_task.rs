@@ -135,9 +135,10 @@ impl CicsService {
             return Err(HostProblem::ResourceExhausted);
         }
         let new_session = existing.is_none();
+        let bridged = invocation.bindings.contains_key("cics.bridge-request");
         let current = existing.unwrap_or_else(|| Session {
-            rows: 1,
-            columns: 1,
+            rows: if bridged { 24 } else { 1 },
+            columns: if bridged { 80 } else { 1 },
             principal: invocation.principal.id().as_str().into(),
             transaction: transaction.to_ascii_uppercase(),
             run_unit: invocation.run_unit_id.as_str().into(),
