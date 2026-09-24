@@ -8608,6 +8608,144 @@ mod tests {
     }
 
     #[test]
+    fn mapped_issue_carrier_reconciles_attempted_control_without_resending() {
+        use std::sync::atomic::AtomicUsize;
+
+        struct Carrier {
+            sent: Arc<AtomicUsize>,
+            reconciled: Arc<AtomicUsize>,
+        }
+
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                system: &str,
+                token: [u8; 4],
+                control_id: u64,
+                flow: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                assert_eq!(system, "SYS1");
+                assert_ne!(token, [0; 4]);
+                assert_ne!(control_id, 0);
+                assert_eq!(flow, GdsIssueFlow::Abend);
+                self.sent.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Pending)
+            }
+
+            fn reconcile_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.reconciled.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 2,
+                enabled: true,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let token = service
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        let command = request(
+            CicsOperation::IssueAbend,
+            BTreeMap::from([("CONVID".into(), cics_literal(&token))]),
+            1,
+        );
+        assert_eq!(
+            handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap()
+            .disposition,
+            CicsDisposition::Suspended
+        );
+        let control_id = ConversationLedger::load(store.as_ref())
+            .unwrap()
+            .conversation(token)
+            .unwrap()
+            .pending_issue
+            .as_ref()
+            .unwrap()
+            .id;
+        let sent = Arc::new(AtomicUsize::new(0));
+        let reconciled = Arc::new(AtomicUsize::new(0));
+        service
+            .install_conversation_transport(Arc::new(Carrier {
+                sent: sent.clone(),
+                reconciled: reconciled.clone(),
+            }))
+            .unwrap();
+        assert_eq!(
+            service
+                .flush_issue_control(&mut run, token, "outer-1", control_id)
+                .unwrap(),
+            ConversationTransmitOutcome::Pending
+        );
+        let attempted = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            attempted.conversation(token).unwrap().state,
+            ConversationState::Allocated
+        );
+        assert!(
+            attempted
+                .conversation(token)
+                .unwrap()
+                .pending_issue
+                .as_ref()
+                .unwrap()
+                .attempted
+        );
+        assert_eq!(
+            service
+                .flush_issue_control(&mut run, token, "outer-1", control_id)
+                .unwrap(),
+            ConversationTransmitOutcome::Confirmed
+        );
+        assert_eq!(sent.load(Ordering::SeqCst), 1);
+        assert_eq!(reconciled.load(Ordering::SeqCst), 1);
+        assert!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .released
+        );
+    }
+
+    #[test]
     fn mapped_issue_route_restarts_with_pending_and_final_receipt_on_sqlite() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-issue-route-{}-{:?}",

@@ -9,7 +9,7 @@
 
 use super::ConversationDataFrame;
 use super::data::MAX_FRAMES;
-use super::{ConversationLedger, ConversationOwner, ConversationProblem};
+use super::{ConversationLedger, ConversationOwner, ConversationProblem, GdsIssueFlow};
 use crate::service::{CicsService, Run, mutation_problem, store_error};
 use mainframe_env_execution_api::Invocation;
 use mainframe_env_host_api::HostProblem;
@@ -39,6 +39,31 @@ pub trait CicsConversationTransport: Send + Sync {
         _system: &str,
         _token: [u8; 4],
         _send_id: u64,
+        _invocation: &Invocation,
+    ) -> Result<ConversationTransmitOutcome, HostProblem> {
+        Err(HostProblem::UnknownOutcome)
+    }
+
+    /// A separate ID namespace keeps ISSUE controls distinct from data SEND
+    /// IDs on the same conversation token. A confirmed result means that the
+    /// partner accepted the control, not that a local carrier queued it.
+    fn transmit_issue(
+        &self,
+        _system: &str,
+        _token: [u8; 4],
+        _control_id: u64,
+        _flow: GdsIssueFlow,
+        _invocation: &Invocation,
+    ) -> Result<ConversationTransmitOutcome, HostProblem> {
+        Err(HostProblem::UnknownOutcome)
+    }
+
+    /// Read-only resolution for a control whose dispatch marker was saved.
+    fn reconcile_issue(
+        &self,
+        _system: &str,
+        _token: [u8; 4],
+        _control_id: u64,
         _invocation: &Invocation,
     ) -> Result<ConversationTransmitOutcome, HostProblem> {
         Err(HostProblem::UnknownOutcome)

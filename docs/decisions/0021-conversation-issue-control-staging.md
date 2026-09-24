@@ -46,6 +46,8 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
   An isolated PostgreSQL race proves one staged CAS winner and restart of the
   attempted control. Provider routing, partner consumption, and selected
   compiled execution remain separate acceptance gates.
-- The internal mapped provider path can stage and replay an ISSUE intent, but
-  has no carrier dispatch yet. It returns suspended while the control is
-  pending and yields a final receipt only after a trusted confirmed result.
+- The internal mapped provider path can stage and replay an ISSUE intent.
+  Its separate control-ID carrier call saves the attempt marker first, uses a
+  read-only reconciliation after uncertain dispatch, and commits the final
+  receipt only on a confirmed result. Partner ingress and public command
+  routing remain acceptance gates.

@@ -78,6 +78,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added a separate confirmed ISSUE control dispatch and read-only reconcile
+  path to the shared conversation carrier. A durable attempt marker precedes
+  transport I/O, and only confirmation commits the control state and replay.
+  The carrier mock verifies no retransmission; ISSUE rows remain unregistered.
+
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and
   MCEP v2 codec; no ISSUE catalog row is registered yet. Removed the obsolete

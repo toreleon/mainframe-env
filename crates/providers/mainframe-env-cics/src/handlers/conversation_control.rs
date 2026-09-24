@@ -27,6 +27,7 @@ mod gds_receive;
 mod gds_wait;
 mod issue_staging;
 mod issue_transition;
+mod issue_transport;
 mod ledger;
 mod peer;
 mod receive;
