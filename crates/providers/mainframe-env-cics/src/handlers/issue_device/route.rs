@@ -3,8 +3,8 @@
 use super::super::{CicsService, Run, store_error};
 use super::*;
 use mainframe_env_host_api::{
-    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
-    HostRequest, canonical_request_digest,
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, CicsUnitOfWorkOutcome,
+    HostProblem, HostRequest, canonical_request_digest,
 };
 
 const RECEIPT_NAMESPACE: &str = "cics-issue-device-receipt-v1";
@@ -168,6 +168,7 @@ pub(in crate::service) fn invoke(
                 text_argument(request, "LOGMODE")?.map(|value| value.trim_end().to_owned());
             next.prepare_pass(
                 &application,
+                run.invocation.run_unit_id.as_str(),
                 data,
                 logmode.as_deref(),
                 request.arguments.contains_key("OPTION.LOGONLOGMODE"),
@@ -416,9 +417,85 @@ fn device_condition(operation: CicsOperation, problem: IssueDeviceProblem) -> Ho
         }
         (_, IssueDeviceProblem::Disconnected) => condition("TERMERR", 81, 0),
         (_, IssueDeviceProblem::Length) => condition("LENGERR", 22, 0),
+        (_, IssueDeviceProblem::StaleOwner) => condition("NOTALLOC", 61, 0),
         (_, IssueDeviceProblem::Malformed | IssueDeviceProblem::Capacity) => {
             HostProblem::InfrastructureFailure
         }
+    }
+}
+
+/// Resolve a staged PASS only at a known task end. The device disposition and
+/// terminal connectivity share one durable CAS so a crash cannot deliver the
+/// PASS while leaving the source session usable.
+pub(in crate::service) fn finish_task(
+    service: &CicsService,
+    run: &Run,
+    outcome: CicsUnitOfWorkOutcome,
+) -> Result<(), HostProblem> {
+    let current_session = service
+        .lock()?
+        .sessions
+        .get(&run.session)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
+    let Some(terminal) = current_session.input.terminal_id.as_deref() else {
+        return Ok(());
+    };
+    let Some(current) =
+        IssueDeviceRecord::load(service.store.as_ref(), terminal).map_err(store_error)?
+    else {
+        return Ok(());
+    };
+    if current.state.pass_target.is_none() {
+        return Ok(());
+    }
+    let owner = run.invocation.run_unit_id.as_str();
+    let mut next = current.clone();
+    let changed = match outcome {
+        CicsUnitOfWorkOutcome::Committed => next.complete_pass(owner),
+        CicsUnitOfWorkOutcome::RolledBack => next.cancel_pass(owner),
+    }
+    .map_err(|problem| device_condition(CicsOperation::IssuePass, problem))?;
+    if !changed {
+        if outcome == CicsUnitOfWorkOutcome::Committed
+            && (!current.state.pass_delivered || current_session.connected)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        return Ok(());
+    }
+    let mut writes = vec![current.mutation(&mut next).map_err(store_error)?];
+    let mut disconnected_session = None;
+    if outcome == CicsUnitOfWorkOutcome::Committed {
+        let mut updated = current_session.clone();
+        updated.version = updated
+            .version
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        updated.connected = false;
+        writes.push(ProviderStateMutation::Put(ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: "cics-session".into(),
+                key: run.session.clone(),
+                version: updated.version,
+                payload: super::super::encode_session(&updated)?,
+            },
+            expected_version: Some(current_session.version),
+        }));
+        disconnected_session = Some(updated);
+    }
+    match service.store.mutate_provider_states_atomic(writes) {
+        Ok(()) => {
+            if let Some(updated) = disconnected_session {
+                service
+                    .lock()?
+                    .sessions
+                    .insert(run.session.clone(), updated);
+            }
+            Ok(())
+        }
+        Err(StoreError::Conflict | StoreError::AlreadyExists) => Err(HostProblem::UnknownOutcome),
+        Err(error) => Err(super::super::super::mutation_problem(store_error(error))),
     }
 }
 

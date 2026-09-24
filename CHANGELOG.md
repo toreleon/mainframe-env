@@ -42,6 +42,10 @@ All notable changes to mainframe-env are documented here.
   LENGTH, explicit/default/saved logon mode selection, and NOQUIESCE state.
   PASS delivery remains tied to task completion.
 
+- Bound staged ISSUE PASS to the existing terminal task-end path: known commit
+  atomically marks the device delivered and disconnects its persisted source
+  session; rollback clears the stage without disconnecting.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

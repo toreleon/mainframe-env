@@ -6962,6 +6962,88 @@ mod tests {
     }
 
     #[test]
+    fn issue_pass_delivers_only_at_committed_terminal_task_end() {
+        for committed in [true, false] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = service(store.clone());
+            let invocation = invocation_for(
+                if committed { "pass-ok" } else { "pass-back" },
+                BTreeMap::new(),
+            );
+            let session =
+                SessionId::new(if committed { "pass-ok" } else { "pass-back" }, 64).unwrap();
+            service
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "MENU",
+                    24,
+                    80,
+                    "pass-csrf",
+                    1,
+                    100,
+                )
+                .unwrap();
+            let terminal = service.lock().unwrap().sessions[session.as_str()]
+                .input
+                .terminal_id
+                .clone()
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: terminal.clone(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec!["APPL1".into()],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: true,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            let command = request(
+                CicsOperation::IssuePass,
+                BTreeMap::from([("LUNAME".into(), cics_literal(b"APPL1"))]),
+                1,
+            );
+            handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+            let staged = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap();
+            assert_eq!(staged.state.pass_target.as_deref(), Some("APPL1"));
+            assert!(!staged.state.disconnected);
+            if committed {
+                service
+                    .complete_terminal_run(&session, invocation.principal.id(), 2)
+                    .unwrap();
+            } else {
+                service
+                    .abort_terminal_run(&session, invocation.principal.id(), 2)
+                    .unwrap();
+            }
+            let finished = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap();
+            assert_eq!(finished.state.pass_delivered, committed);
+            assert_eq!(finished.state.disconnected, committed);
+            assert_eq!(finished.state.pass_target.is_some(), committed);
+            assert_eq!(
+                service.lock().unwrap().sessions[session.as_str()].connected,
+                !committed
+            );
+        }
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

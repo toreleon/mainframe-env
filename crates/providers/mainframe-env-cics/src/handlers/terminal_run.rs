@@ -145,6 +145,7 @@ impl CicsService {
         }
         if let Some(outcome) = outcome {
             super::interval_control::finish_protected_starts(self, &run, outcome)?;
+            super::issue_device::finish_task(self, &run, outcome)?;
         }
         let mut state = self.lock()?;
         if state.runs.get(&run_id).is_none_or(|current| {

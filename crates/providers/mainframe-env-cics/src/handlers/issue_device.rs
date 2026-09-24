@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 mod route;
+pub(in crate::service) use route::finish_task;
 pub(in crate::service) use route::invoke;
 
 pub const ISSUE_DEVICE_NAMESPACE: &str = "cics-issue-device-v1";
@@ -59,11 +60,15 @@ pub struct IssueDeviceState {
     pub loaded_program: Option<String>,
     pub loaded_converse: bool,
     pub pass_target: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pass_owner_run_unit: Option<String>,
     pub pass_data: Vec<u8>,
     pub pass_logmode: Option<String>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub pass_use_logon_mode: bool,
     pub pass_noquiesce: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pass_delivered: bool,
     pub disconnected: bool,
     pub print_count: u32,
     pub last_print: Vec<u8>,
@@ -86,6 +91,7 @@ pub enum IssueDeviceProblem {
     Disconnected,
     Length,
     Capacity,
+    StaleOwner,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -253,9 +259,17 @@ impl IssueDeviceRecord {
             })
             || self.state.pass_target.is_none()
                 && (!self.state.pass_data.is_empty()
+                    || self.state.pass_owner_run_unit.is_some()
                     || self.state.pass_logmode.is_some()
                     || self.state.pass_use_logon_mode
-                    || self.state.pass_noquiesce)
+                    || self.state.pass_noquiesce
+                    || self.state.pass_delivered)
+            || self
+                .state
+                .pass_owner_run_unit
+                .as_ref()
+                .is_some_and(|owner| owner.is_empty() || owner.len() > 128)
+            || self.state.pass_delivered && !self.state.disconnected
             || self
                 .state
                 .pass_logmode
@@ -339,6 +353,7 @@ impl IssueDeviceRecord {
     pub fn prepare_pass(
         &mut self,
         application: &str,
+        owner_run_unit: &str,
         data: &[u8],
         logmode: Option<&str>,
         use_logon_mode: bool,
@@ -356,6 +371,9 @@ impl IssueDeviceRecord {
         {
             return Err(IssueDeviceProblem::NotConfigured);
         }
+        if owner_run_unit.is_empty() || owner_run_unit.len() > 128 {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
         if data.len() > MAX_PASS_BYTES
             || logmode.is_some_and(|name| !valid_name(name, 8))
             || logmode.is_some() && use_logon_mode
@@ -371,11 +389,50 @@ impl IssueDeviceRecord {
             logmode.unwrap_or("")
         };
         self.state.pass_target = Some(application.into());
+        self.state.pass_owner_run_unit = Some(owner_run_unit.into());
         self.state.pass_data = data.to_vec();
         self.state.pass_logmode = (!selected_logmode.is_empty()).then(|| selected_logmode.into());
         self.state.pass_use_logon_mode = use_logon_mode;
         self.state.pass_noquiesce = noquiesce;
+        self.state.pass_delivered = false;
         Ok(())
+    }
+
+    /// Commit an accepted PASS only at the known successful task end. A
+    /// repeated completion of the same owner is idempotent after restart.
+    pub fn complete_pass(&mut self, owner_run_unit: &str) -> Result<bool, IssueDeviceProblem> {
+        if self.state.pass_target.is_none() {
+            return Ok(false);
+        }
+        if self.state.pass_owner_run_unit.as_deref() != Some(owner_run_unit) {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
+        if self.state.pass_delivered {
+            return Ok(false);
+        }
+        self.active()?;
+        self.state.disconnected = true;
+        self.state.pass_delivered = true;
+        Ok(true)
+    }
+
+    /// Roll back an uncommitted PASS without severing its source session.
+    pub fn cancel_pass(&mut self, owner_run_unit: &str) -> Result<bool, IssueDeviceProblem> {
+        if self.state.pass_target.is_none() {
+            return Ok(false);
+        }
+        if self.state.pass_owner_run_unit.as_deref() != Some(owner_run_unit)
+            || self.state.pass_delivered
+        {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
+        self.state.pass_target = None;
+        self.state.pass_owner_run_unit = None;
+        self.state.pass_data.clear();
+        self.state.pass_logmode = None;
+        self.state.pass_use_logon_mode = false;
+        self.state.pass_noquiesce = false;
+        Ok(true)
     }
 
     pub fn disconnect(&mut self) -> Result<(), IssueDeviceProblem> {
@@ -495,12 +552,19 @@ mod tests {
         next.load_program("PROG1", true).unwrap();
         next.mark_eods().unwrap();
         assert_eq!(
-            next.prepare_pass("APPL1", &[1; MAX_PASS_BYTES + 1], None, false, false),
+            next.prepare_pass("APPL1", "run", &[1; MAX_PASS_BYTES + 1], None, false, false),
             Err(IssueDeviceProblem::Length)
         );
         assert!(next.state.pass_target.is_none());
-        next.prepare_pass("APPL1", &[2; MAX_PASS_BYTES], Some("MODE1"), false, true)
-            .unwrap();
+        next.prepare_pass(
+            "APPL1",
+            "run",
+            &[2; MAX_PASS_BYTES],
+            Some("MODE1"),
+            false,
+            true,
+        )
+        .unwrap();
         assert!(initial.persist(&mut next, &first).unwrap());
         drop(first);
         let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
@@ -509,6 +573,24 @@ mod tests {
         assert!(record.state.loaded_converse && record.state.eods);
         assert_eq!(record.state.pass_data, vec![2; MAX_PASS_BYTES]);
         assert_eq!(record.state.pass_logmode.as_deref(), Some("MODE1"));
+        assert_eq!(record.state.pass_owner_run_unit.as_deref(), Some("run"));
+        let mut stale = record.clone();
+        assert_eq!(
+            stale.complete_pass("other"),
+            Err(IssueDeviceProblem::StaleOwner)
+        );
+        assert!(!stale.state.disconnected);
+        assert_eq!(stale.complete_pass("run"), Ok(true));
+        assert!(stale.state.disconnected && stale.state.pass_delivered);
+        assert_eq!(stale.complete_pass("run"), Ok(false));
+        assert_eq!(
+            stale.cancel_pass("run"),
+            Err(IssueDeviceProblem::StaleOwner)
+        );
+        let mut cancelled = record;
+        assert_eq!(cancelled.cancel_pass("run"), Ok(true));
+        assert!(cancelled.state.pass_target.is_none());
+        assert!(!cancelled.state.disconnected);
         drop(reopened);
         std::fs::remove_dir_all(root).unwrap();
     }
