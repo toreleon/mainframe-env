@@ -6394,6 +6394,36 @@ mod tests {
         fn arbitrary_input_never_panics(bytes in prop::collection::vec(any::<u8>(), 0..4096)) {
             let _ = decode_cics_effect_plan(&bytes, CicsPlanLimits::default());
         }
+
+        #[test]
+        fn cics_v1_v2_read_plan_canonical_and_bounded(
+            file in prop::collection::vec(65u8..91u8, 8),
+            extra in prop::collection::vec(any::<u8>(), 1..16),
+        ) {
+            let limits = CicsPlanLimits::default();
+            let mut plan = read_plan();
+            let name = plan.operands.iter_mut()
+                .find(|operand| operand.name == CicsOperandName::File).unwrap();
+            name.value = CicsOperandValue::Literal(file.clone());
+            for version in [LEGACY_VERSION, VERSION] {
+                let bytes = encode_cics_effect_plan_version(&plan, limits, version).unwrap();
+                let decoded = decode_cics_effect_plan(&bytes, limits).unwrap();
+                prop_assert_eq!(
+                    encode_cics_effect_plan_version(&decoded, limits, version),
+                    Ok(bytes.clone())
+                );
+                let has_file = decoded.operands.iter().any(|operand| {
+                    operand.name == CicsOperandName::File
+                        && operand.value == CicsOperandValue::Literal(file.clone())
+                });
+                prop_assert!(has_file);
+                let mut trailing = bytes.clone();
+                trailing.extend_from_slice(&extra);
+                prop_assert_eq!(decode_cics_effect_plan(&trailing, limits), Err(CicsPlanCodecProblem::TrailingData));
+                let bounded = CicsPlanLimits { max_encoded_bytes: bytes.len() - 1, ..limits };
+                prop_assert_eq!(decode_cics_effect_plan(&bytes, bounded), Err(CicsPlanCodecProblem::LimitExceeded));
+            }
+        }
     }
     #[test]
     fn web_service_tag_envelopes_are_unique_round_trip_and_v1_safe() {

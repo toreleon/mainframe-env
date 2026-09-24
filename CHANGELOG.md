@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Extended the R-24 assurance inventory with bounded CICS source and MCEP
+  v1/v2 fuzz targets, parser/decoder properties, and owner-fenced syncpoint
+  Loom models. Recorded the CIC-906 scope and open matrix cells without
+  changing command behavior or the 175/0/88 registry.
+
 - Integrated the eight CIC-905 conversation EXTRACT and POINT routes with the
   sealed miscellaneous and BTS aggregate. The application registry now has
   175 typed, 0 legacy compatibility, and 88 unready rows. The existing

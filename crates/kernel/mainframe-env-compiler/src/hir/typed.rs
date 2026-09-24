@@ -963,6 +963,7 @@ mod tests {
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
+    use proptest::prelude::*;
     use std::collections::BTreeSet;
 
     fn analyze(source: &str) -> crate::CobolAnalysis {
@@ -995,6 +996,20 @@ mod tests {
         let bundle =
             SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap();
         CobolCompiler::default().analyze(&bundle)
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+        #[test]
+        fn cics_unknown_top_level_options_never_become_typed(
+            suffix in "[A-Z]{1,12}",
+        ) {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFZ. PROCEDURE DIVISION. EXEC CICS SYNCPOINT ZZ{suffix} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            prop_assert!(analysis.hir.is_none());
+        }
     }
 
     #[test]
