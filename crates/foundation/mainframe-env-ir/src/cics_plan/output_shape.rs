@@ -376,6 +376,26 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::IssueAbend
+        | CicsPlanOperation::IssueConfirmation
+        | CicsPlanOperation::IssueError
+        | CicsPlanOperation::IssuePrepare
+        | CicsPlanOperation::IssueSignal => matches!(
+            output,
+            CicsOutputName::IssueState | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
+        CicsPlanOperation::GdsIssueAbend
+        | CicsPlanOperation::GdsIssueConfirmation
+        | CicsPlanOperation::GdsIssueError
+        | CicsPlanOperation::GdsIssuePrepare
+        | CicsPlanOperation::GdsIssueSignal => matches!(
+            output,
+            CicsOutputName::IssueState
+                | CicsOutputName::IssueConvData
+                | CicsOutputName::IssueRetCode
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         _ => matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2),
     }
 }

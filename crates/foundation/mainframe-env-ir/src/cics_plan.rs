@@ -1397,6 +1397,54 @@ mod tests {
             assert_eq!(decode_cics_effect_plan(&v2, limits), Ok(plan));
         }
 
+        let basic_signal = CicsEffectPlan {
+            operation: CicsPlanOperation::GdsIssueSignal,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::IssueConvid,
+                value: CicsOperandValue::Literal(b"I001".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::IssueConvData,
+                    target: slot(1, "RESULT.CONVDATA"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::IssueRetCode,
+                    target: slot(2, "RESULT.RETCODE"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        assert_eq!(
+            encode_cics_effect_plan_version(&basic_signal, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let basic_v2 = encode_cics_effect_plan(&basic_signal, limits).unwrap();
+        assert_eq!(&basic_v2[6..8], &257u16.to_be_bytes());
+        assert_eq!(decode_cics_effect_plan(&basic_v2, limits), Ok(basic_signal));
+
+        let mut mapped_state = CicsEffectPlan {
+            operation: CicsPlanOperation::IssueSignal,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::IssueState,
+                target: slot(3, "RESULT.STATE"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let mapped_v2 = encode_cics_effect_plan(&mapped_state, limits).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&mapped_v2, limits),
+            Ok(mapped_state.clone())
+        );
+        mapped_state.outputs[0].name = CicsOutputName::IssueRetCode;
+        assert_eq!(
+            encode_cics_effect_plan(&mapped_state, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+
         let mut forged_v1 =
             encode_cics_effect_plan_version(&read_plan(), limits, LEGACY_VERSION).unwrap();
         forged_v1[6] = 239;

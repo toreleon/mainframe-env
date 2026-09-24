@@ -116,6 +116,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Allowed source-shaped mapped ISSUE STATE and GDS ISSUE STATE/CONVDATA/RETCODE
+  bindings through the global MCEP output whitelist. A valid tag-257 GDS
+  SIGNAL plan now round-trips in v2, fails explicitly in v1, and a mapped plan
+  rejects GDS RETCODE.
+
 - Default ISSUE DISCONNECT and compatibility ISSUE RESET now return a fresh
   normal replay receipt when their supported terminal session is already
   disconnected. The source lists no condition for these terminal types, and
