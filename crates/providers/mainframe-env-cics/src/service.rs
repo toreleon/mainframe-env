@@ -31331,6 +31331,78 @@ mod tests {
     }
 
     #[test]
+    fn bts_transid_unresolved_child_does_not_block_other_work_on_reopen() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsTransidState};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (parent, _) = registered(&first);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let start = |key: &str, digest: [u8; 32]| {
+            authority
+                .start_transid(
+                    parent.run_unit_id.as_str(),
+                    parent.execution_id.as_str(),
+                    "IBMUSER",
+                    key,
+                    digest,
+                    "BT01",
+                    "CHILD",
+                    None,
+                    BTreeMap::new(),
+                    1_000,
+                    4,
+                )
+                .unwrap()
+        };
+        let cancelled = start("cancelled", [1; 32]);
+        first.register_bts_transid_child(&cancelled).unwrap();
+        first.enqueue_bts_transid_work(&cancelled).unwrap();
+        assert_eq!(
+            store
+                .request_cancellation(&cancelled.work_id)
+                .unwrap()
+                .state,
+            WorkState::Cancelled
+        );
+        let pending = start("pending", [2; 32]);
+        first.register_bts_transid_child(&pending).unwrap();
+        drop(first);
+
+        let reopened = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        assert_eq!(
+            store.get_work(&pending.work_id).unwrap().unwrap().state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            reopened.reconcile_bts_transid_work(&cancelled.run_id),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            authority
+                .load_transid(&cancelled.run_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            BtsTransidState::Pending
+        );
+    }
+
+    #[test]
     fn bts_run_outbox_readmits_work_after_provider_reopen() {
         use handlers::bts_lifecycle::{
             BTS_RUN_WORK_GENERATION, BtsCompletion, BtsLifecycleStore, BtsProcess, BtsRunState,

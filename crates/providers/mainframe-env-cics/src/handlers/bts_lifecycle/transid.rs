@@ -457,8 +457,14 @@ impl CicsService {
         let outbox = authority.load_transid_outbox()?;
         let mut admitted = 0;
         for run_id in outbox.pending {
-            if self.reconcile_bts_transid_work(&run_id)?.is_some() {
-                continue;
+            match self.reconcile_bts_transid_work(&run_id) {
+                Ok(Some(_)) => continue,
+                Ok(None) => {}
+                // Retain the unresolved request and allow independent child
+                // work to recover. Its exact reconciliation still reports
+                // UnknownOutcome to the owner/operator.
+                Err(HostProblem::UnknownOutcome) => continue,
+                Err(problem) => return Err(problem),
             }
             let record = authority
                 .load_transid(&run_id)?
