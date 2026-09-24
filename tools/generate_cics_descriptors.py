@@ -92,10 +92,10 @@ EXPECTED_FAMILIES = {
     "recovery": "Recovery",
     "interval-control": "IntervalControl",
     "storage-control": "StorageControl",
-    "transform-control": "TransformControl",
-    "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "transform-control": "TransformControl",
+    "spool-control": "SpoolControl",
     "bts-control": "BtsControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
@@ -106,6 +106,17 @@ TYPED_EXECUTION_FAMILIES = {
     "counter-control": "CounterControl",
     "web-control": "WebControl",
 }
+# CIC-901's runtime descriptor remains a frozen 25-operation source input.
+# Later typed registrations live in a separate catalog and must not change
+# source-map identities merely by entering the runtime operation list below.
+FROZEN_RUNTIME_OPERATION_NAMES = frozenset({
+    "Abend", "Asktime", "Assign", "Delete", "EndBrowse", "FormatTime",
+    "HandleAbend", "HandleCondition", "Inquire", "Link", "Read", "ReadNext",
+    "ReadPrev", "ReceiveMap", "Retrieve", "Return", "Rewrite", "SendMap",
+    "SendText", "SetFileStatus", "StartBrowse", "Syncpoint", "Write",
+    "WriteTransientData", "Xctl",
+})
+
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
     ("AddSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0004"),
@@ -1943,98 +1954,8 @@ def load_catalog(
         EXPECTED_RUNTIME_OPERATIONS
         if include_runtime_admission
         else [
-            row
-            for row in EXPECTED_RUNTIME_OPERATIONS
-            if row[0]
-            not in {
-                "ChangeTask",
-                "Address",
-                "AddressSet",
-                "AsktimeEib",
-                "Cancel",
-                "Delay",
-                "DefineCounter",
-                "DefineDCounter",
-        "DeleteCounter",
-        "DeleteDCounter",
-        "GetCounter",
-        "GetDCounter",
-        "QueryCounter",
-        "QueryDCounter",
-        "RewindCounter",
-        "RewindDCounter",
-        "UpdateCounter",
-        "UpdateDCounter",
-                "Deq",
-                "DeleteTransientData",
-                "DeleteTemporaryStorage",
-                "ReadTemporaryStorage",
-                "WriteTemporaryStorage",
-                "DocumentCreate",
-                "DocumentDelete",
-                "DocumentInsert",
-                "DocumentRetrieve",
-                "DocumentSet",
-                "Enq",
-                "ExtractWeb",
-                "FetchAny",
-                "FetchChild",
-                "FreeChild",
-                "Freemain",
-                "Freemain64",
-                "Getmain",
-                "Getmain64",
-                "HandleAid",
-                "IgnoreCondition",
-                "InvokeApplication",
-                "IssueAbort",
-                "IssueAdd",
-                "IssueEnd",
-                "IssueErase",
-                "IssueNote",
-                "IssueQuery",
-                "IssueReceive",
-                "IssueReplace",
-                "IssueSend",
-                "IssueWait",
-                "Load",
-                "LinkAcqActivity",
-                "LinkAcqProcess",
-                "LinkActivity",
-                "Release",
-                "Route",
-                "PopHandle",
-                "PurgeMessage",
-                "PushHandle",
-                "ReadTransientData",
-                "SetAssociationUserCorrData",
-                "SpoolClose",
-                "SpoolOpenInput",
-                "SpoolOpenOutput",
-                "SpoolRead",
-                "SpoolWrite",
-                "Start",
-                "Suspend",
-                "WaitEvent",
-                "WaitExternal",
-                "WaitJournalName",
-                "WaitJournalNum",
-                "WebClose",
-                "WebConverse",
-                "WebEndBrowse",
-                "WebExtract",
-                "WebOpen",
-                "WebParseUrl",
-                "WebRead",
-                "WebReadNext",
-                "WebReceive",
-                "WebRetrieve",
-                "WebSend",
-                "WebStartBrowse",
-                "WebWrite",
-                "WriteJournalName",
-                "WriteJournalNum",
-            }
+            row for row in EXPECTED_RUNTIME_OPERATIONS
+            if row[0] in FROZEN_RUNTIME_OPERATION_NAMES
         ]
     )
     if observed_runtime != expected_runtime:

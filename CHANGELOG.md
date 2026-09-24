@@ -17,6 +17,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Restored the frozen CIC-901 source descriptor hash by keeping later transform
+  and spool family admissions in the typed registry. The three accepted IBM
+  source maps and their corpus bindings remain unchanged.
+
 - Rebased the ten CICS security-control commands onto the local v0.9
   integration head. Shared command registrations, generated descriptors,
   codec-v2 tags, compiler/interpreter routes, and recovery tests now retain
