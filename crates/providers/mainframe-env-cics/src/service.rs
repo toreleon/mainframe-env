@@ -314,13 +314,6 @@ pub trait CicsReplayClock: Send + Sync {
 }
 
 impl CicsService {
-    /// Resolve the APPC/MRO carrier without holding the mutex during dispatch.
-    pub(in crate::service) fn conversation_transport(
-        &self,
-    ) -> Result<Option<Arc<dyn handlers::CicsConversationTransport>>, HostProblem> {
-        Ok(self.lock()?.conversation_transport.clone())
-    }
-
     fn invoke_host(
         &self,
         invocation: &Invocation,
@@ -1525,6 +1518,12 @@ impl CicsService {
         let retention_tick = effect.deadline_tick.max(run.invocation.deadline_tick);
         let result = self.invoke_run(&mut run, request, retention_tick);
         let result = match (&result, replay_identity.as_ref()) {
+            (Ok(response), _)
+                if operation == CicsOperation::WaitSignal
+                    && response.disposition == CicsDisposition::Suspended =>
+            {
+                result
+            }
             (Ok(response), Some((key, digest))) => {
                 let result_digest =
                     canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
@@ -36151,5 +36150,226 @@ mod tests {
             assert_eq!(result.outputs["RETCODE"].bytes(), expected);
             assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
         }
+    }
+
+    #[test]
+    fn wait_signal_suspends_then_consumes_one_durable_event() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4)
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+        let suspended = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 1),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!(suspended.disposition, CicsDisposition::Suspended);
+        assert!(
+            !ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .signal_pending(&owner)
+                .unwrap()
+        );
+        cics.post_principal_signal(&owner, 1).unwrap();
+        let received = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 1),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!(received.disposition, CicsDisposition::Ignored);
+        assert_eq!(
+            (received.condition.as_str(), received.response),
+            ("SIGNAL", 24)
+        );
+        assert!(
+            !ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .signal_pending(&owner)
+                .unwrap()
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait)
+                .unwrap(),
+            received
+        );
+        let next = request(CicsOperation::WaitSignal, BTreeMap::new(), 2);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+    }
+
+    #[test]
+    fn wait_signal_resumes_after_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "cics-wait-signal-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let invocation = invocation();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            let (registered_invocation, _) = registered(&cics);
+            assert_eq!(registered_invocation.run_unit_id, invocation.run_unit_id);
+            cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4)
+                .unwrap();
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 1),
+                    wait.clone()
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store.clone());
+            let session = SessionId::new("wait-signal-restart", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.post_principal_signal(&owner, 1).unwrap();
+            let received = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 1),
+                    wait.clone(),
+                )
+                .unwrap();
+            assert_eq!(
+                (received.condition.as_str(), received.response),
+                ("SIGNAL", 24)
+            );
+            assert!(
+                !ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .signal_pending(&owner)
+                    .unwrap()
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait)
+                    .unwrap(),
+                received
+            );
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn wait_signal_reconciles_outer_receipt_failure_without_reconsuming() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4)
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        cics.post_principal_signal(&owner, 1).unwrap();
+        let wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 1),
+                wait.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(
+            !ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .signal_pending(&owner)
+                .unwrap()
+        );
+        cics.lock()
+            .unwrap()
+            .runs
+            .get_mut(&invocation.run_unit_id)
+            .unwrap()
+            .handlers
+            .insert("SIGNAL".into(), "AFTER-COMMIT".into());
+        let replay = cics
+            .invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait)
+            .unwrap();
+        assert_eq!(replay.disposition, CicsDisposition::Ignored);
+        assert_eq!((replay.condition.as_str(), replay.response), ("SIGNAL", 24));
+        let next = request(CicsOperation::WaitSignal, BTreeMap::new(), 2);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+    }
+
+    #[test]
+    fn wait_signal_denial_audits_without_consuming_peer_event() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (authorities, seen) = command_authorities(true);
+        let cics = CicsService::open(authorities, store.clone(), Default::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4)
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        cics.post_principal_signal(&owner, 1).unwrap();
+        let wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .signal_pending(&owner)
+                .unwrap()
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.TERMINAL.SIGNAL"
+                        && *intent == AccessIntent::Read
+                })
+        );
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
+        );
     }
 }

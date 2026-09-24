@@ -704,6 +704,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0234"
     },
     {
+      "operation": "WaitSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0237"
+    },
+    {
       "operation": "WaitJournalName",
       "interface": "api",
       "family": "journal-control",

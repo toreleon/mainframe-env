@@ -224,6 +224,8 @@ pub enum CicsOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Suspend the principal supported logical unit until a SIGNAL arrives.
+    WaitSignal,
     Syncpoint,
     /// Typed CICS web-service-control command InvokeService.
     InvokeService,
@@ -421,6 +423,7 @@ impl CicsOperation {
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
             Self::WaitExternal => "WaitExternal",
+            Self::WaitSignal => "WaitSignal",
             Self::Syncpoint => "Syncpoint",
             Self::InvokeService => "InvokeService",
             Self::SoapFaultAdd => "SoapFaultAdd",
@@ -610,6 +613,7 @@ impl CicsOperation {
                 | Self::Retrieve
                 | Self::WaitEvent
                 | Self::WaitExternal
+                | Self::WaitSignal
         )
     }
 
@@ -762,6 +766,7 @@ impl CicsOperation {
             ("SUSPEND", _) => Self::Suspend,
             ("WAIT", Some("EVENT")) => Self::WaitEvent,
             ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
+            ("WAIT", Some("SIGNAL")) => Self::WaitSignal,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,

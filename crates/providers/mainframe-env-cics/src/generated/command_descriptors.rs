@@ -955,6 +955,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::WaitSignal,
+        syntax: "WAIT SIGNAL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0237",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Syncpoint,
         syntax: "SYNCPOINT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0218",

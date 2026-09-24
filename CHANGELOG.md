@@ -10,8 +10,8 @@ All notable changes to mainframe-env are documented here.
   data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
   Extended the shared durable conversation record with bounded peer data,
   staged sends, explicit transmission acknowledgement, partial receive, and
-  GDS return-code contracts. The public routes remain unready pending selected
-  host dispatch and acceptance gates.
+  GDS return-code contracts. Six data/terminal-wait rows remain unready pending
+  selected host dispatch and acceptance gates.
 - Peer conversation frames now carry a monotonic event sequence and digest,
   while staged sends carry distinct acknowledgement IDs. Exact duplicate
   delivery or acknowledgement is idempotent; gaps and conflicting replays fail
@@ -27,7 +27,10 @@ All notable changes to mainframe-env are documented here.
   `MAXFLENGTH` is bounded to 32,767, and BUFFER/LLID cannot be combined.
 - Added a durable principal signal facility for the six LU classes named by
   WAIT SIGNAL. Ordered peer events, one-time consumption, lease fencing, task
-  cleanup, and SQLite reopen are covered without registering the command.
+  cleanup, and SQLite reopen are covered.
+- Registered the source-bounded WAIT SIGNAL row through typed COBOL, the host
+  ABI, the durable provider, and online suspend/resume. Exact replay survives
+  outer receipt failure; Memory and SQLite tests cover event consumption.
 - Added the pinned one-byte EIBSIG update and made source-defined SIGNAL and
   EOC default conditions ignorable, while INBFMH retains its failure default.
 

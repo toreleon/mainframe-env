@@ -329,8 +329,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         | CicsPlanOperation::SendConversation
         | CicsPlanOperation::GdsWaitConversation
         | CicsPlanOperation::WaitConvid
-        | CicsPlanOperation::WaitSignal
         | CicsPlanOperation::WaitTerminal => return None,
+        CicsPlanOperation::WaitSignal => CicsOperation::WaitSignal,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
@@ -1125,9 +1125,19 @@ mod conversation_tests {
             CicsPlanOperation::Converse,
             CicsPlanOperation::FreeConversation,
             CicsPlanOperation::GdsFreeConversation,
+            CicsPlanOperation::ReceiveConversation,
+            CicsPlanOperation::GdsReceiveConversation,
+            CicsPlanOperation::SendConversation,
+            CicsPlanOperation::GdsWaitConversation,
+            CicsPlanOperation::WaitConvid,
+            CicsPlanOperation::WaitTerminal,
         ] {
             assert_eq!(host_operation(operation), None);
         }
+        assert_eq!(
+            host_operation(CicsPlanOperation::WaitSignal),
+            Some(CicsOperation::WaitSignal)
+        );
         assert_eq!(
             host_operation(CicsPlanOperation::Read),
             Some(CicsOperation::Read)

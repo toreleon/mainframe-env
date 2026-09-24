@@ -105,7 +105,9 @@ pub(super) fn suspension(
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal => ("cics-event", true),
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitSignal => {
+            ("cics-event", true)
+        }
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         operation if operation.is_counter() => ("cics-counter", true),

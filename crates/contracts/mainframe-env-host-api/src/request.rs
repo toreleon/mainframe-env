@@ -2497,6 +2497,7 @@ mod tests {
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,
             CicsOperation::WaitExternal,
+            CicsOperation::WaitSignal,
             CicsOperation::Syncpoint,
             CicsOperation::InvokeService,
             CicsOperation::SoapFaultAdd,
@@ -2529,7 +2530,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 119);
+        assert_eq!(forms.len(), 120);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

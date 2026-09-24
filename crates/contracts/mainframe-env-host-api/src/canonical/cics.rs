@@ -131,6 +131,7 @@ impl Canonical for CicsOperation {
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),
             Self::WaitEvent => out.variant("CicsOperation", "WaitEvent", 0),
             Self::WaitExternal => out.variant("CicsOperation", "WaitExternal", 0),
+            Self::WaitSignal => out.variant("CicsOperation", "WaitSignal", 0),
             Self::Syncpoint => out.variant("CicsOperation", "Syncpoint", 0),
             Self::InvokeService => out.variant("CicsOperation", "InvokeService", 0),
             Self::SoapFaultAdd => out.variant("CicsOperation", "SoapFaultAdd", 0),

@@ -17,6 +17,7 @@ mod gds_assign;
 mod ledger;
 mod replay;
 mod transport;
+mod wait_signal;
 pub use data::{
     ConversationDataFrame, ConversationDataReply, ConversationDataState, DataCondition,
 };
@@ -36,6 +37,13 @@ pub use replay::{
 pub use transport::{CicsConversationTransport, ConversationTransmitOutcome};
 
 impl CicsService {
+    /// Resolve the APPC/MRO carrier without holding the mutex during dispatch.
+    pub(in crate::service) fn conversation_transport(
+        &self,
+    ) -> Result<Option<std::sync::Arc<dyn CicsConversationTransport>>, HostProblem> {
+        Ok(self.lock()?.conversation_transport.clone())
+    }
+
     /// Install one transport adapter for this region. A different adapter
     /// requires a fresh service instance after the old one is drained.
     pub fn install_conversation_transport(
@@ -55,6 +63,34 @@ impl CicsService {
     }
 }
 
+pub(in crate::service) fn release_task(
+    service: &CicsService,
+    run: &Run,
+) -> Result<(), HostProblem> {
+    let owner = ConversationOwner {
+        execution: run.invocation.execution_id.as_str().into(),
+        run_unit: run.invocation.run_unit_id.as_str().into(),
+        lease_epoch: u64::from(run.invocation.attempt),
+    };
+    for _ in 0..32 {
+        let current = ConversationLedger::load(service.store.as_ref())
+            .map_err(crate::service::store_error)?;
+        let mut next = current.clone();
+        next.release_task(&owner)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if next == current {
+            return Ok(());
+        }
+        if current
+            .persist(&mut next, service.store.as_ref())
+            .map_err(|error| crate::service::mutation_problem(crate::service::store_error(error)))?
+        {
+            return Ok(());
+        }
+    }
+    Err(HostProblem::UnknownOutcome)
+}
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,
@@ -68,6 +104,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::GdsAllocateConversation => {
             gds_allocate::invoke(service, run, request, retention_tick)
         }
+        CicsOperation::WaitSignal => wait_signal::invoke(service, run, request, retention_tick),
         CicsOperation::GdsAssignConversation => gds_assign::invoke(service, run, request),
         _ => Err(HostProblem::Unsupported),
     }

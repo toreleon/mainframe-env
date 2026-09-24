@@ -284,6 +284,7 @@ pub(super) fn invoke_interval_or_spool_control(
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
+    conversation_control::release_task(service, run)?;
     document_control::release_task(service, run)?;
     release_bms_message_for_task(service, run)?;
     release_outboard_task(service, run)?;
