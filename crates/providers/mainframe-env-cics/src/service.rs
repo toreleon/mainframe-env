@@ -5402,6 +5402,7 @@ mod tests {
             ("GDS ALLOCATE", CicsOperation::GdsAllocateConversation),
             ("GDS ASSIGN", CicsOperation::GdsAssignConversation),
             ("BUILD ATTACH", CicsOperation::BuildAttach),
+            ("CONNECT PROCESS", CicsOperation::ConnectProcess),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6704,7 +6705,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 157);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 158);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -36111,5 +36112,216 @@ mod tests {
             (header.iu_type, header.data_stream, header.record_format),
             (17, 208, 4)
         );
+    }
+
+    #[test]
+    fn connect_process_validates_pip_and_partner_before_durable_send_state() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 2,
+            enabled: true,
+        })
+        .unwrap();
+        cics.register_conversation_partner(ConversationPartnerDefinition {
+            name: "PARTNER1".into(),
+            sysid: "SYS1".into(),
+            profile: "DFHCICSA".into(),
+        })
+        .unwrap();
+        cics.register_conversation_partner_process(ConversationPartnerProcessDefinition {
+            name: "PARTNER1".into(),
+            process: b"REMOTE-TXN".to_vec(),
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            1,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRAN-EXTRA")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+                ("PIPLIST".into(), cics_literal(&[0, 4, 0, 0])),
+                ("PIPLENGTH".into(), cics_decimal(4)),
+                ("SYNCLEVEL".into(), cics_decimal(1)),
+            ]),
+            2,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, connect.clone(), 2),
+                connect.clone(),
+            )
+            .unwrap();
+        assert_eq!((result.condition.as_str(), result.response), ("NORMAL", 0));
+        let record = ConversationLedger::load(store.as_ref())
+            .unwrap()
+            .conversation(token)
+            .unwrap()
+            .clone();
+        assert_eq!(record.state, ConversationState::Send);
+        assert_eq!(record.process.as_deref(), Some(b"TRAN".as_slice()));
+        assert_eq!(record.pip, [0, 4, 0, 0]);
+        assert_eq!(record.sync_level, Some(1));
+        cics.invoke(
+            &effect(&invocation.run_unit_id, connect.clone(), 2),
+            connect,
+        )
+        .unwrap();
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .sequence,
+            1
+        );
+
+        let invalid = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRAN")),
+                ("PROCLENGTH".into(), cics_decimal(65)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .sequence,
+            1
+        );
+
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"SYS1"))]),
+            4,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 4),
+                allocate,
+            )
+            .unwrap();
+        let partner_token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        let by_partner = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&partner_token)),
+                ("PARTNER".into(), cics_literal(b"PARTNER1")),
+            ]),
+            5,
+        );
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, by_partner.clone(), 5),
+                by_partner,
+            )
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(partner_token)
+                .unwrap()
+                .process
+                .as_deref(),
+            Some(b"REMOTE-TXN".as_slice())
+        );
+    }
+
+    #[test]
+    fn connect_process_rejects_dpl_principal_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let invocation = invocation_for(
+            "dpl-connect",
+            BTreeMap::from([(
+                "cics.execution-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.execution-context@1",
+                    b"dpl-synconreturn".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let session = SessionId::new("dpl-connect", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let token = cics
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRAN")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, connect.clone(), 1),
+                connect,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        );
+        let record = ConversationLedger::load(store.as_ref())
+            .unwrap()
+            .conversation(token)
+            .unwrap()
+            .clone();
+        assert_eq!(record.state, ConversationState::Allocated);
+        assert_eq!(record.sequence, 0);
     }
 }

@@ -209,7 +209,12 @@ pub(super) fn operands(
         ),
         ("QUEUE", HirCicsOperandName::ConversationQueue, 1, 64),
         ("PROCNAME", HirCicsOperandName::ConversationProcName, 1, 64),
-        ("PIPLIST", HirCicsOperandName::ConversationPipList, 4, 763),
+        (
+            "PIPLIST",
+            HirCicsOperandName::ConversationPipList,
+            4,
+            32_763,
+        ),
         ("FROM", HirCicsOperandName::ConversationFrom, 1, 1_048_576),
     ] {
         if clause == "CONVID" && operation == HirCicsOperation::GdsAllocateConversation {
