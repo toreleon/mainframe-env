@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Normalized the paired ISSUE ENDFILE/ENDOUTPUT options as valueless flags in
+  only their two unready registry rows. Split the unchanged option tag tables
+  into a focused IR module to clear the 1,200-line module ceiling.
+
 - Applied the launched-terminal task-owner fence to BMS-backed ISSUE COPY and
   ERASEAUP, with exact receipt replay preserved and a foreign-run regression
   proving no target mutation.

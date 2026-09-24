@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:895ef4271832465e6f28a3b0f1ecf9f0557a06f9bc20bec7d36facd7349f4d99"
+    "registry_sha256": "sha256:9930346e7512c365c5394ab6442eee2b7c4bfcd60080f4afa12fae575fa42974"
   },
   "counts": {
     "batches": 3,
@@ -447134,5 +447134,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:cd328ba449b642ae392b020b36468cc7c1ece1a26851837629f46a0ddbe6167c"
+  "contract_sha256": "sha256:f4b70bf7080c5578f9cccc0c2e4e848ee71b399086112781205e361ca37ae277"
 }

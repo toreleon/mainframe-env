@@ -16,6 +16,29 @@ SPEC.loader.exec_module(cics_descriptors)
 
 
 class CicsDescriptorTests(unittest.TestCase):
+    def test_paired_issue_end_markers_are_valueless_flags(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        for label, companion in (
+            ("ISSUE ENDFILE", "ENDOUTPUT"),
+            ("ISSUE ENDOUTPUT", "ENDFILE"),
+        ):
+            command = next(
+                row
+                for batch in contracts["batches"]
+                for row in batch["commands"]
+                if row["label"] == label
+            )
+            registry = cics_descriptors._registry_row_material(
+                command, command["source_dimensions"], command["contract"]
+            )
+            option = next(
+                entry for entry in registry["options"] if entry["name"] == companion
+            )
+            self.assertEqual(
+                (option["value_shape"], option["direction"], option["source_max_value_bytes"]),
+                ("flag", "none", None),
+            )
+
     def test_mapped_issue_session_alias_is_limited_to_source_defined_rows(self):
         contracts = cics_descriptors.build_contracts(ROOT)
         rows = {

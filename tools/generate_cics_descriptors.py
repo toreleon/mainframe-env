@@ -4431,7 +4431,7 @@ def _registry_row_material(
             "value_shape": "flag",
             "directions": ["none"],
             "direction_status": "resolved",
-            "source_max_value_bytes": 0,
+            "source_max_value_bytes": None,
         }
         top_level_names.add(paired_end_flag)
     mapped_issue_session_alias = command["official_row"] in {
