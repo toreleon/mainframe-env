@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Applied the launched-terminal task-owner fence to BMS-backed ISSUE COPY and
+  ERASEAUP, with exact receipt replay preserved and a foreign-run regression
+  proving no target mutation.
+
 - Fenced new physical ISSUE effects to the run unit and principal retained by
   a launched terminal, while preserving exact receipt replay. An unowned
   alternate LU6.1 session now has its source-defined NOTALLOC test expectation.

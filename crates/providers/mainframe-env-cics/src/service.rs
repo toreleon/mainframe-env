@@ -8190,6 +8190,139 @@ mod tests {
     }
 
     #[test]
+    fn issue_bms_controls_reject_foreign_run_on_owned_terminal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "ISSUEMS".into(),
+                map: "ISSUE".into(),
+                line: 1,
+                column: 1,
+                rows: 1,
+                columns: 4,
+                fields: vec![BmsFieldDefinition {
+                    name: "OPEN".into(),
+                    row: 1,
+                    column: 1,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        let owner = invocation_for("issue-bms-owner", BTreeMap::new());
+        let foreign = invocation_for("issue-bms-foreign", BTreeMap::new());
+        let source_run = invocation_for("issue-bms-source", BTreeMap::new());
+        let target_session = SessionId::new("issue-bms-owned-target", 64).unwrap();
+        let source_session = SessionId::new("issue-bms-owned-source", 64).unwrap();
+        service
+            .launch_terminal(
+                owner.clone(),
+                &target_session,
+                "MENU",
+                24,
+                80,
+                "csrf1",
+                1,
+                100,
+            )
+            .unwrap();
+        service
+            .launch_terminal(source_run, &source_session, "MENU", 24, 80, "csrf2", 1, 100)
+            .unwrap();
+        service
+            .register_run(foreign.clone(), &target_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let (target_id, source_id) = {
+            let mut state = service.lock().unwrap();
+            let target = state.sessions.get_mut(target_session.as_str()).unwrap();
+            target.mapset = Some("ISSUEMS".into());
+            target.map = Some("ISSUE".into());
+            target.field_values.insert("OPEN".into(), b"DATA".to_vec());
+            target.field_modified.insert("OPEN".into(), true);
+            let target_id = target.input.terminal_id.clone().unwrap();
+            let source = state.sessions.get_mut(source_session.as_str()).unwrap();
+            source.screen = b"SOURCE\0BUFFER".to_vec();
+            (target_id, source.input.terminal_id.clone().unwrap())
+        };
+        for terminal in [&target_id, &source_id] {
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: (*terminal).clone(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+        }
+        let erase = request(CicsOperation::IssueEraseAup, BTreeMap::new(), 1);
+        let copy = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([("TERMID".into(), cics_literal(source_id.as_bytes()))]),
+            2,
+        );
+        let mut foreign_run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&foreign.run_unit_id)
+            .unwrap();
+        for command in [&erase, &copy] {
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut foreign_run, command),
+                Err(HostProblem::Condition {
+                    name: "NOTALLOC".into(),
+                    response: 61,
+                    response2: 0,
+                })
+            );
+        }
+        {
+            let state = service.lock().unwrap();
+            let before = &state.sessions[target_session.as_str()];
+            assert_eq!(before.version, 1);
+            assert_eq!(before.field_values["OPEN"], b"DATA");
+        }
+        let mut owner_run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&owner.run_unit_id)
+            .unwrap();
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut owner_run, &erase)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut owner_run, &copy)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let state = service.lock().unwrap();
+        let copied = &state.sessions[target_session.as_str()];
+        assert_eq!(copied.version, 3);
+        assert_eq!(copied.screen, b"SOURCE\0BUFFER");
+    }
+
+    #[test]
     fn issue_eraseaup_unknown_outcome_replays_after_sqlite_restart() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-issue-eraseaup-{}-{:?}",

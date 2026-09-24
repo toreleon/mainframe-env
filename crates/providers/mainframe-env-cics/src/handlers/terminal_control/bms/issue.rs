@@ -33,6 +33,7 @@ pub(in crate::service::handlers::terminal_control) fn eraseaup(
             .cloned();
         (current, map)
     };
+    check_terminal_owner(run, &current.run_unit, &current.principal)?;
     if !current.connected {
         return Err(condition("NOTALLOC", 61));
     }
@@ -184,6 +185,7 @@ pub(in crate::service::handlers::terminal_control) fn copy(
             .ok_or_else(|| condition("NOTALLOC", 61))?;
         (current, source_key, source)
     };
+    check_terminal_owner(run, &current.run_unit, &current.principal)?;
     if !current.connected {
         return Err(condition("NOTALLOC", 61));
     }
@@ -257,6 +259,17 @@ fn check_request_live(service: &CicsService, run: &Run) -> Result<(), HostProble
         return Err(HostProblem::TimedOut);
     }
     Ok(())
+}
+
+fn check_terminal_owner(run: &Run, run_unit: &str, principal: &str) -> Result<(), HostProblem> {
+    if !run_unit.is_empty()
+        && (run_unit != run.invocation.run_unit_id.as_str()
+            || principal != run.invocation.principal.id().as_str())
+    {
+        Err(condition("NOTALLOC", 61))
+    } else {
+        Ok(())
+    }
 }
 
 fn request_expired(service: &CicsService, run: &Run) -> Result<bool, HostProblem> {

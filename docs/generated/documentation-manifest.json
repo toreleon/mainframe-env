@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:3241fbfc1426cfd09af8cce528507f0b27dd761d060df5265dcd5fb66e057ab9",
+      "sha256": "sha256:732f3b7e4dc6224c6d426e2a1858f317e3aef3e8a9f5dbbf0bf3312a960f7ebc",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1110,7 +1110,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 84,
-      "sha256": "sha256:3f2c1b58ffad432360a6d58259422d13bec6915faf91c522b4d28f4739744ec8",
+      "sha256": "sha256:9008e14891d545c278baebc5e9616a68606f55fdaaa83cc4c1bf9ab2e300e24d",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 1
     },
