@@ -31,6 +31,8 @@ All notable changes to mainframe-env are documented here.
 - Registered the source-bounded WAIT SIGNAL row through typed COBOL, the host
   ABI, the durable provider, and online suspend/resume. Exact replay survives
   outer receipt failure; Memory and SQLite tests cover event consumption.
+- Bound WAIT SIGNAL's six-byte EIBRCODE to the pinned terminal-control SIGNAL,
+  NOTALLOC, and TERMERR bytes and the corresponding EIBRESP byte.
 - Added the pinned one-byte EIBSIG update and made source-defined SIGNAL and
   EOC default conditions ignorable, while INBFMH retains its failure default.
 

@@ -47,6 +47,7 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBRCODE".into(), CobolValue::Bytes(vec![0x00; 6])),
         ("EIBSIG".into(), CobolValue::Bytes(vec![0x00])),
         ("EIBREQID".into(), CobolValue::Bytes(vec![0x00; 8])),
         (
@@ -95,6 +96,18 @@ pub(super) fn write_context(
             0x00
         }],
     )?;
+    if operation == CicsOperation::WaitSignal {
+        let first = match response.condition.as_str() {
+            "NORMAL" => 0,
+            "SIGNAL" => 0xE5,
+            "NOTALLOC" => 0xD5,
+            "TERMERR" => 0xF1,
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        };
+        let condition =
+            u8::try_from(response.response).map_err(|_| MachineProblem::UnexpectedHostResult)?;
+        machine.write("EIBRCODE", &[first, 0, condition, 0, 0, 0])?;
+    }
     if operation == CicsOperation::AllocateConversation
         && let Some(value) = response.outputs.get("EIBRSRCE")
     {
@@ -230,8 +243,9 @@ mod tests {
             outputs: BTreeMap::new(),
             unit_of_work: None,
         };
-        write_context(&mut machine, CicsOperation::WaitEvent, &response).unwrap();
+        write_context(&mut machine, CicsOperation::WaitSignal, &response).unwrap();
         assert_eq!(machine.read("EIBSIG").unwrap(), &[0xff]);
+        assert_eq!(machine.read("EIBRCODE").unwrap(), &[0xE5, 0, 24, 0, 0, 0]);
         let checkpoint = machine.checkpoint().unwrap();
         let mut restored = ReferenceMachine::from_binary(
             &super::super::tests::binary(),
@@ -243,7 +257,8 @@ mod tests {
         assert_eq!(restored.read("EIBSIG").unwrap(), &[0xff]);
         response.condition = "NORMAL".into();
         response.response = 0;
-        write_context(&mut restored, CicsOperation::WaitEvent, &response).unwrap();
+        write_context(&mut restored, CicsOperation::WaitSignal, &response).unwrap();
         assert_eq!(restored.read("EIBSIG").unwrap(), &[0]);
+        assert_eq!(restored.read("EIBRCODE").unwrap(), &[0; 6]);
     }
 }

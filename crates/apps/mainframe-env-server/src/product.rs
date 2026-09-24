@@ -24092,7 +24092,7 @@ mod tests {
     fn compiled_wait_signal_resumes_on_principal_event_and_sets_eibsig() {
         let artifact = published_source_fixture(
             "SIGWAIT",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SIGWAIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SIGNAL-X PIC X.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WAIT SIGNAL RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBSIG TO SIGNAL-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SIGWAIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SIGNAL-X PIC X.\n01 RCODE-X PIC X(6).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WAIT SIGNAL RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBSIG TO SIGNAL-X.\nMOVE EIBRCODE TO RCODE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -24188,6 +24188,10 @@ mod tests {
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
         assert_eq!(restored.variable("SIGNAL-X").unwrap().bytes(), &[0xFF]);
+        assert_eq!(
+            restored.variable("RCODE-X").unwrap().bytes(),
+            &[0xE5, 0, 24, 0, 0, 0]
+        );
         assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 24]);
         assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
     }
