@@ -79,6 +79,10 @@ All notable changes to mainframe-env are documented here.
   RESET effects with atomic physical-device and terminal-session updates.
   The source's alternate SESSION form remains pending.
 
+- Verified default ISSUE DISCONNECT receipt replay across SQLite restart with
+  the session already closed; a new default request returns NORMAL without
+  advancing the session or device.
+
 - Added a BMS-backed ISSUE ERASEAUP WAIT route that clears unprotected fields
   to nulls, resets their modified tags, positions the cursor, and restores
   the keyboard through the existing durable terminal authority.

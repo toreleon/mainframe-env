@@ -7525,6 +7525,92 @@ mod tests {
     }
 
     #[test]
+    fn issue_disconnect_replays_after_sqlite_restart_with_closed_session() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-disconnect-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let invocation = invocation_for("issue-disconnect-restart", BTreeMap::new());
+        let session = SessionId::new("issue-disconnect-session", 64).unwrap();
+        let command = request(CicsOperation::IssueDisconnect, BTreeMap::new(), 1);
+        let mut run = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "T000".into(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            assert!(!service.lock().unwrap().sessions[session.as_str()].connected);
+            assert_eq!(
+                handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                    .unwrap()
+                    .unwrap()
+                    .version,
+                2
+            );
+            run
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            assert!(!service.lock().unwrap().sessions[session.as_str()].connected);
+            let repeated = request(CicsOperation::IssueDisconnect, BTreeMap::new(), 2);
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &repeated)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            let record = handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                .unwrap()
+                .unwrap();
+            assert!(record.state.disconnected);
+            assert_eq!(record.version, 2);
+            assert_eq!(
+                service.lock().unwrap().sessions[session.as_str()].version,
+                2
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn issue_eraseaup_wait_clears_only_unprotected_fields_and_mdt() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store);
