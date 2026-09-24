@@ -170,11 +170,18 @@ pub(super) fn invalid_shape(
                     && plan.options.contains(&CicsPlanOption::ConversationDataLlid)
         }
         CicsPlanOperation::SendConversation => {
-            !has(CicsOperandName::ConversationDataFrom)
-                || has(CicsOperandName::ConversationDataConvid)
-                    && has(CicsOperandName::ConversationDataSession)
-                || has(CicsOperandName::ConversationDataLength)
-                    == has(CicsOperandName::ConversationDataFullLength)
+            has(CicsOperandName::ConversationDataConvid)
+                && has(CicsOperandName::ConversationDataSession)
+                || if has(CicsOperandName::ConversationDataFrom) {
+                    has(CicsOperandName::ConversationDataLength)
+                        == has(CicsOperandName::ConversationDataFullLength)
+                } else {
+                    has(CicsOperandName::ConversationDataLength)
+                        || has(CicsOperandName::ConversationDataFullLength)
+                        || !plan
+                            .options
+                            .contains(&CicsPlanOption::ConversationDataInvite)
+                }
                 || plan
                     .options
                     .contains(&CicsPlanOption::ConversationDataInvite)
@@ -379,7 +386,7 @@ mod tests {
     }
 
     #[test]
-    fn every_data_wait_form_roundtrips_without_claiming_runtime_readiness() {
+    fn every_data_wait_form_roundtrips_with_distinct_v2_identity() {
         let text = |name, bytes: &[u8]| CicsNamedOperand {
             name,
             value: CicsOperandValue::Literal(bytes.to_vec()),
@@ -463,6 +470,31 @@ mod tests {
         assert_eq!(operand_from_tag(1608), Err(CicsPlanCodecProblem::Malformed));
         assert_eq!(option_from_tag(1541), Err(CicsPlanCodecProblem::Malformed));
         assert_eq!(output_from_tag(1663), Err(CicsPlanCodecProblem::Malformed));
+    }
+
+    #[test]
+    fn control_only_send_invite_roundtrips_and_rejects_orphan_length() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::SendConversation,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::ConversationDataConvid,
+                value: CicsOperandValue::Literal(b"ABCD".to_vec()),
+            }],
+            options: BTreeSet::from([CicsPlanOption::ConversationDataInvite]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let encoded = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(plan.clone()));
+        plan.operands.push(CicsNamedOperand {
+            name: CicsOperandName::ConversationDataLength,
+            value: CicsOperandValue::Integer(4),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]

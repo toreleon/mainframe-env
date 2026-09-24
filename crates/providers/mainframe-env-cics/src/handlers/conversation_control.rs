@@ -165,6 +165,7 @@ pub enum ConversationState {
     Receive,
     Free,
     PendFree,
+    PendReceive,
     ConfFree,
     ConfReceive,
     ConfSend,
@@ -172,6 +173,27 @@ pub enum ConversationState {
     SyncReceive,
     SyncSend,
     Rollback,
+}
+
+impl ConversationState {
+    /// IBM `DFHVALUE` fullword code from the pinned CICS TS 6.x CVDA table.
+    pub const fn cvda(self) -> i32 {
+        match self {
+            Self::Allocated => 81,
+            Self::ConfFree => 82,
+            Self::ConfReceive => 83,
+            Self::ConfSend => 84,
+            Self::Free => 85,
+            Self::PendFree => 86,
+            Self::PendReceive => 87,
+            Self::Receive => 88,
+            Self::Rollback => 89,
+            Self::Send => 90,
+            Self::SyncFree => 91,
+            Self::SyncReceive => 92,
+            Self::SyncSend => 93,
+        }
+    }
 }
 
 /// The invocation that owns a conversation. Its lease epoch fences resumed
@@ -742,5 +764,28 @@ mod tests {
         assert!(!String::from_utf8_lossy(&bytes).contains("processing_profile"));
         assert_eq!(legacy.effective_processing_profile(), "DFHCICSA");
         assert_eq!(ConversationRecord::decode(&bytes), Ok(legacy));
+    }
+
+    #[test]
+    fn conversation_state_cvdas_match_pinned_ibm_table() {
+        let states = [
+            ConversationState::Allocated,
+            ConversationState::ConfFree,
+            ConversationState::ConfReceive,
+            ConversationState::ConfSend,
+            ConversationState::Free,
+            ConversationState::PendFree,
+            ConversationState::PendReceive,
+            ConversationState::Receive,
+            ConversationState::Rollback,
+            ConversationState::Send,
+            ConversationState::SyncFree,
+            ConversationState::SyncReceive,
+            ConversationState::SyncSend,
+        ];
+        assert_eq!(
+            states.map(ConversationState::cvda),
+            std::array::from_fn(|index| { i32::try_from(index).unwrap() + 81 })
+        );
     }
 }

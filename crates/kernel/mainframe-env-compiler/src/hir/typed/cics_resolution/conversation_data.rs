@@ -74,7 +74,7 @@ pub(super) const fn allowed_options(operation: HirCicsOperation) -> &'static [&'
 pub(super) const fn required_clauses(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::GdsReceiveConversation => &["CONVID", "FLENGTH", "MAXFLENGTH", "RETCODE"],
-        HirCicsOperation::SendConversation => &["FROM"],
+        HirCicsOperation::SendConversation => &[],
         HirCicsOperation::GdsWaitConversation => &["RETCODE"],
         HirCicsOperation::WaitConvid => &["CONVID"],
         _ => &[],
@@ -111,8 +111,13 @@ pub(super) fn validate(
         }
         HirCicsOperation::SendConversation => {
             conflict
-                || !has("FROM")
-                || has("LENGTH") == has("FLENGTH")
+                || if has("FROM") {
+                    has("LENGTH") == has("FLENGTH")
+                } else {
+                    has("LENGTH")
+                        || has("FLENGTH")
+                        || !options.iter().any(|option| option == "INVITE")
+                }
                 || options.iter().any(|option| option == "CONFIRM")
                     && options.iter().any(|option| option == "DEFRESP")
         }
@@ -336,6 +341,27 @@ mod tests {
         send.insert("SESSION".into(), vec!["'S1'".into()]);
         send.insert("CONVID".into(), vec!["'ABCD'".into()]);
         assert!(validate(&send, &[], HirCicsOperation::SendConversation).is_err());
+
+        let control_only = Clauses::from([("CONVID".into(), vec!["'ABCD'".into()])]);
+        assert!(
+            validate(
+                &control_only,
+                &["INVITE".into()],
+                HirCicsOperation::SendConversation
+            )
+            .is_ok()
+        );
+        assert!(validate(&control_only, &[], HirCicsOperation::SendConversation).is_err());
+        let mut invalid_length = control_only.clone();
+        invalid_length.insert("LENGTH".into(), vec!["4".into()]);
+        assert!(
+            validate(
+                &invalid_length,
+                &["INVITE".into()],
+                HirCicsOperation::SendConversation
+            )
+            .is_err()
+        );
 
         assert_eq!(required_clauses(HirCicsOperation::WaitConvid), &["CONVID"]);
         assert_eq!(

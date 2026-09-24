@@ -29,6 +29,10 @@ All notable changes to mainframe-env are documented here.
   in that command's CONVDATA reply while clearing the pending ledger bit.
 - Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,
   `MAXFLENGTH` is bounded to 32,767, and BUFFER/LLID cannot be combined.
+- The typed SEND plan now admits the pinned APPC/MRO control-only INVITE form
+  without FROM or a data length; an orphan data length still fails closed.
+- Reused the committed offline CICS CVDA pin for conversation STATE and bound
+  all 13 IBM fullword codes, including PENDRECEIVE, in the shared state type.
 - Added a durable principal signal facility for the six LU classes named by
   WAIT SIGNAL. Ordered peer events, one-time consumption, lease fencing, task
   cleanup, and SQLite reopen are covered.
