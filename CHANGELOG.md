@@ -55,6 +55,10 @@ All notable changes to mainframe-env are documented here.
   and 3650 ISSUE effects, with CAS and SQLite reopen checks. Conversation
   ownership remains with the shared APPC/MRO protocol ledger.
 
+- Added a bounded task owner for alternate LUTYPE6.1 TCTTE device records,
+  preserving canonical reopen of earlier physical rows. This is a physical
+  facility owner; APPC/MRO protocol state remains in the shared ledger.
+
 - Added a guarded provider route for the 3740 ENDFILE/ENDOUTPUT and 3650
   EODS/LOAD ISSUE commands. Device state and an exact owner-bound replay
   receipt commit atomically after SAF, with bounded receipt retention.

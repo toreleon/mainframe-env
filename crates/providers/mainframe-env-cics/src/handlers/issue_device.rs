@@ -70,6 +70,9 @@ pub struct IssueDeviceState {
     #[serde(default, skip_serializing_if = "is_false")]
     pub pass_delivered: bool,
     pub disconnected: bool,
+    /// Task that owns an alternate LUTYPE6.1 TCTTE facility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lu61_owner_run_unit: Option<String>,
     pub print_count: u32,
     pub last_print: Vec<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -310,6 +313,13 @@ impl IssueDeviceRecord {
                 .printer_attached_run
                 .as_ref()
                 .is_some_and(|owner| owner.is_empty() || owner.len() > 128)
+            || self.state.lu61_owner_run_unit.is_some()
+                && self.definition.kind != IssueDeviceKind::Lu61
+            || self
+                .state
+                .lu61_owner_run_unit
+                .as_ref()
+                .is_some_and(|owner| owner.is_empty() || owner.len() > 128 || owner.contains('\0'))
         {
             return Err(IssueDeviceProblem::Malformed);
         }
@@ -470,6 +480,18 @@ impl IssueDeviceRecord {
             return Err(IssueDeviceProblem::NotConfigured);
         }
         self.state.disconnected = true;
+        Ok(())
+    }
+
+    pub fn assign_lu61_owner(&mut self, run_unit: &str) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Lu61 {
+            return Err(IssueDeviceProblem::WrongDevice);
+        }
+        if run_unit.is_empty() || run_unit.len() > 128 || run_unit.contains('\0') {
+            return Err(IssueDeviceProblem::Malformed);
+        }
+        self.state.lu61_owner_run_unit = Some(run_unit.into());
         Ok(())
     }
 
@@ -681,5 +703,24 @@ mod tests {
         assert_eq!(device.state.last_printer.as_deref(), Some("P001"));
         assert_eq!(device.state.last_print, b"3650 DISPLAY");
         device.validate().unwrap();
+    }
+
+    #[test]
+    fn lu61_alternate_owner_is_bounded_and_reopens_canonically() {
+        let store = MemoryStore::new(Default::default());
+        let initial = IssueDeviceRecord::new(definition("S001", IssueDeviceKind::Lu61)).unwrap();
+        initial.install(&store).unwrap();
+        let current = IssueDeviceRecord::load(&store, "S001").unwrap().unwrap();
+        assert!(current.state.lu61_owner_run_unit.is_none());
+        let mut owned = current.clone();
+        owned.assign_lu61_owner("run-1").unwrap();
+        current.persist(&mut owned, &store).unwrap();
+        let reopened = IssueDeviceRecord::load(&store, "S001").unwrap().unwrap();
+        assert_eq!(reopened.state.lu61_owner_run_unit.as_deref(), Some("run-1"));
+        assert_eq!(
+            owned.assign_lu61_owner(""),
+            Err(IssueDeviceProblem::Malformed)
+        );
+        assert_eq!(owned.state.lu61_owner_run_unit.as_deref(), Some("run-1"));
     }
 }
