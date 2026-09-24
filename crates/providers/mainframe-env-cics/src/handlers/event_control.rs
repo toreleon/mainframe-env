@@ -1,6 +1,7 @@
 //! Durable BTS activity event authority and its explicit execution context.
 
 use super::super::{CicsService, Run, store_error};
+use super::bts_lifecycle::{BtsLifecycleStore, BtsMode};
 use mainframe_env_execution_api::RunUnitId;
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
@@ -180,7 +181,25 @@ impl CicsService {
     /// again. A composite child is queued under its parent instead of directly
     /// reattaching the activity.
     pub fn post_input_event(&self, activity: &str, event: &str) -> Result<(), HostProblem> {
-        let activity = event_name(activity)?;
+        let activity = if activity.len() == 52 {
+            let authority = BtsLifecycleStore::new(self.store.as_ref());
+            let index = authority
+                .load_activity_index(activity)?
+                .ok_or_else(|| event_error(4))?;
+            let process = authority
+                .load_process(&index.process_type, &index.process_name)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if process
+                .activities
+                .get(activity)
+                .is_none_or(|subject| subject.mode != BtsMode::Active)
+            {
+                return Err(event_error(4));
+            }
+            activity.to_string()
+        } else {
+            event_name(activity)?
+        };
         let event = event_name(event)?;
         for _ in 0..MAX_CAS_ATTEMPTS {
             let mut state = load_activity(self, &activity)?;
@@ -404,6 +423,54 @@ fn event_error(response2: i32) -> HostProblem {
 }
 
 pub(super) fn context(service: &CicsService, run: &Run) -> Result<EventContext, HostProblem> {
+    let authority = BtsLifecycleStore::new(service.store.as_ref());
+    let run_unit = run.invocation.run_unit_id.as_str();
+    if let Some(binding) = authority.active_context(
+        run_unit,
+        run.invocation.execution_id.as_str(),
+        run.invocation.principal.id().as_str(),
+    )? {
+        let acquisition = authority.load_acquisition(run_unit)?;
+        let (acquired_process, acquired_activity) = if let Some(acquisition) = acquisition {
+            if acquisition.owner_execution != binding.owner_execution
+                || acquisition.owner_principal != binding.owner_principal
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if let Some(id) = acquisition.activity_id {
+                let process = authority
+                    .load_process(
+                        acquisition
+                            .process_type
+                            .as_deref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                        acquisition
+                            .process_name
+                            .as_deref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                if id == process.root_id {
+                    (Some(id), None)
+                } else {
+                    (None, Some(id))
+                }
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        return Ok(EventContext {
+            activity: binding.activity_id,
+            acquired_process,
+            acquired_activity,
+            local_utc_offset_minutes: 0,
+        });
+    }
+    if authority.has_context_row(run_unit)? {
+        return Err(outside_activity());
+    }
     let row = service
         .store
         .get_provider_state(CONTEXT_NAMESPACE, run.invocation.run_unit_id.as_str())

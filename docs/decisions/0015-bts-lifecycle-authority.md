@@ -57,6 +57,10 @@ process checkpoint has advanced; stale owners and changed identities fail
 closed. Closing retains a tombstone until replay and checkpoint retention
 allow safe pruning. The event pool remains a separate content row keyed from
 this authority; it does not define process or activity lifecycle state.
+Existing event commands resolve a registered run's BTS context first and use
+the 52-character lifecycle activity ID as their event-pool key. Closed BTS
+bindings block fallback to the older standalone event context. Input-event
+delivery checks the indexed active activity before changing event state.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed

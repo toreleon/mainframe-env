@@ -31216,6 +31216,92 @@ mod tests {
     }
 
     #[test]
+    fn bts_context_routes_events_to_the_fenced_activity_identity() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                "IBMUSER",
+            )
+            .unwrap();
+        authority
+            .finish_uow(run_unit, execution, "IBMUSER", true)
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                run_unit,
+                execution,
+                "IBMUSER",
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 1, "checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ORDER", &root, 1, 1)
+            .unwrap();
+
+        let define = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"READY"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert!(
+            store
+                .get_provider_state("cics-event-activity-v1", &root)
+                .unwrap()
+                .is_some()
+        );
+        cics.post_input_event(&root, "READY").unwrap();
+        cics.close_bts_activity_context(&invocation.run_unit_id)
+            .unwrap();
+        let after_close = request(
+            CicsOperation::DefineInputEvent,
+            BTreeMap::from([("EVENT".into(), argument(b"LATER"))]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, after_close.clone(), 2),
+                after_close
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            })
+        );
+        assert!(
+            store
+                .get_provider_state("cics-event-activity-v1", "CURRENT")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
     fn define_input_event_requires_activity_and_replays_after_reopen() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let cics = service(store.clone());

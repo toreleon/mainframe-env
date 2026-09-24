@@ -95,6 +95,11 @@ impl CicsService {
 }
 
 impl<'a> BtsLifecycleStore<'a> {
+    /// Distinguish a never-bound run from a closed or stale BTS binding.
+    pub fn has_context_row(&self, run_unit: &str) -> Result<bool, HostProblem> {
+        Ok(self.load_context_row(run_unit)?.is_some())
+    }
+
     pub fn bind_context(&self, context: BtsActivityContext) -> Result<(), HostProblem> {
         context.validate()?;
         if context.closed || context.row_version != 0 {

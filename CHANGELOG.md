@@ -69,6 +69,11 @@ All notable changes to mainframe-env are documented here.
   to the CICS syncpoint and uncertain-outcome reconciliation paths. The
   participant is idempotent and owner-fenced; command routing remains pending.
 
+- Bound existing BTS event commands to the shared 52-character lifecycle
+  activity identity when a fenced active context is present. RUN input-event
+  delivery accepts that exact indexed activity, while closed contexts cannot
+  fall back to a legacy event binding.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline
