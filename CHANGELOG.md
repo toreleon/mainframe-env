@@ -19,6 +19,10 @@ All notable changes to mainframe-env are documented here.
   protocol record. The optional field decodes earlier rows canonically and
   is cleared on ABEND; partner delivery remains pending integration.
 
+- Bound shared conversation STATE to the newly pinned CICS fullword CVDA
+  numbers 82–94, including PENDRECEIVE 88. ISSUE responses can use this
+  conversion after the conversation provider route is connected.
+
 - Pending ISSUE host identities now fail closed through an optional generated
   descriptor lookup. GDS ISSUE protocol failures retain their distinct
   six-byte return codes without turning corrupt state into a normal response.

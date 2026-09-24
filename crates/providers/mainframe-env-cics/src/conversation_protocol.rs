@@ -52,6 +52,28 @@ pub enum ConversationState {
     Rollback,
 }
 
+impl ConversationState {
+    /// Exact DFHVALUE numbers from the pinned CICS TS 6.x `dfha80c.html`
+    /// table; receiving STATE areas are fullword binary.
+    pub const fn cvda_number(self) -> i64 {
+        match self {
+            Self::Allocated => 82,
+            Self::ConfFree => 83,
+            Self::ConfReceive => 84,
+            Self::ConfSend => 85,
+            Self::Free => 86,
+            Self::PendFree => 87,
+            Self::PendReceive => 88,
+            Self::Receive => 89,
+            Self::Rollback => 90,
+            Self::Send => 91,
+            Self::SyncFree => 92,
+            Self::SyncReceive => 93,
+            Self::SyncSend => 94,
+        }
+    }
+}
+
 /// One ISSUE protocol flow. The source command's mapped or GDS form selects
 /// the wire encoding, while this record remains the only state authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -595,6 +617,28 @@ mod tests {
             )
             .unwrap();
         assert!(!record.signal_pending && record.released);
+    }
+
+    #[test]
+    fn issue_state_cvdas_match_the_pinned_fullword_table() {
+        let states = [
+            ConversationState::Allocated,
+            ConversationState::ConfFree,
+            ConversationState::ConfReceive,
+            ConversationState::ConfSend,
+            ConversationState::Free,
+            ConversationState::PendFree,
+            ConversationState::PendReceive,
+            ConversationState::Receive,
+            ConversationState::Rollback,
+            ConversationState::Send,
+            ConversationState::SyncFree,
+            ConversationState::SyncReceive,
+            ConversationState::SyncSend,
+        ];
+        for (index, state) in states.into_iter().enumerate() {
+            assert_eq!(state.cvda_number(), 82 + index as i64);
+        }
     }
 
     #[test]
