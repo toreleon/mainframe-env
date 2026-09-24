@@ -8086,6 +8086,211 @@ mod tests {
     }
 
     #[test]
+    fn issue_signal_lu61_session_is_owner_fenced_and_replay_safe() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let owner = invocation_for("lu61-signal-owner", BTreeMap::new());
+        let session = SessionId::new("lu61-signal-session", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(owner.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("S003".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "S003".into(),
+            kind: handlers::IssueDeviceKind::Lu61,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let current = handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
+            .unwrap()
+            .unwrap();
+        let mut owned = current.clone();
+        owned.assign_lu61_owner(owner.run_unit_id.as_str()).unwrap();
+        current.persist(&mut owned, store.as_ref()).unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&owner.run_unit_id)
+            .unwrap();
+        let alternate = request(
+            CicsOperation::IssueSignal,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S003"))]),
+            1,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &alternate),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &alternate)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        let signaled = handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
+            .unwrap()
+            .unwrap();
+        assert_eq!(signaled.version, 3);
+        assert!(signaled.state.lu61_signal_pending);
+        let principal = request(CicsOperation::IssueSignal, BTreeMap::new(), 2);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &principal)
+                .unwrap()
+                .condition,
+            "NORMAL"
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
+                .unwrap()
+                .unwrap()
+                .version,
+            4
+        );
+        let foreign = invocation_for("lu61-signal-foreign", BTreeMap::new());
+        let foreign_session = SessionId::new("lu61-signal-foreign", 64).unwrap();
+        service.create_session(&foreign_session, 24, 80).unwrap();
+        service
+            .register_run(foreign.clone(), &foreign_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut foreign_run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&foreign.run_unit_id)
+            .unwrap();
+        let unowned = request(
+            CicsOperation::IssueSignal,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S003"))]),
+            3,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut foreign_run, &unowned),
+            Err(HostProblem::Condition {
+                name: "NOTALLOC".into(),
+                response: 61,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "S003")
+                .unwrap()
+                .unwrap()
+                .version,
+            4
+        );
+    }
+
+    #[test]
+    fn issue_signal_lu61_unknown_outcome_replays_after_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-lu61-signal-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let invocation = invocation_for("lu61-signal-restart", BTreeMap::new());
+        let session = SessionId::new("lu61-signal-restart", 64).unwrap();
+        let command = request(
+            CicsOperation::IssueSignal,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S004"))]),
+            1,
+        );
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "S004".into(),
+                kind: handlers::IssueDeviceKind::Lu61,
+                control_unit: None,
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let current = handlers::IssueDeviceRecord::load(store.as_ref(), "S004")
+                .unwrap()
+                .unwrap();
+            let mut owned = current.clone();
+            owned
+                .assign_lu61_owner(invocation.run_unit_id.as_str())
+                .unwrap();
+            current.persist(&mut owned, store.as_ref()).unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            let device = handlers::IssueDeviceRecord::load(store.as_ref(), "S004")
+                .unwrap()
+                .unwrap();
+            assert_eq!(device.version, 3);
+            assert!(device.state.lu61_signal_pending);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            assert_eq!(
+                handlers::invoke_issue_device(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            let device = handlers::IssueDeviceRecord::load(store.as_ref(), "S004")
+                .unwrap()
+                .unwrap();
+            assert_eq!(device.version, 3);
+            assert!(device.state.lu61_signal_pending);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn issue_eraseaup_wait_clears_only_unprotected_fields_and_mdt() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store);

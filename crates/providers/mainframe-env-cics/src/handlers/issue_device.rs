@@ -1,7 +1,7 @@
 //! Durable definitions and device-specific effects for CIC-905 ISSUE forms.
 //!
-//! This record owns only physical terminal/3740/3650 facilities. APPC, MRO,
-//! and LU6.1 conversation ownership belongs to the shared protocol ledger.
+//! This record owns physical terminal/3740/3650 and LU6.1 TCTTE facilities.
+//! APPC and MRO conversation ownership belongs to the shared protocol ledger.
 
 use mainframe_env_store_api::{
     ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -73,6 +73,9 @@ pub struct IssueDeviceState {
     /// Task that owns an alternate LUTYPE6.1 TCTTE facility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lu61_owner_run_unit: Option<String>,
+    /// Outbound direction-change request retained for the LU6.1 peer.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub lu61_signal_pending: bool,
     pub print_count: u32,
     pub last_print: Vec<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -315,6 +318,8 @@ impl IssueDeviceRecord {
                 .is_some_and(|owner| owner.is_empty() || owner.len() > 128)
             || self.state.lu61_owner_run_unit.is_some()
                 && self.definition.kind != IssueDeviceKind::Lu61
+            || self.state.lu61_signal_pending
+                && (self.definition.kind != IssueDeviceKind::Lu61 || self.state.disconnected)
             || self
                 .state
                 .lu61_owner_run_unit
@@ -485,6 +490,19 @@ impl IssueDeviceRecord {
             return Err(IssueDeviceProblem::NotConfigured);
         }
         self.state.disconnected = true;
+        self.state.lu61_signal_pending = false;
+        Ok(())
+    }
+
+    pub fn mark_lu61_signal(&mut self, owner_run_unit: &str) -> Result<(), IssueDeviceProblem> {
+        self.active()?;
+        if self.definition.kind != IssueDeviceKind::Lu61 {
+            return Err(IssueDeviceProblem::WrongDevice);
+        }
+        if self.state.lu61_owner_run_unit.as_deref() != Some(owner_run_unit) {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
+        self.state.lu61_signal_pending = true;
         Ok(())
     }
 
@@ -733,5 +751,39 @@ mod tests {
             Err(IssueDeviceProblem::Malformed)
         );
         assert_eq!(owned.state.lu61_owner_run_unit.as_deref(), Some("run-1"));
+    }
+
+    #[test]
+    fn lu61_signal_marker_reopens_without_changing_legacy_rows() {
+        let store = MemoryStore::new(Default::default());
+        let initial = IssueDeviceRecord::new(definition("S003", IssueDeviceKind::Lu61)).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&initial.encode().unwrap()).contains("lu61_signal_pending")
+        );
+        initial.install(&store).unwrap();
+        let mut owned = initial.clone();
+        owned.assign_lu61_owner("run-3").unwrap();
+        assert!(initial.persist(&mut owned, &store).unwrap());
+        let current = IssueDeviceRecord::load(&store, "S003").unwrap().unwrap();
+        let mut signaled = current.clone();
+        assert_eq!(
+            signaled.mark_lu61_signal("other"),
+            Err(IssueDeviceProblem::StaleOwner)
+        );
+        assert!(!signaled.state.lu61_signal_pending);
+        signaled.mark_lu61_signal("run-3").unwrap();
+        assert!(current.persist(&mut signaled, &store).unwrap());
+        let reopened = IssueDeviceRecord::load(&store, "S003").unwrap().unwrap();
+        assert!(reopened.state.lu61_signal_pending);
+        let mut closed = reopened.clone();
+        closed.disconnect().unwrap();
+        assert!(!closed.state.lu61_signal_pending);
+        assert!(reopened.persist(&mut closed, &store).unwrap());
+        let mut wrong =
+            IssueDeviceRecord::new(definition("T004", IssueDeviceKind::Entry3740)).unwrap();
+        assert_eq!(
+            wrong.mark_lu61_signal("run-3"),
+            Err(IssueDeviceProblem::WrongDevice)
+        );
     }
 }

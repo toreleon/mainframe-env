@@ -243,6 +243,9 @@ pub(in crate::service) fn invoke(
                 disconnected_session = Some(updated);
             }
         }
+        CicsOperation::IssueSignal => next
+            .mark_lu61_signal(run.invocation.run_unit_id.as_str())
+            .map_err(|problem| device_condition(request.operation, problem))?,
         CicsOperation::IssuePrint => {
             if !matches!(
                 current.definition.kind,
@@ -385,6 +388,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             | CicsOperation::IssuePass
             | CicsOperation::IssueDisconnect
             | CicsOperation::IssueReset
+            | CicsOperation::IssueSignal
             | CicsOperation::IssuePrint
     ) || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
     {
@@ -407,10 +411,17 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
             "LENGTH" if request.operation == CicsOperation::IssuePass => {
                 value.schema() == "mainframe-env.cics.decimal@1"
             }
-            "SESSION" if request.operation == CicsOperation::IssueDisconnect => matches!(
-                value.schema(),
-                "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
-            ),
+            "SESSION"
+                if matches!(
+                    request.operation,
+                    CicsOperation::IssueDisconnect | CicsOperation::IssueSignal
+                ) =>
+            {
+                matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                )
+            }
             "OPTION.NOHANDLE" => {
                 value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
             }
@@ -579,6 +590,9 @@ fn device_condition(operation: CicsOperation, problem: IssueDeviceProblem) -> Ho
         (CicsOperation::IssueLoad, IssueDeviceProblem::Disconnected) => condition("NOSTART", 10, 0),
         (CicsOperation::IssueDisconnect, IssueDeviceProblem::NotConfigured) => {
             condition("TERMERR", 81, 0)
+        }
+        (CicsOperation::IssueSignal, IssueDeviceProblem::WrongDevice) => {
+            condition("NOTALLOC", 61, 0)
         }
         (_, IssueDeviceProblem::WrongDevice | IssueDeviceProblem::NotConfigured) => {
             condition("INVREQ", 16, 0)

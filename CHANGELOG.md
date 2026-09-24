@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Retained owner-fenced LUTYPE6.1 ISSUE SIGNAL direction requests in the
+  existing physical TCTTE record, with exact replay and SQLite restart proof.
+  APPC/MRO indicators remain in the shared conversation ledger.
+
 - Normalized the paired ISSUE ENDFILE/ENDOUTPUT options as valueless flags in
   only their two unready registry rows. Split the unchanged option tag tables
   into a focused IR module to clear the 1,200-line module ceiling.
