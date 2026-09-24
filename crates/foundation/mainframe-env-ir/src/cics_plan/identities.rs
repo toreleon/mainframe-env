@@ -193,6 +193,26 @@ pub enum CicsPlanOperation {
     GdsIssueSignal,
     /// APPC mapped ISSUE SIGNAL conversation flow.
     IssueSignal,
+    /// Copy one eligible 3270 terminal buffer.
+    IssueCopy,
+    /// Disconnect one task-owned terminal or alternate session.
+    IssueDisconnect,
+    /// Signal end of file to a 3740 facility.
+    IssueEndfile,
+    /// Signal end of output to a 3740 facility.
+    IssueEndoutput,
+    /// Signal end of data set to a 3650 facility.
+    IssueEods,
+    /// Erase unprotected fields in an eligible 3270 buffer.
+    IssueEraseAup,
+    /// Load one named 3650 application program.
+    IssueLoad,
+    /// Pass a terminal to a Communications Server application at task end.
+    IssuePass,
+    /// Print the displayed buffer on an eligible available printer.
+    IssuePrint,
+    /// Legacy telecommunication-line reset.
+    IssueReset,
     /// Complete a full-BMS logical message and dispatch its final page.
     SendPage,
     /// Rewrite the record held by the current update context.
@@ -334,6 +354,20 @@ pub enum CicsOperandName {
     IssueConvid,
     /// Legacy SESSION alias for a mapped ISSUE conversation token.
     IssueSession,
+    /// Source 3270 terminal for ISSUE COPY.
+    IssueTermId,
+    /// One-byte 3270 copy control character.
+    IssueCtlChar,
+    /// Named 3650 program for ISSUE LOAD.
+    IssueProgram,
+    /// Communications Server application for ISSUE PASS.
+    IssueLuName,
+    /// Optional PASS logon user data.
+    IssueFrom,
+    /// Explicit PASS logon user-data length.
+    IssueLength,
+    /// Optional PASS logon mode.
+    IssueLogMode,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
@@ -858,6 +892,18 @@ pub enum CicsOperandName {
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
+    /// Wait for COPY or ERASEAUP terminal completion.
+    IssueWaitOption,
+    /// ENDFILE additionally signals ENDOUTPUT.
+    IssueEndOutput,
+    /// ENDOUTPUT additionally signals ENDFILE.
+    IssueEndFile,
+    /// Loaded 3650 program may converse with the host.
+    IssueConverse,
+    /// PASS uses the logon-associated mode.
+    IssueLogonLogmode,
+    /// PASS skips session quiescing.
+    IssueNoQuiesce,
     /// BasicAuth token syntax.
     SecurityBasicAuth,
     /// JSON Web Token syntax.

@@ -31,7 +31,17 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         | CicsPlanOperation::IssuePrepare
         | CicsPlanOperation::GdsIssuePrepare
         | CicsPlanOperation::GdsIssueSignal
-        | CicsPlanOperation::IssueSignal => issue::operation_tag(value),
+        | CicsPlanOperation::IssueSignal
+        | CicsPlanOperation::IssueCopy
+        | CicsPlanOperation::IssueDisconnect
+        | CicsPlanOperation::IssueEndfile
+        | CicsPlanOperation::IssueEndoutput
+        | CicsPlanOperation::IssueEods
+        | CicsPlanOperation::IssueEraseAup
+        | CicsPlanOperation::IssueLoad
+        | CicsPlanOperation::IssuePass
+        | CicsPlanOperation::IssuePrint
+        | CicsPlanOperation::IssueReset => issue::operation_tag(value),
         CicsPlanOperation::AddSubevent => 105,
         CicsPlanOperation::RemoveSubevent => 113,
         CicsPlanOperation::DeleteEvent => 110,
@@ -346,7 +356,15 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
-        CicsOperandName::IssueConvid | CicsOperandName::IssueSession => issue::operand_tag(value),
+        CicsOperandName::IssueConvid
+        | CicsOperandName::IssueSession
+        | CicsOperandName::IssueTermId
+        | CicsOperandName::IssueCtlChar
+        | CicsOperandName::IssueProgram
+        | CicsOperandName::IssueLuName
+        | CicsOperandName::IssueFrom
+        | CicsOperandName::IssueLength
+        | CicsOperandName::IssueLogMode => issue::operand_tag(value),
         CicsOperandName::Event => 320,
         CicsOperandName::SubEvent => 329,
         CicsOperandName::SubEvent1 => 321,
@@ -919,6 +937,12 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
 
 pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
     match value {
+        CicsPlanOption::IssueWaitOption
+        | CicsPlanOption::IssueEndOutput
+        | CicsPlanOption::IssueEndFile
+        | CicsPlanOption::IssueConverse
+        | CicsPlanOption::IssueLogonLogmode
+        | CicsPlanOption::IssueNoQuiesce => issue::option_tag(value),
         CicsPlanOption::SecurityBasicAuth => 380,
         CicsPlanOption::SecurityJwt => 381,
         CicsPlanOption::SecurityKerberos => 382,
@@ -1053,6 +1077,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
 
 pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
     match value {
+        1404..=1531 => issue::option_from_tag(value),
         380 => Ok(CicsPlanOption::SecurityBasicAuth),
         381 => Ok(CicsPlanOption::SecurityJwt),
         382 => Ok(CicsPlanOption::SecurityKerberos),

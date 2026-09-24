@@ -15,6 +15,10 @@ All notable changes to mainframe-env are documented here.
   descriptor lookup. GDS ISSUE protocol failures retain their distinct
   six-byte return codes without turning corrupt state into a normal response.
 
+- Reserved the remaining ten terminal/device ISSUE plan identities and their
+  command-specific operand and flag shapes in the assigned MCEP v2 ranges.
+  These plans remain unregistered pending device and selected-route execution.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

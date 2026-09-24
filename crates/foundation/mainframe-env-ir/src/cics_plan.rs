@@ -659,7 +659,17 @@ fn validate_operation_shape(
         | CicsPlanOperation::IssuePrepare
         | CicsPlanOperation::GdsIssuePrepare
         | CicsPlanOperation::GdsIssueSignal
-        | CicsPlanOperation::IssueSignal => issue::invalid_shape(plan, inputs, outputs),
+        | CicsPlanOperation::IssueSignal
+        | CicsPlanOperation::IssueCopy
+        | CicsPlanOperation::IssueDisconnect
+        | CicsPlanOperation::IssueEndfile
+        | CicsPlanOperation::IssueEndoutput
+        | CicsPlanOperation::IssueEods
+        | CicsPlanOperation::IssueEraseAup
+        | CicsPlanOperation::IssueLoad
+        | CicsPlanOperation::IssuePass
+        | CicsPlanOperation::IssuePrint
+        | CicsPlanOperation::IssueReset => issue::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::Route => route::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::InvokeService
         | CicsPlanOperation::SoapFaultAdd
@@ -1368,6 +1378,7 @@ mod tests {
         let limits = CicsPlanLimits::default();
         for operation in [
             CicsPlanOperation::IssueAbend,
+            CicsPlanOperation::IssueReset,
             CicsPlanOperation::IssueSignal,
         ] {
             let plan = CicsEffectPlan {
