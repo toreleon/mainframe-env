@@ -3654,7 +3654,7 @@ mod tests {
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{
-        MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore,
+        MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore, StoreLimits,
     };
     use mainframe_env_store_api::{
         ArtifactRecord, ArtifactStore, AuditSink, EffectDigestFormat, EffectIntentMetadata,
@@ -5098,7 +5098,11 @@ mod tests {
                 .audit_records(&invocation.execution_id, 0, 16)
                 .unwrap()
                 .iter()
-                .any(|record| record.decision == AuditDecision::Deny)
+                .any(|record| {
+                    record.capability.as_str() == "host.security.authorize"
+                        && record.decision == AuditDecision::Deny
+                        && record.run_unit_id == invocation.run_unit_id
+                })
         );
         assert!(
             security
@@ -5476,6 +5480,15 @@ mod tests {
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
                 .unwrap();
+            let stale = registered_counter_run(&cics, &format!("bts-link-{unique}-stale"));
+            assert_eq!(
+                cics.invoke(
+                    &effect(&stale.run_unit_id, link.clone(), sequence),
+                    link.clone()
+                ),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(seen.lock().unwrap().len(), 1);
             let response = cics
                 .invoke(
                     &effect(&invocation.run_unit_id, link.clone(), sequence),
@@ -6195,7 +6208,11 @@ mod tests {
                 .audit_records(&invocation.execution_id, 0, 16)
                 .unwrap()
                 .iter()
-                .any(|record| record.decision == AuditDecision::Deny)
+                .any(|record| {
+                    record.capability.as_str() == "host.security.authorize"
+                        && record.decision == AuditDecision::Deny
+                        && record.run_unit_id == invocation.run_unit_id
+                })
         );
     }
 
@@ -34541,10 +34558,15 @@ mod tests {
                 .is_none()
         );
         assert!(
-            !denied_store
+            denied_store
                 .audit_records(&denied_invocation.execution_id, 0, 64)
                 .unwrap()
-                .is_empty()
+                .iter()
+                .any(|record| {
+                    record.capability.as_str() == "host.security.authorize"
+                        && record.decision == AuditDecision::Deny
+                        && record.run_unit_id == denied_invocation.run_unit_id
+                })
         );
     }
 
@@ -34625,6 +34647,14 @@ mod tests {
             .unwrap();
         let state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         assert!(state["records"].get("DEFAULT/ONCE").is_some());
+        let stale = registered_counter_run(&cics, "counter-receipt-stale-owner");
+        assert_eq!(
+            cics.invoke(
+                &effect(&stale.run_unit_id, define.clone(), 1),
+                define.clone()
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
         let replayed = cics
             .invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
             .unwrap();
@@ -43909,5 +43939,377 @@ mod tests {
         assert_eq!(reply.outputs["STATE"].bytes(), b"91");
         assert_eq!(cics.invoke(&bound, wait).unwrap(), reply);
         assert_eq!(carrier.0.load(Ordering::SeqCst), 1);
+    }
+
+    fn cic906_connected_conversation(
+        store: &dyn ProviderStateStore,
+        invocation: &Invocation,
+    ) -> [u8; 4] {
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store).unwrap();
+        let mut next = current.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcMapped, owner.clone())
+            .unwrap()
+            .token;
+        next.conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                false,
+                b"PROC".to_vec(),
+                Vec::new(),
+                0,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store).unwrap());
+        token
+    }
+
+    fn cic906_send(token: [u8; 4], sequence: u64) -> CicsRequest {
+        request(
+            CicsOperation::SendConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"ONCE")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            sequence,
+        )
+    }
+
+    #[test]
+    fn cic906_audit_saturation_blocks_counter_bts_link_and_appc_send() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
+
+        let store = Arc::new(MemoryStore::new(StoreLimits {
+            max_audits: 0,
+            ..Default::default()
+        }));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+
+        let counter = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([("COUNTER".into(), cics_literal(b"AUDIT"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, counter.clone(), 1),
+                counter
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-counter-control-v1", "state")
+                .unwrap()
+                .is_none()
+        );
+
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "PROC",
+                    &root,
+                    "BTSRUN",
+                    "MENU",
+                    "IBMUSER",
+                    invocation.run_unit_id.as_str(),
+                )
+                .unwrap(),
+                invocation.run_unit_id.as_str(),
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let link = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 2), link),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let process = authority.load_process("TYPE", "PROC").unwrap().unwrap();
+        assert_eq!(process.activities[&root].mode, BtsMode::Initial);
+        assert!(process.replays.is_empty());
+
+        let token = cic906_connected_conversation(store.as_ref(), &invocation);
+        let before = ConversationLedger::load(store.as_ref()).unwrap();
+        let send = cic906_send(token, 3);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 3), send),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+        assert!(
+            store
+                .list_provider_state(CONVERSATION_REPLAY_NAMESPACE, 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .list_provider_state("cics-effect-replay-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn cic906_appc_send_saf_denial_is_typed_and_precedes_staging() {
+        struct DenyConnection(CapabilityDescriptor);
+        impl HostProvider for DenyConnection {
+            fn descriptor(&self) -> &CapabilityDescriptor {
+                &self.0
+            }
+
+            fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+                let outcome = match effect.request {
+                    HostRequest::Security(SecurityRequest::Authorize {
+                        class,
+                        resource,
+                        intent,
+                        ..
+                    }) => {
+                        if class == "CONNECTION" {
+                            assert_eq!(resource.as_str(), "CICS.CONNECTION.SYS1");
+                            assert_eq!(intent, AccessIntent::Update);
+                        }
+                        Ok(HostResult::Security(if class == "CONNECTION" {
+                            SecurityDecision::Deny
+                        } else {
+                            SecurityDecision::Allow
+                        }))
+                    }
+                    _ => Err(HostProblem::Unsupported),
+                };
+                EffectResult {
+                    sequence: effect.sequence,
+                    outcome,
+                }
+            }
+        }
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(
+                    1,
+                    vec![Arc::new(DenyConnection(descriptor(
+                        "host.security.authorize",
+                    )))],
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            HostLimits::default(),
+        ));
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let token = cic906_connected_conversation(store.as_ref(), &invocation);
+        let before = ConversationLedger::load(store.as_ref()).unwrap();
+        let expected_resource = mainframe_env_host_api::canonical_audit_resource_digest(
+            &HostRequest::Security(SecurityRequest::Authorize {
+                principal: invocation.principal.id().clone(),
+                class: "CONNECTION".into(),
+                resource: ResourceName::new("CICS.CONNECTION.SYS1", 246).unwrap(),
+                intent: AccessIntent::Update,
+            }),
+        );
+        let mut send = cic906_send(token, 1);
+        send.condition_policy = CicsConditionPolicy::NoHandle;
+        let reply = cics
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert_eq!((reply.condition.as_str(), reply.response), ("NOTAUTH", 70));
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+        assert!(
+            store
+                .list_provider_state(CONVERSATION_REPLAY_NAMESPACE, 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| {
+                    record.capability.as_str() == "host.security.authorize"
+                        && record.decision == AuditDecision::Deny
+                        && record.run_unit_id == invocation.run_unit_id
+                        && record.resource == expected_resource
+                })
+        );
+    }
+
+    #[test]
+    fn cic906_appc_send_live_cancellation_and_deadline_leave_no_frame() {
+        for cancelled in [true, false] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let cics = CicsService::open_with_replay_clock(
+                authorities(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(if cancelled { 1 } else { 100 })),
+            )
+            .unwrap();
+            let probe = mainframe_env_execution_api::CancellationProbe::new();
+            let name = if cancelled {
+                "cic906-send-cancel"
+            } else {
+                "cic906-send-deadline"
+            };
+            let invocation =
+                invocation_for(name, BTreeMap::new()).with_cancellation_probe(probe.clone());
+            let session = SessionId::new(name, 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let token = cic906_connected_conversation(store.as_ref(), &invocation);
+            let before = ConversationLedger::load(store.as_ref()).unwrap();
+            let send = cic906_send(token, 1);
+            if cancelled {
+                probe.request();
+            }
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send),
+                Err(if cancelled {
+                    HostProblem::Cancelled
+                } else {
+                    HostProblem::TimedOut
+                })
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+            assert!(
+                store
+                    .list_provider_state(CONVERSATION_REPLAY_NAMESPACE, 8)
+                    .unwrap()
+                    .is_empty()
+            );
+            assert!(
+                store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    fn cic906_appc_send_receipt_gap<S>(store: Arc<FailCicsReplayCasStore<S>>)
+    where
+        S: ProviderStateStore + ArtifactStore + 'static,
+    {
+        struct Carrier(AtomicUsize);
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _system: &str,
+                _token: [u8; 4],
+                _send_id: u64,
+                _frame: &ConversationDataFrame,
+                _invocation: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let token = cic906_connected_conversation(store.as_ref(), &invocation);
+        let carrier = Arc::new(Carrier(AtomicUsize::new(0)));
+        cics.install_conversation_transport(carrier.clone())
+            .unwrap();
+        let send = cic906_send(token, 1);
+        store.fail_insert.store(true, Ordering::SeqCst);
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, send.clone(), 1),
+                send.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+        let after = ConversationLedger::load(store.as_ref()).unwrap();
+        let exchange = &after.exchanges[&u32::from_be_bytes(token).to_string()];
+        assert_eq!(exchange.pending_outbound(), 0);
+        assert_eq!(exchange.last_acked_send_id, 2);
+        assert!(
+            store
+                .list_provider_state(CONVERSATION_REPLAY_NAMESPACE, 8)
+                .unwrap()
+                .len()
+                == 1
+        );
+
+        let other = registered_counter_run(&cics, "cic906-stale-send-owner");
+        assert_eq!(
+            cics.invoke(&effect(&other.run_unit_id, send.clone(), 1), send.clone()),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+
+        let reply = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, send.clone(), 1),
+                send.clone(),
+            )
+            .unwrap();
+        assert_eq!(reply.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+                .unwrap(),
+            reply
+        );
+        assert_eq!(carrier.0.load(Ordering::SeqCst), 2);
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), after);
+        assert!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-1")
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn cic906_appc_send_receipt_gap_reconciles_on_memory() {
+        cic906_appc_send_receipt_gap(Arc::new(FailCicsReplayCasStore::new()));
+    }
+
+    #[test]
+    fn cic906_appc_send_receipt_gap_reconciles_on_sqlite() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cic906-send-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let store = Arc::new(FailCicsReplayCasStore::with_inner(
+            SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+        ));
+        cic906_appc_send_receipt_gap(store);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
