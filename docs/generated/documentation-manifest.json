@@ -3,7 +3,7 @@
     "markdown_documents": 190,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 175
+    "xtask_commands": 176
   },
   "documents": [
     {
@@ -1014,9 +1014,9 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.10.0.md",
       "relative_links": 0,
-      "sha256": "sha256:c95833cfcf992e4b7670b57b63b775fd573ab702bcd7446a6aa3bff85a4321a0",
+      "sha256": "sha256:7b2707ba214664a1b72d19504efe971fc7fdfd0d1652035a0f4b2e8f64d7c8e4",
       "title": "mainframe-env 0.10.0 implementation status",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,

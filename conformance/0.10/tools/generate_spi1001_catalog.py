@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""Generate the fail-closed SPI-1001 identity catalog."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import sys
+from typing import Any
+
+
+TOOLS = Path(__file__).resolve().parent
+ROOT = TOOLS.parents[2]
+if str(TOOLS) not in sys.path:
+    sys.path.insert(0, str(TOOLS))
+import verify_spi1001_source as source  # noqa: E402
+
+
+OUTPUT_PATH = Path("conformance/0.10/generated/cics-spi-fepi-identity-catalog.json")
+SCHEMA_VERSION = "mainframe-env.cics-spi-fepi-identity-catalog@1"
+DIGEST_DOMAIN = b"mainframe-env.cics-spi-fepi-identity-catalog@1\0"
+
+
+class CatalogError(ValueError):
+    """The identity catalog cannot be generated safely."""
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise CatalogError(message)
+
+
+def canonical_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def pretty_bytes(value: object) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=False) + "\n").encode("utf-8")
+
+
+def file_sha256(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def identity_digest(commands: list[dict[str, Any]]) -> str:
+    digest = hashlib.sha256()
+    digest.update(DIGEST_DOMAIN)
+    digest.update(canonical_bytes(commands))
+    return "sha256:" + digest.hexdigest()
+
+
+def duplicate_eibfn_by_label(authority: dict[str, Any]) -> dict[str, list[str]]:
+    return {
+        row["label"]: list(row["additional_source_eibfn"])
+        for row in authority["tables"]["spi"]["duplicate_labels"]
+    }
+
+
+def build_catalog(authority: dict[str, Any], official: dict[str, Any]) -> dict[str, Any]:
+    source.validate_projection_boundary(authority)
+    duplicate_codes = duplicate_eibfn_by_label(authority)
+    commands: list[dict[str, Any]] = []
+    unit_specs = [
+        ("spi", "spi-commands-unique", "SPI", "SPI-1001.source-gap.spi-command-bodies", 269),
+        ("fepi", "fepi-commands", "FEPI", "SPI-1001.source-gap.fepi-command-bodies", 39),
+    ]
+    for table_key, unit_id, interface, source_gap, count in unit_specs:
+        table = authority["tables"][table_key]
+        rows = source.official_identity_rows(
+            source.catalog_unit(official, unit_id), table["table_id"], interface
+        )
+        require(len(rows) == count, f"{interface} denominator drifted")
+        for official_row, label, eibfn in rows:
+            commands.append(
+                {
+                    "official_row": official_row,
+                    "interface": interface,
+                    "label": label,
+                    "label_tokens": label.split(),
+                    "source_label_aliases": [],
+                    "eibfn": eibfn,
+                    "additional_eibfn_codes": duplicate_codes.get(label, [])
+                    if interface == "SPI"
+                    else [],
+                    "shared_eibfn_rows": [],
+                    "source": {
+                        "topic_path": authority["topic"]["topic_path"],
+                        "topic_sha256": authority["topic"]["sha256"],
+                        "table_id": table["table_id"],
+                        "source_locator": next(
+                            row["source_locator"]
+                            for row in source.catalog_unit(official, unit_id)
+                            if row["id"] == official_row
+                        ),
+                    },
+                    "semantic_contract": {
+                        "state": "blocked-source-gap",
+                        "source_gap": source_gap,
+                        "blocked_facts": list(source.EXPECTED_BLOCKED_FACTS),
+                    },
+                    "runtime": {
+                        "handler": None,
+                        "advertised": False,
+                        "automatically_registered": False,
+                    },
+                    "coverage_credit": 0,
+                }
+            )
+
+    require(len(commands) == 308, "combined SPI/FEPI denominator drifted")
+    require(
+        len({command["official_row"] for command in commands}) == 308,
+        "official SPI/FEPI row identities are duplicated",
+    )
+    require(
+        len({(command["interface"], command["label"]) for command in commands}) == 308,
+        "SPI/FEPI command labels are duplicated after reviewed deduplication",
+    )
+    by_eibfn: dict[tuple[str, str], list[str]] = {}
+    for command in commands:
+        by_eibfn.setdefault((command["interface"], command["eibfn"]), []).append(
+            command["official_row"]
+        )
+    for command in commands:
+        command["shared_eibfn_rows"] = [
+            row
+            for row in by_eibfn[(command["interface"], command["eibfn"])]
+            if row != command["official_row"]
+        ]
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "target_version": "0.10.0",
+        "work_package": "SPI-1001.catalog",
+        "status": "identity-only-source-gapped",
+        "inputs": {
+            "official_catalog": str(source.CATALOG_PATH),
+            "official_catalog_sha256": authority["baseline"]["catalog_sha256"],
+            "source_authority": str(source.AUTHORITY_PATH),
+            "source_authority_sha256": "sha256:pending-generation",
+        },
+        "counts": {
+            "spi": 269,
+            "fepi": 39,
+            "total": 308,
+            "raw_source_rows": 312,
+            "deduplicated_source_rows": 4,
+        },
+        "projection_boundary": {
+            "semantic_authority": False,
+            "automatic_registration": False,
+            "public_routes": False,
+            "runtime_handlers": 0,
+        },
+        "shared_authorities": dict(authority["shared_authorities"]),
+        "commands": commands,
+        "identity_sha256": identity_digest(commands),
+        "coverage_credit": 0,
+    }
+
+
+def render(root: Path = ROOT) -> bytes:
+    authority, official = source.validate_authority(root)
+    catalog = build_catalog(authority, official)
+    catalog["inputs"]["source_authority_sha256"] = file_sha256(root / source.AUTHORITY_PATH)
+    return pretty_bytes(catalog)
+
+
+def generate(root: Path = ROOT) -> None:
+    path = root / OUTPUT_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(render(root))
+
+
+def check(root: Path = ROOT) -> None:
+    path = root / OUTPUT_PATH
+    require(path.is_file(), f"generated identity catalog is missing: {path}")
+    require(path.read_bytes() == render(root), f"generated identity catalog is stale: {path}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="verify generated bytes")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        if args.check:
+            check()
+        else:
+            generate()
+        print("SPI-1001 catalog: 269 SPI + 39 FEPI identity rows; semantic credit 0")
+        return 0
+    except (CatalogError, source.SourceAuthorityError, OSError) as error:
+        print(f"SPI-1001 catalog: {error}")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
