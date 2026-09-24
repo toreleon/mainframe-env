@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:3c2fd97141e07577815156f6904912cac165af41a375c6bc6c5b0d00b62d692b",
+      "sha256": "sha256:acf2cdf2bffd91c138ee7bbac59d58a325db37699e6a87cfc0c7740dbd06c485",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1094,7 +1094,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/CIC-906-POSTGRES-VALIDATION.md",
       "relative_links": 0,
-      "sha256": "sha256:54ca026d605f86571f2efae9b4e3c7e6b52f4c041e5da0b9ae3cb93ac5c74e8e",
+      "sha256": "sha256:10b938b36c231d586831841832988e59a0848bf4011cfe74adb6fb3056c8d5ef",
       "title": "CIC-906 durable-profile validation slice",
       "xtask_commands": 0
     },

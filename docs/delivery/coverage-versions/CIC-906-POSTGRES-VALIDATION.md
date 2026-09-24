@@ -30,3 +30,23 @@ result. The SQLite fault-injection selector and generic PostgreSQL durable
 resume selector remain distinct evidence. Full product composition, all
 command-family coverage, licensed IBM differential, and exact final-candidate
 acceptance remain pending under the 0.9 matrix.
+
+## Separate-process BTS LINK validation
+
+`tools/cics_postgres_process_restart.sh` creates a task-owned temporary
+PostgreSQL 18.6 cluster, socket, port and database, runs the selected test and
+the earlier same-process reopen control, then stops only that cluster and clears
+this checkout's Cargo target. The ignored
+`bts_selected_link_reconciles_after_postgres_process_exit` selector launches two
+exact test-binary children. After a selected `LINK ACQPROCESS` has dispatched
+once and persisted its outer CICS replay receipt, the first child observes the
+injected `UnknownOutcome`, writes its PID to the task scratch directory and
+exits with code 86 without dropping service adapters. The parent bounds each
+child to 45 seconds and can terminate only its own child handle. A new process
+opens the same PostgreSQL state and artifact adapters, rejects replay under a
+different execution owner, and reconciles the original request. It checks the
+unchanged BTS process row, zero restart-side program dispatches, retained outer
+replay and audit records, and identical executable artifact bytes and metadata.
+This LINK path does not create a task checkpoint, so checkpoint retention remains
+covered by the dedicated backend selectors above. This is one selected typed
+route and grants no other command, licensed differential, or release credit.
