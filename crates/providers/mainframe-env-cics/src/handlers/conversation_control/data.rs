@@ -220,6 +220,19 @@ impl ConversationRecord {
         Ok(block)
     }
 
+    /// Preserve one consumed SIGNAL in the GDS RECEIVE result while clearing
+    /// the pending bit for subsequent commands.
+    pub fn gds_receive_convdata(
+        &self,
+        reply: &ConversationDataReply,
+    ) -> Result<[u8; 24], ConversationProblem> {
+        let mut block = self.gds_convdata(reply.gds_field_complete)?;
+        if reply.condition == DataCondition::Signal {
+            block[4] = 0xff;
+        }
+        Ok(block)
+    }
+
     /// A partner change-direction indicator may arrive independently of local
     /// SEND INVITE. It is a verified transport event, not a delivery guess.
     pub fn peer_offered_data(
@@ -442,7 +455,7 @@ impl ConversationRecord {
         if max_length > MAX_FRAME_BYTES {
             return Err(ConversationProblem::Length);
         }
-        if self.data.signal_pending && !basic {
+        if self.data.signal_pending {
             self.next_sequence()?;
             self.data.signal_pending = false;
             return Ok(Some(ConversationDataReply {
@@ -841,6 +854,56 @@ mod tests {
         assert_eq!(final_part.bytes, b"FG");
         assert!(final_part.end_of_chain);
         assert_eq!(record.state, ConversationState::Send);
+    }
+
+    #[test]
+    fn basic_receive_consumes_signal_and_retains_reply_indicator() {
+        let owner = owner();
+        let mut record = ConversationRecord::allocate(
+            *b"0007",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner.clone(),
+            false,
+        )
+        .unwrap();
+        record
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                vec![],
+                0,
+            )
+            .unwrap();
+        record
+            .peer_offered_data(&owner, ConversationContext::Local)
+            .unwrap();
+        let signal = ConversationDataFrame {
+            bytes: Vec::new(),
+            end_of_chain: false,
+            fmh: false,
+            signal: true,
+            end_structured_field: false,
+            error_code: None,
+        };
+        record
+            .enqueue_peer_data(&owner, ConversationContext::Local, 1, signal)
+            .unwrap();
+        assert_eq!(record.gds_convdata(false).unwrap()[4], 0xff);
+        let received = record
+            .receive_data(&owner, ConversationContext::Local, true, 16, false, false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(received.condition, DataCondition::Signal);
+        assert_eq!(received.returned_length, 0);
+        assert_eq!(record.gds_receive_convdata(&received).unwrap()[4], 0xff);
+        assert_eq!(record.gds_convdata(false).unwrap()[4], 0);
+        assert_eq!(
+            record.receive_data(&owner, ConversationContext::Local, true, 16, false, false),
+            Ok(None)
+        );
     }
 
     #[test]

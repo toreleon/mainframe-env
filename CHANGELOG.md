@@ -25,6 +25,8 @@ All notable changes to mainframe-env are documented here.
 - Added source-shaped GDS `CONVDATA` bytes for APPC basic receive and wait,
   including field-complete, receive, signal, confirm, syncpoint, free, error
   code, rollback, and zeroed reserved fields. GDS rows remain unready.
+- A GDS RECEIVE now consumes a pending peer SIGNAL once and preserves CDBSIG
+  in that command's CONVDATA reply while clearing the pending ledger bit.
 - Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,
   `MAXFLENGTH` is bounded to 32,767, and BUFFER/LLID cannot be combined.
 - Added a durable principal signal facility for the six LU classes named by
