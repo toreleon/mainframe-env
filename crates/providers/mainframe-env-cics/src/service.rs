@@ -7257,7 +7257,8 @@ mod tests {
     #[test]
     fn issue_copy_default_wait_moves_exact_buffer_with_shared_control_unit() {
         let store = Arc::new(MemoryStore::new(Default::default()));
-        let service = service(store.clone());
+        let (host, seen) = command_authorities(false);
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
         let (target_run, target_session) = registered(&service);
         let source_run = invocation_for("copy-source", BTreeMap::new());
         let source_session = SessionId::new("copy-source-session", 64).unwrap();
@@ -7324,6 +7325,18 @@ mod tests {
         assert_eq!(target.field_values["FIELD"], b"DATA");
         assert_eq!(target.field_protection["FIELD"], true);
         drop(state);
+        let checks = seen.lock().unwrap();
+        assert!(checks.iter().any(|(class, resource, intent)| {
+            class == "FACILITY"
+                && resource == "CICS.ISSUE.DEVICE.T005"
+                && *intent == AccessIntent::Read
+        }));
+        assert!(checks.iter().any(|(class, resource, intent)| {
+            class == "FACILITY"
+                && resource == "CICS.ISSUE.DEVICE.T004"
+                && *intent == AccessIntent::Update
+        }));
+        drop(checks);
         assert_eq!(
             handlers::invoke_terminal_control(&service, &mut run, &command),
             Ok(response)
