@@ -1,7 +1,8 @@
 //! Versioned, CAS-backed allocation and attach-header authority.
 
 use super::{
-    ConversationKind, ConversationOwner, ConversationProblem, ConversationRecord, MAX_PROCESS_BYTES,
+    ConversationExchangeState, ConversationKind, ConversationOwner, ConversationPeerFrame,
+    ConversationProblem, ConversationRecord, MAX_PROCESS_BYTES,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -15,6 +16,7 @@ const MAX_ROW_BYTES: usize = 4 * 1024 * 1024;
 const MAX_SYSTEMS: usize = 256;
 const MAX_CONVERSATIONS: usize = 4096;
 const MAX_ATTACH_HEADERS: usize = 4096;
+const LEDGER_VERSION: u16 = 2;
 
 /// Installed APPC or MRO session group. An APPC group may be selected by
 /// either mapped ALLOCATE or basic GDS ALLOCATE.
@@ -100,17 +102,20 @@ pub struct ConversationLedger {
     pub systems: BTreeMap<String, ConversationSystemDefinition>,
     pub conversations: BTreeMap<String, ConversationRecord>,
     pub attach_headers: BTreeMap<String, ConversationAttachHeader>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub exchanges: BTreeMap<String, ConversationExchangeState>,
 }
 
 impl Default for ConversationLedger {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: LEDGER_VERSION,
             version: 0,
             next_token: 1,
             systems: BTreeMap::new(),
             conversations: BTreeMap::new(),
             attach_headers: BTreeMap::new(),
+            exchanges: BTreeMap::new(),
         }
     }
 }
@@ -142,6 +147,7 @@ impl ConversationLedger {
         next: &mut Self,
         store: &dyn ProviderStateStore,
     ) -> Result<bool, StoreError> {
+        next.schema_version = LEDGER_VERSION;
         next.version = self
             .version
             .checked_add(1)
@@ -170,6 +176,7 @@ impl ConversationLedger {
         replay: &super::ConversationReplay,
         store: &dyn ProviderStateStore,
     ) -> Result<bool, StoreError> {
+        next.schema_version = LEDGER_VERSION;
         next.version = self
             .version
             .checked_add(1)
@@ -316,6 +323,32 @@ impl ConversationLedger {
             .get_mut(&u32::from_be_bytes(token).to_string())
     }
 
+    pub fn offer_peer_frame(
+        &mut self,
+        token: [u8; 4],
+        frame: ConversationPeerFrame,
+    ) -> Result<(), ConversationProblem> {
+        let key = u32::from_be_bytes(token).to_string();
+        let record = self
+            .conversations
+            .get(&key)
+            .ok_or(ConversationProblem::NotOwned)?;
+        if record.released || record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        self.exchanges.entry(key).or_default().offer(frame)
+    }
+
+    pub fn exchange_mut(&mut self, token: [u8; 4]) -> Option<&mut ConversationExchangeState> {
+        self.exchanges
+            .get_mut(&u32::from_be_bytes(token).to_string())
+    }
+
+    pub fn remove_exchange(&mut self, token: [u8; 4]) {
+        self.exchanges
+            .remove(&u32::from_be_bytes(token).to_string());
+    }
+
     pub fn set_attach(
         &mut self,
         header: ConversationAttachHeader,
@@ -365,15 +398,22 @@ impl ConversationLedger {
         }
         self.attach_headers
             .retain(|_, header| &header.owner != owner);
+        self.exchanges.retain(|key, _| {
+            self.conversations
+                .get(key)
+                .is_some_and(|record| !record.released)
+        });
         Ok(released)
     }
 
     pub fn validate(&self) -> Result<(), ConversationProblem> {
-        if self.schema_version != 1
+        if !matches!(self.schema_version, 1 | LEDGER_VERSION)
+            || self.schema_version == 1 && !self.exchanges.is_empty()
             || self.next_token == 0
             || self.systems.len() > MAX_SYSTEMS
             || self.conversations.len() > MAX_CONVERSATIONS
             || self.attach_headers.len() > MAX_ATTACH_HEADERS
+            || self.exchanges.len() > MAX_CONVERSATIONS
         {
             return Err(ConversationProblem::Malformed);
         }
@@ -415,6 +455,14 @@ impl ConversationLedger {
         for (key, header) in &self.attach_headers {
             header.validate()?;
             if key != &attach_key(&header.owner, &header.name) {
+                return Err(ConversationProblem::Malformed);
+            }
+        }
+        for (key, exchange) in &self.exchanges {
+            exchange.validate()?;
+            if !self.conversations.get(key).is_some_and(|record| {
+                !record.released && record.kind != ConversationKind::AppcBasic
+            }) {
                 return Err(ConversationProblem::Malformed);
             }
         }
@@ -543,6 +591,104 @@ mod tests {
         );
         let reopened = ConversationLedger::load(&store).unwrap();
         assert_eq!(reopened.conversation(principal.token), Some(&principal));
+    }
+
+    #[test]
+    fn v1_ledger_reopens_and_upgrades_atomically_for_peer_frames() {
+        let store = MemoryStore::new(Default::default());
+        let mut old = ConversationLedger::default();
+        old.schema_version = 1;
+        old.version = 1;
+        old.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = old
+            .allocate("SYS1", ConversationKind::AppcMapped, owner())
+            .unwrap()
+            .token;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: CONVERSATION_STATE_NAMESPACE.into(),
+                    key: KEY.into(),
+                    version: 1,
+                    payload: old.encode().unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let current = ConversationLedger::load(&store).unwrap();
+        assert_eq!(current.schema_version, 1);
+        let mut next = current.clone();
+        next.offer_peer_frame(
+            token,
+            ConversationPeerFrame {
+                data: b"REPLY".to_vec(),
+                next_state: super::super::ConversationState::Receive,
+                end_of_chain: false,
+                inbound_fmh: false,
+                signal: false,
+            },
+        )
+        .unwrap();
+        assert!(current.persist(&mut next, &store).unwrap());
+        let reopened = ConversationLedger::load(&store).unwrap();
+        assert_eq!(reopened.schema_version, LEDGER_VERSION);
+        assert_eq!(
+            reopened.exchanges[&u32::from_be_bytes(token).to_string()].inbound[0].data,
+            b"REPLY"
+        );
+    }
+
+    #[test]
+    fn sqlite_reopen_preserves_explicit_peer_frame() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-conversation-exchange-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let first = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let current = ConversationLedger::load(&first).unwrap();
+        let mut next = current.clone();
+        next.register_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 1,
+            enabled: true,
+        })
+        .unwrap();
+        let token = next
+            .allocate("SYS1", ConversationKind::AppcMapped, owner())
+            .unwrap()
+            .token;
+        next.offer_peer_frame(
+            token,
+            ConversationPeerFrame {
+                data: b"RESPONSE".to_vec(),
+                next_state: super::super::ConversationState::Receive,
+                end_of_chain: true,
+                inbound_fmh: false,
+                signal: false,
+            },
+        )
+        .unwrap();
+        assert!(current.persist(&mut next, &first).unwrap());
+        drop(first);
+        let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
+        let ledger = ConversationLedger::load(&reopened).unwrap();
+        assert_eq!(
+            ledger.exchanges[&u32::from_be_bytes(token).to_string()].inbound[0].data,
+            b"RESPONSE"
+        );
+        assert_eq!(ledger.schema_version, LEDGER_VERSION);
+        drop(reopened);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

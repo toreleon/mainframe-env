@@ -100,6 +100,7 @@ pub(super) fn invoke(
         record
             .release(&owner, super::context(run)?, false)
             .map_err(map_problem)?;
+        next.remove_exchange(token);
         let outputs = if request.arguments.contains_key("STATE") {
             BTreeMap::from([("STATE".into(), vec![0; 4])])
         } else {

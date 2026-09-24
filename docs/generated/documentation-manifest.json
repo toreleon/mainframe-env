@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 191,
+    "markdown_documents": 192,
     "navigation_groups": 5,
-    "normative_documents": 43,
+    "normative_documents": 44,
     "xtask_commands": 168
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:aa393e929a6a3fd2e055fad1423746fa07daac14fc24be6b8e78ccbaaa148dde",
+      "sha256": "sha256:4d844b8a2a30e53b9adf0ea356bee21945305b0a6a233377b033e846edfc61ac",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 78,
-      "sha256": "sha256:89257d074f62db70a5fcdeda28565fa48eef85b0957c13b6d63e7ce76031f4df",
+      "relative_links": 79,
+      "sha256": "sha256:6b131298bd710b0ce94d256c2235813561a3f1fa81d8f96b36673195e470cae3",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -767,10 +767,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0015-conversation-peer-exchange-ledger.md",
+      "relative_links": 1,
+      "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
+      "sha256": "sha256:fa1b98c6b360277f0b0cdfd9da3d419a072841051aefc651a6283ffca3979e66",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0015: Persist explicit conversation peer frames with protocol state",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 14,
-      "sha256": "sha256:b10f4a91e91ff530fcf7fa95f643bbe2327a80f43920d8713c6ea0191f383778",
+      "relative_links": 15,
+      "sha256": "sha256:1f344be09db55b736a8951ba4d2deaba6bb42533a149e9612a1782a8f178bac9",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1109,8 +1121,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 84,
-      "sha256": "sha256:95983a6b160926692c9a998f7d7eb9e82fb1330dd93191441fd2fdebee0fd618",
+      "relative_links": 85,
+      "sha256": "sha256:7ed4b00be5f0c5df1b90d4912630c1ffaaae12f44ea8b68daf469ca0f93cd662",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 1
     },
@@ -1868,6 +1880,10 @@
           "path": "docs/decisions/0014-named-counter-authority.md"
         },
         {
+          "label": "ADR-0015: Conversation peer exchange ledger",
+          "path": "docs/decisions/0015-conversation-peer-exchange-ledger.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2031,7 +2047,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:3c0763d98da8b80a1d29982fa7f66f2eb22a0929d05bc1f963d549dc07606eec",
+  "registry_sha256": "sha256:5a54f73c644c3a8d46b0bf363ffc281e5ecccd14ef8befe5b14041dbd66db259",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

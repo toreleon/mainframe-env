@@ -12,6 +12,7 @@ mod allocate;
 mod build_attach;
 mod connect_process;
 mod definitions;
+mod exchange;
 mod free;
 mod gds;
 mod gds_allocate;
@@ -24,6 +25,10 @@ mod replay;
 pub use definitions::{
     ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
     ConversationProfileDefinition,
+};
+pub use exchange::{
+    ConversationExchangeState, ConversationOutboundFrame, ConversationPeerFrame,
+    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_RECORDED_OUTBOUND_FRAMES,
 };
 pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,

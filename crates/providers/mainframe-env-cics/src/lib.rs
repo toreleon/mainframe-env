@@ -12,12 +12,14 @@ pub use abi::cics_abi_library;
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 pub use service::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
-    ConversationAttachHeader, ConversationContext, ConversationKind, ConversationLedger,
-    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationAttachHeader, ConversationContext, ConversationExchangeState, ConversationKind,
+    ConversationLedger, ConversationOutboundFrame, ConversationOwner,
+    ConversationPartnerDefinition, ConversationPartnerProcessDefinition, ConversationPeerFrame,
     ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
     ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
     GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode, MAX_BASIC_PIP_BYTES,
-    MAX_PIP_BYTES, MAX_PROCESS_BYTES, load_conversation_replay, prune_conversation_replays,
+    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+    MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay, prune_conversation_replays,
 };
 
 pub use retention::{
