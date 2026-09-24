@@ -259,3 +259,105 @@ fn postgres_quota_and_shared_artifact_contract() {
         Err(StoreError::IncompatibleVersion)
     ));
 }
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+fn postgres_artifact_read_versions_are_compatible_and_fail_closed() {
+    let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+        .expect("explicit PostgreSQL test URL required");
+    let writer = PostgresArtifactStore::open(&url, 1024, 2).unwrap();
+    let legacy = artifact(b"legacy artifact", "application/vnd.mainframe-env.core-mir");
+    let current = artifact(
+        b"current artifact",
+        "application/vnd.mainframe-env.core-mir",
+    );
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let pool = runtime
+        .block_on(PgPoolOptions::new().max_connections(2).connect(&url))
+        .unwrap();
+
+    // Simulate a committed pre-v2 row after the migration has been applied.
+    runtime.block_on(async {
+        let mut transaction = pool.begin().await.unwrap();
+        sqlx::query("UPDATE store_quota SET used_rows=used_rows+1 WHERE quota_key='artifact-object'")
+            .execute(&mut *transaction)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO artifact_object(object_key,schema_version,media_type,payload_digest,payload) VALUES($1,1,$2,$3,$4)",
+        )
+        .bind(legacy.artifact.as_str())
+        .bind(&legacy.media_type)
+        .bind(legacy.payload_digest.as_slice())
+        .bind(&legacy.payload)
+        .execute(&mut *transaction)
+        .await
+        .unwrap();
+        transaction.commit().await.unwrap();
+    });
+    let reader = PostgresArtifactStore::open(&url, 1024, 2).unwrap();
+    assert_eq!(
+        reader.get_artifact(&legacy.artifact).unwrap(),
+        Some(legacy.clone())
+    );
+
+    let mut current = current;
+    current.executable = Some(
+        ExecutableArtifactMetadata {
+            artifact_contract: "mainframe-env.artifact@3".into(),
+            compatibility_profile: "mainframe-env.cobol.reference@1".into(),
+            compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+            target: "reference".into(),
+            options: BTreeMap::new(),
+            host_interfaces: BTreeSet::from(["mainframe-env.cics@1".into()]),
+            ir_contract: "mainframe-env.ir-envelope@1".into(),
+            dialect_contracts: Some(BTreeSet::from(["mainframe.core.cobol@1".into()])),
+            semantic_identity: format!("semantic-sha256:{:064x}", 2),
+            manifest_payload_digest: [0; 32],
+        }
+        .bind_to_payload(&current.payload_digest),
+    );
+    writer.put_artifact(current.clone()).unwrap();
+    drop(writer);
+    drop(reader);
+    let reopened = PostgresArtifactStore::open(&url, 1024, 2).unwrap();
+    assert_eq!(
+        reopened.get_artifact(&legacy.artifact).unwrap(),
+        Some(legacy.clone())
+    );
+    assert_eq!(
+        reopened.get_artifact(&current.artifact).unwrap(),
+        Some(current.clone())
+    );
+    assert_eq!(reopened.health().unwrap().used_objects, Some(2));
+
+    // The database rejects unknown row versions; the adapter rejects a v1 row
+    // that carries v2 metadata instead of silently dropping it.
+    assert!(
+        runtime
+            .block_on(
+                sqlx::query("UPDATE artifact_object SET schema_version=3 WHERE object_key=$1")
+                    .bind(legacy.artifact.as_str())
+                    .execute(&pool),
+            )
+            .is_err()
+    );
+    runtime
+        .block_on(
+            sqlx::query("UPDATE artifact_object SET schema_version=1 WHERE object_key=$1")
+                .bind(current.artifact.as_str())
+                .execute(&pool),
+        )
+        .unwrap();
+    assert_eq!(
+        reopened.get_artifact(&current.artifact),
+        Err(StoreError::IncompatibleVersion)
+    );
+    assert_eq!(
+        reopened.get_artifact(&legacy.artifact).unwrap(),
+        Some(legacy)
+    );
+}

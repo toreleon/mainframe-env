@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 196,
+    "markdown_documents": 197,
     "navigation_groups": 5,
     "normative_documents": 48,
     "xtask_commands": 170
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:029d0b7f6db9c8f9d51a253dd8c44d607e86c144bdf59c8bea472dc6af58a320",
+      "sha256": "sha256:b2c545aacaca3fac216de4ef98b05957a1f389bb7a558b4e424c3480464544bf",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1080,6 +1080,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/CIC-906-POSTGRES-VALIDATION.md",
+      "relative_links": 0,
+      "sha256": "sha256:54ca026d605f86571f2efae9b4e3c7e6b52f4c041e5da0b9ae3cb93ac5c74e8e",
+      "title": "CIC-906 durable-profile validation slice",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
       "relative_links": 64,
       "sha256": "sha256:817db9bfc52c077be93dad07f7d8fe897ec1eb2b55fa8eae7dec2375cbbde58f",
@@ -1169,8 +1177,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 85,
-      "sha256": "sha256:f22ea3c87d5dfdde83fc9491c31c00330ff03cf2e6e54caec5f7bf1ce99a93d1",
+      "relative_links": 86,
+      "sha256": "sha256:354cc731b59bad6fbd262466061b1d1dadb626fd40bedb7c5dafedd47735b7db",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },

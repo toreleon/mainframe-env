@@ -12,6 +12,10 @@ All notable changes to mainframe-env are documented here.
   `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` numeric CVDA pin is reused.
   The conversation-open peer-frame ledger on the active branch remains a
   later reconciliation dependency.
+- Added focused CIC-906 PostgreSQL durable-profile validation for separate
+  CICS artifact/state adapters, artifact read versions, and checkpoint-protected
+  CICS replay retention across Memory, SQLite, and PostgreSQL. No command routes
+  or completion credit change.
 
 - Integrated the sealed miscellaneous CICS command branch into the 151-route
   v0.9 head. Regenerated descriptors and contracts now report 161 typed,

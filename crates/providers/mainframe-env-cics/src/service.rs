@@ -3657,7 +3657,9 @@ mod tests {
         SecretRef,
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
-    use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
+    use mainframe_env_store::{
+        MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore,
+    };
     use mainframe_env_store_api::{
         ArtifactRecord, ArtifactStore, AuditSink, EffectDigestFormat, EffectIntentMetadata,
         EffectRecord, EffectState, ExecutableArtifactMetadata, WorkState,
@@ -5378,9 +5380,12 @@ mod tests {
         );
     }
 
-    fn bts_selected_link_reopen<S>(make_store: impl Fn() -> Arc<S>, label: &str)
-    where
-        S: ProviderStateStore + ArtifactStore + 'static,
+    fn bts_selected_link_reopen<S>(
+        make_store: impl Fn() -> Arc<S>,
+        make_artifacts: impl Fn(&Arc<S>) -> Arc<dyn ArtifactStore>,
+        label: &str,
+    ) where
+        S: ProviderStateStore + 'static,
     {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
         let unique = format!("{label}-{}", std::process::id());
@@ -5413,14 +5418,22 @@ mod tests {
         let root = BtsLifecycleStore::root_id("TYPE", &process_name).unwrap();
         {
             let store = make_store();
+            let artifacts = make_artifacts(&store);
             let cics =
                 CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
             let session = SessionId::new(format!("bts-link-{unique}-first"), 64).unwrap();
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
                 .unwrap();
-            cics.bind_artifact_store(store.clone()).unwrap();
-            register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
+            cics.bind_artifact_store(artifacts.clone()).unwrap();
+            register_load_program(
+                &cics,
+                artifacts.as_ref(),
+                "BTSRUN",
+                1,
+                b"compiled-program",
+                0,
+            );
             let authority = BtsLifecycleStore::new(store.as_ref());
             authority
                 .define_process(
@@ -5460,7 +5473,9 @@ mod tests {
         }
         {
             let store = make_store();
+            let artifacts = make_artifacts(&store);
             let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(artifacts).unwrap();
             let session = SessionId::new(format!("bts-link-{unique}-second"), 64).unwrap();
             cics.create_session(&session, 24, 80).unwrap();
             cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
@@ -5500,6 +5515,7 @@ mod tests {
         let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
         bts_selected_link_reopen(
             || Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+            |store| store.clone(),
             "sqlite",
         );
         std::fs::remove_dir_all(directory).unwrap();
@@ -5512,6 +5528,7 @@ mod tests {
             .expect("isolated PostgreSQL 18 test URL");
         bts_selected_link_reopen(
             || Arc::new(PostgresStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+            |_| Arc::new(PostgresArtifactStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
             "postgres",
         );
     }
