@@ -286,7 +286,11 @@ impl IssueDeviceRecord {
             || (self.state.endfile || self.state.endoutput)
                 && self.definition.kind != IssueDeviceKind::Entry3740
             || self.state.eods && self.definition.kind != IssueDeviceKind::Interpreter3650
-            || self.state.print_count > 0 && self.definition.kind != IssueDeviceKind::Display3270
+            || self.state.print_count > 0
+                && !matches!(
+                    self.definition.kind,
+                    IssueDeviceKind::Display3270 | IssueDeviceKind::Printer3270
+                )
             || self.state.last_printer.is_some()
                 && self.definition.kind != IssueDeviceKind::Display3270
             || self.state.printer_out_of_service
@@ -486,6 +490,22 @@ impl IssueDeviceRecord {
             && !self.state.disconnected
             && !self.state.printer_out_of_service
             && self.state.printer_attached_run.is_none()
+    }
+
+    pub fn accept_print(&mut self, bytes: &[u8]) -> Result<(), IssueDeviceProblem> {
+        if !self.printer_available() {
+            return Err(IssueDeviceProblem::NotConfigured);
+        }
+        if bytes.len() > MAX_PRINT_BYTES {
+            return Err(IssueDeviceProblem::Length);
+        }
+        self.state.print_count = self
+            .state
+            .print_count
+            .checked_add(1)
+            .ok_or(IssueDeviceProblem::Capacity)?;
+        self.state.last_print = bytes.to_vec();
+        Ok(())
     }
 }
 

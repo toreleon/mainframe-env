@@ -7464,12 +7464,25 @@ mod tests {
         assert_eq!(printed.state.last_print, b"SCREEN\0IMAGE");
         assert_eq!(printed.state.last_printer.as_deref(), Some("P002"));
         assert_eq!(printed.state.print_count, 1);
+        let printer = handlers::IssueDeviceRecord::load(store.as_ref(), "P002")
+            .unwrap()
+            .unwrap();
+        assert_eq!(printer.state.print_count, 1);
+        assert_eq!(printer.state.last_print, b"SCREEN\0IMAGE");
         assert_eq!(
             handlers::invoke_terminal_control(&service, &mut run, &command),
             Ok(response)
         );
         assert_eq!(
             handlers::IssueDeviceRecord::load(store.as_ref(), "T006")
+                .unwrap()
+                .unwrap()
+                .state
+                .print_count,
+            1
+        );
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), "P002")
                 .unwrap()
                 .unwrap()
                 .state

@@ -81,6 +81,10 @@ All notable changes to mainframe-env are documented here.
 - ISSUE COPY now reports source-defined LENGERR for TERMID outside one to
   four bytes and CTLCHAR values outside one byte before any terminal mutation.
 
+- ISSUE PRINT now persists the exact image and print count on the selected
+  printer as well as the source display. Both physical records and the replay
+  receipt share one atomic commit.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

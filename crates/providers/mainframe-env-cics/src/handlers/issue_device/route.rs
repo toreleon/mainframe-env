@@ -242,6 +242,9 @@ pub(in crate::service) fn invoke(
             next.record_print(printer_id, &current_session.screen)
                 .map_err(|problem| device_condition(request.operation, problem))?;
             let mut reserved = printer.clone();
+            reserved
+                .accept_print(&current_session.screen)
+                .map_err(|problem| device_condition(request.operation, problem))?;
             printer_write = Some(printer.mutation(&mut reserved).map_err(store_error)?);
         }
         _ => return Err(HostProblem::Unsupported),
