@@ -22,7 +22,7 @@ pub use replay::{
 };
 
 /// Durable encoding version for one allocated conversation.
-pub const CONVERSATION_RECORD_VERSION: u16 = 1;
+pub const CONVERSATION_RECORD_VERSION: u16 = 2;
 /// Maximum length of a partner process name defined by APPC.
 pub const MAX_PROCESS_BYTES: usize = 64;
 /// Maximum APPC PIP list length, including each record's four-byte header.
@@ -95,6 +95,10 @@ pub struct ConversationRecord {
     pub process: Option<Vec<u8>>,
     pub pip: Vec<u8>,
     pub sequence: u64,
+    /// PROFILE for mapped/MRO or MODENAME for basic APPC. Missing only in
+    /// canonical v1 records, whose default is recovered by the v2 reader.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub processing_profile: Option<String>,
 }
 
 /// Local/DPL invocation context supplied by the trusted host boundary.
@@ -126,6 +130,29 @@ impl ConversationRecord {
         owner: ConversationOwner,
         principal_facility: bool,
     ) -> Result<Self, ConversationProblem> {
+        let default_profile = if kind == ConversationKind::AppcBasic {
+            "DEFAULT"
+        } else {
+            "DFHCICSA"
+        };
+        Self::allocate_with_profile(
+            token,
+            system,
+            kind,
+            owner,
+            principal_facility,
+            default_profile,
+        )
+    }
+
+    pub fn allocate_with_profile(
+        token: [u8; 4],
+        system: &str,
+        kind: ConversationKind,
+        owner: ConversationOwner,
+        principal_facility: bool,
+        processing_profile: &str,
+    ) -> Result<Self, ConversationProblem> {
         let record = Self {
             version: CONVERSATION_RECORD_VERSION,
             token,
@@ -139,6 +166,7 @@ impl ConversationRecord {
             process: None,
             pip: Vec::new(),
             sequence: 0,
+            processing_profile: Some(processing_profile.into()),
         };
         record.validate()?;
         Ok(record)
@@ -165,8 +193,27 @@ impl ConversationRecord {
         Ok(encoded)
     }
 
+    pub fn effective_processing_profile(&self) -> &str {
+        self.processing_profile
+            .as_deref()
+            .unwrap_or(if self.kind == ConversationKind::AppcBasic {
+                "DEFAULT"
+            } else {
+                "DFHCICSA"
+            })
+    }
+
     pub fn validate(&self) -> Result<(), ConversationProblem> {
-        if self.version != CONVERSATION_RECORD_VERSION
+        if !matches!(self.version, 1 | CONVERSATION_RECORD_VERSION)
+            || self.version == 1 && self.processing_profile.is_some()
+            || self.version == CONVERSATION_RECORD_VERSION && self.processing_profile.is_none()
+            || self.processing_profile.as_ref().is_some_and(|profile| {
+                profile.is_empty()
+                    || profile.len() > 8
+                    || !profile.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+                    })
+            })
             || self.token == [0; 4]
             || self.system.is_empty()
             || self.system.len() > 4
@@ -521,7 +568,7 @@ mod tests {
             Err(ConversationProblem::Malformed)
         );
         let mut corrupt = record;
-        corrupt.version = 2;
+        corrupt.version = 3;
         assert_eq!(corrupt.encode(), Err(ConversationProblem::Malformed));
         let mut unknown: serde_json::Value = serde_json::from_slice(
             &ConversationRecord::allocate(*b"C006", "SYS1", ConversationKind::Mro, owner(3), false)
@@ -539,5 +586,32 @@ mod tests {
             ConversationRecord::allocate(*b"C005", "SYS1", ConversationKind::Mro, owner(0), false),
             Err(ConversationProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn v1_record_reads_without_profile_and_v2_records_preserve_selected_profile() {
+        let selected = ConversationRecord::allocate_with_profile(
+            *b"C007",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(3),
+            false,
+            "FAST",
+        )
+        .unwrap();
+        assert_eq!(selected.version, 2);
+        assert_eq!(selected.processing_profile.as_deref(), Some("FAST"));
+        assert_eq!(
+            ConversationRecord::decode(&selected.encode().unwrap()),
+            Ok(selected.clone())
+        );
+
+        let mut legacy = selected;
+        legacy.version = 1;
+        legacy.processing_profile = None;
+        let bytes = legacy.encode().unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("processing_profile"));
+        assert_eq!(legacy.effective_processing_profile(), "DFHCICSA");
+        assert_eq!(ConversationRecord::decode(&bytes), Ok(legacy));
     }
 }

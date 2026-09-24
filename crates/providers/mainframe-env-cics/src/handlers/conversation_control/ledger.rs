@@ -231,6 +231,21 @@ impl ConversationLedger {
         kind: ConversationKind,
         owner: ConversationOwner,
     ) -> Result<ConversationRecord, ConversationProblem> {
+        let default_profile = if kind == ConversationKind::AppcBasic {
+            "DEFAULT"
+        } else {
+            "DFHCICSA"
+        };
+        self.allocate_with_profile(sysid, kind, owner, default_profile)
+    }
+
+    pub fn allocate_with_profile(
+        &mut self,
+        sysid: &str,
+        kind: ConversationKind,
+        owner: ConversationOwner,
+        processing_profile: &str,
+    ) -> Result<ConversationRecord, ConversationProblem> {
         let system = self
             .systems
             .get(sysid)
@@ -254,7 +269,14 @@ impl ConversationLedger {
         if self.next_token == u32::MAX || self.conversations.contains_key(&token_key) {
             return Err(ConversationProblem::Exhausted);
         }
-        let record = ConversationRecord::allocate(token, sysid, kind, owner, false)?;
+        let record = ConversationRecord::allocate_with_profile(
+            token,
+            sysid,
+            kind,
+            owner,
+            false,
+            processing_profile,
+        )?;
         self.next_token += 1;
         self.conversations.insert(token_key, record.clone());
         Ok(record)
