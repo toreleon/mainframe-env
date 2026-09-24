@@ -21,6 +21,10 @@ All notable changes to mainframe-env are documented here.
   conversation handler, including PREPARE and CONFIRMATION sync-level codes.
   These internal mappings do not register the five GDS ISSUE rows.
 
+- Verified default ISSUE DISCONNECT and compatibility RESET against two
+  concurrent PostgreSQL providers and restart replay. Each device and source
+  session advances once; both catalog rows remain unregistered.
+
 - Prevented the COBOL copybook preprocessor from interpreting `COPY` inside
   `EXEC CICS ISSUE COPY` as a library directive. Ordinary COPY expansion and
   source origins remain intact.

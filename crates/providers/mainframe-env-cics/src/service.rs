@@ -9201,6 +9201,113 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn issue_disconnect_and_reset_commit_once_across_postgres_providers() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let suffix = format!(
+            "{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        for (index, operation) in [CicsOperation::IssueDisconnect, CicsOperation::IssueReset]
+            .into_iter()
+            .enumerate()
+        {
+            let invocation = invocation_for(&format!("close-pg-{suffix}-{index}"), BTreeMap::new());
+            let session = SessionId::new(format!("close-pg-session-{suffix}-{index}"), 64).unwrap();
+            let mut command = request(operation, BTreeMap::new(), 1);
+            command.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+                format!("close-pg-effect-{suffix}-{index}"),
+                InvocationLimits::default(),
+            )
+            .unwrap();
+            let terminal;
+            let run;
+            {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+                let service = service(store.clone());
+                service
+                    .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                    .unwrap();
+                terminal = service.lock().unwrap().sessions[session.as_str()]
+                    .input
+                    .terminal_id
+                    .clone()
+                    .unwrap();
+                handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                    terminal: terminal.clone(),
+                    kind: handlers::IssueDeviceKind::Display3270,
+                    control_unit: Some("CU1".into()),
+                    printers: vec![],
+                    programs: vec![],
+                    applications: vec![],
+                    logon_logmode: None,
+                    disconnect_allowed: true,
+                    pass_allowed: false,
+                })
+                .unwrap()
+                .install(store.as_ref())
+                .unwrap();
+                run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+            }
+            let gate = Arc::new(Barrier::new(2));
+            let mut workers = Vec::new();
+            for inject_unknown in [true, false] {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+                let worker = service(store);
+                if inject_unknown {
+                    worker.inject_replay_unknown_after_persist_once();
+                }
+                let gate = gate.clone();
+                let command = command.clone();
+                let mut run = run.clone();
+                workers.push(std::thread::spawn(move || {
+                    gate.wait();
+                    handlers::invoke_issue_device(&worker, &mut run, &command)
+                }));
+            }
+            let results = workers
+                .into_iter()
+                .map(|worker| worker.join().unwrap())
+                .collect::<Vec<_>>();
+            assert!(results.iter().any(Result::is_ok));
+            assert!(results.iter().all(|result| match result {
+                Ok(response) => response.condition == "NORMAL",
+                Err(problem) => *problem == HostProblem::UnknownOutcome,
+            }));
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let device = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap();
+            assert_eq!(device.version, 2);
+            assert!(device.state.disconnected);
+            let row = store
+                .get_provider_state("cics-session", session.as_str())
+                .unwrap()
+                .unwrap();
+            assert!(
+                !decode_session(&row.payload, row.version, CicsLimits::default())
+                    .unwrap()
+                    .connected
+            );
+            let reopened = service(store);
+            let mut replay_run = run.clone();
+            assert_eq!(
+                handlers::invoke_issue_device(&reopened, &mut replay_run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+        }
+    }
+
+    #[test]
     fn issue_disconnect_alternate_lu61_is_owner_fenced_and_capability_checked() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());
