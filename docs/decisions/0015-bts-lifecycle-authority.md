@@ -156,7 +156,12 @@ the public `register_bts_child` signature retains its live-parent guard.
 The isolated snapshot reader currently uses the older global transform-container
 map; integration must read the container lane's run-unit-scoped channel rows
 before the `CHANNEL` option is sealed. Neither channel row is a process or
-activity lifecycle authority.
+activity lifecycle authority. The container authority should supply one
+in-flight snapshot operation using the authenticated parent `Run` and channel
+name: validate task ownership and scope, create a missing empty channel under
+its capacity CAS, and copy the bounded containers at issue time. RUN TRANSID
+then retains that copy in its existing request row without a fallback to the
+global transform map.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed

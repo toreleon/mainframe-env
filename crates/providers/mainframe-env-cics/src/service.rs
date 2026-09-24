@@ -31584,6 +31584,84 @@ mod tests {
     }
 
     #[test]
+    fn bts_transid_child_result_reconciles_after_sqlite_process_reopen() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransidState,
+        };
+
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bts-transid-child-reopen-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let run_id = {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (parent, _) = registered(&cics);
+            let record = BtsLifecycleStore::new(store.as_ref())
+                .start_transid(
+                    parent.run_unit_id.as_str(),
+                    parent.execution_id.as_str(),
+                    "IBMUSER",
+                    "child",
+                    [1; 32],
+                    "BT01",
+                    "CHILD",
+                    None,
+                    BTreeMap::new(),
+                    1_000,
+                    4,
+                )
+                .unwrap();
+            cics.register_bts_transid_child(&record).unwrap();
+            cics.enqueue_bts_transid_work(&record).unwrap();
+            let work = store
+                .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_000, 30_000)
+                .unwrap()
+                .unwrap();
+            cics.promote_bts_transid_work(&work).unwrap();
+            cics.complete_bts_child(
+                &parent.run_unit_id,
+                record.token,
+                CicsBtsChildCompletion::Normal,
+                None,
+            )
+            .unwrap();
+            record.run_id
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_001)),
+            )
+            .unwrap();
+            assert_eq!(cics.recover_bts_transid_work().unwrap(), 0);
+            assert_eq!(
+                BtsLifecycleStore::new(store.as_ref())
+                    .load_transid(&run_id)
+                    .unwrap()
+                    .unwrap()
+                    .state,
+                BtsTransidState::Finished
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn bts_transid_cancelled_work_without_child_outcome_stays_unknown() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsTransidState};
 
