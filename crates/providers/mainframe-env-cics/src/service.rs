@@ -7324,6 +7324,53 @@ mod tests {
             assert_eq!(staged.state.pass_target.as_deref(), Some("APPL1"));
             assert!(!staged.state.disconnected);
             if committed {
+                let foreign_invocation = invocation_for("pass-foreign", BTreeMap::new());
+                let foreign_session = SessionId::new("pass-foreign", 64).unwrap();
+                service.create_session(&foreign_session, 24, 80).unwrap();
+                service
+                    .register_run(
+                        foreign_invocation.clone(),
+                        &foreign_session,
+                        "MENU",
+                        "MEAPPL",
+                        "MESYS",
+                    )
+                    .unwrap();
+                service
+                    .lock()
+                    .unwrap()
+                    .sessions
+                    .get_mut(foreign_session.as_str())
+                    .unwrap()
+                    .input = handlers::TerminalInput::identified(terminal.clone());
+                let mut foreign = service
+                    .lock()
+                    .unwrap()
+                    .runs
+                    .remove(&foreign_invocation.run_unit_id)
+                    .unwrap();
+                let override_pass = request(
+                    CicsOperation::IssuePass,
+                    BTreeMap::from([("LUNAME".into(), cics_literal(b"APPL1"))]),
+                    2,
+                );
+                assert_eq!(
+                    handlers::invoke_issue_device(&service, &mut foreign, &override_pass),
+                    Err(HostProblem::Condition {
+                        name: "NOTALLOC".into(),
+                        response: 61,
+                        response2: 0,
+                    })
+                );
+                assert_eq!(
+                    handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                        .unwrap()
+                        .unwrap()
+                        .version,
+                    staged.version
+                );
+            }
+            if committed {
                 service
                     .complete_terminal_run(&session, invocation.principal.id(), 2)
                     .unwrap();

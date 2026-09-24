@@ -399,6 +399,11 @@ impl IssueDeviceRecord {
         noquiesce: bool,
     ) -> Result<(), IssueDeviceProblem> {
         self.active()?;
+        if self.state.pass_target.is_some()
+            && self.state.pass_owner_run_unit.as_deref() != Some(owner_run_unit)
+        {
+            return Err(IssueDeviceProblem::StaleOwner);
+        }
         if !self.definition.pass_allowed || !self.definition.disconnect_allowed {
             return Err(IssueDeviceProblem::NotConfigured);
         }
@@ -651,6 +656,12 @@ mod tests {
         assert_eq!(record.state.pass_data, vec![2; MAX_PASS_BYTES]);
         assert_eq!(record.state.pass_logmode.as_deref(), Some("MODE1"));
         assert_eq!(record.state.pass_owner_run_unit.as_deref(), Some("run"));
+        let mut foreign = record.clone();
+        assert_eq!(
+            foreign.prepare_pass("APPL1", "other", b"OVERRIDE", None, false, false),
+            Err(IssueDeviceProblem::StaleOwner)
+        );
+        assert_eq!(foreign.state, record.state);
         let mut stale = record.clone();
         assert_eq!(
             stale.complete_pass("other"),
