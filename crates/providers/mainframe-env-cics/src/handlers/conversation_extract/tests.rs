@@ -473,6 +473,71 @@ fn conversation_extract_negative_conditions_do_not_change_protocol_or_position()
 }
 
 #[test]
+fn conversation_extract_ambiguous_principal_fails_closed_without_positioning() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-principal-ambiguity", BTreeMap::new());
+    let session = SessionId::new("extract-principal-ambiguity", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+        .unwrap();
+    let (mapped, basic, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let before = ConversationLedger::load(store.as_ref()).unwrap();
+    let mut ambiguous = before.clone();
+    ambiguous.conversation_mut(basic).unwrap().principal_facility = true;
+    assert!(before.persist(&mut ambiguous, store.as_ref()).unwrap());
+    let sidecar_before = store
+        .get_provider_state(
+            "cics-conversation-extract-v1",
+            invocation.run_unit_id.as_str(),
+        )
+        .unwrap()
+        .unwrap();
+    let mut attributes = request(
+        CicsOperation::ExtractAttributes,
+        BTreeMap::from([("STATE".into(), argument(b"STATE-X"))]),
+        1,
+    );
+    attributes.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(),
+        response2_field: Some("RESP2-X".into()),
+    };
+    assert_eq!(
+        cics.invoke(
+            &effect(&invocation.run_unit_id, attributes.clone(), 1),
+            attributes,
+        ),
+        Err(HostProblem::InfrastructureFailure)
+    );
+    let point = request(CicsOperation::Point, BTreeMap::new(), 2);
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, point.clone(), 2), point),
+        Err(HostProblem::InfrastructureFailure)
+    );
+    assert_eq!(
+        store
+            .get_provider_state(
+                "cics-conversation-extract-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap(),
+        sidecar_before
+    );
+    let explicit = extract_call(
+        &cics,
+        &invocation.run_unit_id,
+        CicsOperation::ExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&mapped)),
+            ("STATE".into(), argument(b"STATE-X")),
+        ]),
+        3,
+    );
+    assert_eq!(explicit.outputs["STATE"].bytes(), b"91");
+}
+
+#[test]
 fn conversation_extract_dpl_principal_restrictions_are_command_specific() {
     let store = Arc::new(MemoryStore::new(Default::default()));
     let cics = service(store.clone());

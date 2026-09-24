@@ -78,6 +78,10 @@ All notable changes to mainframe-env are documented here.
   trusted terminal or conversation owner republishes task extraction facts
   under the sidecar's expected store version.
 
+- Fail closed when an invalid conversation ledger exposes two live principal
+  facilities to an implicit EXTRACT or POINT selector; explicit CONVID remains
+  deterministic.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

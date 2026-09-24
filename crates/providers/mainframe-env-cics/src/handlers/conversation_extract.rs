@@ -269,12 +269,16 @@ pub(super) fn select_facility<'a>(
             .get(session.trim_end())
             .ok_or_else(|| condition("NOTALLOC", 61, 0))?
     } else {
-        ledger
-            .conversations
-            .values()
-            .find(|record| record.principal_facility && &record.owner == owner && !record.released)
-            .map(|record| record.token)
-            .ok_or_else(|| condition("NOTALLOC", 61, 0))?
+        let mut principals = ledger.conversations.values().filter(|record| {
+            record.principal_facility && &record.owner == owner && !record.released
+        });
+        let principal = principals
+            .next()
+            .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
+        if principals.next().is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        principal.token
     };
     let record = ledger
         .conversation(token)
