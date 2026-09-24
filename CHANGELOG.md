@@ -54,6 +54,8 @@ All notable changes to mainframe-env are documented here.
   GDS six-byte return codes, reserved MCEP v2 conversation identities, and
   source-bounded compiler lowering for mapped APPC/MRO forms, and atomic
   conversation state/replay CAS receipts with checkpoint-aware retention.
+  Version 2 conversation records retain the selected PROFILE or MODENAME and
+  continue reading canonical version 1 records.
   The nine command routes remain unregistered while selected execution and
   recovery gates are completed. IBM CICS TS 6.x `sources-a` catalog rows
   `0007`, `0008`, `0012`, `0015`, `0028`, `0029`, `0030`, `0081`, and `0082`
