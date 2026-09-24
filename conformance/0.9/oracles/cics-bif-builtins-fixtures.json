@@ -1,0 +1,13 @@
+{
+  "schema_version": "mainframe-env.cics-oracle-family-fixtures@1",
+  "family_id": "bif-builtins-v1",
+  "comparison_policy": "cics-bif-exact-bytes@1",
+  "expected_observations": [
+    {"scenario_id": "deedit-example", "application_output": "DEEDIT:000:000:00146704B\n", "record_hex": "f0f0f1f4f6f7f0f4c2"},
+    {"scenario_id": "deedit-lengerr", "application_output": "DEEDIT-LENGERR:022:000\n", "record_hex": ""},
+    {"scenario_id": "digest-hex", "application_output": "DIGEST-HEX:000:000:A9993E364706816ABA3E25717850C26C9CD0D89D\n", "record_hex": "c1f9f9f9f3c5f3f6f4f7f0f6f8f1f6c1c2c1f3c5f2f5f7f1f7f8f5f0c3f2f6c3f9c3c4f0c4f8f9c4"},
+    {"scenario_id": "digest-binary", "application_output": "DIGEST-BINARY:000:000\n", "record_hex": "a9993e364706816aba3e25717850c26c9cd0d89d"},
+    {"scenario_id": "digest-base64", "application_output": "DIGEST-BASE64:000:000:qZk+NkcGgWq6PiVxeFDCbJzQ2J0=\n", "record_hex": "98e9924ed59283c787e698f6d789e5a785c6c4c382d1a9d8f2d1f07e"},
+    {"scenario_id": "digest-lengerr", "application_output": "DIGEST-LENGERR:022:002\n", "record_hex": ""}
+  ]
+}
