@@ -141,11 +141,11 @@ pub(super) fn invoke(
 }
 
 fn validate_shape(request: &CicsRequest) -> Result<(), HostProblem> {
-    if request.arguments.contains_key("CONVID") && request.arguments.contains_key("SESSION")
+    if request.arguments.contains_key("SESSION")
         || request.arguments.keys().any(|name| {
             !matches!(
                 name.as_str(),
-                "CONVID" | "SESSION" | "STATE" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
+                "CONVID" | "STATE" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
             )
         })
     {

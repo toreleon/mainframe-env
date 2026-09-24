@@ -36591,6 +36591,25 @@ mod tests {
         let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
             .try_into()
             .unwrap();
+        let symbolic_session = request(
+            CicsOperation::FreeConversation,
+            BTreeMap::from([("SESSION".into(), cics_literal(&token))]),
+            99,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, symbolic_session.clone(), 99),
+                symbolic_session,
+            ),
+            Err(HostProblem::Unsupported)
+        );
+        assert!(
+            !ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .released
+        );
         let free = request(
             CicsOperation::FreeConversation,
             BTreeMap::from([
@@ -37006,7 +37025,7 @@ mod tests {
         let converse = request(
             CicsOperation::Converse,
             BTreeMap::from([
-                ("CONVID".into(), cics_literal(&token)),
+                ("SESSION".into(), cics_literal(&token)),
                 ("FROM".into(), cics_literal(b"REQUEST")),
                 ("FROMLENGTH".into(), cics_decimal(7)),
                 ("INTO".into(), argument(b"INTO-X")),
@@ -37225,6 +37244,26 @@ mod tests {
             "mro-fmh-1",
         )
         .unwrap();
+        let symbolic_session = request(
+            CicsOperation::Converse,
+            BTreeMap::from([
+                ("SESSION".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"REQUEST")),
+                ("SET".into(), argument(b"SET-X")),
+            ]),
+            99,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, symbolic_session.clone(), 99),
+                symbolic_session,
+            ),
+            Err(HostProblem::Unsupported)
+        );
+        let key = u32::from_be_bytes(token).to_string();
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(ledger.exchanges[&key].inbound.len(), 1);
+        assert!(ledger.exchanges[&key].outbound.is_empty());
         let converse = responding(request(
             CicsOperation::Converse,
             BTreeMap::from([

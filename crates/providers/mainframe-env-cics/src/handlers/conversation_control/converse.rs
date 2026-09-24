@@ -41,6 +41,9 @@ pub(super) fn invoke(
         .ok_or_else(|| condition("NOTALLOC", 61, 0))?;
     let system = record.system.clone();
     let kind = record.kind;
+    if kind == ConversationKind::Mro && request.arguments.contains_key("SESSION") {
+        return Err(HostProblem::Unsupported);
+    }
     if kind == ConversationKind::AppcBasic {
         return Err(condition("INVREQ", 16, 0));
     }

@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Kept the APPC CONVERSE SESSION compatibility synonym and rejected symbolic
+  MRO SESSION in CONVERSE and FREE until a TCTTE name authority is installed.
+  An MRO token supplied in SESSION can no longer alias CONVID or mutate the
+  peer-frame ledger.
+
 - Added mapped APPC/MRO CONVERSE over explicit durable peer frames. It sends
   bounded application data, consumes one real peer result, records outbound
   data and protocol state atomically with replay, and reports source EOC,
