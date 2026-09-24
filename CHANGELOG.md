@@ -58,8 +58,8 @@ All notable changes to mainframe-env are documented here.
   authority. Child tokens are parent owned and durable; LINK selects an
   installed program, resolves nested named descendants from the active
   lifecycle frame, retains parent child tokens across nested selected RETURN,
-  and fences uncertain dispatch without automatic replay, including after
-  SQLite reopen.
+  binds durable activity context to its execution and principal, and fences
+  uncertain dispatch without automatic replay, including after SQLite reopen.
   The isolated CICS registry is 157 typed, 0 legacy, and 106 unready rows.
   Licensed differential evidence remains pending.
 

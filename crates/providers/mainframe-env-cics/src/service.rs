@@ -5636,6 +5636,35 @@ mod tests {
                 response2: 7
             })
         );
+        let context = store
+            .get_provider_state("cics-bts-link-context-v2", named.run_unit_id.as_str())
+            .unwrap()
+            .unwrap();
+        let mut forged: serde_json::Value = serde_json::from_slice(&context.payload).unwrap();
+        forged["owner_principal"] = "OTHER".into();
+        store
+            .delete_provider_state(&context.namespace, &context.key, context.version)
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: context.namespace,
+                    key: context.key,
+                    version: 1,
+                    payload: serde_json::to_vec(&forged).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let stale = request(
+            CicsOperation::LinkActivity,
+            BTreeMap::from([("ACTIVITY".into(), cics_literal(b"CHILD"))]),
+            8,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&named.run_unit_id, stale.clone(), 8), stale),
+            Err(HostProblem::IdempotencyConflict)
+        );
 
         let creator = registered_counter_run(&cics, "bts-creator");
         let (root2, child2) = setup("PROC2", &creator, false);

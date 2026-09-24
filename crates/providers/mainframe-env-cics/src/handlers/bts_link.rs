@@ -13,8 +13,9 @@ use mainframe_env_store_api::ProviderStateRecord;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const CONTEXT_NS: &str = "cics-bts-link-context-v1";
+const CONTEXT_NS: &str = "cics-bts-link-context-v2";
 const FRAME_NS: &str = "cics-bts-link-frame-v1";
+const MAX_CONTEXT_BYTES: usize = 1024;
 const MAX_LINK_DEPTH: usize = 16;
 
 /// Task-local reference to an active BTS activity, supplied by the shared RUN authority.
@@ -26,6 +27,14 @@ pub struct CicsBtsLinkContext {
     pub active_activity_id: Option<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredLinkContext {
+    active_activity_id: Option<String>,
+    owner_execution: String,
+    owner_principal: String,
+}
+
 impl CicsService {
     /// Bind an active activity ID for LINK ACTIVITY child-name selection.
     pub fn bind_bts_link_context(
@@ -33,9 +42,14 @@ impl CicsService {
         run_unit: &RunUnitId,
         context: CicsBtsLinkContext,
     ) -> Result<(), HostProblem> {
-        if !self.lock()?.runs.contains_key(run_unit) {
-            return Err(HostProblem::Unauthorized);
-        }
+        let (owner_execution, owner_principal) = {
+            let state = self.lock()?;
+            let run = state.runs.get(run_unit).ok_or(HostProblem::Unauthorized)?;
+            (
+                run.invocation.execution_id.as_str().to_string(),
+                run.invocation.principal.id().as_str().to_string(),
+            )
+        };
         if let Some(id) = &context.active_activity_id {
             let authority = BtsLifecycleStore::new(self.store.as_ref());
             let index = authority
@@ -53,7 +67,15 @@ impl CicsService {
                 return Err(HostProblem::Unauthorized);
             }
         }
-        let payload = serde_json::to_vec(&context).map_err(|_| HostProblem::ResourceExhausted)?;
+        let payload = serde_json::to_vec(&StoredLinkContext {
+            active_activity_id: context.active_activity_id,
+            owner_execution,
+            owner_principal,
+        })
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        if payload.len() > MAX_CONTEXT_BYTES {
+            return Err(HostProblem::ResourceExhausted);
+        }
         if let Some(row) = self
             .store
             .get_provider_state(CONTEXT_NS, run_unit.as_str())
@@ -91,6 +113,7 @@ struct Target {
 #[serde(deny_unknown_fields)]
 struct LinkFrame {
     owner_execution: String,
+    owner_principal: String,
     process_type: String,
     process_name: String,
     activity_id: String,
@@ -132,6 +155,7 @@ fn push_frame(
     }
     stack.push(LinkFrame {
         owner_execution: run.invocation.execution_id.as_str().into(),
+        owner_principal: run.invocation.principal.id().as_str().into(),
         process_type: target.process_type.clone(),
         process_name: target.process_name.clone(),
         activity_id: target.activity_id.clone(),
@@ -162,6 +186,7 @@ fn pop_frame(service: &CicsService, run: &Run, target: &Target) -> Result<(), Ho
         return Ok(());
     };
     if last.owner_execution != run.invocation.execution_id.as_str()
+        || last.owner_principal != run.invocation.principal.id().as_str()
         || last.activity_id != target.activity_id
     {
         return Err(HostProblem::IdempotencyConflict);
@@ -206,6 +231,9 @@ pub(super) fn nested_activity_scope(
     else {
         return Ok(None);
     };
+    if frame.owner_principal != run.invocation.principal.id().as_str() {
+        return Err(HostProblem::IdempotencyConflict);
+    }
     let authority = BtsLifecycleStore::new(service.store.as_ref());
     let process = authority
         .load_process(&frame.process_type, &frame.process_name)?
@@ -549,11 +577,16 @@ fn active_activity(service: &CicsService, run: &Run) -> Result<Option<String>, H
         .get_provider_state(CONTEXT_NS, run.invocation.run_unit_id.as_str())
         .map_err(store_error)?;
     let Some(row) = row else { return Ok(None) };
-    if row.version != 1 || row.payload.len() > 256 {
+    if row.version != 1 || row.payload.len() > MAX_CONTEXT_BYTES {
         return Err(HostProblem::InfrastructureFailure);
     }
-    let context: CicsBtsLinkContext =
+    let context: StoredLinkContext =
         serde_json::from_slice(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if context.owner_execution != run.invocation.execution_id.as_str()
+        || context.owner_principal != run.invocation.principal.id().as_str()
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
     if let Some(id) = &context.active_activity_id {
         let authority = BtsLifecycleStore::new(service.store.as_ref());
         let index = authority
