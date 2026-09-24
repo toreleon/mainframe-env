@@ -28,6 +28,8 @@ All notable changes to mainframe-env are documented here.
 - Added a durable principal signal facility for the six LU classes named by
   WAIT SIGNAL. Ordered peer events, one-time consumption, lease fencing, task
   cleanup, and SQLite reopen are covered without registering the command.
+- Added the pinned one-byte EIBSIG update and made source-defined SIGNAL and
+  EOC default conditions ignorable, while INBFMH retains its failure default.
 
 ### Changed
 

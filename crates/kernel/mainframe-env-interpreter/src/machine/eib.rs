@@ -47,6 +47,7 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBSIG".into(), CobolValue::Bytes(vec![0x00])),
         ("EIBREQID".into(), CobolValue::Bytes(vec![0x00; 8])),
         (
             "EIBCALEN".into(),
@@ -86,6 +87,14 @@ pub(super) fn write_context(
     {
         machine.write("EIBFN", &descriptor.eibfn)?;
     }
+    machine.write(
+        "EIBSIG",
+        &[if response.condition == "SIGNAL" {
+            0xff
+        } else {
+            0x00
+        }],
+    )?;
     if operation == CicsOperation::AllocateConversation
         && let Some(value) = response.outputs.get("EIBRSRCE")
     {
@@ -183,4 +192,58 @@ fn write_clock(
             scale: 0,
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mainframe_env_execution_api::{InvocationLimits, Machine};
+    use mainframe_env_host_api::CicsDisposition;
+    use mainframe_env_ir::CodecLimits;
+
+    #[test]
+    fn signal_indicator_is_written_and_restored_without_stale_flag() {
+        let mut machine = ReferenceMachine::from_binary(
+            &super::super::tests::binary(),
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(machine.read("EIBSIG").unwrap(), &[0]);
+        let mut response = CicsResponse {
+            disposition: CicsDisposition::Ignored,
+            condition: "SIGNAL".into(),
+            response: 24,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "MENU".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: BoundedPayload::new(
+                "mainframe-env.cics.test@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        write_context(&mut machine, CicsOperation::WaitEvent, &response).unwrap();
+        assert_eq!(machine.read("EIBSIG").unwrap(), &[0xff]);
+        let checkpoint = machine.checkpoint().unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            &super::super::tests::binary(),
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(restored.read("EIBSIG").unwrap(), &[0xff]);
+        response.condition = "NORMAL".into();
+        response.response = 0;
+        write_context(&mut restored, CicsOperation::WaitEvent, &response).unwrap();
+        assert_eq!(restored.read("EIBSIG").unwrap(), &[0]);
+    }
 }

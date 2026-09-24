@@ -35675,6 +35675,45 @@ mod tests {
     }
 
     #[test]
+    fn conversation_signal_and_eoc_default_to_ignore_but_inbfmh_does_not() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        for (name, code) in [("SIGNAL", 24), ("EOC", 6)] {
+            let response = handlers::condition(
+                &cics,
+                &run,
+                &CicsConditionPolicy::Default,
+                HostProblem::Condition {
+                    name: name.into(),
+                    response: code,
+                    response2: 0,
+                },
+            )
+            .unwrap();
+            assert_eq!(response.disposition, CicsDisposition::Ignored);
+            assert_eq!(
+                (response.condition.as_str(), response.response),
+                (name, code)
+            );
+        }
+        assert!(
+            handlers::condition(
+                &cics,
+                &run,
+                &CicsConditionPolicy::Default,
+                HostProblem::Condition {
+                    name: "INBFMH".into(),
+                    response: 7,
+                    response2: 0,
+                },
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn conversation_transport_reconciles_attempted_send_without_redispatch() {
         use crate::{
             CicsConversationTransport, ConversationDataFrame, ConversationTransmitOutcome,
