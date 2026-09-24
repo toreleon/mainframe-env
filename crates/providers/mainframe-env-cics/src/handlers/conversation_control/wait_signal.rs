@@ -290,4 +290,29 @@ impl CicsService {
         }
         Err(HostProblem::UnknownOutcome)
     }
+
+    /// Trusted LU ingress records a terminal failure in the same ordered event
+    /// stream. A waiting task observes TERMERR after this durable transition.
+    pub fn fail_principal_signal(
+        &self,
+        owner: &ConversationOwner,
+        event_sequence: u64,
+    ) -> Result<(), HostProblem> {
+        for _ in 0..MAX_CAS_RETRIES {
+            let current = ConversationLedger::load(self.store.as_ref()).map_err(store_error)?;
+            let mut next = current.clone();
+            next.fail_signal_facility(owner, event_sequence)
+                .map_err(signal_problem)?;
+            if next == current {
+                return Ok(());
+            }
+            if current
+                .persist(&mut next, self.store.as_ref())
+                .map_err(|error| mutation_problem(store_error(error)))?
+            {
+                return Ok(());
+            }
+        }
+        Err(HostProblem::UnknownOutcome)
+    }
 }

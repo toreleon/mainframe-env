@@ -401,6 +401,26 @@ impl ConversationLedger {
         Ok(())
     }
 
+    pub fn fail_signal_facility(
+        &mut self,
+        owner: &ConversationOwner,
+        event_sequence: u64,
+    ) -> Result<(), ConversationProblem> {
+        let facility = self.signal_facility_mut(owner)?;
+        if facility.terminal_error && event_sequence == facility.last_event_sequence {
+            return Ok(());
+        }
+        if facility.terminal_error
+            || event_sequence != facility.last_event_sequence.saturating_add(1)
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        facility.last_event_sequence = event_sequence;
+        facility.pending = false;
+        facility.terminal_error = true;
+        Ok(())
+    }
+
     pub fn signal_pending(&self, owner: &ConversationOwner) -> Result<bool, ConversationProblem> {
         let facility = self.signal_facility(owner)?;
         if facility.terminal_error {
@@ -562,6 +582,8 @@ impl ConversationLedger {
             if !facility.owner.valid()
                 || key != &signal_key(&facility.owner)
                 || facility.pending && facility.last_event_sequence == 0
+                || facility.terminal_error
+                    && (facility.pending || facility.last_event_sequence == 0)
                 || self.conversations.values().any(|record| {
                     record.owner.execution == facility.owner.execution
                         && record.owner.run_unit == facility.owner.run_unit

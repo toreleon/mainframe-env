@@ -36346,6 +36346,25 @@ mod tests {
                     .unwrap(),
                 received
             );
+            cics.fail_principal_signal(&owner, 2).unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let cics = service(store);
+            let session = SessionId::new("wait-signal-error-restart", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 2);
+            wait.condition_policy = CicsConditionPolicy::NoHandle;
+            let received = cics
+                .invoke(&effect(&invocation.run_unit_id, wait.clone(), 2), wait)
+                .unwrap();
+            assert_eq!(
+                (received.condition.as_str(), received.response),
+                ("TERMERR", 81)
+            );
         }
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_dir(directory);
@@ -36441,6 +36460,54 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
+        );
+    }
+
+    #[test]
+    fn wait_signal_reports_durable_terminal_error_without_signal_delivery() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        cics.install_principal_signal_facility(&invocation.run_unit_id, SignalLuType::LuType4)
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        cics.fail_principal_signal(&owner, 1).unwrap();
+        cics.fail_principal_signal(&owner, 1).unwrap();
+        assert_eq!(
+            cics.post_principal_signal(&owner, 2),
+            Err(HostProblem::Condition {
+                name: "TERMERR".into(),
+                response: 81,
+                response2: 0,
+            })
+        );
+        let mut wait = request(CicsOperation::WaitSignal, BTreeMap::new(), 1);
+        wait.condition_policy = CicsConditionPolicy::NoHandle;
+        let response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, wait.clone(), 1),
+                wait.clone(),
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("TERMERR", 81)
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, wait.clone(), 1), wait)
+                .unwrap(),
+            response
+        );
+        assert!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .signal_pending(&owner)
+                .is_err()
         );
     }
 }

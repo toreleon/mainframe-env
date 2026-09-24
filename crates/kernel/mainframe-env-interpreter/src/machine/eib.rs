@@ -260,5 +260,9 @@ mod tests {
         write_context(&mut restored, CicsOperation::WaitSignal, &response).unwrap();
         assert_eq!(restored.read("EIBSIG").unwrap(), &[0]);
         assert_eq!(restored.read("EIBRCODE").unwrap(), &[0; 6]);
+        response.condition = "TERMERR".into();
+        response.response = 81;
+        write_context(&mut restored, CicsOperation::WaitSignal, &response).unwrap();
+        assert_eq!(restored.read("EIBRCODE").unwrap(), &[0xF1, 0, 81, 0, 0, 0]);
     }
 }

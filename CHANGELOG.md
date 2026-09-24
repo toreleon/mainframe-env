@@ -37,6 +37,8 @@ All notable changes to mainframe-env are documented here.
   outer receipt failure; Memory and SQLite tests cover event consumption.
 - Bound WAIT SIGNAL's six-byte EIBRCODE to the pinned terminal-control SIGNAL,
   NOTALLOC, and TERMERR bytes and the corresponding EIBRESP byte.
+- Trusted principal ingress can now persist an ordered terminal failure;
+  WAIT SIGNAL returns TERMERR after restart and rejects later signals.
 - Added the pinned one-byte EIBSIG update and made source-defined SIGNAL and
   EOC default conditions ignorable, while INBFMH retains its failure default.
 
