@@ -26,6 +26,7 @@ mod gds_issue;
 mod gds_issue_route;
 mod gds_receive;
 mod gds_wait;
+mod issue_peer;
 mod issue_staging;
 mod issue_transition;
 mod issue_transport;

@@ -6,7 +6,7 @@
 
 use super::{
     ConversationContext, ConversationKind, ConversationOwner, ConversationProblem,
-    ConversationRecord, ConversationState,
+    ConversationRecord, ConversationState, GdsIssueFlow,
 };
 use crate::service::{CicsService, mutation_problem, store_error};
 use mainframe_env_host_api::HostProblem;
@@ -232,6 +232,43 @@ impl ConversationDataState {
 }
 
 impl ConversationRecord {
+    /// Apply a partner ABEND or PREPARE in this allocation's durable record.
+    /// SIGNAL and ERROR already enter through the peer data frame path;
+    /// CONFIRMATION resolves the sender's confirmed transport attempt.
+    pub fn accept_peer_issue(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        flow: GdsIssueFlow,
+    ) -> Result<(), ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if !matches!(
+            self.kind,
+            ConversationKind::AppcMapped | ConversationKind::AppcBasic
+        ) || self.pending_issue.is_some()
+            || self.data.terminal_error
+            || self.state == ConversationState::Free
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        match flow {
+            GdsIssueFlow::Abend => {
+                self.next_sequence()?;
+                self.state = ConversationState::Free;
+                self.data.peer_error_code = Some([0x08, 0x64, 0, 0]);
+                self.data.terminal_error = self.kind == ConversationKind::AppcMapped;
+            }
+            GdsIssueFlow::Prepare
+                if self.sync_level == Some(2) && self.state == ConversationState::Receive =>
+            {
+                self.next_sequence()?;
+                self.state = ConversationState::SyncReceive;
+            }
+            _ => return Err(ConversationProblem::WrongState),
+        }
+        Ok(())
+    }
+
     pub fn record_basic_negative_response(
         &mut self,
         owner: &ConversationOwner,
@@ -800,6 +837,83 @@ mod tests {
             error_code: None,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn peer_issue_abend_and_prepare_use_shared_state_and_basic_indicators() {
+        let owner = owner();
+        let mut mapped = ConversationRecord::allocate(
+            *b"M001",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner.clone(),
+            false,
+        )
+        .unwrap();
+        mapped
+            .accept_peer_issue(&owner, ConversationContext::Local, GdsIssueFlow::Abend)
+            .unwrap();
+        assert_eq!(mapped.state, ConversationState::Free);
+        assert!(mapped.data.terminal_error());
+        assert_eq!(mapped.data.peer_error_code, Some([0x08, 0x64, 0, 0]));
+        assert_eq!(
+            mapped.accept_peer_issue(&owner, ConversationContext::Local, GdsIssueFlow::Abend),
+            Err(ConversationProblem::WrongState)
+        );
+        mapped
+            .release(&owner, ConversationContext::Local, false)
+            .unwrap();
+
+        let mut basic = ConversationRecord::allocate(
+            *b"B001",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner.clone(),
+            false,
+        )
+        .unwrap();
+        basic
+            .accept_peer_issue(&owner, ConversationContext::Local, GdsIssueFlow::Abend)
+            .unwrap();
+        let block = basic.gds_convdata(false).unwrap();
+        assert_eq!((block[2], block[6]), (0xff, 0xff));
+        assert_eq!(&block[7..11], &[0x08, 0x64, 0, 0]);
+        basic
+            .release(&owner, ConversationContext::Local, true)
+            .unwrap();
+
+        let mut prepare = ConversationRecord::allocate(
+            *b"B002",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner.clone(),
+            false,
+        )
+        .unwrap();
+        prepare
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                vec![],
+                2,
+            )
+            .unwrap();
+        prepare
+            .peer_offered_data(&owner, ConversationContext::Local)
+            .unwrap();
+        prepare
+            .accept_peer_issue(&owner, ConversationContext::Local, GdsIssueFlow::Prepare)
+            .unwrap();
+        assert_eq!(prepare.state, ConversationState::SyncReceive);
+        assert_eq!(prepare.gds_convdata(false).unwrap()[1], 0xff);
+        let before = prepare.clone();
+        assert_eq!(
+            prepare.accept_peer_issue(&owner, ConversationContext::Local, GdsIssueFlow::Prepare),
+            Err(ConversationProblem::WrongState)
+        );
+        assert_eq!(prepare, before);
     }
 
     #[test]

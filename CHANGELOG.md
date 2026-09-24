@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added trusted partner ABEND/PREPARE ingress to the versioned APPC ledger.
+  A carrier confirms only after the target's owner-fenced, SAF-authorized
+  transition and exact event receipt commit. Mapped/basic target indicators,
+  replay conflict, foreign-owner denial, and SQLite restart are covered.
 - Integrated exactly seven CIC-905 conversation data/wait rows with the
   existing 184 typed routes, yielding 191 typed and 72 unready application
   commands while retaining the sealed CONVERSE, EXTRACT, CardDemo, and bounded

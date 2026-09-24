@@ -10158,6 +10158,332 @@ mod tests {
     }
 
     #[test]
+    fn issue_abend_and_prepare_confirm_after_partner_ledger_commit_for_both_appc_forms() {
+        use std::sync::atomic::AtomicUsize;
+
+        struct PeerCarrier {
+            target: Arc<CicsService>,
+            target_run_unit: RunUnitId,
+            target_token: [u8; 4],
+            delivered: Arc<AtomicUsize>,
+        }
+
+        impl CicsConversationTransport for PeerCarrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                control_id: u64,
+                flow: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.target.accept_conversation_peer_issue(
+                    &self.target_run_unit,
+                    self.target_token,
+                    flow,
+                    &format!("issue-{control_id}"),
+                )?;
+                self.delivered.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        for (kind, flow, operation, partner_state) in [
+            (
+                ConversationKind::AppcMapped,
+                GdsIssueFlow::Abend,
+                CicsOperation::IssueAbend,
+                ConversationState::Free,
+            ),
+            (
+                ConversationKind::AppcBasic,
+                GdsIssueFlow::Abend,
+                CicsOperation::GdsIssueAbend,
+                ConversationState::Free,
+            ),
+            (
+                ConversationKind::AppcMapped,
+                GdsIssueFlow::Prepare,
+                CicsOperation::IssuePrepare,
+                ConversationState::SyncReceive,
+            ),
+            (
+                ConversationKind::AppcBasic,
+                GdsIssueFlow::Prepare,
+                CicsOperation::GdsIssuePrepare,
+                ConversationState::SyncReceive,
+            ),
+        ] {
+            let source_store = Arc::new(MemoryStore::new(Default::default()));
+            let source = service(source_store.clone());
+            let target_store = Arc::new(MemoryStore::new(Default::default()));
+            let target = service(target_store.clone());
+            for service in [&source, &target] {
+                service
+                    .register_conversation_system(ConversationSystemDefinition {
+                        sysid: "SYS1".into(),
+                        kind: ConversationKind::AppcMapped,
+                        capacity: 2,
+                        enabled: true,
+                    })
+                    .unwrap();
+            }
+            let (source_invocation, _) = registered(&source);
+            let (target_invocation, _) = registered(&target);
+            let source_token = source
+                .install_conversation_principal_for_run(
+                    &source_invocation.run_unit_id,
+                    "SYS1",
+                    kind,
+                )
+                .unwrap();
+            let target_token = target
+                .install_conversation_principal_for_run(
+                    &target_invocation.run_unit_id,
+                    "SYS1",
+                    kind,
+                )
+                .unwrap();
+            if flow == GdsIssueFlow::Prepare {
+                for (store, invocation, token, receiving) in [
+                    (&source_store, &source_invocation, source_token, false),
+                    (&target_store, &target_invocation, target_token, true),
+                ] {
+                    let owner = ConversationOwner {
+                        execution: invocation.execution_id.as_str().into(),
+                        run_unit: invocation.run_unit_id.as_str().into(),
+                        lease_epoch: u64::from(invocation.attempt),
+                    };
+                    let current = ConversationLedger::load(store.as_ref()).unwrap();
+                    let mut next = current.clone();
+                    let record = next.conversation_mut(token).unwrap();
+                    record
+                        .connect(
+                            &owner,
+                            ConversationContext::Local,
+                            kind == ConversationKind::AppcBasic,
+                            b"PROC".to_vec(),
+                            vec![],
+                            2,
+                        )
+                        .unwrap();
+                    if receiving {
+                        record
+                            .peer_offered_data(&owner, ConversationContext::Local)
+                            .unwrap();
+                    }
+                    assert!(current.persist(&mut next, store.as_ref()).unwrap());
+                }
+            }
+            let delivered = Arc::new(AtomicUsize::new(0));
+            source
+                .install_conversation_transport(Arc::new(PeerCarrier {
+                    target: target.clone(),
+                    target_run_unit: target_invocation.run_unit_id.clone(),
+                    target_token,
+                    delivered: delivered.clone(),
+                }))
+                .unwrap();
+            let mut run = source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
+            let mut arguments = BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]);
+            if kind == ConversationKind::AppcBasic {
+                arguments.insert("RETCODE".into(), argument(b"RETCODE-X"));
+                arguments.insert("CONVDATA".into(), argument(b"CONVDATA-X"));
+            }
+            let command = request(operation, arguments, 1);
+            assert_eq!(
+                handlers::invoke_extended_control(
+                    &source,
+                    &mut run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Complete
+            );
+            assert_eq!(delivered.load(Ordering::SeqCst), 1);
+            let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
+            let record = partner.conversation(target_token).unwrap();
+            assert_eq!(record.state, partner_state, "{kind:?} {flow:?}");
+            if flow == GdsIssueFlow::Abend {
+                if kind == ConversationKind::AppcMapped {
+                    assert!(record.data.terminal_error());
+                } else {
+                    let block = record.gds_convdata(false).unwrap();
+                    assert_eq!((block[2], block[6]), (0xff, 0xff));
+                    assert_eq!(&block[7..11], &[0x08, 0x64, 0, 0]);
+                }
+            } else if kind == ConversationKind::AppcBasic {
+                assert_eq!(record.gds_convdata(false).unwrap()[1], 0xff);
+            }
+            let receipt = handlers::load_conversation_replay(source_store.as_ref(), "outer-1")
+                .unwrap()
+                .unwrap();
+            let control_id = u64::from_be_bytes(
+                receipt.reply.outputs["CONTROL_ID"]
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            );
+            let event = format!("issue-{control_id}");
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &target_invocation.run_unit_id,
+                    target_token,
+                    flow,
+                    &event,
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                ConversationLedger::load(target_store.as_ref()).unwrap(),
+                partner
+            );
+            let other_flow = if flow == GdsIssueFlow::Abend {
+                GdsIssueFlow::Prepare
+            } else {
+                GdsIssueFlow::Abend
+            };
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &target_invocation.run_unit_id,
+                    target_token,
+                    other_flow,
+                    &event,
+                ),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &target_invocation.run_unit_id,
+                    target_token,
+                    flow,
+                    "second-event",
+                ),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            let foreign = registered_counter_run(&target, "foreign-peer-issue");
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &foreign.run_unit_id,
+                    target_token,
+                    flow,
+                    &event,
+                ),
+                Err(HostProblem::Unauthorized)
+            );
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &target_invocation.run_unit_id,
+                    target_token,
+                    flow,
+                    "bad/event",
+                ),
+                Err(HostProblem::Malformed)
+            );
+            assert_eq!(
+                ConversationLedger::load(target_store.as_ref()).unwrap(),
+                partner
+            );
+        }
+    }
+
+    #[test]
+    fn peer_issue_abend_reopens_from_sqlite_with_exact_receipt() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-peer-issue-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("peer-issue-restart", BTreeMap::new());
+        let token;
+        let committed;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let session = SessionId::new("peer-issue-first", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            token = target
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                )
+                .unwrap();
+            target
+                .accept_conversation_peer_issue(
+                    &invocation.run_unit_id,
+                    token,
+                    GdsIssueFlow::Abend,
+                    "peer-abend-one",
+                )
+                .unwrap();
+            committed = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                committed.conversation(token).unwrap().state,
+                ConversationState::Free
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            let session = SessionId::new("peer-issue-reopen", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &invocation.run_unit_id,
+                    token,
+                    GdsIssueFlow::Abend,
+                    "peer-abend-one",
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                target.accept_conversation_peer_issue(
+                    &invocation.run_unit_id,
+                    token,
+                    GdsIssueFlow::Abend,
+                    "peer-abend-two",
+                ),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn mapped_issue_route_rejects_dpl_principal_before_staging() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());
