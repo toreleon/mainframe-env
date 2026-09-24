@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Integrated the eight CIC-905 conversation EXTRACT and POINT routes with the
+  sealed miscellaneous and BTS aggregate. The application registry now has
+  175 typed, 0 legacy compatibility, and 88 unready rows. The existing
+  `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` numeric CVDA pin is reused.
+  The conversation-open peer-frame ledger on the active branch remains a
+  later reconciliation dependency.
+
 - Integrated the sealed miscellaneous CICS command branch into the 151-route
   v0.9 head. Regenerated descriptors and contracts now report 161 typed,
   0 legacy compatibility, and 102 unready application rows; CICSMESSAGE

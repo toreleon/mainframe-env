@@ -5,6 +5,14 @@ use super::*;
 impl Canonical for CicsOperation {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
+            Self::ExtractAttach => out.variant("CicsOperation", "ExtractAttach", 0),
+            Self::ExtractAttributes => out.variant("CicsOperation", "ExtractAttributes", 0),
+            Self::GdsExtractAttributes => out.variant("CicsOperation", "GdsExtractAttributes", 0),
+            Self::ExtractLogonMsg => out.variant("CicsOperation", "ExtractLogonMsg", 0),
+            Self::ExtractProcess => out.variant("CicsOperation", "ExtractProcess", 0),
+            Self::GdsExtractProcess => out.variant("CicsOperation", "GdsExtractProcess", 0),
+            Self::ExtractTct => out.variant("CicsOperation", "ExtractTct", 0),
+            Self::Point => out.variant("CicsOperation", "Point", 0),
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
             Self::FetchAny => out.variant("CicsOperation", "FetchAny", 0),
             Self::FetchChild => out.variant("CicsOperation", "FetchChild", 0),

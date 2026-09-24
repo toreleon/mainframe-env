@@ -42,8 +42,38 @@ pub(in crate::machine) fn write_output(
     {
         return retrieve::write_load_pointer(machine, target, value, load_base);
     }
-    if matches!(name, "SET" | "OUTTOKEN" | "ENCRYPTPTKT") {
+    if matches!(name, "SET" | "OUTTOKEN" | "ENCRYPTPTKT" | "PIPLIST") {
         return retrieve::write_set_output(machine, operation, target, value);
+    }
+    if name == "PIPLENGTH"
+        && matches!(
+            operation,
+            CicsOperation::ExtractProcess | CicsOperation::GdsExtractProcess
+        )
+    {
+        if value.schema() != "mainframe-env.cics.decimal@1" {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let length = std::str::from_utf8(value.bytes())
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?
+            .parse::<u16>()
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+        let maximum = if operation == CicsOperation::ExtractProcess {
+            32_763
+        } else {
+            763
+        };
+        if length > maximum {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let CicsTarget::Resolved(slot) = target else {
+            return Err(MachineProblem::UnexpectedHostResult);
+        };
+        let area = resolved_slot(machine, slot)?;
+        if area.length != 2 {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        return machine.write_reference(&area, &length.to_be_bytes());
     }
     if name == "SET64" {
         return retrieve::write_set64_output(machine, target, value);
@@ -102,6 +132,13 @@ pub(in crate::machine) fn write_output(
             | "ELEMNSLEN"
             | "TYPENAMELEN"
             | "TYPENSLEN"
+            | "STATE"
+            | "IUTYPE"
+            | "DATASTR"
+            | "RECFM"
+            | "PROCLENGTH"
+            | "PIPLENGTH"
+            | "SYNCLEVEL"
     ) && value.schema() != "mainframe-env.cics.decimal@1"
         || operation == CicsOperation::ExtractCertificate
             && CicsCertificateOutput::from_name(name).is_some_and(CicsCertificateOutput::length)
@@ -132,6 +169,16 @@ pub(in crate::machine) fn write_output(
                 | "PARTN"
                 | "EVENT"
                 | "SUBEVENT"
+                | "PROCESS"
+                | "RESOURCE"
+                | "RPROCESS"
+                | "RRESOURCE"
+                | "CONVDATA"
+                | "RETCODE"
+                | "PROCNAME"
+                | "SYSID"
+                | "TERMID"
+                | "INTO"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && matches!(

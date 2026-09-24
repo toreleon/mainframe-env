@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 167);
+        assert_eq!(typed.len(), 175);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 96);
+        assert_eq!(unready.len(), 88);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -303,6 +303,14 @@ mod tests {
                 CicsPlanOperation::LinkAcqActivity,
                 CicsPlanOperation::LinkAcqProcess,
                 CicsPlanOperation::LinkActivity,
+                CicsPlanOperation::ExtractAttach,
+                CicsPlanOperation::ExtractAttributes,
+                CicsPlanOperation::GdsExtractAttributes,
+                CicsPlanOperation::ExtractLogonMsg,
+                CicsPlanOperation::ExtractProcess,
+                CicsPlanOperation::GdsExtractProcess,
+                CicsPlanOperation::ExtractTct,
+                CicsPlanOperation::Point,
                 CicsPlanOperation::ChangePassword,
                 CicsPlanOperation::ChangePhrase,
                 CicsPlanOperation::QuerySecurity,

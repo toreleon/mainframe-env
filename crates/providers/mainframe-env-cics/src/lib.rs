@@ -3,12 +3,21 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod conversation_protocol;
 mod event_wait;
 mod generated;
 mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
+pub use conversation_protocol::{
+    CONVERSATION_RECORD_VERSION, CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader,
+    ConversationContext, ConversationIndicators, ConversationKind, ConversationLedger,
+    ConversationOwner, ConversationProblem, ConversationRecord, ConversationState,
+    ConversationSystemDefinition, GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure,
+    GdsExtractAttributesFailure, GdsExtractProcessFailure, GdsFreeFailure, GdsReturnCode,
+    MAX_BASIC_PIP_BYTES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+};
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 pub use service::bts_lifecycle;
 

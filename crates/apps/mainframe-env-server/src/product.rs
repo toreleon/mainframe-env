@@ -6320,7 +6320,8 @@ mod tests {
         CicsCertificateName, CicsClientCertificate, CicsEventPostMode, CicsJavaStatus,
         CicsMonitorAction, CicsMonitorPointDefinition, CicsPartitionDefinition,
         CicsPartitionSetDefinition, CicsProgramDefinition, CicsTcpipAuthenticate, CicsTcpipContext,
-        CicsTcpipPrivacy, CicsTcpipSslType,
+        CicsTcpipPrivacy, CicsTcpipSslType, ConversationContext, ConversationKind,
+        ConversationLedger, ConversationOwner, ConversationSystemDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -25511,5 +25512,269 @@ mod tests {
                 .iter()
                 .any(|audit| audit.action == "CICS-SIGNOFF")
         );
+    }
+
+    #[test]
+    fn compiled_conversation_extract_process_uses_sqlite_selected_route_and_reopens() {
+        let artifact = published_source_fixture(
+            "CEXTR",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CEXTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PROC-X PIC X(32).\n01 PROC-LEN PIC S9(4) COMP.\n01 SYNC-X PIC S9(4) COMP.\n01 PIP-PTR POINTER-32.\n01 PIP-LEN PIC S9(4) COMP.\n01 PIP-OBS PIC X(4).\n01 PROC-FN PIC X(2).\n01 STATE-X PIC S9(8) COMP.\n01 ATTR-FN PIC X(2).\n01 POINT-FN PIC X(2).\n01 ATTACH-FN PIC X(2).\n01 TCT-FN PIC X(2).\n01 LOGON-FN PIC X(2).\n01 ATTACH-X PIC X(64).\n01 TERM-X PIC X(4).\n01 LOGON-X PIC X(256).\n01 LOGON-LEN PIC S9(4) COMP.\n01 RC PIC S9(9) COMP.\nLINKAGE SECTION.\n01 PIP-VIEW PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) SYNCLEVEL(SYNC-X) PIPLIST(PIP-PTR) PIPLENGTH(PIP-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO PROC-FN.\nSET ADDRESS OF PIP-VIEW TO PIP-PTR.\nMOVE PIP-VIEW TO PIP-OBS.\nEXEC CICS EXTRACT ATTRIBUTES STATE(STATE-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTR-FN.\nEXEC CICS POINT SESSION('L1') RESP(RC) END-EXEC.\nMOVE EIBFN TO POINT-FN.\nEXEC CICS EXTRACT ATTACH ATTACHID('HDR1') PROCESS(ATTACH-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO ATTACH-FN.\nEXEC CICS EXTRACT TCT NETNAME('LUNAME01') TERMID(TERM-X) RESP(RC) END-EXEC.\nMOVE EIBFN TO TCT-FN.\nEXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.\nMOVE EIBFN TO LOGON-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-conversation-extract-route-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id(),
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let mut settings = config();
+        settings.store_profile = crate::StoreProfile::Sqlite;
+        settings.sqlite_url = url.clone();
+        settings.artifact_root = root.join("artifacts");
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open(
+            settings.clone(),
+            first_platform,
+            secrets.clone(),
+            default_program_router(),
+        )
+        .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        first
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CEXTR".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CE00".into(), "CEXTR".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CEXTR".into(),
+                    map: "CEXTR".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("conversation-extract-route", 64).unwrap();
+        let invocation = first
+            .cics_invocation("IBMUSER", "CE00", Some(artifact_ref))
+            .unwrap();
+        first
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CE00",
+                24,
+                80,
+                "conversation-extract-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let prior = ConversationLedger::load(first_store.as_ref()).unwrap();
+        let mut ledger = prior.clone();
+        ledger
+            .register_system(ConversationSystemDefinition {
+                sysid: "APP1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 2,
+                enabled: true,
+            })
+            .unwrap();
+        ledger
+            .register_system(ConversationSystemDefinition {
+                sysid: "LU61".into(),
+                kind: ConversationKind::LuType61,
+                capacity: 2,
+                enabled: true,
+            })
+            .unwrap();
+        let token = ledger
+            .allocate("APP1", ConversationKind::AppcMapped, owner.clone())
+            .unwrap()
+            .token;
+        let lu_token = ledger
+            .allocate("LU61", ConversationKind::LuType61, owner.clone())
+            .unwrap()
+            .token;
+        let mut pip = vec![255; 32_763];
+        pip[..2].copy_from_slice(&32_763u16.to_be_bytes());
+        pip[2..4].fill(0);
+        ledger
+            .conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                false,
+                b"ORDER".to_vec(),
+                pip,
+                2,
+            )
+            .unwrap();
+        ledger.conversation_mut(token).unwrap().principal_facility = true;
+        ledger
+            .set_attach(mainframe_env_cics::ConversationAttachHeader {
+                owner,
+                name: "HDR1".into(),
+                process: b"TRNX".to_vec(),
+                resource: Vec::new(),
+                return_process: Vec::new(),
+                return_resource: Vec::new(),
+                queue: Vec::new(),
+                iu_type: 1,
+                data_stream: 0,
+                record_format: 4,
+            })
+            .unwrap();
+        assert!(prior.persist(&mut ledger, first_store.as_ref()).unwrap());
+        let metadata = serde_json::json!({
+            "schema_version": 1, "run_unit": invocation.run_unit_id.as_str(),
+            "selected_token": null, "session_names": {"L1": lu_token},
+            "netnames": {"LUNAME01": {
+                "token": lu_token, "sysid": "LU61", "termid": "T001"
+            }},
+            "received_attach": "HDR1", "network_attached": true,
+            "logon_message": b"HELLO".to_vec(), "logon_consumed": false,
+            "last_mutation": null
+        });
+        first_store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-conversation-extract-v1".into(),
+                    key: invocation.run_unit_id.as_str().into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&metadata).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        first
+            .run_online_exchange(&session, &principal, "CEXTR", 2)
+            .unwrap();
+        let continuation = first
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(&restored.variable("PROC-X").unwrap().bytes()[..5], b"ORDER");
+        assert_eq!(restored.variable("PROC-LEN").unwrap().bytes(), &[0, 5]);
+        assert_eq!(restored.variable("SYNC-X").unwrap().bytes(), &[0, 2]);
+        assert_eq!(restored.variable("PIP-LEN").unwrap().bytes(), &[0x7f, 0xfb]);
+        assert_eq!(
+            restored.variable("PIP-OBS").unwrap().bytes(),
+            &[0x7f, 0xfb, 0, 0]
+        );
+        assert_eq!(restored.variable("PROC-FN").unwrap().bytes(), &[0x04, 0x2e]);
+        assert_eq!(
+            restored.variable("STATE-X").unwrap().bytes(),
+            &[0, 0, 0, 91]
+        );
+        assert_eq!(restored.variable("ATTR-FN").unwrap().bytes(), &[0x04, 0x3e]);
+        assert_eq!(
+            restored.variable("POINT-FN").unwrap().bytes(),
+            &[0x04, 0x24]
+        );
+        assert_eq!(
+            restored.variable("ATTACH-FN").unwrap().bytes(),
+            &[0x04, 0x28]
+        );
+        assert_eq!(restored.variable("TCT-FN").unwrap().bytes(), &[0x04, 0x2a]);
+        assert_eq!(
+            restored.variable("LOGON-FN").unwrap().bytes(),
+            &[0x04, 0x3c]
+        );
+        assert_eq!(
+            &restored.variable("ATTACH-X").unwrap().bytes()[..4],
+            b"TRNX"
+        );
+        assert_eq!(restored.variable("TERM-X").unwrap().bytes(), b"T001");
+        assert_eq!(
+            &restored.variable("LOGON-X").unwrap().bytes()[..5],
+            b"HELLO"
+        );
+        assert_eq!(restored.variable("LOGON-LEN").unwrap().bytes(), &[0, 5]);
+        assert_eq!(restored.variable("RC").unwrap().bytes(), &[0; 4]);
+        let trace = first
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        for operation in [
+            CicsOperation::ExtractProcess,
+            CicsOperation::ExtractAttributes,
+            CicsOperation::Point,
+            CicsOperation::ExtractAttach,
+            CicsOperation::ExtractTct,
+            CicsOperation::ExtractLogonMsg,
+        ] {
+            assert!(
+                trace
+                    .iter()
+                    .any(|entry| entry.operation == operation && entry.outcome == "NORMAL")
+            );
+        }
+        drop((restored, first, first_store));
+        let reopened_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = reopened_store.clone();
+        let second =
+            ProductServer::open(settings, second_platform, secrets, default_program_router())
+                .unwrap();
+        assert_eq!(
+            ConversationLedger::load(reopened_store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .process
+                .as_deref(),
+            Some(b"ORDER".as_slice())
+        );
+        let meta = reopened_store
+            .get_provider_state(
+                "cics-conversation-extract-v1",
+                invocation.run_unit_id.as_str(),
+            )
+            .unwrap()
+            .unwrap();
+        let meta: serde_json::Value = serde_json::from_slice(&meta.payload).unwrap();
+        assert_eq!(meta["selected_token"], serde_json::json!(lu_token));
+        assert_eq!(meta["logon_consumed"], true);
+        assert!(
+            second
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        drop((second, reopened_store));
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

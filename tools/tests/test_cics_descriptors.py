@@ -143,16 +143,16 @@ class CicsDescriptorTests(unittest.TestCase):
         contracts = cics_descriptors.build_contracts(ROOT)
         ir_registry = cics_descriptors.render_ir_registry(ROOT, contracts)
         self.assertEqual(
-            provider.count("CicsOperation::") + provider_tail.count("CicsOperation::"), 169
+            provider.count("CicsOperation::") + provider_tail.count("CicsOperation::"), 177
         )
-        self.assertEqual(lookup.count("CicsOperation::"), 169)
+        self.assertEqual(lookup.count("CicsOperation::"), 177)
         self.assertIn("pub(crate) const CICS_CONDITION_NAMES", provider)
         self.assertIn('"PGMIDERR"', provider)
         self.assertIn("CicsCommandFamily::TaskControl", provider)
         self.assertIn("CicsCommandFamily::Recovery", provider)
         self.assertIn("CicsCommandFamily::JournalControl", provider)
         self.assertEqual(len(catalog["_application_commands"]), 263)
-        self.assertEqual(len(catalog["_runtime_operations"]), 169)
+        self.assertEqual(len(catalog["_runtime_operations"]), 177)
         self.assertEqual(host.count("official_row:"), 263)
         self.assertIn(
             'official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"',
@@ -174,10 +174,10 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertFalse(contracts["execution_authority"])
         self.assertEqual(contracts["coverage_credit"], 0)
         self.assertEqual(contracts["semantic_credit"], 0)
-        self.assertEqual(contracts["counts"]["runtime_backed_commands"], 167)
-        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 167)
+        self.assertEqual(contracts["counts"]["runtime_backed_commands"], 175)
+        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 175)
         self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 0)
-        self.assertEqual(contracts["counts"]["advertised_commands"], 167)
+        self.assertEqual(contracts["counts"]["advertised_commands"], 175)
         contract_rows = [
             command for batch in contracts["batches"] for command in batch["commands"]
         ]
@@ -196,10 +196,10 @@ class CicsDescriptorTests(unittest.TestCase):
             if row["implementation_status"] != "unimplemented"
         }
         self.assertEqual(observed_runtime, expected_runtime)
-        self.assertEqual(len(observed_runtime), 167)
+        self.assertEqual(len(observed_runtime), 175)
         self.assertEqual(
             sum(row["implementation_status"] == "unimplemented" for row in contract_rows),
-            96,
+            88,
         )
         rows_by_label = {row["label"]: row for row in contract_rows}
         composite_options = {
@@ -285,10 +285,10 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
         self.assertIn("CICS_APPLICATION_REGISTRY_SHA256", ir_registry)
         self.assertEqual(contracts["registry"]["shape_commands"], 263)
-        self.assertEqual(contracts["registry"]["typed_handlers"], 167)
+        self.assertEqual(contracts["registry"]["typed_handlers"], 175)
         self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 0)
-        self.assertEqual(contracts["registry"]["advertised_commands"], 167)
-        self.assertEqual(contracts["registry"]["unready_handlers"], 96)
+        self.assertEqual(contracts["registry"]["advertised_commands"], 175)
+        self.assertEqual(contracts["registry"]["unready_handlers"], 88)
         self.assertIsNone(contracts["registry"]["default_handler"])
         self.assertEqual(contracts["participant_contract"]["status"], "bounded-ambiguity")
         self.assertEqual(contracts["participant_contract"]["execution_credit"], 0)
@@ -308,7 +308,7 @@ class CicsDescriptorTests(unittest.TestCase):
         )
         self.assertEqual(
             sum(row["contract"]["registry"]["advertised"] for row in contract_rows),
-            167,
+            175,
         )
         self.assertTrue(
             all(
@@ -636,7 +636,7 @@ class CicsDescriptorTests(unittest.TestCase):
         counts = {"api": 0, "spi-compatibility": 0}
         for operation in catalog["_runtime_operations"]:
             counts[operation["interface"]] += 1
-        self.assertEqual(counts, {"api": 167, "spi-compatibility": 2})
+        self.assertEqual(counts, {"api": 175, "spi-compatibility": 2})
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -748,20 +748,20 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertTrue(all(":api-commands:" in row["official_row"] for row in rows))
         self.assertFalse(any(":spi-" in row["official_row"] for row in rows))
         self.assertFalse(any(":fepi-" in row["official_row"] for row in rows))
-        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 167)
+        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 175)
         self.assertEqual(
             sum(row["readiness"] == "legacy-compatibility" for row in registry), 0
         )
-        self.assertEqual(sum(row["advertised"] for row in registry), 167)
-        self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 96)
+        self.assertEqual(sum(row["advertised"] for row in registry), 175)
+        self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 88)
         self.assertFalse(contracts["automatic_registration"])
         self.assertIsNone(contracts["registry"]["default_handler"])
         self.assertEqual(
             contracts["participant_contract"]["mutating_rows"],
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
-        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 131)
-        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 96)
+        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 133)
+        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 88)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(
             contracts["participant_contract"]["unknown_outcome"]["automatic_redispatch"]
@@ -849,14 +849,18 @@ class CicsDescriptorTests(unittest.TestCase):
                 self.assertEqual(grammar["status"], "bounded-ambiguity")
                 self.assertEqual(grammar["variants"], [])
 
-        for label in (
-            "GET CONTAINER",
-            "GDS EXTRACT ATTRIBUTES",
-        ):
+        for label in ("GET CONTAINER",):
             with self.subTest(label=label):
                 effect = rows[label]["contract"]["effect"]
                 self.assertEqual(effect["status"], "bounded-ambiguity")
                 self.assertIsNone(effect["mutating"])
+        self.assertEqual(
+            rows["GDS EXTRACT ATTRIBUTES"]["contract"]["effect"]["status"],
+            "resolved",
+        )
+        self.assertFalse(
+            rows["GDS EXTRACT ATTRIBUTES"]["contract"]["effect"]["mutating"]
+        )
         self.assertEqual(rows["WEB READ"]["contract"]["effect"]["status"], "resolved")
         self.assertFalse(rows["WEB READ"]["contract"]["effect"]["mutating"])
         self.assertEqual(rows["WAIT JOURNALNAME"]["contract"]["effect"]["status"], "resolved")
@@ -1049,11 +1053,11 @@ class CicsDescriptorTests(unittest.TestCase):
         ]
         self.assertEqual(
             sum("memory-read" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            155,
+            163,
         )
         self.assertEqual(
             sum("memory-write" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            167,
+            175,
         )
 
     def test_resource_selectors_are_family_scoped_and_input_only(self):
@@ -1224,6 +1228,14 @@ class CicsDescriptorTests(unittest.TestCase):
                 "ENTER TRACENUM",
                 "EXTRACT CERTIFICATE",
                 "EXTRACT TCPIP",
+                "EXTRACT ATTACH",
+                "EXTRACT ATTRIBUTES",
+                "GDS EXTRACT ATTRIBUTES",
+                "EXTRACT LOGONMSG",
+                "EXTRACT PROCESS",
+                "GDS EXTRACT PROCESS",
+                "EXTRACT TCT",
+                "POINT",
                 "FORMATTIME",
                 "HANDLE ABEND",
                 "HANDLE AID",

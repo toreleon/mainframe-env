@@ -10,6 +10,9 @@ pub mod bts_lifecycle;
 mod bts_link;
 mod builtin_function;
 mod condition;
+mod conversation_extract;
+#[cfg(test)]
+pub(in crate::service) use conversation_extract::{ExtractMetadata, LuName, publish_metadata};
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -160,6 +163,23 @@ pub use bridge_start::{CICS_BRIDGE_START_WORK_GENERATION, CicsBridgeStartIntent}
 pub use bts_child_link::CicsBtsChildCompletion;
 pub use bts_link::CicsBtsLinkContext;
 pub(super) use condition::respond as condition;
+pub(super) fn condition_for_request(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    problem: HostProblem,
+) -> Result<CicsResponse, HostProblem> {
+    if matches!(
+        request.operation,
+        mainframe_env_host_api::CicsOperation::GdsExtractAttributes
+            | mainframe_env_host_api::CicsOperation::GdsExtractProcess
+    ) || request.operation == mainframe_env_host_api::CicsOperation::ExtractAttributes
+        && problem == HostProblem::Unsupported
+    {
+        return Err(problem);
+    }
+    condition::respond(service, run, &request.condition_policy, problem)
+}
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
 pub use diagnostics::{
@@ -306,6 +326,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::BuiltinFunctionControl => {
             builtin_function::invoke(service, run, request)
+        }
+        crate::generated::CicsCommandFamily::ConversationControl => {
+            conversation_extract::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

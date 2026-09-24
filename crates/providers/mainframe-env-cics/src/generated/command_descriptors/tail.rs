@@ -2,7 +2,63 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 16] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 24] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebConverse,
+        syntax: "WEB CONVERSE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0241",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebEndBrowse,
+        syntax: "WEB ENDBROWSE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0242",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebExtract,
+        syntax: "WEB EXTRACT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0243",
+        family: CicsCommandFamily::WebControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebOpen,
+        syntax: "WEB OPEN",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0244",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebParseUrl,
+        syntax: "WEB PARSE URL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0245",
+        family: CicsCommandFamily::WebControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebRead,
+        syntax: "WEB READ",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0246",
+        family: CicsCommandFamily::WebControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebReadNext,
+        syntax: "WEB READNEXT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0247",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WebReceive,
+        syntax: "WEB RECEIVE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0248",
+        family: CicsCommandFamily::WebControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::WebRetrieve,
         syntax: "WEB RETRIEVE",

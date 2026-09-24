@@ -20,6 +20,22 @@ pub enum CicsOperation {
     LinkAcqProcess,
     /// Synchronously activate one named child activity.
     LinkActivity,
+    /// Read the task's LUTYPE6.1 or MRO attach-header fields.
+    ExtractAttach,
+    /// Read mapped APPC or MRO conversation state.
+    ExtractAttributes,
+    /// Read APPC basic state and its GDS return code.
+    GdsExtractAttributes,
+    /// Consume the task's one-shot terminal logon message.
+    ExtractLogonMsg,
+    /// Read the principal mapped APPC attach process.
+    ExtractProcess,
+    /// Read the principal APPC basic attach process.
+    GdsExtractProcess,
+    /// Resolve an LUTYPE6.1 network name to local system/terminal names.
+    ExtractTct,
+    /// Position the task on an owned LUTYPE6.1 or MRO facility.
+    Point,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
     /// Return checked virtual addresses for task storage areas.
@@ -336,6 +352,14 @@ impl CicsOperation {
             Self::LinkAcqActivity => "LinkAcqActivity",
             Self::LinkAcqProcess => "LinkAcqProcess",
             Self::LinkActivity => "LinkActivity",
+            Self::ExtractAttach => "ExtractAttach",
+            Self::ExtractAttributes => "ExtractAttributes",
+            Self::GdsExtractAttributes => "GdsExtractAttributes",
+            Self::ExtractLogonMsg => "ExtractLogonMsg",
+            Self::ExtractProcess => "ExtractProcess",
+            Self::GdsExtractProcess => "GdsExtractProcess",
+            Self::ExtractTct => "ExtractTct",
+            Self::Point => "Point",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
             Self::AddressSet => "AddressSet",
@@ -532,6 +556,8 @@ impl CicsOperation {
                 | Self::LinkAcqActivity
                 | Self::LinkAcqProcess
                 | Self::LinkActivity
+                | Self::ExtractLogonMsg
+                | Self::Point
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -688,6 +714,18 @@ impl CicsOperation {
             .map(|word| word.split('(').next().unwrap_or(word));
         Some(match (first, second) {
             ("ABEND", _) => Self::Abend,
+            ("EXTRACT", Some("ATTACH")) => Self::ExtractAttach,
+            ("EXTRACT", Some("ATTRIBUTES")) => Self::ExtractAttributes,
+            ("EXTRACT", Some("LOGONMSG")) => Self::ExtractLogonMsg,
+            ("EXTRACT", Some("PROCESS")) => Self::ExtractProcess,
+            ("EXTRACT", Some("TCT")) => Self::ExtractTct,
+            ("GDS", Some("EXTRACT")) if words.get(2).is_some_and(|word| word == "ATTRIBUTES") => {
+                Self::GdsExtractAttributes
+            }
+            ("GDS", Some("EXTRACT")) if words.get(2).is_some_and(|word| word == "PROCESS") => {
+                Self::GdsExtractProcess
+            }
+            ("POINT", _) => Self::Point,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
             ("ADDRESS", _) => Self::Address,

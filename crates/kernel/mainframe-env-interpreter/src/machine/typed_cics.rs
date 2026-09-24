@@ -196,6 +196,9 @@ pub(super) fn execute(
     if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
         retrieve::release_temporary_storage_set(machine);
     }
+    if plan.operation == CicsPlanOperation::ExtractLogonMsg {
+        retrieve::release_logon_message_set(machine);
+    }
     if matches!(
         plan.operation,
         CicsPlanOperation::ReceivePartn
@@ -510,6 +513,83 @@ pub(super) fn execute(
             tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
         }
         match output.name {
+            CicsOutputName::LogonSet | CicsOutputName::PipList => {
+                let capacity = retrieve::allocation_capacity(machine, &target)?;
+                arguments.insert(
+                    format!("{key}.MAXLENGTH"),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        capacity.to_string().into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::LogonInto => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "INTO.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::ProcessName => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "PROCNAME.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::AttachProcess
+            | CicsOutputName::AttachResource
+            | CicsOutputName::AttachReturnProcess
+            | CicsOutputName::AttachReturnResource
+            | CicsOutputName::AttachQueue => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    format!("{key}.MAXLENGTH"),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::AttachIuType
+            | CicsOutputName::AttachDataStream
+            | CicsOutputName::AttachRecordFormat
+            | CicsOutputName::ConversationState
+            | CicsOutputName::ConversationData
+            | CicsOutputName::ConversationRetCode
+            | CicsOutputName::LogonLength
+            | CicsOutputName::ProcessLength
+            | CicsOutputName::SyncLevel
+            | CicsOutputName::PipLength
+            | CicsOutputName::TctSysId
+            | CicsOutputName::TctTermId => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate
@@ -1164,6 +1244,76 @@ mod tests {
         assert!(!machine.freed_allocations.contains(&base));
         retrieve::release_temporary_storage_set(&mut machine);
         assert!(machine.freed_allocations.contains(&base));
+    }
+
+    #[test]
+    fn extract_logonmsg_set_pointer_expires_at_the_next_extract() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("LOGON-PTR", 4);
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractLogonMsg,
+            "SET",
+            &CicsTarget::Resolved(slot.clone()),
+            &payload("mainframe-env.cics.payload@1", b"LOGON".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        let pointer = machine
+            .read_reference(&resolved_slot(&machine, &slot).unwrap())
+            .unwrap();
+        let (base, offset) = machine.decode_address(&pointer).unwrap().unwrap();
+        assert_eq!(offset, 0);
+        assert!(!machine.freed_allocations.contains(&base));
+        retrieve::release_logon_message_set(&mut machine);
+        assert!(machine.freed_allocations.contains(&base));
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractLogonMsg,
+            "SET",
+            &CicsTarget::Resolved(slot.clone()),
+            &payload("mainframe-env.cics.pointer-null@1", Vec::new()).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
+            Ok(vec![0; 4])
+        );
+    }
+
+    #[test]
+    fn extract_process_pip_length_uses_full_halfword_and_checks_host_bounds() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PIP-LEN", 2);
+        let target = CicsTarget::Resolved(slot.clone());
+        write_output(
+            &mut machine,
+            CicsOperation::ExtractProcess,
+            "PIPLENGTH",
+            &target,
+            &payload("mainframe-env.cics.decimal@1", b"32763".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
+            Ok(vec![0x7f, 0xfb])
+        );
+        for (operation, value) in [
+            (CicsOperation::ExtractProcess, b"32764".as_slice()),
+            (CicsOperation::GdsExtractProcess, b"764".as_slice()),
+        ] {
+            assert_eq!(
+                write_output(
+                    &mut machine,
+                    operation,
+                    "PIPLENGTH",
+                    &target,
+                    &payload("mainframe-env.cics.decimal@1", value.to_vec()).unwrap(),
+                    None,
+                ),
+                Err(MachineProblem::UnexpectedHostResult)
+            );
+        }
     }
 
     #[test]

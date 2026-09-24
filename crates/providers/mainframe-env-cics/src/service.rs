@@ -285,8 +285,7 @@ struct State {
     journals: BTreeMap<String, handlers::JournalRecord>,
     spool: handlers::SpoolState,
     web: handlers::WebState,
-    // Internal authority for the declared records-core slice. Command handlers
-    // remain deliberately disconnected until the producer/consumer slices seal.
+    // Interval records remain disconnected until their producer and consumer slices seal.
     #[allow(dead_code)]
     interval_records: BTreeMap<String, handlers::IntervalStartRecord>,
     #[cfg(feature = "fault-injection")]
@@ -1788,7 +1787,8 @@ impl CicsService {
             | CicsCommandFamily::BtsControl
             | CicsCommandFamily::Diagnostics
             | CicsCommandFamily::SecurityControl
-            | CicsCommandFamily::BuiltinFunctionControl => handlers::invoke_extended_control(
+            | CicsCommandFamily::BuiltinFunctionControl
+            | CicsCommandFamily::ConversationControl => handlers::invoke_extended_control(
                 self,
                 run,
                 &request,
@@ -1796,7 +1796,7 @@ impl CicsService {
                 retention_tick,
             ),
         }
-        .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
+        .or_else(|problem| handlers::condition_for_request(self, run, &request, problem))
     }
 
     pub fn reconcile_unit_of_work(
@@ -3672,17 +3672,23 @@ mod tests {
         fail_next: AtomicBool,
     }
 
-    struct FailCicsReplayCasStore {
-        inner: MemoryStore,
+    struct FailCicsReplayCasStore<S> {
+        inner: S,
         fail_insert: AtomicBool,
         fail_next: AtomicBool,
         fail_session: AtomicBool,
     }
 
-    impl FailCicsReplayCasStore {
+    impl FailCicsReplayCasStore<MemoryStore> {
         fn new() -> Self {
+            Self::with_inner(MemoryStore::new(Default::default()))
+        }
+    }
+
+    impl<S> FailCicsReplayCasStore<S> {
+        fn with_inner(inner: S) -> Self {
             Self {
-                inner: MemoryStore::new(Default::default()),
+                inner,
                 fail_insert: AtomicBool::new(false),
                 fail_next: AtomicBool::new(false),
                 fail_session: AtomicBool::new(false),
@@ -3690,7 +3696,9 @@ mod tests {
         }
     }
 
-    impl mainframe_env_store_api::AuditSink for FailCicsReplayCasStore {
+    impl<S: ProviderStateStore + ArtifactStore> mainframe_env_store_api::AuditSink
+        for FailCicsReplayCasStore<S>
+    {
         fn record_audit(
             &self,
             record: mainframe_env_execution_api::AuditRecord,
@@ -3709,7 +3717,7 @@ mod tests {
         }
     }
 
-    impl ArtifactStore for FailCicsReplayCasStore {
+    impl<S: ProviderStateStore + ArtifactStore> ArtifactStore for FailCicsReplayCasStore<S> {
         fn health(&self) -> Result<mainframe_env_store_api::ArtifactStoreHealth, StoreError> {
             self.inner.health()
         }
@@ -3727,7 +3735,7 @@ mod tests {
         }
     }
 
-    impl ProviderStateStore for FailCicsReplayCasStore {
+    impl<S: ProviderStateStore + ArtifactStore> ProviderStateStore for FailCicsReplayCasStore<S> {
         fn get_provider_state(
             &self,
             namespace: &str,
@@ -38867,4 +38875,6 @@ mod tests {
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
+
+    include!("handlers/conversation_extract/tests.rs");
 }
