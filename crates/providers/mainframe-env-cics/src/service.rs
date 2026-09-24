@@ -37498,8 +37498,8 @@ mod tests {
                 )
             })
         };
-        let left = allocate(first, first_invocation, 701);
-        let right = allocate(second, second_invocation, 702);
+        let left = allocate(first, first_invocation.clone(), 701);
+        let right = allocate(second, second_invocation.clone(), 702);
         let left = left.join().unwrap();
         let right = right.join().unwrap();
         let mut wins = Vec::new();
@@ -37530,6 +37530,92 @@ mod tests {
         );
         assert!(
             load_conversation_replay(&reopened, &format!("outer-{}", wins[0]))
+                .unwrap()
+                .is_some()
+        );
+        drop(reopened);
+        let winner = if wins[0] == 701 {
+            first_invocation
+        } else {
+            second_invocation
+        };
+        let resumed = service(Arc::new(
+            PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+        ));
+        resumed
+            .register_run(winner.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let token = [0, 0, 0, 1];
+        let connect = request(
+            CicsOperation::ConnectProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("PROCNAME".into(), cics_literal(b"TRN1")),
+                ("PROCLENGTH".into(), cics_decimal(4)),
+            ]),
+            703,
+        );
+        resumed
+            .invoke(&effect(&winner.run_unit_id, connect.clone(), 703), connect)
+            .unwrap();
+        let converse = request(
+            CicsOperation::Converse,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("FROM".into(), cics_literal(b"PING")),
+                ("INTO".into(), argument(b"INTO-X")),
+                ("CAPACITY.INTO".into(), cics_decimal(8)),
+            ]),
+            704,
+        );
+        let waiting = resumed
+            .invoke(
+                &effect(&winner.run_unit_id, converse.clone(), 704),
+                converse.clone(),
+            )
+            .unwrap();
+        assert_eq!(waiting.disposition, CicsDisposition::Suspended);
+        let reopened = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let staged = ConversationLedger::load(&reopened).unwrap();
+        let key = u32::from_be_bytes(token).to_string();
+        assert_eq!(
+            staged.exchanges[&key]
+                .pending_converse
+                .as_ref()
+                .unwrap()
+                .outbound
+                .data,
+            b"PING"
+        );
+        assert!(staged.exchanges[&key].outbound.is_empty());
+        drop(reopened);
+        resumed
+            .offer_conversation_peer_frame(
+                &winner.run_unit_id,
+                token,
+                ConversationPeerFrame {
+                    data: b"PONG".to_vec(),
+                    next_state: ConversationState::Receive,
+                    end_of_chain: false,
+                    inbound_fmh: false,
+                    signal: false,
+                },
+                "pg-converse-peer-1",
+            )
+            .unwrap();
+        let result = resumed
+            .invoke(
+                &effect(&winner.run_unit_id, converse.clone(), 704),
+                converse,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"PONG");
+        let reopened = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let finished = ConversationLedger::load(&reopened).unwrap();
+        assert_eq!(finished.exchanges[&key].outbound.len(), 1);
+        assert!(finished.exchanges[&key].pending_converse.is_none());
+        assert!(
+            load_conversation_replay(&reopened, "outer-704")
                 .unwrap()
                 .is_some()
         );
