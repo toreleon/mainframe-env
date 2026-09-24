@@ -31877,6 +31877,70 @@ mod tests {
     }
 
     #[test]
+    fn bts_run_outbox_admits_exact_work_after_sqlite_process_reopen() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsRunState};
+
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-bts-run-reopen-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let (run_id, work_id, root) = {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap();
+            authority
+                .define_process(
+                    BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1")
+                        .unwrap(),
+                    "UOW1",
+                    "EXEC1",
+                    "USER",
+                )
+                .unwrap();
+            authority.finish_uow("UOW1", "EXEC1", "USER", true).unwrap();
+            authority
+                .acquire("UOW2", "EXEC2", "USER", "TYPE", "ORDER", &root)
+                .unwrap();
+            let record = authority
+                .start_run(
+                    "TYPE", "ORDER", &root, None, false, None, "UOW2", "EXEC2", "USER", "UOW2:44",
+                    "run", [1; 32], [1; 32], 1_000, 4,
+                )
+                .unwrap();
+            assert!(store.get_work(&record.work_id).unwrap().is_none());
+            (record.run_id, record.work_id, root)
+        };
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_001)),
+            )
+            .unwrap();
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            let record = authority.load_run(&run_id).unwrap().unwrap();
+            assert_eq!(record.state, BtsRunState::Pending);
+            assert_eq!(record.activity_id, root);
+            assert_eq!(
+                store.get_work(&work_id).unwrap(),
+                Some(record.work_record().unwrap())
+            );
+            assert_eq!(cics.recover_bts_run_work().unwrap(), 1);
+            assert_eq!(
+                store.get_work(&work_id).unwrap(),
+                Some(record.work_record().unwrap())
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn bts_terminal_run_work_does_not_block_independent_recovery() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsRunState};
 
