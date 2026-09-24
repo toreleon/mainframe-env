@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 198);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 200);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8668,6 +8668,112 @@ mod tests {
                 .unwrap()
                 .keyboard_unlocked
         );
+    }
+
+    #[test]
+    fn registered_disconnect_and_reset_public_routes_sever_only_selected_facility() {
+        for operation in [CicsOperation::IssueDisconnect, CicsOperation::IssueReset] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = service(store.clone());
+            let (invocation, session) = registered(&service);
+            service
+                .lock()
+                .unwrap()
+                .sessions
+                .get_mut(session.as_str())
+                .unwrap()
+                .input = handlers::TerminalInput::identified("T001".into());
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "T001".into(),
+                kind: handlers::IssueDeviceKind::Display3270,
+                control_unit: Some("CU1".into()),
+                printers: vec![],
+                programs: vec![],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            let command = request(operation, BTreeMap::new(), 1);
+            let first = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command.clone(),
+                )
+                .unwrap();
+            assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command
+                    )
+                    .unwrap(),
+                first
+            );
+            assert!(!service.lock().unwrap().sessions[session.as_str()].connected);
+            let saved = handlers::IssueDeviceRecord::load(store.as_ref(), "T001")
+                .unwrap()
+                .unwrap();
+            assert_eq!(saved.version, 2);
+            assert!(saved.state.disconnected);
+        }
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "S001".into(),
+            kind: handlers::IssueDeviceKind::Lu61,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let current = handlers::IssueDeviceRecord::load(store.as_ref(), "S001")
+            .unwrap()
+            .unwrap();
+        let mut owned = current.clone();
+        owned
+            .assign_lu61_owner(invocation.run_unit_id.as_str())
+            .unwrap();
+        current.persist(&mut owned, store.as_ref()).unwrap();
+        let command = request(
+            CicsOperation::IssueDisconnect,
+            BTreeMap::from([("SESSION".into(), cics_literal(b"S001"))]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command
+                )
+                .unwrap(),
+            first
+        );
+        assert!(service.lock().unwrap().sessions[session.as_str()].connected);
+        let saved = handlers::IssueDeviceRecord::load(store.as_ref(), "S001")
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.version, 3);
+        assert!(saved.state.disconnected);
     }
 
     #[test]

@@ -651,6 +651,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::IssueDisconnect,
+        syntax: "ISSUE DISCONNECT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0115",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueEnd,
         syntax: "ISSUE END",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0116",
@@ -725,6 +732,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "ISSUE REPLACE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0132",
         family: CicsCommandFamily::TerminalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::IssueReset,
+        syntax: "ISSUE RESET",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0133",
+        family: CicsCommandFamily::ConversationControl,
         mutating: true,
     },
     CicsCommandDescriptor {
@@ -1105,20 +1119,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::SecurityControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::VerifyPassword,
-        syntax: "VERIFY PASSWORD",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0228",
-        family: CicsCommandFamily::SecurityControl,
-        mutating: true,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::VerifyPhrase,
-        syntax: "VERIFY PHRASE",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0229",
-        family: CicsCommandFamily::SecurityControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1164,6 +1164,8 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[42],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[43],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[44],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[45],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[46],
 ];
 
 mod lookup;

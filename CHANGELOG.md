@@ -123,6 +123,9 @@ All notable changes to mainframe-env are documented here.
   route and compiled COBOL WAIT plan. It clears unprotected fields and MDTs,
   positions the cursor, restores the keyboard, and replays the saved result.
   The integrated registry is 196 typed and 67 unready.
+- Registered CIC-905 ISSUE DISCONNECT and RESET rows 0115 and 0133. Compiled
+  COBOL and public routes select default or alternate LU6.1 facilities with
+  exact replay; the integrated registry is 198 typed and 65 unready.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

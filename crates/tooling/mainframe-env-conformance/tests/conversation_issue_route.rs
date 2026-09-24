@@ -51,6 +51,20 @@ fn compiled_issue_device_markers_select_exact_host_operations_and_companion_flag
             None,
         ),
         (
+            "ISSUE DISCONNECT SESSION(SS-X)",
+            CicsPlanOperation::IssueDisconnect,
+            CicsOperation::IssueDisconnect,
+            None,
+            Some("SESSION"),
+        ),
+        (
+            "ISSUE RESET",
+            CicsPlanOperation::IssueReset,
+            CicsOperation::IssueReset,
+            None,
+            None,
+        ),
+        (
             "ISSUE LOAD PROGRAM('APP1') CONVERSE",
             CicsPlanOperation::IssueLoad,
             CicsOperation::IssueLoad,
@@ -70,7 +84,7 @@ fn compiled_case(
     operand: Option<&str>,
 ) {
     let source = format!(
-        "IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN."
+        "IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. 01 SS-X PIC X(4) VALUE 'S001'. PROCEDURE DIVISION. EXEC CICS {command} RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN."
     );
     let source_limits = SourceLimits::default();
     let path = LogicalPath::new("ISSUEEF.cbl", source_limits.max_path_bytes).unwrap();
