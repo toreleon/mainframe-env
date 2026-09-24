@@ -6760,6 +6760,124 @@ mod tests {
     }
 
     #[test]
+    fn issue_endfile_selected_provider_commit_is_atomic_and_replay_safe() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        let terminal = "T001".to_string();
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified(terminal.clone());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: terminal.clone(),
+            kind: handlers::IssueDeviceKind::Entry3740,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let command = request(
+            CicsOperation::IssueEndfile,
+            BTreeMap::from([("OPTION.ENDOUTPUT".into(), cics_option())]),
+            1,
+        );
+        let first = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        let state = handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(state.version, 2);
+        assert!(state.state.endfile && state.state.endoutput);
+        let replay = handlers::invoke_issue_device(&service, &mut run, &command).unwrap();
+        assert_eq!(replay, first);
+        assert_eq!(
+            handlers::IssueDeviceRecord::load(store.as_ref(), &terminal)
+                .unwrap()
+                .unwrap()
+                .version,
+            2
+        );
+        let malformed = request(
+            CicsOperation::IssueEndfile,
+            BTreeMap::from([("OPTION.ENDFILE".into(), cics_option())]),
+            2,
+        );
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &malformed),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn issue_device_saf_denial_precedes_durable_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = command_authorities(true);
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, session) = registered(&service);
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("T002".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "T002".into(),
+            kind: handlers::IssueDeviceKind::Entry3740,
+            control_unit: None,
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let mut run = service
+            .lock()
+            .unwrap()
+            .runs
+            .remove(&invocation.run_unit_id)
+            .unwrap();
+        let command = request(CicsOperation::IssueEndfile, BTreeMap::new(), 1);
+        assert_eq!(
+            handlers::invoke_issue_device(&service, &mut run, &command),
+            Err(HostProblem::Unauthorized)
+        );
+        let state = handlers::IssueDeviceRecord::load(store.as_ref(), "T002")
+            .unwrap()
+            .unwrap();
+        assert_eq!(state.version, 1);
+        assert!(!state.state.endfile);
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "FACILITY"
+                        && resource == "CICS.ISSUE.DEVICE.T002"
+                        && *intent == AccessIntent::Update
+                })
+        );
+    }
+
+    #[test]
     fn document_set_replaces_case_sensitive_symbols_without_retroactive_content_changes() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());

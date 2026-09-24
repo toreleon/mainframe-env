@@ -12,6 +12,10 @@ mod host_boundary;
 mod interval;
 mod interval_control;
 mod issue_device;
+#[cfg(test)]
+pub(in crate::service) use issue_device::{
+    IssueDeviceDefinition, IssueDeviceKind, IssueDeviceRecord, invoke as invoke_issue_device,
+};
 mod journal_control;
 mod limits;
 mod program_control;

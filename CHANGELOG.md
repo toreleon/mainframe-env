@@ -34,6 +34,10 @@ All notable changes to mainframe-env are documented here.
   and 3650 ISSUE effects, with CAS and SQLite reopen checks. Conversation
   ownership remains with the shared APPC/MRO protocol ledger.
 
+- Added a guarded provider route for the 3740 ENDFILE/ENDOUTPUT and 3650
+  EODS/LOAD ISSUE commands. Device state and an exact owner-bound replay
+  receipt commit atomically after SAF, with bounded receipt retention.
+
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.

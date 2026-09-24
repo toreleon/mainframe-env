@@ -84,6 +84,10 @@ pub(in crate::service) fn invoke(
         | CicsOperation::IssueReplace
         | CicsOperation::IssueSend
         | CicsOperation::IssueWait => outboard::invoke(service, run, request),
+        CicsOperation::IssueEndfile
+        | CicsOperation::IssueEndoutput
+        | CicsOperation::IssueEods
+        | CicsOperation::IssueLoad => super::issue_device::invoke(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
         CicsOperation::PurgeMessage => bms::purge(service, run, request),
