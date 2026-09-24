@@ -35,6 +35,12 @@ All notable changes to mainframe-env are documented here.
   the shared ledger, then retain its attempt marker and confirmed transition
   across restart. No transport or partner result is inferred from the CAS.
 
+- Added internal mapped ISSUE staging with source-shaped token selection,
+  owner and DPL checks, SAF, suspended exact retry, and a final replay receipt
+  written with an explicitly confirmed control. SQLite restart preserves the
+  pending and completed states. Public ISSUE rows remain unregistered until
+  carrier and partner consumption are wired.
+
 - Verified default ISSUE DISCONNECT and compatibility RESET against two
   concurrent PostgreSQL providers and restart replay. Each device and source
   session advances once; both catalog rows remain unregistered.

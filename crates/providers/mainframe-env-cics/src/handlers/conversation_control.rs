@@ -22,6 +22,7 @@ mod gds_assign;
 mod gds_connect_process;
 mod gds_free;
 mod gds_issue;
+mod issue_staging;
 mod issue_transition;
 mod ledger;
 mod peer;
@@ -40,7 +41,10 @@ pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
 };
 pub use gds_issue::{GdsIssueFailure, GdsIssueFlow};
-pub use issue_transition::{IssuePendingControl, IssueValidationProblem};
+pub(in crate::service) use issue_staging::{
+    confirm as confirm_issue_control, mark_attempted as mark_issue_control_attempted,
+};
+pub use issue_transition::{IssuePendingControl, IssueRequestIdentity, IssueValidationProblem};
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
     ConversationSystemDefinition,
@@ -76,6 +80,13 @@ pub(in crate::service) fn invoke(
             gds_free::invoke(service, run, request, retention_tick)
         }
         CicsOperation::Converse => converse::invoke(service, run, request, retention_tick),
+        CicsOperation::IssueAbend
+        | CicsOperation::IssueConfirmation
+        | CicsOperation::IssueError
+        | CicsOperation::IssuePrepare
+        | CicsOperation::IssueSignal => {
+            issue_staging::invoke(service, run, request, retention_tick)
+        }
         _ => Err(HostProblem::Unsupported),
     }
 }

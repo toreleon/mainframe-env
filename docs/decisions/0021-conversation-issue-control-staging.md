@@ -29,10 +29,11 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
    attempted control cannot be silently discarded by task cleanup. A carrier
    retry must reconcile the stable ID. Only an explicit confirmed partner
    result may apply the state transition and clear the pending record.
-4. Command handlers must persist exact replay and audit with the staged
-   transition, and must use the data/wait lane's confirmed transport boundary
-   for partner delivery and consumption. This ADR grants no catalog readiness
-   until those routes and recovery gates pass.
+4. Command handlers retain exact request identity in the staged record and
+   write the final replay receipt atomically with the confirmed transition.
+   They must use the data/wait lane's confirmed transport boundary for partner
+   delivery and consumption. This ADR grants no catalog readiness until
+   those routes and recovery gates pass.
 
 ## Consequences
 
@@ -45,3 +46,6 @@ The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
   An isolated PostgreSQL race proves one staged CAS winner and restart of the
   attempted control. Provider routing, partner consumption, and selected
   compiled execution remain separate acceptance gates.
+- The internal mapped provider path can stage and replay an ISSUE intent, but
+  has no carrier dispatch yet. It returns suspended while the control is
+  pending and yields a final receipt only after a trusted confirmed result.

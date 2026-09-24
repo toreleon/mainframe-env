@@ -8199,6 +8199,333 @@ mod tests {
     }
 
     #[test]
+    fn mapped_issue_route_stages_and_replays_confirmed_control() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 2,
+                enabled: true,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let token = service
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        let command = request(
+            CicsOperation::IssueAbend,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("STATE".into(), argument(b"STATE-X")),
+            ]),
+            1,
+        );
+        let stage = |run: &mut Run, request: &CicsRequest| {
+            handlers::invoke_extended_control(
+                &service,
+                run,
+                request,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+        };
+        assert_eq!(
+            stage(&mut run, &command).unwrap().disposition,
+            CicsDisposition::Suspended
+        );
+        let first = ConversationLedger::load(store.as_ref()).unwrap();
+        let pending = first
+            .conversation(token)
+            .unwrap()
+            .pending_issue
+            .as_ref()
+            .unwrap();
+        assert_eq!(pending.flow, GdsIssueFlow::Abend);
+        assert_eq!(pending.request.as_ref().unwrap().principal, "IBMUSER");
+        assert!(pending.request.as_ref().unwrap().state_output);
+        assert_eq!(
+            first.conversation(token).unwrap().state,
+            ConversationState::Allocated
+        );
+        assert_eq!(
+            stage(&mut run, &command).unwrap().disposition,
+            CicsDisposition::Suspended
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref()).unwrap().version,
+            first.version
+        );
+        let mut changed = command.clone();
+        changed.arguments.remove("STATE");
+        assert_eq!(
+            stage(&mut run, &changed),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let foreign_invocation = invocation_for("foreign-issue-stage", BTreeMap::new());
+        let foreign_session = SessionId::new("foreign-issue-stage", 64).unwrap();
+        service.create_session(&foreign_session, 24, 80).unwrap();
+        service
+            .register_run(
+                foreign_invocation.clone(),
+                &foreign_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let mut foreign = service.lock().unwrap().runs[&foreign_invocation.run_unit_id].clone();
+        let foreign_request = request(
+            CicsOperation::IssueAbend,
+            BTreeMap::from([("CONVID".into(), cics_literal(&token))]),
+            2,
+        );
+        assert_eq!(
+            stage(&mut foreign, &foreign_request),
+            Err(HostProblem::Condition {
+                name: "NOTALLOC".into(),
+                response: 61,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            ConversationLedger::load(store.as_ref()).unwrap().version,
+            first.version
+        );
+        let pending_id = first
+            .conversation(token)
+            .unwrap()
+            .pending_issue
+            .as_ref()
+            .unwrap()
+            .id;
+        assert_eq!(
+            handlers::confirm_issue_control(&service, &mut run, token, "outer-1", pending_id),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        handlers::mark_issue_control_attempted(&service, &mut run, token, "outer-1", pending_id)
+            .unwrap();
+        handlers::confirm_issue_control(&service, &mut run, token, "outer-1", pending_id).unwrap();
+        assert_eq!(
+            handlers::confirm_issue_control(&service, &mut run, token, "outer-1", pending_id),
+            Ok(())
+        );
+        let completed = stage(&mut run, &command).unwrap();
+        assert_eq!(completed.disposition, CicsDisposition::Complete);
+        assert_eq!(completed.outputs["STATE"].bytes(), &86_i32.to_be_bytes());
+        let final_state = ConversationLedger::load(store.as_ref()).unwrap();
+        assert!(final_state.conversation(token).unwrap().released);
+        assert!(
+            final_state
+                .conversation(token)
+                .unwrap()
+                .pending_issue
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn mapped_issue_route_restarts_with_pending_and_final_receipt_on_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-route-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("issue-route-restart", BTreeMap::new());
+        let session = SessionId::new("issue-route-restart", 64).unwrap();
+        let token;
+        let mut run;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            token = service
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcMapped,
+                )
+                .unwrap();
+            run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+            let command = request(
+                CicsOperation::IssueAbend,
+                BTreeMap::from([
+                    ("CONVID".into(), cics_literal(&token)),
+                    ("STATE".into(), argument(b"STATE-X")),
+                ]),
+                1,
+            );
+            assert_eq!(
+                handlers::invoke_extended_control(
+                    &service,
+                    &mut run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+        let command = request(
+            CicsOperation::IssueAbend,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("STATE".into(), argument(b"STATE-X")),
+            ]),
+            1,
+        );
+        let id;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            assert_eq!(
+                handlers::invoke_extended_control(
+                    &service,
+                    &mut run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+                .unwrap()
+                .disposition,
+                CicsDisposition::Suspended
+            );
+            let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+            id = ledger
+                .conversation(token)
+                .unwrap()
+                .pending_issue
+                .as_ref()
+                .unwrap()
+                .id;
+            handlers::mark_issue_control_attempted(&service, &mut run, token, "outer-1", id)
+                .unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            assert!(
+                ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .conversation(token)
+                    .unwrap()
+                    .pending_issue
+                    .as_ref()
+                    .unwrap()
+                    .attempted
+            );
+            handlers::confirm_issue_control(&service, &mut run, token, "outer-1", id).unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            let response = handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            )
+            .unwrap();
+            assert_eq!(response.disposition, CicsDisposition::Complete);
+            assert_eq!(response.outputs["STATE"].bytes(), &86_i32.to_be_bytes());
+            assert!(
+                ConversationLedger::load(store.as_ref())
+                    .unwrap()
+                    .conversation(token)
+                    .unwrap()
+                    .released
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn mapped_issue_route_rejects_dpl_principal_before_staging() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        let invocation = invocation_for(
+            "dpl-issue-stage",
+            BTreeMap::from([(
+                "cics.execution-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.execution-context@1",
+                    b"dpl-synconreturn".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let session = SessionId::new("dpl-issue-stage", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let token = service
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        let command = request(
+            CicsOperation::IssueAbend,
+            BTreeMap::from([("CONVID".into(), cics_literal(&token))]),
+            1,
+        );
+        let before = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            handlers::invoke_extended_control(
+                &service,
+                &mut run,
+                &command,
+                crate::generated::CicsCommandFamily::ConversationControl,
+                100,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        );
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+    }
+
+    #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn issue_endfile_unknown_outcome_replays_after_postgres_restart() {
         let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")

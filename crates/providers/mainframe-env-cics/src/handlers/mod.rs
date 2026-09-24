@@ -218,9 +218,12 @@ pub use conversation_control::{
     ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
     ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
     GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow,
-    GdsReturnCode, IssueValidationProblem, MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES,
-    MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES,
-    load_conversation_replay, prune_conversation_replays,
+    GdsReturnCode, IssueRequestIdentity, IssueValidationProblem, MAX_BASIC_PIP_BYTES,
+    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
+    MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay, prune_conversation_replays,
+};
+pub(in crate::service) use conversation_control::{
+    confirm_issue_control, mark_issue_control_attempted,
 };
 pub(super) use conversation_control::{
     context as conversation_context, deadline as conversation_deadline,

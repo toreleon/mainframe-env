@@ -20,6 +20,49 @@ pub struct IssuePendingControl {
     pub id: u64,
     #[serde(default, skip_serializing_if = "is_false")]
     pub attempted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<IssueRequestIdentity>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssueRequestIdentity {
+    pub principal: String,
+    pub mutation_sequence: u64,
+    pub digest: [u8; 32],
+    pub deadline_tick: u64,
+    pub retain_until_tick: u64,
+    pub state_output: bool,
+    pub convdata_output: bool,
+    pub retcode_output: bool,
+}
+
+impl IssueRequestIdentity {
+    pub fn validate(&self) -> Result<(), ConversationProblem> {
+        if self.principal.is_empty()
+            || self.principal.len() > 128
+            || self.principal.contains('\0')
+            || self.mutation_sequence == 0
+            || self.deadline_tick == 0
+            || self.retain_until_tick < self.deadline_tick
+        {
+            return Err(ConversationProblem::Malformed);
+        }
+        Ok(())
+    }
+}
+
+impl IssuePendingControl {
+    pub fn matches_request(
+        &self,
+        effect_key: &str,
+        request: &IssueRequestIdentity,
+    ) -> Result<(), ConversationProblem> {
+        if self.effect_key != effect_key || self.request.as_ref() != Some(request) {
+            return Err(ConversationProblem::StaleOwner);
+        }
+        Ok(())
+    }
 }
 
 fn is_false(value: &bool) -> bool {
@@ -48,6 +91,11 @@ impl ConversationRecord {
             || pending.effect_key.contains('\0')
             || pending.id == 0
             || pending.id > self.sequence
+            || pending.request.as_ref().is_some_and(|request| {
+                request.validate().is_err()
+                    || request.convdata_output && self.kind != ConversationKind::AppcBasic
+                    || request.retcode_output && self.kind != ConversationKind::AppcBasic
+            })
             || !issue_state_valid(self, pending.flow)
         {
             return Err(ConversationProblem::Malformed);
@@ -124,7 +172,35 @@ impl ConversationRecord {
             effect_key: effect_key.into(),
             id,
             attempted: false,
+            request: None,
         });
+        Ok(id)
+    }
+
+    pub fn stage_issue_request(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        basic: bool,
+        flow: GdsIssueFlow,
+        effect_key: &str,
+        request: IssueRequestIdentity,
+    ) -> Result<u64, IssueValidationProblem> {
+        request
+            .validate()
+            .map_err(IssueValidationProblem::Protocol)?;
+        if (request.convdata_output || request.retcode_output) && !basic {
+            return Err(IssueValidationProblem::Protocol(
+                ConversationProblem::Malformed,
+            ));
+        }
+        let id = self.stage_issue(owner, context, basic, flow, effect_key)?;
+        self.pending_issue
+            .as_mut()
+            .ok_or(IssueValidationProblem::Protocol(
+                ConversationProblem::Malformed,
+            ))?
+            .request = Some(request);
         Ok(id)
     }
 
@@ -383,17 +459,46 @@ mod tests {
     fn issue_control_requires_durable_attempt_before_confirmed_transition() {
         let mut record = connected(ConversationKind::AppcMapped, 2);
         record.state = ConversationState::Receive;
+        let request = IssueRequestIdentity {
+            principal: "IBMUSER".into(),
+            mutation_sequence: 1,
+            digest: [7; 32],
+            deadline_tick: 100,
+            retain_until_tick: 100,
+            state_output: true,
+            convdata_output: false,
+            retcode_output: false,
+        };
         let id = record
-            .stage_issue(
+            .stage_issue_request(
                 &owner(),
                 ConversationContext::Local,
                 false,
                 GdsIssueFlow::Signal,
                 "signal-1",
+                request.clone(),
             )
             .unwrap();
         assert_eq!(record.state, ConversationState::Receive);
         assert!(!record.pending_issue.as_ref().unwrap().attempted);
+        assert_eq!(
+            record
+                .pending_issue
+                .as_ref()
+                .unwrap()
+                .matches_request("signal-1", &request),
+            Ok(())
+        );
+        let mut changed = request.clone();
+        changed.digest = [8; 32];
+        assert_eq!(
+            record
+                .pending_issue
+                .as_ref()
+                .unwrap()
+                .matches_request("signal-1", &changed),
+            Err(ConversationProblem::StaleOwner)
+        );
         let bytes = record.encode().unwrap();
         let mut reopened = ConversationRecord::decode(&bytes).unwrap();
         assert_eq!(reopened, record);
