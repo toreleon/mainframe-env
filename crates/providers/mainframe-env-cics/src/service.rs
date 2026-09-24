@@ -5404,6 +5404,7 @@ mod tests {
             ("BUILD ATTACH", CicsOperation::BuildAttach),
             ("CONNECT PROCESS", CicsOperation::ConnectProcess),
             ("GDS CONNECT PROCESS", CicsOperation::GdsConnectProcess),
+            ("FREE", CicsOperation::FreeConversation),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
@@ -6706,7 +6707,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 159);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 160);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -36553,5 +36554,194 @@ mod tests {
             .clone();
         assert_eq!(record.state, ConversationState::Allocated);
         assert_eq!(record.sequence, 0);
+    }
+
+    #[test]
+    fn free_returns_mro_session_and_replays_omitted_principal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "MRO1".into(),
+            kind: ConversationKind::Mro,
+            capacity: 2,
+            enabled: true,
+        })
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"MRO1"))]),
+            1,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 1),
+                allocate,
+            )
+            .unwrap();
+        let token: [u8; 4] = allocated.outputs["EIBRSRCE"].bytes()[..4]
+            .try_into()
+            .unwrap();
+        let free = request(
+            CicsOperation::FreeConversation,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&token)),
+                ("STATE".into(), argument(b"STATE-X")),
+            ]),
+            2,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, free.clone(), 2),
+                free.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(first.outputs["STATE"].bytes(), &[0; 4]);
+        let record = ConversationLedger::load(store.as_ref())
+            .unwrap()
+            .conversation(token)
+            .unwrap()
+            .clone();
+        assert!(record.released);
+        assert_eq!(record.state, ConversationState::Free);
+        let repeated = cics
+            .invoke(&effect(&invocation.run_unit_id, free.clone(), 2), free)
+            .unwrap();
+        assert_eq!(repeated.outputs["STATE"], first.outputs["STATE"]);
+        assert_eq!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .sequence,
+            1
+        );
+
+        let principal = cics
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "MRO1",
+                ConversationKind::Mro,
+            )
+            .unwrap();
+        let implicit = request(CicsOperation::FreeConversation, BTreeMap::new(), 3);
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, implicit.clone(), 3),
+                implicit.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert!(
+            ConversationLedger::load(store.as_ref())
+                .unwrap()
+                .conversation(principal)
+                .unwrap()
+                .released
+        );
+        let replayed = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, implicit.clone(), 3),
+                implicit,
+            )
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+
+        let allocate = request(
+            CicsOperation::AllocateConversation,
+            BTreeMap::from([("SYSID".into(), cics_literal(b"MRO1"))]),
+            4,
+        );
+        let allocated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, allocate.clone(), 4),
+                allocate,
+            )
+            .unwrap();
+        assert_eq!(allocated.outputs["EIBRSRCE"].bytes()[..4], [0, 0, 0, 3]);
+    }
+
+    #[test]
+    fn free_rejects_basic_and_dpl_principal_without_release() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        cics.register_conversation_system(ConversationSystemDefinition {
+            sysid: "SYS1".into(),
+            kind: ConversationKind::AppcMapped,
+            capacity: 2,
+            enabled: true,
+        })
+        .unwrap();
+        let (local, _) = registered(&cics);
+        let allocate = request(
+            CicsOperation::GdsAllocateConversation,
+            BTreeMap::from([
+                ("SYSID".into(), cics_literal(b"SYS1")),
+                ("CONVID".into(), argument(b"TOKEN-X")),
+                ("RETCODE".into(), argument(b"RETURN-X")),
+            ]),
+            1,
+        );
+        let allocated = cics
+            .invoke(&effect(&local.run_unit_id, allocate.clone(), 1), allocate)
+            .unwrap();
+        let basic_token: [u8; 4] = allocated.outputs["CONVID"].bytes().try_into().unwrap();
+        let wrong_kind = request(
+            CicsOperation::FreeConversation,
+            BTreeMap::from([("CONVID".into(), cics_literal(&basic_token))]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&local.run_unit_id, wrong_kind.clone(), 2),
+                wrong_kind,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 0,
+            })
+        );
+
+        let dpl = invocation_for(
+            "dpl-free",
+            BTreeMap::from([(
+                "cics.execution-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.execution-context@1",
+                    b"dpl-synconreturn".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let session = SessionId::new("dpl-free", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(dpl.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let principal = cics
+            .install_conversation_principal_for_run(
+                &dpl.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcMapped,
+            )
+            .unwrap();
+        let free = request(
+            CicsOperation::FreeConversation,
+            BTreeMap::from([("CONVID".into(), cics_literal(&principal))]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&dpl.run_unit_id, free.clone(), 3), free),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        );
+        let ledger = ConversationLedger::load(store.as_ref()).unwrap();
+        assert!(!ledger.conversation(basic_token).unwrap().released);
+        assert!(!ledger.conversation(principal).unwrap().released);
     }
 }

@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added mapped APPC/MRO FREE for an explicit CONVID or the task's principal
+  facility. The durable CAS release and replay return the session to capacity;
+  STATE receives the pinned zero CVDA after release. DPL principal, basic
+  conversation, and unowned-token failures retain their distinct conditions.
+  The selected COBOL route reaches the provider with EIBFN `0422`; isolated
+  readiness is 158 typed, 0 legacy, and 105 unready.
+
 - Added APPC basic GDS CONNECT PROCESS against the task-owned conversation
   ledger. It uses six-byte RETCODE outcomes for process, PIP, sync-level,
   ownership and state failures, including DPL principal fencing, with no

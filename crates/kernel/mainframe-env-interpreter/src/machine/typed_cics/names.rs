@@ -307,11 +307,11 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         CicsPlanOperation::AllocateConversation => CicsOperation::AllocateConversation,
         CicsPlanOperation::BuildAttach => CicsOperation::BuildAttach,
         CicsPlanOperation::ConnectProcess => CicsOperation::ConnectProcess,
+        CicsPlanOperation::FreeConversation => CicsOperation::FreeConversation,
         CicsPlanOperation::GdsAllocateConversation
         | CicsPlanOperation::GdsAssignConversation
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
-        | CicsPlanOperation::FreeConversation
         | CicsPlanOperation::GdsFreeConversation => return None,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
