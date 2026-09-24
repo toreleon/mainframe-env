@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 197,
+    "markdown_documents": 198,
     "navigation_groups": 5,
     "normative_documents": 48,
     "xtask_commands": 170
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:b2c545aacaca3fac216de4ef98b05957a1f389bb7a558b4e424c3480464544bf",
+      "sha256": "sha256:d96c0f9b4de2ce6ff0e962fbe87504ede7c7fa2bc42f0f9fcf941e6f9e98c0b9",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1112,6 +1112,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/cic-906-bounded-validation.md",
+      "relative_links": 1,
+      "sha256": "sha256:d855d43e8511c8bc6734a1d72966e28532c9ff1e3db4170bf80d447077fe60cf",
+      "title": "CIC-906 bounded CICS validation slice",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/review/0.8.0.md",
       "relative_links": 5,
       "sha256": "sha256:2a91b82dfbc4d2db4c6dc15dfe5f17bbc2fb24e223ed8fbcd2598daf43816c7a",
@@ -1177,8 +1185,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 86,
-      "sha256": "sha256:354cc731b59bad6fbd262466061b1d1dadb626fd40bedb7c5dafedd47735b7db",
+      "relative_links": 88,
+      "sha256": "sha256:e3a5abee179127340b452289d938eca039168471e0106d739b021692bad95697",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },

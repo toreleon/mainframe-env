@@ -34,7 +34,8 @@ fuzz_target!(|data: &[u8]| {
     let Ok(file) = SourceFile::input("FUZZ.cbl", source.to_vec(), format, encoding, limits) else {
         return;
     };
-    let Ok(bundle) = SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits) else {
+    let Ok(bundle) = SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits)
+    else {
         return;
     };
     let _ = CobolCompiler::default().analyze(&bundle);
