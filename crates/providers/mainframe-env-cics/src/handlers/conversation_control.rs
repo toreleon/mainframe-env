@@ -17,7 +17,9 @@ mod gds;
 mod gds_allocate;
 mod gds_assign;
 mod gds_connect_process;
+mod gds_free;
 mod ledger;
+mod peer;
 mod replay;
 pub use definitions::{
     ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
@@ -57,6 +59,9 @@ pub(in crate::service) fn invoke(
             gds_connect_process::invoke(service, run, request, retention_tick)
         }
         CicsOperation::FreeConversation => free::invoke(service, run, request, retention_tick),
+        CicsOperation::GdsFreeConversation => {
+            gds_free::invoke(service, run, request, retention_tick)
+        }
         _ => Err(HostProblem::Unsupported),
     }
 }
