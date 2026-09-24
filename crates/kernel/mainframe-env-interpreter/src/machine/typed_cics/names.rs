@@ -36,6 +36,7 @@ pub(super) enum SlotUse {
     AbstimeInput,
     SeparatorInput,
     Output,
+    ExactOutput(usize),
     AbstimeOutput,
     FormatTextOutput(usize),
     MillisecondsOutput,
@@ -173,7 +174,8 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::TimerStatus => SlotUse::FullwordOutput,
         CicsOutputName::IssueState => SlotUse::FullwordOutput,
-        CicsOutputName::IssueConvData | CicsOutputName::IssueRetCode => SlotUse::Output,
+        CicsOutputName::IssueConvData => SlotUse::ExactOutput(24),
+        CicsOutputName::IssueRetCode => SlotUse::ExactOutput(6),
         CicsOutputName::EventName | CicsOutputName::SubEventName => SlotUse::Output,
         CicsOutputName::EventType | CicsOutputName::FireStatus => SlotUse::FullwordOutput,
         CicsOutputName::Commarea
@@ -1093,6 +1095,14 @@ mod issue_tests {
         }
         assert_eq!(output(CicsOutputName::IssueState), "STATE");
         assert_eq!(output(CicsOutputName::IssueRetCode), "RETCODE");
+        assert!(matches!(
+            output_slot_use(CicsOutputName::IssueConvData),
+            SlotUse::ExactOutput(24)
+        ));
+        assert!(matches!(
+            output_slot_use(CicsOutputName::IssueRetCode),
+            SlotUse::ExactOutput(6)
+        ));
         assert_eq!(operand(CicsOperandName::IssueConvid), "CONVID");
         assert_eq!(option(CicsPlanOption::IssueEndFile), "ENDFILE");
     }

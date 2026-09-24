@@ -115,6 +115,7 @@ pub(super) fn validate_machine_slot(
     if matches!(
         slot_use,
         SlotUse::Output
+            | SlotUse::ExactOutput(_)
             | SlotUse::CounterNumber
             | SlotUse::AbstimeOutput
             | SlotUse::FormatTextOutput(_)
@@ -137,6 +138,13 @@ pub(super) fn validate_machine_slot(
     }
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if let SlotUse::ExactOutput(expected) = slot_use
+        && layout.length != expected
+    {
+        return Err(invalid_plan(
+            "GDS ISSUE output area has the wrong byte length",
+        ));
     }
     if matches!(slot_use, SlotUse::HalfwordOutput)
         && (layout.category != LayoutCategory::Binary || layout.length != 2 || layout.scale != 0)

@@ -1054,6 +1054,31 @@ mod tests {
         )
     }
 
+    #[test]
+    fn gds_issue_output_areas_reject_wrong_storage_widths() {
+        for (name, output, expected) in [
+            ("CONVDATA-X", CicsOutputName::IssueConvData, 24usize),
+            ("RETCODE-X", CicsOutputName::IssueRetCode, 6usize),
+        ] {
+            for length in [expected - 1, expected, expected + 1] {
+                let (machine, slot) = machine_with_alphanumeric_slot(name, length);
+                let mut operation = machine.operations[0].clone();
+                operation.storage.push(StorageReference {
+                    storage: slot.storage,
+                    offset: 0,
+                    length: length as u64,
+                });
+                let result = validate_machine_slot(
+                    &machine,
+                    &operation,
+                    &slot,
+                    names::output_slot_use(output),
+                );
+                assert_eq!(result.is_ok(), length == expected, "{name} width {length}");
+            }
+        }
+    }
+
     /// Issue #207: compact FORMATTIME output leaves a wider field's suffix unchanged.
     #[test]
     fn compact_formattime_output_preserves_wider_field_suffix() {

@@ -39,6 +39,9 @@ All notable changes to mainframe-env are documented here.
 - Bound all twenty ISSUE MCEP operations to distinct host operation names in
   the interpreter, with exact ISSUE input, output, and option wire names.
 
+- Enforced the pinned GDS ISSUE output-area widths during interpreter storage
+  validation: CONVDATA is 24 bytes and RETCODE is 6 bytes.
+
 - Added a versioned, bounded device-definition/state record for 3270, 3740,
   and 3650 ISSUE effects, with CAS and SQLite reopen checks. Conversation
   ownership remains with the shared APPC/MRO protocol ledger.
