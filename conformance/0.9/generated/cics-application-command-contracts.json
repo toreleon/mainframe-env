@@ -12,7 +12,7 @@
   "inputs": {
     "command_descriptors": {
       "path": "conformance/0.9/cics/command-descriptors.json",
-      "file_sha256": "sha256:08dab052e2be177224c320cbcc390c67626f2d3c635afe10a591ed3d71b07717",
+      "file_sha256": "sha256:af06985dba30c6fd7f8dab88886340b3b4fa88ad5b770ef287201b7e172ea948",
       "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
     }
   },
@@ -447164,5 +447164,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:80756e31368b5009d25282de9df427624e065da689df73d18704d73f1a7a0a5f"
+  "contract_sha256": "sha256:6799734527f65f5fcc7c41752b019aa1dcc59e61b496ba1ca818992b0e874aa9"
 }
