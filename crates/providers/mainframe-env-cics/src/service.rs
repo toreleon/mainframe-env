@@ -7009,6 +7009,53 @@ mod tests {
             assert_eq!(device.version, 2);
             assert!(device.state.endfile && device.state.endoutput);
         }
+        let mut concurrent = request(
+            CicsOperation::IssueEndoutput,
+            BTreeMap::from([("OPTION.ENDFILE".into(), cics_option())]),
+            2,
+        );
+        concurrent.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("issue-pg-concurrent-{suffix}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let worker = service(store);
+            worker
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 3)
+                .unwrap();
+            let mut run = worker
+                .lock()
+                .unwrap()
+                .runs
+                .remove(&invocation.run_unit_id)
+                .unwrap();
+            let gate = barrier.clone();
+            let command = concurrent.clone();
+            workers.push(std::thread::spawn(move || {
+                gate.wait();
+                let result = handlers::invoke_issue_device(&worker, &mut run, &command);
+                match result {
+                    Err(HostProblem::UnknownOutcome) => {
+                        handlers::invoke_issue_device(&worker, &mut run, &command)
+                    }
+                    other => other,
+                }
+            }));
+        }
+        for worker in workers {
+            assert_eq!(worker.join().unwrap().unwrap().condition, "NORMAL");
+        }
+        let store = PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
+        let device = handlers::IssueDeviceRecord::load(&store, &terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(device.version, 3);
+        assert!(device.state.endfile && device.state.endoutput);
     }
 
     #[test]
