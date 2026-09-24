@@ -643,6 +643,51 @@ mod tests {
     }
 
     #[test]
+    fn malformed_pending_issue_fails_durable_decode() {
+        let mut record = connected(ConversationKind::AppcMapped, 2);
+        record
+            .stage_issue(
+                &owner(),
+                ConversationContext::Local,
+                false,
+                GdsIssueFlow::Prepare,
+                "prepare-1",
+            )
+            .unwrap();
+        for corrupt in [
+            {
+                let mut value = record.clone();
+                value.pending_issue.as_mut().unwrap().effect_key.clear();
+                value
+            },
+            {
+                let mut value = record.clone();
+                value.pending_issue.as_mut().unwrap().effect_key =
+                    "X".repeat(MAX_ISSUE_EFFECT_KEY + 1);
+                value
+            },
+            {
+                let mut value = record.clone();
+                value.pending_issue.as_mut().unwrap().id = value.sequence + 1;
+                value
+            },
+            {
+                let mut value = record.clone();
+                value.released = true;
+                value.state = ConversationState::Free;
+                value
+            },
+        ] {
+            assert_eq!(corrupt.encode(), Err(ConversationProblem::Malformed));
+            let bytes = serde_json::to_vec(&corrupt).unwrap();
+            assert_eq!(
+                ConversationRecord::decode(&bytes),
+                Err(ConversationProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn pending_issue_postgres_cas_race_and_restart_confirm_once() {
         let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
