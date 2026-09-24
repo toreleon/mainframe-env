@@ -624,8 +624,96 @@ mod tests {
     use super::*;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Barrier};
 
     static NEXT_SQLITE: AtomicU64 = AtomicU64::new(1);
+
+    fn race_for_root(store: Arc<dyn ProviderStateStore>) {
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", "DEFINE-UOW").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "DEFINE-UOW")
+                    .unwrap(),
+                "DEFINE-UOW",
+                "DEFINE-EXEC",
+                "USER",
+            )
+            .unwrap();
+        authority
+            .finish_uow("DEFINE-UOW", "DEFINE-EXEC", "USER", true)
+            .unwrap();
+        let barrier = Arc::new(Barrier::new(3));
+        let mut handles = Vec::new();
+        for number in 1..=2 {
+            let store = store.clone();
+            let barrier = barrier.clone();
+            let root = root.clone();
+            handles.push(std::thread::spawn(move || {
+                let uow = format!("ACQUIRE-UOW-{number}");
+                let execution = format!("ACQUIRE-EXEC-{number}");
+                barrier.wait();
+                (
+                    uow.clone(),
+                    BtsLifecycleStore::new(store.as_ref())
+                        .acquire(&uow, &execution, "USER", "TYPE", "ORDER", &root),
+                )
+            }));
+        }
+        barrier.wait();
+        let results = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            results.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|(_, result)| matches!(
+                    result,
+                    Err(HostProblem::Condition { name, response: 106, response2: 13 })
+                        if name == "PROCESSBUSY"
+                ))
+                .count(),
+            1
+        );
+        let owner = results
+            .iter()
+            .find(|(_, result)| result.is_ok())
+            .unwrap()
+            .0
+            .as_str();
+        assert_eq!(
+            authority
+                .load_process("TYPE", "ORDER")
+                .unwrap()
+                .unwrap()
+                .activities[&root]
+                .acquired_by
+                .as_deref(),
+            Some(owner)
+        );
+    }
+
+    #[test]
+    fn concurrent_root_acquire_has_one_owner_on_memory_and_sqlite() {
+        race_for_root(Arc::new(MemoryStore::new(Default::default())));
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-acquire-race-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            race_for_root(Arc::new(sqlite));
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn acquisition_and_definition_replay_exact_effect_after_restart() {
