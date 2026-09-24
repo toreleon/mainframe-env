@@ -99,6 +99,14 @@ fn syncpoint(
             _ => return Err(HostProblem::IdempotencyConflict),
         }
     } else {
+        if outcome == CicsUnitOfWorkOutcome::Committed {
+            super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref())
+                .preflight_pending_definition(
+                    run.invocation.run_unit_id.as_str(),
+                    run.invocation.execution_id.as_str(),
+                    run.invocation.principal.id().as_str(),
+                )?;
+        }
         service
             .store
             .put_provider_state(

@@ -68,7 +68,15 @@ impl<'a> BtsLifecycleStore<'a> {
                 return Err(HostProblem::IdempotencyConflict);
             }
             if acquisition.is_held() {
-                self.finish_uow(run_unit, owner_execution, owner_principal, commit)?;
+                self.finish_uow(run_unit, owner_execution, owner_principal, commit)
+                    .map_err(|problem| match problem {
+                        HostProblem::Condition {
+                            name,
+                            response: 108,
+                            response2: 2,
+                        } if commit && name == "PROCESSERR" => HostProblem::UnknownOutcome,
+                        other => other,
+                    })?;
             }
         }
         Ok(())

@@ -123,6 +123,23 @@ impl<'a> BtsLifecycleStore<'a> {
         process: &BtsProcess,
         run_unit: &str,
     ) -> Result<ProviderStateMutation, HostProblem> {
+        self.create_process_name(repository, process, Some(run_unit))
+    }
+
+    pub(super) fn publish_process_name(
+        &self,
+        repository: &str,
+        process: &BtsProcess,
+    ) -> Result<ProviderStateMutation, HostProblem> {
+        self.create_process_name(repository, process, None)
+    }
+
+    fn create_process_name(
+        &self,
+        repository: &str,
+        process: &BtsProcess,
+        pending_uow: Option<&str>,
+    ) -> Result<ProviderStateMutation, HostProblem> {
         if self.load_reservation(repository, &process.name)?.is_some() {
             return Err(duplicate_name());
         }
@@ -132,7 +149,7 @@ impl<'a> BtsLifecycleStore<'a> {
             process_name: process.name.clone(),
             process_type: process.process_type.clone(),
             root_id: process.root_id.clone(),
-            pending_uow: Some(run_unit.into()),
+            pending_uow: pending_uow.map(str::to_owned),
             row_version: 0,
         }
         .write(None)
@@ -205,6 +222,23 @@ mod tests {
         )
     }
 
+    fn define_nocheck(
+        authority: &BtsLifecycleStore<'_>,
+        process_type: &str,
+        repository: &str,
+        uow: &str,
+    ) -> Result<(), HostProblem> {
+        authority.define_process_nocheck_exact(
+            process(process_type, uow),
+            repository,
+            uow,
+            uow,
+            "USER",
+            "nocheck",
+            [2; 32],
+        )
+    }
+
     #[test]
     fn process_name_is_unique_across_types_sharing_a_repository() {
         let memory = MemoryStore::new(Default::default());
@@ -256,6 +290,129 @@ mod tests {
             assert_eq!(
                 define(&authority, "TYPE2", "BTS.REPO", "UOW2"),
                 Err(duplicate_name())
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn nocheck_defers_repository_collision_until_commit_preflight() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        define(&authority, "TYPE1", "BTS.REPO", "UOW1").unwrap();
+        authority.finish_uow("UOW1", "UOW1", "USER", true).unwrap();
+        define_nocheck(&authority, "TYPE2", "BTS.REPO", "UOW2").unwrap();
+        define_nocheck(&authority, "TYPE2", "BTS.REPO", "UOW2").unwrap();
+        assert_eq!(
+            authority.preflight_pending_definition("UOW2", "UOW2", "USER"),
+            Err(duplicate_name())
+        );
+        authority.finish_uow("UOW2", "UOW2", "USER", false).unwrap();
+        assert!(authority.load_process("TYPE2", "ORDER").unwrap().is_none());
+        assert!(authority.load_process("TYPE1", "ORDER").unwrap().is_some());
+    }
+
+    #[test]
+    fn nocheck_same_type_duplicate_does_not_mutate_the_existing_process() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        define(&authority, "TYPE1", "BTS.REPO", "UOW1").unwrap();
+        authority.finish_uow("UOW1", "UOW1", "USER", true).unwrap();
+        let existing = authority.load_process("TYPE1", "ORDER").unwrap().unwrap();
+        define_nocheck(&authority, "TYPE1", "BTS.REPO", "UOW2").unwrap();
+        assert!(
+            authority
+                .load_acquisition("UOW2")
+                .unwrap()
+                .unwrap()
+                .effect
+                .unwrap()
+                .deferred_duplicate
+        );
+        assert_eq!(
+            authority.preflight_pending_definition("UOW2", "UOW2", "USER"),
+            Err(duplicate_name())
+        );
+        authority.finish_uow("UOW2", "UOW2", "USER", false).unwrap();
+        assert_eq!(
+            authority.load_process("TYPE1", "ORDER").unwrap().unwrap(),
+            existing
+        );
+    }
+
+    #[test]
+    fn nocheck_publishes_name_only_at_syncpoint() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        define_nocheck(&authority, "TYPE1", "BTS.REPO", "UOW1").unwrap();
+        assert!(
+            !authority
+                .process_name_reserved("BTS.REPO", "ORDER")
+                .unwrap()
+        );
+        authority
+            .preflight_pending_definition("UOW1", "UOW1", "USER")
+            .unwrap();
+        authority.finish_uow("UOW1", "UOW1", "USER", true).unwrap();
+        assert!(
+            authority
+                .process_name_reserved("BTS.REPO", "ORDER")
+                .unwrap()
+        );
+        assert_eq!(
+            define(&authority, "TYPE2", "BTS.REPO", "UOW2"),
+            Err(duplicate_name())
+        );
+    }
+
+    #[test]
+    fn nocheck_definition_survives_sqlite_reopen_before_publication() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-nocheck-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            define_nocheck(
+                &BtsLifecycleStore::new(&sqlite),
+                "TYPE1",
+                "BTS.REPO",
+                "UOW1",
+            )
+            .unwrap();
+        }
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let authority = BtsLifecycleStore::new(&sqlite);
+            define_nocheck(&authority, "TYPE1", "BTS.REPO", "UOW1").unwrap();
+            assert!(
+                !authority
+                    .process_name_reserved("BTS.REPO", "ORDER")
+                    .unwrap()
+            );
+            authority
+                .preflight_pending_definition("UOW1", "UOW1", "USER")
+                .unwrap();
+            authority.finish_uow("UOW1", "UOW1", "USER", true).unwrap();
+        }
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let authority = BtsLifecycleStore::new(&sqlite);
+            assert!(
+                authority
+                    .process_name_reserved("BTS.REPO", "ORDER")
+                    .unwrap()
+            );
+            assert!(
+                authority
+                    .load_process("TYPE1", "ORDER")
+                    .unwrap()
+                    .unwrap()
+                    .pending_uow
+                    .is_none()
             );
         }
         std::fs::remove_dir_all(directory).unwrap();

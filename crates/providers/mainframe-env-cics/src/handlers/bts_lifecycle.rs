@@ -339,6 +339,12 @@ pub struct BtsAcquisitionEffect {
     /// Repository-name reservation, present for catalog-backed DEFINE.
     #[serde(default)]
     pub repository_resource: Option<String>,
+    /// DEFINE PROCESS NOCHECK defers repository-name reservation to syncpoint.
+    #[serde(default)]
+    pub nocheck: bool,
+    /// A duplicate process key has no provisional process row of its own.
+    #[serde(default)]
+    pub deferred_duplicate: bool,
 }
 
 impl BtsAcquisition {
@@ -396,6 +402,8 @@ impl BtsAcquisition {
                             effect.operation != "DEFINE PROCESS"
                                 || validate_identifier(resource, 44).is_err()
                         })
+                    || effect.nocheck && effect.repository_resource.is_none()
+                    || effect.deferred_duplicate && !effect.nocheck
             })
         {
             return Err(HostProblem::InfrastructureFailure);

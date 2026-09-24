@@ -31311,6 +31311,69 @@ mod tests {
     }
 
     #[test]
+    fn bts_nocheck_collision_fails_before_syncpoint_intent() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let first_root = BtsLifecycleStore::root_id("TYPE1", "ORDER", "UOW1").unwrap();
+        authority
+            .define_process_in_repository_exact(
+                BtsProcess::new(
+                    "TYPE1",
+                    "ORDER",
+                    &first_root,
+                    "MAIN",
+                    "BTS1",
+                    "IBMUSER",
+                    "UOW1",
+                )
+                .unwrap(),
+                "BTS.REPO",
+                "UOW1",
+                "EXEC1",
+                "IBMUSER",
+                "first",
+                [1; 32],
+            )
+            .unwrap();
+        authority
+            .finish_uow("UOW1", "EXEC1", "IBMUSER", true)
+            .unwrap();
+
+        let (invocation, _) = registered(&cics);
+        let run_unit = invocation.run_unit_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE2", "ORDER", run_unit).unwrap();
+        authority
+            .define_process_nocheck_exact(
+                BtsProcess::new("TYPE2", "ORDER", &root, "MAIN", "BTS1", "IBMUSER", run_unit)
+                    .unwrap(),
+                "BTS.REPO",
+                run_unit,
+                invocation.execution_id.as_str(),
+                "IBMUSER",
+                "nocheck",
+                [2; 32],
+            )
+            .unwrap();
+        let sync = request(CicsOperation::Syncpoint, BTreeMap::new(), 1);
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, sync.clone(), 1), sync),
+            Err(HostProblem::Condition {
+                name: "PROCESSERR".into(),
+                response: 108,
+                response2: 2,
+            })
+        );
+        assert!(store.list_provider_state("cics-uow", 1).unwrap().is_empty());
+        authority
+            .finish_uow(run_unit, invocation.execution_id.as_str(), "IBMUSER", false)
+            .unwrap();
+        assert!(authority.load_process("TYPE2", "ORDER").unwrap().is_none());
+    }
+
+    #[test]
     fn bts_context_routes_events_to_the_fenced_activity_identity() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
 

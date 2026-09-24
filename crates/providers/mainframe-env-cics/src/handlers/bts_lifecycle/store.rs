@@ -151,6 +151,8 @@ impl<'a> BtsLifecycleStore<'a> {
             owner_principal,
             None,
             None,
+            false,
+            MAX_CAS_ATTEMPTS,
         )
     }
 
@@ -172,6 +174,8 @@ impl<'a> BtsLifecycleStore<'a> {
             owner_principal,
             Some((effect_key, request_digest)),
             None,
+            false,
+            MAX_CAS_ATTEMPTS,
         )
     }
 
@@ -195,6 +199,33 @@ impl<'a> BtsLifecycleStore<'a> {
             owner_principal,
             Some((effect_key, request_digest)),
             Some(repository_resource),
+            false,
+            MAX_CAS_ATTEMPTS,
+        )
+    }
+
+    /// Define without reserving the repository name until successful syncpoint.
+    #[allow(clippy::too_many_arguments)]
+    pub fn define_process_nocheck_exact(
+        &self,
+        process: BtsProcess,
+        repository_resource: &str,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+        effect_key: &str,
+        request_digest: [u8; 32],
+    ) -> Result<(), HostProblem> {
+        validate_identifier(effect_key, 256)?;
+        self.define_process_inner(
+            process,
+            run_unit,
+            owner_execution,
+            owner_principal,
+            Some((effect_key, request_digest)),
+            Some(repository_resource),
+            true,
+            MAX_CAS_ATTEMPTS,
         )
     }
 
@@ -206,7 +237,15 @@ impl<'a> BtsLifecycleStore<'a> {
         owner_principal: &str,
         effect: Option<(&str, [u8; 32])>,
         repository_resource: Option<&str>,
+        nocheck: bool,
+        attempts_left: usize,
     ) -> Result<(), HostProblem> {
+        if attempts_left == 0 {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        if nocheck && (repository_resource.is_none() || effect.is_none()) {
+            return Err(HostProblem::Malformed);
+        }
         validate_identifier(run_unit, 256)?;
         if process.pending_uow.as_deref() != Some(run_unit) || process.row_version != 0 {
             return Err(HostProblem::Malformed);
@@ -235,6 +274,7 @@ impl<'a> BtsLifecycleStore<'a> {
                     && saved.process_name == process.name
                     && saved.activity_id == process.root_id
                     && saved.repository_resource.as_deref() == repository_resource
+                    && saved.nocheck == nocheck
                 {
                     Ok(())
                 } else {
@@ -249,10 +289,10 @@ impl<'a> BtsLifecycleStore<'a> {
                 response2: 22,
             });
         }
-        if self
+        let duplicate = self
             .load_process(&process.process_type, &process.name)?
-            .is_some()
-        {
+            .is_some();
+        if duplicate && !nocheck {
             return Err(HostProblem::Condition {
                 name: "PROCESSERR".into(),
                 response: 108,
@@ -270,7 +310,28 @@ impl<'a> BtsLifecycleStore<'a> {
             process_name: process.name.clone(),
             activity_id: process.root_id.clone(),
             repository_resource: repository_resource.map(str::to_owned),
+            nocheck,
+            deferred_duplicate: duplicate,
         });
+        if duplicate {
+            return match self
+                .store
+                .mutate_provider_states_atomic(vec![put_acquisition(run_unit, &acquisition)?])
+            {
+                Ok(()) => Ok(()),
+                Err(StoreError::AlreadyExists | StoreError::Conflict) => self.define_process_inner(
+                    process,
+                    run_unit,
+                    owner_execution,
+                    owner_principal,
+                    effect,
+                    repository_resource,
+                    nocheck,
+                    attempts_left - 1,
+                ),
+                Err(error) => Err(store_error(error)),
+            };
+        }
         let key = Self::process_key(&process.process_type, &process.name)?;
         let root_index = BtsActivityIndex {
             schema_version: ACTIVITY_INDEX_SCHEMA.into(),
@@ -286,12 +347,24 @@ impl<'a> BtsLifecycleStore<'a> {
             put_acquisition(run_unit, &acquisition)?,
             put_activity_index(&root_index, None)?,
         ];
-        if let Some(repository) = repository_resource {
+        if let Some(repository) = repository_resource.filter(|_| !nocheck) {
             writes.push(self.reserve_process_name(repository, &process, run_unit)?);
         }
         match self.store.mutate_provider_states_atomic(writes) {
             Ok(()) => Ok(()),
             Err(error @ (StoreError::AlreadyExists | StoreError::Conflict)) => {
+                if nocheck {
+                    return self.define_process_inner(
+                        process,
+                        run_unit,
+                        owner_execution,
+                        owner_principal,
+                        effect,
+                        repository_resource,
+                        nocheck,
+                        attempts_left - 1,
+                    );
+                }
                 let reserved = repository_resource
                     .map(|repository| self.process_name_reserved(repository, &process.name))
                     .transpose()?
@@ -457,6 +530,8 @@ impl<'a> BtsLifecycleStore<'a> {
                     process_name: process_name.into(),
                     activity_id: activity_id.into(),
                     repository_resource: None,
+                    nocheck: false,
+                    deferred_duplicate: false,
                 });
             let expected = process.row_version;
             process.epoch = process
@@ -566,6 +641,50 @@ impl<'a> BtsLifecycleStore<'a> {
 
     /// End a UOW, publishing or rolling back a pending DEFINE and releasing
     /// its acquisition in one store transaction. The tombstone fences ABA.
+    pub fn preflight_pending_definition(
+        &self,
+        run_unit: &str,
+        owner_execution: &str,
+        owner_principal: &str,
+    ) -> Result<(), HostProblem> {
+        let Some(acquisition) = self.load_acquisition(run_unit)? else {
+            return Ok(());
+        };
+        if acquisition.owner_execution != owner_execution
+            || acquisition.owner_principal != owner_principal
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let Some(effect) = acquisition.effect.as_ref().filter(|effect| {
+            acquisition.is_held() && effect.operation == "DEFINE PROCESS" && effect.nocheck
+        }) else {
+            return Ok(());
+        };
+        if effect.deferred_duplicate
+            || self.process_name_reserved(
+                effect
+                    .repository_resource
+                    .as_deref()
+                    .ok_or(HostProblem::InfrastructureFailure)?,
+                &effect.process_name,
+            )?
+        {
+            return Err(HostProblem::Condition {
+                name: "PROCESSERR".into(),
+                response: 108,
+                response2: 2,
+            });
+        }
+        let process = self
+            .load_process(&effect.process_type, &effect.process_name)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if process.root_id != effect.activity_id || process.pending_uow.as_deref() != Some(run_unit)
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        Ok(())
+    }
+
     pub fn finish_uow(
         &self,
         run_unit: &str,
@@ -597,6 +716,34 @@ impl<'a> BtsLifecycleStore<'a> {
                 .activity_id
                 .clone()
                 .ok_or(HostProblem::InfrastructureFailure)?;
+            if current
+                .effect
+                .as_ref()
+                .is_some_and(|effect| effect.deferred_duplicate)
+            {
+                if commit {
+                    return Err(HostProblem::Condition {
+                        name: "PROCESSERR".into(),
+                        response: 108,
+                        response2: 2,
+                    });
+                }
+                current.epoch = current
+                    .epoch
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                current.process_type = None;
+                current.process_name = None;
+                current.activity_id = None;
+                match self
+                    .store
+                    .mutate_provider_states_atomic(vec![put_acquisition(run_unit, &current)?])
+                {
+                    Ok(()) => return Ok(()),
+                    Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                    Err(error) => return Err(store_error(error)),
+                }
+            }
             let mut process = self
                 .load_process(&process_type, &process_name)?
                 .ok_or(HostProblem::InfrastructureFailure)?;
@@ -624,18 +771,21 @@ impl<'a> BtsLifecycleStore<'a> {
             let key = Self::process_key(&process_type, &process_name)?;
             let mut writes = vec![put_acquisition(run_unit, &current)?];
             if process.pending_uow.as_deref() == Some(run_unit)
-                && let Some(repository) = current
-                    .effect
-                    .as_ref()
-                    .filter(|effect| {
-                        effect.operation == "DEFINE PROCESS"
-                            && effect.process_type == process_type
-                            && effect.process_name == process_name
-                            && effect.activity_id == activity_id
-                    })
-                    .and_then(|effect| effect.repository_resource.as_deref())
+                && let Some(effect) = current.effect.as_ref().filter(|effect| {
+                    effect.operation == "DEFINE PROCESS"
+                        && effect.process_type == process_type
+                        && effect.process_name == process_name
+                        && effect.activity_id == activity_id
+                })
+                && let Some(repository) = effect.repository_resource.as_deref()
             {
-                writes.push(self.settle_process_name(repository, &process, run_unit, commit)?);
+                if effect.nocheck {
+                    if commit {
+                        writes.push(self.publish_process_name(repository, &process)?);
+                    }
+                } else {
+                    writes.push(self.settle_process_name(repository, &process, run_unit, commit)?);
+                }
             }
             writes.extend(self.settle_pending_children(&mut process, run_unit, commit)?);
             if process.pending_uow.as_deref() == Some(run_unit) && !commit {

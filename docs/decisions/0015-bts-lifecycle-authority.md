@@ -50,6 +50,17 @@ index. The `cics-bts-process-v1` row remains the only process/activity state
 authority. The additive acquisition effect field identifies the repository
 for settlement and old rows without that field remain readable.
 
+NOCHECK records the pending process, root index, and acquisition without a
+repository-name reservation. If the same process key already exists, it saves
+only a deferred-duplicate acquisition with the new root identity; it does not
+expose the existing process as the provisional one. Commit preflight checks
+the repository name before the CICS UOW intent is recorded and returns
+`PROCESSERR 108/2` for a known collision. Successful syncpoint publishes the
+name with the process; rollback removes the pending process or deferred
+acquisition. A collision arising after preflight is an uncertain UOW outcome
+requiring reconciliation, rather than an asserted successful commit. Old
+acquisition rows without NOCHECK fields retain their original behavior.
+
 The CICS syncpoint path settles BTS child definitions and its one acquisition
 before finalizing the UOW. Reconciliation reuses the durable UOW owner metadata
 and BTS owner rows to finish an interrupted settlement. Each step is

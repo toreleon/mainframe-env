@@ -95,6 +95,12 @@ All notable changes to mainframe-env are documented here.
   reservation, definition, and rollback or publication move atomically. Public
   command registration remains pending.
 
+- Added durable DEFINE PROCESS NOCHECK acquisition state. Repository-name
+  reservation occurs at syncpoint, while known duplicates are reported by a
+  commit preflight before UOW intent is recorded. Rollback and reopen retain
+  exact replay and leave an existing process unchanged. Public command routing
+  remains pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline
