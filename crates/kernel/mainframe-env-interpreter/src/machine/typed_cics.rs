@@ -112,9 +112,10 @@ pub(super) fn suspension(
         CicsOperation::Converse => ("cics-converse", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
-            ("cics-event", true)
-        }
+        CicsOperation::WaitEvent
+        | CicsOperation::WaitExternal
+        | CicsOperation::WaitCics
+        | CicsOperation::WaitSignal => ("cics-event", true),
         CicsOperation::WaitJournalName => ("cics-journal", true),
         CicsOperation::WaitJournalNum => ("cics-journal", true),
         operation if operation.is_counter() => ("cics-counter", true),
@@ -200,6 +201,9 @@ pub(super) fn execute(
     }
     if plan.operation == CicsPlanOperation::ExtractLogonMsg {
         retrieve::release_logon_message_set(machine);
+    }
+    if plan.operation == CicsPlanOperation::ReceiveConversation {
+        retrieve::release_conversation_receive_set(machine);
     }
     if matches!(
         plan.operation,
@@ -517,6 +521,30 @@ pub(super) fn execute(
             tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
         }
         match output.name {
+            CicsOutputName::ConversationDataInto => {
+                let CicsTarget::Resolved(slot) = &target else {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                };
+                arguments.insert(
+                    "INTO.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        resolved_slot(machine, slot)?
+                            .length
+                            .to_string()
+                            .into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
+            CicsOutputName::ConversationDataSet => {
+                arguments.extend(retrieve::allocation_arguments(
+                    machine,
+                    &target,
+                    plan.operation,
+                )?);
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::LogonSet | CicsOutputName::PipList => {
                 let capacity = retrieve::allocation_capacity(machine, &target)?;
                 arguments.insert(
@@ -708,6 +736,11 @@ pub(super) fn execute(
             | CicsOutputName::WebConverseStatusLength
             | CicsOutputName::WebConverseMediaType
             | CicsOutputName::WebConverseBodyCharset
+            | CicsOutputName::ConversationDataLength
+            | CicsOutputName::ConversationDataFullLength
+            | CicsOutputName::ConversationDataRetcode
+            | CicsOutputName::ConversationDataConvData
+            | CicsOutputName::ConversationDataState
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -720,7 +753,8 @@ pub(super) fn execute(
             CicsOutputName::Into => {
                 if matches!(
                     plan.operation,
-                    CicsPlanOperation::ReadTransientData
+                    CicsPlanOperation::Retrieve
+                        | CicsPlanOperation::ReadTransientData
                         | CicsPlanOperation::ReceivePartn
                         | CicsPlanOperation::IssueReceive
                         | CicsPlanOperation::DocumentRetrieve
@@ -1470,6 +1504,22 @@ mod tests {
             machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
             Ok(b"083026XX".to_vec())
         );
+
+        let (mut compact_machine, compact_slot) = machine_with_alphanumeric_slot("TIME-X", 6);
+        write_output(
+            &mut compact_machine,
+            CicsOperation::FormatTime,
+            "TIME",
+            &CicsTarget::Resolved(compact_slot.clone()),
+            &payload("mainframe-env.cics.payload@1", b"123456".to_vec()).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            compact_machine
+                .read_reference(&resolved_slot(&compact_machine, &compact_slot).unwrap()),
+            Ok(b"123456".to_vec())
+        );
     }
 
     #[test]
@@ -1882,6 +1932,114 @@ mod tests {
         assert!(request.is_mutating());
         assert!(request.mutation.is_some());
         assert_eq!(request.arguments["FILE"].bytes(), b"ACCTDAT");
+    }
+
+    #[test]
+    fn selected_retrieve_without_length_sends_destination_capacity() {
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let storage = builder.add_storage("MSG-X", 684, None).unwrap();
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(super::super::NAMESPACE, "define", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("name".into(), Attribute::Text("MSG-X".into())),
+                    ("simple_name".into(), Attribute::Text("MSG-X".into())),
+                    ("category".into(), Attribute::Text("alphanumeric".into())),
+                    ("picture".into(), Attribute::Text("X(684)".into())),
+                    ("digits".into(), Attribute::Integer(0)),
+                    ("scale".into(), Attribute::Integer(0)),
+                    ("signed".into(), Attribute::Integer(0)),
+                    ("sign_separate".into(), Attribute::Integer(0)),
+                    ("section".into(), Attribute::Text("working".into())),
+                    ("offset".into(), Attribute::Integer(0)),
+                    ("length".into(), Attribute::Integer(684)),
+                    ("element_length".into(), Attribute::Integer(684)),
+                    ("occurs".into(), Attribute::Integer(1)),
+                    ("parent".into(), Attribute::Text(String::new())),
+                    ("condition_values".into(), Attribute::Text(String::new())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let descriptor = cics_executable_descriptor(CicsPlanOperation::Retrieve);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Retrieve,
+            operands: Vec::new(),
+            options: BTreeSet::from([CicsPlanOption::NoHandle]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Into,
+                target: CicsStorageSlot {
+                    storage,
+                    qualified_layout_name: "MSG-X".into(),
+                },
+            }],
+            condition: CicsCondition::NoHandle,
+        };
+        builder
+            .add_operation(
+                block,
+                descriptor.identity(),
+                Vec::new(),
+                0,
+                BTreeMap::from([(
+                    PLAN_ATTRIBUTE.into(),
+                    Attribute::Bytes(
+                        encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap(),
+                    ),
+                )]),
+                descriptor.effects.to_vec(),
+                vec![StorageReference {
+                    storage,
+                    offset: 0,
+                    length: 684,
+                }],
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(super::super::NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let module = builder.finish().unwrap();
+        assert!(super::super::validate_module(&module).is_ok());
+        let bytes = mainframe_env_ir::encode_binary(&module, CodecLimits::default()).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            &bytes,
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let selected = machine
+            .operations
+            .iter()
+            .find(|operation| operation.identity == descriptor.identity())
+            .unwrap()
+            .clone();
+        let Step::Effect(effect) = execute(&mut machine, &selected).unwrap() else {
+            panic!("selected RETRIEVE must emit a host effect");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("selected RETRIEVE must use CICS");
+        };
+        assert_eq!(request.operation, CicsOperation::Retrieve);
+        assert_eq!(request.arguments["INTO.MAXLENGTH"].bytes(), b"684");
+        assert!(!request.arguments.contains_key("LENGTH"));
+        assert_eq!(request.condition_policy, CicsConditionPolicy::NoHandle);
     }
 
     #[test]

@@ -18,15 +18,18 @@ pub use service::IssuePassTransfer;
 pub use service::bts_lifecycle;
 pub use service::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
-    ConversationAttachHeader, ConversationContext, ConversationExchangeState, ConversationKind,
-    ConversationLedger, ConversationOutboundFrame, ConversationOwner,
-    ConversationPartnerDefinition, ConversationPartnerProcessDefinition, ConversationPeerFrame,
-    ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
-    ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
-    GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow,
-    GdsReturnCode, IssueRequestIdentity, IssueValidationProblem, MAX_BASIC_PIP_BYTES,
-    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
-    MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay, prune_conversation_replays,
+    CicsConversationTransport, ConversationAttachHeader, ConversationConnectFrame,
+    ConversationContext, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    ConversationExchangeState, ConversationKind, ConversationLedger, ConversationOutboundFrame,
+    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationPeerFrame, ConversationProblem, ConversationProfileDefinition, ConversationRecord,
+    ConversationReplay, ConversationReply, ConversationState, ConversationSystemDefinition,
+    ConversationTransmitOutcome, DataCondition, GdsAllocateFailure, GdsAssignFailure,
+    GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow, GdsReceiveFailure,
+    GdsReturnCode, GdsWaitFailure, IssuePendingControl, IssueRequestIdentity,
+    IssueValidationProblem, MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
+    SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
 
 pub use retention::{

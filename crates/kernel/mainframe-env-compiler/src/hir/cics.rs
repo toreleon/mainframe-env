@@ -233,6 +233,28 @@ impl PlanContext<'_> {
                 HirCicsOperandName::ConversationToFullLength => {
                     CicsOperandName::ConversationToFullLength
                 }
+                HirCicsOperandName::ConversationDataConvid => {
+                    CicsOperandName::ConversationDataConvid
+                }
+                HirCicsOperandName::ConversationDataSession => {
+                    CicsOperandName::ConversationDataSession
+                }
+                HirCicsOperandName::ConversationDataFrom => CicsOperandName::ConversationDataFrom,
+                HirCicsOperandName::ConversationDataLength => {
+                    CicsOperandName::ConversationDataLength
+                }
+                HirCicsOperandName::ConversationDataFullLength => {
+                    CicsOperandName::ConversationDataFullLength
+                }
+                HirCicsOperandName::ConversationDataMaxLength => {
+                    CicsOperandName::ConversationDataMaxLength
+                }
+                HirCicsOperandName::ConversationDataMaxFullLength => {
+                    CicsOperandName::ConversationDataMaxFullLength
+                }
+                HirCicsOperandName::ConversationDataAttachId => {
+                    CicsOperandName::ConversationDataAttachId
+                }
                 HirCicsOperandName::Abcode => CicsOperandName::Abcode,
                 HirCicsOperandName::ResClass => CicsOperandName::ResClass,
                 HirCicsOperandName::IssueConvid => CicsOperandName::IssueConvid,
@@ -569,6 +591,19 @@ impl PlanContext<'_> {
                 HirCicsOutputName::ConversationToFullLength => {
                     CicsOutputName::ConversationToFullLength
                 }
+                HirCicsOutputName::ConversationDataInto => CicsOutputName::ConversationDataInto,
+                HirCicsOutputName::ConversationDataSet => CicsOutputName::ConversationDataSet,
+                HirCicsOutputName::ConversationDataLength => CicsOutputName::ConversationDataLength,
+                HirCicsOutputName::ConversationDataFullLength => {
+                    CicsOutputName::ConversationDataFullLength
+                }
+                HirCicsOutputName::ConversationDataRetcode => {
+                    CicsOutputName::ConversationDataRetcode
+                }
+                HirCicsOutputName::ConversationDataConvData => {
+                    CicsOutputName::ConversationDataConvData
+                }
+                HirCicsOutputName::ConversationDataState => CicsOutputName::ConversationDataState,
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::SecurityRead => CicsOutputName::SecurityRead,
                 HirCicsOutputName::IssueState => CicsOutputName::IssueState,
@@ -775,6 +810,13 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Converse => CicsPlanOperation::Converse,
         HirCicsOperation::FreeConversation => CicsPlanOperation::FreeConversation,
         HirCicsOperation::GdsFreeConversation => CicsPlanOperation::GdsFreeConversation,
+        HirCicsOperation::ReceiveConversation => CicsPlanOperation::ReceiveConversation,
+        HirCicsOperation::GdsReceiveConversation => CicsPlanOperation::GdsReceiveConversation,
+        HirCicsOperation::SendConversation => CicsPlanOperation::SendConversation,
+        HirCicsOperation::GdsWaitConversation => CicsPlanOperation::GdsWaitConversation,
+        HirCicsOperation::WaitConvid => CicsPlanOperation::WaitConvid,
+        HirCicsOperation::WaitSignal => CicsPlanOperation::WaitSignal,
+        HirCicsOperation::WaitTerminal => CicsPlanOperation::WaitTerminal,
         HirCicsOperation::Abend => CicsPlanOperation::Abend,
         HirCicsOperation::QuerySecurity => CicsPlanOperation::QuerySecurity,
         HirCicsOperation::VerifyPassword => CicsPlanOperation::VerifyPassword,
@@ -971,6 +1013,15 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::ConversationNotruncate => CicsPlanOption::ConversationNotruncate,
         HirCicsOption::ConversationDefresp => CicsPlanOption::ConversationDefresp,
         HirCicsOption::ConversationFmh => CicsPlanOption::ConversationFmh,
+        HirCicsOption::ConversationDataNotruncate => CicsPlanOption::ConversationDataNotruncate,
+        HirCicsOption::ConversationDataBuffer => CicsPlanOption::ConversationDataBuffer,
+        HirCicsOption::ConversationDataLlid => CicsPlanOption::ConversationDataLlid,
+        HirCicsOption::ConversationDataInvite => CicsPlanOption::ConversationDataInvite,
+        HirCicsOption::ConversationDataLast => CicsPlanOption::ConversationDataLast,
+        HirCicsOption::ConversationDataConfirm => CicsPlanOption::ConversationDataConfirm,
+        HirCicsOption::ConversationDataWait => CicsPlanOption::ConversationDataWait,
+        HirCicsOption::ConversationDataFmh => CicsPlanOption::ConversationDataFmh,
+        HirCicsOption::ConversationDataDefresp => CicsPlanOption::ConversationDataDefresp,
         HirCicsOption::SecurityBasicAuth => CicsPlanOption::SecurityBasicAuth,
         HirCicsOption::SecurityJwt => CicsPlanOption::SecurityJwt,
         HirCicsOption::SecurityKerberos => CicsPlanOption::SecurityKerberos,

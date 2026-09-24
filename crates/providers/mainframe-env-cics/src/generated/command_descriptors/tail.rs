@@ -2,7 +2,56 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 33] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 40] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::WsaContextBuild,
+        syntax: "WSACONTEXT BUILD",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0259",
+        family: CicsCommandFamily::WebServiceControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WsaContextDelete,
+        syntax: "WSACONTEXT DELETE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0260",
+        family: CicsCommandFamily::WebServiceControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WsaContextGet,
+        syntax: "WSACONTEXT GET",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0261",
+        family: CicsCommandFamily::WebServiceControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WsaEprCreate,
+        syntax: "WSAEPR CREATE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0262",
+        family: CicsCommandFamily::WebServiceControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WaitEvent,
+        syntax: "WAIT EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0233",
+        family: CicsCommandFamily::TaskControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WaitExternal,
+        syntax: "WAIT EXTERNAL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0234",
+        family: CicsCommandFamily::TaskControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::WaitCics,
+        syntax: "WAITCICS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0239",
+        family: CicsCommandFamily::TaskControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::WriteOperator,
         syntax: "WRITE OPERATOR",

@@ -24,6 +24,14 @@ impl Canonical for CicsOperation {
             Self::FreeConversation => out.variant("CicsOperation", "FreeConversation", 0),
             Self::GdsFreeConversation => out.variant("CicsOperation", "GdsFreeConversation", 0),
             Self::Converse => out.variant("CicsOperation", "Converse", 0),
+            Self::ReceiveConversation => out.variant("CicsOperation", "ReceiveConversation", 0),
+            Self::GdsReceiveConversation => {
+                out.variant("CicsOperation", "GdsReceiveConversation", 0)
+            }
+            Self::SendConversation => out.variant("CicsOperation", "SendConversation", 0),
+            Self::GdsWaitConversation => out.variant("CicsOperation", "GdsWaitConversation", 0),
+            Self::WaitConvid => out.variant("CicsOperation", "WaitConvid", 0),
+            Self::WaitTerminal => out.variant("CicsOperation", "WaitTerminal", 0),
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
             Self::FetchAny => out.variant("CicsOperation", "FetchAny", 0),
             Self::FetchChild => out.variant("CicsOperation", "FetchChild", 0),
@@ -181,6 +189,7 @@ impl Canonical for CicsOperation {
             Self::WaitEvent => out.variant("CicsOperation", "WaitEvent", 0),
             Self::WaitExternal => out.variant("CicsOperation", "WaitExternal", 0),
             Self::WaitCics => out.variant("CicsOperation", "WaitCics", 0),
+            Self::WaitSignal => out.variant("CicsOperation", "WaitSignal", 0),
             Self::Syncpoint => out.variant("CicsOperation", "Syncpoint", 0),
             Self::InvokeService => out.variant("CicsOperation", "InvokeService", 0),
             Self::SoapFaultAdd => out.variant("CicsOperation", "SoapFaultAdd", 0),

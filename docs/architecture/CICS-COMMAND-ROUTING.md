@@ -82,10 +82,11 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 184 API routes are the only advertised application commands.
-The nine conversation-open routes share the `cics-conversation-v1` ledger with
+The current 191 API routes are the only advertised application commands.
+The nine conversation-open and seven data/wait routes share the `cics-conversation-v1` ledger with
 the eight EXTRACT and POINT routes. Version 1 records remain readable; version
-2 adds bounded peer frames and staged CONVERSE sends. EXTRACT keeps only task
+2 adds bounded peer frames, staged CONVERSE sends, numbered data sends, and
+principal signal events. EXTRACT keeps only task
 presentation, POINT position, and mutation-reply metadata outside that ledger.
 The selected compiler and interpreter route mapped APPC and MRO forms; GDS
 basic forms remain assembler/C-only at the COBOL source boundary.

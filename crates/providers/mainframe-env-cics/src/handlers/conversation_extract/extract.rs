@@ -105,10 +105,16 @@ pub(super) fn attributes(
                 .outputs
                 .insert("STATE".into(), number(state_cvda(facility.state))?);
         }
-        response.outputs.insert(
-            "CONVDATA".into(),
-            bytes(facility.indicators.convdata().to_vec())?,
-        );
+        let indicators = if facility.data.is_empty() {
+            facility.indicators.convdata()
+        } else {
+            facility
+                .gds_convdata(false)
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+        };
+        response
+            .outputs
+            .insert("CONVDATA".into(), bytes(indicators.to_vec())?);
         return Ok(response);
     }
     if !matches!(
@@ -142,21 +148,7 @@ pub(super) fn attributes(
 
 /// Pinned `dfha80c.html` CVDAs for EXTRACT ATTRIBUTES and GDS STATE.
 fn state_cvda(state: ConversationState) -> i64 {
-    match state {
-        ConversationState::Allocated => 82,
-        ConversationState::ConfFree => 83,
-        ConversationState::ConfReceive => 84,
-        ConversationState::ConfSend => 85,
-        ConversationState::Free => 86,
-        ConversationState::PendFree => 87,
-        ConversationState::PendReceive => 88,
-        ConversationState::Receive => 89,
-        ConversationState::Rollback => 90,
-        ConversationState::Send => 91,
-        ConversationState::SyncFree => 92,
-        ConversationState::SyncReceive => 93,
-        ConversationState::SyncSend => 94,
-    }
+    i64::from(state.cvda())
 }
 
 pub(super) fn logon(

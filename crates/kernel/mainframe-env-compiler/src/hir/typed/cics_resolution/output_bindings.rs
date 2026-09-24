@@ -124,6 +124,8 @@ pub(super) fn resolve(
                     | HirCicsOperation::WebConverse
                     | HirCicsOperation::ExtractLogonMsg
                     | HirCicsOperation::Converse
+                    | HirCicsOperation::ReceiveConversation
+                    | HirCicsOperation::GdsReceiveConversation
             )
         {
             continue;

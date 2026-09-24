@@ -142,3 +142,62 @@ pub(super) const CONVERSATION_OPEN_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescri
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];
+
+pub(super) const CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 7] = [
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReceiveConversation,
+        namespace: "cics.conversation",
+        name: "receive",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::GdsReceiveConversation,
+        namespace: "cics.conversation",
+        name: "gds-receive",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendConversation,
+        namespace: "cics.conversation",
+        name: "send",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::GdsWaitConversation,
+        namespace: "cics.conversation",
+        name: "gds-wait",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitConvid,
+        namespace: "cics.conversation",
+        name: "wait-convid",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitSignal,
+        namespace: "cics.conversation",
+        name: "wait-signal",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitTerminal,
+        namespace: "cics.conversation",
+        name: "wait-terminal",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+];

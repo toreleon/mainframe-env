@@ -210,5 +210,12 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::ExtractTcpip => &CICS_EXECUTABLE_DESCRIPTORS[158],
         CicsPlanOperation::StartAttach => &CICS_EXECUTABLE_DESCRIPTORS[159],
         CicsPlanOperation::StartBrexit => &CICS_EXECUTABLE_DESCRIPTORS[160],
+        CicsPlanOperation::ReceiveConversation => &CICS_EXECUTABLE_DESCRIPTORS[204],
+        CicsPlanOperation::GdsReceiveConversation => &CICS_EXECUTABLE_DESCRIPTORS[205],
+        CicsPlanOperation::SendConversation => &CICS_EXECUTABLE_DESCRIPTORS[206],
+        CicsPlanOperation::GdsWaitConversation => &CICS_EXECUTABLE_DESCRIPTORS[207],
+        CicsPlanOperation::WaitConvid => &CICS_EXECUTABLE_DESCRIPTORS[208],
+        CicsPlanOperation::WaitSignal => &CICS_EXECUTABLE_DESCRIPTORS[209],
+        CicsPlanOperation::WaitTerminal => &CICS_EXECUTABLE_DESCRIPTORS[210],
     }
 }

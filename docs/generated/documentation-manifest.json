@@ -3,7 +3,7 @@
     "markdown_documents": 201,
     "navigation_groups": 5,
     "normative_documents": 51,
-    "xtask_commands": 170
+    "xtask_commands": 171
   },
   "documents": [
     {
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:3628043a189fd450fccee088f5dac89e434e0b3a3d7e4389deb26bc4273c9437",
+      "sha256": "sha256:b1ac0034ca1c8df508c38bbe44ea7c7058b5c6d0d913c0bf350f3c735629519f",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:f5dc4ce7af371ae45a2d0e0da251f5040e1ab8282aca4432e589e630661eca2c",
+      "sha256": "sha256:4251639af133995505cca70a3d3c92add7bc380169a41bda33b236825bd9ffe5",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -833,7 +833,7 @@
       "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md",
       "relative_links": 1,
       "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
-      "sha256": "sha256:a136cbbfe1ee5fadd8a4f3d1f5bd756066494457b824e0881ae04272375fe9e2",
+      "sha256": "sha256:6fdb627d819b8df702dbeddbbff33625c3af8d70bd05f17e8194eab409b4bfc7",
       "status": "Proposed for v0.9 development",
       "title": "ADR-0020: Persist explicit conversation peer frames with protocol state",
       "xtask_commands": 0
@@ -1118,7 +1118,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/CIC-906-POSTGRES-VALIDATION.md",
       "relative_links": 0,
-      "sha256": "sha256:54ca026d605f86571f2efae9b4e3c7e6b52f4c041e5da0b9ae3cb93ac5c74e8e",
+      "sha256": "sha256:3eb472f090a6822f7b97de8db615b05d9a5f9c2c6e4461ba6667e2ce8bb06f31",
       "title": "CIC-906 durable-profile validation slice",
       "xtask_commands": 0
     },
@@ -1222,7 +1222,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 91,
-      "sha256": "sha256:6ff2d1d51c3f2455067d09ede534861deeae43dfc4c90e680b49da66a6cd18c0",
+      "sha256": "sha256:fa3ee327d5a49e3617d3734db33fb116ff333cecb9a83d9a4e8298c2a1c9f976",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
@@ -1606,9 +1606,9 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 0,
-      "sha256": "sha256:703b73496ea5fa2d24b205df0377b37dd576de76d217283da658ee16fff0b7ff",
+      "sha256": "sha256:c2eae35405b61ce84000117820ec7bd2d030ff1fd7fba4bb6daed0cc42049438",
       "title": "CardDemo operator compatibility",
-      "xtask_commands": 5
+      "xtask_commands": 6
     },
     {
       "normative": false,

@@ -23,6 +23,15 @@ pub enum CicsPlanOption {
     ConversationNotruncate,
     ConversationDefresp,
     ConversationFmh,
+    ConversationDataNotruncate,
+    ConversationDataBuffer,
+    ConversationDataLlid,
+    ConversationDataInvite,
+    ConversationDataLast,
+    ConversationDataConfirm,
+    ConversationDataWait,
+    ConversationDataFmh,
+    ConversationDataDefresp,
     /// BasicAuth token syntax.
     SecurityBasicAuth,
     /// JSON Web Token syntax.

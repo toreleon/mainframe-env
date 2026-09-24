@@ -71,7 +71,7 @@ fn require_separator(name: &str, value: &HirCicsValue) -> Resolution<()> {
 pub(super) fn require_output_shape(
     name: HirCicsOutputName,
     target: &HirDataReference,
-    _clauses: &Clauses,
+    clauses: &Clauses,
     _options: &[String],
 ) -> Resolution<()> {
     match name {
@@ -104,7 +104,15 @@ pub(super) fn require_output_shape(
                 HirCicsOutputName::Yyddd => 6,
                 _ => unreachable!(),
             };
-            if target.length == field
+            let compact = target.length == 6
+                && match name {
+                    HirCicsOutputName::Time => !clauses.contains_key("TIMESEP"),
+                    HirCicsOutputName::Mmddyy | HirCicsOutputName::Yymmdd => {
+                        !clauses.contains_key("DATESEP")
+                    }
+                    _ => false,
+                };
+            if (target.length == field || compact)
                 && matches!(
                     target.category,
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
@@ -258,6 +266,13 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::ConversationInto
         | HirCicsOutputName::ConversationSet
         | HirCicsOutputName::ConversationToLength
-        | HirCicsOutputName::ConversationToFullLength => Ok(()),
+        | HirCicsOutputName::ConversationToFullLength
+        | HirCicsOutputName::ConversationDataInto
+        | HirCicsOutputName::ConversationDataSet
+        | HirCicsOutputName::ConversationDataLength
+        | HirCicsOutputName::ConversationDataFullLength
+        | HirCicsOutputName::ConversationDataRetcode
+        | HirCicsOutputName::ConversationDataConvData
+        | HirCicsOutputName::ConversationDataState => Ok(()),
     }
 }

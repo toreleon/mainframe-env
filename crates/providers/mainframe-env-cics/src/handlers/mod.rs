@@ -62,6 +62,8 @@ mod task_control;
 mod task_enqueue;
 mod task_return;
 mod task_wait;
+mod trace;
+pub use trace::CicsTraceEntry;
 mod terminal_control;
 mod terminal_lifecycle;
 mod terminal_run;
@@ -82,7 +84,18 @@ use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
 
 pub(super) fn deferred_converse(operation: CicsOperation, response: &CicsResponse) -> bool {
-    operation == CicsOperation::Converse && response.disposition == CicsDisposition::Suspended
+    response.disposition == CicsDisposition::Suspended
+        && matches!(
+            operation,
+            CicsOperation::Converse
+                | CicsOperation::ReceiveConversation
+                | CicsOperation::GdsReceiveConversation
+                | CicsOperation::SendConversation
+                | CicsOperation::GdsWaitConversation
+                | CicsOperation::WaitConvid
+                | CicsOperation::WaitSignal
+                | CicsOperation::WaitTerminal
+        )
 }
 
 pub(super) fn cics_result_digest(response: &CicsResponse) -> Result<[u8; 32], HostProblem> {
@@ -214,15 +227,18 @@ pub(super) fn condition_for_request(
 }
 pub use conversation_control::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
-    ConversationAttachHeader, ConversationContext, ConversationExchangeState, ConversationKind,
-    ConversationLedger, ConversationOutboundFrame, ConversationOwner,
-    ConversationPartnerDefinition, ConversationPartnerProcessDefinition, ConversationPeerFrame,
-    ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
-    ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
-    GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow,
-    GdsReturnCode, IssueRequestIdentity, IssueValidationProblem, MAX_BASIC_PIP_BYTES,
-    MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
-    MAX_RECORDED_OUTBOUND_FRAMES, load_conversation_replay, prune_conversation_replays,
+    CicsConversationTransport, ConversationAttachHeader, ConversationConnectFrame,
+    ConversationContext, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    ConversationExchangeState, ConversationKind, ConversationLedger, ConversationOutboundFrame,
+    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationPeerFrame, ConversationProblem, ConversationProfileDefinition, ConversationRecord,
+    ConversationReplay, ConversationReply, ConversationState, ConversationSystemDefinition,
+    ConversationTransmitOutcome, DataCondition, GdsAllocateFailure, GdsAssignFailure,
+    GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow, GdsReceiveFailure,
+    GdsReturnCode, GdsWaitFailure, IssuePendingControl, IssueRequestIdentity,
+    IssueValidationProblem, MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
+    SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
 pub(in crate::service) use conversation_control::{
     confirm_issue_control, mark_issue_control_attempted,
@@ -446,6 +462,7 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     bts_link::release_task(service, run)?;
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
+    conversation_control::release_task(service, run)?;
     document_control::release_task(service, run)?;
     release_bms_message_for_task(service, run)?;
     release_outboard_task(service, run)?;

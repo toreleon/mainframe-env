@@ -8,7 +8,7 @@ mod task_entries;
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 204] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 211] = [
     task_entries::TASK_QUEUE_DESCRIPTORS[0],
     task_entries::TASK_QUEUE_DESCRIPTORS[1],
     CicsExecutableDescriptor {
@@ -1186,4 +1186,11 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 204] = [
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[17],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[18],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[19],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[0],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[1],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[2],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[3],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[4],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[5],
+    conversation_entries::CONVERSATION_DATA_EXECUTABLE_DESCRIPTORS[6],
 ];

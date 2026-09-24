@@ -1,8 +1,9 @@
 //! Versioned, CAS-backed allocation and attach-header authority.
 
 use super::{
-    ConversationExchangeState, ConversationKind, ConversationOwner, ConversationPeerFrame,
-    ConversationProblem, ConversationRecord, MAX_PROCESS_BYTES,
+    ConversationConnectFrame, ConversationDataFrame, ConversationExchangeState, ConversationKind,
+    ConversationOwner, ConversationPeerFrame, ConversationProblem, ConversationRecord,
+    MAX_PROCESS_BYTES,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -16,7 +17,29 @@ const MAX_ROW_BYTES: usize = 4 * 1024 * 1024;
 const MAX_SYSTEMS: usize = 256;
 const MAX_CONVERSATIONS: usize = 4096;
 const MAX_ATTACH_HEADERS: usize = 4096;
+const MAX_SIGNAL_FACILITIES: usize = 4096;
 const LEDGER_VERSION: u16 = 2;
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SignalLuType {
+    LuType4,
+    LuType61,
+    Pipeline3601,
+    Interactive3767,
+    Batch3770,
+    FullFunction3790,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalFacilityRecord {
+    pub owner: ConversationOwner,
+    pub lu_type: SignalLuType,
+    pub pending: bool,
+    pub terminal_error: bool,
+    pub last_event_sequence: u64,
+}
 
 /// Installed APPC or MRO session group. An APPC group may be selected by
 /// either mapped ALLOCATE or basic GDS ALLOCATE.
@@ -104,6 +127,8 @@ pub struct ConversationLedger {
     pub attach_headers: BTreeMap<String, ConversationAttachHeader>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub exchanges: BTreeMap<String, ConversationExchangeState>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub signal_facilities: BTreeMap<String, SignalFacilityRecord>,
 }
 
 impl Default for ConversationLedger {
@@ -116,6 +141,7 @@ impl Default for ConversationLedger {
             conversations: BTreeMap::new(),
             attach_headers: BTreeMap::new(),
             exchanges: BTreeMap::new(),
+            signal_facilities: BTreeMap::new(),
         }
     }
 }
@@ -334,7 +360,8 @@ impl ConversationLedger {
                 && record.owner.run_unit == owner.run_unit
                 && record.principal_facility
                 && !record.released
-        }) {
+        }) || self.signal_facilities.contains_key(&signal_key(&owner))
+        {
             return Err(ConversationProblem::WrongState);
         }
         let mut record = self.allocate(sysid, kind, owner)?;
@@ -399,6 +426,412 @@ impl ConversationLedger {
             .remove(&u32::from_be_bytes(token).to_string());
     }
 
+    pub fn bind_mro_session(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        name: &str,
+    ) -> Result<(), ConversationProblem> {
+        if name.is_empty()
+            || name.len() > 4
+            || !name.bytes().all(|byte| {
+                byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
+            })
+        {
+            return Err(ConversationProblem::Malformed);
+        }
+        if self.conversations.values().any(|record| {
+            record.token != token
+                && !record.released
+                && record.owner.execution == owner.execution
+                && record.owner.run_unit == owner.run_unit
+                && record.mro_session_name.as_deref() == Some(name)
+        }) {
+            return Err(ConversationProblem::WrongState);
+        }
+        let record = self
+            .conversation_mut(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind != ConversationKind::Mro {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if record.mro_session_name.as_deref() == Some(name) {
+            return Ok(());
+        }
+        if record.mro_session_name.is_some() {
+            return Err(ConversationProblem::WrongState);
+        }
+        record.next_sequence()?;
+        record.mro_session_name = Some(name.into());
+        Ok(())
+    }
+
+    pub fn receive_mapped_peer_frame(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        max_length: usize,
+        retain_remainder: bool,
+    ) -> Result<Option<super::ConversationDataReply>, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if record.data.terminal_error() || record.state != super::ConversationState::Receive {
+            return Err(ConversationProblem::WrongState);
+        }
+        let kind = record.kind;
+        let key = u32::from_be_bytes(token).to_string();
+        let Some(exchange) = self.exchanges.get_mut(&key) else {
+            return Ok(None);
+        };
+        let reply = exchange.receive_mapped(kind, max_length, retain_remainder)?;
+        if let Some(ref reply) = reply {
+            let record = self
+                .conversation_mut(token)
+                .ok_or(ConversationProblem::Malformed)?;
+            record.next_sequence()?;
+            record.state = reply.state;
+        }
+        Ok(reply)
+    }
+
+    pub fn consume_mapped_signal(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+    ) -> Result<bool, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        let Some(exchange) = self.exchange_mut(token) else {
+            return Ok(false);
+        };
+        if !exchange.take_signal() {
+            return Ok(false);
+        }
+        self.conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?
+            .next_sequence()?;
+        Ok(true)
+    }
+
+    /// The sealed CONNECT PROCESS route records local state. The first SEND or
+    /// WAIT that actually transmits data stages its process header in the same
+    /// peer-frame ledger; CONVERSE continues to own its existing exchange path.
+    pub fn ensure_mapped_connect_staged(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+    ) -> Result<bool, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind != ConversationKind::AppcMapped {
+            return Ok(false);
+        }
+        let Some(process) = record.process.clone() else {
+            return Ok(false);
+        };
+        let pip = record.pip.clone();
+        let sync_level = record.sync_level.ok_or(ConversationProblem::Malformed)?;
+        let key = u32::from_be_bytes(token).to_string();
+        if self.exchanges.get(&key).is_some_and(|exchange| {
+            exchange.next_send_id != 0
+                || !exchange.outbound.is_empty()
+                || exchange.pending_converse.is_some()
+        }) {
+            return Ok(false);
+        }
+        self.stage_mapped_send(
+            token,
+            owner,
+            context,
+            ConversationDataFrame {
+                end_structured_field: true,
+                connect: Some(ConversationConnectFrame {
+                    process,
+                    pip,
+                    sync_level,
+                }),
+                ..Default::default()
+            },
+        )?;
+        Ok(true)
+    }
+
+    pub fn stage_mapped_send(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        mut frame: ConversationDataFrame,
+    ) -> Result<u64, ConversationProblem> {
+        let record = self
+            .conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?;
+        record.check_owner(owner, context)?;
+        if record.kind == ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if record.data.terminal_error()
+            || record.state != super::ConversationState::Send
+                && !(record.kind == ConversationKind::Mro
+                    && record.state == super::ConversationState::Allocated)
+            || frame.confirm
+                && (record.kind != ConversationKind::AppcMapped
+                    || !matches!(record.sync_level, Some(1 | 2)))
+            || frame.defresp && record.kind != ConversationKind::Mro
+            || frame.connect.as_ref().is_some_and(|connect| {
+                record.kind != ConversationKind::AppcMapped
+                    || record.process.as_deref() != Some(connect.process.as_slice())
+                    || record.pip != connect.pip
+                    || record.sync_level != Some(connect.sync_level)
+            })
+            || frame
+                .attach_id
+                .as_ref()
+                .is_some_and(|name| self.attach(owner, name).is_none())
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        if let Some(name) = frame.attach_id.as_deref() {
+            frame.attach_header = Some(
+                self.attach(owner, name)
+                    .ok_or(ConversationProblem::WrongState)?
+                    .clone(),
+            );
+        }
+        let next_state = if frame.end_of_chain {
+            super::ConversationState::PendFree
+        } else if frame.invite {
+            super::ConversationState::Receive
+        } else {
+            super::ConversationState::Send
+        };
+        let key = u32::from_be_bytes(token).to_string();
+        let id = self
+            .exchanges
+            .entry(key)
+            .or_default()
+            .stage_send(frame, next_state)?;
+        let record = self
+            .conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?;
+        record.next_sequence()?;
+        if next_state == super::ConversationState::Receive {
+            record.state = if record.kind == ConversationKind::Mro {
+                super::ConversationState::Send
+            } else {
+                super::ConversationState::PendReceive
+            };
+        } else if next_state == super::ConversationState::PendFree {
+            record.state = super::ConversationState::PendFree;
+        } else if record.state == super::ConversationState::Allocated {
+            record.state = super::ConversationState::Send;
+        }
+        Ok(id)
+    }
+
+    pub fn mark_mapped_send_attempted(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        send_id: u64,
+    ) -> Result<(), ConversationProblem> {
+        self.conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?
+            .check_owner(owner, context)?;
+        self.exchange_mut(token)
+            .ok_or(ConversationProblem::WrongState)?
+            .mark_send_attempted(send_id)?;
+        self.conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?
+            .next_sequence()
+    }
+
+    pub fn acknowledge_mapped_send(
+        &mut self,
+        token: [u8; 4],
+        owner: &ConversationOwner,
+        context: super::ConversationContext,
+        send_id: u64,
+    ) -> Result<(), ConversationProblem> {
+        self.conversation(token)
+            .ok_or(ConversationProblem::NotOwned)?
+            .check_owner(owner, context)?;
+        let exchange = self
+            .exchange_mut(token)
+            .ok_or(ConversationProblem::WrongState)?;
+        let confirmed_state = exchange.acknowledge_send(send_id)?;
+        let pending_state = exchange.pending_sends.last().map(|send| send.next_state);
+        let record = self
+            .conversation_mut(token)
+            .ok_or(ConversationProblem::Malformed)?;
+        record.next_sequence()?;
+        record.state = if record.state == super::ConversationState::Receive
+            && matches!(
+                confirmed_state,
+                super::ConversationState::Send | super::ConversationState::Receive
+            ) {
+            super::ConversationState::Receive
+        } else {
+            match pending_state {
+                Some(super::ConversationState::Receive) => {
+                    if record.kind == ConversationKind::Mro {
+                        super::ConversationState::Send
+                    } else {
+                        super::ConversationState::PendReceive
+                    }
+                }
+                Some(super::ConversationState::PendFree) => super::ConversationState::PendFree,
+                _ => confirmed_state,
+            }
+        };
+        Ok(())
+    }
+
+    pub fn install_signal_facility(
+        &mut self,
+        owner: ConversationOwner,
+        lu_type: SignalLuType,
+    ) -> Result<(), ConversationProblem> {
+        if !owner.valid()
+            || self.conversations.values().any(|record| {
+                record.owner.execution == owner.execution
+                    && record.owner.run_unit == owner.run_unit
+                    && record.principal_facility
+                    && !record.released
+            })
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        let key = signal_key(&owner);
+        if let Some(existing) = self.signal_facilities.get(&key) {
+            return if existing.owner == owner && existing.lu_type == lu_type {
+                Ok(())
+            } else {
+                Err(ConversationProblem::WrongState)
+            };
+        }
+        if self.signal_facilities.len() >= MAX_SIGNAL_FACILITIES {
+            return Err(ConversationProblem::Exhausted);
+        }
+        self.signal_facilities.insert(
+            key,
+            SignalFacilityRecord {
+                owner,
+                lu_type,
+                pending: false,
+                terminal_error: false,
+                last_event_sequence: 0,
+            },
+        );
+        Ok(())
+    }
+
+    pub fn post_signal(
+        &mut self,
+        owner: &ConversationOwner,
+        event_sequence: u64,
+    ) -> Result<(), ConversationProblem> {
+        let facility = self.signal_facility_mut(owner)?;
+        if event_sequence == facility.last_event_sequence && event_sequence != 0 {
+            return Ok(());
+        }
+        if facility.terminal_error
+            || event_sequence != facility.last_event_sequence.saturating_add(1)
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        facility.last_event_sequence = event_sequence;
+        facility.pending = true;
+        Ok(())
+    }
+
+    pub fn fail_signal_facility(
+        &mut self,
+        owner: &ConversationOwner,
+        event_sequence: u64,
+    ) -> Result<(), ConversationProblem> {
+        let facility = self.signal_facility_mut(owner)?;
+        if facility.terminal_error && event_sequence == facility.last_event_sequence {
+            return Ok(());
+        }
+        if facility.terminal_error
+            || event_sequence != facility.last_event_sequence.saturating_add(1)
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        facility.last_event_sequence = event_sequence;
+        facility.pending = false;
+        facility.terminal_error = true;
+        Ok(())
+    }
+
+    pub fn signal_pending(&self, owner: &ConversationOwner) -> Result<bool, ConversationProblem> {
+        let facility = self.signal_facility(owner)?;
+        if facility.terminal_error {
+            return Err(ConversationProblem::WrongState);
+        }
+        Ok(facility.pending)
+    }
+
+    pub fn consume_signal(
+        &mut self,
+        owner: &ConversationOwner,
+    ) -> Result<bool, ConversationProblem> {
+        let facility = self.signal_facility_mut(owner)?;
+        if facility.terminal_error {
+            return Err(ConversationProblem::WrongState);
+        }
+        let pending = facility.pending;
+        facility.pending = false;
+        Ok(pending)
+    }
+
+    fn signal_facility(
+        &self,
+        owner: &ConversationOwner,
+    ) -> Result<&SignalFacilityRecord, ConversationProblem> {
+        let record = self
+            .signal_facilities
+            .get(&signal_key(owner))
+            .ok_or(ConversationProblem::NotOwned)?;
+        if record.owner.lease_epoch != owner.lease_epoch {
+            return Err(ConversationProblem::StaleOwner);
+        }
+        Ok(record)
+    }
+
+    fn signal_facility_mut(
+        &mut self,
+        owner: &ConversationOwner,
+    ) -> Result<&mut SignalFacilityRecord, ConversationProblem> {
+        let record = self
+            .signal_facilities
+            .get_mut(&signal_key(owner))
+            .ok_or(ConversationProblem::NotOwned)?;
+        if record.owner.lease_epoch != owner.lease_epoch {
+            return Err(ConversationProblem::StaleOwner);
+        }
+        Ok(record)
+    }
+
     pub fn set_attach(
         &mut self,
         header: ConversationAttachHeader,
@@ -453,6 +886,7 @@ impl ConversationLedger {
                 record.released = true;
                 record.state = super::ConversationState::Free;
                 record.pending_issue = None;
+                record.data = super::ConversationDataState::default();
                 record.sequence += 1;
                 released += 1;
             }
@@ -464,17 +898,23 @@ impl ConversationLedger {
                 .get(key)
                 .is_some_and(|record| !record.released)
         });
+        let prior_signals = self.signal_facilities.len();
+        self.signal_facilities
+            .retain(|_, facility| &facility.owner != owner);
+        released += prior_signals - self.signal_facilities.len();
         Ok(released)
     }
 
     pub fn validate(&self) -> Result<(), ConversationProblem> {
         if !matches!(self.schema_version, 1 | LEDGER_VERSION)
             || self.schema_version == 1 && !self.exchanges.is_empty()
+            || self.schema_version == 1 && !self.signal_facilities.is_empty()
             || self.next_token == 0
             || self.systems.len() > MAX_SYSTEMS
             || self.conversations.len() > MAX_CONVERSATIONS
             || self.attach_headers.len() > MAX_ATTACH_HEADERS
             || self.exchanges.len() > MAX_CONVERSATIONS
+            || self.signal_facilities.len() > MAX_SIGNAL_FACILITIES
         {
             return Err(ConversationProblem::Malformed);
         }
@@ -494,6 +934,18 @@ impl ConversationLedger {
         }
         if self.schema_version == LEDGER_VERSION {
             let mut principals = std::collections::BTreeSet::new();
+            let mut mro_sessions = std::collections::BTreeSet::new();
+            for record in self
+                .conversations
+                .values()
+                .filter(|record| !record.released)
+            {
+                if let Some(name) = record.mro_session_name.as_deref()
+                    && !mro_sessions.insert((&record.owner.execution, &record.owner.run_unit, name))
+                {
+                    return Err(ConversationProblem::Malformed);
+                }
+            }
             for record in self
                 .conversations
                 .values()
@@ -549,6 +1001,22 @@ impl ConversationLedger {
                 return Err(ConversationProblem::Malformed);
             }
         }
+        for (key, facility) in &self.signal_facilities {
+            if !facility.owner.valid()
+                || key != &signal_key(&facility.owner)
+                || facility.pending && facility.last_event_sequence == 0
+                || facility.terminal_error
+                    && (facility.pending || facility.last_event_sequence == 0)
+                || self.conversations.values().any(|record| {
+                    record.owner.execution == facility.owner.execution
+                        && record.owner.run_unit == facility.owner.run_unit
+                        && record.principal_facility
+                        && !record.released
+                })
+            {
+                return Err(ConversationProblem::Malformed);
+            }
+        }
         Ok(())
     }
 
@@ -564,6 +1032,10 @@ impl ConversationLedger {
 
 fn attach_key(owner: &ConversationOwner, name: &str) -> String {
     format!("{}\0{}\0{name}", owner.execution, owner.run_unit)
+}
+
+fn signal_key(owner: &ConversationOwner) -> String {
+    format!("{}\0{}", owner.execution, owner.run_unit)
 }
 
 #[cfg(test)]
@@ -706,6 +1178,18 @@ mod tests {
             .unwrap();
         let current = ConversationLedger::load(&store).unwrap();
         assert_eq!(current.schema_version, 1);
+        let mut impossible = current.clone();
+        impossible.signal_facilities.insert(
+            signal_key(&owner()),
+            SignalFacilityRecord {
+                owner: owner(),
+                lu_type: SignalLuType::LuType4,
+                pending: false,
+                terminal_error: false,
+                last_event_sequence: 0,
+            },
+        );
+        assert_eq!(impossible.validate(), Err(ConversationProblem::Malformed));
         let mut next = current.clone();
         next.offer_peer_frame(
             token,

@@ -31,6 +31,9 @@ pub(super) fn invoke(
     let max_data_length = optional_decimal(request, "SET.MAXLENGTH")?
         .map(|value| usize::try_from(value).map_err(|_| HostProblem::Malformed))
         .transpose()?;
+    let into_capacity = optional_decimal(request, "INTO.MAXLENGTH")?
+        .map(|value| usize::try_from(value).map_err(|_| HostProblem::Malformed))
+        .transpose()?;
     let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
         .map_err(|_| HostProblem::ResourceExhausted)?;
     let record = {
@@ -98,9 +101,11 @@ pub(super) fn invoke(
     }
     let actual = record.data.len();
     let maximum = if request.arguments.contains_key("INTO") {
-        optional_decimal(request, "LENGTH")?
+        let requested = optional_decimal(request, "LENGTH")?
             .map(|value| usize::try_from(value.max(0)).unwrap_or(0))
-            .unwrap_or(actual)
+            .or(into_capacity)
+            .ok_or(HostProblem::Malformed)?;
+        requested.min(into_capacity.unwrap_or(requested))
     } else {
         actual
     };
@@ -189,6 +194,7 @@ pub(super) fn invoke(
 fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "INTO",
+        "INTO.MAXLENGTH",
         "LENGTH",
         "OPTION.NOHANDLE",
         "OPTION.WAIT",
@@ -203,8 +209,12 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let into_form = request.arguments.contains_key("INTO");
     let set_form = request.arguments.contains_key("SET");
     if into_form == set_form
-        || !request.arguments.contains_key("LENGTH")
+        || (set_form && !request.arguments.contains_key("LENGTH"))
+        || (into_form
+            && !request.arguments.contains_key("LENGTH")
+            && !request.arguments.contains_key("INTO.MAXLENGTH"))
         || set_form != request.arguments.contains_key("SET.MAXLENGTH")
+        || (!into_form && request.arguments.contains_key("INTO.MAXLENGTH"))
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || if name == "LENGTH" {
@@ -214,7 +224,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
                         } else {
                             "mainframe-env.cics.argument@1"
                         }
-                } else if name == "SET.MAXLENGTH" {
+                } else if matches!(name.as_str(), "SET.MAXLENGTH" | "INTO.MAXLENGTH") {
                     value.schema() != "mainframe-env.cics.decimal@1"
                 } else if matches!(name.as_str(), "OPTION.NOHANDLE" | "OPTION.WAIT") {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
