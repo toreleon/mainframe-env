@@ -1,0 +1,12 @@
+{
+  "schema_version": "mainframe-env.cics-oracle-source-review@1",
+  "product": "IBM CICS TS 6.x",
+  "baseline": "ibm-cics-ts-6x-application-api-sources-a-2026-09-10",
+  "catalog_baseline": "ibm-cics-ts-6x-2026-08-31:api-commands",
+  "topics": [
+    {"command_row": "0013", "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_bifdeedit.html", "sha256": "c166e90680e4f846cf2a69e9287273c95a5bb6551ed31bc8c3f516ec49af5d3a"},
+    {"command_row": "0014", "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_bifdigest.html", "sha256": "e6f40f97a1ffa4d1c6e1764e8118fb4498f030f98fd4596e240c9ac51747781c"}
+  ],
+  "source_review_credit": 0,
+  "licensed_execution_credit": 0
+}

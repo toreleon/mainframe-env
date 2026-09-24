@@ -131,6 +131,10 @@ struct CobolReferenceArgs {
 struct CicsOracleArgs {
     #[arg(long)]
     capture: PathBuf,
+    #[arg(long, help = "Sealed family ID; omit for the existing file/UOW pilot")]
+    family: Option<String>,
+    #[arg(long, help = "Exact external environment JSON for a family capture")]
+    environment_manifest: Option<PathBuf>,
     #[arg(
         long,
         help = "Optional raw 32-byte Ed25519 public key from the protected runner"
@@ -438,7 +442,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::CicsOracle(args) => (
             "cics-oracle",
             false,
-            import_cics_oracle(root, &args.capture, args.public_key.as_deref()),
+            import_cics_oracle(
+                root,
+                &args.capture,
+                args.family.as_deref(),
+                args.environment_manifest.as_deref(),
+                args.public_key.as_deref(),
+            ),
         ),
         XtaskCommand::JclCatalog(args) => checked!(
             "jcl-catalog",
@@ -1432,6 +1442,8 @@ fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> Task
 fn import_cics_oracle(
     root: &Path,
     capture_path: &Path,
+    family_id: Option<&str>,
+    environment_manifest_path: Option<&Path>,
     public_key_path: Option<&Path>,
 ) -> TaskResult {
     let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
@@ -1451,14 +1463,102 @@ fn import_cics_oracle(
             "CICS oracle Ed25519 public key must contain exactly 32 raw bytes",
         )?;
     }
-    let adapter_path = root.join("conformance/0.9/oracles/cics-licensed-differential.json");
-    let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
-    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
-    let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
+    let (adapter_path, fixture_path, review_path, environment_path, family_manifest_digest) =
+        if let Some(family) = family_id {
+            require(
+                !family.is_empty()
+                    && family.len() <= 80
+                    && family.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
+                    }),
+                "CICS oracle family ID is malformed",
+            )?;
+            let adapter_path = root.join(format!(
+                "conformance/0.9/oracles/cics-licensed-family-{family}.json"
+            ));
+            let adapter = json(&adapter_path)?;
+            let schema_path = root.join("conformance/0.9/schemas/cics-licensed-family.schema.json");
+            validate_schema_instance(&json(&schema_path)?, &adapter, &adapter_path)?;
+            require(
+                adapter["family_id"].as_str() == Some(family)
+                    && adapter["capture_contract"] == "mainframe-env.cics-oracle-capture@2"
+                    && adapter["trusted_authority_id"] == "ibm-cics-protected-runner"
+                    && adapter["signature_algorithm"] == "ed25519"
+                    && adapter["public_key_source"] == "--public-key"
+                    && adapter["local_model_and_synthetic_credit"] == 0,
+                "CICS oracle family manifest identity is stale",
+            )?;
+            let environment_path = environment_manifest_path
+                .ok_or_else(|| "CICS oracle family needs --environment-manifest".to_string())?;
+            let environment_path = fs::canonicalize(environment_path)
+                .map_err(|error| format!("CICS oracle environment manifest: {error}"))?;
+            require(
+                !environment_path.starts_with(&canonical_root),
+                "CICS oracle exact environment manifest must remain outside the candidate tree",
+            )?;
+            require(
+                fs::metadata(&environment_path)
+                    .map_err(|error| format!("CICS oracle environment manifest: {error}"))?
+                    .len()
+                    <= 64 * 1024,
+                "CICS oracle exact environment manifest exceeds its byte limit",
+            )?;
+            let environment = json(&environment_path)?;
+            let fields = array(&adapter, "environment_manifest_fields", &adapter_path)?;
+            let expected_keys = fields
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .chain(std::iter::once("schema_version".to_string()))
+                .collect::<BTreeSet<_>>();
+            require(
+                environment["schema_version"] == "mainframe-env.cics-oracle-environment@1"
+                    && environment.as_object().is_some_and(|object| {
+                        object.keys().cloned().collect::<BTreeSet<_>>() == expected_keys
+                            && fields.iter().filter_map(Value::as_str).all(|field| {
+                                object[field]
+                                    .as_str()
+                                    .is_some_and(|value| !value.is_empty() && value.len() <= 4096)
+                            })
+                    }),
+                "CICS oracle exact environment manifest is incomplete or has unknown fields",
+            )?;
+            let fixture_path = root.join(text(&adapter, "fixture_path", &adapter_path)?);
+            let review_path = root.join(text(&adapter, "source_review_path", &adapter_path)?);
+            (
+                adapter_path.clone(),
+                fixture_path,
+                review_path,
+                environment_path,
+                Some(format!("sha256:{}", file_digest(&adapter_path)?)),
+            )
+        } else {
+            require(
+                environment_manifest_path.is_none(),
+                "pilot capture does not take --environment-manifest",
+            )?;
+            (
+                root.join("conformance/0.9/oracles/cics-licensed-differential.json"),
+                root.join("conformance/0.9/cics/pilot-fixtures.json"),
+                root.join("conformance/0.9/cics/pilot-rule-review.json"),
+                root.join("conformance/0.9/cics/pilot-environment.json"),
+                None,
+            )
+        };
     let adapter = json(&adapter_path)?;
     let fixture = json(&fixture_path)?;
     let review = json(&review_path)?;
-    let required_scenarios = array(&adapter, "required_scenarios", &adapter_path)?
+    let scenario_values = if family_id.is_some() {
+        array(&adapter, "observations", &adapter_path)?
+            .iter()
+            .map(|value| &value["scenario_id"])
+            .collect::<Vec<_>>()
+    } else {
+        array(&adapter, "required_scenarios", &adapter_path)?
+            .iter()
+            .collect::<Vec<_>>()
+    };
+    let required_scenarios = scenario_values
         .iter()
         .map(|value| {
             value
@@ -1467,13 +1567,98 @@ fn import_cics_oracle(
                 .ok_or_else(|| "CICS oracle required scenario is not a string".to_string())
         })
         .collect::<TaskResult<BTreeSet<_>>>()?;
+    let required_order = family_id.map(|_| {
+        scenario_values
+            .iter()
+            .filter_map(|value| value.as_str())
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+    });
+    require(
+        required_scenarios.len() == scenario_values.len(),
+        "CICS oracle family scenario IDs are duplicate",
+    )?;
+    if family_id.is_some() {
+        let rows = array(&adapter, "command_rows", &adapter_path)?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<BTreeSet<_>>();
+        require(
+            array(&adapter, "observations", &adapter_path)?
+                .iter()
+                .all(|observation| {
+                    observation["command_row"]
+                        .as_str()
+                        .is_some_and(|row| rows.contains(row))
+                })
+                && fixture["family_id"].as_str() == family_id
+                && fixture["schema_version"] == "mainframe-env.cics-oracle-family-fixtures@1"
+                && review["source_review_credit"] == 0
+                && review["licensed_execution_credit"] == 0,
+            "CICS oracle family fixture/source scope is stale",
+        )?;
+        let pins_path =
+            root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
+        let pins = json(&pins_path)?;
+        let registrations_path =
+            root.join("conformance/0.9/cics/typed-execution-registrations.json");
+        let registrations = json(&registrations_path)?;
+        let reviewed_topics = array(&review, "topics", &review_path)?;
+        require(
+            review["schema_version"] == "mainframe-env.cics-oracle-source-review@1"
+                && review["baseline"] == pins["baseline_id"]
+                && review["catalog_baseline"] == "ibm-cics-ts-6x-2026-08-31:api-commands"
+                && reviewed_topics.len() == rows.len()
+                && reviewed_topics
+                    .iter()
+                    .filter_map(|topic| topic["command_row"].as_str())
+                    .collect::<BTreeSet<_>>()
+                    .len()
+                    == rows.len()
+                && reviewed_topics.iter().all(|topic| {
+                    let Some(short_row) = topic["command_row"].as_str() else {
+                        return false;
+                    };
+                    let full_row = format!("ibm-cics-ts-6x-2026-08-31:api-commands:{short_row}");
+                    rows.contains(full_row.as_str())
+                        && pins["topics"].as_array().is_some_and(|pinned| {
+                            pinned.iter().any(|pin| {
+                                pin["topic_path"] == topic["topic_path"]
+                                    && pin["sha256"] == topic["sha256"]
+                            })
+                        })
+                })
+                && rows.iter().all(|row| {
+                    registrations["registrations"]
+                        .as_array()
+                        .is_some_and(|items| {
+                            items.iter().any(|item| {
+                                item["official_row"].as_str() == Some(*row)
+                                    && item["interface"] == "api"
+                            })
+                        })
+                }),
+            "CICS oracle family source pins or typed rows are stale",
+        )?;
+    }
     let spec = compile_shared_spec(root)?;
     let candidate = candidate_digest(root)?;
     let fixture_digest = format!("sha256:{}", file_digest(&fixture_path)?);
     let review_digest = format!("sha256:{}", file_digest(&review_path)?);
     let environment_digest = format!("sha256:{}", file_digest(&environment_path)?);
-    let comparison_policy = text(&fixture["comparison_policy"], "version", &fixture_path)?;
-    let expected_observations = fixture["licensed_expected_observations"]
+    let comparison_policy = if family_id.is_some() {
+        fixture["comparison_policy"]
+            .as_str()
+            .ok_or_else(|| "CICS oracle family comparison policy is missing".to_string())?
+    } else {
+        text(&fixture["comparison_policy"], "version", &fixture_path)?
+    };
+    let fixture_observations = if family_id.is_some() {
+        &fixture["expected_observations"]
+    } else {
+        &fixture["licensed_expected_observations"]
+    };
+    let fixture_observations = fixture_observations
         .as_array()
         .ok_or_else(|| "CICS licensed expected observations are missing".to_string())?
         .iter()
@@ -1481,11 +1666,33 @@ fn import_cics_oracle(
             serde_json::from_value::<CicsOracleObservation>(value.clone())
                 .map_err(|error| format!("CICS licensed expected observation: {error}"))
         })
-        .collect::<TaskResult<Vec<_>>>()?
+        .collect::<TaskResult<Vec<_>>>()?;
+    if let Some(order) = &required_order {
+        require(
+            fixture_observations
+                .iter()
+                .map(|observation| &observation.scenario_id)
+                .collect::<Vec<_>>()
+                == order.iter().collect::<Vec<_>>(),
+            "CICS oracle reviewed fixture order differs from its sealed family manifest",
+        )?;
+    }
+    require(
+        fixture_observations
+            .iter()
+            .map(|observation| observation.scenario_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            == fixture_observations.len(),
+        "CICS oracle reviewed fixture has duplicate observations",
+    )?;
+    let expected_observations = fixture_observations
         .into_iter()
         .map(|observation| (observation.scenario_id.clone(), observation))
         .collect::<BTreeMap<_, _>>();
     let expected = CicsOracleExpectation {
+        family_id,
+        family_manifest_digest: family_manifest_digest.as_deref(),
         candidate_digest: &candidate,
         spec_digest: spec.spec_digest(),
         fixture_digest: &fixture_digest,
@@ -1493,6 +1700,7 @@ fn import_cics_oracle(
         environment_manifest_digest: &environment_digest,
         comparison_policy,
         required_scenarios: &required_scenarios,
+        required_order,
         expected_observations: &expected_observations,
     };
     let outcome = import_cics_oracle_capture(&capture, &expected, public_key.as_deref())?;
@@ -1506,16 +1714,24 @@ fn import_cics_oracle(
             run_job_id,
             receipt_digest,
         } => {
-            require(
-                review["review_status"] == "accepted"
-                    && spec
-                        .scenarios()
-                        .any(|scenario| scenario.scenario_id().as_str() == "cics.file-uow.local"),
-                "licensed CICS capture cannot import before reviewed pilot promotion",
-            )?;
-            println!(
-                "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-pilot-only"
-            );
+            if family_id.is_none() {
+                require(
+                    review["review_status"] == "accepted"
+                        && spec.scenarios().any(|scenario| {
+                            scenario.scenario_id().as_str() == "cics.file-uow.local"
+                        }),
+                    "licensed CICS capture cannot import before reviewed pilot promotion",
+                )?;
+            }
+            if let Some(family) = family_id {
+                println!(
+                    "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-family-only family={family} differential=pending"
+                );
+            } else {
+                println!(
+                    "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-pilot-only"
+                );
+            }
         }
     }
     Ok(())
@@ -1524,6 +1740,82 @@ fn import_cics_oracle(
 #[cfg(test)]
 mod docs_driven_pipeline_tests {
     use super::*;
+
+    #[test]
+    fn cics_bif_family_local_import_binds_manifest_fixture_and_external_environment() {
+        let root = repository_root().unwrap();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let external = std::env::temp_dir().join(format!("cics-bif-oracle-test-{nonce}"));
+        fs::create_dir(&external).unwrap();
+        let environment_path = external.join("environment.json");
+        let environment = serde_json::json!({
+            "schema_version": "mainframe-env.cics-oracle-environment@1",
+            "cics_version_and_maintenance": "test-only-local",
+            "enterprise_cobol_version_and_maintenance": "test-only-local",
+            "compiler_options": "test-only-local",
+            "encoding": "CP037",
+            "cpacf_msa_availability": "test-only-local",
+            "program_and_transaction_definition": "test-only-local",
+            "principal_and_saf_configuration": "test-only-local",
+            "capture_serialization_version": "test-only-local",
+        });
+        fs::write(&environment_path, serde_json::to_vec(&environment).unwrap()).unwrap();
+        let manifest_path =
+            root.join("conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json");
+        let fixture_path = root.join("conformance/0.9/oracles/cics-bif-builtins-fixtures.json");
+        let source_path = root.join("conformance/0.9/oracles/cics-bif-builtins-source-review.json");
+        let fixture = json(&fixture_path).unwrap();
+        let observations = fixture["expected_observations"].clone();
+        let typed_observations =
+            serde_json::from_value::<Vec<CicsOracleObservation>>(observations.clone()).unwrap();
+        let capture_path = external.join("capture.json");
+        let capture = serde_json::json!({
+            "schema_version": "mainframe-env.cics-oracle-capture@2",
+            "family_id": "bif-builtins-v1",
+            "family_manifest_digest": format!("sha256:{}", file_digest(&manifest_path).unwrap()),
+            "candidate_digest": candidate_digest(&root).unwrap(),
+            "spec_digest": compile_shared_spec(&root).unwrap().spec_digest(),
+            "fixture_digest": format!("sha256:{}", file_digest(&fixture_path).unwrap()),
+            "source_review_digest": format!("sha256:{}", file_digest(&source_path).unwrap()),
+            "environment_manifest_digest": format!("sha256:{}", file_digest(&environment_path).unwrap()),
+            "comparison_policy": fixture["comparison_policy"],
+            "raw_capture_digest": format!("sha256:{:x}", Sha256::digest(serde_json::to_vec(&typed_observations).unwrap())),
+            "observations": observations,
+            "origin": {"kind": "local", "authority": "test-only-local", "run_job_id": "test-1", "signature": null},
+        });
+        fs::write(&capture_path, serde_json::to_vec(&capture).unwrap()).unwrap();
+        assert!(
+            import_cics_oracle(
+                &root,
+                &capture_path,
+                Some("bif-builtins-v1"),
+                Some(&environment_path),
+                None
+            )
+            .is_ok()
+        );
+        let mut changed_environment = environment;
+        changed_environment["encoding"] = serde_json::json!("other-test-encoding");
+        fs::write(
+            &environment_path,
+            serde_json::to_vec(&changed_environment).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            import_cics_oracle(
+                &root,
+                &capture_path,
+                Some("bif-builtins-v1"),
+                Some(&environment_path),
+                None
+            )
+            .is_err()
+        );
+        fs::remove_dir_all(external).unwrap();
+    }
 
     #[test]
     fn stale_source_review_fails_the_fast_spec_gate_before_execution() {
@@ -8069,6 +8361,35 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
         compile_draft_2020_12_schema(&value, file)?;
     }
+    let family_path =
+        root.join("conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json");
+    let family_schema = root.join("conformance/0.9/schemas/cics-licensed-family.schema.json");
+    let family = json(&family_path)?;
+    validate_schema_instance(&json(&family_schema)?, &family, &family_path)?;
+    let fixture_path = root.join(text(&family, "fixture_path", &family_path)?);
+    let fixture = json(&fixture_path)?;
+    require(
+        fixture["family_id"] == family["family_id"]
+            && fixture["schema_version"] == "mainframe-env.cics-oracle-family-fixtures@1"
+            && family["observations"].as_array().is_some_and(|scenarios| {
+                fixture["expected_observations"]
+                    .as_array()
+                    .is_some_and(|expected| {
+                        scenarios.len() == expected.len()
+                            && scenarios
+                                .iter()
+                                .zip(expected)
+                                .all(|(scenario, observation)| {
+                                    scenario["scenario_id"] == observation["scenario_id"]
+                                        && serde_json::from_value::<CicsOracleObservation>(
+                                            observation.clone(),
+                                        )
+                                        .is_ok()
+                                })
+                    })
+            }),
+        "CICS BIF oracle family manifest/fixture closure drifted",
+    )?;
     validate_0_2_schema_artifacts(root)?;
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");

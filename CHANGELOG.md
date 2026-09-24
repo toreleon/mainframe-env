@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added a sealed CICS BIF DEEDIT/DIGEST licensed-oracle family manifest and v2
+  capture contract with exact family, environment, observation, and protected
+  signature checks. The existing file/UOW pilot remains compatible; no licensed
+  campaign or full-minor credit is claimed.
+
 - Integrated nine CIC-905 conversation-open routes with the existing EXTRACT,
   miscellaneous, BTS, and CIC-906 slices. The registry derives 184 typed and
   79 unready API rows. One versioned APPC/MRO ledger now owns allocations,
