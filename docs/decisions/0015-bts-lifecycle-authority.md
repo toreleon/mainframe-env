@@ -138,6 +138,15 @@ in the pinned DELETE ACTIVITY contract. Source: baseline A catalog row `0041`,
 `dfhp4_deleteactivity.html` SHA-256
 `3d91328683fc209e5ee8583f96f8c77de09c99caf6ca1994b2e19e81a00e7a24`.
 
+RESET and explicit DELETE also leave a subtree unchanged when a descendant is
+live, because its durable RUN work still refers to that activity identity. A
+descendant pending in another UOW returns `LOCKED`; the defining UOW can
+delete its own INITIAL child. A held descendant retains the same condition.
+Full source deletion of live descendants still needs coordinated work fencing.
+Source: baseline B row `0170`, `dfhp4_resetactivity.html` SHA-256
+`23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52`;
+baseline A row `0041` DELETE ACTIVITY hash above.
+
 RUN TRANSID issues a child token through the sibling `CicsService` registration
 and completion signatures. This checkout carries a compatible child-token
 port while the sibling FETCH/FREE lane is separate. The token row is an

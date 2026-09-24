@@ -149,6 +149,20 @@ impl<'a> BtsLifecycleStore<'a> {
                     process.delete_child(parent_id, child_name)?
                 }
             };
+            let foreign_pending = |id: &str| {
+                original[id]
+                    .pending_uow
+                    .as_deref()
+                    .is_some_and(|owner| owner != run_unit)
+            };
+            if removed.iter().any(|id| foreign_pending(id))
+                || matches!(
+                    removal,
+                    BtsRemoval::Reset { activity_id } if foreign_pending(activity_id)
+                )
+            {
+                return Err(condition("LOCKED", 100, 0));
+            }
             let mut writes = Vec::with_capacity(removed.len() + 1);
             match removal {
                 BtsRemoval::Reset { activity_id } => {
@@ -416,5 +430,72 @@ mod tests {
         let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
         assert_eq!(process.activities.len(), 1);
         assert_eq!(process.activities[&root].mode, BtsMode::Initial);
+    }
+
+    #[test]
+    fn delete_keeps_another_uows_pending_child_and_index() {
+        let memory = MemoryStore::new(Default::default());
+        let authority = BtsLifecycleStore::new(&memory);
+        let (root, _) = parent_and_child(&authority);
+        let pending = authority
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "PENDING".into(),
+                    completion_event: "PENDINGEV".into(),
+                    program: "WORKER".into(),
+                    transid: "BTS2".into(),
+                    userid: "USER".into(),
+                },
+                "UOW3",
+                "EXEC3",
+                "USER",
+                "define-pending",
+                [6; 32],
+            )
+            .unwrap();
+        let before = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(
+            authority.remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "delete-pending",
+                [7; 32],
+                &BtsRemoval::Delete {
+                    parent_id: root,
+                    child_name: "PENDING".into(),
+                },
+            ),
+            Err(condition("LOCKED", 100, 0))
+        );
+        assert_eq!(
+            authority.load_process("TYPE", "ORDER").unwrap(),
+            Some(before.clone())
+        );
+        assert!(authority.load_activity_index(&pending).unwrap().is_some());
+        assert_eq!(
+            authority.remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "reset-pending",
+                [8; 32],
+                &BtsRemoval::Reset {
+                    activity_id: pending.clone(),
+                },
+            ),
+            Err(condition("LOCKED", 100, 0))
+        );
+        assert_eq!(
+            authority.load_process("TYPE", "ORDER").unwrap(),
+            Some(before)
+        );
     }
 }

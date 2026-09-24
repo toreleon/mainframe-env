@@ -221,6 +221,12 @@ impl BtsProcess {
         {
             return Err(condition("LOCKED", 100, 0));
         }
+        if descendants.iter().any(|id| {
+            let child = &self.activities[id];
+            !matches!(child.mode, BtsMode::Initial | BtsMode::Complete)
+        }) {
+            return Err(HostProblem::UnknownOutcome);
+        }
         for id in &descendants {
             self.activities.remove(id);
         }
@@ -256,6 +262,12 @@ impl BtsProcess {
             .any(|id| self.activities[id].acquired_by.is_some())
         {
             return Err(condition("LOCKED", 100, 0));
+        }
+        if ids.iter().any(|id| {
+            let descendant = &self.activities[id];
+            !matches!(descendant.mode, BtsMode::Initial | BtsMode::Complete)
+        }) {
+            return Err(HostProblem::UnknownOutcome);
         }
         for id in &ids {
             self.activities.remove(id);
@@ -423,5 +435,66 @@ mod tests {
         assert!(!state.activities.contains_key(&left));
         assert!(state.activities.contains_key(&right));
         state.validate().unwrap();
+    }
+
+    #[test]
+    fn reset_and_delete_preserve_live_descendant_run_identity() {
+        let mut state = process();
+        let root = state.root_id.clone();
+        state.start(&root, None, false).unwrap();
+        let child = BtsLifecycleStore::child_id("TYPE", "ORDER", &root, 1).unwrap();
+        let grandchild = BtsLifecycleStore::child_id("TYPE", "ORDER", &root, 2).unwrap();
+        for (id, name, parent, mode, completion, activation_epoch) in [
+            (
+                &child,
+                "CHILD",
+                &root,
+                BtsMode::Complete,
+                BtsCompletion::Normal,
+                1,
+            ),
+            (
+                &grandchild,
+                "GRANDCHILD",
+                &child,
+                BtsMode::Active,
+                BtsCompletion::Incomplete,
+                1,
+            ),
+        ] {
+            state.activities.insert(
+                id.clone(),
+                BtsActivity {
+                    id: id.clone(),
+                    name: name.into(),
+                    parent_id: Some(parent.clone()),
+                    completion_event: Some(name.into()),
+                    program: "CHILD".into(),
+                    transid: "BTS1".into(),
+                    userid: "USER".into(),
+                    mode,
+                    completion,
+                    suspended: false,
+                    activation_epoch,
+                    checkpoint: None,
+                    acquired_by: None,
+                    pending_uow: None,
+                    abcode: None,
+                    abprogram: None,
+                },
+            );
+        }
+        state.validate().unwrap();
+        let before = state.clone();
+        assert_eq!(
+            state.delete_child(&root, "CHILD"),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(state, before);
+        assert_eq!(
+            state.reset_subtree(&child),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(state, before);
     }
 }
