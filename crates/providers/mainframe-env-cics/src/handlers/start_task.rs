@@ -17,6 +17,8 @@ pub struct CicsStartTask {
     pub principal: String,
     /// Principal facility requested for the task, when supported.
     pub terminal: Option<String>,
+    /// Whether this was a noncancelable START ATTACH with STARTCODE U.
+    pub attached: bool,
 }
 
 /// Retained terminal session selected by a terminal-associated START.
@@ -36,6 +38,7 @@ pub(in crate::service) fn from_interval_record(record: &IntervalStartRecord) -> 
         transaction: record.transaction.clone(),
         principal: record.principal.clone(),
         terminal: record.terminal.clone(),
+        attached: record.state == super::interval_control::IntervalStartState::AttachedReady,
     }
 }
 
@@ -132,10 +135,11 @@ impl CicsService {
             return Err(HostProblem::ResourceExhausted);
         }
         let new_session = existing.is_none();
+        let bridged = invocation.bindings.contains_key("cics.bridge-request");
         let current = existing.unwrap_or_else(|| Session {
             terminal_identity: super::TerminalIdentity::default(),
-            rows: 1,
-            columns: 1,
+            rows: if bridged { 24 } else { 1 },
+            columns: if bridged { 80 } else { 1 },
             principal: invocation.principal.id().as_str().into(),
             transaction: transaction.to_ascii_uppercase(),
             run_unit: invocation.run_unit_id.as_str().into(),

@@ -2414,9 +2414,15 @@ mod tests {
             CicsOperation::Address,
             CicsOperation::AddressSet,
             CicsOperation::Asktime,
+            CicsOperation::BifDeedit,
+            CicsOperation::BifDigest,
             CicsOperation::AsktimeEib,
             CicsOperation::Assign,
             CicsOperation::ChangeTask,
+            CicsOperation::Post,
+            CicsOperation::WriteOperator,
+            CicsOperation::ExtractCertificate,
+            CicsOperation::ExtractTcpip,
             CicsOperation::Deq,
             CicsOperation::Delete,
             CicsOperation::DefineInputEvent,
@@ -2433,6 +2439,7 @@ mod tests {
             CicsOperation::Enq,
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
+            CicsOperation::ConvertTime,
             CicsOperation::Freemain,
             CicsOperation::Freemain64,
             CicsOperation::Getmain,
@@ -2493,10 +2500,13 @@ mod tests {
             CicsOperation::SpoolOpenOutput,
             CicsOperation::SpoolRead,
             CicsOperation::SpoolWrite,
+            CicsOperation::Start,
             CicsOperation::StartBrowse,
+            CicsOperation::StartAttach,
             CicsOperation::Suspend,
             CicsOperation::WaitEvent,
             CicsOperation::WaitExternal,
+            CicsOperation::WaitCics,
             CicsOperation::Syncpoint,
             CicsOperation::InvokeService,
             CicsOperation::SoapFaultAdd,
@@ -2529,7 +2539,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 119);
+        assert_eq!(forms.len(), 129);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

@@ -30,7 +30,65 @@ pub enum CicsOperation {
     SuspendAcqActivity,
     SuspendAcqProcess,
     SuspendActivity,
+    /// Allocate one task-owned mapped APPC or MRO conversation.
+    AllocateConversation,
+    /// Allocate one task-owned APPC basic conversation with GDS return codes.
+    GdsAllocateConversation,
+    /// Read this task's principal APPC basic facility with GDS return codes.
+    GdsAssignConversation,
+    /// Build one task-owned MRO attach control block for a later send.
+    BuildAttach,
+    /// Initiate one task-owned mapped APPC process conversation.
+    ConnectProcess,
+    /// Initiate one APPC basic process conversation with GDS return codes.
+    GdsConnectProcess,
+    /// Return one mapped APPC or MRO facility to the session group.
+    FreeConversation,
+    /// Return one completed APPC basic facility with GDS return codes.
+    GdsFreeConversation,
+    /// Send and receive one explicit mapped APPC or MRO peer frame.
+    Converse,
+    /// Consume one task-owned mapped APPC or MRO peer frame.
+    ReceiveConversation,
+    /// Receive APPC basic data and indicators with a six-byte GDS RETCODE.
+    GdsReceiveConversation,
+    /// Stage mapped APPC or MRO data for carrier-confirmed transmission.
+    SendConversation,
+    /// Confirm accumulated mapped APPC process and SEND transmission.
+    WaitConvid,
+    /// Confirm APPC basic accumulated output with a six-byte GDS RETCODE.
+    GdsWaitConversation,
+    /// Confirm terminal output and observe one peer EOC or SIGNAL indicator.
+    WaitTerminal,
     Abend,
+    /// Fetch the next completed child token owned by this parent task.
+    FetchAny,
+    /// Fetch the completion of one parent-owned child token.
+    FetchChild,
+    /// Free a child token and its unfetched reply resources.
+    FreeChild,
+    /// Synchronously activate the acquired BTS activity.
+    LinkAcqActivity,
+    /// Synchronously activate the acquired BTS process root.
+    LinkAcqProcess,
+    /// Synchronously activate one named child activity.
+    LinkActivity,
+    /// Read the task's LUTYPE6.1 or MRO attach-header fields.
+    ExtractAttach,
+    /// Read mapped APPC or MRO conversation state.
+    ExtractAttributes,
+    /// Read APPC basic state and its GDS return code.
+    GdsExtractAttributes,
+    /// Consume the task's one-shot terminal logon message.
+    ExtractLogonMsg,
+    /// Read the principal mapped APPC attach process.
+    ExtractProcess,
+    /// Read the principal APPC basic attach process.
+    GdsExtractProcess,
+    /// Resolve an LUTYPE6.1 network name to local system/terminal names.
+    ExtractTct,
+    /// Position the task on an owned LUTYPE6.1 or MRO facility.
+    Point,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
     /// Return checked virtual addresses for task storage areas.
@@ -38,6 +96,10 @@ pub enum CicsOperation {
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
+    /// Remove editing characters from one numeric field in place.
+    BifDeedit,
+    /// Calculate a bounded SHA-1 digest of caller supplied data.
+    BifDigest,
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
@@ -75,6 +137,14 @@ pub enum CicsOperation {
     UpdateCounter,
     /// Execute IBM UPDATE against an unsigned doubleword named counter.
     UpdateDCounter,
+    /// Arm one task-owned timer-event control area.
+    Post,
+    /// Write one system-console message and optionally await its reply.
+    WriteOperator,
+    /// Return fields from the accepted client certificate of this TCP/IP task.
+    ExtractCertificate,
+    /// Return selected fields of the accepted TCP/IP connection.
+    ExtractTcpip,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -123,6 +193,8 @@ pub enum CicsOperation {
     Enq,
     EndBrowse,
     FormatTime,
+    /// Convert a 64-byte architected date-time string to packed absolute time.
+    ConvertTime,
     /// Release one task-local virtual storage area acquired by GETMAIN.
     Freemain,
     /// Release one checked AMODE(64) virtual allocation.
@@ -234,6 +306,10 @@ pub enum CicsOperation {
     EnterTraceId,
     /// Schedule one interval-control START record.
     Start,
+    /// Start one noncancelable local task immediately without copied data.
+    StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
@@ -241,6 +317,10 @@ pub enum CicsOperation {
     WaitEvent,
     /// Wait for standard MVS posting of one ECB in a bounded external list.
     WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
+    /// Suspend the principal supported logical unit until a SIGNAL arrives.
+    WaitSignal,
     Syncpoint,
     /// Typed CICS web-service-control command InvokeService.
     InvokeService,
@@ -343,11 +423,42 @@ impl CicsOperation {
             Self::SuspendAcqActivity => "SuspendAcqActivity",
             Self::SuspendAcqProcess => "SuspendAcqProcess",
             Self::SuspendActivity => "SuspendActivity",
+            Self::AllocateConversation => "AllocateConversation",
+            Self::GdsAllocateConversation => "GdsAllocateConversation",
+            Self::GdsAssignConversation => "GdsAssignConversation",
+            Self::BuildAttach => "BuildAttach",
+            Self::ConnectProcess => "ConnectProcess",
+            Self::GdsConnectProcess => "GdsConnectProcess",
+            Self::FreeConversation => "FreeConversation",
+            Self::GdsFreeConversation => "GdsFreeConversation",
+            Self::Converse => "Converse",
+            Self::ReceiveConversation => "ReceiveConversation",
+            Self::GdsReceiveConversation => "GdsReceiveConversation",
+            Self::SendConversation => "SendConversation",
+            Self::WaitConvid => "WaitConvid",
+            Self::GdsWaitConversation => "GdsWaitConversation",
+            Self::WaitTerminal => "WaitTerminal",
             Self::Abend => "Abend",
+            Self::FetchAny => "FetchAny",
+            Self::FetchChild => "FetchChild",
+            Self::FreeChild => "FreeChild",
+            Self::LinkAcqActivity => "LinkAcqActivity",
+            Self::LinkAcqProcess => "LinkAcqProcess",
+            Self::LinkActivity => "LinkActivity",
+            Self::ExtractAttach => "ExtractAttach",
+            Self::ExtractAttributes => "ExtractAttributes",
+            Self::GdsExtractAttributes => "GdsExtractAttributes",
+            Self::ExtractLogonMsg => "ExtractLogonMsg",
+            Self::ExtractProcess => "ExtractProcess",
+            Self::GdsExtractProcess => "GdsExtractProcess",
+            Self::ExtractTct => "ExtractTct",
+            Self::Point => "Point",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
+            Self::BifDeedit => "BifDeedit",
+            Self::BifDigest => "BifDigest",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
@@ -367,6 +478,10 @@ impl CicsOperation {
             Self::RewindDCounter => "RewindDCounter",
             Self::UpdateCounter => "UpdateCounter",
             Self::UpdateDCounter => "UpdateDCounter",
+            Self::Post => "Post",
+            Self::WriteOperator => "WriteOperator",
+            Self::ExtractCertificate => "ExtractCertificate",
+            Self::ExtractTcpip => "ExtractTcpip",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DefineInputEvent => "DefineInputEvent",
@@ -392,6 +507,7 @@ impl CicsOperation {
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::ConvertTime => "ConvertTime",
             Self::Freemain => "Freemain",
             Self::Freemain64 => "Freemain64",
             Self::Getmain => "Getmain",
@@ -454,10 +570,14 @@ impl CicsOperation {
             Self::Trace => "Trace",
             Self::EnterTraceId => "EnterTraceId",
             Self::Start => "Start",
+            Self::StartAttach => "StartAttach",
+            Self::StartBrexit => "StartBrexit",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
             Self::WaitEvent => "WaitEvent",
             Self::WaitExternal => "WaitExternal",
+            Self::WaitCics => "WaitCics",
+            Self::WaitSignal => "WaitSignal",
             Self::Syncpoint => "Syncpoint",
             Self::InvokeService => "InvokeService",
             Self::SoapFaultAdd => "SoapFaultAdd",
@@ -545,6 +665,28 @@ impl CicsOperation {
                 | Self::SuspendAcqActivity
                 | Self::SuspendAcqProcess
                 | Self::SuspendActivity
+                | Self::FetchAny
+                | Self::FetchChild
+                | Self::FreeChild
+                | Self::LinkAcqActivity
+                | Self::LinkAcqProcess
+                | Self::LinkActivity
+                | Self::ExtractLogonMsg
+                | Self::Point
+                | Self::AllocateConversation
+                | Self::GdsAllocateConversation
+                | Self::BuildAttach
+                | Self::ConnectProcess
+                | Self::GdsConnectProcess
+                | Self::FreeConversation
+                | Self::GdsFreeConversation
+                | Self::Converse
+                | Self::ReceiveConversation
+                | Self::GdsReceiveConversation
+                | Self::SendConversation
+                | Self::WaitConvid
+                | Self::GdsWaitConversation
+                | Self::WaitTerminal
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -597,6 +739,8 @@ impl CicsOperation {
                 | Self::RewindDCounter
                 | Self::UpdateCounter
                 | Self::UpdateDCounter
+                | Self::Post
+                | Self::WriteOperator
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -663,9 +807,13 @@ impl CicsOperation {
                 | Self::Trace
                 | Self::EnterTraceId
                 | Self::Start
+                | Self::StartAttach
+                | Self::StartBrexit
                 | Self::Retrieve
                 | Self::WaitEvent
                 | Self::WaitExternal
+                | Self::WaitCics
+                | Self::WaitSignal
         )
     }
 
@@ -691,8 +839,37 @@ impl CicsOperation {
             .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
             .collect();
         let first = words.first()?.as_str();
-        Some(match (first, words.get(1).map(String::as_str)) {
+        let second = words
+            .get(1)
+            .map(|word| word.split('(').next().unwrap_or(word));
+        Some(match (first, second) {
+            ("ALLOCATE", _) => Self::AllocateConversation,
+            ("GDS", Some("ALLOCATE")) => Self::GdsAllocateConversation,
+            ("GDS", Some("ASSIGN")) => Self::GdsAssignConversation,
+            ("BUILD", Some("ATTACH")) => Self::BuildAttach,
+            ("CONNECT", Some("PROCESS")) => Self::ConnectProcess,
+            ("GDS", Some("CONNECT")) => Self::GdsConnectProcess,
+            ("FREE", Some("CHILD")) => Self::FreeChild,
+            ("FREE", _) => Self::FreeConversation,
+            ("GDS", Some("FREE")) => Self::GdsFreeConversation,
+            ("CONVERSE", _) => Self::Converse,
+            ("GDS", Some("RECEIVE")) => Self::GdsReceiveConversation,
+            ("WAIT", Some("CONVID")) => Self::WaitConvid,
+            ("GDS", Some("WAIT")) => Self::GdsWaitConversation,
+            ("WAIT", Some("TERMINAL")) => Self::WaitTerminal,
             ("ABEND", _) => Self::Abend,
+            ("EXTRACT", Some("ATTACH")) => Self::ExtractAttach,
+            ("EXTRACT", Some("ATTRIBUTES")) => Self::ExtractAttributes,
+            ("EXTRACT", Some("LOGONMSG")) => Self::ExtractLogonMsg,
+            ("EXTRACT", Some("PROCESS")) => Self::ExtractProcess,
+            ("EXTRACT", Some("TCT")) => Self::ExtractTct,
+            ("GDS", Some("EXTRACT")) if words.get(2).is_some_and(|word| word == "ATTRIBUTES") => {
+                Self::GdsExtractAttributes
+            }
+            ("GDS", Some("EXTRACT")) if words.get(2).is_some_and(|word| word == "PROCESS") => {
+                Self::GdsExtractProcess
+            }
+            ("POINT", _) => Self::Point,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
             ("ADDRESS", _) => Self::Address,
@@ -704,12 +881,23 @@ impl CicsOperation {
                 Self::Asktime
             }
             ("ASKTIME", _) => Self::AsktimeEib,
+            ("BIF", Some("DEEDIT")) => Self::BifDeedit,
+            ("BIF", Some("DIGEST")) => Self::BifDigest,
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
+            ("FETCH", Some("ANY")) => Self::FetchAny,
+            ("FETCH", Some("CHILD")) => Self::FetchChild,
+            ("LINK", Some("ACQACTIVITY")) => Self::LinkAcqActivity,
+            ("LINK", Some("ACQPROCESS")) => Self::LinkAcqProcess,
+            ("LINK", Some("ACTIVITY")) => Self::LinkActivity,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("CHANGE", Some("PASSWORD")) => Self::ChangePassword,
             ("CHANGE", Some("PHRASE")) => Self::ChangePhrase,
             ("DELAY", _) => Self::Delay,
+            ("POST", _) => Self::Post,
+            ("WRITE", Some("OPERATOR")) => Self::WriteOperator,
+            ("EXTRACT", Some("CERTIFICATE")) => Self::ExtractCertificate,
+            ("EXTRACT", Some("TCPIP")) => Self::ExtractTcpip,
             ("DEQ", _) => Self::Deq,
             ("DEFINE", Some("COUNTER")) => Self::DefineCounter,
             ("DEFINE", Some("DCOUNTER")) => Self::DefineDCounter,
@@ -738,6 +926,7 @@ impl CicsOperation {
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("CONVERTTIME", _) => Self::ConvertTime,
             ("FREEMAIN", _) => Self::Freemain,
             ("FREEMAIN64", _) => Self::Freemain64,
             ("GETMAIN", _) => Self::Getmain,
@@ -774,6 +963,7 @@ impl CicsOperation {
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
             ("RECEIVE", Some("PARTN")) => Self::ReceivePartn,
+            ("RECEIVE", _) => Self::ReceiveConversation,
             ("RETRIEVE", Some("REATTACH")) => Self::RetrieveReattachEvent,
             ("RETRIEVE", Some("SUBEVENT")) => Self::RetrieveSubevent,
             ("RETRIEVE", _) => Self::Retrieve,
@@ -797,6 +987,7 @@ impl CicsOperation {
             ("ISSUE", Some("WAIT")) => Self::IssueWait,
             ("SEND", Some("PAGE")) => Self::SendPage,
             ("SEND", Some("PARTNSET")) => Self::SendPartnset,
+            ("SEND", Some("CONVID" | "SESSION")) => Self::SendConversation,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
             ("SPOOLCLOSE", _) => Self::SpoolClose,
@@ -810,11 +1001,15 @@ impl CicsOperation {
             ("DUMP", _) => Self::Dump,
             ("TRACE", _) => Self::Trace,
             ("ENTER", Some("TRACEID")) => Self::EnterTraceId,
+            ("START", Some("ATTACH")) => Self::StartAttach,
+            ("START", Some("BREXIT")) => Self::StartBrexit,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,
             ("WAIT", Some("EVENT")) => Self::WaitEvent,
             ("WAIT", Some("EXTERNAL")) => Self::WaitExternal,
+            ("WAITCICS", _) => Self::WaitCics,
+            ("WAIT", Some("SIGNAL")) => Self::WaitSignal,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("TRANSFORM", Some("DATATOJSON")) => Self::TransformDataToJson,
             ("TRANSFORM", Some("DATATOXML")) => Self::TransformDataToXml,

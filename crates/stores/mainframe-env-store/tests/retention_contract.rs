@@ -1574,6 +1574,96 @@ fn sqlite_cics_replay_full_validation_and_legacy_migration() {
     );
 }
 
+fn run_checkpointed_cics_replay_retention(store: &dyn PlatformStore) {
+    let owner = ids("cics-checkpoint-owner");
+    finish_execution(store, &owner);
+    store.put_checkpoint(checkpoint(&owner)).unwrap();
+    let intent = effect(&owner, "cics-checkpoint-effect", EffectState::Intent);
+    store.record_intent(intent.clone()).unwrap();
+    store
+        .record_result(
+            &intent.key,
+            EffectRecord {
+                state: EffectState::Completed,
+                result_digest: Some([2; 32]),
+                resolved_tick: Some(10),
+                ..intent.clone()
+            },
+        )
+        .unwrap();
+    // The store treats provider payloads as opaque. CICS codec validation is
+    // owned by the provider before it submits this deletion candidate.
+    let source = cics_replay(intent.key.as_str(), 1, &owner.execution, false);
+    store.put_provider_state(source.clone(), None).unwrap();
+    let candidate = ProviderRetentionRow {
+        row: source,
+        owner_execution: Some(owner.execution.clone()),
+        owner_run_unit: Some(owner.run.clone()),
+        retention_tick: 10,
+        observation: None,
+        dependency: ProviderRetentionDependency::CoreEffect {
+            key: intent.key,
+            request_digest: [1; 32],
+            result_digest: [2; 32],
+        },
+    };
+    let deletion = || ProviderStateArchiveDeletion {
+        expected_epoch: store.provider_state_retention_epoch().unwrap(),
+        target: RetentionTarget::CicsReplay,
+        archived_tick: 20,
+        watermark_tick: 10,
+        rows: vec![candidate.clone()],
+    };
+    assert_eq!(
+        store.archive_provider_state_deletion(deletion()),
+        Err(StoreError::Conflict)
+    );
+    assert!(
+        store
+            .get_provider_state("cics-effect-replay-v1", "cics-checkpoint-effect")
+            .unwrap()
+            .is_some()
+    );
+    assert!(store.get_checkpoint(&owner.execution).unwrap().is_some());
+
+    store.delete_checkpoint(&owner.execution).unwrap();
+    assert_eq!(
+        store
+            .archive_provider_state_deletion(deletion())
+            .unwrap()
+            .rows
+            .len(),
+        1
+    );
+    assert!(
+        store
+            .get_provider_state("cics-effect-replay-v1", "cics-checkpoint-effect")
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn memory_checkpoint_protects_cics_replay_until_release() {
+    run_checkpointed_cics_replay_retention(&MemoryStore::new(StoreLimits::default()));
+}
+
+#[test]
+fn sqlite_checkpoint_protects_cics_replay_until_release() {
+    run_checkpointed_cics_replay_retention(
+        &SqliteStateStore::open("sqlite::memory:", 1024 * 1024, 128).unwrap(),
+    );
+}
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+fn postgres_checkpoint_protects_cics_replay_until_release() {
+    let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+        .expect("explicit PostgreSQL 18 test URL required");
+    let store = PostgresStateStore::open(&url, 1024 * 1024, 128).unwrap();
+    run_checkpointed_cics_replay_retention(&store);
+}
+
 #[test]
 fn memory_legacy_replay_reconciliation_is_cas_fenced_and_conservative() {
     run_legacy_replay_reconciliation(&MemoryStore::new(StoreLimits::default()));

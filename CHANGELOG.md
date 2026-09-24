@@ -4,6 +4,89 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Merged the 23 BTS lifecycle routes with the SAF/audit integration branch,
+  retaining the child-token and LINK routes on one process/activity authority.
+  The generated application contract now has 214 typed and 49 unready rows.
+  New activity IDs bind the defining UOW or root incarnation; retained
+  key-only candidate IDs remain opaque and are not rewritten.
+
+- Added a bounded CIC-906 validation receipt for DEFINE COUNTER, BTS LINK
+  ACQPROCESS, and mapped APPC SEND. Focused tests cover typed SAF denial,
+  pre-dispatch audit saturation, outer-receipt uncertainty, owner fencing,
+  selected replay/restart paths, and SEND live cancellation/deadline without
+  expanding the 191 typed application routes or claiming release credit.
+- Integrated exactly seven CIC-905 conversation data/wait rows with the
+  existing 184 typed routes, yielding 191 typed and 72 unready application
+  commands while retaining the sealed CONVERSE, EXTRACT, CardDemo, and bounded
+  CIC-906 routes. The shared ledger uses the pinned `dfha80c` conversation
+  STATE table (`ALLOCATED=82` through `SYNCSEND=94`).
+- Routed mapped APPC/MRO SEND, WAIT CONVID, and WAIT TERMINAL through the
+  accepted host ABI and shared conversation-open exchange ledger. CONNECT and
+  SEND frames use durable pre-dispatch markers, read-only reconciliation,
+  source STATE values, and exact replay. WAIT TERMINAL observes EOC or SIGNAL
+  once without consuming the peer data; a principal terminal with completed
+  synchronous output returns normally.
+- Routed APPC basic GDS WAIT through the same carrier boundary and durable
+  basic record, returning source CONVDATA, RETCODE, and STATE. SQLite restart
+  checks an attempted CONNECT by reconciliation without retransmission.
+- Added a confirmed negative partner response to the conversation carrier.
+  SEND CONFIRM persists its four-byte error code by send ID and writes EIBERR
+  and EIBERRCD on first completion and exact reissue.
+- Selected APPC basic GDS RECEIVE through the accepted host ABI and durable
+  conversation record. BUFFER and LLID delimiters, CONVDATA, STATE, FLENGTH,
+  six-byte RETCODE failures, one-time SIGNAL, exact replay, and SQLite reopen
+  have focused direct-provider coverage; this assembler/C-only row has no
+  COBOL runtime alias.
+- Selected mapped APPC/MRO RECEIVE through the accepted host ABI, typed COBOL
+  interpreter, and durable peer exchange. The route handles NOTRUNCATE,
+  truncation, EOC, SIGNAL, MRO FMH, STATE, length outputs, and exact replay.
+  Memory, SQLite reopen, pointer lifetime, and a compiled online provider
+  route now cover the promoted application row `0161`.
+- The shared conversation record can now bind an MRO alternate facility's
+  trusted symbolic SESSION name. MRO RECEIVE resolves that name under the
+  existing owner and lease and gives INBFMH precedence over EOC.
+- Reserved distinct MCEP v2 identities for the seven CIC-905 conversation
+  data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
+  Extended the shared durable conversation record with bounded peer data,
+  staged sends, explicit transmission acknowledgement, partial receive, and
+  GDS return-code contracts. Their selected routes are described above.
+- Peer conversation frames now carry a monotonic event sequence and digest,
+  while staged sends carry distinct acknowledgement IDs. Exact duplicate
+  delivery or acknowledgement is idempotent; gaps and conflicting replays fail
+  without advancing the shared durable conversation record.
+- Added a transport-neutral send confirmation and read-only reconciliation
+  boundary. The shared conversation row retains a pre-dispatch marker, and a
+  restarted flush reconciles the same send ID without transmitting it again.
+  The adapter alone grants no application row readiness; the seven selected
+  routes have their own registrations and regressions.
+- A confirmed flush now drains every staged frame in send-ID order, retaining
+  one-time dispatch and reconciliation for each frame.
+- Added source-shaped GDS `CONVDATA` bytes for APPC basic receive and wait,
+  including field-complete, receive, signal, confirm, syncpoint, free, error
+  code, rollback, and zeroed reserved fields.
+- A GDS RECEIVE now consumes a pending peer SIGNAL once and preserves CDBSIG
+  in that command's CONVDATA reply while clearing the pending ledger bit.
+- Tightened the frozen GDS RECEIVE plan: `FLENGTH` is output only,
+  `MAXFLENGTH` is bounded to 32,767, and BUFFER/LLID cannot be combined.
+- The typed SEND plan now admits the pinned APPC/MRO control-only INVITE form
+  without FROM or a data length; an orphan data length still fails closed.
+- Reused the committed offline CICS CVDA pin for conversation STATE and bound
+  all 13 IBM fullword codes, including PENDRECEIVE, in the shared state type.
+- Added a durable principal signal facility for the six LU classes named by
+  WAIT SIGNAL. Ordered peer events, one-time consumption, lease fencing, task
+  cleanup, and SQLite reopen are covered.
+- Registered the source-bounded WAIT SIGNAL row through typed COBOL, the host
+  ABI, the durable provider, and online suspend/resume. Exact replay survives
+  outer receipt failure; Memory and SQLite tests cover event consumption.
+- Bound WAIT SIGNAL's six-byte EIBRCODE to the pinned terminal-control SIGNAL,
+  NOTALLOC, and TERMERR bytes and the corresponding EIBRESP byte.
+- Trusted principal ingress can now persist an ordered terminal failure;
+  WAIT SIGNAL returns TERMERR after restart and rejects later signals.
+- Added the pinned one-byte EIBSIG update and made source-defined SIGNAL and
+  EOC default conditions ignorable, while INBFMH retains its failure default.
+
 ### Changed
 
 - Terminal BTS parent completion now deletes settled descendants, their
@@ -46,10 +129,55 @@ All notable changes to mainframe-env are documented here.
 
 - DEFINE ACTIVITY and DEFINE PROCESS rollback now retire deferred BTS RUN
   reservations atomically with pending child or process deletion.
+- Added a bounded CIC-906 PostgreSQL BTS LINK subprocess restart selector with
+  explicit child exit after the durable receipt, fresh-process owner fencing and
+  replay checks, and a disposable PostgreSQL 18.6 launcher. Command semantics
+  and registry readiness are unchanged.
+- Added a sealed CICS BIF DEEDIT/DIGEST licensed-oracle family manifest and v2
+  capture contract with exact family, environment, observation, and protected
+  signature checks. The existing file/UOW pilot remains compatible; no licensed
+  campaign or full-minor credit is claimed.
+
+- Integrated nine CIC-905 conversation-open routes with the existing EXTRACT,
+  miscellaneous, BTS, and CIC-906 slices. The registry derives 184 typed and
+  79 unready API rows. One versioned APPC/MRO ledger now owns allocations,
+  EXTRACT-visible indicators, and explicit peer frames; CONVERSE retains its
+  staged send and exact replay across SQLite and PostgreSQL recovery.
+- Extended the R-24 assurance inventory with bounded CICS source and MCEP
+  v1/v2 fuzz targets, parser/decoder properties, and owner-fenced syncpoint
+  Loom models. Recorded the CIC-906 scope and open matrix cells without
+  changing command behavior or the then-current 175/0/88 registry.
+
+- Integrated the eight CIC-905 conversation EXTRACT and POINT routes with the
+  sealed miscellaneous and BTS aggregate. The application registry now has
+  175 typed, 0 legacy compatibility, and 88 unready rows. The existing
+  `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` numeric CVDA pin is reused.
+  The conversation-open peer-frame ledger was reconciled in the subsequent
+  integration above.
+- Added focused CIC-906 PostgreSQL durable-profile validation for separate
+  CICS artifact/state adapters, artifact read versions, and checkpoint-protected
+  CICS replay retention across Memory, SQLite, and PostgreSQL. No command routes
+  or completion credit change.
+
+- Integrated the sealed miscellaneous CICS command branch into the 151-route
+  v0.9 head. Regenerated descriptors and contracts now report 161 typed,
+  0 legacy compatibility, and 102 unready application rows; CICSMESSAGE
+  remains unready. The merge retains prior codec tags and both MCEP versions.
+- Integrated the six BTS child and LINK command rows on that sealed aggregate.
+  The combined registry reports 167 typed, 0 legacy compatibility, and 96
+  unready rows. All 161 previously typed row contracts remain unchanged.
 
 - Secret CICS payloads now share one zeroizing byte allocation across clones and
   render as redacted values in debug output. This keeps typed credential
   requests transient without changing their canonical bytes.
+- Registered typed CICS `START BREXIT` row `0207` with reserved MCEP v2 tags.
+  The local worker now invokes the exact installed exit for BRXA Init, Bind,
+  bounded BMS callbacks, and Term or Abend, and recovers durable admission and
+  callback state. Target and exit artifacts are fixed at admission; deployment
+  ABI constants are bound to the installed exit artifact.
+
+- Recognize the source-defined bare `START BREXIT` discriminator when a
+  transaction supplies its default exit.
 
 - Versioned the typed CICS effect-plan codec as `MCEP` v2 with big-endian `u16`
   operation, operand, option, and output tags. Existing tag numbers and
@@ -57,6 +185,20 @@ All notable changes to mainframe-env are documented here.
   bytes, and malformed or unknown tags fail closed.
 
 ### Fixed
+
+- Added a bounded 0.9 CardDemo host comparison that retains immutable CD-008,
+  recognizes the CD-024 SQL INCLUDE/cursor preprocessing delta, and binds
+  exact host, resource, and online observations to a clean candidate commit
+  and tree. It grants no CardDemo-full or licensed completion credit.
+
+- Preserved compact and source-sized CICS forms reached by the pinned CardDemo
+  corpus: `RETRIEVE INTO` without `LENGTH`, unseparated six-byte `FORMATTIME`
+  outputs, and same-area `LENGTH OF` on file `READ`/browse. Typed requests stay
+  bounded by the destination area; no application-name dispatch was added.
+
+- Restored the frozen CIC-901 source descriptor hash by keeping later transform
+  and spool family admissions in the typed registry. The three accepted IBM
+  source maps and their corpus bindings remain unchanged.
 
 - Rebased the ten CICS security-control commands onto the local v0.9
   integration head. Shared command registrations, generated descriptors,
@@ -89,6 +231,18 @@ All notable changes to mainframe-env are documented here.
   unique and decodes to its original identity.
 
 ### Added
+
+- Added typed BTS `FETCH ANY`, `FETCH CHILD`, `FREE CHILD`, `LINK ACQACTIVITY`,
+  `LINK ACQPROCESS`, and `LINK ACTIVITY` routes over the shared lifecycle
+  authority. Child tokens are parent owned and durable; LINK selects an
+  installed program, resolves nested named descendants from the active
+  lifecycle frame, retains parent child tokens across nested selected RETURN,
+  binds durable activity context to its execution and principal, and fences
+  uncertain dispatch without automatic replay, including after SQLite and
+  PostgreSQL reopen.
+  The child checkout registered 157 typed, 0 legacy, and 106 unready rows;
+  the combined registry registers 167 typed, 0 legacy, and 96 unready rows.
+  Licensed differential evidence remains pending.
 
 - Added the shared versioned BTS process/activity authority for the pending
   lifecycle slice, with UOW-scoped acquisition epochs, atomic pending DEFINE
@@ -446,6 +600,96 @@ All notable changes to mainframe-env are documented here.
   Its CICS TS catalog identity is row 0065. The committed cross-product and
   older-version compatibility topics are absent locally, so full IBM
   monitoring equivalence is not claimed.
+- Added a source-pinned BRXA Init COMMAREA layout for the pending START BREXIT
+  adapter. It checks the fixed header, transaction, command and BRDATA offsets,
+  virtual pointers, and the fields an Init exit may change. The ABI version
+  remains an explicit input until its numeric constant is pinned.
+
+- Added a checked BRXA Bind transition that carries the validated Init image
+  forward, preserves its BRDATA pointer, accepts only source-listed Bind fields,
+  and caps facility keep time at one week. The Bind command code remains an
+  explicit deployment input.
+
+- Added a durable START BREXIT admission record and private work generation.
+  Admission freezes the local transaction, selected installed exit artifact,
+  principal, bounded BRDATA, priority, and producer digest. Exact replay,
+  interrupted enqueue repair, and corrupt-row rejection are covered before
+  the command is registered for execution.
+
+- Added typed CICS `START ATTACH` for the no-FROM local task form of row
+  `0206`. It resolves an installed target, authorizes before scheduling,
+  creates noncancelable durable work with STARTCODE `U`, leaves EIBREQID null,
+  and survives worker replay and SQLite reopen. FROM/LENGTH remain closed
+  until live parent storage can be shared without copying it.
+
+- Added a read-only durable local transaction lookup for the pending CICS
+  `START ATTACH` and `START BREXIT` routes. It resolves installed targets from
+  the existing server catalog, returns TRANSIDERR 28/0 for undefined names,
+  and rejects malformed or missing executable artifacts before scheduling.
+
+- Added immutable `START BREXIT` default exit definitions over installed local
+  programs. Explicit BREXIT names override the transaction default; a missing
+  default returns PGMIDERR 27/0. Canonical rows survive SQLite reopen and
+  malformed rows fail during CICS open.
+
+- Completed the typed `EXTRACT TCPIP` route for row `0074`. It returns the
+  task's trusted IPv4/IPv6 addresses, DNS names supplied by ingress, service,
+  port, and maximum data length with source-defined buffer lengths and
+  LENGERR responses. AUTHENTICATE, CLNTIPFAMILY, SRVRIPFAMILY, SSLTYPE, and
+  PRIVACY return exact fullword numeric CVDAs from the newly pinned IBM table.
+
+- Added typed CICS `EXTRACT CERTIFICATE` for row `0070`. It reads the
+  immutable, task-owned TLS client certificate, returns checked virtual
+  pointers and source-defined lengths/USERID, selects owner or issuer fields,
+  rejects non-TCP/IP tasks with INVREQ 16/5, and expires pointer storage at the
+  next CICS command. A compiled COBOL route verifies the selected provider,
+  EIBFN, RESP/RESP2, and pointer lifetime.
+
+- Added a strict task-owned TCP/IP ingress and client-certificate context for
+  the `EXTRACT TCPIP` and `EXTRACT CERTIFICATE` routes. Trusted host
+  registration is immutable, survives SQLite reopen, rejects malformed
+  connection/certificate envelopes, and releases with the CICS task.
+
+- Added typed CICS `WRITE OPERATOR` for row `0256`. It persists a bounded
+  console message with reviewed routing and action codes, displays long text
+  in source-bounded console lines, and optionally suspends for a SAF-gated
+  reply or durable timeout. Reply truncation returns LENGERR 22/8; expiry
+  returns EXPIRED 31/7. Canonical MCEP v2 uses operation tag 159, operand tags
+  645–652, option tags 575–577, and output tags 698–699 while v1 remains
+  compatible with historical plans. Memory/SQLite replay and compiled reply
+  and timeout routes are covered.
+
+- Added typed CICS `POST` for row `0147`. A task-owned four-byte timer-event
+  area starts at zero, is posted with bytes `40 00 80 00` on expiry or cross-task
+  CANCEL, and can wake WAIT EVENT, WAIT EXTERNAL, or WAITCICS. The durable timer
+  uses the shared interval clock and worker; later POST, DELAY, or local START
+  supersedes it. MCEP v2 operation tag 158 reuses reviewed schedule and SET
+  identities while v1 rejects the new operation.
+
+- Added typed CICS `WAITCICS` for row `0239`. It waits on one or more checked
+  MVS-format ECBs, admits standard or hand posting, honors purgeability, and
+  persists the wait through SQLite reopen. MCEP v2 uses operation tag 157 and
+  the existing ECB-list operand identities. Terminal cleanup now releases task
+  state outside the CICS mutex so completed waits can finish.
+
+- Added typed CICS `BIF DIGEST` for row `0014`. An explicit HEX, BINARY,
+  BASE64, or named DIGESTTYPE selector returns the reviewed SHA-1 representation
+  into a bounded caller result area. Bad record lengths and selectors return
+  their source conditions. MCEP v2 uses operation tag 156, operand tags
+  642–644, option tags 572–574, and output tag 697.
+
+- Added typed CICS `BIF DEEDIT` for row `0013`. The command edits caller-owned
+  character storage in place, removes editing bytes, right-aligns digits,
+  preserves terminal zoned overpunch, and returns `LENGERR` for an invalid
+  length. MCEP v2 uses operation tag 155, FIELD input tag 641, and FIELD output
+  tag 696; the compiled selected route and memory/SQLite provider agree.
+
+- Added typed CICS `CONVERTTIME` for row `0031`. A 64-character DATESTRING
+  accepts the four pinned architected formats, converts fractional seconds
+  without rounding, and returns packed ABSTIME through the compiled selected
+  route. Invalid calendar, clock, weekday, fraction, and offset values return
+  their reviewed INVREQ/RESP2 codes with zero ABSTIME under RESP handling;
+  memory and SQLite provider routes agree.
 
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse

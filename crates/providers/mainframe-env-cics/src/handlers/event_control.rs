@@ -29,6 +29,7 @@ mod delete;
 mod retrieve;
 mod state_validation;
 mod timer;
+pub(super) use timer::clock_millis;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -146,9 +147,9 @@ impl CicsService {
             return Err(HostProblem::Malformed);
         }
         let context = EventContext {
-            activity: event_name(activity)?,
-            acquired_process: acquired_process.map(event_name).transpose()?,
-            acquired_activity: acquired_activity.map(event_name).transpose()?,
+            activity: activity_scope(activity)?,
+            acquired_process: acquired_process.map(activity_scope).transpose()?,
+            acquired_activity: acquired_activity.map(activity_scope).transpose()?,
             local_utc_offset_minutes,
         };
         if !self.lock()?.runs.contains_key(run_unit) {
@@ -508,6 +509,14 @@ pub(super) fn context(service: &CicsService, run: &Run) -> Result<EventContext, 
     if authority.has_context_row(run_unit)? {
         return Err(outside_activity());
     }
+    if let Some(activity) = super::bts_link::nested_activity_scope(service, run)? {
+        return Ok(EventContext {
+            activity,
+            acquired_process: None,
+            acquired_activity: None,
+            local_utc_offset_minutes: 0,
+        });
+    }
     let row = service
         .store
         .get_provider_state(CONTEXT_NAMESPACE, run.invocation.run_unit_id.as_str())
@@ -520,21 +529,21 @@ pub(super) fn context(service: &CicsService, run: &Run) -> Result<EventContext, 
 }
 
 fn decode_context(payload: &[u8]) -> Result<EventContext, HostProblem> {
-    if payload.len() > 256 {
+    if payload.len() > 512 {
         return Err(HostProblem::InfrastructureFailure);
     }
     let context: EventContext =
         serde_json::from_slice(payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-    if event_name(&context.activity)? != context.activity
+    if activity_scope(&context.activity)? != context.activity
         || !(-840..=840).contains(&context.local_utc_offset_minutes)
         || context
             .acquired_process
             .as_deref()
-            .is_some_and(|name| event_name(name).ok().as_deref() != Some(name))
+            .is_some_and(|name| activity_scope(name).ok().as_deref() != Some(name))
         || context
             .acquired_activity
             .as_deref()
-            .is_some_and(|name| event_name(name).ok().as_deref() != Some(name))
+            .is_some_and(|name| activity_scope(name).ok().as_deref() != Some(name))
     {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -640,6 +649,16 @@ pub(super) fn event_name(name: &str) -> Result<String, HostProblem> {
         return Err(HostProblem::Malformed);
     }
     Ok(name.into())
+}
+
+/// Shared lifecycle identities are 52 hex characters; earlier event-only
+/// bindings retain their bounded local name format until integration.
+fn activity_scope(name: &str) -> Result<String, HostProblem> {
+    if name.len() == 52 && name.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Ok(name.into())
+    } else {
+        event_name(name)
+    }
 }
 
 pub(super) fn outside_activity() -> HostProblem {

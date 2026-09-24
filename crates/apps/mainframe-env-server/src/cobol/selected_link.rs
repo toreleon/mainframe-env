@@ -41,11 +41,17 @@ impl CobolProgram {
         let result =
             self.execute_installed_effect(parent, effect, program, &call, Some(selection))?;
         let mut returned = decode_selected_result(&result)?;
-        let bytes = if returned.is_empty() {
+        let mut bytes = if returned.is_empty() {
             payload.bytes().to_vec()
         } else {
             returned.remove(0)
         };
+        if payload.schema() == "mainframe-env.cics.brxa@1" {
+            if bytes.len() < payload.bytes().len() {
+                return Err(HostProblem::ProviderFailure);
+            }
+            bytes.truncate(payload.bytes().len());
+        }
         BoundedPayload::new(
             "mainframe-env.cics.payload@1",
             bytes,

@@ -25,6 +25,17 @@ pub(super) const BTS_RUN_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+pub(super) const CONVERSATION_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalRead,
+    Effect::TerminalWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 pub(super) const DIAGNOSTIC_EFFECTS: &[Effect] = DOCUMENT_EFFECTS;
 pub(super) const TRACE_EFFECTS: &[Effect] = &[
@@ -146,6 +157,18 @@ pub(super) const FORMAT_TIME_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
+pub(super) const BUILTIN_EFFECTS: &[Effect] = FORMAT_TIME_EFFECTS;
+pub(super) const OPERATOR_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalWrite,
+    Effect::Clock,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 pub(super) const ABEND_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,
@@ -161,6 +184,15 @@ pub(super) const CONTROL_TRANSFER_EFFECTS: &[Effect] = &[
     Effect::ProgramControl,
     Effect::Security,
     Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+pub(super) const BTS_FETCH_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
     Effect::Condition,
     Effect::Transaction,
 ];

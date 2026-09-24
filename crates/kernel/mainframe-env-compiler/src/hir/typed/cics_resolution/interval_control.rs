@@ -25,6 +25,22 @@ pub(super) const DELAY_CLAUSES: &[&str] = &[
     "RESP2",
 ];
 
+pub(super) const BREXIT_CLAUSES: &[&str] = &[
+    "BREXIT",
+    "TRANSID",
+    "BRDATA",
+    "BRDATALENGTH",
+    "USERID",
+    "RESP",
+    "RESP2",
+];
+
+pub(super) fn bare_brexit_discriminator(row: &str, name: &str) -> bool {
+    // The required command word has an optional operand when TRANSID names a
+    // transaction with a default exit (pinned api-commands:0207).
+    row == "ibm-cics-ts-6x-2026-08-31:api-commands:0207" && name == "BREXIT"
+}
+
 pub(super) fn validate_constraints(
     clauses: &Clauses,
     options: &[String],
@@ -65,6 +81,22 @@ pub(super) fn validate_constraints(
                 ));
             }
         }
+        HirCicsOperation::Post => {
+            let after = options.iter().any(|option| option == "AFTER");
+            let at = options.iter().any(|option| option == "AT");
+            let units = ["HOURS", "MINUTES", "SECONDS"]
+                .into_iter()
+                .any(|name| clauses.contains_key(name));
+            let schedules = usize::from(clauses.contains_key("INTERVAL"))
+                + usize::from(clauses.contains_key("TIME"))
+                + usize::from(after)
+                + usize::from(at);
+            if schedules > 1 || (after || at) != units {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS POST accepts one INTERVAL, TIME, AFTER, or AT schedule".into(),
+                ));
+            }
+        }
         HirCicsOperation::Start => {
             let after = options.iter().any(|option| option == "AFTER");
             let at = options.iter().any(|option| option == "AT");
@@ -96,12 +128,20 @@ pub(super) fn validate_constraints(
                 ));
             }
         }
-        HirCicsOperation::Retrieve
-            if clauses.contains_key("INTO") == clauses.contains_key("SET")
-                || !clauses.contains_key("LENGTH") =>
+        HirCicsOperation::StartBrexit
+            if clauses.contains_key("BRDATA") != clauses.contains_key("BRDATALENGTH") =>
         {
             return Err(ResolutionFailure::Invalid(
-                "typed CICS RETRIEVE requires exactly one of INTO or SET plus LENGTH".into(),
+                "CICS START BREXIT requires BRDATA and BRDATALENGTH together".into(),
+            ));
+        }
+        HirCicsOperation::Retrieve
+            if clauses.contains_key("INTO") == clauses.contains_key("SET")
+                || (clauses.contains_key("SET") && !clauses.contains_key("LENGTH")) =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "typed CICS RETRIEVE requires exactly one of INTO or SET; SET requires LENGTH"
+                    .into(),
             ));
         }
         _ => {}
@@ -116,8 +156,12 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
         HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
-        HirCicsOperation::Delay => delay_operands(clauses, semantic),
-        HirCicsOperation::Start => start_operands(clauses, semantic),
+        HirCicsOperation::Delay => delay_operands(clauses, semantic, "DELAY"),
+        HirCicsOperation::Post => delay_operands(clauses, semantic, "POST"),
+        HirCicsOperation::Start | HirCicsOperation::StartAttach => {
+            start_operands(clauses, semantic)
+        }
+        HirCicsOperation::StartBrexit => start_brexit_operands(clauses, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
@@ -126,6 +170,7 @@ pub(super) fn operands(
 fn delay_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
+    operation: &str,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let mut operands = clauses
         .get("INTERVAL")
@@ -145,7 +190,7 @@ fn delay_operands(
     if let Some(request_id) = clauses.get("REQID") {
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::ReqId,
-            value: bounded_name(request_id, semantic, 8, "DELAY", "REQID")?,
+            value: bounded_name(request_id, semantic, 8, operation, "REQID")?,
         });
     }
     for (clause, name) in [
@@ -267,6 +312,56 @@ fn start_operands(
     Ok(operands)
 }
 
+fn start_brexit_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::TransId,
+        value: bounded_name(&clauses["TRANSID"], semantic, 4, "START BREXIT", "TRANSID")?,
+    }];
+    for (clause, name) in [
+        ("BREXIT", HirCicsOperandName::BrExit),
+        ("USERID", HirCicsOperandName::UserId),
+    ] {
+        if let Some(value) = clauses.get(clause) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: bounded_name(value, semantic, 8, "START BREXIT", clause)?,
+            });
+        }
+    }
+    if let Some(value) = clauses.get("BRDATA") {
+        let HirCicsValue::Data(data) = cics_value(value, semantic)? else {
+            return Err(ResolutionFailure::Invalid(
+                "CICS START BREXIT BRDATA requires a data area".into(),
+            ));
+        };
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::BrData,
+            value: HirCicsValue::Data(data),
+        });
+        let length = cics_integer_value(&clauses["BRDATALENGTH"], semantic)?;
+        if let HirCicsValue::Data(reference) = &length
+            && (reference.length != 4
+                || !matches!(
+                    reference.usage,
+                    crate::CobolUsage::Binary | crate::CobolUsage::NativeBinary
+                )
+                || reference.scale != 0)
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS START BREXIT BRDATALENGTH requires a fullword binary value".into(),
+            ));
+        }
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::BrDataLength,
+            value: length,
+        });
+    }
+    Ok(operands)
+}
+
 fn retrieve_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
@@ -287,7 +382,10 @@ fn retrieve_operands(
             }
         }
     }
-    let reference = complete_data_reference(&clauses["LENGTH"], semantic)?;
+    let Some(length) = clauses.get("LENGTH") else {
+        return Ok(Vec::new());
+    };
+    let reference = complete_data_reference(length, semantic)?;
     require_numeric(&reference)?;
     require_writable(&reference)?;
     Ok(clauses

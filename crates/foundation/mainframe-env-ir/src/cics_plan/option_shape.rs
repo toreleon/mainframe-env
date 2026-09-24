@@ -5,6 +5,67 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         operation if bts_lifecycle::is_bts(operation) => {
             !bts_lifecycle::allowed_option(operation, *option)
         }
+        CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => {
+            !super::conversation_data_shape::option_allowed(plan.operation, *option)
+        }
+        CicsPlanOperation::FetchAny | CicsPlanOperation::FetchChild => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::BtsNoSuspend
+        ),
+        CicsPlanOperation::FreeChild | CicsPlanOperation::LinkActivity => {
+            !matches!(option, CicsPlanOption::NoHandle)
+        }
+        CicsPlanOperation::LinkAcqActivity => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::BtsAcqActivity
+        ),
+        CicsPlanOperation::LinkAcqProcess => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::BtsAcqProcess
+        ),
+        CicsPlanOperation::BifDigest => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::DigestHex
+                | CicsPlanOption::DigestBinary
+                | CicsPlanOption::DigestBase64
+        ),
+        CicsPlanOperation::Post => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::After | CicsPlanOption::At
+        ),
+        CicsPlanOperation::WriteOperator => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::OperatorImmediate
+                | CicsPlanOption::OperatorEventual
+                | CicsPlanOption::OperatorCritical
+        ),
+        CicsPlanOperation::ExtractCertificate => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::CertificateOwner
+                | CicsPlanOption::CertificateIssuer
+        ),
+        CicsPlanOperation::AllocateConversation | CicsPlanOperation::GdsAllocateConversation => {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle | CicsPlanOption::ConversationNoQueue
+            )
+        }
+        CicsPlanOperation::Converse => !matches!(
+            option,
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::ConversationNotruncate
+                | CicsPlanOption::ConversationDefresp
+                | CicsPlanOption::ConversationFmh
+        ),
         CicsPlanOperation::FormatTime => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep

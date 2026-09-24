@@ -8,7 +8,9 @@ pub(super) fn allocation_arguments(
     let mut capacity = allocation_capacity(machine, target)?;
     if matches!(
         operation,
-        CicsPlanOperation::ReceivePartn | CicsPlanOperation::IssueReceive
+        CicsPlanOperation::ReceivePartn
+            | CicsPlanOperation::IssueReceive
+            | CicsPlanOperation::ReceiveConversation
     ) {
         let live = machine
             .bases
@@ -21,7 +23,11 @@ pub(super) fn allocation_arguments(
         {
             0
         } else {
-            capacity.saturating_sub(PARTITION_RECEIVE_MARKER.len())
+            capacity.saturating_sub(if operation == CicsPlanOperation::ReceiveConversation {
+                CONVERSATION_RECEIVE_MARKER.len()
+            } else {
+                PARTITION_RECEIVE_MARKER.len()
+            })
         };
     }
     let mut arguments = BTreeMap::from([(
@@ -42,6 +48,22 @@ pub(super) fn allocation_arguments(
                     .max_storage_bytes
                     .to_string()
                     .into_bytes(),
+            )?,
+        );
+    }
+    if operation == CicsPlanOperation::Post {
+        let CicsTarget::Resolved(slot) = target else {
+            return Err(MachineProblem::UnexpectedHostResult);
+        };
+        let pointer = resolved_slot(machine, slot)?;
+        if pointer.length != 4 {
+            return Err(invalid_plan("POST SET requires a four-byte pointer"));
+        }
+        arguments.insert(
+            "POST.SET.ADDRESS".into(),
+            payload(
+                "mainframe-env.cics.virtual-address@1",
+                machine.address_bytes_for(machine.bases.len(), 0, pointer.length)?,
             )?,
         );
     }
@@ -358,11 +380,41 @@ pub(super) fn release_temporary_storage_set(machine: &mut ReferenceMachine) {
 }
 
 const PARTITION_RECEIVE_MARKER: &[u8] = b"MEC-RECEIVE-PARTN";
+const CONVERSATION_RECEIVE_MARKER: &[u8] = b"MEC-RECEIVE-CONVERSATION";
+const LOGON_MESSAGE_MARKER: &[u8] = b"MEC-EXTRACT-LOGONMSG";
+
+pub(super) fn release_logon_message_set(machine: &mut ReferenceMachine) {
+    let mut releases = Vec::new();
+    for marker in machine.static_base_count..machine.bases.len().saturating_sub(1) {
+        if machine.bases[marker] == LOGON_MESSAGE_MARKER
+            && machine.freed_allocations.contains(&marker)
+            && !machine.freed_allocations.contains(&(marker + 1))
+        {
+            releases.push(marker + 1);
+        }
+    }
+    machine.freed_allocations.extend(releases);
+}
 
 pub(super) fn release_partition_receive_set(machine: &mut ReferenceMachine) {
     let mut releases = Vec::new();
     for marker in machine.static_base_count..machine.bases.len().saturating_sub(2) {
         if machine.bases[marker] == PARTITION_RECEIVE_MARKER
+            && machine.bases[marker + 1].is_empty()
+            && machine.freed_allocations.contains(&marker)
+            && machine.freed_allocations.contains(&(marker + 1))
+            && !machine.freed_allocations.contains(&(marker + 2))
+        {
+            releases.push(marker + 2);
+        }
+    }
+    machine.freed_allocations.extend(releases);
+}
+
+pub(super) fn release_conversation_receive_set(machine: &mut ReferenceMachine) {
+    let mut releases = Vec::new();
+    for marker in machine.static_base_count..machine.bases.len().saturating_sub(2) {
+        if machine.bases[marker] == CONVERSATION_RECEIVE_MARKER
             && machine.bases[marker + 1].is_empty()
             && machine.freed_allocations.contains(&marker)
             && machine.freed_allocations.contains(&(marker + 1))
@@ -400,12 +452,16 @@ pub(super) fn write_set_output(
     if value.bytes().len() > capacity
         || matches!(
             operation,
-            CicsOperation::ReceivePartn | CicsOperation::IssueReceive
-        ) && (value
-            .bytes()
-            .len()
-            .saturating_add(PARTITION_RECEIVE_MARKER.len())
-            > capacity
+            CicsOperation::ReceivePartn
+                | CicsOperation::IssueReceive
+                | CicsOperation::ReceiveConversation
+        ) && (value.bytes().len().saturating_add(
+            if operation == CicsOperation::ReceiveConversation {
+                CONVERSATION_RECEIVE_MARKER.len()
+            } else {
+                PARTITION_RECEIVE_MARKER.len()
+            },
+        ) > capacity
             || machine
                 .bases
                 .iter()
@@ -427,14 +483,24 @@ pub(super) fn write_set_output(
         machine.bases.extend([Vec::new(), Vec::new()]);
         machine.freed_allocations.extend([marker, marker + 1]);
         marker + 2
+    } else if operation == CicsOperation::ExtractLogonMsg {
+        let marker = machine.bases.len();
+        machine.bases.push(LOGON_MESSAGE_MARKER.to_vec());
+        machine.freed_allocations.insert(marker);
+        marker + 1
     } else if matches!(
         operation,
-        CicsOperation::ReceivePartn | CicsOperation::IssueReceive
+        CicsOperation::ReceivePartn
+            | CicsOperation::IssueReceive
+            | CicsOperation::ReceiveConversation
     ) {
         let marker = machine.bases.len();
-        machine
-            .bases
-            .extend([PARTITION_RECEIVE_MARKER.to_vec(), Vec::new()]);
+        let marker_bytes = if operation == CicsOperation::ReceiveConversation {
+            CONVERSATION_RECEIVE_MARKER
+        } else {
+            PARTITION_RECEIVE_MARKER
+        };
+        machine.bases.extend([marker_bytes.to_vec(), Vec::new()]);
         machine.freed_allocations.extend([marker, marker + 1]);
         marker + 2
     } else {

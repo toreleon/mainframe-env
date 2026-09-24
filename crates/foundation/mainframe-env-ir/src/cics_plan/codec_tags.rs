@@ -1,16 +1,36 @@
-mod option;
+mod conversation;
+mod options;
 mod output;
-pub(super) use option::{option_from_tag, option_tag};
+pub(super) use options::{option_from_tag, option_tag};
 pub(super) use output::{output_from_tag, output_tag};
 
 use super::{
-    CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem, CicsPlanOperation,
-    CicsPlanOption,
+    CicsAssignOutput, CicsCertificateOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem,
+    CicsPlanOperation, CicsPlanOption, CicsTcpipOutput,
 };
 
 const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
 const ASSIGN_OUTPUT_LEGACY_COUNT: u16 = 78;
 const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u16 = 96;
+
+pub(super) fn bounded_count(value: usize, maximum: usize) -> Result<(), CicsPlanCodecProblem> {
+    if value > maximum || u32::try_from(value).is_err() {
+        Err(CicsPlanCodecProblem::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+pub(super) fn require_order<T: Copy + Ord>(
+    previous: Option<T>,
+    current: T,
+) -> Result<(), CicsPlanCodecProblem> {
+    match previous {
+        Some(previous) if previous == current => Err(CicsPlanCodecProblem::Malformed),
+        Some(previous) if previous > current => Err(CicsPlanCodecProblem::NonCanonical),
+        _ => Ok(()),
+    }
+}
 
 #[cfg(test)]
 pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u16> = 68..=71;
@@ -46,6 +66,20 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::SuspendAcqActivity => 185,
         CicsPlanOperation::SuspendAcqProcess => 186,
         CicsPlanOperation::SuspendActivity => 187,
+        CicsPlanOperation::FetchAny => 216,
+        CicsPlanOperation::FetchChild => 217,
+        CicsPlanOperation::FreeChild => 218,
+        CicsPlanOperation::LinkAcqActivity => 219,
+        CicsPlanOperation::LinkAcqProcess => 220,
+        CicsPlanOperation::LinkActivity => 221,
+        CicsPlanOperation::ExtractAttach => 231,
+        CicsPlanOperation::ExtractAttributes => 232,
+        CicsPlanOperation::GdsExtractAttributes => 233,
+        CicsPlanOperation::ExtractLogonMsg => 234,
+        CicsPlanOperation::ExtractProcess => 235,
+        CicsPlanOperation::GdsExtractProcess => 236,
+        CicsPlanOperation::ExtractTct => 237,
+        CicsPlanOperation::Point => 238,
         CicsPlanOperation::AddSubevent => 105,
         CicsPlanOperation::RemoveSubevent => 113,
         CicsPlanOperation::DeleteEvent => 110,
@@ -74,6 +108,13 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::AsktimeEib => 14,
         CicsPlanOperation::Asktime => 15,
         CicsPlanOperation::FormatTime => 16,
+        CicsPlanOperation::ConvertTime => 154,
+        CicsPlanOperation::WriteOperator => 159,
+        CicsPlanOperation::ExtractCertificate => 160,
+        CicsPlanOperation::ExtractTcpip => 161,
+        CicsPlanOperation::BifDeedit => 155,
+        CicsPlanOperation::BifDigest => 156,
+        CicsPlanOperation::Post => 158,
         CicsPlanOperation::Abend => 17,
         CicsPlanOperation::HandleAbend => 18,
         CicsPlanOperation::Link => 19,
@@ -96,6 +137,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::Assign => 32,
         CicsPlanOperation::PurgeMessage => 33,
         CicsPlanOperation::Start => 34,
+        CicsPlanOperation::StartAttach => 162,
+        CicsPlanOperation::StartBrexit => 163,
         CicsPlanOperation::Retrieve => 35,
         CicsPlanOperation::Cancel => 36,
         CicsPlanOperation::Delay => 37,
@@ -109,6 +152,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::ReadTransientData => 51,
         CicsPlanOperation::WaitEvent => 43,
         CicsPlanOperation::WaitExternal => 44,
+        CicsPlanOperation::WaitCics => 157,
         CicsPlanOperation::ReadTemporaryStorage => 49,
         CicsPlanOperation::WriteTemporaryStorage => 50,
         CicsPlanOperation::InvokeApplication => 46,
@@ -197,6 +241,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::VerifyToken => 139,
         CicsPlanOperation::Signon => 136,
         CicsPlanOperation::Signoff => 135,
+        other => conversation::operation_tag(other),
     }
 }
 
@@ -225,6 +270,20 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         185 => Ok(CicsPlanOperation::SuspendAcqActivity),
         186 => Ok(CicsPlanOperation::SuspendAcqProcess),
         187 => Ok(CicsPlanOperation::SuspendActivity),
+        216 => Ok(CicsPlanOperation::FetchAny),
+        217 => Ok(CicsPlanOperation::FetchChild),
+        218 => Ok(CicsPlanOperation::FreeChild),
+        219 => Ok(CicsPlanOperation::LinkAcqActivity),
+        220 => Ok(CicsPlanOperation::LinkAcqProcess),
+        221 => Ok(CicsPlanOperation::LinkActivity),
+        231 => Ok(CicsPlanOperation::ExtractAttach),
+        232 => Ok(CicsPlanOperation::ExtractAttributes),
+        233 => Ok(CicsPlanOperation::GdsExtractAttributes),
+        234 => Ok(CicsPlanOperation::ExtractLogonMsg),
+        235 => Ok(CicsPlanOperation::ExtractProcess),
+        236 => Ok(CicsPlanOperation::GdsExtractProcess),
+        237 => Ok(CicsPlanOperation::ExtractTct),
+        238 => Ok(CicsPlanOperation::Point),
         105 => Ok(CicsPlanOperation::AddSubevent),
         113 => Ok(CicsPlanOperation::RemoveSubevent),
         110 => Ok(CicsPlanOperation::DeleteEvent),
@@ -253,6 +312,13 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         14 => Ok(CicsPlanOperation::AsktimeEib),
         15 => Ok(CicsPlanOperation::Asktime),
         16 => Ok(CicsPlanOperation::FormatTime),
+        154 => Ok(CicsPlanOperation::ConvertTime),
+        159 => Ok(CicsPlanOperation::WriteOperator),
+        160 => Ok(CicsPlanOperation::ExtractCertificate),
+        161 => Ok(CicsPlanOperation::ExtractTcpip),
+        155 => Ok(CicsPlanOperation::BifDeedit),
+        156 => Ok(CicsPlanOperation::BifDigest),
+        158 => Ok(CicsPlanOperation::Post),
         17 => Ok(CicsPlanOperation::Abend),
         18 => Ok(CicsPlanOperation::HandleAbend),
         19 => Ok(CicsPlanOperation::Link),
@@ -275,6 +341,8 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         32 => Ok(CicsPlanOperation::Assign),
         33 => Ok(CicsPlanOperation::PurgeMessage),
         34 => Ok(CicsPlanOperation::Start),
+        162 => Ok(CicsPlanOperation::StartAttach),
+        163 => Ok(CicsPlanOperation::StartBrexit),
         35 => Ok(CicsPlanOperation::Retrieve),
         36 => Ok(CicsPlanOperation::Cancel),
         37 => Ok(CicsPlanOperation::Delay),
@@ -288,6 +356,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         51 => Ok(CicsPlanOperation::ReadTransientData),
         43 => Ok(CicsPlanOperation::WaitEvent),
         44 => Ok(CicsPlanOperation::WaitExternal),
+        157 => Ok(CicsPlanOperation::WaitCics),
         49 => Ok(CicsPlanOperation::ReadTemporaryStorage),
         50 => Ok(CicsPlanOperation::WriteTemporaryStorage),
         46 => Ok(CicsPlanOperation::InvokeApplication),
@@ -376,7 +445,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         139 => Ok(CicsPlanOperation::VerifyToken),
         136 => Ok(CicsPlanOperation::Signon),
         135 => Ok(CicsPlanOperation::Signoff),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::operation_from_tag(value),
     }
 }
 
@@ -393,6 +462,15 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::BtsUserId => 712,
         CicsOperandName::BtsFacilityToken => 713,
         CicsOperandName::BtsChannel => 714,
+        CicsOperandName::BtsChild => 1088,
+        CicsOperandName::BtsLinkActivity => 1089,
+        CicsOperandName::BtsLinkInputEvent => 1090,
+        CicsOperandName::BtsTimeout => 1091,
+        CicsOperandName::ConversationAttachId => 1344,
+        CicsOperandName::ConversationConvid => 1345,
+        CicsOperandName::ConversationSession => 1346,
+        CicsOperandName::ConversationMaxProcLen => 1347,
+        CicsOperandName::ConversationNetName => 1348,
         CicsOperandName::Event => 320,
         CicsOperandName::SubEvent => 329,
         CicsOperandName::SubEvent1 => 321,
@@ -431,6 +509,22 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::Conditions => 13,
         CicsOperandName::Aids => 14,
         CicsOperandName::Abstime => 15,
+        CicsOperandName::DateString => 640,
+        CicsOperandName::Field => 641,
+        CicsOperandName::Record => 642,
+        CicsOperandName::RecordLength => 643,
+        CicsOperandName::DigestType => 644,
+        CicsOperandName::OperatorText => 645,
+        CicsOperandName::OperatorTextLength => 646,
+        CicsOperandName::OperatorRouteCodes => 647,
+        CicsOperandName::OperatorNumRoutes => 648,
+        CicsOperandName::OperatorConsName => 649,
+        CicsOperandName::OperatorAction => 650,
+        CicsOperandName::OperatorMaxLength => 651,
+        CicsOperandName::OperatorTimeout => 652,
+        CicsOperandName::BrExit => 653,
+        CicsOperandName::BrData => 654,
+        CicsOperandName::BrDataLength => 655,
         CicsOperandName::DateSep => 16,
         CicsOperandName::TimeSep => 17,
         CicsOperandName::Abcode => 18,
@@ -673,6 +767,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::WebSendUriMap => 290,
         CicsOperandName::WebReceiveMaxLength => 291,
         CicsOperandName::WebReceiveStatusLength => 292,
+        other => conversation::operand_tag(other),
     }
 }
 
@@ -689,6 +784,15 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         712 => Ok(CicsOperandName::BtsUserId),
         713 => Ok(CicsOperandName::BtsFacilityToken),
         714 => Ok(CicsOperandName::BtsChannel),
+        1088 => Ok(CicsOperandName::BtsChild),
+        1089 => Ok(CicsOperandName::BtsLinkActivity),
+        1090 => Ok(CicsOperandName::BtsLinkInputEvent),
+        1091 => Ok(CicsOperandName::BtsTimeout),
+        1344 => Ok(CicsOperandName::ConversationAttachId),
+        1345 => Ok(CicsOperandName::ConversationConvid),
+        1346 => Ok(CicsOperandName::ConversationSession),
+        1347 => Ok(CicsOperandName::ConversationMaxProcLen),
+        1348 => Ok(CicsOperandName::ConversationNetName),
         320 => Ok(CicsOperandName::Event),
         329 => Ok(CicsOperandName::SubEvent),
         321 => Ok(CicsOperandName::SubEvent1),
@@ -727,6 +831,22 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         13 => Ok(CicsOperandName::Conditions),
         14 => Ok(CicsOperandName::Aids),
         15 => Ok(CicsOperandName::Abstime),
+        640 => Ok(CicsOperandName::DateString),
+        641 => Ok(CicsOperandName::Field),
+        642 => Ok(CicsOperandName::Record),
+        643 => Ok(CicsOperandName::RecordLength),
+        644 => Ok(CicsOperandName::DigestType),
+        645 => Ok(CicsOperandName::OperatorText),
+        646 => Ok(CicsOperandName::OperatorTextLength),
+        647 => Ok(CicsOperandName::OperatorRouteCodes),
+        648 => Ok(CicsOperandName::OperatorNumRoutes),
+        649 => Ok(CicsOperandName::OperatorConsName),
+        650 => Ok(CicsOperandName::OperatorAction),
+        651 => Ok(CicsOperandName::OperatorMaxLength),
+        652 => Ok(CicsOperandName::OperatorTimeout),
+        653 => Ok(CicsOperandName::BrExit),
+        654 => Ok(CicsOperandName::BrData),
+        655 => Ok(CicsOperandName::BrDataLength),
         16 => Ok(CicsOperandName::DateSep),
         17 => Ok(CicsOperandName::TimeSep),
         18 => Ok(CicsOperandName::Abcode),
@@ -969,6 +1089,6 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         290 => Ok(CicsOperandName::WebSendUriMap),
         291 => Ok(CicsOperandName::WebReceiveMaxLength),
         292 => Ok(CicsOperandName::WebReceiveStatusLength),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        _ => conversation::operand_from_tag(value),
     }
 }

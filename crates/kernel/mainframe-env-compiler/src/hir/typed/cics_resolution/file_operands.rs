@@ -279,6 +279,17 @@ pub(super) fn resolve(
             }
             if matches!(
                 operation,
+                HirCicsOperation::Read | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+            ) && name == "LENGTH"
+                && let HirCicsValue::LengthOf(length) = &value
+                && complete_data_reference(&clauses["INTO"], semantic)? != *length
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS {operation:?} LENGTH OF must name the INTO data area"
+                )));
+            }
+            if matches!(
+                operation,
                 HirCicsOperation::Read
                     | HirCicsOperation::Write
                     | HirCicsOperation::Delete

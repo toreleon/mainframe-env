@@ -1,4 +1,4 @@
-# ADR-0015: Shared BTS lifecycle authority
+# ADR-0021: Shared BTS lifecycle authority
 
 Status: **Proposed for the incremental CIC-904.bts-lifecycle slice**
 Owner: **CICS provider and execution maintainers**
@@ -284,9 +284,14 @@ carries the retained map.
 
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed
-identities, and excess state. There is no prior BTS process row to migrate.
-Rollback to a build without this feature requires stopped admission and a
-compatible backup; it must not silently ignore live process/checkpoint rows.
+identities, and excess state. The unmerged child/LINK candidate also wrote v1
+rows with key-only root and child IDs. Readers treat a retained ID as opaque,
+validate its tree and index, and preserve its bytes through later transitions;
+new definitions use defining-UOW-bound root IDs and root-bound child IDs.
+The candidate's old DEFINE writer cannot create those new identities. A
+rollback to it requires stopped admission and a compatible backup or explicit
+row migration, and must not silently rewrite activity IDs or ignore live
+process/checkpoint rows.
 Retention must preserve pending definitions, acquisition tombstones, replay
 records, and checkpoint references until their owning UOW and effect windows
 close. The initial implementation does not prune those rows automatically.

@@ -434,6 +434,63 @@ mod tests {
         bundle_in_format(source, SourceFormat::Free)
     }
 
+    #[test]
+    fn bts_child_link_six_rows_lower_with_reserved_tags_and_reject_conflicting_wait() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-X PIC X(16). 01 ANY-X PIC X(16). 01 CHANNEL-X PIC X(16). 01 AB-X PIC X(4). 01 STATUS-X PIC S9(9) COMP. 01 TIMEOUT-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FETCH ANY(ANY-X) COMPSTATUS(STATUS-X) CHANNEL(CHANNEL-X) ABCODE(AB-X) NOSUSPEND END-EXEC. EXEC CICS FETCH CHILD(CHILD-X) COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X) END-EXEC. EXEC CICS FREE CHILD(CHILD-X) END-EXEC. EXEC CICS LINK ACQACTIVITY END-EXEC. EXEC CICS LINK ACQPROCESS END-EXEC. EXEC CICS LINK ACTIVITY('SUBTASK') INPUTEVENT('GO') END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let hir = analysis.hir.unwrap();
+        let plans = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            plans.iter().map(|plan| plan.operation).collect::<Vec<_>>(),
+            vec![
+                CicsPlanOperation::FetchAny,
+                CicsPlanOperation::FetchChild,
+                CicsPlanOperation::FreeChild,
+                CicsPlanOperation::LinkAcqActivity,
+                CicsPlanOperation::LinkAcqProcess,
+                CicsPlanOperation::LinkActivity,
+            ]
+        );
+        for (plan, tag) in plans.iter().zip(216..=221) {
+            let bytes = encode_cics_effect_plan(plan, CicsPlanLimits::default()).unwrap();
+            assert_eq!(u16::from_be_bytes([bytes[6], bytes[7]]), tag);
+        }
+        assert!(
+            plans[0]
+                .options
+                .contains(&mainframe_env_ir::CicsPlanOption::BtsNoSuspend)
+        );
+        assert!(
+            plans[1]
+                .operands
+                .iter()
+                .any(|operand| operand.name == CicsOperandName::BtsTimeout)
+        );
+        let invalid = source.replace(
+            "COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X)",
+            "COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X) NOSUSPEND",
+        );
+        let rejected = CobolCompiler::default().analyze(&bundle(&invalid));
+        assert!(!rejected.diagnostics.is_empty());
+    }
+
     fn bundle_in_format(source: &str, format: SourceFormat) -> SourceBundle {
         bundle_with_options(source, format, BTreeMap::new())
     }
@@ -1814,6 +1871,42 @@ mod tests {
                 }
                 CicsPlanOperation::SuspendAcqProcess => crate::HirCicsOperation::SuspendAcqProcess,
                 CicsPlanOperation::SuspendActivity => crate::HirCicsOperation::SuspendActivity,
+                CicsPlanOperation::FetchAny => crate::HirCicsOperation::FetchAny,
+                CicsPlanOperation::FetchChild => crate::HirCicsOperation::FetchChild,
+                CicsPlanOperation::FreeChild => crate::HirCicsOperation::FreeChild,
+                CicsPlanOperation::LinkAcqActivity => crate::HirCicsOperation::LinkAcqActivity,
+                CicsPlanOperation::LinkAcqProcess => crate::HirCicsOperation::LinkAcqProcess,
+                CicsPlanOperation::LinkActivity => crate::HirCicsOperation::LinkActivity,
+                CicsPlanOperation::AllocateConversation => {
+                    crate::HirCicsOperation::AllocateConversation
+                }
+                CicsPlanOperation::GdsAllocateConversation => {
+                    crate::HirCicsOperation::GdsAllocateConversation
+                }
+                CicsPlanOperation::GdsAssignConversation => {
+                    crate::HirCicsOperation::GdsAssignConversation
+                }
+                CicsPlanOperation::BuildAttach => crate::HirCicsOperation::BuildAttach,
+                CicsPlanOperation::ConnectProcess => crate::HirCicsOperation::ConnectProcess,
+                CicsPlanOperation::GdsConnectProcess => crate::HirCicsOperation::GdsConnectProcess,
+                CicsPlanOperation::Converse => crate::HirCicsOperation::Converse,
+                CicsPlanOperation::FreeConversation => crate::HirCicsOperation::FreeConversation,
+                CicsPlanOperation::GdsFreeConversation => {
+                    crate::HirCicsOperation::GdsFreeConversation
+                }
+                CicsPlanOperation::ReceiveConversation => {
+                    crate::HirCicsOperation::ReceiveConversation
+                }
+                CicsPlanOperation::GdsReceiveConversation => {
+                    crate::HirCicsOperation::GdsReceiveConversation
+                }
+                CicsPlanOperation::SendConversation => crate::HirCicsOperation::SendConversation,
+                CicsPlanOperation::GdsWaitConversation => {
+                    crate::HirCicsOperation::GdsWaitConversation
+                }
+                CicsPlanOperation::WaitConvid => crate::HirCicsOperation::WaitConvid,
+                CicsPlanOperation::WaitSignal => crate::HirCicsOperation::WaitSignal,
+                CicsPlanOperation::WaitTerminal => crate::HirCicsOperation::WaitTerminal,
                 CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
                 CicsPlanOperation::QuerySecurity => crate::HirCicsOperation::QuerySecurity,
                 CicsPlanOperation::VerifyPassword => crate::HirCicsOperation::VerifyPassword,
@@ -1832,6 +1925,9 @@ mod tests {
                 CicsPlanOperation::Asktime => crate::HirCicsOperation::Asktime,
                 CicsPlanOperation::AsktimeEib => crate::HirCicsOperation::AsktimeEib,
                 CicsPlanOperation::FormatTime => crate::HirCicsOperation::FormatTime,
+                CicsPlanOperation::ConvertTime => crate::HirCicsOperation::ConvertTime,
+                CicsPlanOperation::BifDeedit => crate::HirCicsOperation::BifDeedit,
+                CicsPlanOperation::BifDigest => crate::HirCicsOperation::BifDigest,
                 CicsPlanOperation::Cancel => crate::HirCicsOperation::Cancel,
                 CicsPlanOperation::Delay => crate::HirCicsOperation::Delay,
                 CicsPlanOperation::DefineCounter => crate::HirCicsOperation::DefineCounter,
@@ -1846,6 +1942,12 @@ mod tests {
                 CicsPlanOperation::RewindDCounter => crate::HirCicsOperation::RewindDCounter,
                 CicsPlanOperation::UpdateCounter => crate::HirCicsOperation::UpdateCounter,
                 CicsPlanOperation::UpdateDCounter => crate::HirCicsOperation::UpdateDCounter,
+                CicsPlanOperation::Post => crate::HirCicsOperation::Post,
+                CicsPlanOperation::WriteOperator => crate::HirCicsOperation::WriteOperator,
+                CicsPlanOperation::ExtractCertificate => {
+                    crate::HirCicsOperation::ExtractCertificate
+                }
+                CicsPlanOperation::ExtractTcpip => crate::HirCicsOperation::ExtractTcpip,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
                 CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
                 CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,
@@ -1933,7 +2035,10 @@ mod tests {
                 CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
                 CicsPlanOperation::WaitEvent => crate::HirCicsOperation::WaitEvent,
                 CicsPlanOperation::WaitExternal => crate::HirCicsOperation::WaitExternal,
+                CicsPlanOperation::WaitCics => crate::HirCicsOperation::WaitCics,
                 CicsPlanOperation::Start => crate::HirCicsOperation::Start,
+                CicsPlanOperation::StartAttach => crate::HirCicsOperation::StartAttach,
+                CicsPlanOperation::StartBrexit => crate::HirCicsOperation::StartBrexit,
                 CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
                 CicsPlanOperation::DocumentCreate => crate::HirCicsOperation::DocumentCreate,
                 CicsPlanOperation::DefineInputEvent => crate::HirCicsOperation::DefineInputEvent,
@@ -1981,6 +2086,16 @@ mod tests {
                 CicsPlanOperation::WebOpen => crate::HirCicsOperation::WebOpen,
                 CicsPlanOperation::WebClose => crate::HirCicsOperation::WebClose,
                 CicsPlanOperation::WebExtract => crate::HirCicsOperation::WebExtract,
+                CicsPlanOperation::ExtractAttach => crate::HirCicsOperation::ExtractAttach,
+                CicsPlanOperation::ExtractAttributes => crate::HirCicsOperation::ExtractAttributes,
+                CicsPlanOperation::GdsExtractAttributes => {
+                    crate::HirCicsOperation::GdsExtractAttributes
+                }
+                CicsPlanOperation::ExtractLogonMsg => crate::HirCicsOperation::ExtractLogonMsg,
+                CicsPlanOperation::ExtractProcess => crate::HirCicsOperation::ExtractProcess,
+                CicsPlanOperation::GdsExtractProcess => crate::HirCicsOperation::GdsExtractProcess,
+                CicsPlanOperation::ExtractTct => crate::HirCicsOperation::ExtractTct,
+                CicsPlanOperation::Point => crate::HirCicsOperation::Point,
                 CicsPlanOperation::ExtractWeb => crate::HirCicsOperation::ExtractWeb,
                 CicsPlanOperation::WebRead => crate::HirCicsOperation::WebRead,
                 CicsPlanOperation::WebStartBrowse => crate::HirCicsOperation::WebStartBrowse,
@@ -2586,5 +2701,84 @@ mod tests {
         assert!(operation.attributes.contains_key("arguments"));
         assert!(!operation.attributes.contains_key("assignment_plan"));
         assert!(operation.location.is_some());
+    }
+
+    #[test]
+    fn conversation_extract_cobol_forms_lower_to_distinct_v2_plans() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CONVX. DATA DIVISION. WORKING-STORAGE SECTION. 01 CV PIC X(4). 01 NET-X PIC X(8). 01 TERM-X PIC X(4). 01 PROC-X PIC X(8). 01 PROC-LEN PIC S9(4) COMP. 01 PROC-MAX PIC S9(4) COMP VALUE 8. 01 SYNC-X PIC S9(4) COMP. 01 PIP-PTR POINTER-32. 01 PIP-LEN PIC S9(4) COMP. 01 LOGON-X PIC X(256). 01 LOGON-LEN PIC S9(4) COMP. 01 RC PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) MAXPROCLEN(PROC-MAX) SYNCLEVEL(SYNC-X) PIPLIST(PIP-PTR) PIPLENGTH(PIP-LEN) RESP(RC) END-EXEC. EXEC CICS POINT CONVID(CV) RESP(RC) END-EXEC. EXEC CICS EXTRACT TCT NETNAME(NET-X) TERMID(TERM-X) RESP(RC) END-EXEC. EXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let plans = analysis
+            .hir
+            .unwrap()
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            plans.iter().map(|plan| plan.operation).collect::<Vec<_>>(),
+            [
+                CicsPlanOperation::ExtractProcess,
+                CicsPlanOperation::Point,
+                CicsPlanOperation::ExtractTct,
+                CicsPlanOperation::ExtractLogonMsg,
+            ]
+        );
+        assert!(
+            plans[0]
+                .outputs
+                .iter()
+                .any(|output| output.name == CicsOutputName::PipList)
+        );
+        assert!(
+            plans[3]
+                .outputs
+                .iter()
+                .any(|output| output.name == CicsOutputName::LogonInto)
+        );
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(&source.replace(
+                    "PROCNAME(PROC-X) PROCLENGTH(PROC-LEN)",
+                    "PROCNAME(PROC-X)"
+                )))
+                .diagnostics
+                .is_empty()
+        );
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(
+                    &source.replace("POINT CONVID(CV)", "POINT CONVID(CV) SESSION(CV)")
+                ))
+                .diagnostics
+                .is_empty()
+        );
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(
+                    &source.replace("EXTRACT PROCESS", "GDS EXTRACT PROCESS")
+                ))
+                .diagnostics
+                .is_empty()
+        );
+        let gds_source = "IDENTIFICATION DIVISION. PROGRAM-ID. GDSX. DATA DIVISION. WORKING-STORAGE SECTION. 01 CV PIC X(4). 01 DATA-X PIC X(24). 01 RC-X PIC X(6). PROCEDURE DIVISION. EXEC CICS GDS EXTRACT ATTRIBUTES CONVID(CV) CONVDATA(DATA-X) RETCODE(RC-X) END-EXEC.";
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(gds_source))
+                .diagnostics
+                .is_empty()
+        );
     }
 }

@@ -6,7 +6,9 @@
   "additionalProperties": false,
   "required": ["schema_version", "candidate_digest", "spec_digest", "fixture_digest", "source_review_digest", "environment_manifest_digest", "comparison_policy", "raw_capture_digest", "observations", "origin"],
   "properties": {
-    "schema_version": {"const": "mainframe-env.cics-oracle-capture@1"},
+    "schema_version": {"enum": ["mainframe-env.cics-oracle-capture@1", "mainframe-env.cics-oracle-capture@2"]},
+    "family_id": {"$ref": "#/$defs/id"},
+    "family_manifest_digest": {"$ref": "#/$defs/digest"},
     "candidate_digest": {"$ref": "#/$defs/digest"},
     "spec_digest": {"$ref": "#/$defs/digest"},
     "fixture_digest": {"$ref": "#/$defs/digest"},
@@ -27,6 +29,9 @@
       }
     }
   },
+  "allOf": [
+    {"if": {"properties": {"schema_version": {"const": "mainframe-env.cics-oracle-capture@2"}}}, "then": {"required": ["family_id", "family_manifest_digest"]}, "else": {"not": {"anyOf": [{"required": ["family_id"]}, {"required": ["family_manifest_digest"]}]}}}
+  ],
   "$defs": {
     "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"},
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},

@@ -1181,4 +1181,126 @@ mod tests {
             Some("UOW1")
         );
     }
+
+    #[test]
+    fn key_only_candidate_ids_remain_opaque_through_read_and_transition() {
+        let memory = MemoryStore::new(Default::default());
+        let key = BtsLifecycleStore::process_key("TYPE", "ORDER").unwrap();
+        let legacy_id = |sequence: u64| {
+            let mut hash = Sha256::new();
+            hash.update(b"mainframe-env.cics.bts-activity-id@1\0");
+            hash.update(key.as_bytes());
+            hash.update([0]);
+            hash.update(sequence.to_be_bytes());
+            hash.finalize()
+                .iter()
+                .take(26)
+                .map(|byte| format!("{byte:02X}"))
+                .collect::<String>()
+        };
+        let root = legacy_id(0);
+        let child = legacy_id(1);
+        assert_ne!(
+            root,
+            BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW1").unwrap()
+        );
+        let mut process =
+            BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", "USER", "UOW1").unwrap();
+        process.pending_uow = None;
+        process.activities.get_mut(&root).unwrap().pending_uow = None;
+        process.activities.insert(
+            child.clone(),
+            BtsActivity {
+                id: child.clone(),
+                name: "CHILD".into(),
+                parent_id: Some(root.clone()),
+                completion_event: Some("DONE".into()),
+                program: "MAIN".into(),
+                transid: "BTS1".into(),
+                userid: "USER".into(),
+                mode: BtsMode::Initial,
+                completion: BtsCompletion::Incomplete,
+                suspended: false,
+                activation_epoch: 0,
+                checkpoint: None,
+                acquired_by: None,
+                pending_uow: None,
+                abcode: None,
+                abprogram: None,
+            },
+        );
+        process.next_child_sequence = 2;
+        process.validate().unwrap();
+        memory
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: PROCESS_NAMESPACE.into(),
+                    key,
+                    version: 1,
+                    payload: serde_json::to_vec(&process).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        for (id, parent_id) in [(&root, None), (&child, Some(root.clone()))] {
+            let index = BtsActivityIndex {
+                schema_version: ACTIVITY_INDEX_SCHEMA.into(),
+                activity_id: id.clone(),
+                process_type: "TYPE".into(),
+                process_name: "ORDER".into(),
+                parent_id,
+                pending_uow: None,
+                row_version: 0,
+            };
+            memory
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: ACTIVITY_INDEX_NAMESPACE.into(),
+                        key: id.clone(),
+                        version: 1,
+                        payload: serde_json::to_vec(&index).unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        let reopened = BtsLifecycleStore::new(&memory);
+        let loaded = reopened.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(loaded.root_id, root);
+        assert!(loaded.activities.contains_key(&child));
+        assert_eq!(
+            reopened
+                .load_activity_index(&root)
+                .unwrap()
+                .unwrap()
+                .activity_id,
+            root
+        );
+        assert_eq!(
+            reopened
+                .load_activity_index(&child)
+                .unwrap()
+                .unwrap()
+                .activity_id,
+            child
+        );
+        reopened
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC2",
+                "USER",
+                "suspend",
+                [2; 32],
+                |row| {
+                    row.set_suspended(&root, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let retained = reopened.load_process("TYPE", "ORDER").unwrap().unwrap();
+        assert_eq!(retained.root_id, root);
+        assert!(retained.activities.contains_key(&child));
+    }
 }

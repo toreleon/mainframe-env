@@ -3,6 +3,7 @@ use super::{
     ResolutionFailure, cics_integer_value, cics_value, complete_data_reference,
 };
 use crate::{CobolUsage, DataCategory, SemanticModel};
+use mainframe_env_ir::{CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor};
 use std::collections::BTreeMap;
 
 const WAIT_EVENT_CLAUSES: &[&str] = &["ECADDR", "NAME", "RESP", "RESP2"];
@@ -16,10 +17,18 @@ const WAIT_EXTERNAL_CLAUSES: &[&str] = &[
 ];
 pub(super) const WAIT_EXTERNAL_OPTIONS: &[&str] = &["PURGEABLE", "NOTPURGEABLE", "NOHANDLE"];
 
+pub(super) fn option_value_shape(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    name: &str,
+) -> Option<CicsApplicationOptionValueShape> {
+    (descriptor.label_tokens == ["WAITCICS"] && matches!(name, "PURGEABLE" | "NOTPURGEABLE"))
+        .then_some(CicsApplicationOptionValueShape::Flag)
+}
+
 pub(super) fn names(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::WaitEvent => WAIT_EVENT_CLAUSES,
-        HirCicsOperation::WaitExternal => WAIT_EXTERNAL_CLAUSES,
+        HirCicsOperation::WaitExternal | HirCicsOperation::WaitCics => WAIT_EXTERNAL_CLAUSES,
         _ => unreachable!("WAIT clause contract requested for another operation"),
     }
 }
@@ -33,7 +42,9 @@ pub(super) fn resolve(
     validate_constraints(clauses, options, operation)?;
     for required in match operation {
         HirCicsOperation::WaitEvent => &["ECADDR"][..],
-        HirCicsOperation::WaitExternal => &["ECBLIST", "NUMEVENTS"][..],
+        HirCicsOperation::WaitExternal | HirCicsOperation::WaitCics => {
+            &["ECBLIST", "NUMEVENTS"][..]
+        }
         _ => return Ok(Vec::new()),
     } {
         if !clauses.contains_key(*required) {
@@ -50,7 +61,10 @@ fn validate_constraints(
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
-    if operation != HirCicsOperation::WaitExternal {
+    if !matches!(
+        operation,
+        HirCicsOperation::WaitExternal | HirCicsOperation::WaitCics
+    ) {
         return Ok(());
     }
     let purge_selectors = usize::from(clauses.contains_key("PURGEABILITY"))
@@ -72,7 +86,10 @@ fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    if operation == HirCicsOperation::WaitExternal {
+    if matches!(
+        operation,
+        HirCicsOperation::WaitExternal | HirCicsOperation::WaitCics
+    ) {
         return external_operands(clauses, semantic);
     }
     if operation != HirCicsOperation::WaitEvent {

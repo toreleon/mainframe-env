@@ -18,7 +18,13 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0012](0012-checked-amode64-storage-boundary.md) | checked AMODE(64) virtual storage and checkpoint boundary | Proposed |
 | [0013](0013-cics-web-service-control-boundary.md) | bounded CICS web service control and durable channel replay | Proposed |
 | [0014](0014-named-counter-authority.md) | versioned named-counter pool authority and bounded typed routing | Proposed |
-| [0015](0015-bts-lifecycle-authority.md) | shared versioned BTS process/activity state and UOW acquisition | Proposed |
+| [0015](0015-cics-operator-reply-boundary.md) | durable CICS operator reply and console ingress boundary | Proposed |
+| [0016](0016-cics-tcpip-ingress-context.md) | trusted TCP/IP and client-certificate task context | Proposed |
+| [0017](0017-cics-immediate-start-target-authority.md) | durable local target admission for immediate CICS START | Proposed |
+| [0018](0018-cics-start-attach-lifetime.md) | noncancelable START ATTACH state and live-address boundary | Proposed |
+| [0019](0019-bts-lifecycle-authority.md) | pre-integration BTS authority draft | Superseded |
+| [0020](0020-conversation-peer-exchange-ledger.md) | shared APPC/MRO ledger and explicit durable peer frames | Proposed |
+| [0021](0021-bts-lifecycle-authority.md) | shared versioned BTS process/activity state and UOW acquisition | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

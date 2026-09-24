@@ -20,12 +20,13 @@ TYPED_EXECUTION_REGISTRATIONS_PATH = Path(
     "conformance/0.9/cics/typed-execution-registrations.json"
 )
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
-PROVIDER_BTS_OUTPUT_PATH = Path(
-    "crates/providers/mainframe-env-cics/src/generated/command_descriptors/bts_entries.rs"
-)
 LOOKUP_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/lookup.rs"
 )
+PROVIDER_TAIL_OUTPUT_PATH = Path(
+    "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
+)
+PROVIDER_INLINE_OPERATIONS = 153
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -95,28 +96,61 @@ EXPECTED_FAMILIES = {
     "recovery": "Recovery",
     "interval-control": "IntervalControl",
     "storage-control": "StorageControl",
-    "transform-control": "TransformControl",
-    "spool-control": "SpoolControl",
 }
 TYPED_EXECUTION_FAMILIES = {
+    "transform-control": "TransformControl",
+    "spool-control": "SpoolControl",
     "bts-control": "BtsControl",
+    "conversation-control": "ConversationControl",
     "security-control": "SecurityControl",
     "diagnostics": "Diagnostics",
+    "builtin-function-control": "BuiltinFunctionControl",
     "document-control": "DocumentControl",
     "event-control": "EventControl",
     "journal-control": "JournalControl",
     "web-service-control": "WebServiceControl",
     "counter-control": "CounterControl",
     "web-control": "WebControl",
+    "operator-control": "OperatorControl",
+    "network-control": "NetworkControl",
 }
+# CIC-901's runtime descriptor remains a frozen 25-operation source input.
+# Later typed registrations live in a separate catalog and must not change
+# source-map identities merely by entering the runtime operation list below.
+FROZEN_RUNTIME_OPERATION_NAMES = frozenset({
+    "Abend", "Asktime", "Assign", "Delete", "EndBrowse", "FormatTime",
+    "HandleAbend", "HandleCondition", "Inquire", "Link", "Read", "ReadNext",
+    "ReadPrev", "ReceiveMap", "Retrieve", "Return", "Rewrite", "SendMap",
+    "SendText", "SetFileStatus", "StartBrowse", "Syncpoint", "Write",
+    "WriteTransientData", "Xctl",
+})
+
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
     ("AddSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0004"),
     ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
+    ("AllocateConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0007"),
+    ("GdsAllocateConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0008"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
+    ("BifDeedit", "api", "builtin-function-control", False, f"{OFFICIAL_BASELINE}:api-commands:0013"),
+    ("BifDigest", "api", "builtin-function-control", False, f"{OFFICIAL_BASELINE}:api-commands:0014"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
+    ("GdsAssignConversation", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0012"),
+    ("BuildAttach", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0015"),
+    ("ConnectProcess", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0028"),
+    ("GdsConnectProcess", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0029"),
+    ("FreeConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0081"),
+    ("GdsFreeConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0082"),
+    ("Converse", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0030"),
+    ("ReceiveConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0161"),
+    ("GdsReceiveConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0162"),
+    ("SendConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0187"),
+    ("GdsWaitConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0231"),
+    ("WaitConvid", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0232"),
+    ("WaitSignal", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0237"),
+    ("WaitTerminal", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0238"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
     ("CheckTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0026"),
@@ -129,6 +163,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("SignalEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0194"),
     ("DefineCompositeEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0033"),
     ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
+    ("ConvertTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0031"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
     ("DefineCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0034"),
     ("DefineDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0035"),
@@ -196,7 +231,16 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
+    ("ExtractAttach", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0067"),
+    ("ExtractAttributes", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0068"),
+    ("GdsExtractAttributes", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0069"),
+    ("ExtractLogonMsg", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0071"),
+    ("ExtractProcess", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0072"),
+    ("GdsExtractProcess", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0073"),
+    ("ExtractTct", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0075"),
     ("ExtractWeb", "api", "web-control", False, f"{OFFICIAL_BASELINE}:api-commands:0076"),
+    ("ExtractCertificate", "api", "network-control", False, f"{OFFICIAL_BASELINE}:api-commands:0070"),
+    ("ExtractTcpip", "api", "network-control", False, f"{OFFICIAL_BASELINE}:api-commands:0074"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("Freemain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0084"),
     ("Freemain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0085"),
@@ -233,7 +277,9 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("Link", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0138"),
     ("Load", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0142"),
+    ("Point", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0145"),
     ("PopHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0146"),
+    ("Post", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0147"),
     (
         "PurgeMessage",
         "api",
@@ -315,6 +361,8 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
     ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
+    ("StartAttach", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0206"),
+    ("StartBrexit", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0207"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
@@ -334,6 +382,8 @@ EXPECTED_RUNTIME_OPERATIONS = [
 
     ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
+    ("WaitCics", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0239"),
+    ("WriteOperator", "api", "operator-control", True, f"{OFFICIAL_BASELINE}:api-commands:0256"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     (
         "TransformDataToJson",
@@ -521,6 +571,12 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("SuspendAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0215"),
     ("SuspendAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0216"),
     ("SuspendActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0217"),
+    ("FetchAny", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0077"),
+    ("FetchChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0078"),
+    ("FreeChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0083"),
+    ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
+    ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
+    ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
 ]
 
 CONTRACT_BATCHES = (
@@ -748,6 +804,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SuspendAcqActivity",
         "SuspendAcqProcess",
         "SuspendActivity",
+        "FetchAny", "FetchChild", "FreeChild", "LinkAcqActivity", "LinkAcqProcess", "LinkActivity",
         "Abend",
         "AddSubevent",
         "Address",
@@ -755,6 +812,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "ChangeTask",
         "DefineCompositeEvent",
         "DefineInputEvent",
+        "ConvertTime",
         "Delay",
         "DefineCounter",
         "DefineDCounter",
@@ -769,11 +827,39 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "UpdateCounter",
         "UpdateDCounter",
         "AddressSet",
+        "AllocateConversation",
+        "GdsAllocateConversation",
+        "GdsAssignConversation",
+        "BuildAttach",
+        "ConnectProcess",
+        "GdsConnectProcess",
+        "FreeConversation",
+        "GdsFreeConversation",
+        "Converse",
+        "ReceiveConversation",
+        "GdsReceiveConversation",
+        "SendConversation",
+        "GdsWaitConversation",
+        "WaitConvid",
+        "WaitSignal",
+        "WaitTerminal",
         "Asktime",
         "AsktimeEib",
+        "BifDeedit",
+        "BifDigest",
         "Deq",
         "Enq",
+        "ExtractAttach",
+        "ExtractAttributes",
+        "GdsExtractAttributes",
+        "ExtractLogonMsg",
+        "ExtractProcess",
+        "GdsExtractProcess",
+        "ExtractTct",
+        "Point",
         "ExtractWeb",
+        "ExtractCertificate",
+        "ExtractTcpip",
         "FormatTime",
         "Freemain",
         "Freemain64",
@@ -840,6 +926,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "PurgeMessage",
         "QuerySecurity",
         "PopHandle",
+        "Post",
+        "WriteOperator",
         "PushHandle",
         "Read",
         "Rewrite",
@@ -861,6 +949,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Trace",
         "WaitEvent",
         "WaitExternal",
+        "WaitCics",
         "Syncpoint",
         "Unlock",
         "VerifyPassword",
@@ -873,6 +962,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Signon",
         "Signoff",
         "Start",
+        "StartAttach",
+        "StartBrexit",
         "Retrieve",
         "TransformDataToJson",
         "TransformDataToXml",
@@ -965,6 +1056,20 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "FetchAny": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FetchChild": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FreeChild": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "LinkAcqActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkAcqProcess": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "ExtractAttach": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "ExtractAttributes": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "GdsExtractAttributes": frozenset({"memory-read", "memory-write", "transaction"}),
+    "ExtractLogonMsg": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "ExtractProcess": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "GdsExtractProcess": frozenset({"memory-read", "memory-write", "transaction"}),
+    "ExtractTct": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "Point": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "SignalEvent": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "RetrieveReattachEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
     "RetrieveSubevent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
@@ -992,12 +1097,31 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "AllocateConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsAllocateConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsAssignConversation": frozenset({"memory-write", "terminal-read", "security", "audit"}),
+    "BuildAttach": frozenset({"memory-read", "memory-write", "security", "audit", "transaction"}),
+    "ConnectProcess": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsConnectProcess": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "transaction"}),
+    "FreeConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "condition", "transaction"}),
+    "GdsFreeConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "transaction"}),
+    "Converse": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "ReceiveConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsReceiveConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "SendConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsWaitConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "WaitConvid": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "WaitSignal": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "WaitTerminal": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
     "Address": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
+    "BifDeedit": frozenset({"memory-read", "memory-write", "condition"}),
+    "BifDigest": frozenset({"memory-read", "memory-write", "condition"}),
     "ChangeTask": frozenset(
         {"memory-read", "memory-write", "suspension", "condition"}
     ),
+    "ConvertTime": frozenset({"memory-read", "memory-write", "condition"}),
     "Deq": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Enq": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1232,6 +1356,8 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
     "Assign": frozenset({"memory-write", "condition", "transaction"}),
+    "ExtractCertificate": frozenset({"memory-write", "condition", "transaction"}),
+    "ExtractTcpip": frozenset({"memory-write", "condition", "transaction"}),
     "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
     "QuerySecurity": frozenset(
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
@@ -1266,6 +1392,8 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
+    "Post": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "WriteOperator": frozenset({"memory-read", "memory-write", "terminal-write", "clock", "condition", "transaction"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -1313,7 +1441,16 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WaitExternal": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "WaitCics": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "Start": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
+    "StartAttach": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
+    "StartBrexit": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
     "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
@@ -1591,11 +1728,29 @@ def _load_typed_execution_registrations(
         "AddSubevent",
         "Address",
         "AddressSet",
+        "AllocateConversation",
+        "GdsAllocateConversation",
+        "GdsAssignConversation",
+        "BuildAttach",
+        "ConnectProcess",
+        "GdsConnectProcess",
+        "FreeConversation",
+        "GdsFreeConversation",
+        "Converse",
+        "ReceiveConversation",
+        "GdsReceiveConversation",
+        "SendConversation",
+        "GdsWaitConversation",
+        "WaitConvid",
+        "WaitTerminal",
         "AsktimeEib",
+        "BifDeedit",
+        "BifDigest",
         "Cancel",
         "ChangePassword",
         "ChangePhrase",
         "ChangeTask",
+        "ConvertTime",
         "Delay",
         "DefineCounter",
         "DefineDCounter",
@@ -1624,7 +1779,16 @@ def _load_typed_execution_registrations(
         "Enq",
         "EnterTraceId",
         "EnterTraceNum",
+        "ExtractAttach",
+        "ExtractAttributes",
+        "GdsExtractAttributes",
+        "ExtractLogonMsg",
+        "ExtractProcess",
+        "GdsExtractProcess",
+        "ExtractTct",
         "ExtractWeb",
+        "ExtractCertificate",
+        "ExtractTcpip",
         "Freemain",
         "Freemain64",
         "Getmain",
@@ -1645,7 +1809,9 @@ def _load_typed_execution_registrations(
         "IssueWait",
         "Load",
         "Monitor",
+        "Point",
         "PopHandle",
+        "Post",
         "PurgeMessage",
         "PushHandle",
         "QuerySecurity",
@@ -1673,6 +1839,8 @@ def _load_typed_execution_registrations(
         "SpoolRead",
         "SpoolWrite",
         "Start",
+        "StartAttach",
+        "StartBrexit",
         "Suspend",
         "Trace",
         "TransformDataToJson",
@@ -1685,6 +1853,7 @@ def _load_typed_execution_registrations(
         "VerifyToken",
         "WaitEvent",
         "WaitExternal",
+        "WaitSignal",
         "WaitJournalName",
         "WaitJournalNum",
         "WebClose",
@@ -1700,8 +1869,10 @@ def _load_typed_execution_registrations(
         "WebSend",
         "WebStartBrowse",
         "WebWrite",
+        "WaitCics",
         "WriteJournalName",
         "WriteJournalNum",
+        "WriteOperator",
         "WriteTemporaryStorage",
         "WsaContextBuild",
         "WsaContextDelete",
@@ -1739,6 +1910,12 @@ def _load_typed_execution_registrations(
         "SuspendAcqActivity",
         "SuspendAcqProcess",
         "SuspendActivity",
+        "FetchAny",
+        "FetchChild",
+        "FreeChild",
+        "LinkAcqActivity",
+        "LinkAcqProcess",
+        "LinkActivity",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -2025,92 +2202,8 @@ def load_catalog(
         EXPECTED_RUNTIME_OPERATIONS
         if include_runtime_admission
         else [
-            row
-            for row in EXPECTED_RUNTIME_OPERATIONS
-            if row[0]
-            not in {
-                "ChangeTask",
-                "Address",
-                "AddressSet",
-                "AsktimeEib",
-                "Cancel",
-                "Delay",
-                "DefineCounter",
-                "DefineDCounter",
-        "DeleteCounter",
-        "DeleteDCounter",
-        "GetCounter",
-        "GetDCounter",
-        "QueryCounter",
-        "QueryDCounter",
-        "RewindCounter",
-        "RewindDCounter",
-        "UpdateCounter",
-        "UpdateDCounter",
-                "Deq",
-                "DeleteTransientData",
-                "DeleteTemporaryStorage",
-                "ReadTemporaryStorage",
-                "WriteTemporaryStorage",
-                "DocumentCreate",
-                "DocumentDelete",
-                "DocumentInsert",
-                "DocumentRetrieve",
-                "DocumentSet",
-                "Enq",
-                "ExtractWeb",
-                "Freemain",
-                "Freemain64",
-                "Getmain",
-                "Getmain64",
-                "HandleAid",
-                "IgnoreCondition",
-                "InvokeApplication",
-                "IssueAbort",
-                "IssueAdd",
-                "IssueEnd",
-                "IssueErase",
-                "IssueNote",
-                "IssueQuery",
-                "IssueReceive",
-                "IssueReplace",
-                "IssueSend",
-                "IssueWait",
-                "Load",
-                "Release",
-                "Route",
-                "PopHandle",
-                "PurgeMessage",
-                "PushHandle",
-                "ReadTransientData",
-                "SetAssociationUserCorrData",
-                "SpoolClose",
-                "SpoolOpenInput",
-                "SpoolOpenOutput",
-                "SpoolRead",
-                "SpoolWrite",
-                "Start",
-                "Suspend",
-                "WaitEvent",
-                "WaitExternal",
-                "WaitJournalName",
-                "WaitJournalNum",
-                "WebClose",
-                "WebConverse",
-                "WebEndBrowse",
-                "WebExtract",
-                "WebOpen",
-                "WebParseUrl",
-                "WebRead",
-                "WebReadNext",
-                "WebReceive",
-                "WebRetrieve",
-                "WebSend",
-                "WebStartBrowse",
-                "WebWrite",
-                "WriteJournalName",
-                "WriteJournalNum",
-            }
+            row for row in EXPECTED_RUNTIME_OPERATIONS
+            if row[0] in FROZEN_RUNTIME_OPERATION_NAMES
         ]
     )
     if observed_runtime != expected_runtime:
@@ -2388,7 +2481,7 @@ def _load_source_batch(
             f"{batch_id} source projection must cover exactly rows {start:04d}-{end:04d}"
         )
     rows_by_id: dict[str, dict[str, Any]] = {}
-    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands, strict=True), start):
+    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands), start):
         row = _object(raw_row, f"{batch_id} source row {offset:04d}")
         identity = {
             "official_row": row.get("official_row"),
@@ -4721,8 +4814,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
                 source_status = "not-projected"
             else:
                 projected_commands += 1
+                if len(source_row["dimensions"]) != len(SOURCE_DIMENSIONS):
+                    raise DescriptorError(
+                        f"{command['official_row']} source dimension count differs"
+                    )
                 for raw_dimension, (source_name, contract_name, candidate_kind) in zip(
-                    source_row["dimensions"], SOURCE_DIMENSIONS, strict=True
+                    source_row["dimensions"], SOURCE_DIMENSIONS
                 ):
                     dimension = _object(raw_dimension, f"{command['official_row']} {source_name}")
                     projection_state = _text(
@@ -5015,6 +5112,41 @@ def _rust_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=True)
 
 
+def _render_provider_entries(
+    operations: list[dict[str, Any]], family_variants: dict[str, str]
+) -> list[str]:
+    lines = []
+    for operation in operations:
+        lines.extend(
+            [
+                "    CicsCommandDescriptor {",
+                f"        operation: CicsOperation::{operation['operation']},",
+                f"        syntax: {_rust_string(operation['label'])},",
+                f"        official_row: {_rust_string(operation['official_row'])},",
+                f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
+                f"        mutating: {str(operation['mutating']).lower()},",
+                "    },",
+            ]
+        )
+    return lines
+
+
+def render_provider_tail(root: Path = ROOT) -> str:
+    catalog = load_catalog(root)
+    family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
+    operations = catalog["_runtime_operations"][PROVIDER_INLINE_OPERATIONS:]
+    lines = [
+        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
+        "",
+        "use super::*;",
+        "",
+        f"pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; {len(operations)}] = [",
+    ]
+    lines.extend(_render_provider_entries(operations, family_variants))
+    lines.extend(["];", ""])
+    return "\n".join(lines)
+
+
 def render_provider(
     root: Path = ROOT, contracts: dict[str, Any] | None = None
 ) -> str:
@@ -5023,10 +5155,7 @@ def render_provider(
     condition_authority = contracts.get("condition_name_authority") or {}
     condition_names = condition_authority.get("allowed_names", [])
     family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
-    operations = [
-        operation for operation in catalog["_runtime_operations"]
-        if operation["family"] != "bts-control"
-    ]
+    operations = catalog["_runtime_operations"]
     lines = [
         "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
         "",
@@ -5060,48 +5189,10 @@ def render_provider(
             "pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[",
         ]
     )
-    for operation in operations:
-        lines.extend(
-            [
-                "    CicsCommandDescriptor {",
-                f"        operation: CicsOperation::{operation['operation']},",
-                f"        syntax: {_rust_string(operation['label'])},",
-                f"        official_row: {_rust_string(operation['official_row'])},",
-                f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
-                f"        mutating: {str(operation['mutating']).lower()},",
-                "    },",
-            ]
-        )
-    lines.extend(["];", "", "mod bts_entries;", "mod lookup;",
-                  "use bts_entries::BTS_COMMAND_DESCRIPTORS;",
-                  "pub(crate) use lookup::command_descriptor;", ""])
-    return "\n".join(lines)
-
-
-def render_provider_bts(root: Path = ROOT) -> str:
-    """Keep this slice's 23 descriptors below the generated-module ceiling."""
-    catalog = load_catalog(root)
-    family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
-    lines = [
-        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
-        "",
-        "use super::*;",
-        "",
-        "pub(super) const BTS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[",
-    ]
-    for operation in catalog["_runtime_operations"]:
-        if operation["family"] != "bts-control":
-            continue
-        lines.extend([
-            "    CicsCommandDescriptor {",
-            f"        operation: CicsOperation::{operation['operation']},",
-            f"        syntax: {_rust_string(operation['label'])},",
-            f"        official_row: {_rust_string(operation['official_row'])},",
-            f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
-            f"        mutating: {str(operation['mutating']).lower()},",
-            "    },",
-        ])
-    lines.extend(["];", ""])
+    lines.extend(_render_provider_entries(operations[:PROVIDER_INLINE_OPERATIONS], family_variants))
+    for index in range(PROVIDER_INLINE_OPERATIONS, len(operations)):
+        lines.append(f"    tail::CICS_COMMAND_DESCRIPTOR_TAIL[{index - PROVIDER_INLINE_OPERATIONS}],")
+    lines.extend(["];", "", "mod lookup;", "mod tail;", "pub(crate) use lookup::command_descriptor;", ""])
     return "\n".join(lines)
 
 
@@ -5116,17 +5207,9 @@ def render_provider_lookup(root: Path = ROOT) -> str:
         "pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static CicsCommandDescriptor {",
         "    match operation {",
     ]
-    core_index = 0
-    bts_index = 0
-    for operation in operations:
-        if operation["family"] == "bts-control":
-            collection, index = "BTS_COMMAND_DESCRIPTORS", bts_index
-            bts_index += 1
-        else:
-            collection, index = "CICS_COMMAND_DESCRIPTORS", core_index
-            core_index += 1
+    for index, operation in enumerate(operations):
         lines.append(
-            f"        CicsOperation::{operation['operation']} => &{collection}[{index}],"
+            f"        CicsOperation::{operation['operation']} => &CICS_COMMAND_DESCRIPTORS[{index}],"
         )
     lines.extend(["    }", "}", ""])
     return "\n".join(lines)
@@ -5501,8 +5584,8 @@ def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     contracts = build_contracts(root)
     return {
         OUTPUT_PATH: render_provider(root, contracts),
-        PROVIDER_BTS_OUTPUT_PATH: render_provider_bts(root),
         LOOKUP_OUTPUT_PATH: render_provider_lookup(root),
+        PROVIDER_TAIL_OUTPUT_PATH: render_provider_tail(root),
         HOST_OUTPUT_PATH: render_host(root),
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),
         IR_REGISTRY_OUTPUT_PATH: render_ir_registry(root, contracts),
@@ -5541,7 +5624,7 @@ def main() -> None:
         generate()
         print(
             "cics-command-descriptors: generated "
-            f"{OUTPUT_PATH}, {LOOKUP_OUTPUT_PATH}, {HOST_OUTPUT_PATH}, {COMPILER_SPI_COMPAT_OUTPUT_PATH}, "
+            f"{OUTPUT_PATH}, {LOOKUP_OUTPUT_PATH}, {PROVIDER_TAIL_OUTPUT_PATH}, {HOST_OUTPUT_PATH}, {COMPILER_SPI_COMPAT_OUTPUT_PATH}, "
             f"{IR_REGISTRY_OUTPUT_PATH}, and {CONTRACT_OUTPUT_PATH}"
         )
 

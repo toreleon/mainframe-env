@@ -33,7 +33,9 @@ pub(in crate::machine) fn write_response_state(
     {
         address::apply(machine, action)?;
     }
-    retrieve::prepare_load_allocation(machine, operation, response, outputs)
+    let load_base = retrieve::prepare_load_allocation(machine, operation, response, outputs)?;
+    certificate::apply_outputs(machine, operation, outputs, response)?;
+    Ok(load_base)
 }
 
 pub(in crate::machine) fn write_runtime_output(
@@ -42,6 +44,9 @@ pub(in crate::machine) fn write_runtime_output(
     name: &str,
     value: &BoundedPayload,
 ) -> Result<bool, MachineProblem> {
+    if post::apply_event(machine, name, value)? {
+        return Ok(true);
+    }
     if retrieve::release_output(machine, operation, name, value)? {
         return Ok(true);
     }
@@ -49,6 +54,11 @@ pub(in crate::machine) fn write_runtime_output(
         return Ok(true);
     }
     if task_wait::apply_posted_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
+    if operation == CicsOperation::ExtractCertificate
+        && CicsCertificateOutput::from_name(name).is_some_and(CicsCertificateOutput::pointer)
+    {
         return Ok(true);
     }
     if name != "TASK.PRIORITY" {

@@ -94,12 +94,34 @@ pub(super) fn validate_candidate(
                 ));
             }
             (CicsApplicationOptionValueShape::Value, false) => {
+                if interval_control::bare_brexit_discriminator(descriptor.official_row, name) {
+                    continue;
+                }
                 return Err(format!(
                     "CICS {} option {name} requires a parenthesized operand",
                     operation::command_label(descriptor)
                 ));
             }
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("WriteOperator")
+                    && matches!(*name, "ACTION" | "REPLY" | "REPLYLENGTH") => {}
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("ExtractCertificate")
+                    && certificate_control::bounded_output_name(name) => {}
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("ExtractTcpip")
+                    && matches!(*name, "CLNTIPFAMILY" | "SRVRIPFAMILY" | "SSLTYPE") => {}
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("StartBrexit") && *name == "BRDATA" => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
+                if matches!(
+                    descriptor.label_tokens,
+                    ["FETCH", "ANY"] | ["FETCH", "CHILD"]
+                ) && *name == "COMPSTATUS"
+                    && has_value
+                {
+                    continue;
+                }
                 if web_control::reviewed_ambiguous_shape(descriptor, name, has_value)
                     || bts_lifecycle::reviewed_ambiguous_shape(descriptor, name, has_value)
                 {

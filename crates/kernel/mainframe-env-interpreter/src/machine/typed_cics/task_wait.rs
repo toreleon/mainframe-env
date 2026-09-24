@@ -9,7 +9,9 @@ pub(super) fn arguments(
 ) -> Result<Option<BTreeMap<String, BoundedPayload>>, MachineProblem> {
     match plan.operation {
         CicsPlanOperation::WaitEvent => wait_event_arguments(machine, plan).map(Some),
-        CicsPlanOperation::WaitExternal => wait_external_arguments(machine, plan).map(Some),
+        CicsPlanOperation::WaitExternal | CicsPlanOperation::WaitCics => {
+            wait_external_arguments(machine, plan).map(Some)
+        }
         _ => Ok(None),
     }
 }
@@ -202,10 +204,13 @@ pub(super) fn apply_posted_output(
         .and_then(|pc| machine.operations.get(pc))
         .ok_or(MachineProblem::UnexpectedHostResult)?;
     let plan = plan(ir_operation)?;
-    if names::host_operation(plan.operation) != operation {
+    if names::host_operation(plan.operation) != Some(operation) {
         return Err(MachineProblem::UnexpectedHostResult);
     }
-    if operation == CicsOperation::WaitExternal {
+    if matches!(
+        operation,
+        CicsOperation::WaitExternal | CicsOperation::WaitCics
+    ) {
         return apply_external_post(machine, &plan, index);
     }
     if operation != CicsOperation::WaitEvent || index != 0 {

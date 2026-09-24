@@ -1,4 +1,4 @@
-use super::super::CicsAssignOutput;
+use super::super::{CicsAssignOutput, CicsCertificateOutput, CicsTcpipOutput};
 
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -10,6 +10,51 @@ pub enum CicsOutputName {
     BtsAbCode,
     BtsAbProgram,
     BtsChildToken,
+    /// Opaque token selected by FETCH ANY.
+    BtsAny,
+    /// Child completion CVDA.
+    BtsChildCompStatus,
+    /// Reply channel name fetched from a child.
+    BtsChannel,
+    /// Four-character child abend code.
+    BtsAbcode,
+    AttachProcess,
+    AttachResource,
+    AttachReturnProcess,
+    AttachReturnResource,
+    AttachQueue,
+    AttachIuType,
+    AttachDataStream,
+    AttachRecordFormat,
+    ConversationState,
+    ConversationData,
+    ConversationRetCode,
+    LogonInto,
+    LogonSet,
+    LogonLength,
+    ProcessName,
+    ProcessLength,
+    SyncLevel,
+    PipList,
+    PipLength,
+    TctSysId,
+    TctTermId,
+    ConversationConvid,
+    ConversationRetcode,
+    ConversationPrinConvid,
+    ConversationPrinSysid,
+    ConversationConvData,
+    ConversationInto,
+    ConversationSet,
+    ConversationToLength,
+    ConversationToFullLength,
+    ConversationDataInto,
+    ConversationDataSet,
+    ConversationDataLength,
+    ConversationDataFullLength,
+    ConversationDataRetcode,
+    ConversationDataConvData,
+    ConversationDataState,
     /// Verified eight-character user identity.
     SecurityIsUserId,
     /// Four-byte token encryption-key handle.
@@ -84,6 +129,18 @@ pub enum CicsOutputName {
     Resp2,
     /// `ABSTIME(...)` packed-decimal destination.
     Abstime,
+    /// In-place `FIELD(...)` result of BIF DEEDIT.
+    Field,
+    /// `RESULT(...)` destination of BIF DIGEST.
+    DigestResult,
+    /// Operator reply bytes received through `REPLY(...)`.
+    OperatorReply,
+    /// Actual operator reply byte count.
+    OperatorReplyLength,
+    /// One source-reviewed EXTRACT CERTIFICATE result.
+    Certificate(CicsCertificateOutput),
+    /// One source-reviewed EXTRACT TCPIP result.
+    Tcpip(CicsTcpipOutput),
     /// `MILLISECONDS(...)` fullword-binary destination.
     Milliseconds,
     /// `MMDDYY(...)` character destination.

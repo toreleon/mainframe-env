@@ -1,8 +1,19 @@
 mod bms_map;
-mod bts_child_bridge;
-pub use bts_child_bridge::CicsBtsChildCompletion;
+mod bridge_abi;
+mod bridge_definition;
+mod bridge_profile;
+mod bridge_runtime;
+mod bridge_start;
+mod bridge_terminal;
+mod bts_child_link;
 pub mod bts_lifecycle;
+mod bts_link;
+mod builtin_function;
 mod condition;
+mod conversation_extract;
+#[cfg(test)]
+pub(in crate::service) use conversation_extract::{ExtractMetadata, LuName, publish_metadata};
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -16,6 +27,9 @@ mod interval;
 mod interval_control;
 mod journal_control;
 mod limits;
+mod network_context;
+mod network_control;
+mod operator_control;
 mod program_control;
 mod queue_control;
 mod recovery;
@@ -33,6 +47,7 @@ pub(in crate::service) use security_control::{
 };
 mod signal_event;
 mod spool_control;
+mod start_brexit;
 mod start_task;
 mod storage_control;
 mod task_context;
@@ -40,9 +55,13 @@ mod task_control;
 mod task_enqueue;
 mod task_return;
 mod task_wait;
+mod trace;
+pub use trace::CicsTraceEntry;
 mod terminal_control;
+mod terminal_lifecycle;
 mod terminal_run;
 mod time;
+mod transaction_definition;
 mod transform_control;
 pub(in crate::service) mod transient_data;
 mod web_control;
@@ -50,9 +69,43 @@ mod web_service_control;
 
 use super::{CicsService, Run};
 use crate::generated::CicsCommandFamily;
-use mainframe_env_host_api::{AccessIntent, CicsRequest, CicsResponse, HostProblem};
+use mainframe_env_host_api::{
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+    HostResult, canonical_result_digest,
+};
 use mainframe_env_store_api::StoreError;
 use std::collections::BTreeMap;
+
+pub(super) fn deferred_converse(operation: CicsOperation, response: &CicsResponse) -> bool {
+    response.disposition == CicsDisposition::Suspended
+        && matches!(
+            operation,
+            CicsOperation::Converse
+                | CicsOperation::ReceiveConversation
+                | CicsOperation::GdsReceiveConversation
+                | CicsOperation::SendConversation
+                | CicsOperation::GdsWaitConversation
+                | CicsOperation::WaitConvid
+                | CicsOperation::WaitSignal
+                | CicsOperation::WaitTerminal
+        )
+}
+
+pub(super) fn cics_result_digest(response: &CicsResponse) -> Result<[u8; 32], HostProblem> {
+    canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
+        .map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+pub(super) fn originating_task_for(
+    session: &super::Session,
+    invocation: &mainframe_env_execution_api::Invocation,
+) -> String {
+    if session.run_unit.is_empty() {
+        invocation.run_unit_id.as_str().to_string()
+    } else {
+        session.run_unit.clone()
+    }
+}
 
 pub(super) fn assert_descriptor(
     descriptor: &crate::generated::CicsCommandDescriptor,
@@ -61,6 +114,26 @@ pub(super) fn assert_descriptor(
     debug_assert_eq!(descriptor.operation, request.operation);
     debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
     debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
+}
+
+fn bts_live(service: &CicsService, run: &Run, retention_tick: u64) -> Result<(), HostProblem> {
+    if run.invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    let tick = match &service.replay_clock {
+        Some(clock) => clock.now_tick()?,
+        None => retention_tick.saturating_sub(1),
+    };
+    if tick >= run.invocation.deadline_tick {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
+}
+
+/// A selected program LINK retains its caller's run unit on nested RETURN.
+fn selected_link_return(run: &Run) -> bool {
+    run.invocation.parent_execution_id.is_some()
+        && run.invocation.bindings.contains_key("cobol.call.arguments")
 }
 
 pub(super) fn authorize_and_describe(
@@ -119,7 +192,60 @@ pub use bms_map::{BmsFieldDefinition, BmsMapDefinition};
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
+pub use bridge_abi::{BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply};
+pub use bridge_definition::{CicsBridgeExitDefault, CicsBridgeExitSelection};
+pub use bridge_profile::{CicsBridgeAbiProfile, CicsBridgeAbiSelection};
+pub use bridge_runtime::CicsBridgeRuntime;
+pub use bridge_start::{CICS_BRIDGE_START_WORK_GENERATION, CicsBridgeStartIntent};
+pub use bts_child_link::CicsBtsChildCompletion;
+pub use bts_link::CicsBtsLinkContext;
 pub(super) use condition::respond as condition;
+pub(super) fn condition_for_request(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    problem: HostProblem,
+) -> Result<CicsResponse, HostProblem> {
+    if matches!(
+        request.operation,
+        mainframe_env_host_api::CicsOperation::GdsExtractAttributes
+            | mainframe_env_host_api::CicsOperation::GdsExtractProcess
+    ) || request.operation == mainframe_env_host_api::CicsOperation::ExtractAttributes
+        && problem == HostProblem::Unsupported
+    {
+        return Err(problem);
+    }
+    condition::respond(service, run, &request.condition_policy, problem)
+}
+pub use conversation_control::{
+    CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
+    CicsConversationTransport, ConversationAttachHeader, ConversationConnectFrame,
+    ConversationContext, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    ConversationExchangeState, ConversationKind, ConversationLedger, ConversationOutboundFrame,
+    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationPeerFrame, ConversationProblem, ConversationProfileDefinition, ConversationRecord,
+    ConversationReplay, ConversationReply, ConversationState, ConversationSystemDefinition,
+    ConversationTransmitOutcome, DataCondition, GdsAllocateFailure, GdsAssignFailure,
+    GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure, GdsReturnCode, GdsWaitFailure,
+    MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES, MAX_PIP_BYTES,
+    MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord, SignalLuType,
+    load_conversation_replay, prune_conversation_replays,
+};
+pub(super) use conversation_control::{
+    context as conversation_context, deadline as conversation_deadline,
+};
+
+pub(super) fn preflight_conversation(
+    service: &CicsService,
+    run: &Run,
+    family: CicsCommandFamily,
+) -> Result<(), HostProblem> {
+    if family == CicsCommandFamily::ConversationControl {
+        conversation_context(run)?;
+        conversation_deadline(service, run)?;
+    }
+    Ok(())
+}
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
 pub use diagnostics::{
@@ -132,6 +258,29 @@ pub(super) use document_control::{
 pub use file_control::CicsFileDefinition;
 pub(super) use file_control::{DurableFileStatus, invoke as invoke_file_control};
 pub(super) use file_tokens::FileUpdateState;
+pub use network_context::{
+    CicsCertificateName, CicsClientCertificate, CicsTcpipAuthenticate, CicsTcpipContext,
+    CicsTcpipPrivacy, CicsTcpipSslType,
+};
+pub(super) use network_control::invoke as invoke_network;
+pub use operator_control::CICS_OPERATOR_WORK_GENERATION;
+pub use operator_control::CicsOperatorMessageView;
+pub(super) use operator_control::invoke as invoke_operator;
+pub(super) use time::invoke as invoke_time;
+pub(super) fn validate_owned_stores(
+    store: &dyn mainframe_env_store_api::ProviderStateStore,
+    limits: super::CicsLimits,
+) -> Result<(), HostProblem> {
+    task_enqueue::validate_store(store, limits)?;
+    operator_control::load_operator_messages(store, limits)?;
+    operator_control::validate_active_operator_commands(store, limits)?;
+    network_context::validate_store(store, limits)?;
+    bridge_definition::validate_store(store, limits)?;
+    bridge_profile::validate_store(store, limits)?;
+    bridge_runtime::validate_store(store, limits)?;
+    bridge_start::validate_store(store, limits)?;
+    Ok(())
+}
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };
@@ -139,7 +288,26 @@ pub use interval::{CicsIntervalError, CicsIntervalMode, CicsIntervalTime};
 #[cfg(test)]
 pub(super) use interval_control::IntervalStartState;
 pub(super) use interval_control::load as load_interval_records;
-pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
+pub use interval_control::{
+    CICS_DELAY_WORK_GENERATION, CICS_POST_WORK_GENERATION, CICS_START_WORK_GENERATION,
+};
+pub(super) fn post_event_outputs(
+    service: &CicsService,
+    run: &Run,
+) -> Result<BTreeMap<String, mainframe_env_execution_api::BoundedPayload>, HostProblem> {
+    let Some(event) = interval_control::post_ready_event(service, run)? else {
+        return Ok(BTreeMap::new());
+    };
+    Ok(BTreeMap::from([(
+        "POST.EVENT".into(),
+        mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.post-event@1",
+            event,
+            mainframe_env_execution_api::InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    )]))
+}
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use journal_control::{JournalRecord, load as load_journals};
 pub(super) use program_control::invoke as invoke_program_control;
@@ -165,10 +333,7 @@ pub(super) use task_control::{
     new_run_with_state,
 };
 pub use task_enqueue::CicsEnqueueModelDefinition;
-pub(super) use task_enqueue::{
-    load_enqueue_models, release_uow as release_uow_enqueues,
-    validate_store as validate_enqueue_store,
-};
+pub(super) use task_enqueue::{load_enqueue_models, release_uow as release_uow_enqueues};
 pub use terminal_control::{
     CicsBmsControlSnapshot, CicsOutboardDestinationDefinition, CicsOutboardKind,
     CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
@@ -178,7 +343,6 @@ pub(super) use terminal_control::{
     release_outboard_task, release_partition_set_for_task, valid_aid as valid_terminal_aid,
 };
 pub(in crate::service) use terminal_run::terminal_secret_digest;
-pub(super) use time::invoke as invoke_time;
 pub use web_control::{
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
     CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
@@ -193,8 +357,22 @@ pub(super) fn invoke_extended_control(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match family {
-        crate::generated::CicsCommandFamily::BtsControl => {
-            bts_lifecycle::invoke(service, run, request)
+        crate::generated::CicsCommandFamily::ConversationControl => {
+            if matches!(
+                request.operation,
+                CicsOperation::ExtractAttach
+                    | CicsOperation::ExtractAttributes
+                    | CicsOperation::GdsExtractAttributes
+                    | CicsOperation::ExtractLogonMsg
+                    | CicsOperation::ExtractProcess
+                    | CicsOperation::GdsExtractProcess
+                    | CicsOperation::ExtractTct
+                    | CicsOperation::Point
+            ) {
+                conversation_extract::invoke(service, run, request)
+            } else {
+                conversation_control::invoke(service, run, request, retention_tick)
+            }
         }
         crate::generated::CicsCommandFamily::TransformControl => {
             transform_control::invoke(service, run, request)
@@ -212,6 +390,19 @@ pub(super) fn invoke_extended_control(
                 event_control::invoke(service, run, request)
             }
         }
+        crate::generated::CicsCommandFamily::BtsControl => match request.operation {
+            mainframe_env_host_api::CicsOperation::FetchAny
+            | mainframe_env_host_api::CicsOperation::FetchChild
+            | mainframe_env_host_api::CicsOperation::FreeChild => {
+                bts_child_link::invoke_child(service, run, request, retention_tick)
+            }
+            mainframe_env_host_api::CicsOperation::LinkAcqActivity
+            | mainframe_env_host_api::CicsOperation::LinkAcqProcess
+            | mainframe_env_host_api::CicsOperation::LinkActivity => {
+                bts_link::invoke(service, run, request, retention_tick)
+            }
+            _ => bts_lifecycle::invoke(service, run, request),
+        },
         crate::generated::CicsCommandFamily::Diagnostics => {
             invoke_diagnostics(service, run, request)
         }
@@ -220,6 +411,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::SecurityControl => {
             security_control::invoke(service, run, request, retention_tick)
+        }
+        crate::generated::CicsCommandFamily::BuiltinFunctionControl => {
+            builtin_function::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }
@@ -257,8 +451,11 @@ pub(super) fn invoke_interval_or_spool_control(
 }
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    bts_child_link::release_task(service, run)?;
+    bts_link::release_task(service, run)?;
     task_enqueue::release_task(service, run)?;
     task_wait::release_task(service, run)?;
+    conversation_control::release_task(service, run)?;
     document_control::release_task(service, run)?;
     release_bms_message_for_task(service, run)?;
     release_outboard_task(service, run)?;
@@ -267,10 +464,11 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     interval_control::release_task(service, run)?;
     program_control::release_task_program_loads(service, run)?;
     security_control::release_task_token_key(service, run)?;
+    network_context::release_task(service, run)?;
     web_service_control::release_task(service, run)
 }
 
-pub(super) fn rollback_task(
+pub(super) fn discard_task_starts(
     service: &CicsService,
     records: &mut BTreeMap<String, IntervalStartRecord>,
     run: &Run,
@@ -279,6 +477,5 @@ pub(super) fn rollback_task(
         service.store.as_ref(),
         records,
         run.invocation.run_unit_id.as_str(),
-    )?;
-    release_task_state(service, run)
+    )
 }

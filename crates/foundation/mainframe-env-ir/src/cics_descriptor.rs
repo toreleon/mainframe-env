@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 151);
+        assert_eq!(typed.len(), 214);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 112);
+        assert_eq!(unready.len(), 49);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -297,6 +297,59 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::AcquireActivityId,
+                CicsPlanOperation::AcquireProcess,
+                CicsPlanOperation::CancelAcqActivity,
+                CicsPlanOperation::CancelAcqProcess,
+                CicsPlanOperation::CancelActivity,
+                CicsPlanOperation::CheckAcqActivity,
+                CicsPlanOperation::CheckAcqProcess,
+                CicsPlanOperation::CheckActivity,
+                CicsPlanOperation::DefineActivity,
+                CicsPlanOperation::DefineProcess,
+                CicsPlanOperation::DeleteActivity,
+                CicsPlanOperation::ResetAcqProcess,
+                CicsPlanOperation::ResetActivity,
+                CicsPlanOperation::ResumeAcqActivity,
+                CicsPlanOperation::ResumeAcqProcess,
+                CicsPlanOperation::ResumeActivity,
+                CicsPlanOperation::RunAcqActivity,
+                CicsPlanOperation::RunAcqProcess,
+                CicsPlanOperation::RunActivity,
+                CicsPlanOperation::RunTransId,
+                CicsPlanOperation::SuspendAcqActivity,
+                CicsPlanOperation::SuspendAcqProcess,
+                CicsPlanOperation::SuspendActivity,
+                CicsPlanOperation::FetchAny,
+                CicsPlanOperation::FetchChild,
+                CicsPlanOperation::FreeChild,
+                CicsPlanOperation::LinkAcqActivity,
+                CicsPlanOperation::LinkAcqProcess,
+                CicsPlanOperation::LinkActivity,
+                CicsPlanOperation::ExtractAttach,
+                CicsPlanOperation::ExtractAttributes,
+                CicsPlanOperation::GdsExtractAttributes,
+                CicsPlanOperation::ExtractLogonMsg,
+                CicsPlanOperation::ExtractProcess,
+                CicsPlanOperation::GdsExtractProcess,
+                CicsPlanOperation::ExtractTct,
+                CicsPlanOperation::Point,
+                CicsPlanOperation::AllocateConversation,
+                CicsPlanOperation::GdsAllocateConversation,
+                CicsPlanOperation::GdsAssignConversation,
+                CicsPlanOperation::BuildAttach,
+                CicsPlanOperation::ConnectProcess,
+                CicsPlanOperation::GdsConnectProcess,
+                CicsPlanOperation::Converse,
+                CicsPlanOperation::FreeConversation,
+                CicsPlanOperation::GdsFreeConversation,
+                CicsPlanOperation::ReceiveConversation,
+                CicsPlanOperation::GdsReceiveConversation,
+                CicsPlanOperation::SendConversation,
+                CicsPlanOperation::GdsWaitConversation,
+                CicsPlanOperation::WaitConvid,
+                CicsPlanOperation::WaitSignal,
+                CicsPlanOperation::WaitTerminal,
                 CicsPlanOperation::ChangePassword,
                 CicsPlanOperation::ChangePhrase,
                 CicsPlanOperation::QuerySecurity,
@@ -313,6 +366,16 @@ mod tests {
                 CicsPlanOperation::Asktime,
                 CicsPlanOperation::AsktimeEib,
                 CicsPlanOperation::FormatTime,
+                CicsPlanOperation::ConvertTime,
+                CicsPlanOperation::BifDeedit,
+                CicsPlanOperation::BifDigest,
+                CicsPlanOperation::WaitCics,
+                CicsPlanOperation::Post,
+                CicsPlanOperation::WriteOperator,
+                CicsPlanOperation::ExtractCertificate,
+                CicsPlanOperation::ExtractTcpip,
+                CicsPlanOperation::StartAttach,
+                CicsPlanOperation::StartBrexit,
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,

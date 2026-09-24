@@ -26,6 +26,16 @@ pub(super) fn invoke(
         .map_err(|_| HostProblem::ResourceExhausted)?;
     let record = service.lock()?.interval_records.get(&request_id).cloned();
     let Some(record) = record else {
+        if let Some(response) = super::post::cancel_named(
+            service,
+            run,
+            &request_id,
+            selected_transaction.as_deref(),
+            mutation.idempotency_key.as_str(),
+            digest,
+        )? {
+            return Ok(response);
+        }
         return super::delay::cancel_named(
             service,
             run,

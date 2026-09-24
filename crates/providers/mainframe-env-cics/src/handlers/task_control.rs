@@ -264,7 +264,7 @@ pub(in crate::service) fn invoke(
             set_association_user_corr_data(service, run, request)
         }
         CicsOperation::Suspend => suspend(service, run, request),
-        CicsOperation::WaitEvent | CicsOperation::WaitExternal => {
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
             super::task_wait::invoke(service, run, request)
         }
         CicsOperation::Abend => abend(service, run, request),
