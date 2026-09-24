@@ -1789,6 +1789,23 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::AllocateConversation => {
+                    crate::HirCicsOperation::AllocateConversation
+                }
+                CicsPlanOperation::GdsAllocateConversation => {
+                    crate::HirCicsOperation::GdsAllocateConversation
+                }
+                CicsPlanOperation::GdsAssignConversation => {
+                    crate::HirCicsOperation::GdsAssignConversation
+                }
+                CicsPlanOperation::BuildAttach => crate::HirCicsOperation::BuildAttach,
+                CicsPlanOperation::ConnectProcess => crate::HirCicsOperation::ConnectProcess,
+                CicsPlanOperation::GdsConnectProcess => crate::HirCicsOperation::GdsConnectProcess,
+                CicsPlanOperation::Converse => crate::HirCicsOperation::Converse,
+                CicsPlanOperation::FreeConversation => crate::HirCicsOperation::FreeConversation,
+                CicsPlanOperation::GdsFreeConversation => {
+                    crate::HirCicsOperation::GdsFreeConversation
+                }
                 CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
                 CicsPlanOperation::QuerySecurity => crate::HirCicsOperation::QuerySecurity,
                 CicsPlanOperation::VerifyPassword => crate::HirCicsOperation::VerifyPassword,

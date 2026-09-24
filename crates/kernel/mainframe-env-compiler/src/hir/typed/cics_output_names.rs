@@ -2,6 +2,16 @@ use mainframe_env_ir::CicsAssignOutput;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
+    ConversationState,
+    ConversationConvid,
+    ConversationRetcode,
+    ConversationPrinConvid,
+    ConversationPrinSysid,
+    ConversationConvData,
+    ConversationInto,
+    ConversationSet,
+    ConversationToLength,
+    ConversationToFullLength,
     SecurityRead,
     SecurityUpdate,
     SecurityControl,
