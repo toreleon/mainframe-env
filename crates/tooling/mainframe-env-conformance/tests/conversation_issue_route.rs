@@ -21,27 +21,37 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
 fn compiled_issue_device_markers_select_exact_host_operations_and_companion_flags() {
-    for (command, plan, host, flag) in [
+    for (command, plan, host, flag, operand) in [
         (
             "ISSUE ENDFILE ENDOUTPUT",
             CicsPlanOperation::IssueEndfile,
             CicsOperation::IssueEndfile,
             Some((CicsPlanOption::IssueEndOutput, "OPTION.ENDOUTPUT")),
+            None,
         ),
         (
             "ISSUE ENDOUTPUT ENDFILE",
             CicsPlanOperation::IssueEndoutput,
             CicsOperation::IssueEndoutput,
             Some((CicsPlanOption::IssueEndFile, "OPTION.ENDFILE")),
+            None,
         ),
         (
             "ISSUE EODS",
             CicsPlanOperation::IssueEods,
             CicsOperation::IssueEods,
             None,
+            None,
+        ),
+        (
+            "ISSUE LOAD PROGRAM('APP1') CONVERSE",
+            CicsPlanOperation::IssueLoad,
+            CicsOperation::IssueLoad,
+            Some((CicsPlanOption::IssueConverse, "OPTION.CONVERSE")),
+            Some("PROGRAM"),
         ),
     ] {
-        compiled_case(command, plan, host, flag);
+        compiled_case(command, plan, host, flag, operand);
     }
 }
 
@@ -50,6 +60,7 @@ fn compiled_case(
     expected_plan: CicsPlanOperation,
     expected_host: CicsOperation,
     flag: Option<(CicsPlanOption, &str)>,
+    operand: Option<&str>,
 ) {
     let source = format!(
         "IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN."
@@ -143,6 +154,9 @@ fn compiled_case(
     };
     assert_eq!(request.operation, expected_host);
     if let Some((_, name)) = flag {
+        assert!(request.arguments.contains_key(name));
+    }
+    if let Some(name) = operand {
         assert!(request.arguments.contains_key(name));
     }
     assert!(request.arguments.contains_key("RESP"));

@@ -1079,7 +1079,6 @@ impl CicsOperation {
                 | Self::IssueCopy
                 | Self::IssueDisconnect
                 | Self::IssueEraseAup
-                | Self::IssueLoad
                 | Self::IssuePass
                 | Self::IssuePrint
                 | Self::IssueReset
@@ -1170,7 +1169,7 @@ mod issue_tests {
     use super::CicsOperation;
 
     #[test]
-    fn exact_issue_heads_are_distinct_with_three_device_rows_admitted() {
+    fn exact_issue_heads_are_distinct_with_four_device_rows_admitted() {
         let heads = [
             ("ISSUE ABEND", CicsOperation::IssueAbend),
             ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
@@ -1209,6 +1208,7 @@ mod issue_tests {
                     CicsOperation::IssueEndfile
                         | CicsOperation::IssueEndoutput
                         | CicsOperation::IssueEods
+                        | CicsOperation::IssueLoad
                 )
             );
             assert!(expected.is_mutating());

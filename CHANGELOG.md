@@ -115,6 +115,10 @@ All notable changes to mainframe-env are documented here.
   ENDFILE option sets both 3740 markers; EODS sets the 3650 marker. Public
   provider replay and compiled COBOL routes pass; the integrated registry is
   194 typed and 69 unready.
+- Registered CIC-905 ISSUE LOAD row 0124. The selected COBOL route carries
+  PROGRAM and CONVERSE to the public 3650 provider; Memory and SQLite restart
+  tests preserve one load and exact replay. The integrated registry is 195
+  typed and 68 unready.
 
 - Integrated the sealed CIC-905 conversation-open branch into the ISSUE
   worktree. ISSUE plan identities now use its versioned APPC/MRO ledger and

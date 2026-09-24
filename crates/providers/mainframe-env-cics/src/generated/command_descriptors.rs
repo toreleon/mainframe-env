@@ -686,6 +686,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::IssueLoad,
+        syntax: "ISSUE LOAD",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0124",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueNote,
         syntax: "ISSUE NOTE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0125",
@@ -1112,13 +1119,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::SecurityControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::RequestEncryptPassTicket,
-        syntax: "REQUEST ENCRYPTPTKT",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0167",
-        family: CicsCommandFamily::SecurityControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1162,6 +1162,7 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[40],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[41],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[42],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[43],
 ];
 
 mod lookup;

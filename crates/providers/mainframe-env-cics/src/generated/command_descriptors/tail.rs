@@ -2,7 +2,14 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 43] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 44] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::RequestEncryptPassTicket,
+        syntax: "REQUEST ENCRYPTPTKT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0167",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::VerifyToken,
         syntax: "VERIFY TOKEN",

@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 196);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 197);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -8453,6 +8453,145 @@ mod tests {
                 assert!(saved.state.eods);
             }
         }
+    }
+
+    #[test]
+    fn registered_issue_load_public_route_selects_3650_program_and_converse() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        let terminal = "T001";
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified(terminal.into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: terminal.into(),
+            kind: handlers::IssueDeviceKind::Interpreter3650,
+            control_unit: None,
+            printers: vec![],
+            programs: vec!["APP1".into()],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let command = request(
+            CicsOperation::IssueLoad,
+            BTreeMap::from([
+                ("PROGRAM".into(), cics_literal(b"APP1")),
+                ("OPTION.CONVERSE".into(), cics_option()),
+            ]),
+            1,
+        );
+        let first = service
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 1),
+                command.clone(),
+            )
+            .unwrap();
+        assert_eq!((first.condition.as_str(), first.response), ("NORMAL", 0));
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command
+                )
+                .unwrap(),
+            first
+        );
+        let saved = handlers::IssueDeviceRecord::load(store.as_ref(), terminal)
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.version, 2);
+        assert_eq!(saved.state.loaded_program.as_deref(), Some("APP1"));
+        assert!(saved.state.loaded_converse);
+    }
+
+    #[test]
+    fn registered_issue_load_replays_after_sqlite_restart_without_reloading() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-load-public-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("issue-load-public", BTreeMap::new());
+        let session = SessionId::new("issue-load-public", 64).unwrap();
+        let command = request(
+            CicsOperation::IssueLoad,
+            BTreeMap::from([
+                ("PROGRAM".into(), cics_literal(b"APP1")),
+                ("OPTION.CONVERSE".into(), cics_option()),
+            ]),
+            1,
+        );
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+                terminal: "T000".into(),
+                kind: handlers::IssueDeviceKind::Interpreter3650,
+                control_unit: None,
+                printers: vec![],
+                programs: vec!["APP1".into()],
+                applications: vec![],
+                logon_logmode: None,
+                disconnect_allowed: true,
+                pass_allowed: false,
+            })
+            .unwrap()
+            .install(store.as_ref())
+            .unwrap();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command.clone(),
+                ),
+                Err(HostProblem::UnknownOutcome)
+            );
+            assert_eq!(
+                handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                    .unwrap()
+                    .unwrap()
+                    .version,
+                2
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 2)
+                .unwrap();
+            let reply = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+                .unwrap();
+            assert_eq!(reply.condition, "NORMAL");
+            let saved = handlers::IssueDeviceRecord::load(store.as_ref(), "T000")
+                .unwrap()
+                .unwrap();
+            assert_eq!(saved.version, 2);
+            assert_eq!(saved.state.loaded_program.as_deref(), Some("APP1"));
+            assert!(saved.state.loaded_converse);
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
