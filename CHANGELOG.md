@@ -60,6 +60,11 @@ All notable changes to mainframe-env are documented here.
   reset/delete, UOW publication or rollback, and stale checkpoint rejection.
   Public command registration remains pending.
 
+- Added a durable BTS active-run context bound to the process/activity and
+  coordinator checkpoint epochs, with restart reads, lease takeover fencing,
+  and a retained closed state for replay protection. Public command routing
+  remains pending.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

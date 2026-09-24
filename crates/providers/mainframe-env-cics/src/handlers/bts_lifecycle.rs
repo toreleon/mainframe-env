@@ -426,9 +426,11 @@ pub const BTS_PARTICIPANT: BtsParticipantContract = BtsParticipantContract {
 };
 
 mod children;
+mod context;
 mod removal;
 mod store;
 mod transitions;
+pub use context::BtsActivityContext;
 pub use store::BtsLifecycleStore;
 
 fn put_process(

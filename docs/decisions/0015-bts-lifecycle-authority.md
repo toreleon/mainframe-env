@@ -42,6 +42,16 @@ activation and lease epochs. The first v1 writer omitted an activity-level
 pending-UOW field; the reader derives it only for its pending root and rewrites
 the additive shape at the next mutation.
 
+An attached run binds to an active activity through one versioned
+`cics-bts-activity-context-v1` row. The binding names the process, activity,
+activation epoch, owner execution and principal, and coordinator lease epoch.
+Readers verify the process row and exact checkpoint epoch on every use. A
+recovered worker may advance the lease epoch for the same activation after the
+process checkpoint has advanced; stale owners and changed identities fail
+closed. Closing retains a tombstone until replay and checkpoint retention
+allow safe pruning. The event pool remains a separate content row keyed from
+this authority; it does not define process or activity lifecycle state.
+
 The process row schema and namespace are version 1. Readers reject unknown
 fields, invalid relationships, cycles, stale checkpoint epochs, malformed
 identities, and excess state. There is no prior BTS process row to migrate.
