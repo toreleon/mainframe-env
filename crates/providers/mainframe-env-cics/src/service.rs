@@ -7404,6 +7404,50 @@ mod tests {
             service.lock().unwrap().sessions[target_session.as_str()].version,
             version
         );
+        let foreign_run = invocation_for("copy-foreign", BTreeMap::new());
+        let foreign_session = SessionId::new("copy-foreign-session", 64).unwrap();
+        service.create_session(&foreign_session, 24, 80).unwrap();
+        service
+            .register_run(foreign_run, &foreign_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .lock()
+            .unwrap()
+            .sessions
+            .get_mut(foreign_session.as_str())
+            .unwrap()
+            .input = handlers::TerminalInput::identified("T007".into());
+        handlers::IssueDeviceRecord::new(handlers::IssueDeviceDefinition {
+            terminal: "T007".into(),
+            kind: handlers::IssueDeviceKind::Display3270,
+            control_unit: Some("CU2".into()),
+            printers: vec![],
+            programs: vec![],
+            applications: vec![],
+            logon_logmode: None,
+            disconnect_allowed: true,
+            pass_allowed: false,
+        })
+        .unwrap()
+        .install(store.as_ref())
+        .unwrap();
+        let wrong_control_unit = request(
+            CicsOperation::IssueCopy,
+            BTreeMap::from([("TERMID".into(), cics_literal(b"T007"))]),
+            8,
+        );
+        assert_eq!(
+            handlers::invoke_terminal_control(&service, &mut run, &wrong_control_unit),
+            Err(HostProblem::Condition {
+                name: "TERMERR".into(),
+                response: 81,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[target_session.as_str()].version,
+            version
+        );
     }
 
     #[test]
