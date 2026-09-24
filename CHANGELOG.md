@@ -91,6 +91,10 @@ All notable changes to mainframe-env are documented here.
   to nulls, resets their modified tags, positions the cursor, and restores
   the keyboard through the existing durable terminal authority.
 
+- Verified ISSUE ERASEAUP after an uncertain SQLite commit and service
+  restart: protected fields remain intact, unprotected fields stay null,
+  and exact receipt replay does not increment the session version.
+
 - Added the default ISSUE COPY route over the existing BMS
   authority. It copies the complete 3270 buffer between sessions on the same
   installed control unit with source-read and target-update SAF checks and an

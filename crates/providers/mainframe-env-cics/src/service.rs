@@ -7715,6 +7715,135 @@ mod tests {
     }
 
     #[test]
+    fn issue_eraseaup_unknown_outcome_replays_after_sqlite_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-issue-eraseaup-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("cics.db").display());
+        let invocation = invocation_for("issue-eraseaup-restart", BTreeMap::new());
+        let session = SessionId::new("issue-eraseaup-session", 64).unwrap();
+        let command = request(CicsOperation::IssueEraseAup, BTreeMap::new(), 1);
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .register_map(BmsMapDefinition {
+                    mapset: "ISSUEMS".into(),
+                    map: "ISSUE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 1,
+                    columns: 8,
+                    fields: vec![
+                        BmsFieldDefinition {
+                            name: "OPEN".into(),
+                            row: 1,
+                            column: 1,
+                            length: 4,
+                            initial: Vec::new(),
+                            color: None,
+                            highlight: None,
+                            protected: false,
+                            secret: false,
+                            fset: false,
+                            justify_right: false,
+                            fill_zero: false,
+                            output_offset: None,
+                            attribute_offset: None,
+                        },
+                        BmsFieldDefinition {
+                            name: "LOCK".into(),
+                            row: 1,
+                            column: 5,
+                            length: 4,
+                            initial: b"KEEP".to_vec(),
+                            color: None,
+                            highlight: None,
+                            protected: true,
+                            secret: false,
+                            fset: true,
+                            justify_right: false,
+                            fill_zero: false,
+                            output_offset: None,
+                            attribute_offset: None,
+                        },
+                    ],
+                })
+                .unwrap();
+            service
+                .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+                .unwrap();
+            let current = service.lock().unwrap().sessions[session.as_str()].clone();
+            let mut next = current.clone();
+            next.version += 1;
+            next.mapset = Some("ISSUEMS".into());
+            next.map = Some("ISSUE".into());
+            next.field_values = BTreeMap::from([
+                ("OPEN".into(), b"DATA".to_vec()),
+                ("LOCK".into(), b"KEEP".to_vec()),
+            ]);
+            next.field_protection = BTreeMap::from([("OPEN".into(), false), ("LOCK".into(), true)]);
+            next.field_modified = BTreeMap::from([("OPEN".into(), true), ("LOCK".into(), true)]);
+            service
+                .persist_session(session.as_str(), &next, Some(current.version))
+                .unwrap();
+            service
+                .lock()
+                .unwrap()
+                .sessions
+                .insert(session.as_str().into(), next);
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            service.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command),
+                Err(HostProblem::UnknownOutcome)
+            );
+            let state = service.lock().unwrap();
+            let current = &state.sessions[session.as_str()];
+            assert_eq!(current.field_values["OPEN"], [0; 4]);
+            assert_eq!(current.field_values["LOCK"], b"KEEP");
+            assert_eq!(current.version, 3);
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .restore_terminal_run(invocation.clone(), &session, "MENU", vec![], 2)
+                .unwrap();
+            let mut run = service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .clone();
+            assert_eq!(
+                handlers::invoke_terminal_control(&service, &mut run, &command)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+            let state = service.lock().unwrap();
+            let current = &state.sessions[session.as_str()];
+            assert_eq!(current.field_values["OPEN"], [0; 4]);
+            assert_eq!(current.field_values["LOCK"], b"KEEP");
+            assert_eq!(current.version, 3);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn issue_copy_default_wait_moves_exact_buffer_with_shared_control_unit() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let (host, seen) = command_authorities(false);
