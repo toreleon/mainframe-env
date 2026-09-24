@@ -3876,6 +3876,13 @@ mod tests {
         seen: CommandSecurityTrace,
     }
 
+    struct DenyExactSecurityClass {
+        descriptor: CapabilityDescriptor,
+        denied_class: &'static str,
+        denied_resource: Option<&'static str>,
+        seen: CommandSecurityTrace,
+    }
+
     struct TracedProgramAuthority {
         descriptor: CapabilityDescriptor,
         seen: ProgramLinkTrace,
@@ -4022,6 +4029,48 @@ mod tests {
                 }
                 HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
                     Ok(HostResult::Security(self.principal_decision.clone()))
+                }
+                _ => Err(HostProblem::Unsupported),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
+    impl HostProvider for DenyExactSecurityClass {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Security(SecurityRequest::Authorize {
+                    class,
+                    resource,
+                    intent,
+                    ..
+                }) => {
+                    self.seen.lock().unwrap().push((
+                        class.clone(),
+                        resource.as_str().into(),
+                        intent,
+                    ));
+                    Ok(HostResult::Security(
+                        if class == self.denied_class
+                            && self
+                                .denied_resource
+                                .is_none_or(|name| resource.as_str() == name)
+                        {
+                            SecurityDecision::Deny
+                        } else {
+                            SecurityDecision::Allow
+                        },
+                    ))
+                }
+                HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
+                    Ok(HostResult::Security(SecurityDecision::Allow))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -4306,6 +4355,28 @@ mod tests {
             Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
             HostLimits::default(),
         ))
+    }
+
+    fn deny_exact_class_authorities(
+        denied_class: &'static str,
+        denied_resource: Option<&'static str>,
+    ) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(DenyExactSecurityClass {
+            descriptor: descriptor("host.security.authorize"),
+            denied_class,
+            denied_resource,
+            seen: seen.clone(),
+        }) as Arc<dyn HostProvider>;
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+                ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
     }
 
     fn command_authorities(deny_command: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
@@ -31517,6 +31588,66 @@ mod tests {
     }
 
     #[test]
+    fn bts_run_transid_issue_denial_is_audited_before_child_admission() {
+        use handlers::bts_lifecycle::BtsTransactionDefinition;
+
+        let (host, seen) = deny_exact_class_authorities("TCICSTRN", Some("CICS.BT01"));
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = CicsService::open_with_runtime(
+            host,
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        cics.register_bts_transaction(
+            BtsTransactionDefinition::new("BT01", "CHILD", true, false).unwrap(),
+        )
+        .unwrap();
+        let (parent, _) = registered(&cics);
+        let command = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT01")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&parent.run_unit_id, command.clone(), 1), command),
+            Err(HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            })
+        );
+        assert!(seen.lock().unwrap().contains(&(
+            "TCICSTRN".into(),
+            "CICS.BT01".into(),
+            AccessIntent::Execute
+        )));
+        assert!(
+            store
+                .list_provider_state("cics-bts-transid-run-v1", 1)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .list_provider_state("cics-bts-child-ownership-v1", 1)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            !store
+                .audit_records(&parent.execution_id, 0, 64)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn bts_transid_restart_reconciles_completed_child_before_work_readmission() {
         use handlers::bts_lifecycle::{
             BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransidState,
@@ -32657,54 +32788,7 @@ mod tests {
             BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
         };
 
-        struct DenyBtsRepository {
-            descriptor: CapabilityDescriptor,
-            seen: Arc<Mutex<Vec<(String, String)>>>,
-        }
-
-        impl HostProvider for DenyBtsRepository {
-            fn descriptor(&self) -> &CapabilityDescriptor {
-                &self.descriptor
-            }
-
-            fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
-                let outcome = match effect.request {
-                    HostRequest::Security(SecurityRequest::Authorize {
-                        class, resource, ..
-                    }) => {
-                        self.seen
-                            .lock()
-                            .unwrap()
-                            .push((class.clone(), resource.as_str().into()));
-                        Ok(HostResult::Security(if class == "BTSREPO" {
-                            SecurityDecision::Deny
-                        } else {
-                            SecurityDecision::Allow
-                        }))
-                    }
-                    HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
-                        Ok(HostResult::Security(SecurityDecision::Allow))
-                    }
-                    _ => Err(HostProblem::Unsupported),
-                };
-                EffectResult {
-                    sequence: effect.sequence,
-                    outcome,
-                }
-            }
-        }
-
-        let seen = Arc::new(Mutex::new(Vec::new()));
-        let provider = Arc::new(DenyBtsRepository {
-            descriptor: descriptor("host.security.authorize"),
-            seen: seen.clone(),
-        }) as Arc<dyn HostProvider>;
-        let host = Arc::new(ScopedHostService::new(
-            Arc::new(
-                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
-            ),
-            HostLimits::default(),
-        ));
+        let (host, seen) = deny_exact_class_authorities("BTSREPO", None);
         let store = Arc::new(MemoryStore::new(Default::default()));
         let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
         cics.register_bts_process_type(
@@ -32733,11 +32817,11 @@ mod tests {
                 response2: 101,
             })
         );
-        assert!(
-            seen.lock()
-                .unwrap()
-                .contains(&("BTSREPO".into(), "BTS.REPO".into()))
-        );
+        assert!(seen.lock().unwrap().contains(&(
+            "BTSREPO".into(),
+            "BTS.REPO".into(),
+            AccessIntent::Update
+        )));
         assert!(
             BtsLifecycleStore::new(store.as_ref())
                 .load_process("TYPE", "ORDER")
