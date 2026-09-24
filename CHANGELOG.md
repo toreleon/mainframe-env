@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added APPC basic GDS CONNECT PROCESS against the task-owned conversation
+  ledger. It uses six-byte RETCODE outcomes for process, PIP, sync-level,
+  ownership and state failures, including DPL principal fencing, with no
+  EXEC CICS conditions. Isolated readiness is 157 typed, 0 legacy, and 106
+  unready; CONVDATA field layout and numeric STATE remain explicit gaps.
+
 - Added mapped APPC CONNECT PROCESS over the task-owned conversation ledger.
   It validates CONVID ownership, process and PIP lengths, synchronization
   level, PARTNER process selection, and the DPL principal restriction before

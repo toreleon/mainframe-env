@@ -17,6 +17,8 @@ pub enum CicsOperation {
     BuildAttach,
     /// Initiate one task-owned mapped APPC process conversation.
     ConnectProcess,
+    /// Initiate one APPC basic process conversation with GDS return codes.
+    GdsConnectProcess,
     Abend,
     /// Add one atomic event to an activity-owned composite predicate.
     AddSubevent,
@@ -312,6 +314,7 @@ impl CicsOperation {
             Self::GdsAssignConversation => "GdsAssignConversation",
             Self::BuildAttach => "BuildAttach",
             Self::ConnectProcess => "ConnectProcess",
+            Self::GdsConnectProcess => "GdsConnectProcess",
             Self::Abend => "Abend",
             Self::AddSubevent => "AddSubevent",
             Self::Address => "Address",
@@ -497,6 +500,7 @@ impl CicsOperation {
                 | Self::GdsAllocateConversation
                 | Self::BuildAttach
                 | Self::ConnectProcess
+                | Self::GdsConnectProcess
                 | Self::ChangePassword
                 | Self::ChangePhrase
                 | Self::RequestPassTicket
@@ -649,6 +653,7 @@ impl CicsOperation {
             ("GDS", Some("ASSIGN")) => Self::GdsAssignConversation,
             ("BUILD", Some("ATTACH")) => Self::BuildAttach,
             ("CONNECT", Some("PROCESS")) => Self::ConnectProcess,
+            ("GDS", Some("CONNECT")) => Self::GdsConnectProcess,
             ("ABEND", _) => Self::Abend,
             ("ADD", Some("SUBEVENT")) => Self::AddSubevent,
             ("ADDRESS", Some("SET")) => Self::AddressSet,

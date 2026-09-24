@@ -15,6 +15,7 @@ mod definitions;
 mod gds;
 mod gds_allocate;
 mod gds_assign;
+mod gds_connect_process;
 mod ledger;
 mod replay;
 pub use definitions::{
@@ -50,6 +51,9 @@ pub(in crate::service) fn invoke(
         CicsOperation::BuildAttach => build_attach::invoke(service, run, request, retention_tick),
         CicsOperation::ConnectProcess => {
             connect_process::invoke(service, run, request, retention_tick)
+        }
+        CicsOperation::GdsConnectProcess => {
+            gds_connect_process::invoke(service, run, request, retention_tick)
         }
         _ => Err(HostProblem::Unsupported),
     }
