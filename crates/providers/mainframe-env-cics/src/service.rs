@@ -31648,6 +31648,92 @@ mod tests {
     }
 
     #[test]
+    fn bts_child_attach_denial_retains_security_completion_without_abcode() {
+        use handlers::bts_lifecycle::{
+            BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransactionDefinition,
+            BtsTransidState,
+        };
+
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        first
+            .register_bts_transaction(
+                BtsTransactionDefinition::new("BT01", "CHILD", true, false).unwrap(),
+            )
+            .unwrap();
+        let (parent, _) = registered(&first);
+        let command = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT01")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            1,
+        );
+        first
+            .invoke(&effect(&parent.run_unit_id, command.clone(), 1), command)
+            .unwrap();
+        let row = store
+            .list_provider_state("cics-bts-transid-run-v1", 1)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let record = BtsLifecycleStore::new(store.as_ref())
+            .load_transid(&row.key)
+            .unwrap()
+            .unwrap();
+        drop(first);
+
+        let (host, seen) = deny_exact_class_authorities("TCICSTRN", Some("CICS.BT01"));
+        let reopened = CicsService::open_with_runtime(
+            host,
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_001)),
+        )
+        .unwrap();
+        let claimed = store
+            .claim("worker", Some(BTS_TRANSID_WORK_GENERATION), 1_001, 30_000)
+            .unwrap()
+            .unwrap();
+        reopened.promote_bts_transid_work(&claimed).unwrap();
+        let child_invocation = invocation_for("bts-denied-child", BTreeMap::new());
+        let child_session = SessionId::new("bts-denied-child-session", 64).unwrap();
+        assert_eq!(
+            reopened.launch_background_task(child_invocation, &child_session, "BT01"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(seen.lock().unwrap().contains(&(
+            "TCICSTRN".into(),
+            "CICS.BT01".into(),
+            AccessIntent::Execute
+        )));
+        reopened
+            .complete_bts_transid_work(&claimed, CicsBtsChildCompletion::SecurityError, None)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .bts_child_outcome(&parent.run_unit_id, record.token)
+                .unwrap(),
+            Some((CicsBtsChildCompletion::SecurityError, None))
+        );
+        let finished = BtsLifecycleStore::new(store.as_ref())
+            .load_transid(&record.run_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(finished.state, BtsTransidState::Finished);
+        assert_eq!(finished.abcode, None);
+    }
+
+    #[test]
     fn bts_transid_restart_reconciles_completed_child_before_work_readmission() {
         use handlers::bts_lifecycle::{
             BTS_TRANSID_WORK_GENERATION, BtsLifecycleStore, BtsTransidState,
