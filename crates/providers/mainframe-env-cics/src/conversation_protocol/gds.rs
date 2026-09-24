@@ -11,6 +11,46 @@ impl GdsReturnCode {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GdsExtractAttributesFailure {
+    NotAppc,
+    DplPrincipal,
+    NotBasic,
+    NotOwned,
+}
+
+impl GdsExtractAttributesFailure {
+    #[must_use]
+    pub const fn retcode(self) -> GdsReturnCode {
+        GdsReturnCode(match self {
+            Self::NotAppc => [0x03, 0, 0, 0, 0, 0],
+            Self::DplPrincipal => [0x03, 0x01, 0, 0, 0, 0],
+            Self::NotBasic => [0x03, 0x04, 0, 0, 0, 0],
+            Self::NotOwned => [0x04, 0, 0, 0, 0, 0],
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GdsExtractProcessFailure {
+    NotAppcOrPrincipal,
+    NotBasic,
+    NotOwned,
+    ProcessTooLong,
+}
+
+impl GdsExtractProcessFailure {
+    #[must_use]
+    pub const fn retcode(self) -> GdsReturnCode {
+        GdsReturnCode(match self {
+            Self::NotAppcOrPrincipal => [0x03, 0, 0, 0, 0, 0],
+            Self::NotBasic => [0x03, 0x04, 0, 0, 0, 0],
+            Self::NotOwned => [0x04, 0, 0, 0, 0, 0],
+            Self::ProcessTooLong => [0x05, 0, 0, 0, 0, 0x20],
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GdsAllocateFailure {
     UnknownSystem,
     WrongConnectionKind,
@@ -118,6 +158,14 @@ mod tests {
 
     #[test]
     fn each_gds_command_preserves_its_source_return_codes() {
+        assert_eq!(
+            GdsExtractAttributesFailure::DplPrincipal.retcode().0,
+            [3, 1, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            GdsExtractProcessFailure::ProcessTooLong.retcode().0,
+            [5, 0, 0, 0, 0, 0x20]
+        );
         assert_eq!(GdsReturnCode::NORMAL.0, [0; 6]);
         assert_eq!(
             GdsAllocateFailure::NoImmediateSession.retcode().0,

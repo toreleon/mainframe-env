@@ -284,8 +284,7 @@ struct State {
     journals: BTreeMap<String, handlers::JournalRecord>,
     spool: handlers::SpoolState,
     web: handlers::WebState,
-    // Internal authority for the declared records-core slice. Command handlers
-    // remain deliberately disconnected until the producer/consumer slices seal.
+    // Interval records remain disconnected until their producer and consumer slices seal.
     #[allow(dead_code)]
     interval_records: BTreeMap<String, handlers::IntervalStartRecord>,
     #[cfg(feature = "fault-injection")]
@@ -1765,6 +1764,7 @@ impl CicsService {
             | CicsCommandFamily::WebControl
             | CicsCommandFamily::EventControl
             | CicsCommandFamily::Diagnostics
+            | CicsCommandFamily::ConversationControl
             | CicsCommandFamily::SecurityControl => handlers::invoke_extended_control(
                 self,
                 run,
@@ -1773,7 +1773,7 @@ impl CicsService {
                 retention_tick,
             ),
         }
-        .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
+        .or_else(|problem| handlers::condition_for_request(self, run, &request, problem))
     }
 
     pub fn reconcile_unit_of_work(
@@ -35670,4 +35670,6 @@ mod tests {
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
+
+    include!("handlers/conversation_control/tests.rs");
 }

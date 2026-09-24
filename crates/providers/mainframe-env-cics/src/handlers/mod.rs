@@ -1,5 +1,8 @@
 mod bms_map;
 mod condition;
+mod conversation_control;
+#[cfg(test)]
+pub(in crate::service) use conversation_control::{ExtractMetadata, LuName, publish_metadata};
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -117,6 +120,23 @@ pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
 pub(super) use condition::respond as condition;
+pub(super) fn condition_for_request(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+    problem: HostProblem,
+) -> Result<CicsResponse, HostProblem> {
+    if matches!(
+        request.operation,
+        mainframe_env_host_api::CicsOperation::GdsExtractAttributes
+            | mainframe_env_host_api::CicsOperation::GdsExtractProcess
+    ) || request.operation == mainframe_env_host_api::CicsOperation::ExtractAttributes
+        && problem == HostProblem::Unsupported
+    {
+        return Err(problem);
+    }
+    condition::respond(service, run, &request.condition_policy, problem)
+}
 pub(super) use counter_control::invoke as invoke_counter;
 pub(super) use diagnostics::invoke as invoke_diagnostics;
 pub use diagnostics::{
@@ -214,6 +234,9 @@ pub(super) fn invoke_extended_control(
         }
         crate::generated::CicsCommandFamily::SecurityControl => {
             security_control::invoke(service, run, request, retention_tick)
+        }
+        crate::generated::CicsCommandFamily::ConversationControl => {
+            conversation_control::invoke(service, run, request)
         }
         _ => unreachable!("only extended control families delegate here"),
     }

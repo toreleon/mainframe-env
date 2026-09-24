@@ -1,0 +1,407 @@
+use crate::conversation_protocol::{
+    ConversationAttachHeader, ConversationKind, ConversationLedger, ConversationOwner,
+    ConversationSystemDefinition,
+};
+
+fn install_extract_fixture(
+    cics: &CicsService,
+    store: &dyn ProviderStateStore,
+    invocation: &Invocation,
+) -> ([u8; 4], [u8; 4], [u8; 4]) {
+    let owner = ConversationOwner {
+        execution: invocation.execution_id.as_str().into(),
+        run_unit: invocation.run_unit_id.as_str().into(),
+        lease_epoch: u64::from(invocation.attempt),
+    };
+    let initial = ConversationLedger::load(store).unwrap();
+    let mut ledger = initial.clone();
+    for (sysid, kind) in [
+        ("APP1", ConversationKind::AppcMapped),
+        ("MRO1", ConversationKind::Mro),
+        ("LU61", ConversationKind::LuType61),
+    ] {
+        ledger.register_system(ConversationSystemDefinition {
+            sysid: sysid.into(), kind, capacity: 4, enabled: true,
+        }).unwrap();
+    }
+    assert_eq!(
+        ledger.allocate("LU61", ConversationKind::AppcMapped, owner.clone()),
+        Err(crate::ConversationProblem::WrongKind),
+    );
+    let mapped = ledger.allocate("APP1", ConversationKind::AppcMapped, owner.clone()).unwrap().token;
+    let basic = ledger.allocate("APP1", ConversationKind::AppcBasic, owner.clone()).unwrap().token;
+    let lu = ledger.allocate("LU61", ConversationKind::LuType61, owner.clone()).unwrap().token;
+    let mro = ledger.allocate("MRO1", ConversationKind::Mro, owner.clone()).unwrap().token;
+    ledger.conversation_mut(mapped).unwrap().connect(
+        &owner, crate::ConversationContext::Local, false,
+        b"ORDR".to_vec(), vec![0, 4, 0, 0], 2,
+    ).unwrap();
+    ledger.conversation_mut(basic).unwrap().connect(
+        &owner, crate::ConversationContext::Local, true,
+        b"BASICP".to_vec(), vec![0, 4, 0, 0], 1,
+    ).unwrap();
+    ledger.conversation_mut(mapped).unwrap().principal_facility = true;
+    ledger.set_attach(ConversationAttachHeader {
+        owner,
+        name: "HDR1".into(),
+        process: b"TRNX".to_vec(),
+        resource: b"RES1".to_vec(),
+        return_process: b"RTRN".to_vec(),
+        return_resource: b"RRES".to_vec(),
+        queue: b"QUEUE".to_vec(),
+        iu_type: 1,
+        data_stream: 0,
+        record_format: 4,
+    }).unwrap();
+    assert!(initial.persist(&mut ledger, store).unwrap());
+    let mut metadata = handlers::ExtractMetadata::for_run_unit(invocation.run_unit_id.as_str().into());
+    metadata.session_names.insert("L1".into(), lu);
+    metadata.session_names.insert("M1".into(), mro);
+    metadata.netnames.insert("LUNAME01".into(), handlers::LuName {
+        token: lu, sysid: "LU61".into(), termid: "T001".into(),
+    });
+    metadata.received_attach = Some("HDR1".into());
+    metadata.network_attached = true;
+    metadata.logon_message = Some(b"HELLO".to_vec());
+    handlers::publish_metadata(cics, metadata, None).unwrap();
+    (mapped, basic, lu)
+}
+
+fn extract_call(
+    cics: &CicsService,
+    run: &RunUnitId,
+    operation: CicsOperation,
+    arguments: BTreeMap<String, BoundedPayload>,
+    sequence: u64,
+) -> CicsResponse {
+    let command = request(operation, arguments, sequence);
+    cics.invoke(&effect(run, command.clone(), sequence), command).unwrap()
+}
+
+#[test]
+fn conversation_extract_reads_shared_ledger_and_positions_owned_lu() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-shared", BTreeMap::new());
+    let session = SessionId::new("extract-shared", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS").unwrap();
+    let (mapped, basic, lu) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let process = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::ExtractProcess,
+        BTreeMap::from([
+            ("PROCNAME".into(), argument(b"PROC-X")),
+            ("PROCNAME.MAXLENGTH".into(), cics_decimal(8)),
+            ("PROCLENGTH".into(), argument(b"LEN-X")),
+            ("MAXPROCLEN".into(), cics_decimal(8)),
+            ("SYNCLEVEL".into(), argument(b"SYNC-X")),
+            ("PIPLIST".into(), argument(b"PIP-X")),
+            ("PIPLIST.MAXLENGTH".into(), cics_decimal(16)),
+            ("PIPLENGTH".into(), argument(b"PIPLEN-X")),
+        ]), 1,
+    );
+    assert_eq!(process.outputs["PROCNAME"].bytes(), b"ORDR    ");
+    assert_eq!(process.outputs["PROCLENGTH"].bytes(), b"4");
+    assert_eq!(process.outputs["SYNCLEVEL"].bytes(), b"2");
+    assert_eq!(process.outputs["PIPLIST"].bytes(), [0, 4, 0, 0]);
+    assert_eq!(process.outputs["PIPLENGTH"].bytes(), b"4");
+    let attach = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::ExtractAttach,
+        BTreeMap::from([
+            ("ATTACHID".into(), cics_literal(b"HDR1")),
+            ("PROCESS".into(), argument(b"PROC-X")),
+            ("PROCESS.MAXLENGTH".into(), cics_decimal(8)),
+            ("IUTYPE".into(), argument(b"IU-X")),
+        ]), 2,
+    );
+    assert_eq!(attach.outputs["PROCESS"].bytes(), b"TRNX");
+    assert_eq!(attach.outputs["IUTYPE"].bytes(), b"1");
+    let tct = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::ExtractTct,
+        BTreeMap::from([
+            ("NETNAME".into(), cics_literal(b"LUNAME01")),
+            ("TERMID".into(), argument(b"TERM-X")),
+        ]), 3,
+    );
+    assert_eq!(tct.outputs["TERMID"].bytes(), b"T001");
+    let point = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::Point,
+        BTreeMap::from([("SESSION".into(), cics_literal(b"L1"))]), 4,
+    );
+    assert_eq!(point.condition, "NORMAL");
+    let row = store.get_provider_state("cics-conversation-extract-v1", invocation.run_unit_id.as_str())
+        .unwrap().unwrap();
+    let metadata: handlers::ExtractMetadata = serde_json::from_slice(&row.payload).unwrap();
+    assert_eq!(metadata.selected_token, Some(lu));
+    let logon = request(CicsOperation::ExtractLogonMsg, BTreeMap::from([
+        ("INTO".into(), argument(b"LOGON-X")),
+        ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+        ("LENGTH".into(), argument(b"LEN-X")),
+    ]), 5);
+    let first = cics.invoke(&effect(&invocation.run_unit_id, logon.clone(), 5), logon.clone()).unwrap();
+    assert_eq!(first.outputs["INTO"].bytes(), b"HELLO");
+    assert_eq!(first.outputs["LENGTH"].bytes(), b"5");
+    let replay = cics.invoke(&effect(&invocation.run_unit_id, logon.clone(), 5), logon).unwrap();
+    assert_eq!(replay.outputs["INTO"].bytes(), b"HELLO");
+    let again = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::ExtractLogonMsg,
+        BTreeMap::from([
+            ("INTO".into(), argument(b"LOGON-X")),
+            ("INTO.MAXLENGTH".into(), cics_decimal(256)),
+            ("LENGTH".into(), argument(b"LEN-X")),
+        ]), 6,
+    );
+    assert_eq!(again.outputs["LENGTH"].bytes(), b"0");
+    assert_eq!(again.outputs["INTO"].bytes(), b"");
+    assert_ne!(mapped, basic);
+}
+
+#[test]
+fn conversation_process_conditions_and_gds_return_codes_are_distinct() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-condition", BTreeMap::new());
+    let session = SessionId::new("extract-condition", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS").unwrap();
+    let (mapped, basic, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let mut mapped_state = request(
+        CicsOperation::ExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&mapped)),
+            ("STATE".into(), argument(b"STATE-X")),
+        ]),
+        1,
+    );
+    mapped_state.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(),
+        response2_field: Some("RESP2-X".into()),
+    };
+    assert_eq!(
+        cics.invoke(&effect(&invocation.run_unit_id, mapped_state.clone(), 1), mapped_state),
+        Err(HostProblem::Unsupported),
+    );
+    let mut too_short = request(CicsOperation::ExtractProcess, BTreeMap::from([
+        ("PROCNAME".into(), argument(b"NAME-X")),
+        ("PROCNAME.MAXLENGTH".into(), cics_decimal(4)),
+        ("PROCLENGTH".into(), argument(b"LEN-X")),
+        ("MAXPROCLEN".into(), cics_decimal(3)),
+    ]), 1);
+    too_short.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(), response2_field: Some("RESP2-X".into()),
+    };
+    let short = cics.invoke(&effect(&invocation.run_unit_id, too_short.clone(), 1), too_short).unwrap();
+    assert_eq!((short.condition.as_str(), short.response), ("LENGERR", 22));
+    let basic_result = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::GdsExtractProcess,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&basic)),
+            ("RETCODE".into(), argument(b"RC-X")),
+            ("PROCNAME".into(), argument(b"NAME-X")),
+            ("PROCNAME.MAXLENGTH".into(), cics_decimal(8)),
+            ("PROCLENGTH".into(), argument(b"LEN-X")),
+            ("MAXPROCLEN".into(), cics_decimal(8)),
+        ]), 2,
+    );
+    assert_eq!(basic_result.condition, "NORMAL");
+    assert_eq!(basic_result.outputs["RETCODE"].bytes(), [3, 0, 0, 0, 0, 0]);
+    let before = ConversationLedger::load(store.as_ref()).unwrap();
+    let mut promoted = before.clone();
+    promoted.conversation_mut(mapped).unwrap().principal_facility = false;
+    promoted.conversation_mut(basic).unwrap().principal_facility = true;
+    assert!(before.persist(&mut promoted, store.as_ref()).unwrap());
+    let basic_success = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::GdsExtractProcess,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&basic)),
+            ("RETCODE".into(), argument(b"RC-X")),
+            ("PROCNAME".into(), argument(b"NAME-X")),
+            ("PROCNAME.MAXLENGTH".into(), cics_decimal(8)),
+            ("PROCLENGTH".into(), argument(b"LEN-X")),
+            ("MAXPROCLEN".into(), cics_decimal(8)),
+            ("SYNCLEVEL".into(), argument(b"SYNC-X")),
+        ]), 3,
+    );
+    assert_eq!(basic_success.outputs["RETCODE"].bytes(), [0; 6]);
+    assert_eq!(basic_success.outputs["PROCNAME"].bytes(), b"BASICP  ");
+    assert_eq!(basic_success.outputs["PROCLENGTH"].bytes(), b"6");
+    assert_eq!(basic_success.outputs["SYNCLEVEL"].bytes(), b"1");
+    let indicators = extract_call(
+        &cics,
+        &invocation.run_unit_id,
+        CicsOperation::GdsExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&basic)),
+            ("CONVDATA".into(), argument(b"DATA-X")),
+            ("RETCODE".into(), argument(b"RC-X")),
+        ]),
+        4,
+    );
+    assert_eq!(indicators.outputs["RETCODE"].bytes(), [0; 6]);
+    assert_eq!(indicators.outputs["CONVDATA"].bytes(), [0; 24]);
+    let mut indicators_unready = request(
+        CicsOperation::GdsExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&basic)),
+            ("CONVDATA".into(), argument(b"DATA-X")),
+            ("STATE".into(), argument(b"STATE-X")),
+            ("RETCODE".into(), argument(b"RC-X")),
+        ]),
+        4,
+    );
+    indicators_unready.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(),
+        response2_field: Some("RESP2-X".into()),
+    };
+    assert_eq!(
+        cics.invoke(
+            &effect(&invocation.run_unit_id, indicators_unready.clone(), 4),
+            indicators_unready,
+        ),
+        Err(HostProblem::Unsupported),
+    );
+    let bad_kind = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::GdsExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&mapped)),
+            ("CONVDATA".into(), argument(b"DATA-X")),
+            ("RETCODE".into(), argument(b"RC-X")),
+        ]), 5,
+    );
+    assert_eq!(bad_kind.outputs["RETCODE"].bytes(), [3, 4, 0, 0, 0, 0]);
+    let unowned = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::GdsExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(b"BAD1")),
+            ("CONVDATA".into(), argument(b"DATA-X")),
+            ("RETCODE".into(), argument(b"RC-X")),
+        ]), 6,
+    );
+    assert_eq!(unowned.outputs["RETCODE"].bytes(), [4, 0, 0, 0, 0, 0]);
+}
+
+#[test]
+fn conversation_extract_negative_conditions_do_not_change_protocol_or_position() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for("extract-negative", BTreeMap::new());
+    let session = SessionId::new("extract-negative", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS").unwrap();
+    let (_, basic, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let ledger_before = ConversationLedger::load(store.as_ref()).unwrap();
+    let meta_before = store.get_provider_state(
+        "cics-conversation-extract-v1", invocation.run_unit_id.as_str(),
+    ).unwrap().unwrap();
+    for (index, (operation, arguments, expected)) in [
+        (
+            CicsOperation::ExtractTct,
+            BTreeMap::from([
+                ("NETNAME".into(), cics_literal(b"SHORT")),
+                ("TERMID".into(), argument(b"TERM-X")),
+            ]),
+            ("INVREQ", 16),
+        ),
+        (
+            CicsOperation::ExtractAttach,
+            BTreeMap::from([
+                ("ATTACHID".into(), cics_literal(b"MISSING")),
+                ("PROCESS".into(), argument(b"PROC-X")),
+                ("PROCESS.MAXLENGTH".into(), cics_decimal(64)),
+            ]),
+            ("CBIDERR", 62),
+        ),
+        (
+            CicsOperation::ExtractProcess,
+            BTreeMap::from([
+                ("CONVID".into(), cics_literal(&basic)),
+                ("PROCNAME".into(), argument(b"PROC-X")),
+                ("PROCNAME.MAXLENGTH".into(), cics_decimal(32)),
+                ("PROCLENGTH".into(), argument(b"LEN-X")),
+            ]),
+            ("INVREQ", 16),
+        ),
+        (
+            CicsOperation::Point,
+            BTreeMap::from([("CONVID".into(), cics_literal(b"BAD1"))]),
+            ("NOTALLOC", 61),
+        ),
+    ].into_iter().enumerate() {
+        let sequence = index as u64 + 1;
+        let mut command = request(operation, arguments, sequence);
+        command.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let result = cics.invoke(
+            &effect(&invocation.run_unit_id, command.clone(), sequence),
+            command,
+        ).unwrap();
+        assert_eq!((result.condition.as_str(), result.response), expected);
+    }
+    assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), ledger_before);
+    let meta_after = store.get_provider_state(
+        "cics-conversation-extract-v1", invocation.run_unit_id.as_str(),
+    ).unwrap().unwrap();
+    assert_eq!(meta_after.payload, meta_before.payload);
+}
+
+#[test]
+fn conversation_extract_dpl_principal_restrictions_are_command_specific() {
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let cics = service(store.clone());
+    let invocation = invocation_for(
+        "extract-dpl",
+        BTreeMap::from([(
+            "cics.execution-context".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.execution-context@1",
+                b"dpl-without-synconreturn".to_vec(),
+                InvocationLimits::default(),
+            ).unwrap(),
+        )]),
+    );
+    let session = SessionId::new("extract-dpl", 64).unwrap();
+    cics.create_session(&session, 24, 80).unwrap();
+    cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS").unwrap();
+    let (mapped, basic, _) = install_extract_fixture(&cics, store.as_ref(), &invocation);
+    let mut process = request(
+        CicsOperation::ExtractProcess,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&mapped)),
+            ("PROCNAME".into(), argument(b"PROC-X")),
+            ("PROCNAME.MAXLENGTH".into(), cics_decimal(32)),
+            ("PROCLENGTH".into(), argument(b"LEN-X")),
+        ]),
+        1,
+    );
+    process.condition_policy = CicsConditionPolicy::Respond {
+        response_field: "RESP-X".into(), response2_field: Some("RESP2-X".into()),
+    };
+    let rejected = cics.invoke(
+        &effect(&invocation.run_unit_id, process.clone(), 1), process,
+    ).unwrap();
+    assert_eq!(
+        (rejected.condition.as_str(), rejected.response, rejected.response2),
+        ("INVREQ", 16, 200),
+    );
+    let point = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::Point,
+        BTreeMap::from([("SESSION".into(), cics_literal(b"L1"))]), 2,
+    );
+    assert_eq!(point.condition, "NORMAL");
+    let old = ConversationLedger::load(store.as_ref()).unwrap();
+    let mut next = old.clone();
+    next.conversation_mut(mapped).unwrap().principal_facility = false;
+    next.conversation_mut(basic).unwrap().principal_facility = true;
+    assert!(old.persist(&mut next, store.as_ref()).unwrap());
+    let gds = extract_call(
+        &cics, &invocation.run_unit_id, CicsOperation::GdsExtractAttributes,
+        BTreeMap::from([
+            ("CONVID".into(), cics_literal(&basic)),
+            ("CONVDATA".into(), argument(b"DATA-X")),
+            ("RETCODE".into(), argument(b"RC-X")),
+        ]), 3,
+    );
+    assert_eq!(gds.outputs["RETCODE"].bytes(), [3, 1, 0, 0, 0, 0]);
+}

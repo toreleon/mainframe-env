@@ -217,6 +217,27 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::SecurityEncryptLength
         | HirCicsOutputName::SecurityLangInUse
         | HirCicsOutputName::SecurityNatLangInUse
+        | HirCicsOutputName::AttachProcess
+        | HirCicsOutputName::AttachResource
+        | HirCicsOutputName::AttachReturnProcess
+        | HirCicsOutputName::AttachReturnResource
+        | HirCicsOutputName::AttachQueue
+        | HirCicsOutputName::AttachIuType
+        | HirCicsOutputName::AttachDataStream
+        | HirCicsOutputName::AttachRecordFormat
+        | HirCicsOutputName::ConversationState
+        | HirCicsOutputName::ConversationData
+        | HirCicsOutputName::ConversationRetCode
+        | HirCicsOutputName::LogonInto
+        | HirCicsOutputName::LogonSet
+        | HirCicsOutputName::LogonLength
+        | HirCicsOutputName::ProcessName
+        | HirCicsOutputName::ProcessLength
+        | HirCicsOutputName::SyncLevel
+        | HirCicsOutputName::PipList
+        | HirCicsOutputName::PipLength
+        | HirCicsOutputName::TctSysId
+        | HirCicsOutputName::TctTermId
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

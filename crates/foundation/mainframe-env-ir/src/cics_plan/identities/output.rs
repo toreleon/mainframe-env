@@ -3,6 +3,27 @@ use super::super::CicsAssignOutput;
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    AttachProcess,
+    AttachResource,
+    AttachReturnProcess,
+    AttachReturnResource,
+    AttachQueue,
+    AttachIuType,
+    AttachDataStream,
+    AttachRecordFormat,
+    ConversationState,
+    ConversationData,
+    ConversationRetCode,
+    LogonInto,
+    LogonSet,
+    LogonLength,
+    ProcessName,
+    ProcessLength,
+    SyncLevel,
+    PipList,
+    PipLength,
+    TctSysId,
+    TctTermId,
     /// Verified eight-character user identity.
     SecurityIsUserId,
     /// Four-byte token encryption-key handle.

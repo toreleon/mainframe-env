@@ -20,6 +20,7 @@ mod assign_validation;
 mod candidate_validation;
 mod clause_parser;
 mod command_recognition;
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -317,6 +318,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let event_shape = event_control::shape(operation);
     let command_shape = transform_shape.as_ref().or(event_shape.as_ref());
     let allowed_clauses: &[&str] = match operation {
+        op if conversation_control::is_operation(op) => conversation_control::allowed_clauses(op),
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
         HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
@@ -471,6 +473,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     };
     let allowed_options: &[&str] = match operation {
+        op if conversation_control::is_operation(op) => &["NOHANDLE"],
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
         HirCicsOperation::InvokeApplication => &["EXACTMATCH", "MINIMUM", "NOHANDLE"],
@@ -635,6 +638,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     route::validate_constraints(&clauses, &raw_options, operation)?;
     security_control::validate(&clauses, operation, semantic)?;
+    conversation_control::validate(&clauses, operation)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
@@ -645,6 +649,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     event_control::validate_constraints(operation, &raw_options)?;
     web_service_control::validate(&clauses, operation)?;
     for required in match operation {
+        op if conversation_control::is_operation(op) => &[][..],
         HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
@@ -912,6 +917,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
     operands.extend(security_control::operands(&clauses, operation, semantic)?);
+    operands.extend(conversation_control::operands(
+        &clauses, operation, semantic,
+    )?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -957,6 +965,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(conversation_control::outputs(
+        &clauses, operation, semantic,
+    )?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;

@@ -12,9 +12,10 @@ mod service;
 pub use abi::cics_abi_library;
 pub use conversation_protocol::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader,
-    ConversationContext, ConversationKind, ConversationLedger, ConversationOwner,
-    ConversationProblem, ConversationRecord, ConversationState, ConversationSystemDefinition,
-    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
+    ConversationContext, ConversationIndicators, ConversationKind, ConversationLedger,
+    ConversationOwner, ConversationProblem, ConversationRecord, ConversationState,
+    ConversationSystemDefinition, GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure,
+    GdsExtractAttributesFailure, GdsExtractProcessFailure, GdsFreeFailure, GdsReturnCode,
     MAX_PIP_BYTES, MAX_PROCESS_BYTES,
 };
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};

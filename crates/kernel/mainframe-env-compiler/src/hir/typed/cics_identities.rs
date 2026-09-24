@@ -1,5 +1,13 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    ExtractAttach,
+    ExtractAttributes,
+    GdsExtractAttributes,
+    ExtractLogonMsg,
+    ExtractProcess,
+    GdsExtractProcess,
+    ExtractTct,
+    Point,
     ChangePassword,
     ChangePhrase,
     QuerySecurity,
@@ -153,6 +161,11 @@ pub enum HirCicsOperation {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
+    ConversationAttachId,
+    ConversationConvid,
+    ConversationSession,
+    ConversationMaxProcLen,
+    ConversationNetName,
     ResClass,
     ResId,
     ResIdLength,

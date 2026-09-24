@@ -275,6 +275,10 @@
     "frozen_service": "crates/providers/mainframe-env-cics/src/service.rs",
     "existing_modules": [
       "crates/providers/mainframe-env-cics/src/abi.rs",
+      "crates/providers/mainframe-env-cics/src/conversation_protocol.rs",
+      "crates/providers/mainframe-env-cics/src/conversation_protocol/gds.rs",
+      "crates/providers/mainframe-env-cics/src/conversation_protocol/indicators.rs",
+      "crates/providers/mainframe-env-cics/src/conversation_protocol/ledger.rs",
       "crates/providers/mainframe-env-cics/src/event_wait.rs",
       "crates/providers/mainframe-env-cics/src/lib.rs",
       "crates/providers/mainframe-env-cics/src/limits.rs",
@@ -286,6 +290,11 @@
     "handler_modules": [
       "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/extract.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/metadata.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/process.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/conversation_control/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/define.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/delete.rs",
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/get.rs",

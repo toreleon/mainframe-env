@@ -65,6 +65,11 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::ConversationMaxProcLen => SlotUse::HalfwordInput,
+        CicsOperandName::ConversationAttachId
+        | CicsOperandName::ConversationConvid
+        | CicsOperandName::ConversationSession
+        | CicsOperandName::ConversationNetName => SlotUse::Input,
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
@@ -166,6 +171,26 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::AttachIuType
+        | CicsOutputName::AttachDataStream
+        | CicsOutputName::AttachRecordFormat
+        | CicsOutputName::LogonLength
+        | CicsOutputName::ProcessLength
+        | CicsOutputName::SyncLevel
+        | CicsOutputName::PipLength => SlotUse::HalfwordOutput,
+        CicsOutputName::ConversationState => SlotUse::FullwordOutput,
+        CicsOutputName::LogonSet | CicsOutputName::PipList => SlotUse::PointerOutput,
+        CicsOutputName::AttachProcess
+        | CicsOutputName::AttachResource
+        | CicsOutputName::AttachReturnProcess
+        | CicsOutputName::AttachReturnResource
+        | CicsOutputName::AttachQueue
+        | CicsOutputName::ConversationData
+        | CicsOutputName::ConversationRetCode
+        | CicsOutputName::LogonInto
+        | CicsOutputName::ProcessName
+        | CicsOutputName::TctSysId
+        | CicsOutputName::TctTermId => SlotUse::Output,
         CicsOutputName::CounterValue
         | CicsOutputName::CounterMinimum
         | CicsOutputName::CounterMaximum => SlotUse::CounterNumber,
@@ -282,6 +307,14 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::ExtractAttach => CicsOperation::ExtractAttach,
+        CicsPlanOperation::ExtractAttributes => CicsOperation::ExtractAttributes,
+        CicsPlanOperation::GdsExtractAttributes => CicsOperation::GdsExtractAttributes,
+        CicsPlanOperation::ExtractLogonMsg => CicsOperation::ExtractLogonMsg,
+        CicsPlanOperation::ExtractProcess => CicsOperation::ExtractProcess,
+        CicsPlanOperation::GdsExtractProcess => CicsOperation::GdsExtractProcess,
+        CicsPlanOperation::ExtractTct => CicsOperation::ExtractTct,
+        CicsPlanOperation::Point => CicsOperation::Point,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
@@ -438,6 +471,11 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::ConversationAttachId => "ATTACHID",
+        CicsOperandName::ConversationConvid => "CONVID",
+        CicsOperandName::ConversationSession => "SESSION",
+        CicsOperandName::ConversationMaxProcLen => "MAXPROCLEN",
+        CicsOperandName::ConversationNetName => "NETNAME",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -743,6 +781,27 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::AttachProcess => "PROCESS",
+        CicsOutputName::AttachResource => "RESOURCE",
+        CicsOutputName::AttachReturnProcess => "RPROCESS",
+        CicsOutputName::AttachReturnResource => "RRESOURCE",
+        CicsOutputName::AttachQueue => "QUEUE",
+        CicsOutputName::AttachIuType => "IUTYPE",
+        CicsOutputName::AttachDataStream => "DATASTR",
+        CicsOutputName::AttachRecordFormat => "RECFM",
+        CicsOutputName::ConversationState => "STATE",
+        CicsOutputName::ConversationData => "CONVDATA",
+        CicsOutputName::ConversationRetCode => "RETCODE",
+        CicsOutputName::LogonInto => "INTO",
+        CicsOutputName::LogonSet => "SET",
+        CicsOutputName::LogonLength => "LENGTH",
+        CicsOutputName::ProcessName => "PROCNAME",
+        CicsOutputName::ProcessLength => "PROCLENGTH",
+        CicsOutputName::SyncLevel => "SYNCLEVEL",
+        CicsOutputName::PipList => "PIPLIST",
+        CicsOutputName::PipLength => "PIPLENGTH",
+        CicsOutputName::TctSysId => "SYSID",
+        CicsOutputName::TctTermId => "TERMID",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",

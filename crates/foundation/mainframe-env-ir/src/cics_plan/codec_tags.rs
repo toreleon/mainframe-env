@@ -21,6 +21,14 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::ExtractAttach => 231,
+        CicsPlanOperation::ExtractAttributes => 232,
+        CicsPlanOperation::GdsExtractAttributes => 233,
+        CicsPlanOperation::ExtractLogonMsg => 234,
+        CicsPlanOperation::ExtractProcess => 235,
+        CicsPlanOperation::GdsExtractProcess => 236,
+        CicsPlanOperation::ExtractTct => 237,
+        CicsPlanOperation::Point => 238,
         CicsPlanOperation::AddSubevent => 105,
         CicsPlanOperation::RemoveSubevent => 113,
         CicsPlanOperation::DeleteEvent => 110,
@@ -177,6 +185,14 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        231 => Ok(CicsPlanOperation::ExtractAttach),
+        232 => Ok(CicsPlanOperation::ExtractAttributes),
+        233 => Ok(CicsPlanOperation::GdsExtractAttributes),
+        234 => Ok(CicsPlanOperation::ExtractLogonMsg),
+        235 => Ok(CicsPlanOperation::ExtractProcess),
+        236 => Ok(CicsPlanOperation::GdsExtractProcess),
+        237 => Ok(CicsPlanOperation::ExtractTct),
+        238 => Ok(CicsPlanOperation::Point),
         105 => Ok(CicsPlanOperation::AddSubevent),
         113 => Ok(CicsPlanOperation::RemoveSubevent),
         110 => Ok(CicsPlanOperation::DeleteEvent),
@@ -334,6 +350,11 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
+        CicsOperandName::ConversationAttachId => 1344,
+        CicsOperandName::ConversationConvid => 1345,
+        CicsOperandName::ConversationSession => 1346,
+        CicsOperandName::ConversationMaxProcLen => 1347,
+        CicsOperandName::ConversationNetName => 1348,
         CicsOperandName::Event => 320,
         CicsOperandName::SubEvent => 329,
         CicsOperandName::SubEvent1 => 321,
@@ -619,6 +640,11 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
+        1344 => Ok(CicsOperandName::ConversationAttachId),
+        1345 => Ok(CicsOperandName::ConversationConvid),
+        1346 => Ok(CicsOperandName::ConversationSession),
+        1347 => Ok(CicsOperandName::ConversationMaxProcLen),
+        1348 => Ok(CicsOperandName::ConversationNetName),
         320 => Ok(CicsOperandName::Event),
         329 => Ok(CicsOperandName::SubEvent),
         321 => Ok(CicsOperandName::SubEvent1),

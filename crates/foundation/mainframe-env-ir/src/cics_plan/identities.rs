@@ -4,6 +4,22 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Read one owned LUTYPE6.1 or MRO attach header.
+    ExtractAttach,
+    /// Read mapped APPC or MRO state.
+    ExtractAttributes,
+    /// Read basic APPC state with GDS return code.
+    GdsExtractAttributes,
+    /// Extract one terminal logon message.
+    ExtractLogonMsg,
+    /// Read mapped APPC attach process information.
+    ExtractProcess,
+    /// Read basic APPC attach process information.
+    GdsExtractProcess,
+    /// Translate an LUTYPE6.1 network name to local IDs.
+    ExtractTct,
+    /// Position on one owned conversation facility.
+    Point,
     /// Change a standard RACF password under one SAF effect.
     ChangePassword,
     /// Change a length-selected password or phrase under one SAF effect.
@@ -310,6 +326,16 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    /// Task-local attach-header identifier.
+    ConversationAttachId,
+    /// Four-byte conversation token.
+    ConversationConvid,
+    /// One to four character session identifier.
+    ConversationSession,
+    /// Process-name receive capacity, defaulting to 32.
+    ConversationMaxProcLen,
+    /// Eight-character SNA network name.
+    ConversationNetName,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.

@@ -7,10 +7,13 @@
 use serde::{Deserialize, Serialize};
 
 mod gds;
+mod indicators;
 mod ledger;
 pub use gds::{
-    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
+    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsExtractAttributesFailure,
+    GdsExtractProcessFailure, GdsFreeFailure, GdsReturnCode,
 };
+pub use indicators::ConversationIndicators;
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
     ConversationSystemDefinition,
@@ -30,6 +33,8 @@ pub enum ConversationKind {
     AppcMapped,
     AppcBasic,
     Mro,
+    /// LUTYPE6.1 facility used by POINT, EXTRACT ATTACH, and EXTRACT TCT.
+    LuType61,
 }
 
 /// Source-visible conversation state. Future sibling commands can add guarded
@@ -89,6 +94,8 @@ pub struct ConversationRecord {
     pub sync_level: Option<u8>,
     pub process: Option<Vec<u8>>,
     pub pip: Vec<u8>,
+    #[serde(default, skip_serializing_if = "ConversationIndicators::is_empty")]
+    pub indicators: ConversationIndicators,
     pub sequence: u64,
 }
 
@@ -133,6 +140,7 @@ impl ConversationRecord {
             sync_level: None,
             process: None,
             pip: Vec::new(),
+            indicators: ConversationIndicators::default(),
             sequence: 0,
         };
         record.validate()?;
@@ -177,8 +185,10 @@ impl ConversationRecord {
             || self.sync_level.is_some_and(|level| level > 2)
             || (self.released && self.state != ConversationState::Free)
             || (self.process.is_none() && self.sync_level.is_some())
-            || (self.kind != ConversationKind::Mro
-                && self.state != ConversationState::Allocated
+            || (!matches!(
+                self.kind,
+                ConversationKind::Mro | ConversationKind::LuType61
+            ) && self.state != ConversationState::Allocated
                 && self.process.is_none()
                 && self.state != ConversationState::Free)
         {
@@ -293,6 +303,7 @@ impl ConversationRecord {
         }
         self.next_sequence()?;
         self.state = ConversationState::Free;
+        self.indicators.free_required = true;
         Ok(())
     }
 
@@ -499,6 +510,7 @@ mod tests {
         record
             .peer_finished(&owner(3), ConversationContext::Local)
             .unwrap();
+        assert_eq!(record.indicators.convdata()[2], 0xff);
         record
             .release(&owner(3), ConversationContext::Local, true)
             .unwrap();

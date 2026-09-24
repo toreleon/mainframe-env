@@ -358,6 +358,20 @@ pub(super) fn release_temporary_storage_set(machine: &mut ReferenceMachine) {
 }
 
 const PARTITION_RECEIVE_MARKER: &[u8] = b"MEC-RECEIVE-PARTN";
+const LOGON_MESSAGE_MARKER: &[u8] = b"MEC-EXTRACT-LOGONMSG";
+
+pub(super) fn release_logon_message_set(machine: &mut ReferenceMachine) {
+    let mut releases = Vec::new();
+    for marker in machine.static_base_count..machine.bases.len().saturating_sub(1) {
+        if machine.bases[marker] == LOGON_MESSAGE_MARKER
+            && machine.freed_allocations.contains(&marker)
+            && !machine.freed_allocations.contains(&(marker + 1))
+        {
+            releases.push(marker + 1);
+        }
+    }
+    machine.freed_allocations.extend(releases);
+}
 
 pub(super) fn release_partition_receive_set(machine: &mut ReferenceMachine) {
     let mut releases = Vec::new();
@@ -427,6 +441,11 @@ pub(super) fn write_set_output(
         machine.bases.extend([Vec::new(), Vec::new()]);
         machine.freed_allocations.extend([marker, marker + 1]);
         marker + 2
+    } else if operation == CicsOperation::ExtractLogonMsg {
+        let marker = machine.bases.len();
+        machine.bases.push(LOGON_MESSAGE_MARKER.to_vec());
+        machine.freed_allocations.insert(marker);
+        marker + 1
     } else if matches!(
         operation,
         CicsOperation::ReceivePartn | CicsOperation::IssueReceive

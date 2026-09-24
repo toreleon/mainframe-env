@@ -256,6 +256,55 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0066"
     },
     {
+      "operation": "ExtractAttach",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0067"
+    },
+    {
+      "operation": "ExtractAttributes",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0068"
+    },
+    {
+      "operation": "GdsExtractAttributes",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0069"
+    },
+    {
+      "operation": "ExtractLogonMsg",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0071"
+    },
+    {
+      "operation": "ExtractProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0072"
+    },
+    {
+      "operation": "GdsExtractProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0073"
+    },
+    {
+      "operation": "ExtractTct",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0075"
+    },
+    {
       "operation": "ExtractWeb",
       "interface": "api",
       "family": "web-control",
@@ -401,6 +450,13 @@
       "family": "diagnostics",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0143"
+    },
+    {
+      "operation": "Point",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0145"
     },
     {
       "operation": "PopHandle",

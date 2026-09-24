@@ -10,6 +10,14 @@ pub(super) fn resolve(
 ) -> Resolution<HirCicsOperation> {
     Ok(match descriptor.label_tokens {
         ["ABEND"] => HirCicsOperation::Abend,
+        ["EXTRACT", "ATTACH"] => HirCicsOperation::ExtractAttach,
+        ["EXTRACT", "ATTRIBUTES"] => HirCicsOperation::ExtractAttributes,
+        ["GDS", "EXTRACT", "ATTRIBUTES"] => HirCicsOperation::GdsExtractAttributes,
+        ["EXTRACT", "LOGONMSG"] => HirCicsOperation::ExtractLogonMsg,
+        ["EXTRACT", "PROCESS"] => HirCicsOperation::ExtractProcess,
+        ["GDS", "EXTRACT", "PROCESS"] => HirCicsOperation::GdsExtractProcess,
+        ["EXTRACT", "TCT"] => HirCicsOperation::ExtractTct,
+        ["POINT"] => HirCicsOperation::Point,
         ["ADD", "SUBEVENT"] => HirCicsOperation::AddSubevent,
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
         ["ADDRESS"] => HirCicsOperation::Address,

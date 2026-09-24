@@ -49,6 +49,18 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added an isolated `CIC-905.conversation-extract` candidate for catalog rows
+  `0067`, `0068`, `0069`, `0071`, `0072`, `0073`, `0075`, and `0145` on baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands`. It consumes the conversation-open
+  ledger from source commit `3944e66c`, binds typed MCEP v2 tags `231`–`238`,
+  and persists task extraction facts and POINT selection separately from
+  protocol state. Selected SQLite execution, bounds, GDS return codes, and
+  one-time LOGONMSG extraction have focused coverage. The numeric CVDA table
+  linked by pinned `dfha80x.html` (`sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25`)
+  is not committed or retained; EXTRACT ATTRIBUTES and GDS STATE output remain
+  explicitly unsupported, so the generated 159/104 registry is unsealed and
+  claims no completed eight-row slice or licensed credit.
+
 - Added typed CICS `WEB CONVERSE` as one checked client request and bounded
   response operation, with durable replay, dispatch uncertainty, SAF, and
   continuation through WEB RECEIVE. IBM CICS TS 6.x baseline

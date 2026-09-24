@@ -16,7 +16,7 @@ pub(in crate::machine) fn write_output(
     {
         return retrieve::write_load_pointer(machine, target, value, load_base);
     }
-    if name == "SET" {
+    if matches!(name, "SET" | "PIPLIST") {
         return retrieve::write_set_output(machine, operation, target, value);
     }
     if name == "SET64" {
@@ -34,13 +34,35 @@ pub(in crate::machine) fn write_output(
             | "ELEMNSLEN"
             | "TYPENAMELEN"
             | "TYPENSLEN"
+            | "STATE"
+            | "IUTYPE"
+            | "DATASTR"
+            | "RECFM"
+            | "PROCLENGTH"
+            | "PIPLENGTH"
+            | "SYNCLEVEL"
     ) && value.schema() != "mainframe-env.cics.decimal@1"
         || name == "TOKEN"
             && operation == CicsOperation::Read
             && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
-            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE" | "PARTN"
+            "COMMAREA"
+                | "RIDFLD"
+                | "RTRANSID"
+                | "RTERMID"
+                | "QUEUE"
+                | "PARTN"
+                | "PROCESS"
+                | "RESOURCE"
+                | "RPROCESS"
+                | "RRESOURCE"
+                | "CONVDATA"
+                | "RETCODE"
+                | "PROCNAME"
+                | "SYSID"
+                | "TERMID"
+                | "INTO"
         ) && value.schema() != "mainframe-env.cics.payload@1"
         || name == "TOKEN"
             && matches!(

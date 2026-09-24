@@ -1956,6 +1956,16 @@ mod tests {
                 CicsPlanOperation::WebOpen => crate::HirCicsOperation::WebOpen,
                 CicsPlanOperation::WebClose => crate::HirCicsOperation::WebClose,
                 CicsPlanOperation::WebExtract => crate::HirCicsOperation::WebExtract,
+                CicsPlanOperation::ExtractAttach => crate::HirCicsOperation::ExtractAttach,
+                CicsPlanOperation::ExtractAttributes => crate::HirCicsOperation::ExtractAttributes,
+                CicsPlanOperation::GdsExtractAttributes => {
+                    crate::HirCicsOperation::GdsExtractAttributes
+                }
+                CicsPlanOperation::ExtractLogonMsg => crate::HirCicsOperation::ExtractLogonMsg,
+                CicsPlanOperation::ExtractProcess => crate::HirCicsOperation::ExtractProcess,
+                CicsPlanOperation::GdsExtractProcess => crate::HirCicsOperation::GdsExtractProcess,
+                CicsPlanOperation::ExtractTct => crate::HirCicsOperation::ExtractTct,
+                CicsPlanOperation::Point => crate::HirCicsOperation::Point,
                 CicsPlanOperation::ExtractWeb => crate::HirCicsOperation::ExtractWeb,
                 CicsPlanOperation::WebRead => crate::HirCicsOperation::WebRead,
                 CicsPlanOperation::WebStartBrowse => crate::HirCicsOperation::WebStartBrowse,
@@ -2561,5 +2571,84 @@ mod tests {
         assert!(operation.attributes.contains_key("arguments"));
         assert!(!operation.attributes.contains_key("assignment_plan"));
         assert!(operation.location.is_some());
+    }
+
+    #[test]
+    fn conversation_extract_cobol_forms_lower_to_distinct_v2_plans() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CONVX. DATA DIVISION. WORKING-STORAGE SECTION. 01 CV PIC X(4). 01 NET-X PIC X(8). 01 TERM-X PIC X(4). 01 PROC-X PIC X(8). 01 PROC-LEN PIC S9(4) COMP. 01 PROC-MAX PIC S9(4) COMP VALUE 8. 01 SYNC-X PIC S9(4) COMP. 01 PIP-PTR POINTER-32. 01 PIP-LEN PIC S9(4) COMP. 01 LOGON-X PIC X(256). 01 LOGON-LEN PIC S9(4) COMP. 01 RC PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS EXTRACT PROCESS PROCNAME(PROC-X) PROCLENGTH(PROC-LEN) MAXPROCLEN(PROC-MAX) SYNCLEVEL(SYNC-X) PIPLIST(PIP-PTR) PIPLENGTH(PIP-LEN) RESP(RC) END-EXEC. EXEC CICS POINT CONVID(CV) RESP(RC) END-EXEC. EXEC CICS EXTRACT TCT NETNAME(NET-X) TERMID(TERM-X) RESP(RC) END-EXEC. EXEC CICS EXTRACT LOGONMSG INTO(LOGON-X) LENGTH(LOGON-LEN) RESP(RC) END-EXEC.";
+        let analysis = CobolCompiler::default().analyze(&bundle(source));
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let plans = analysis
+            .hir
+            .unwrap()
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter_map(|operation| match operation.attributes.get("cics_plan") {
+                Some(Attribute::Bytes(bytes)) => {
+                    Some(decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            plans.iter().map(|plan| plan.operation).collect::<Vec<_>>(),
+            [
+                CicsPlanOperation::ExtractProcess,
+                CicsPlanOperation::Point,
+                CicsPlanOperation::ExtractTct,
+                CicsPlanOperation::ExtractLogonMsg,
+            ]
+        );
+        assert!(
+            plans[0]
+                .outputs
+                .iter()
+                .any(|output| output.name == CicsOutputName::PipList)
+        );
+        assert!(
+            plans[3]
+                .outputs
+                .iter()
+                .any(|output| output.name == CicsOutputName::LogonInto)
+        );
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(&source.replace(
+                    "PROCNAME(PROC-X) PROCLENGTH(PROC-LEN)",
+                    "PROCNAME(PROC-X)"
+                )))
+                .diagnostics
+                .is_empty()
+        );
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(
+                    &source.replace("POINT CONVID(CV)", "POINT CONVID(CV) SESSION(CV)")
+                ))
+                .diagnostics
+                .is_empty()
+        );
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(
+                    &source.replace("EXTRACT PROCESS", "GDS EXTRACT PROCESS")
+                ))
+                .diagnostics
+                .is_empty()
+        );
+        let gds_source = "IDENTIFICATION DIVISION. PROGRAM-ID. GDSX. DATA DIVISION. WORKING-STORAGE SECTION. 01 CV PIC X(4). 01 DATA-X PIC X(24). 01 RC-X PIC X(6). PROCEDURE DIVISION. EXEC CICS GDS EXTRACT ATTRIBUTES CONVID(CV) CONVDATA(DATA-X) RETCODE(RC-X) END-EXEC.";
+        assert!(
+            !CobolCompiler::default()
+                .analyze(&bundle(gds_source))
+                .diagnostics
+                .is_empty()
+        );
     }
 }

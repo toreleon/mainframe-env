@@ -9,6 +9,7 @@ mod assign;
 mod browse;
 mod codec_tags;
 mod condition_handlers;
+mod conversation_control;
 mod counter_control;
 mod diagnostics;
 mod document_control;
@@ -165,7 +166,8 @@ fn encode_cics_effect_plan_version(
     validate_plan(plan, limits)?;
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag(plan.operation))
-            || (130..=139).contains(&operation_tag(plan.operation)))
+            || (130..=139).contains(&operation_tag(plan.operation))
+            || (231..=238).contains(&operation_tag(plan.operation)))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -237,7 +239,9 @@ pub fn decode_cics_effect_plan(
     }
     let operation_tag = reader.tag(version)?;
     if version == LEGACY_VERSION
-        && ((91..=104).contains(&operation_tag) || (130..=139).contains(&operation_tag))
+        && ((91..=104).contains(&operation_tag)
+            || (130..=139).contains(&operation_tag)
+            || (231..=238).contains(&operation_tag))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -424,6 +428,16 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
+        CicsPlanOperation::ExtractAttach
+        | CicsPlanOperation::ExtractAttributes
+        | CicsPlanOperation::GdsExtractAttributes
+        | CicsPlanOperation::ExtractLogonMsg
+        | CicsPlanOperation::ExtractProcess
+        | CicsPlanOperation::GdsExtractProcess
+        | CicsPlanOperation::ExtractTct
+        | CicsPlanOperation::Point => {
+            conversation_control::invalid_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::Address => address::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::AddressSet => {
@@ -2086,6 +2100,83 @@ mod tests {
         invalid.outputs.remove(1);
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn conversation_extract_tags_and_shapes_are_exact_and_v2_only() {
+        for (operation, tag) in [
+            (CicsPlanOperation::ExtractAttach, 231),
+            (CicsPlanOperation::ExtractAttributes, 232),
+            (CicsPlanOperation::GdsExtractAttributes, 233),
+            (CicsPlanOperation::ExtractLogonMsg, 234),
+            (CicsPlanOperation::ExtractProcess, 235),
+            (CicsPlanOperation::GdsExtractProcess, 236),
+            (CicsPlanOperation::ExtractTct, 237),
+            (CicsPlanOperation::Point, 238),
+        ] {
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        for (name, tag) in [
+            (CicsOperandName::ConversationAttachId, 1344),
+            (CicsOperandName::ConversationConvid, 1345),
+            (CicsOperandName::ConversationSession, 1346),
+            (CicsOperandName::ConversationMaxProcLen, 1347),
+            (CicsOperandName::ConversationNetName, 1348),
+        ] {
+            assert_eq!(operand_tag(name), tag);
+            assert_eq!(operand_from_tag(tag), Ok(name));
+        }
+        let mut point = CicsEffectPlan {
+            operation: CicsPlanOperation::Point,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::ConversationConvid,
+                value: CicsOperandValue::Literal(b"ABCD".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&point, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(point.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&point, CicsPlanLimits::default(), LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        point.operands.push(CicsNamedOperand {
+            name: CicsOperandName::ConversationSession,
+            value: CicsOperandValue::Literal(b"S1".to_vec()),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&point, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        point.operands.clear();
+        point.operation = CicsPlanOperation::ExtractLogonMsg;
+        point.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::LogonLength,
+            target: slot(1, "LENGTH-X"),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&point, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        point.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::LogonInto,
+            target: slot(2, "INTO-X"),
+        });
+        assert!(encode_cics_effect_plan(&point, CicsPlanLimits::default()).is_ok());
+        point.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::LogonSet,
+            target: slot(3, "SET-X"),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&point, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

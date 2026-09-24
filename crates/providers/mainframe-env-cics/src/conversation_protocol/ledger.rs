@@ -195,7 +195,18 @@ impl ConversationLedger {
         if !system.enabled {
             return Err(ConversationProblem::WrongState);
         }
-        if (system.kind == ConversationKind::Mro) != (kind == ConversationKind::Mro) {
+        let compatible = match system.kind {
+            ConversationKind::AppcMapped => {
+                matches!(
+                    kind,
+                    ConversationKind::AppcMapped | ConversationKind::AppcBasic
+                )
+            }
+            ConversationKind::Mro => kind == ConversationKind::Mro,
+            ConversationKind::LuType61 => kind == ConversationKind::LuType61,
+            ConversationKind::AppcBasic => false,
+        };
+        if !compatible {
             return Err(ConversationProblem::WrongKind);
         }
         let active = self
