@@ -508,6 +508,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0107"
     },
     {
+      "operation": "IssueAbend",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0108"
+    },
+    {
       "operation": "IssueAbort",
       "interface": "api",
       "family": "terminal-control",
@@ -520,6 +527,13 @@
       "family": "terminal-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0111"
+    },
+    {
+      "operation": "IssueConfirmation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0112"
     },
     {
       "operation": "IssueDisconnect",
@@ -571,6 +585,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0121"
     },
     {
+      "operation": "IssueError",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0122"
+    },
+    {
       "operation": "IssueLoad",
       "interface": "api",
       "family": "conversation-control",
@@ -590,6 +611,13 @@
       "family": "conversation-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0126"
+    },
+    {
+      "operation": "IssuePrepare",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0127"
     },
     {
       "operation": "IssuePrint",
@@ -632,6 +660,13 @@
       "family": "terminal-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0134"
+    },
+    {
+      "operation": "IssueSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
     },
     {
       "operation": "IssueWait",

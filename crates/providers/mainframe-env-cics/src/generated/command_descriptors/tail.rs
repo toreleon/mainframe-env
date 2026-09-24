@@ -2,7 +2,42 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 49] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 54] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::StartAttach,
+        syntax: "START ATTACH",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0206",
+        family: CicsCommandFamily::IntervalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::StartBrexit,
+        syntax: "START BREXIT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0207",
+        family: CicsCommandFamily::IntervalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::StartBrowse,
+        syntax: "STARTBR",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
+        family: CicsCommandFamily::FileControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::Suspend,
+        syntax: "SUSPEND",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0214",
+        family: CicsCommandFamily::TaskControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::Unlock,
+        syntax: "UNLOCK",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0225",
+        family: CicsCommandFamily::FileControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::ChangePassword,
         syntax: "CHANGE PASSWORD",

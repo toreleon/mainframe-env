@@ -637,6 +637,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::IssueAbend,
+        syntax: "ISSUE ABEND",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueAbort,
         syntax: "ISSUE ABORT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0110",
@@ -648,6 +655,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "ISSUE ADD",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0111",
         family: CicsCommandFamily::TerminalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::IssueConfirmation,
+        syntax: "ISSUE CONFIRMATION",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+        family: CicsCommandFamily::ConversationControl,
         mutating: true,
     },
     CicsCommandDescriptor {
@@ -700,6 +714,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::IssueError,
+        syntax: "ISSUE ERROR",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueLoad,
         syntax: "ISSUE LOAD",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0124",
@@ -717,6 +738,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         operation: CicsOperation::IssuePass,
         syntax: "ISSUE PASS",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0126",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::IssuePrepare,
+        syntax: "ISSUE PREPARE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
         family: CicsCommandFamily::ConversationControl,
         mutating: true,
     },
@@ -760,6 +788,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "ISSUE SEND",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0134",
         family: CicsCommandFamily::TerminalControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::IssueSignal,
+        syntax: "ISSUE SIGNAL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+        family: CicsCommandFamily::ConversationControl,
         mutating: true,
     },
     CicsCommandDescriptor {
@@ -1084,41 +1119,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::IntervalControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::StartAttach,
-        syntax: "START ATTACH",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0206",
-        family: CicsCommandFamily::IntervalControl,
-        mutating: true,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::StartBrexit,
-        syntax: "START BREXIT",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0207",
-        family: CicsCommandFamily::IntervalControl,
-        mutating: true,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::StartBrowse,
-        syntax: "STARTBR",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
-        family: CicsCommandFamily::FileControl,
-        mutating: false,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::Suspend,
-        syntax: "SUSPEND",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0214",
-        family: CicsCommandFamily::TaskControl,
-        mutating: false,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::Unlock,
-        syntax: "UNLOCK",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0225",
-        family: CicsCommandFamily::FileControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1168,6 +1168,11 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[46],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[47],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[48],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[49],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[50],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[51],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[52],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[53],
 ];
 
 mod lookup;

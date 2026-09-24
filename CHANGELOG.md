@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Registered mapped APPC ISSUE ABEND, CONFIRMATION, ERROR, PREPARE, and SIGNAL
+  with their shared owner-fenced control carrier. Public provider calls and
+  selected compiled COBOL plans now reach the same durable ledger; partner
+  ABEND/PREPARE, SIGNAL, and SEND confirmation/error consumption precede
+  source completion.
 - Added trusted partner ABEND/PREPARE ingress to the versioned APPC ledger.
   A carrier confirms only after the target's owner-fenced, SAF-authorized
   transition and exact event receipt commit. Mapped/basic target indicators,

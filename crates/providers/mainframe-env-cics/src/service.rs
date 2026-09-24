@@ -8177,7 +8177,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 202);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 207);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9320,22 +9320,19 @@ mod tests {
                 sent: sent.clone(),
             }))
             .unwrap();
-        let mut run = source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueSignal,
             BTreeMap::from([("SESSION".into(), cics_literal(&source_token))]),
             1,
         );
         assert_eq!(
-            handlers::invoke_extended_control(
-                &source,
-                &mut run,
-                &command,
-                crate::generated::CicsCommandFamily::ConversationControl,
-                100,
-            )
-            .unwrap()
-            .disposition,
+            source
+                .invoke(
+                    &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+                .unwrap()
+                .disposition,
             CicsDisposition::Complete
         );
         assert_eq!(sent.load(Ordering::SeqCst), 1);
@@ -9550,23 +9547,19 @@ mod tests {
                     response,
                 }))
                 .unwrap();
-            let mut source_run =
-                source.lock().unwrap().runs[&source_invocation.run_unit_id].clone();
             let command = request(
                 operation,
                 BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
                 1,
             );
             assert_eq!(
-                handlers::invoke_extended_control(
-                    &source,
-                    &mut source_run,
-                    &command,
-                    crate::generated::CicsCommandFamily::ConversationControl,
-                    100,
-                )
-                .unwrap()
-                .disposition,
+                source
+                    .invoke(
+                        &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                        command,
+                    )
+                    .unwrap()
+                    .disposition,
                 CicsDisposition::Complete
             );
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
@@ -10302,7 +10295,12 @@ mod tests {
                 arguments.insert("CONVDATA".into(), argument(b"CONVDATA-X"));
             }
             let command = request(operation, arguments, 1);
-            assert_eq!(
+            let response = if kind == ConversationKind::AppcMapped {
+                source.invoke(
+                    &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                    command.clone(),
+                )
+            } else {
                 handlers::invoke_extended_control(
                     &source,
                     &mut run,
@@ -10310,10 +10308,8 @@ mod tests {
                     crate::generated::CicsCommandFamily::ConversationControl,
                     100,
                 )
-                .unwrap()
-                .disposition,
-                CicsDisposition::Complete
-            );
+            };
+            assert_eq!(response.unwrap().disposition, CicsDisposition::Complete);
             assert_eq!(delivered.load(Ordering::SeqCst), 1);
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
             let record = partner.conversation(target_token).unwrap();

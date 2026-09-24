@@ -11,8 +11,8 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{CicsOperation, HostRequest};
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::{
-    Attribute, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CodecLimits, decode_binary,
-    decode_cics_effect_plan,
+    Attribute, CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CodecLimits,
+    decode_binary, decode_cics_effect_plan,
 };
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
@@ -93,6 +93,39 @@ fn compiled_issue_device_markers_select_exact_host_operations_and_companion_flag
     );
 }
 
+#[test]
+fn compiled_mapped_issue_controls_select_the_shared_provider_routes() {
+    for (command, plan, host) in [
+        (
+            "ISSUE ABEND CONVID(SS-X)",
+            CicsPlanOperation::IssueAbend,
+            CicsOperation::IssueAbend,
+        ),
+        (
+            "ISSUE CONFIRMATION CONVID(SS-X)",
+            CicsPlanOperation::IssueConfirmation,
+            CicsOperation::IssueConfirmation,
+        ),
+        (
+            "ISSUE ERROR CONVID(SS-X)",
+            CicsPlanOperation::IssueError,
+            CicsOperation::IssueError,
+        ),
+        (
+            "ISSUE PREPARE CONVID(SS-X) STATE(ST-X)",
+            CicsPlanOperation::IssuePrepare,
+            CicsOperation::IssuePrepare,
+        ),
+        (
+            "ISSUE SIGNAL CONVID(SS-X)",
+            CicsPlanOperation::IssueSignal,
+            CicsOperation::IssueSignal,
+        ),
+    ] {
+        compiled_case(command, plan, host, None, Some("CONVID"));
+    }
+}
+
 fn compiled_case(
     command: &str,
     expected_plan: CicsPlanOperation,
@@ -117,7 +150,7 @@ fn compiled_case_multi(
     operands: &[&str],
 ) {
     let source = format!(
-        "IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. 01 SS-X PIC X(4) VALUE 'S001'. 01 DATA-X PIC X(8) VALUE 'LOGON'. PROCEDURE DIVISION. EXEC CICS {command} RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN."
+        "IDENTIFICATION DIVISION. PROGRAM-ID. ISSUEEF. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. 01 ST-X PIC S9(9) COMP. 01 SS-X PIC X(4) VALUE 'S001'. 01 DATA-X PIC X(8) VALUE 'LOGON'. PROCEDURE DIVISION. EXEC CICS {command} RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN."
     );
     let source_limits = SourceLimits::default();
     let path = LogicalPath::new("ISSUEEF.cbl", source_limits.max_path_bytes).unwrap();
@@ -168,6 +201,13 @@ fn compiled_case_multi(
     for (option, _) in flags {
         assert!(plan.options.contains(option));
     }
+    if command.contains("STATE(") {
+        assert!(
+            plan.outputs
+                .iter()
+                .any(|output| output.name == CicsOutputName::IssueState)
+        );
+    }
 
     let limits = InvocationLimits::default();
     let invocation = Invocation::new(
@@ -212,6 +252,9 @@ fn compiled_case_multi(
     }
     for name in operands {
         assert!(request.arguments.contains_key(*name));
+    }
+    if command.contains("STATE(") {
+        assert!(request.arguments.contains_key("STATE"));
     }
     assert!(request.arguments.contains_key("RESP"));
     assert!(request.arguments.contains_key("RESP2"));
