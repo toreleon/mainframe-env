@@ -40,7 +40,7 @@ pub use gds::{
     GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
 };
 pub use gds_issue::{GdsIssueFailure, GdsIssueFlow};
-pub use issue_transition::IssueValidationProblem;
+pub use issue_transition::{IssuePendingControl, IssueValidationProblem};
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
     ConversationSystemDefinition,
@@ -193,6 +193,9 @@ pub struct ConversationRecord {
     /// canonical v1 records, whose default is recovered by the v2 reader.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub processing_profile: Option<String>,
+    /// A control flow staged in this same durable record before peer dispatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_issue: Option<IssuePendingControl>,
 }
 
 /// Local/DPL invocation context supplied by the trusted host boundary.
@@ -262,6 +265,7 @@ impl ConversationRecord {
             indicators: ConversationIndicators::default(),
             sequence: 0,
             processing_profile: Some(processing_profile.into()),
+            pending_issue: None,
         };
         record.validate()?;
         Ok(record)
@@ -309,6 +313,7 @@ impl ConversationRecord {
                         byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"$#@".contains(&byte)
                     })
             })
+            || self.validate_pending_issue().is_err()
             || self.token == [0; 4]
             || self.system.is_empty()
             || self.system.len() > 4
@@ -381,6 +386,9 @@ impl ConversationRecord {
         sync_level: u8,
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
+        if self.pending_issue.is_some() {
+            return Err(ConversationProblem::WrongState);
+        }
         let expected = if basic {
             ConversationKind::AppcBasic
         } else {
@@ -441,6 +449,9 @@ impl ConversationRecord {
         context: ConversationContext,
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
+        if self.pending_issue.is_some() {
+            return Err(ConversationProblem::WrongState);
+        }
         if matches!(
             self.kind,
             ConversationKind::AppcBasic | ConversationKind::LuType61
@@ -463,6 +474,9 @@ impl ConversationRecord {
         context: ConversationContext,
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
+        if self.pending_issue.is_some() {
+            return Err(ConversationProblem::WrongState);
+        }
         if self.kind != ConversationKind::AppcBasic || self.state != ConversationState::Send {
             return Err(ConversationProblem::WrongState);
         }
@@ -481,6 +495,9 @@ impl ConversationRecord {
         basic: bool,
     ) -> Result<(), ConversationProblem> {
         self.check_owner(owner, context)?;
+        if self.pending_issue.is_some() {
+            return Err(ConversationProblem::WrongState);
+        }
         if basic != (self.kind == ConversationKind::AppcBasic) {
             return Err(ConversationProblem::WrongKind);
         }

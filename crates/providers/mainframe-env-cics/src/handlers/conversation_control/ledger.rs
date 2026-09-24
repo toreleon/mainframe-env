@@ -437,11 +437,22 @@ impl ConversationLedger {
         {
             return Err(ConversationProblem::Exhausted);
         }
+        if self.conversations.values().any(|record| {
+            &record.owner == owner
+                && !record.released
+                && record
+                    .pending_issue
+                    .as_ref()
+                    .is_some_and(|pending| pending.attempted)
+        }) {
+            return Err(ConversationProblem::WrongState);
+        }
         let mut released = 0;
         for record in self.conversations.values_mut() {
             if &record.owner == owner && !record.released {
                 record.released = true;
                 record.state = super::ConversationState::Free;
+                record.pending_issue = None;
                 record.sequence += 1;
                 released += 1;
             }

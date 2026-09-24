@@ -24,6 +24,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0018](0018-cics-start-attach-lifetime.md) | noncancelable START ATTACH state and live-address boundary | Proposed |
 | [0019](0019-bts-lifecycle-authority.md) | shared versioned BTS process/activity state and UOW acquisition | Proposed |
 | [0020](0020-conversation-peer-exchange-ledger.md) | shared APPC/MRO ledger and explicit durable peer frames | Proposed |
+| [0021](0021-conversation-issue-control-staging.md) | staged ISSUE controls and confirmed partner transitions in the shared ledger | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

@@ -1,9 +1,11 @@
 //! Source-specific GDS ISSUE return codes over the shared APPC basic ledger.
 
 use super::{ConversationKind, ConversationProblem, GdsReturnCode, IssueValidationProblem};
+use serde::{Deserialize, Serialize};
 
 /// The five APPC basic ISSUE controls share the six-byte GDS result area.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum GdsIssueFlow {
     Abend,
     Confirmation,

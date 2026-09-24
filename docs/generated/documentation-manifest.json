@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 199,
+    "markdown_documents": 200,
     "navigation_groups": 5,
-    "normative_documents": 49,
+    "normative_documents": 50,
     "xtask_commands": 170
   },
   "documents": [
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:093e946cfde80507d84f6a63fbe439d14469b598c659a9268478cfcb50e14791",
+      "sha256": "sha256:53915931d26ae924a6dd42180b8203ffb61edbf214867cc7be827bf1adf76afd",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -309,8 +309,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 84,
-      "sha256": "sha256:576984b0257ae5de28106021148ce34c9244ab03ee362c5b272e0224b9e1ca40",
+      "relative_links": 85,
+      "sha256": "sha256:a41b7be26ccc9844d7a3f7f209cc35a6cfce8cd3e79deab460ed6b67741c84d7",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -839,10 +839,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0021-conversation-issue-control-staging.md",
+      "relative_links": 2,
+      "scope": "CIC-905 mapped and GDS ISSUE controls",
+      "sha256": "sha256:84f9f6220379fae04f60b49838f94764c923c9d9f3eb22640eb5372dc120bc90",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0021: Stage ISSUE controls in the shared conversation ledger",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 20,
-      "sha256": "sha256:24ba234da3dcd7de76d2f04ad7237221dd8fabcc0ec31c350fcdc57ccfdd0822",
+      "relative_links": 21,
+      "sha256": "sha256:7c89ca17f64ef05300544d4bcd0f03d249493f78f59ebd3cf61dc0f46f407654",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1197,8 +1209,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 89,
-      "sha256": "sha256:fe3d3867aae34b9aceb97efcc738e65001b3e13046c38f6db2ec5315d5590b2a",
+      "relative_links": 90,
+      "sha256": "sha256:138e3e165021a879ed1fb948f4ccb6c3049dd351ed737de1ec5d6c82890da3e4",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 3
     },
@@ -1980,6 +1992,10 @@
           "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md"
         },
         {
+          "label": "ADR-0021: Conversation ISSUE control staging",
+          "path": "docs/decisions/0021-conversation-issue-control-staging.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2143,7 +2159,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:5540daceaf12acb0e1ae44fd4e628765dbd2cf6b08ff323c4391f939737ef468",
+  "registry_sha256": "sha256:59d035c07de6d46ec9e6dcee74dea361401d483eb3c3789da7f5875c9e0de839",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

@@ -83,6 +83,7 @@ explicitly names that authority as superseded.
 - [ADR-0018: CICS START ATTACH lifetime](decisions/0018-cics-start-attach-lifetime.md)
 - [ADR-0019: BTS lifecycle authority](decisions/0019-bts-lifecycle-authority.md)
 - [ADR-0020: Conversation peer exchange ledger](decisions/0020-conversation-peer-exchange-ledger.md)
+- [ADR-0021: Conversation ISSUE control staging](decisions/0021-conversation-issue-control-staging.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

@@ -25,6 +25,11 @@ All notable changes to mainframe-env are documented here.
   conversation record. The check is mutation-free until a partner control is
   staged and confirmed; no ISSUE route gains readiness.
 
+- Added bounded two-phase ISSUE control intent to the shared APPC record.
+  Dispatch is marked before carrier I/O, confirmed outcomes alone change
+  state, and SQLite restart retains an attempted control. This internal
+  protocol work leaves all ISSUE catalog rows unregistered.
+
 - Verified default ISSUE DISCONNECT and compatibility RESET against two
   concurrent PostgreSQL providers and restart replay. Each device and source
   session advances once; both catalog rows remain unregistered.
