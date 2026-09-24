@@ -11,6 +11,13 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::Converse => 228,
         CicsPlanOperation::FreeConversation => 229,
         CicsPlanOperation::GdsFreeConversation => 230,
+        CicsPlanOperation::ReceiveConversation => 259,
+        CicsPlanOperation::GdsReceiveConversation => 260,
+        CicsPlanOperation::SendConversation => 261,
+        CicsPlanOperation::GdsWaitConversation => 262,
+        CicsPlanOperation::WaitConvid => 263,
+        CicsPlanOperation::WaitSignal => 264,
+        CicsPlanOperation::WaitTerminal => 265,
         _ => panic!("unmapped conversation operation"),
     }
 }
@@ -26,6 +33,13 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         228 => Ok(CicsPlanOperation::Converse),
         229 => Ok(CicsPlanOperation::FreeConversation),
         230 => Ok(CicsPlanOperation::GdsFreeConversation),
+        259 => Ok(CicsPlanOperation::ReceiveConversation),
+        260 => Ok(CicsPlanOperation::GdsReceiveConversation),
+        261 => Ok(CicsPlanOperation::SendConversation),
+        262 => Ok(CicsPlanOperation::GdsWaitConversation),
+        263 => Ok(CicsPlanOperation::WaitConvid),
+        264 => Ok(CicsPlanOperation::WaitSignal),
+        265 => Ok(CicsPlanOperation::WaitTerminal),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -59,6 +73,14 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::ConversationMaxFullLength => 1240,
         CicsOperandName::ConversationToLength => 1241,
         CicsOperandName::ConversationToFullLength => 1242,
+        CicsOperandName::ConversationDataConvid => 1600,
+        CicsOperandName::ConversationDataSession => 1601,
+        CicsOperandName::ConversationDataFrom => 1602,
+        CicsOperandName::ConversationDataLength => 1603,
+        CicsOperandName::ConversationDataFullLength => 1604,
+        CicsOperandName::ConversationDataMaxLength => 1605,
+        CicsOperandName::ConversationDataMaxFullLength => 1606,
+        CicsOperandName::ConversationDataAttachId => 1607,
         _ => panic!("unmapped conversation operand"),
     }
 }
@@ -92,6 +114,14 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         1240 => Ok(CicsOperandName::ConversationMaxFullLength),
         1241 => Ok(CicsOperandName::ConversationToLength),
         1242 => Ok(CicsOperandName::ConversationToFullLength),
+        1600 => Ok(CicsOperandName::ConversationDataConvid),
+        1601 => Ok(CicsOperandName::ConversationDataSession),
+        1602 => Ok(CicsOperandName::ConversationDataFrom),
+        1603 => Ok(CicsOperandName::ConversationDataLength),
+        1604 => Ok(CicsOperandName::ConversationDataFullLength),
+        1605 => Ok(CicsOperandName::ConversationDataMaxLength),
+        1606 => Ok(CicsOperandName::ConversationDataMaxFullLength),
+        1607 => Ok(CicsOperandName::ConversationDataAttachId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -102,6 +132,15 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u16 {
         CicsPlanOption::ConversationNotruncate => 1149,
         CicsPlanOption::ConversationDefresp => 1150,
         CicsPlanOption::ConversationFmh => 1151,
+        CicsPlanOption::ConversationDataNotruncate => 1532,
+        CicsPlanOption::ConversationDataBuffer => 1533,
+        CicsPlanOption::ConversationDataLlid => 1534,
+        CicsPlanOption::ConversationDataInvite => 1535,
+        CicsPlanOption::ConversationDataLast => 1536,
+        CicsPlanOption::ConversationDataConfirm => 1537,
+        CicsPlanOption::ConversationDataWait => 1538,
+        CicsPlanOption::ConversationDataFmh => 1539,
+        CicsPlanOption::ConversationDataDefresp => 1540,
         _ => panic!("unmapped conversation option"),
     }
 }
@@ -112,6 +151,15 @@ pub(super) fn option_from_tag(value: u16) -> Result<CicsPlanOption, CicsPlanCode
         1149 => Ok(CicsPlanOption::ConversationNotruncate),
         1150 => Ok(CicsPlanOption::ConversationDefresp),
         1151 => Ok(CicsPlanOption::ConversationFmh),
+        1532 => Ok(CicsPlanOption::ConversationDataNotruncate),
+        1533 => Ok(CicsPlanOption::ConversationDataBuffer),
+        1534 => Ok(CicsPlanOption::ConversationDataLlid),
+        1535 => Ok(CicsPlanOption::ConversationDataInvite),
+        1536 => Ok(CicsPlanOption::ConversationDataLast),
+        1537 => Ok(CicsPlanOption::ConversationDataConfirm),
+        1538 => Ok(CicsPlanOption::ConversationDataWait),
+        1539 => Ok(CicsPlanOption::ConversationDataFmh),
+        1540 => Ok(CicsPlanOption::ConversationDataDefresp),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

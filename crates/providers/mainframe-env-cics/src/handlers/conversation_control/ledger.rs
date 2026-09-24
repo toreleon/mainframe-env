@@ -335,6 +335,7 @@ impl ConversationLedger {
             if &record.owner == owner && !record.released {
                 record.released = true;
                 record.state = super::ConversationState::Free;
+                record.data = super::ConversationDataState::default();
                 record.sequence += 1;
                 released += 1;
             }
@@ -534,6 +535,27 @@ mod tests {
             .allocate("SYS1", ConversationKind::AppcMapped, owner())
             .unwrap()
             .token;
+        let conversation = allocated.conversation_mut(token).unwrap();
+        conversation
+            .connect(
+                &owner(),
+                super::super::ConversationContext::Local,
+                false,
+                b"PROC".to_vec(),
+                vec![],
+                0,
+            )
+            .unwrap();
+        conversation
+            .stage_send(
+                &owner(),
+                super::super::ConversationContext::Local,
+                b"PENDING".to_vec(),
+                true,
+                false,
+                false,
+            )
+            .unwrap();
         assert!(
             installed
                 .persist_with_replay(&mut allocated, &replay(token), &first)
@@ -543,6 +565,10 @@ mod tests {
         let reopened = SqliteStateStore::open(&url, MAX_ROW_BYTES, 65_536).unwrap();
         let current = ConversationLedger::load(&reopened).unwrap();
         assert_eq!(current.conversation(token).unwrap().owner, owner());
+        assert_eq!(
+            current.conversation(token).unwrap().data.pending_outbound(),
+            1
+        );
         let saved = super::super::load_conversation_replay(&reopened, "alloc-effect")
             .unwrap()
             .unwrap();
@@ -556,6 +582,14 @@ mod tests {
                 .conversation(token)
                 .unwrap()
                 .released
+        );
+        assert!(
+            ConversationLedger::load(&reopened)
+                .unwrap()
+                .conversation(token)
+                .unwrap()
+                .data
+                .is_empty()
         );
         drop(reopened);
         std::fs::remove_dir_all(root).unwrap();

@@ -1806,6 +1806,19 @@ mod tests {
                 CicsPlanOperation::GdsFreeConversation => {
                     crate::HirCicsOperation::GdsFreeConversation
                 }
+                CicsPlanOperation::ReceiveConversation => {
+                    crate::HirCicsOperation::ReceiveConversation
+                }
+                CicsPlanOperation::GdsReceiveConversation => {
+                    crate::HirCicsOperation::GdsReceiveConversation
+                }
+                CicsPlanOperation::SendConversation => crate::HirCicsOperation::SendConversation,
+                CicsPlanOperation::GdsWaitConversation => {
+                    crate::HirCicsOperation::GdsWaitConversation
+                }
+                CicsPlanOperation::WaitConvid => crate::HirCicsOperation::WaitConvid,
+                CicsPlanOperation::WaitSignal => crate::HirCicsOperation::WaitSignal,
+                CicsPlanOperation::WaitTerminal => crate::HirCicsOperation::WaitTerminal,
                 CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
                 CicsPlanOperation::QuerySecurity => crate::HirCicsOperation::QuerySecurity,
                 CicsPlanOperation::VerifyPassword => crate::HirCicsOperation::VerifyPassword,

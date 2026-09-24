@@ -588,6 +588,13 @@ pub(super) fn execute(
             | CicsOutputName::WebConverseStatusLength
             | CicsOutputName::WebConverseMediaType
             | CicsOutputName::WebConverseBodyCharset
+            | CicsOutputName::ConversationDataInto
+            | CicsOutputName::ConversationDataSet
+            | CicsOutputName::ConversationDataLength
+            | CicsOutputName::ConversationDataFullLength
+            | CicsOutputName::ConversationDataRetcode
+            | CicsOutputName::ConversationDataConvData
+            | CicsOutputName::ConversationDataState
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }

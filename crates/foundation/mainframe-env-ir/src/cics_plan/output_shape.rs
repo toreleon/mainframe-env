@@ -10,7 +10,14 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
         | CicsPlanOperation::FreeConversation
-        | CicsPlanOperation::GdsFreeConversation => {
+        | CicsPlanOperation::GdsFreeConversation
+        | CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => {
             super::conversation_control::output_allowed(operation, output)
         }
         CicsPlanOperation::Asktime => matches!(

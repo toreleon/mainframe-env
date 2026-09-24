@@ -13,6 +13,13 @@ pub enum CicsOutputName {
     ConversationSet,
     ConversationToLength,
     ConversationToFullLength,
+    ConversationDataInto,
+    ConversationDataSet,
+    ConversationDataLength,
+    ConversationDataFullLength,
+    ConversationDataRetcode,
+    ConversationDataConvData,
+    ConversationDataState,
     /// Verified eight-character user identity.
     SecurityIsUserId,
     /// Four-byte token encryption-key handle.

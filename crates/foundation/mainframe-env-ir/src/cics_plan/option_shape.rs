@@ -2,6 +2,15 @@ use super::{CicsEffectPlan, CicsPlanOperation, CicsPlanOption};
 
 pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
     plan.options.iter().any(|option| match plan.operation {
+        CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => {
+            !super::conversation_control::option_allowed(plan.operation, *option)
+        }
         CicsPlanOperation::AllocateConversation | CicsPlanOperation::GdsAllocateConversation => {
             !matches!(
                 option,

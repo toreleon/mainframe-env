@@ -100,6 +100,48 @@ pub enum GdsFreeFailure {
     NotOwned,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GdsReceiveFailure {
+    NotAppc,
+    NotBasic,
+    StateCheck,
+    NotOwned,
+    InvalidMaxFullLength,
+}
+
+impl GdsReceiveFailure {
+    #[must_use]
+    pub const fn retcode(self) -> GdsReturnCode {
+        GdsReturnCode(match self {
+            Self::NotAppc => [0x03, 0, 0, 0, 0, 0],
+            Self::NotBasic => [0x03, 0x04, 0, 0, 0, 0],
+            Self::StateCheck => [0x03, 0x08, 0, 0, 0, 0],
+            Self::NotOwned => [0x04, 0, 0, 0, 0, 0],
+            Self::InvalidMaxFullLength => [0x05, 0, 0, 0, 0x7f, 0xff],
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GdsWaitFailure {
+    NotAppc,
+    NotBasic,
+    StateCheck,
+    NotOwned,
+}
+
+impl GdsWaitFailure {
+    #[must_use]
+    pub const fn retcode(self) -> GdsReturnCode {
+        GdsReturnCode(match self {
+            Self::NotAppc => [0x03, 0, 0, 0, 0, 0],
+            Self::NotBasic => [0x03, 0x04, 0, 0, 0, 0],
+            Self::StateCheck => [0x03, 0x08, 0, 0, 0, 0],
+            Self::NotOwned => [0x04, 0, 0, 0, 0, 0],
+        })
+    }
+}
+
 impl GdsFreeFailure {
     #[must_use]
     pub const fn retcode(self) -> GdsReturnCode {
@@ -140,5 +182,10 @@ mod tests {
             [5, 0, 0, 0, 127, 255]
         );
         assert_eq!(GdsFreeFailure::StateCheck.retcode().0, [3, 8, 0, 0, 0, 0]);
+        assert_eq!(
+            GdsReceiveFailure::InvalidMaxFullLength.retcode().0,
+            [5, 0, 0, 0, 127, 255]
+        );
+        assert_eq!(GdsWaitFailure::NotBasic.retcode().0, [3, 4, 0, 0, 0, 0]);
     }
 }

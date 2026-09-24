@@ -73,10 +73,14 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::ConversationSyncLevel
         | CicsOperandName::ConversationFromLength
         | CicsOperandName::ConversationMaxLength
-        | CicsOperandName::ConversationToLength => SlotUse::HalfwordInput,
+        | CicsOperandName::ConversationToLength
+        | CicsOperandName::ConversationDataLength
+        | CicsOperandName::ConversationDataMaxLength => SlotUse::HalfwordInput,
         CicsOperandName::ConversationFromFullLength
         | CicsOperandName::ConversationMaxFullLength
-        | CicsOperandName::ConversationToFullLength => SlotUse::FullwordInput,
+        | CicsOperandName::ConversationToFullLength
+        | CicsOperandName::ConversationDataFullLength
+        | CicsOperandName::ConversationDataMaxFullLength => SlotUse::FullwordInput,
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
@@ -179,6 +183,13 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
         CicsOutputName::ConversationState => SlotUse::FullwordOutput,
+        CicsOutputName::ConversationDataState => SlotUse::FullwordOutput,
+        CicsOutputName::ConversationDataLength => SlotUse::HalfwordOutput,
+        CicsOutputName::ConversationDataFullLength => SlotUse::FullwordOutput,
+        CicsOutputName::ConversationDataSet => SlotUse::PointerOutput,
+        CicsOutputName::ConversationDataInto
+        | CicsOutputName::ConversationDataRetcode
+        | CicsOutputName::ConversationDataConvData => SlotUse::Output,
         CicsOutputName::ConversationToLength => SlotUse::HalfwordOutput,
         CicsOutputName::ConversationToFullLength => SlotUse::FullwordOutput,
         CicsOutputName::ConversationSet => SlotUse::PointerOutput,
@@ -312,7 +323,14 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsO
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
         | CicsPlanOperation::FreeConversation
-        | CicsPlanOperation::GdsFreeConversation => return None,
+        | CicsPlanOperation::GdsFreeConversation
+        | CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => return None,
         CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddSubevent => CicsOperation::AddSubevent,
         CicsPlanOperation::RemoveSubevent => CicsOperation::RemoveSubevent,
@@ -496,6 +514,14 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::ConversationMaxFullLength => "MAXFLENGTH",
         CicsOperandName::ConversationToLength => "TOLENGTH",
         CicsOperandName::ConversationToFullLength => "TOFLENGTH",
+        CicsOperandName::ConversationDataConvid => "CONVID",
+        CicsOperandName::ConversationDataSession => "SESSION",
+        CicsOperandName::ConversationDataFrom => "FROM",
+        CicsOperandName::ConversationDataLength => "LENGTH",
+        CicsOperandName::ConversationDataFullLength => "FLENGTH",
+        CicsOperandName::ConversationDataMaxLength => "MAXLENGTH",
+        CicsOperandName::ConversationDataMaxFullLength => "MAXFLENGTH",
+        CicsOperandName::ConversationDataAttachId => "ATTACHID",
         CicsOperandName::ResClass => "RESCLASS",
         CicsOperandName::ResId => "RESID",
         CicsOperandName::ResIdLength => "RESIDLENGTH",
@@ -811,6 +837,13 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::ConversationSet => "SET",
         CicsOutputName::ConversationToLength => "TOLENGTH",
         CicsOutputName::ConversationToFullLength => "TOFLENGTH",
+        CicsOutputName::ConversationDataInto => "INTO",
+        CicsOutputName::ConversationDataSet => "SET",
+        CicsOutputName::ConversationDataLength => "LENGTH",
+        CicsOutputName::ConversationDataFullLength => "FLENGTH",
+        CicsOutputName::ConversationDataRetcode => "RETCODE",
+        CicsOutputName::ConversationDataConvData => "CONVDATA",
+        CicsOutputName::ConversationDataState => "STATE",
         CicsOutputName::CounterValue => "VALUE",
         CicsOutputName::CounterMinimum => "MINIMUM",
         CicsOutputName::CounterMaximum => "MAXIMUM",
@@ -932,6 +965,15 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::ConversationNotruncate => "NOTRUNCATE",
         CicsPlanOption::ConversationDefresp => "DEFRESP",
         CicsPlanOption::ConversationFmh => "FMH",
+        CicsPlanOption::ConversationDataNotruncate => "NOTRUNCATE",
+        CicsPlanOption::ConversationDataBuffer => "BUFFER",
+        CicsPlanOption::ConversationDataLlid => "LLID",
+        CicsPlanOption::ConversationDataInvite => "INVITE",
+        CicsPlanOption::ConversationDataLast => "LAST",
+        CicsPlanOption::ConversationDataConfirm => "CONFIRM",
+        CicsPlanOption::ConversationDataWait => "WAIT",
+        CicsPlanOption::ConversationDataFmh => "FMH",
+        CicsPlanOption::ConversationDataDefresp => "DEFRESP",
         CicsPlanOption::DefResp => "DEFRESP",
         CicsPlanOption::NoWait => "NOWAIT",
         CicsPlanOption::Rrn => "RRN",

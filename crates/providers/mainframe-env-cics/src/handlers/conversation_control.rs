@@ -6,13 +6,18 @@
 
 use serde::{Deserialize, Serialize};
 
+mod data;
 mod definitions;
 mod gds;
 mod ledger;
 mod replay;
+pub use data::{
+    ConversationDataFrame, ConversationDataReply, ConversationDataState, DataCondition,
+};
 pub use definitions::{ConversationPartnerDefinition, ConversationProfileDefinition};
 pub use gds::{
-    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode,
+    GdsAllocateFailure, GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReceiveFailure,
+    GdsReturnCode, GdsWaitFailure,
 };
 pub use ledger::{
     CONVERSATION_STATE_NAMESPACE, ConversationAttachHeader, ConversationLedger,
@@ -29,6 +34,7 @@ pub const CONVERSATION_RECORD_VERSION: u16 = 2;
 pub const MAX_PROCESS_BYTES: usize = 64;
 /// Maximum APPC PIP list length, including each record's four-byte header.
 pub const MAX_PIP_BYTES: usize = 763;
+const MAX_CONVERSATION_RECORD_BYTES: usize = 384 * 1024;
 
 /// The session protocol selected at allocation, independent of its carrier.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -101,6 +107,10 @@ pub struct ConversationRecord {
     /// canonical v1 records, whose default is recovered by the v2 reader.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub processing_profile: Option<String>,
+    /// Pending peer and local data share this allocation's durable owner and
+    /// CAS lifecycle. Empty v1/v2 rows retain their canonical encoding.
+    #[serde(default, skip_serializing_if = "ConversationDataState::is_empty")]
+    pub data: ConversationDataState,
 }
 
 /// Local/DPL invocation context supplied by the trusted host boundary.
@@ -169,6 +179,7 @@ impl ConversationRecord {
             pip: Vec::new(),
             sequence: 0,
             processing_profile: Some(processing_profile.into()),
+            data: ConversationDataState::default(),
         };
         record.validate()?;
         Ok(record)
@@ -177,7 +188,7 @@ impl ConversationRecord {
     /// Decode an existing provider row. Unknown schema versions, malformed
     /// lengths and impossible state combinations cannot become live sessions.
     pub fn decode(bytes: &[u8]) -> Result<Self, ConversationProblem> {
-        if bytes.len() > 2048 {
+        if bytes.len() > MAX_CONVERSATION_RECORD_BYTES {
             return Err(ConversationProblem::Length);
         }
         let record: Self =
@@ -189,7 +200,7 @@ impl ConversationRecord {
     pub fn encode(&self) -> Result<Vec<u8>, ConversationProblem> {
         self.validate()?;
         let encoded = serde_json::to_vec(self).map_err(|_| ConversationProblem::Malformed)?;
-        if encoded.len() > 2048 {
+        if encoded.len() > MAX_CONVERSATION_RECORD_BYTES {
             return Err(ConversationProblem::Length);
         }
         Ok(encoded)
@@ -230,6 +241,7 @@ impl ConversationRecord {
             || self.pip.len() > MAX_PIP_BYTES
             || self.sync_level.is_some_and(|level| level > 2)
             || (self.released && self.state != ConversationState::Free)
+            || (self.released && !self.data.is_empty())
             || (self.process.is_none() && self.sync_level.is_some())
             || (self.kind != ConversationKind::Mro
                 && self.state != ConversationState::Allocated
@@ -239,6 +251,7 @@ impl ConversationRecord {
             return Err(ConversationProblem::Malformed);
         }
         validate_pip(&self.pip)?;
+        self.data.validate()?;
         Ok(())
     }
 
@@ -371,9 +384,13 @@ impl ConversationRecord {
         {
             return Err(ConversationProblem::WrongState);
         }
+        if self.data.pending_outbound() != 0 {
+            return Err(ConversationProblem::WrongState);
+        }
         self.next_sequence()?;
         self.state = ConversationState::Free;
         self.released = true;
+        self.data = ConversationDataState::default();
         Ok(())
     }
 

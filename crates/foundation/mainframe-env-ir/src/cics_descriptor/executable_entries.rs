@@ -4,7 +4,7 @@ mod security_entries;
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 160] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 167] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -1152,4 +1152,11 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 160] = [
     conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[6],
     conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[7],
     conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[8],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[9],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[10],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[11],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[12],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[13],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[14],
+    conversation_entries::CONVERSATION_EXECUTABLE_DESCRIPTORS[15],
 ];

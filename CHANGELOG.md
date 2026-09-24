@@ -4,6 +4,15 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Reserved distinct MCEP v2 identities for the seven CIC-905 conversation
+  data/wait rows, with typed COBOL plan lowering and source-bounded shapes.
+  Extended the shared durable conversation record with bounded peer data,
+  staged sends, explicit transmission acknowledgement, partial receive, and
+  GDS return-code contracts. The public routes remain unready pending selected
+  host dispatch and acceptance gates.
+
 ### Changed
 
 - Secret CICS payloads now share one zeroizing byte allocation across clones and

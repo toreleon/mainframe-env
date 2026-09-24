@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CONVERSATION_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 9] = [
+pub(super) const CONVERSATION_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 16] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::AllocateConversation,
         namespace: "cics.conversation",
@@ -69,6 +69,62 @@ pub(super) const CONVERSATION_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor;
         operation: CicsPlanOperation::GdsFreeConversation,
         namespace: "cics.conversation",
         name: "gds-free",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReceiveConversation,
+        namespace: "cics.conversation",
+        name: "receive",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::GdsReceiveConversation,
+        namespace: "cics.conversation",
+        name: "gds-receive",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendConversation,
+        namespace: "cics.conversation",
+        name: "send",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::GdsWaitConversation,
+        namespace: "cics.conversation",
+        name: "gds-wait",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitConvid,
+        namespace: "cics.conversation",
+        name: "wait-convid",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitSignal,
+        namespace: "cics.conversation",
+        name: "wait-signal",
+        major: 1,
+        effects: CONVERSATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitTerminal,
+        namespace: "cics.conversation",
+        name: "wait-terminal",
         major: 1,
         effects: CONVERSATION_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,

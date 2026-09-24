@@ -167,7 +167,8 @@ fn encode_cics_effect_plan_version(
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag(plan.operation))
             || (130..=139).contains(&operation_tag(plan.operation))
-            || (222..=230).contains(&operation_tag(plan.operation)))
+            || (222..=230).contains(&operation_tag(plan.operation))
+            || (259..=265).contains(&operation_tag(plan.operation)))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -241,7 +242,8 @@ pub fn decode_cics_effect_plan(
     if version == LEGACY_VERSION
         && ((91..=104).contains(&operation_tag)
             || (130..=139).contains(&operation_tag)
-            || (222..=230).contains(&operation_tag))
+            || (222..=230).contains(&operation_tag)
+            || (259..=265).contains(&operation_tag))
     {
         return Err(CicsPlanCodecProblem::Malformed);
     }
@@ -436,7 +438,14 @@ fn validate_operation_shape(
         | CicsPlanOperation::GdsConnectProcess
         | CicsPlanOperation::Converse
         | CicsPlanOperation::FreeConversation
-        | CicsPlanOperation::GdsFreeConversation => {
+        | CicsPlanOperation::GdsFreeConversation
+        | CicsPlanOperation::ReceiveConversation
+        | CicsPlanOperation::GdsReceiveConversation
+        | CicsPlanOperation::SendConversation
+        | CicsPlanOperation::GdsWaitConversation
+        | CicsPlanOperation::WaitConvid
+        | CicsPlanOperation::WaitSignal
+        | CicsPlanOperation::WaitTerminal => {
             conversation_control::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),

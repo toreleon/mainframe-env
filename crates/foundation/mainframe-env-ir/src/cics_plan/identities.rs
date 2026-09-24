@@ -22,6 +22,13 @@ pub enum CicsPlanOperation {
     FreeConversation,
     /// Return an APPC basic session after the peer reaches FREE.
     GdsFreeConversation,
+    ReceiveConversation,
+    GdsReceiveConversation,
+    SendConversation,
+    GdsWaitConversation,
+    WaitConvid,
+    WaitSignal,
+    WaitTerminal,
     /// Change a standard RACF password under one SAF effect.
     ChangePassword,
     /// Change a length-selected password or phrase under one SAF effect.
@@ -355,6 +362,14 @@ pub enum CicsOperandName {
     ConversationMaxFullLength,
     ConversationToLength,
     ConversationToFullLength,
+    ConversationDataConvid,
+    ConversationDataSession,
+    ConversationDataFrom,
+    ConversationDataLength,
+    ConversationDataFullLength,
+    ConversationDataMaxLength,
+    ConversationDataMaxFullLength,
+    ConversationDataAttachId,
     /// Security resource class supplied to QUERY SECURITY.
     ResClass,
     /// Security resource identifier supplied to QUERY SECURITY.
@@ -883,6 +898,15 @@ pub enum CicsPlanOption {
     ConversationNotruncate,
     ConversationDefresp,
     ConversationFmh,
+    ConversationDataNotruncate,
+    ConversationDataBuffer,
+    ConversationDataLlid,
+    ConversationDataInvite,
+    ConversationDataLast,
+    ConversationDataConfirm,
+    ConversationDataWait,
+    ConversationDataFmh,
+    ConversationDataDefresp,
     /// BasicAuth token syntax.
     SecurityBasicAuth,
     /// JSON Web Token syntax.

@@ -59,6 +59,30 @@ pub(super) fn invalid_shape(
             CicsOperandName::ConversationConvid,
             CicsOperandName::ConversationSession,
         ],
+        CicsPlanOperation::ReceiveConversation | CicsPlanOperation::GdsReceiveConversation => &[
+            CicsOperandName::ConversationDataConvid,
+            CicsOperandName::ConversationDataSession,
+            CicsOperandName::ConversationDataLength,
+            CicsOperandName::ConversationDataFullLength,
+            CicsOperandName::ConversationDataMaxLength,
+            CicsOperandName::ConversationDataMaxFullLength,
+        ],
+        CicsPlanOperation::SendConversation => &[
+            CicsOperandName::ConversationDataConvid,
+            CicsOperandName::ConversationDataSession,
+            CicsOperandName::ConversationDataFrom,
+            CicsOperandName::ConversationDataLength,
+            CicsOperandName::ConversationDataFullLength,
+            CicsOperandName::ConversationDataAttachId,
+        ],
+        CicsPlanOperation::GdsWaitConversation | CicsPlanOperation::WaitConvid => {
+            &[CicsOperandName::ConversationDataConvid]
+        }
+        CicsPlanOperation::WaitSignal => &[],
+        CicsPlanOperation::WaitTerminal => &[
+            CicsOperandName::ConversationDataConvid,
+            CicsOperandName::ConversationDataSession,
+        ],
         _ => return true,
     };
     if !inputs.is_subset(&allowed.iter().copied().collect())
@@ -115,6 +139,43 @@ pub(super) fn invalid_shape(
         CicsPlanOperation::GdsFreeConversation => {
             !has(CicsOperandName::ConversationConvid) || !out(CicsOutputName::ConversationRetcode)
         }
+        CicsPlanOperation::ReceiveConversation => {
+            has(CicsOperandName::ConversationDataConvid)
+                && has(CicsOperandName::ConversationDataSession)
+                || !out(CicsOutputName::ConversationDataInto)
+                    && !out(CicsOutputName::ConversationDataSet)
+                || out(CicsOutputName::ConversationDataInto)
+                    && out(CicsOutputName::ConversationDataSet)
+                || has(CicsOperandName::ConversationDataLength)
+                    && has(CicsOperandName::ConversationDataFullLength)
+                || has(CicsOperandName::ConversationDataMaxLength)
+                    && has(CicsOperandName::ConversationDataMaxFullLength)
+                || out(CicsOutputName::ConversationDataLength)
+                    && out(CicsOutputName::ConversationDataFullLength)
+        }
+        CicsPlanOperation::GdsReceiveConversation => {
+            !has(CicsOperandName::ConversationDataConvid)
+                || has(CicsOperandName::ConversationDataSession)
+                || !has(CicsOperandName::ConversationDataMaxFullLength)
+                || !out(CicsOutputName::ConversationDataRetcode)
+                || !out(CicsOutputName::ConversationDataFullLength)
+                || out(CicsOutputName::ConversationDataInto)
+                    == out(CicsOutputName::ConversationDataSet)
+        }
+        CicsPlanOperation::SendConversation => {
+            !has(CicsOperandName::ConversationDataFrom)
+                || has(CicsOperandName::ConversationDataConvid)
+                    && has(CicsOperandName::ConversationDataSession)
+                || has(CicsOperandName::ConversationDataLength)
+                    == has(CicsOperandName::ConversationDataFullLength)
+        }
+        CicsPlanOperation::GdsWaitConversation => !out(CicsOutputName::ConversationDataRetcode),
+        CicsPlanOperation::WaitConvid => !has(CicsOperandName::ConversationDataConvid),
+        CicsPlanOperation::WaitSignal => false,
+        CicsPlanOperation::WaitTerminal => {
+            has(CicsOperandName::ConversationDataConvid)
+                && has(CicsOperandName::ConversationDataSession)
+        }
         _ => true,
     };
     wrong
@@ -133,6 +194,10 @@ pub(super) fn invalid_shape(
                     | CicsOperandName::ConversationMaxFullLength
                     | CicsOperandName::ConversationToLength
                     | CicsOperandName::ConversationToFullLength
+                    | CicsOperandName::ConversationDataLength
+                    | CicsOperandName::ConversationDataFullLength
+                    | CicsOperandName::ConversationDataMaxLength
+                    | CicsOperandName::ConversationDataMaxFullLength
             );
             if numeric {
                 !matches!(
@@ -237,15 +302,81 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
     }
+
+    #[test]
+    fn data_wait_tags_and_source_shapes_are_v2_only() {
+        let operations = [
+            CicsPlanOperation::ReceiveConversation,
+            CicsPlanOperation::GdsReceiveConversation,
+            CicsPlanOperation::SendConversation,
+            CicsPlanOperation::GdsWaitConversation,
+            CicsPlanOperation::WaitConvid,
+            CicsPlanOperation::WaitSignal,
+            CicsPlanOperation::WaitTerminal,
+        ];
+        for (index, operation) in operations.into_iter().enumerate() {
+            let tag = 259 + index as u16;
+            assert_eq!(operation_tag(operation), tag);
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        assert_eq!(operand_tag(CicsOperandName::ConversationDataConvid), 1600);
+        assert_eq!(operand_tag(CicsOperandName::ConversationDataAttachId), 1607);
+        assert_eq!(option_tag(CicsPlanOption::ConversationDataNotruncate), 1532);
+        assert_eq!(option_tag(CicsPlanOption::ConversationDataDefresp), 1540);
+        assert_eq!(output_tag(CicsOutputName::ConversationDataInto), 1656);
+        assert_eq!(output_tag(CicsOutputName::ConversationDataState), 1662);
+
+        let mut receive = CicsEffectPlan {
+            operation: CicsPlanOperation::ReceiveConversation,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::ConversationDataConvid,
+                value: CicsOperandValue::Literal(b"ABCD".to_vec()),
+            }],
+            options: BTreeSet::from([CicsPlanOption::ConversationDataNotruncate]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::ConversationDataInto,
+                target: slot(1),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&receive, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(receive.clone()));
+        assert_eq!(
+            encode_cics_effect_plan_version(&receive, limits, LEGACY_VERSION),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        receive
+            .options
+            .insert(CicsPlanOption::ConversationDataInvite);
+        assert_eq!(
+            encode_cics_effect_plan(&receive, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
 }
 
-fn option_allowed(operation: CicsPlanOperation, option: CicsPlanOption) -> bool {
+pub(super) fn option_allowed(operation: CicsPlanOperation, option: CicsPlanOption) -> bool {
     if option == CicsPlanOption::NoHandle {
         return true;
     }
     matches!(
         (operation, option),
         (
+            CicsPlanOperation::ReceiveConversation,
+            CicsPlanOption::ConversationDataNotruncate
+        ) | (
+            CicsPlanOperation::GdsReceiveConversation,
+            CicsPlanOption::ConversationDataBuffer | CicsPlanOption::ConversationDataLlid
+        ) | (
+            CicsPlanOperation::SendConversation,
+            CicsPlanOption::ConversationDataInvite
+                | CicsPlanOption::ConversationDataLast
+                | CicsPlanOption::ConversationDataConfirm
+                | CicsPlanOption::ConversationDataWait
+                | CicsPlanOption::ConversationDataFmh
+                | CicsPlanOption::ConversationDataDefresp
+        ) | (
             CicsPlanOperation::AllocateConversation | CicsPlanOperation::GdsAllocateConversation,
             CicsPlanOption::ConversationNoQueue
         ) | (
@@ -264,6 +395,22 @@ pub(super) const fn output_allowed(operation: CicsPlanOperation, output: CicsOut
     matches!(
         (operation, output),
         (
+            CicsPlanOperation::ReceiveConversation
+                | CicsPlanOperation::GdsReceiveConversation
+                | CicsPlanOperation::SendConversation
+                | CicsPlanOperation::GdsWaitConversation
+                | CicsPlanOperation::WaitConvid,
+            CicsOutputName::ConversationDataState
+        ) | (
+            CicsPlanOperation::ReceiveConversation | CicsPlanOperation::GdsReceiveConversation,
+            CicsOutputName::ConversationDataInto
+                | CicsOutputName::ConversationDataSet
+                | CicsOutputName::ConversationDataLength
+                | CicsOutputName::ConversationDataFullLength
+        ) | (
+            CicsPlanOperation::GdsReceiveConversation | CicsPlanOperation::GdsWaitConversation,
+            CicsOutputName::ConversationDataRetcode | CicsOutputName::ConversationDataConvData
+        ) | (
             CicsPlanOperation::AllocateConversation
                 | CicsPlanOperation::GdsAllocateConversation
                 | CicsPlanOperation::ConnectProcess
