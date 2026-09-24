@@ -48,6 +48,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Added APPC basic GDS FREE with six-byte RETCODE outcomes and source-pinned
+  zero STATE CVDA after release. A trusted peer-completion hook records FREE
+  protocol state and an exact replay receipt before GDS FREE can return session
+  capacity; it does not treat message delivery as peer completion. Isolated
+  readiness is 159 typed, 0 legacy, and 104 unready.
+
 - Added mapped APPC/MRO FREE for an explicit CONVID or the task's principal
   facility. The durable CAS release and replay return the session to capacity;
   STATE receives the pinned zero CVDA after release. DPL principal, basic
