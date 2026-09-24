@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Split mapped and basic APPC PIP bounds to the source limits of 32,763 and
+  763 bytes, respectively. A separately versioned PARTNER process definition
+  now retains the 1–64-byte remote TPNAME/XTPNAME without changing earlier
+  allocation definitions. CONNECT PROCESS routes remain the next feature.
+
 - Added BUILD ATTACH for task-owned MRO attach headers. The command replaces
   the named durable header, applies source defaults to omitted fields, checks
   low-order SNA bit fields, and retains an exact replay receipt. The compiled

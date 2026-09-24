@@ -132,11 +132,11 @@ pub(super) use condition::respond as condition;
 pub use conversation_control::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
     ConversationAttachHeader, ConversationContext, ConversationKind, ConversationLedger,
-    ConversationOwner, ConversationPartnerDefinition, ConversationProblem,
-    ConversationProfileDefinition, ConversationRecord, ConversationReplay, ConversationReply,
-    ConversationState, ConversationSystemDefinition, GdsAllocateFailure, GdsAssignFailure,
-    GdsConnectFailure, GdsFreeFailure, GdsReturnCode, MAX_PIP_BYTES, MAX_PROCESS_BYTES,
-    load_conversation_replay, prune_conversation_replays,
+    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationProblem, ConversationProfileDefinition, ConversationRecord, ConversationReplay,
+    ConversationReply, ConversationState, ConversationSystemDefinition, GdsAllocateFailure,
+    GdsAssignFailure, GdsConnectFailure, GdsFreeFailure, GdsReturnCode, MAX_BASIC_PIP_BYTES,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES, load_conversation_replay, prune_conversation_replays,
 };
 pub(super) use conversation_control::{
     context as conversation_context, deadline as conversation_deadline,
