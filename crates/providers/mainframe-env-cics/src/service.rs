@@ -5362,6 +5362,113 @@ mod tests {
     }
 
     #[test]
+    fn bts_selected_link_reconciles_outer_receipt_after_sqlite_reopen() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsMode, BtsProcess};
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-link-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let seen: ProgramLinkTrace = Arc::new(Mutex::new(Vec::new()));
+        let providers = vec![
+            Arc::new(Authority {
+                descriptor: descriptor("host.security.authorize"),
+            }) as Arc<dyn HostProvider>,
+            Arc::new(TracedProgramAuthority {
+                descriptor: descriptor("host.program.invoke"),
+                seen: seen.clone(),
+            }) as Arc<dyn HostProvider>,
+        ];
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ));
+        let invocation = invocation_for("bts-link-sqlite", BTreeMap::new());
+        let link = request(
+            CicsOperation::LinkAcqProcess,
+            BTreeMap::from([("OPTION.ACQPROCESS".into(), cics_option())]),
+            1,
+        );
+        let root = BtsLifecycleStore::root_id("TYPE", "PROC").unwrap();
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics =
+                CicsService::open(host.clone(), store.clone(), CicsLimits::default()).unwrap();
+            let session = SessionId::new("bts-link-sqlite-first", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            register_load_program(&cics, store.as_ref(), "BTSRUN", 1, b"compiled-program", 0);
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            authority
+                .define_process(
+                    BtsProcess::new(
+                        "TYPE",
+                        "PROC",
+                        &root,
+                        "BTSRUN",
+                        "MENU",
+                        "IBMUSER",
+                        invocation.run_unit_id.as_str(),
+                    )
+                    .unwrap(),
+                    invocation.run_unit_id.as_str(),
+                    invocation.execution_id.as_str(),
+                    invocation.principal.id().as_str(),
+                )
+                .unwrap();
+            cics.inject_replay_unknown_after_persist_once();
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, link.clone(), 1),
+                    link.clone()
+                ),
+                Err(HostProblem::UnknownOutcome)
+            );
+            assert_eq!(seen.lock().unwrap().len(), 1);
+            assert_eq!(
+                authority
+                    .load_process("TYPE", "PROC")
+                    .unwrap()
+                    .unwrap()
+                    .activities[&root]
+                    .mode,
+                BtsMode::Dormant
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+            let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            let session = SessionId::new("bts-link-sqlite-second", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let response = cics
+                .invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link)
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("NORMAL", 0, 0)
+            );
+            assert_eq!(seen.lock().unwrap().len(), 1);
+            assert!(
+                store
+                    .get_provider_state("cics-bts-link-frame-v1", invocation.run_unit_id.as_str())
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn bts_named_child_and_acquired_activity_use_shared_tree_and_uow_lease() {
         use handlers::bts_lifecycle::{
             BtsActivity, BtsActivityIndex, BtsCompletion, BtsLifecycleStore, BtsMode, BtsProcess,
