@@ -1,0 +1,30 @@
+{
+  "schema_version": "mainframe-env.cics-oracle-capture@1",
+  "candidate_digest": "sha256:c4e5c4d7d40d6c5618ae4cde2e478d18a531f690f4eebacf44cf16959f70c984",
+  "spec_digest": "sha256:039a321b1319aaea8e7905f6e50e6fa88c995a9f08a15bd1fcd78fd8a9f4bfa6",
+  "fixture_digest": "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b",
+  "source_review_digest": "sha256:e2371ad6d757c9a1f59294541439c4563fcf43461fb837e1ef153e618213adef",
+  "environment_manifest_digest": "sha256:1105c9abe56a32e261e73b8e8d1fb71c4b1038637ac53ff33a5ffbd9134e9e64",
+  "comparison_policy": "cics-file-uow-comparison@2",
+  "raw_capture_digest": "sha256:03305af9e0f7b2c36604c553fc0136fceace72d8ed657c3dcbe4f4064b818a9b",
+  "observations": [
+    {"scenario_id": "plain-read", "application_output": "PLAIN:000:000:AA11\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "read-update", "application_output": "UPDATE1:000:000:AA11\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "missing-record", "application_output": "MISSING:013:080\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "unauthorized", "application_output": "UNAUTHORIZED:070:101\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "closed-file", "application_output": "CLOSED:019:060\nCLOSEDENABLED:000:000:AA22\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "requires-read-update", "application_output": "INVPLAIN:000:000:AA11\nINVALID:016:030\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "rewrite-record", "application_output": "UPDATE1:000:000:AA11\nREWRITE1:000:000\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "forbidden-mutation-on-invreq", "application_output": "INVPLAIN:000:000:AA11\nINVALID:016:030\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "context-invalidated-at-syncpoint", "application_output": "CTXREAD:000:000:AA22\nCTXSYNC:000:000\nCTXREWRITE:016:030\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "commit-boundary", "application_output": "COMMIT:000:000\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "rollback-boundary", "application_output": "UPDATE2:000:000:AA22\nREWRITE2:000:000\nPREBACKOUT:000:000:AA33\nROLLBACK:000:000\nFINAL:000:000:AA22\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "durable-restart", "application_output": "before-intent:RECOVERED:000:000\nafter-intent:RECOVERED:000:000\nafter-mutation:RECOVERED:000:000\n", "record_hex": "c1c1f1f1"}
+  ],
+  "origin": {
+    "kind": "local",
+    "authority": "cer1701-synthetic-fixture",
+    "run_job_id": "synthetic-run-1",
+    "signature": null
+  }
+}

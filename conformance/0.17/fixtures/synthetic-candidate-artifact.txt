@@ -1,0 +1,2 @@
+CER-1701 synthetic candidate artifact for zero-credit harness plumbing.
+It contains no executable, licensed output, credential, or customer data.

@@ -48,6 +48,15 @@ All notable changes to mainframe-env are documented here.
   applicability and rejection mapping. It adds no route, profile behavior,
   universal 2PC, or exactly-once claim.
 
+- Added the CER-1701 licensed-certification harness foundation. Versioned
+  zero-credit contracts now bind external environment facts, product and
+  service/APAR/PTF identity, locale/CCSID, topology, authorization,
+  capabilities, independent fixtures, reviewed normalization, bounds, source
+  candidate, catalogs/spec, artifacts, legacy adapter receipts, and replay
+  commands. Ten subsystem/cross-resource slots remain explicitly pending;
+  synthetic fixtures and fail-closed mutation tests validate plumbing without
+  claiming licensed IBM differential credit.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,
