@@ -1081,6 +1081,56 @@ mod tests {
     }
 
     #[test]
+    fn issue_reply_rejects_malformed_host_outputs_before_storage_write() {
+        for (name, schema, width) in [
+            ("CONVDATA", "mainframe-env.cics.payload@1", 24usize),
+            ("RETCODE", "mainframe-env.cics.gds-retcode@1", 6usize),
+            ("STATE", "mainframe-env.cics.cvda@1", 4usize),
+        ] {
+            let (mut machine, slot) = machine_with_alphanumeric_slot("OUTPUT-X", width);
+            let target = CicsTarget::Resolved(slot.clone());
+            write_resolved(&mut machine, &slot, &CobolValue::Bytes(vec![b'X'; width])).unwrap();
+            for bad_width in [width - 1, width + 1] {
+                let result = write_output(
+                    &mut machine,
+                    CicsOperation::GdsIssueAbend,
+                    name,
+                    &target,
+                    &payload(schema, vec![0; bad_width]).unwrap(),
+                    None,
+                );
+                assert_eq!(result, Err(MachineProblem::UnexpectedHostResult));
+                assert_eq!(machine.read("OUTPUT-X").unwrap(), vec![b'X'; width]);
+            }
+            if name != "CONVDATA" {
+                let wrong_schema = payload("mainframe-env.cics.payload@1", vec![0; width]).unwrap();
+                assert_eq!(
+                    write_output(
+                        &mut machine,
+                        CicsOperation::GdsIssueAbend,
+                        name,
+                        &target,
+                        &wrong_schema,
+                        None,
+                    ),
+                    Err(MachineProblem::UnexpectedHostResult)
+                );
+                assert_eq!(machine.read("OUTPUT-X").unwrap(), vec![b'X'; width]);
+            }
+            write_output(
+                &mut machine,
+                CicsOperation::GdsIssueAbend,
+                name,
+                &target,
+                &payload(schema, vec![0; width]).unwrap(),
+                None,
+            )
+            .unwrap();
+            assert_eq!(machine.read("OUTPUT-X").unwrap(), vec![0; width]);
+        }
+    }
+
+    #[test]
     fn issue_pass_halfword_length_reaches_host_as_decimal() {
         let mut builder = ModuleBuilder::new(IrLimits::default());
         let from = builder.add_storage("FROM-X", 3, None).unwrap();

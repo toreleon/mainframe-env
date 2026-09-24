@@ -8,6 +8,28 @@ pub(in crate::machine) fn write_output(
     value: &BoundedPayload,
     load_base: Option<usize>,
 ) -> Result<(), MachineProblem> {
+    if matches!(
+        operation,
+        CicsOperation::IssueAbend
+            | CicsOperation::GdsIssueAbend
+            | CicsOperation::IssueConfirmation
+            | CicsOperation::GdsIssueConfirmation
+            | CicsOperation::IssueError
+            | CicsOperation::GdsIssueError
+            | CicsOperation::IssuePrepare
+            | CicsOperation::GdsIssuePrepare
+            | CicsOperation::IssueSignal
+            | CicsOperation::GdsIssueSignal
+    ) && match name {
+        "STATE" => value.schema() != "mainframe-env.cics.cvda@1" || value.bytes().len() != 4,
+        "CONVDATA" => value.bytes().len() != 24,
+        "RETCODE" => {
+            value.schema() != "mainframe-env.cics.gds-retcode@1" || value.bytes().len() != 6
+        }
+        _ => false,
+    } {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
     if web_service_control::write_output(machine, operation, name, target, value)? {
         return Ok(());
     }

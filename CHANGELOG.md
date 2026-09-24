@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Rejected malformed mapped/GDS ISSUE STATE, CONVDATA, and RETCODE host outputs
+  before writing receiving storage. Exact reply lengths and the shared GDS
+  return-code schema now guard the typed interpreter boundary.
+
 - Corrected the typed ISSUE PASS effect builder to convert its halfword
   `LENGTH` input to canonical decimal bytes before provider dispatch. A
   selected-plan regression covers the storage-to-host boundary.
