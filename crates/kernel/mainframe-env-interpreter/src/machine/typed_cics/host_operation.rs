@@ -2,6 +2,13 @@ use super::*;
 
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> Option<CicsOperation> {
     Some(match operation {
+        CicsPlanOperation::BtsEndBrowseEvent => CicsOperation::BtsEndBrowseEvent,
+        CicsPlanOperation::BtsGetNextEvent => CicsOperation::BtsGetNextEvent,
+        CicsPlanOperation::BtsInquireEvent => CicsOperation::BtsInquireEvent,
+        CicsPlanOperation::BtsStartBrowseEvent => CicsOperation::BtsStartBrowseEvent,
+        CicsPlanOperation::BtsEndBrowseTimer => CicsOperation::BtsEndBrowseTimer,
+        CicsPlanOperation::BtsInquireTimer => CicsOperation::BtsInquireTimer,
+        CicsPlanOperation::BtsStartBrowseTimer => CicsOperation::BtsStartBrowseTimer,
         CicsPlanOperation::BtsStartBrowseActivity => CicsOperation::BtsStartBrowseActivity,
         CicsPlanOperation::BtsGetNextActivity => CicsOperation::BtsGetNextActivity,
         CicsPlanOperation::BtsEndBrowseActivity => CicsOperation::BtsEndBrowseActivity,

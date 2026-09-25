@@ -44,6 +44,13 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::BtsEndBrowseEvent => 198,
+        CicsPlanOperation::BtsGetNextEvent => 203,
+        CicsPlanOperation::BtsInquireEvent => 208,
+        CicsPlanOperation::BtsStartBrowseEvent => 213,
+        CicsPlanOperation::BtsEndBrowseTimer => 200,
+        CicsPlanOperation::BtsInquireTimer => 210,
+        CicsPlanOperation::BtsStartBrowseTimer => 215,
         CicsPlanOperation::BtsEndBrowseActivity => 196,
         CicsPlanOperation::BtsGetNextActivity => 201,
         CicsPlanOperation::BtsInquireActivity => 206,
@@ -276,6 +283,13 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        198 => Ok(CicsPlanOperation::BtsEndBrowseEvent),
+        203 => Ok(CicsPlanOperation::BtsGetNextEvent),
+        208 => Ok(CicsPlanOperation::BtsInquireEvent),
+        213 => Ok(CicsPlanOperation::BtsStartBrowseEvent),
+        200 => Ok(CicsPlanOperation::BtsEndBrowseTimer),
+        210 => Ok(CicsPlanOperation::BtsInquireTimer),
+        215 => Ok(CicsPlanOperation::BtsStartBrowseTimer),
         196 => Ok(CicsPlanOperation::BtsEndBrowseActivity),
         201 => Ok(CicsPlanOperation::BtsGetNextActivity),
         206 => Ok(CicsPlanOperation::BtsInquireActivity),
@@ -821,7 +835,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
-        960..=963 => super::BtsBrowseInput::from_tag(value)
+        960..=965 => super::BtsBrowseInput::from_tag(value)
             .map(CicsOperandName::BtsBrowse)
             .ok_or(CicsPlanCodecProblem::Malformed),
         704 => Ok(CicsOperandName::BtsActivityId),

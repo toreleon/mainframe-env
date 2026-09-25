@@ -458,7 +458,14 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
-        CicsPlanOperation::BtsStartBrowseActivity
+        CicsPlanOperation::BtsEndBrowseEvent
+        |         CicsPlanOperation::BtsGetNextEvent
+        |         CicsPlanOperation::BtsInquireEvent
+        |         CicsPlanOperation::BtsStartBrowseEvent
+        |         CicsPlanOperation::BtsEndBrowseTimer
+        |         CicsPlanOperation::BtsInquireTimer
+        |         CicsPlanOperation::BtsStartBrowseTimer
+        |         CicsPlanOperation::BtsStartBrowseActivity
         | CicsPlanOperation::BtsGetNextActivity
         | CicsPlanOperation::BtsEndBrowseActivity
         | CicsPlanOperation::BtsInquireActivity

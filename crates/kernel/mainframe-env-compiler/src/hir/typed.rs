@@ -5185,9 +5185,31 @@ mod tests {
     }
 
     #[test]
-    fn bts_browse_eight_rows_lower_with_exact_receivers() {
-        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 ACT-X PIC X(16). 01 ACTID-X PIC X(52). 01 PROC-X PIC X(36). 01 LEVEL-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
+    fn bts_browse_fifteen_rows_lower_with_exact_receivers() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 ACT-X PIC X(16). 01 ACTID-X PIC X(52). 01 PROC-X PIC X(36). 01 EVENT-X PIC X(16). 01 LEVEL-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
         for (source, expected) in [
+            (
+                "ENDBROWSE EVENT BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseEvent,
+            ),
+            (
+                "GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextEvent,
+            ),
+            ("INQUIRE EVENT('READY')", HirCicsOperation::BtsInquireEvent),
+            (
+                "STARTBROWSE EVENT BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseEvent,
+            ),
+            (
+                "ENDBROWSE TIMER BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseTimer,
+            ),
+            ("INQUIRE TIMER('WAKE')", HirCicsOperation::BtsInquireTimer),
+            (
+                "STARTBROWSE TIMER('WAKE') BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseTimer,
+            ),
             (
                 "ENDBROWSE ACTIVITY BROWSETOKEN(TOKEN-X)",
                 HirCicsOperation::BtsEndBrowseActivity,
@@ -5237,6 +5259,9 @@ mod tests {
             assert_eq!(selected, Some(expected), "{source}");
         }
         for source in [
+            "INQUIRE EVENT('DFHINITIAL')",
+            "GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) EVENTTYPE(LEVEL-X)",
+            "INQUIRE TIMER('WAKE') ABSTIME(LEVEL-X)",
             "STARTBROWSE ACTIVITY PROCESS('P1') BROWSETOKEN(TOKEN-X)",
             "GETNEXT ACTIVITY(PROC-X) BROWSETOKEN(TOKEN-X)",
             "INQUIRE ACTIVITYID('A1') MODE(LEVEL-X)",

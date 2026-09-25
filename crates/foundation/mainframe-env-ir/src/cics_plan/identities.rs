@@ -6,6 +6,13 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    BtsEndBrowseEvent,
+    BtsGetNextEvent,
+    BtsInquireEvent,
+    BtsStartBrowseEvent,
+    BtsEndBrowseTimer,
+    BtsInquireTimer,
+    BtsStartBrowseTimer,
     BtsStartBrowseActivity,
     BtsGetNextActivity,
     BtsEndBrowseActivity,

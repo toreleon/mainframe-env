@@ -1,4 +1,4 @@
-//! Selected ACTIVITY and PROCESS BTS browse command routes.
+//! Selected BTS browse command routes.
 
 use super::super::bts_lifecycle::{BtsActivity, BtsLifecycleStore};
 use super::*;
@@ -9,6 +9,7 @@ use mainframe_env_host_api::{
 };
 
 type Outputs = Vec<(&'static str, &'static str, Vec<u8>)>;
+mod event_timer;
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
@@ -48,6 +49,9 @@ pub(in crate::service) fn invoke(
         }
     }
     let outputs = match request.operation {
+        operation if event_timer::is_operation(operation) => {
+            event_timer::invoke(service, run, request, &authority, &cursors, &owner)?
+        }
         CicsOperation::BtsStartBrowseProcess => {
             let process_type = text_arg(request, "PROCESSTYPE", 8)?;
             let definition = authority
@@ -375,6 +379,14 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         &[&str],
         &[&str],
     ) = match request.operation {
+        CicsOperation::BtsStartBrowseEvent => (&[], &["ACTIVITYID"], &["BROWSETOKEN"], &[]),
+        CicsOperation::BtsStartBrowseTimer => (&["TIMER"], &["ACTIVITYID"], &["BROWSETOKEN"], &[]),
+        CicsOperation::BtsGetNextEvent => (&["BROWSETOKEN"], &[], &["EVENT"], &[]),
+        CicsOperation::BtsEndBrowseEvent | CicsOperation::BtsEndBrowseTimer => {
+            (&["BROWSETOKEN"], &[], &[], &[])
+        }
+        CicsOperation::BtsInquireEvent => (&["EVENT"], &["ACTIVITYID"], &[], &[]),
+        CicsOperation::BtsInquireTimer => (&["TIMER"], &["ACTIVITYID"], &[], &[]),
         CicsOperation::BtsStartBrowseProcess => (&["PROCESSTYPE"], &[], &["BROWSETOKEN"], &[]),
         CicsOperation::BtsStartBrowseActivity => (
             &[],
@@ -462,6 +474,14 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
             return Err(HostProblem::Malformed);
         }
     }
+    if request.operation == CicsOperation::BtsInquireEvent
+        && request.arguments.get("EVENT").is_some_and(|value| {
+            std::str::from_utf8(value.bytes())
+                .is_ok_and(|name| name.to_ascii_uppercase().starts_with("DFH"))
+        })
+    {
+        return Err(HostProblem::Unsupported);
+    }
     Ok(())
 }
 
@@ -505,6 +525,19 @@ fn replay_outputs(request: &CicsRequest, outcome: BrowseOutcome) -> Result<Outpu
             "BROWSETOKEN",
             "mainframe-env.cics.decimal@1",
             token.to_string().into_bytes(),
+        )]),
+        (
+            CicsOperation::BtsStartBrowseEvent | CicsOperation::BtsStartBrowseTimer,
+            BrowseOutcome::Token(token),
+        ) => Ok(vec![(
+            "BROWSETOKEN",
+            "mainframe-env.cics.decimal@1",
+            token.to_string().into_bytes(),
+        )]),
+        (CicsOperation::BtsGetNextEvent, BrowseOutcome::Item(item)) => Ok(vec![(
+            "EVENT",
+            "mainframe-env.cics.payload@1",
+            padded(&item.name, 16)?,
         )]),
         (CicsOperation::BtsGetNextProcess, BrowseOutcome::Item(item)) => {
             let mut values = vec![(
@@ -554,7 +587,10 @@ fn replay_outputs(request: &CicsRequest, outcome: BrowseOutcome) -> Result<Outpu
             Ok(values)
         }
         (
-            CicsOperation::BtsEndBrowseActivity | CicsOperation::BtsEndBrowseProcess,
+            CicsOperation::BtsEndBrowseActivity
+            | CicsOperation::BtsEndBrowseProcess
+            | CicsOperation::BtsEndBrowseEvent
+            | CicsOperation::BtsEndBrowseTimer,
             BrowseOutcome::Ended,
         ) => Ok(Vec::new()),
         _ => Err(HostProblem::InfrastructureFailure),
@@ -617,6 +653,42 @@ mod tests {
                 mutation: None,
             };
             assert_eq!(validate(&request), Err(HostProblem::Unsupported));
+        }
+    }
+
+    #[test]
+    fn bts_browse_event_timer_unsupported_forms_fail_before_authority_access() {
+        let argument = |bytes: &[u8]| {
+            BoundedPayload::new(
+                "mainframe-env.cics.argument@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        for (operation, arguments, expected) in [
+            (
+                CicsOperation::BtsInquireEvent,
+                [("EVENT".into(), argument(b"DFHINITIAL"))].into(),
+                HostProblem::Unsupported,
+            ),
+            (
+                CicsOperation::BtsInquireTimer,
+                [
+                    ("TIMER".into(), argument(b"WAKE")),
+                    ("ABSTIME".into(), argument(b"OUT")),
+                ]
+                .into(),
+                HostProblem::Malformed,
+            ),
+        ] {
+            let request = CicsRequest {
+                operation,
+                arguments,
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: None,
+            };
+            assert_eq!(validate(&request), Err(expected));
         }
     }
 }

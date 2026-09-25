@@ -77,6 +77,8 @@ pub struct BrowseScope {
     pub epoch: u64,
     pub process_type: Option<String>,
     pub process_name: Option<String>,
+    #[serde(default)]
+    pub activity_id: Option<String>,
 }
 
 impl BrowseScope {
@@ -101,6 +103,7 @@ impl BrowseScope {
             epoch,
             process_type: None,
             process_name: None,
+            activity_id: None,
         })
     }
 
@@ -121,6 +124,12 @@ impl BrowseScope {
         Ok(self)
     }
 
+    pub fn with_activity(mut self, activity_id: &str) -> Result<Self, HostProblem> {
+        super::bts_lifecycle::validate_activity_id(activity_id)?;
+        self.activity_id = Some(activity_id.into());
+        Ok(self)
+    }
+
     fn validate(&self) -> Result<(), HostProblem> {
         Self::new(
             self.kind,
@@ -137,6 +146,10 @@ impl BrowseScope {
                 .as_deref()
                 .is_some_and(|name| super::bts_lifecycle::validate_name(name, 36, true).is_err())
             || self.process_name.is_some() && self.process_type.is_none()
+            || self
+                .activity_id
+                .as_deref()
+                .is_some_and(|id| super::bts_lifecycle::validate_activity_id(id).is_err())
         {
             return Err(HostProblem::Malformed);
         }
@@ -269,7 +282,10 @@ impl BrowseBook {
             .items
             .get(cursor.position)
             .ok_or_else(end_of_browse)?;
-        let epoch = if kind == BrowseKind::Process {
+        let epoch = if matches!(
+            kind,
+            BrowseKind::Process | BrowseKind::Event | BrowseKind::Timer
+        ) {
             item.resource_epoch
         } else {
             cursor.scope.epoch
@@ -375,6 +391,24 @@ mod tests {
         book.end(token, BrowseKind::Process).unwrap();
         assert!(book.start(scope, vec![process_item("P"); 257]).is_err());
         book.validate().unwrap();
+    }
+
+    #[test]
+    fn bts_browse_event_timer_cursor_kinds_and_state_epoch() {
+        let mut book = BrowseBook::default();
+        for kind in [BrowseKind::Event, BrowseKind::Timer] {
+            let scope = BrowseScope::new(kind, "BTSEVENT", "CICS.BTS.A.BROWSE", 7).unwrap();
+            let item = BrowseItem::new("READY", None, 0)
+                .unwrap()
+                .with_epoch(3)
+                .unwrap();
+            let token = book.start(scope, vec![item.clone()]).unwrap();
+            assert_eq!(book.peek(token, kind), Ok(item.clone()));
+            assert_eq!(book.next(token, kind, 4, &item), Err(token_error()));
+            assert_eq!(book.next(token, kind, 3, &item), Ok(item));
+            assert!(book.peek(token, kind).is_err());
+            book.end(token, kind).unwrap();
+        }
     }
 
     #[test]

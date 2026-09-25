@@ -15,6 +15,13 @@ impl CicsOperation {
             .get(1)
             .map(|word| word.split('(').next().unwrap_or(word));
         Some(match (first, second) {
+            ("ENDBROWSE", Some("EVENT")) => Self::BtsEndBrowseEvent,
+            ("GETNEXT", Some("EVENT")) => Self::BtsGetNextEvent,
+            ("INQUIRE", Some("EVENT")) => Self::BtsInquireEvent,
+            ("STARTBROWSE", Some("EVENT")) => Self::BtsStartBrowseEvent,
+            ("ENDBROWSE", Some("TIMER")) => Self::BtsEndBrowseTimer,
+            ("INQUIRE", Some("TIMER")) => Self::BtsInquireTimer,
+            ("STARTBROWSE", Some("TIMER")) => Self::BtsStartBrowseTimer,
             ("STARTBROWSE", Some("ACTIVITY")) => Self::BtsStartBrowseActivity,
             ("GETNEXT", Some("ACTIVITY")) => Self::BtsGetNextActivity,
             ("ENDBROWSE", Some("ACTIVITY")) => Self::BtsEndBrowseActivity,

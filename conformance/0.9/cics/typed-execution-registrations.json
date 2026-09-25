@@ -1418,6 +1418,55 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
     },
     {
+      "operation": "BtsEndBrowseEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0061"
+    },
+    {
+      "operation": "BtsGetNextEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0091"
+    },
+    {
+      "operation": "BtsInquireEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0103"
+    },
+    {
+      "operation": "BtsStartBrowseEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0211"
+    },
+    {
+      "operation": "BtsEndBrowseTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0063"
+    },
+    {
+      "operation": "BtsInquireTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0105"
+    },
+    {
+      "operation": "BtsStartBrowseTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0213"
+    },
+    {
       "operation": "BtsEndBrowseActivity",
       "interface": "api",
       "family": "bts-control",

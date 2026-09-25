@@ -819,6 +819,13 @@ impl PlanContext<'_> {
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
         HirCicsOperation::AcquireActivityId => CicsPlanOperation::AcquireActivityId,
+        HirCicsOperation::BtsEndBrowseEvent => CicsPlanOperation::BtsEndBrowseEvent,
+        HirCicsOperation::BtsGetNextEvent => CicsPlanOperation::BtsGetNextEvent,
+        HirCicsOperation::BtsInquireEvent => CicsPlanOperation::BtsInquireEvent,
+        HirCicsOperation::BtsStartBrowseEvent => CicsPlanOperation::BtsStartBrowseEvent,
+        HirCicsOperation::BtsEndBrowseTimer => CicsPlanOperation::BtsEndBrowseTimer,
+        HirCicsOperation::BtsInquireTimer => CicsPlanOperation::BtsInquireTimer,
+        HirCicsOperation::BtsStartBrowseTimer => CicsPlanOperation::BtsStartBrowseTimer,
         HirCicsOperation::BtsStartBrowseActivity => CicsPlanOperation::BtsStartBrowseActivity,
         HirCicsOperation::BtsGetNextActivity => CicsPlanOperation::BtsGetNextActivity,
         HirCicsOperation::BtsEndBrowseActivity => CicsPlanOperation::BtsEndBrowseActivity,

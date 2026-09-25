@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 92] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 99] = [
     CicsCommandDescriptor {
         operation: CicsOperation::Monitor,
         syntax: "MONITOR",
@@ -588,6 +588,55 @@ pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 92] = [
         operation: CicsOperation::LinkActivity,
         syntax: "LINK ACTIVITY",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0141",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsEndBrowseEvent,
+        syntax: "ENDBROWSE EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0061",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsGetNextEvent,
+        syntax: "GETNEXT EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0091",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsInquireEvent,
+        syntax: "INQUIRE EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0103",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsStartBrowseEvent,
+        syntax: "STARTBROWSE EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0211",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsEndBrowseTimer,
+        syntax: "ENDBROWSE TIMER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0063",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsInquireTimer,
+        syntax: "INQUIRE TIMER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0105",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsStartBrowseTimer,
+        syntax: "STARTBROWSE TIMER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0213",
         family: CicsCommandFamily::BtsControl,
         mutating: true,
     },

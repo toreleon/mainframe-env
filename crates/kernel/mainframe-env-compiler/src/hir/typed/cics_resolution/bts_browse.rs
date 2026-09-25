@@ -1,4 +1,4 @@
-//! Source-bounded lowering for the eight ACTIVITY and PROCESS browse rows.
+//! Source-bounded lowering for ACTIVITY, PROCESS, EVENT, and TIMER browse rows.
 
 use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
@@ -16,6 +16,13 @@ pub(super) const fn is_browse(operation: HirCicsOperation) -> bool {
     matches!(
         operation,
         HirCicsOperation::BtsStartBrowseActivity
+            | HirCicsOperation::BtsEndBrowseEvent
+            | HirCicsOperation::BtsGetNextEvent
+            | HirCicsOperation::BtsInquireEvent
+            | HirCicsOperation::BtsStartBrowseEvent
+            | HirCicsOperation::BtsEndBrowseTimer
+            | HirCicsOperation::BtsInquireTimer
+            | HirCicsOperation::BtsStartBrowseTimer
             | HirCicsOperation::BtsGetNextActivity
             | HirCicsOperation::BtsEndBrowseActivity
             | HirCicsOperation::BtsInquireActivity
@@ -36,8 +43,8 @@ pub(super) fn selector_matches(
         }
         [
             "STARTBROWSE" | "GETNEXT" | "ENDBROWSE" | "INQUIRE",
-            "PROCESS",
-        ] => Some("PROCESS"),
+            "PROCESS" | "EVENT" | "TIMER",
+        ] => Some(descriptor.label_tokens[1]),
         _ => None,
     };
     resource.is_none_or(|resource| {
@@ -48,6 +55,36 @@ pub(super) fn selector_matches(
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
     Some(match operation {
+        HirCicsOperation::BtsStartBrowseEvent => CommandShape {
+            clauses: &["ACTIVITYID", "BROWSETOKEN", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsStartBrowseTimer => CommandShape {
+            clauses: &["ACTIVITYID", "TIMER", "BROWSETOKEN", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["TIMER", "BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsGetNextEvent => CommandShape {
+            clauses: &["BROWSETOKEN", "EVENT", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN", "EVENT"],
+        },
+        HirCicsOperation::BtsEndBrowseEvent | HirCicsOperation::BtsEndBrowseTimer => CommandShape {
+            clauses: &["BROWSETOKEN", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsInquireEvent => CommandShape {
+            clauses: &["EVENT", "ACTIVITYID", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["EVENT"],
+        },
+        HirCicsOperation::BtsInquireTimer => CommandShape {
+            clauses: &["TIMER", "ACTIVITYID", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["TIMER"],
+        },
         HirCicsOperation::BtsStartBrowseActivity => CommandShape {
             clauses: &[
                 "ACTIVITYID",
@@ -127,8 +164,7 @@ pub(super) fn reviewed_ambiguous_shape(
     has_value
         && matches!(
             descriptor.label_tokens,
-            ["INQUIRE", "ACTIVITYID"]
-                if matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS")
+            ["INQUIRE", "ACTIVITYID"] if matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS")
         )
 }
 
@@ -154,6 +190,20 @@ pub(super) fn validate(
             "CICS INQUIRE ACTIVITYID COMPSTATUS, MODE, and SUSPSTATUS are not implemented".into(),
         ));
     }
+    if operation == HirCicsOperation::BtsInquireEvent
+        && clauses.get("EVENT").is_some_and(|tokens| {
+            tokens.iter().any(|token| {
+                token
+                    .trim_matches('\'')
+                    .to_ascii_uppercase()
+                    .starts_with("DFH")
+            })
+        })
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SYSTEM event inquiry is unsupported".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -171,6 +221,8 @@ pub(super) fn operands(
         ("PROCESS", I::Process, 36),
         ("PROCESSTYPE", I::ProcessType, 8),
         ("BROWSETOKEN", I::BrowseToken, 4),
+        ("EVENT", I::Event, 16),
+        ("TIMER", I::Timer, 16),
     ] {
         let input = matches!(
             (operation, identity),
@@ -186,6 +238,24 @@ pub(super) fn operands(
                     I::BrowseToken,
                 )
                 | (HirCicsOperation::BtsInquireActivity, I::ActivityId)
+                | (
+                    HirCicsOperation::BtsStartBrowseEvent
+                        | HirCicsOperation::BtsStartBrowseTimer
+                        | HirCicsOperation::BtsInquireEvent
+                        | HirCicsOperation::BtsInquireTimer,
+                    I::ActivityId
+                )
+                | (
+                    HirCicsOperation::BtsStartBrowseTimer | HirCicsOperation::BtsInquireTimer,
+                    I::Timer
+                )
+                | (HirCicsOperation::BtsInquireEvent, I::Event)
+                | (
+                    HirCicsOperation::BtsGetNextEvent
+                        | HirCicsOperation::BtsEndBrowseEvent
+                        | HirCicsOperation::BtsEndBrowseTimer,
+                    I::BrowseToken
+                )
                 | (
                     HirCicsOperation::BtsInquireProcess,
                     I::Process | I::ProcessType
@@ -263,12 +333,18 @@ pub(super) fn outputs(
                 HirCicsOperation::BtsStartBrowseActivity | HirCicsOperation::BtsStartBrowseProcess,
                 O::BrowseToken,
             ) | (
-                HirCicsOperation::BtsGetNextActivity,
-                O::Activity | O::ActivityId | O::Level
-            ) | (
-                HirCicsOperation::BtsGetNextProcess,
-                O::Process | O::ActivityId
-            ) | (HirCicsOperation::BtsInquireProcess, O::ActivityId)
+                HirCicsOperation::BtsStartBrowseEvent | HirCicsOperation::BtsStartBrowseTimer,
+                O::BrowseToken,
+            ) | (HirCicsOperation::BtsGetNextEvent, O::Event,)
+                | (
+                    HirCicsOperation::BtsGetNextActivity,
+                    O::Activity | O::ActivityId | O::Level
+                )
+                | (
+                    HirCicsOperation::BtsGetNextProcess,
+                    O::Process | O::ActivityId
+                )
+                | (HirCicsOperation::BtsInquireProcess, O::ActivityId)
                 | (
                     HirCicsOperation::BtsInquireActivity,
                     O::Abcode

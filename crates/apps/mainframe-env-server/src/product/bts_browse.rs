@@ -76,7 +76,7 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         "DATA DIVISION. WORKING-STORAGE SECTION. ",
         "01 TOKEN-X PIC S9(9) COMP. 01 PROCESS-X PIC X(36). ",
         "01 ROOT-X PIC X(52). 01 ACT-TOKEN PIC S9(9) COMP. ",
-        "01 ACT-NAME PIC X(16). 01 ACT-ID PIC X(52). ",
+        "01 ACT-NAME PIC X(16). 01 ACT-ID PIC X(52). 01 EVENT-X PIC X(16). ",
         "PROCEDURE DIVISION. ",
         "EXEC CICS STARTBROWSE PROCESS PROCESSTYPE('TYPE') BROWSETOKEN(TOKEN-X) END-EXEC. ",
         "EXEC CICS GETNEXT PROCESS(PROCESS-X) BROWSETOKEN(TOKEN-X) ACTIVITYID(ROOT-X) END-EXEC. ",
@@ -86,6 +86,15 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         "EXEC CICS GETNEXT ACTIVITY(ACT-NAME) BROWSETOKEN(ACT-TOKEN) ACTIVITYID(ACT-ID) END-EXEC. ",
         "EXEC CICS ENDBROWSE ACTIVITY BROWSETOKEN(ACT-TOKEN) END-EXEC. ",
         "EXEC CICS INQUIRE ACTIVITYID(ROOT-X) ACTIVITY(ACT-NAME) END-EXEC. ",
+        "EXEC CICS DEFINE INPUT EVENT('READY') END-EXEC. ",
+        "EXEC CICS DEFINE TIMER('WAKE') EVENT('BELL') AFTER SECONDS(5) END-EXEC. ",
+        "EXEC CICS STARTBROWSE EVENT ACTIVITYID(ROOT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS ENDBROWSE EVENT BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS INQUIRE EVENT('READY') ACTIVITYID(ROOT-X) END-EXEC. ",
+        "EXEC CICS STARTBROWSE TIMER('WAKE') ACTIVITYID(ROOT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS ENDBROWSE TIMER BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS INQUIRE TIMER('WAKE') ACTIVITYID(ROOT-X) END-EXEC. ",
         "STOP RUN."
     );
     let artifact = published_source_fixture("BTSBR", source);
@@ -127,6 +136,18 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         .cics
         .launch_background_task(invocation.clone(), &session, "BT01")
         .unwrap();
+    second.cics.bind_event_activity(&invocation.run_unit_id, &root_id, None, None).unwrap();
+    let browse_resource = format!("CICS.BTS.{root_id}.BROWSE");
+    second.racf.define_profile("BTSEVENT", &browse_resource, "IBMUSER", None).unwrap();
+    second.racf.permit("BTSEVENT", &browse_resource, "IBMUSER", AccessIntent::Read).unwrap();
+    second.racf.define_profile("BTSTIMER", &browse_resource, "IBMUSER", None).unwrap();
+    second.racf.permit("BTSTIMER", &browse_resource, "IBMUSER", AccessIntent::Read).unwrap();
+    let event_resource = format!("CICS.BTS.{root_id}.READY");
+    second.racf.define_profile("BTSEVENT", &event_resource, "IBMUSER", None).unwrap();
+    second.racf.permit("BTSEVENT", &event_resource, "IBMUSER", AccessIntent::Update).unwrap();
+    let timer_resource = format!("CICS.BTS.{root_id}.WAKE");
+    second.racf.define_profile("BTSTIMER", &timer_resource, "IBMUSER", None).unwrap();
+    second.racf.permit("BTSTIMER", &timer_resource, "IBMUSER", AccessIntent::Update).unwrap();
     let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
     let tick = session_tick().unwrap();
     let context = second
@@ -145,6 +166,7 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         .expect("selected browse route persisted task-owned cursor state");
     let state: serde_json::Value = serde_json::from_slice(&cursor.payload).unwrap();
     assert_eq!(state["closed"], true);
+    assert_eq!(state["book"]["next_token"], 5);
     drop(second);
     drop(second_store);
     std::fs::remove_dir_all(root).unwrap();

@@ -1,4 +1,4 @@
-//! Frozen ACTIVITY and PROCESS BTS browse field identities and plan shapes.
+//! Frozen BTS browse field identities and plan shapes.
 
 use super::{
     CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, CicsPlanOperation,
@@ -12,6 +12,8 @@ pub enum BtsBrowseInput {
     Process,
     ProcessType,
     BrowseToken,
+    Event,
+    Timer,
 }
 
 impl BtsBrowseInput {
@@ -25,6 +27,8 @@ impl BtsBrowseInput {
             961 => Some(Self::Process),
             962 => Some(Self::ProcessType),
             963 => Some(Self::BrowseToken),
+            964 => Some(Self::Event),
+            965 => Some(Self::Timer),
             _ => None,
         }
     }
@@ -35,6 +39,8 @@ impl BtsBrowseInput {
             Self::Process => "PROCESS",
             Self::ProcessType => "PROCESSTYPE",
             Self::BrowseToken => "BROWSETOKEN",
+            Self::Event => "EVENT",
+            Self::Timer => "TIMER",
         }
     }
 
@@ -44,6 +50,7 @@ impl BtsBrowseInput {
             Self::Process => 36,
             Self::ProcessType => 8,
             Self::BrowseToken => 4,
+            Self::Event | Self::Timer => 16,
         }
     }
 }
@@ -122,6 +129,13 @@ pub(super) const fn is_operation(operation: CicsPlanOperation) -> bool {
     matches!(
         operation,
         CicsPlanOperation::BtsStartBrowseActivity
+            | CicsPlanOperation::BtsEndBrowseEvent
+            | CicsPlanOperation::BtsGetNextEvent
+            | CicsPlanOperation::BtsInquireEvent
+            | CicsPlanOperation::BtsStartBrowseEvent
+            | CicsPlanOperation::BtsEndBrowseTimer
+            | CicsPlanOperation::BtsInquireTimer
+            | CicsPlanOperation::BtsStartBrowseTimer
             | CicsPlanOperation::BtsGetNextActivity
             | CicsPlanOperation::BtsEndBrowseActivity
             | CicsPlanOperation::BtsInquireActivity
@@ -146,6 +160,24 @@ pub(super) fn invalid_shape(
         &[O],
         &[O],
     ) = match plan.operation {
+        P::BtsStartBrowseEvent => (&[I::ActivityId], &[], &[O::BrowseToken], &[O::BrowseToken]),
+        P::BtsStartBrowseTimer => (
+            &[I::ActivityId, I::Timer],
+            &[I::Timer],
+            &[O::BrowseToken],
+            &[O::BrowseToken],
+        ),
+        P::BtsGetNextEvent => (
+            &[I::BrowseToken],
+            &[I::BrowseToken],
+            &[O::Event],
+            &[O::Event],
+        ),
+        P::BtsEndBrowseEvent | P::BtsEndBrowseTimer => {
+            (&[I::BrowseToken], &[I::BrowseToken], &[], &[])
+        }
+        P::BtsInquireEvent => (&[I::ActivityId, I::Event], &[I::Event], &[], &[]),
+        P::BtsInquireTimer => (&[I::ActivityId, I::Timer], &[I::Timer], &[], &[]),
         P::BtsStartBrowseActivity => (
             &[I::ActivityId, I::Process, I::ProcessType],
             &[],
@@ -225,11 +257,14 @@ pub(super) fn invalid_shape(
                 (CicsOperandValue::Integer(value), I::BrowseToken) => {
                     !(1..=i32::MAX as i64).contains(value)
                 }
-                (CicsOperandValue::Literal(bytes), I::ActivityId | I::Process | I::ProcessType) => {
-                    std::str::from_utf8(bytes).map_or(true, |value| {
-                        value.is_empty() || value.chars().count() > field.width()
-                    })
-                }
+                (
+                    CicsOperandValue::Literal(bytes),
+                    I::ActivityId | I::Process | I::ProcessType | I::Event | I::Timer,
+                ) => std::str::from_utf8(bytes).map_or(true, |value| {
+                    value.is_empty()
+                        || value.chars().count() > field.width()
+                        || field == I::Event && value.to_ascii_uppercase().starts_with("DFH")
+                }),
                 _ => true,
             }
         })
@@ -329,7 +364,8 @@ mod tests {
             ),
         ] {
             let valid = plan(operation, &inputs, &outputs);
-            let encoded = encode_cics_effect_plan(&valid, CicsPlanLimits::default()).unwrap();
+            let encoded = encode_cics_effect_plan(&valid, CicsPlanLimits::default())
+                .unwrap_or_else(|error| panic!("{operation:?}: {error:?}"));
             assert!(
                 super::super::encode_cics_effect_plan_version(
                     &valid,
@@ -351,7 +387,7 @@ mod tests {
                 assert!(encode_cics_effect_plan(&invalid, CicsPlanLimits::default()).is_err());
             }
         }
-        assert!(BtsBrowseInput::from_tag(964).is_none());
+        assert!(BtsBrowseInput::from_tag(966).is_none());
         assert!(BtsBrowseOutput::from_tag(1028).is_none());
         let mut future_tag = encode_cics_effect_plan(
             &plan(P::BtsEndBrowseActivity, &[I::BrowseToken], &[]),
@@ -363,5 +399,47 @@ mod tests {
         let mut bad_token = plan(P::BtsGetNextActivity, &[I::BrowseToken], &[O::Activity]);
         bad_token.operands[0].value = CicsOperandValue::Literal(b"1".to_vec());
         assert!(encode_cics_effect_plan(&bad_token, CicsPlanLimits::default()).is_err());
+    }
+
+    #[test]
+    fn bts_browse_event_timer_tags_are_reserved_without_getnext_timer() {
+        assert_eq!(
+            super::super::codec_tags::operation_tag(CicsPlanOperation::BtsEndBrowseEvent),
+            198
+        );
+        assert_eq!(
+            super::super::codec_tags::operation_tag(CicsPlanOperation::BtsStartBrowseTimer),
+            215
+        );
+        assert!(super::super::codec_tags::operation_from_tag(205).is_err());
+        use BtsBrowseInput as I;
+        use BtsBrowseOutput as O;
+        use CicsPlanOperation as P;
+        for (operation, inputs, outputs) in [
+            (P::BtsEndBrowseEvent, vec![I::BrowseToken], vec![]),
+            (P::BtsGetNextEvent, vec![I::BrowseToken], vec![O::Event]),
+            (P::BtsInquireEvent, vec![I::Event], vec![]),
+            (P::BtsStartBrowseEvent, vec![], vec![O::BrowseToken]),
+            (P::BtsEndBrowseTimer, vec![I::BrowseToken], vec![]),
+            (P::BtsInquireTimer, vec![I::Timer], vec![]),
+            (P::BtsStartBrowseTimer, vec![I::Timer], vec![O::BrowseToken]),
+        ] {
+            let valid = plan(operation, &inputs, &outputs);
+            let encoded = encode_cics_effect_plan(&valid, CicsPlanLimits::default())
+                .unwrap_or_else(|error| panic!("{operation:?}: {error:?}"));
+            assert_eq!(
+                decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+                valid
+            );
+            let mut bad = valid.clone();
+            bad.outputs.push(CicsOutputBinding {
+                name: CicsOutputName::BtsBrowse(O::UserId),
+                target: slot(24),
+            });
+            assert!(encode_cics_effect_plan(&bad, CicsPlanLimits::default()).is_err());
+        }
+        let mut system = plan(P::BtsInquireEvent, &[I::Event], &[]);
+        system.operands[0].value = CicsOperandValue::Literal(b"DFHINITIAL".to_vec());
+        assert!(encode_cics_effect_plan(&system, CicsPlanLimits::default()).is_err());
     }
 }

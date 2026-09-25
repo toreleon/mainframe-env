@@ -404,7 +404,14 @@ pub(super) fn invoke_extended_control(
             }
         }
         crate::generated::CicsCommandFamily::BtsControl => match request.operation {
-            mainframe_env_host_api::CicsOperation::BtsStartBrowseActivity
+            mainframe_env_host_api::CicsOperation::BtsEndBrowseEvent
+            | mainframe_env_host_api::CicsOperation::BtsGetNextEvent
+            | mainframe_env_host_api::CicsOperation::BtsInquireEvent
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseEvent
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseTimer
+            | mainframe_env_host_api::CicsOperation::BtsInquireTimer
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseTimer
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseActivity
             | mainframe_env_host_api::CicsOperation::BtsGetNextActivity
             | mainframe_env_host_api::CicsOperation::BtsEndBrowseActivity
             | mainframe_env_host_api::CicsOperation::BtsInquireActivity
