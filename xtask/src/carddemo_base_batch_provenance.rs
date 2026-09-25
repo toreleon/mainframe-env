@@ -7,6 +7,96 @@ const V1_PATH: &str = "conformance/0.8/evidence/carddemo-base-batch.json";
 const V2_PATH: &str = "conformance/0.8/evidence/carddemo-base-batch@2.json";
 const V1_SCHEMA: &str = "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json";
 const V2_SCHEMA: &str = "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json";
+const REFERENCE_PATH: &str = "conformance/0.8/oracles/carddemo-tranrept-reference@1.json";
+const REFERENCE_SCHEMA: &str = "conformance/0.8/schemas/carddemo-tranrept-reference.schema.json";
+const REFERENCE_ID: &str = "mainframe-env.carddemo-tranrept-reference@1";
+
+fn sha256_text(value: &Value) -> bool {
+    value
+        .as_str()
+        .is_some_and(|text| text.len() == 64 && text.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+fn validate_reference_manifest(root: &Path, manifest: &Value) -> TaskResult<()> {
+    let path = root.join(REFERENCE_PATH);
+    validate_schema_instance(&json(&root.join(REFERENCE_SCHEMA))?, manifest, &path)?;
+    require(
+        manifest["schema_version"] == REFERENCE_ID,
+        "reference identity differs",
+    )?;
+    for (label, value) in [
+        ("input bytes", &manifest["input"]["sha256"]),
+        ("input raw records", &manifest["input"]["raw_record_sha256"]),
+        (
+            "input framed dataset",
+            &manifest["input"]["framed_dataset_sha256"],
+        ),
+        ("tool binary", &manifest["tool"]["sha256"]),
+        ("TRANREPT JCL", &manifest["date_parameters"]["jcl_sha256"]),
+        (
+            "derivation script",
+            &manifest["derivation"]["script_sha256"],
+        ),
+        ("SORT translation", &manifest["derivation"]["sort_sha256"]),
+        (
+            "canonicaliser",
+            &manifest["derivation"]["canonicaliser_sha256"],
+        ),
+    ] {
+        require(
+            sha256_text(value),
+            &format!("reference {label} digest is malformed"),
+        )?;
+    }
+    let files = manifest["program"]["files"]
+        .as_object()
+        .ok_or("reference program files are missing")?;
+    require(!files.is_empty(), "reference program files are empty")?;
+    for (name, digest) in files {
+        require(
+            sha256_text(digest),
+            &format!("reference program digest is malformed for {name}"),
+        )?;
+    }
+    for (label, relative, digest) in [
+        (
+            "input",
+            manifest["input"]["path"].as_str(),
+            &manifest["input"]["sha256"],
+        ),
+        (
+            "derivation script",
+            manifest["derivation"]["script_path"].as_str(),
+            &manifest["derivation"]["script_sha256"],
+        ),
+        (
+            "SORT translation",
+            manifest["derivation"]["sort_path"].as_str(),
+            &manifest["derivation"]["sort_sha256"],
+        ),
+        (
+            "canonicaliser",
+            manifest["derivation"]["canonicaliser_path"].as_str(),
+            &manifest["derivation"]["canonicaliser_sha256"],
+        ),
+    ] {
+        let relative = relative.ok_or_else(|| format!("reference {label} path is missing"))?;
+        require(
+            matches!(
+                relative,
+                "conformance/0.8/oracles/carddemo-tranrept-input@1.bin"
+                    | "conformance/0.8/oracles/carddemo-tranrept-sort@1.cbl"
+                    | "conformance/tools/carddemo_tranrept_reference.py"
+            ),
+            &format!("reference {label} path is not approved"),
+        )?;
+        require(
+            crate::file_digest(&root.join(relative))? == digest.as_str().unwrap(),
+            &format!("reference {label} digest differs"),
+        )?;
+    }
+    Ok(())
+}
 
 #[derive(Debug, Default)]
 pub(super) struct CreditSummary {
@@ -118,7 +208,34 @@ pub(super) fn validate_carddemo_provenance(v2: &Value, v1: &Value) -> TaskResult
                 )?;
                 summary.self_recorded += 1;
             }
-            "independent-reference" | "customer-captured" => summary.conformance += 1,
+            "independent-reference" => {
+                let root = crate::repository_root()?;
+                require(
+                    entry["source_id"] == format!("{REFERENCE_PATH}#{REFERENCE_ID}"),
+                    &format!("independent source identity differs for {path}"),
+                )?;
+                let manifest_path = root.join(REFERENCE_PATH);
+                let manifest = json(&manifest_path)?;
+                require(
+                    entry["source_digest"].as_str()
+                        == Some(&format!("sha256:{}", crate::file_digest(&manifest_path)?)),
+                    &format!("independent manifest digest differs for {path}"),
+                )?;
+                validate_reference_manifest(&root, &manifest)?;
+                let locator = entry["source_locator"]
+                    .as_str()
+                    .ok_or_else(|| format!("independent locator missing for {path}"))?;
+                require(
+                    locator.starts_with("/results/")
+                        && manifest.pointer(locator).is_some()
+                        && manifest.pointer(locator) == receipt.pointer(path),
+                    &format!("independent value differs for {path}"),
+                )?;
+                summary.conformance += 1;
+            }
+            "customer-captured" => {
+                return Err(format!("customer-captured is not supported yet for {path}"));
+            }
             "licensed-ibm" => summary.licensed_pending += 1,
             _ => return Err(format!("unknown provenance source {source} for {path}")),
         }
@@ -282,6 +399,48 @@ mod tests {
     }
 
     #[test]
+    fn carddemo_base_batch_provenance_missing_independent_manifest_fails() {
+        let (v1, mut v2) = fixture();
+        let entry = &mut v2["expected_value_provenance"][0];
+        entry["source"] = json!("independent-reference");
+        entry["source_id"] = json!("conformance/0.8/oracles/missing.json#1");
+        entry["source_digest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        entry["source_locator"] = json!("/results/status");
+        assert!(validate_carddemo_provenance(&v2, &v1).is_err());
+    }
+
+    #[test]
+    fn carddemo_base_batch_provenance_mismatched_independent_binding_fails() {
+        let root = crate::repository_root().unwrap();
+        let v1 = crate::json(&root.join(V1_PATH)).unwrap();
+        let mut v2 = crate::json(&root.join(V2_PATH)).unwrap();
+        let position = v2["expected_value_provenance"]
+            .as_array_mut()
+            .unwrap()
+            .iter()
+            .position(|entry| entry["source"] == "independent-reference")
+            .unwrap();
+        v2["expected_value_provenance"][position]["source_digest"] =
+            json!(format!("sha256:{}", "0".repeat(64)));
+        assert!(validate_carddemo_provenance(&v2, &v1).is_err());
+        v2["expected_value_provenance"][position]["source_digest"] = json!(format!(
+            "sha256:{}",
+            crate::file_digest(&root.join(REFERENCE_PATH)).unwrap()
+        ));
+        v2["expected_value_provenance"][position]["source_locator"] =
+            json!("/results/tranrept_report_records");
+        assert!(validate_carddemo_provenance(&v2, &v1).is_err());
+    }
+
+    #[test]
+    fn carddemo_base_batch_provenance_customer_capture_is_pending() {
+        let (v1, mut v2) = fixture();
+        v2["expected_value_provenance"][0]["source"] = json!("customer-captured");
+        let error = validate_carddemo_provenance(&v2, &v1).unwrap_err();
+        assert!(error.contains("not supported yet"), "{error}");
+    }
+
+    #[test]
     fn carddemo_provenance_editable_credit_is_schema_invalid() {
         let (_, mut v2) = fixture();
         v2["expected_value_provenance"][0]["credit"] = json!(1);
@@ -335,7 +494,7 @@ mod tests {
         let v2 = crate::json(&root.join(V2_PATH)).unwrap();
         let summary = validate_carddemo_provenance(&v2, &v1).unwrap();
         assert_eq!(summary.total, 90);
-        assert_eq!(summary.self_recorded, summary.total);
-        assert_eq!(summary.conformance, 0);
+        assert_eq!(summary.self_recorded, 88);
+        assert_eq!(summary.conformance, 2);
     }
 }

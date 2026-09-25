@@ -40,6 +40,26 @@ For documentation only, the source classes map to modernize-ai's
 
 ## Consequences
 
+### First independent reference: TRANREPT
+
+The CardDemo 0.8 TRANREPT reference binds a product-captured, fixed-record
+`TRANSACT.BKUP.G0002V00` input to a separately compiled GnuCOBOL translation
+of the JCL SORT/INCLUDE card and the unmodified corpus `CBTRN03C` program.
+It tests the selected records and report stage for that exact input. The input
+comes from this implementation's upstream jobs, so this reference does not
+validate their posting or backup behavior. GnuCOBOL is an independent
+implementation, not IBM authority, and this reference earns no licensed
+credit. Only receipt leaves whose independently derived values match are
+eligible for `independent-reference` credit; divergent leaves retain their
+prior self-recorded attribution. A dataset digest also frames the dataset's
+attributes, so a digest is eligible only when those attributes are derived
+independently too. The first increment credits the selected and report record
+counts (2 of 90). `TRANSACT.DALY` records match, but its framed attributes are
+the product's own (see #267). The report digest differs because of the insertion
+comma defect #229. The captured input also carries the upstream defect #266
+(interest transaction IDs without the PARM date); this is in scope only as a
+pinned input.
+
 **Compatibility impact:** this is an additive versioned evidence contract.
 The v1 0.8 artifact and historical 0.1.1 CD-023 receipt remain readable and
 unchanged; readers assign their unattributed assertions zero credit. The new

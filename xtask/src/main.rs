@@ -8651,6 +8651,10 @@ fn check_schemas(root: &Path) -> TaskResult {
             "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json",
         ),
         (
+            "conformance/0.8/oracles/carddemo-tranrept-reference@1.json",
+            "conformance/0.8/schemas/carddemo-tranrept-reference.schema.json",
+        ),
+        (
             "conformance/0.8/inventory/jes-dd-surface.json",
             "conformance/0.8/schemas/jes-dd-surface.schema.json",
         ),

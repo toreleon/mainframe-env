@@ -4,7 +4,10 @@
   "supersedes": "conformance/0.8/evidence/carddemo-base-batch.json",
   "historical_receipt_rewritten": false,
   "transition_justification": [
-    "Supersedes the unchanged 0.8 v1 receipt with per-assertion source attribution. Every current expected value is copied from that self-recorded receipt; this provides regression coverage and zero conformance credit."
+    "Supersedes the unchanged 0.8 v1 receipt with per-assertion source attribution. Receipt values remain unchanged from v1; self-recorded leaves provide regression coverage without conformance credit.",
+    "Two TRANREPT stage counts (selected and report records) match the independently derived GnuCOBOL reference and earn independent-reference credit.",
+    "TRANSACT.DALY stays self-recorded: its records match, but its framed attributes (Variable, LRECL 32760) come from the product and contradict DCB=(*.SORTIN) (#267).",
+    "The TRANREPT report digest stays self-recorded: it differs at record 5 byte 102, the insertion-comma defect #229."
   ],
   "evidence_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
   "receipt": {
@@ -178,17 +181,17 @@
     },
     {
       "assertion_path": "/tranrept_selected_records",
-      "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
-      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
-      "source_locator": "/receipt/tranrept_selected_records"
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:ebf4d2abca5872805e8f0de2df9c2a572dfd876f7461aba559d2e87f1ba87365",
+      "source_locator": "/results/tranrept_selected_records"
     },
     {
       "assertion_path": "/tranrept_report_records",
-      "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
-      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
-      "source_locator": "/receipt/tranrept_report_records"
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:ebf4d2abca5872805e8f0de2df9c2a572dfd876f7461aba559d2e87f1ba87365",
+      "source_locator": "/results/tranrept_report_records"
     },
     {
       "assertion_path": "/dataset_sha256/@CATALOG",
