@@ -4099,7 +4099,7 @@ impl ReferenceMachine {
             "write" => {
                 let record = position(args, "FROM")
                     .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.get(1))
+                    .or_else(|| args.first())
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
@@ -12614,6 +12614,82 @@ mod tests {
         match drive {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"HELLO\n"),
             other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn write_without_from_uses_record_name_and_preserves_fixed_length() {
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        for (name, length) in [("REC", 5), ("WS-ITEM", 5), ("FILE-STATUS", 2)] {
+            builder.add_storage(name, length, None).unwrap();
+        }
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let binary =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut machine =
+            ReferenceMachine::from_binary(&binary, invocation(), CodecLimits::default()).unwrap();
+        machine.files.insert(
+            "TESTFILE".into(),
+            FileMetadata {
+                assignment: "TESTFILE".into(),
+                record_name: Some("REC".into()),
+                organization: "SEQUENTIAL".into(),
+                access_mode: "SEQUENTIAL".into(),
+                record_key: None,
+                alternate_record_keys: Vec::new(),
+                relative_key: None,
+                file_status: Some("FILE-STATUS".into()),
+                sort_merge: false,
+                description: String::new(),
+                record_min: Some(5),
+                record_max: Some(5),
+                ccsid: None,
+                linage: Some(10),
+            },
+        );
+        machine.write_raw("REC", b"REC01").unwrap();
+        machine.write_raw("WS-ITEM", b"FROM2").unwrap();
+        for (args, expected) in [
+            (vec!["REC"], b"REC01".as_slice()),
+            (vec!["REC", "FROM", "WS-ITEM"], b"FROM2".as_slice()),
+            (
+                vec!["REC", "AFTER", "ADVANCING", "1", "LINE"],
+                b"REC01".as_slice(),
+            ),
+            (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
+        ] {
+            let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
+            let step = machine.dataset_effect("write", &args).unwrap();
+            let Step::Effect(effect) = step else {
+                panic!("WRITE did not request a dataset effect");
+            };
+            let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = &effect.request
+            else {
+                panic!("WRITE did not append a sequential record");
+            };
+            assert_eq!(records, &vec![expected.to_vec()]);
+            machine
+                .resume_host(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Dataset(
+                        mainframe_env_host_api::DatasetResult::Mutated { version: 1 },
+                    )),
+                })
+                .unwrap();
+            assert_eq!(machine.resolve("FILE-STATUS").unwrap(), b"00");
         }
     }
     #[test]
