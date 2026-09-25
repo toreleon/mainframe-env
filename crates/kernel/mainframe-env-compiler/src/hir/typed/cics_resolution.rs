@@ -22,6 +22,7 @@ mod bts_lifecycle;
 mod builtin_function;
 mod candidate_validation;
 mod certificate_control;
+mod channel_container;
 mod clause_parser;
 mod command_recognition;
 use command_recognition::{is_aid_name, is_single_condition_label};
@@ -490,10 +491,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
-        operation if counter_control::is_counter(operation) => {
-            counter_control::allowed_clauses(operation)
-        }
+        op if counter_control::is_counter(op) => counter_control::allowed_clauses(op),
         operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_clauses(operation),
+        op if channel_container::is_channel_container(op) => channel_container::allowed_clauses(op),
         op if outboard::is_issue(op) => outboard::allowed_clauses(op),
         op if issue_control::is_issue(op) => issue_control::allowed_clauses(op),
         HirCicsOperation::SpoolClose
@@ -635,10 +635,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
-        operation if counter_control::is_counter(operation) => {
-            counter_control::allowed_options(operation)
-        }
+        op if counter_control::is_counter(op) => counter_control::allowed_options(op),
         operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_options(operation),
+        op if channel_container::is_channel_container(op) => channel_container::allowed_options(op),
         op if outboard::is_issue(op) => outboard::allowed_options(op),
         op if issue_control::is_issue(op) => issue_control::allowed_options(op),
         HirCicsOperation::SpoolClose
@@ -701,6 +700,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     route::validate_constraints(&clauses, &raw_options, operation)?;
     bts_lifecycle::validate_constraints(operation, &clauses, &raw_options)?;
+    channel_container::validate(&clauses, &raw_options, operation)?;
     security_control::validate(&clauses, operation, semantic)?;
     conversation_control::validate(&clauses, operation)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
@@ -848,6 +848,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
         operation if counter_control::is_counter(operation) => counter_control::required(operation),
         operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::required(operation),
+        op if channel_container::is_channel_container(op) => channel_container::required(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -1009,6 +1010,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
     operands.extend(bts_lifecycle::operands(&clauses, operation, semantic)?);
+    operands.extend(channel_container::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
     operands.extend(conversation_control::operands(
         &clauses, operation, semantic,
@@ -1082,6 +1084,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(bts_lifecycle::outputs(&clauses, operation, semantic)?);
+    outputs.extend(channel_container::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_control::outputs(
@@ -1093,22 +1096,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(bts_browse::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_open::outputs(&clauses, operation, semantic)?);
     outputs.extend(issue_control::outputs(&clauses, operation, semantic)?);
-    if operation == HirCicsOperation::Retrieve
-        && let Some(length) = clauses.get("LENGTH")
-    {
-        let target = complete_data_reference(length, semantic)?;
-        require_writable(&target)?;
-        outputs.push(HirCicsOutputBinding {
-            name: HirCicsOutputName::Length,
-            target,
-        });
-    } else if let Some(target) = output_bindings::inout_length(&operands, operation) {
-        require_writable(target)?;
-        outputs.push(HirCicsOutputBinding {
-            name: HirCicsOutputName::Length,
-            target: target.clone(),
-        });
-    }
+    output_bindings::append_inout_length(&mut outputs, &clauses, &operands, operation, semantic)?;
     let mut options = raw_options
         .iter()
         .filter(|option| {
@@ -1124,6 +1112,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 .or_else(|| conversation_data::option(operation, option))
                 .or_else(|| bts_child_link::option(operation, option))
                 .or_else(|| bts_lifecycle::option(operation, option))
+                .or_else(|| channel_container::option(operation, option))
                 .or_else(|| counter_control::option(operation, option))
                 .or_else(|| event_control::option(operation, option))
                 .or_else(|| diagnostics::option(operation, option))

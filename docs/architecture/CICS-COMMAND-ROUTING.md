@@ -697,6 +697,19 @@ amendment. Generated descriptors never contain behavior, and handler modules
 are never generator-owned. [ADR-0010](../decisions/0010-rust-module-review-budgets.md)
 records the hard limits and exact legacy ceiling policy.
 
+## Task-channel context
+
+The task-channel container route scopes a channel to the authenticated
+execution, run unit, and principal. A program's current channel is initialized
+from a validated `cics.channel` invocation binding when that program enters
+the CICS provider. Container commands without CHANNEL use this value; when it
+is absent, they return INVREQ before a channel read or mutation. An explicit
+CHANNEL names an owner-scoped channel and does not change the current channel.
+The provider records the creating program on a channel; DELETE CHANNEL rejects
+a different program and the current channel. RUN TRANSID CHANNEL reads the
+owner-scoped channel at issue time and passes its bytes and metadata to the
+existing child snapshot authority.
+
 ## Verification
 
 ```bash

@@ -7,6 +7,7 @@ mod bridge_start;
 mod bridge_terminal;
 pub mod bts_browse;
 mod bts_child_link;
+mod bts_container;
 pub mod bts_lifecycle;
 mod bts_link;
 mod builtin_function;
@@ -241,6 +242,7 @@ pub use conversation_control::{
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
+#[cfg(test)]
 pub(in crate::service) use conversation_control::{
     confirm_issue_control, mark_issue_control_attempted,
 };
@@ -420,6 +422,14 @@ pub(super) fn invoke_extended_control(
             | mainframe_env_host_api::CicsOperation::BtsEndBrowseProcess
             | mainframe_env_host_api::CicsOperation::BtsInquireProcess => {
                 bts_browse::invoke(service, run, request)
+            }
+            CicsOperation::DeleteChannel
+            | CicsOperation::DeleteContainer
+            | CicsOperation::GetContainer
+            | CicsOperation::MoveContainer
+            | CicsOperation::PutContainer
+            | CicsOperation::QueryChannel => {
+                bts_container::invoke_channel_container(service, run, request)
             }
             mainframe_env_host_api::CicsOperation::FetchAny
             | mainframe_env_host_api::CicsOperation::FetchChild

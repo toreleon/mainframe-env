@@ -11,6 +11,9 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         operation if bts_lifecycle::is_bts(operation) => {
             bts_lifecycle::allowed_output(operation, output)
         }
+        operation if super::channel_container::is_channel_container(operation) => {
+            super::channel_container::allowed_output(operation, output)
+        }
         CicsPlanOperation::ReceiveConversation
         | CicsPlanOperation::GdsReceiveConversation
         | CicsPlanOperation::SendConversation

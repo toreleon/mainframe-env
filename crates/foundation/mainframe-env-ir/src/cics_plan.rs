@@ -10,6 +10,7 @@ mod bts_browse;
 mod bts_child_link;
 mod bts_lifecycle;
 mod certificate;
+mod channel_container;
 mod codec_problem;
 mod codec_tags;
 mod condition_handlers;
@@ -459,13 +460,13 @@ fn validate_operation_shape(
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
         CicsPlanOperation::BtsEndBrowseEvent
-        |         CicsPlanOperation::BtsGetNextEvent
-        |         CicsPlanOperation::BtsInquireEvent
-        |         CicsPlanOperation::BtsStartBrowseEvent
-        |         CicsPlanOperation::BtsEndBrowseTimer
-        |         CicsPlanOperation::BtsInquireTimer
-        |         CicsPlanOperation::BtsStartBrowseTimer
-        |         CicsPlanOperation::BtsStartBrowseActivity
+        | CicsPlanOperation::BtsGetNextEvent
+        | CicsPlanOperation::BtsInquireEvent
+        | CicsPlanOperation::BtsStartBrowseEvent
+        | CicsPlanOperation::BtsEndBrowseTimer
+        | CicsPlanOperation::BtsInquireTimer
+        | CicsPlanOperation::BtsStartBrowseTimer
+        | CicsPlanOperation::BtsStartBrowseActivity
         | CicsPlanOperation::BtsGetNextActivity
         | CicsPlanOperation::BtsEndBrowseActivity
         | CicsPlanOperation::BtsInquireActivity
@@ -474,6 +475,14 @@ fn validate_operation_shape(
         | CicsPlanOperation::BtsEndBrowseProcess
         | CicsPlanOperation::BtsInquireProcess => {
             bts_browse::invalid_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::DeleteChannel
+        | CicsPlanOperation::DeleteContainer
+        | CicsPlanOperation::GetContainer
+        | CicsPlanOperation::MoveContainer
+        | CicsPlanOperation::PutContainer
+        | CicsPlanOperation::QueryChannel => {
+            channel_container::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::AcquireActivityId
         | CicsPlanOperation::AcquireProcess
@@ -1175,6 +1184,87 @@ mod tests {
         CicsStorageSlot {
             storage: StorageId::from_index(index).unwrap(),
             qualified_layout_name: name.into(),
+        }
+    }
+
+    #[test]
+    fn channel_container_v2_tags_round_trip_and_v1_rejects_them() {
+        let limits = CicsPlanLimits::default();
+        for (operation, tag) in [
+            (CicsPlanOperation::DeleteChannel, 188),
+            (CicsPlanOperation::DeleteContainer, 189),
+            (CicsPlanOperation::GetContainer, 190),
+            (CicsPlanOperation::MoveContainer, 192),
+            (CicsPlanOperation::PutContainer, 193),
+            (CicsPlanOperation::QueryChannel, 195),
+        ] {
+            let mut operands = vec![CicsNamedOperand {
+                name: CicsOperandName::BtsChannel,
+                value: CicsOperandValue::Literal(b"WORK".to_vec()),
+            }];
+            if matches!(
+                operation,
+                CicsPlanOperation::DeleteContainer
+                    | CicsPlanOperation::GetContainer
+                    | CicsPlanOperation::MoveContainer
+                    | CicsPlanOperation::PutContainer
+            ) {
+                operands.push(CicsNamedOperand {
+                    name: CicsOperandName::ContainerName,
+                    value: CicsOperandValue::Literal(b"ITEM".to_vec()),
+                });
+            }
+            if operation == CicsPlanOperation::MoveContainer {
+                operands.push(CicsNamedOperand {
+                    name: CicsOperandName::ContainerAs,
+                    value: CicsOperandValue::Literal(b"NEXT".to_vec()),
+                });
+            }
+            if operation == CicsPlanOperation::PutContainer {
+                operands.push(CicsNamedOperand {
+                    name: CicsOperandName::ContainerFrom,
+                    value: CicsOperandValue::Literal(b"DATA".to_vec()),
+                });
+            }
+            let outputs = match operation {
+                CicsPlanOperation::GetContainer => vec![CicsOutputBinding {
+                    name: CicsOutputName::ContainerInto,
+                    target: slot(1, "INTO-X"),
+                }],
+                CicsPlanOperation::QueryChannel => vec![CicsOutputBinding {
+                    name: CicsOutputName::ContainerCount,
+                    target: slot(2, "COUNT-X"),
+                }],
+                _ => vec![],
+            };
+            let plan = CicsEffectPlan {
+                operation,
+                operands,
+                options: BTreeSet::new(),
+                outputs,
+                condition: CicsCondition::Default,
+            };
+            let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+            assert_eq!(u16::from_be_bytes([bytes[6], bytes[7]]), tag);
+            assert_eq!(decode_cics_effect_plan(&bytes, limits), Ok(plan.clone()));
+            assert_eq!(
+                encode_cics_effect_plan_version(&plan, limits, LEGACY_VERSION),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+            for selector in [
+                CicsPlanOption::ContainerProcess,
+                CicsPlanOption::ContainerAcqProcess,
+                CicsPlanOption::ContainerAcqActivity,
+                CicsPlanOption::ContainerFromProcess,
+                CicsPlanOption::ContainerToProcess,
+            ] {
+                let mut bts = plan.clone();
+                bts.options.insert(selector);
+                assert_eq!(
+                    encode_cics_effect_plan(&bts, limits),
+                    Err(CicsPlanCodecProblem::Malformed)
+                );
+            }
         }
     }
 

@@ -1897,6 +1897,12 @@ mod tests {
                 CicsPlanOperation::RunAcqProcess => crate::HirCicsOperation::RunAcqProcess,
                 CicsPlanOperation::RunActivity => crate::HirCicsOperation::RunActivity,
                 CicsPlanOperation::RunTransId => crate::HirCicsOperation::RunTransId,
+                CicsPlanOperation::DeleteChannel => crate::HirCicsOperation::DeleteChannel,
+                CicsPlanOperation::DeleteContainer => crate::HirCicsOperation::DeleteContainer,
+                CicsPlanOperation::GetContainer => crate::HirCicsOperation::GetContainer,
+                CicsPlanOperation::MoveContainer => crate::HirCicsOperation::MoveContainer,
+                CicsPlanOperation::PutContainer => crate::HirCicsOperation::PutContainer,
+                CicsPlanOperation::QueryChannel => crate::HirCicsOperation::QueryChannel,
                 CicsPlanOperation::SuspendAcqActivity => {
                     crate::HirCicsOperation::SuspendAcqActivity
                 }

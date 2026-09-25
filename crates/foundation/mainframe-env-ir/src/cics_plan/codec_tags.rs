@@ -102,6 +102,12 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::SuspendAcqActivity => 185,
         CicsPlanOperation::SuspendAcqProcess => 186,
         CicsPlanOperation::SuspendActivity => 187,
+        CicsPlanOperation::DeleteChannel => 188,
+        CicsPlanOperation::DeleteContainer => 189,
+        CicsPlanOperation::GetContainer => 190,
+        CicsPlanOperation::MoveContainer => 192,
+        CicsPlanOperation::PutContainer => 193,
+        CicsPlanOperation::QueryChannel => 195,
         CicsPlanOperation::FetchAny => 216,
         CicsPlanOperation::FetchChild => 217,
         CicsPlanOperation::FreeChild => 218,
@@ -321,6 +327,12 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         185 => Ok(CicsPlanOperation::SuspendAcqActivity),
         186 => Ok(CicsPlanOperation::SuspendAcqProcess),
         187 => Ok(CicsPlanOperation::SuspendActivity),
+        188 => Ok(CicsPlanOperation::DeleteChannel),
+        189 => Ok(CicsPlanOperation::DeleteContainer),
+        190 => Ok(CicsPlanOperation::GetContainer),
+        192 => Ok(CicsPlanOperation::MoveContainer),
+        193 => Ok(CicsPlanOperation::PutContainer),
+        195 => Ok(CicsPlanOperation::QueryChannel),
         216 => Ok(CicsPlanOperation::FetchAny),
         217 => Ok(CicsPlanOperation::FetchChild),
         218 => Ok(CicsPlanOperation::FreeChild),
@@ -524,6 +536,18 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::BtsUserId => 712,
         CicsOperandName::BtsFacilityToken => 713,
         CicsOperandName::BtsChannel => 714,
+        CicsOperandName::ContainerName => 1720,
+        CicsOperandName::ContainerAs => 1721,
+        CicsOperandName::ContainerToChannel => 1722,
+        CicsOperandName::ContainerFrom => 1723,
+        CicsOperandName::ContainerLength => 1724,
+        CicsOperandName::ContainerDatatype => 1725,
+        CicsOperandName::ContainerCcsid => 1726,
+        CicsOperandName::ContainerByteOffset => 1727,
+        CicsOperandName::ContainerIntoCcsid => 1728,
+        CicsOperandName::ContainerFromCodepage => 1729,
+        CicsOperandName::ContainerIntoCodepage => 1730,
+        CicsOperandName::ContainerConvertst => 1731,
         CicsOperandName::BtsChild => 1088,
         CicsOperandName::BtsLinkActivity => 1089,
         CicsOperandName::BtsLinkInputEvent => 1090,
@@ -849,6 +873,18 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         712 => Ok(CicsOperandName::BtsUserId),
         713 => Ok(CicsOperandName::BtsFacilityToken),
         714 => Ok(CicsOperandName::BtsChannel),
+        1720 => Ok(CicsOperandName::ContainerName),
+        1721 => Ok(CicsOperandName::ContainerAs),
+        1722 => Ok(CicsOperandName::ContainerToChannel),
+        1723 => Ok(CicsOperandName::ContainerFrom),
+        1724 => Ok(CicsOperandName::ContainerLength),
+        1725 => Ok(CicsOperandName::ContainerDatatype),
+        1726 => Ok(CicsOperandName::ContainerCcsid),
+        1727 => Ok(CicsOperandName::ContainerByteOffset),
+        1728 => Ok(CicsOperandName::ContainerIntoCcsid),
+        1729 => Ok(CicsOperandName::ContainerFromCodepage),
+        1730 => Ok(CicsOperandName::ContainerIntoCodepage),
+        1731 => Ok(CicsOperandName::ContainerConvertst),
         1088 => Ok(CicsOperandName::BtsChild),
         1089 => Ok(CicsOperandName::BtsLinkActivity),
         1090 => Ok(CicsOperandName::BtsLinkInputEvent),
@@ -1156,5 +1192,109 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         292 => Ok(CicsOperandName::WebReceiveStatusLength),
         1472..=1599 => issue::operand_from_tag(value),
         _ => conversation::operand_from_tag(value),
+    }
+}
+
+#[cfg(test)]
+mod merge_tag_tests {
+    use super::*;
+    use crate::cics_plan::{BtsBrowseInput, BtsBrowseOutput};
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn channel_container_and_bts_browse_tags_are_unique_by_space() {
+        use CicsPlanOperation as P;
+        let operations = [
+            P::DeleteChannel,
+            P::DeleteContainer,
+            P::GetContainer,
+            P::MoveContainer,
+            P::PutContainer,
+            P::QueryChannel,
+            P::BtsEndBrowseActivity,
+            P::BtsGetNextActivity,
+            P::BtsInquireActivity,
+            P::BtsStartBrowseActivity,
+            P::BtsEndBrowseEvent,
+            P::BtsGetNextEvent,
+            P::BtsInquireEvent,
+            P::BtsStartBrowseEvent,
+            P::BtsEndBrowseProcess,
+            P::BtsGetNextProcess,
+            P::BtsInquireProcess,
+            P::BtsStartBrowseProcess,
+            P::BtsEndBrowseTimer,
+            P::BtsInquireTimer,
+            P::BtsStartBrowseTimer,
+        ];
+        let mut seen = BTreeSet::new();
+        for operation in operations {
+            let tag = operation_tag(operation);
+            assert!(seen.insert(tag), "duplicate operation tag {tag}");
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        assert_eq!(seen.len(), 21);
+        for held in [191, 194, 197, 202, 205, 207, 212] {
+            assert!(operation_from_tag(held).is_err());
+        }
+
+        let mut seen = BTreeSet::new();
+        for tag in 1720..=1731 {
+            let operand = operand_from_tag(tag).unwrap();
+            assert!(seen.insert(operand_tag(operand)));
+            assert_eq!(operand_tag(operand), tag);
+        }
+        for field in [
+            BtsBrowseInput::ActivityId,
+            BtsBrowseInput::Process,
+            BtsBrowseInput::ProcessType,
+            BtsBrowseInput::BrowseToken,
+            BtsBrowseInput::Event,
+            BtsBrowseInput::Timer,
+        ] {
+            let operand = CicsOperandName::BtsBrowse(field);
+            let tag = operand_tag(operand);
+            assert!(seen.insert(tag), "duplicate operand tag {tag}");
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        assert_eq!(seen.len(), 18);
+
+        let mut seen = BTreeSet::new();
+        for tag in 1550..=1556 {
+            let option = option_from_tag(tag).unwrap();
+            assert!(
+                seen.insert(option_tag(option)),
+                "duplicate option tag {tag}"
+            );
+            assert_eq!(option_tag(option), tag);
+        }
+        assert_eq!(seen.len(), 7);
+
+        let mut seen = BTreeSet::new();
+        for tag in 1720..=1724 {
+            let output = output_from_tag(tag).unwrap();
+            assert!(seen.insert(output_tag(output)));
+            assert_eq!(output_tag(output), tag);
+        }
+        for field in [
+            BtsBrowseOutput::BrowseToken,
+            BtsBrowseOutput::Activity,
+            BtsBrowseOutput::ActivityId,
+            BtsBrowseOutput::Level,
+            BtsBrowseOutput::Process,
+            BtsBrowseOutput::Abcode,
+            BtsBrowseOutput::Abprogram,
+            BtsBrowseOutput::Event,
+            BtsBrowseOutput::ProcessType,
+            BtsBrowseOutput::Program,
+            BtsBrowseOutput::TransId,
+            BtsBrowseOutput::UserId,
+        ] {
+            let output = CicsOutputName::BtsBrowse(field);
+            let tag = output_tag(output);
+            assert!(seen.insert(tag), "duplicate output tag {tag}");
+            assert_eq!(output_from_tag(tag), Ok(output));
+        }
+        assert_eq!(seen.len(), 17);
     }
 }

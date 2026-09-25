@@ -25,6 +25,11 @@ pub enum CicsOutputName {
     BtsChannel,
     /// Four-character child abend code.
     BtsAbcode,
+    ContainerInto,
+    ContainerSet,
+    ContainerLength,
+    ContainerCcsid,
+    ContainerCount,
     AttachProcess,
     AttachResource,
     AttachReturnProcess,

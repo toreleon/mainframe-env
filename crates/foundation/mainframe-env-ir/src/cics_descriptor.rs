@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 246);
+        assert_eq!(typed.len(), 252);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 17);
+        assert_eq!(unready.len(), 11);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -297,6 +297,13 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::BtsEndBrowseEvent,
+                CicsPlanOperation::BtsGetNextEvent,
+                CicsPlanOperation::BtsInquireEvent,
+                CicsPlanOperation::BtsStartBrowseEvent,
+                CicsPlanOperation::BtsEndBrowseTimer,
+                CicsPlanOperation::BtsInquireTimer,
+                CicsPlanOperation::BtsStartBrowseTimer,
                 CicsPlanOperation::BtsStartBrowseActivity,
                 CicsPlanOperation::BtsGetNextActivity,
                 CicsPlanOperation::BtsEndBrowseActivity,
@@ -305,6 +312,12 @@ mod tests {
                 CicsPlanOperation::BtsGetNextProcess,
                 CicsPlanOperation::BtsEndBrowseProcess,
                 CicsPlanOperation::BtsInquireProcess,
+                CicsPlanOperation::DeleteChannel,
+                CicsPlanOperation::DeleteContainer,
+                CicsPlanOperation::GetContainer,
+                CicsPlanOperation::MoveContainer,
+                CicsPlanOperation::PutContainer,
+                CicsPlanOperation::QueryChannel,
                 CicsPlanOperation::AcquireActivityId,
                 CicsPlanOperation::AcquireProcess,
                 CicsPlanOperation::CancelAcqActivity,

@@ -5355,6 +5355,65 @@ mod tests {
     }
 
     #[test]
+    fn channel_container_compiler_selects_only_task_channel_forms() {
+        let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. CNTNFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LEN-X PIC S9(9) COMP. 01 COUNT-X PIC S9(9) COMP. 01 PTR-X POINTER-32. PROCEDURE DIVISION. ";
+        for (command, expected) in [
+            ("DELETE CHANNEL('WORK')", HirCicsOperation::DeleteChannel),
+            (
+                "DELETE CONTAINER('ITEM') CHANNEL('WORK')",
+                HirCicsOperation::DeleteContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') CHANNEL('WORK') INTO(DATA-X) FLENGTH(LEN-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') CHANNEL('WORK') SET(PTR-X) FLENGTH(LEN-X) CCSID(COUNT-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') CHANNEL('WORK') NODATA FLENGTH(LEN-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "MOVE CONTAINER('ITEM') AS('NEXT') CHANNEL('WORK') TOCHANNEL('WORK')",
+                HirCicsOperation::MoveContainer,
+            ),
+            (
+                "PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) FLENGTH(8)",
+                HirCicsOperation::PutContainer,
+            ),
+            (
+                "PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) DATATYPE(DFHVALUE(CHAR)) FROMCCSID(37) APPEND",
+                HirCicsOperation::PutContainer,
+            ),
+            (
+                "QUERY CHANNEL('WORK') CONTAINERCNT(COUNT-X)",
+                HirCicsOperation::QueryChannel,
+            ),
+        ] {
+            let source = format!("{prefix}EXEC CICS {command} END-EXEC. STOP RUN.");
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            assert!(hir.statements.iter().any(|statement| {
+                matches!(&statement.resolved, Some(HirResolvedStatement::Cics(cics)) if cics.operation == expected)
+            }));
+        }
+        for command in [
+            "DELETE CONTAINER('ITEM') PROCESS",
+            "GET CONTAINER('ITEM') ACQPROCESS INTO(DATA-X)",
+            "GET CONTAINER('ITEM') ACQACTIVITY INTO(DATA-X)",
+            "PUT CONTAINER('ITEM') ACTIVITY('CHILD') FROM(DATA-X)",
+            "MOVE CONTAINER('ITEM') AS('NEXT') FROMPROCESS TOPROCESS",
+        ] {
+            let source = format!("{prefix}EXEC CICS {command} END-EXEC. STOP RUN.");
+            assert!(analyze(&source).hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
     fn cics_true_identity_qualifiers_remain_required() {
         for (label, qualifier) in [
             (&["ASKTIME", "ABSTIME"][..], "ABSTIME"),

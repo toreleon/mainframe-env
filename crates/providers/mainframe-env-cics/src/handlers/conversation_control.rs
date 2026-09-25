@@ -58,6 +58,7 @@ pub use gds::{
     GdsReturnCode, GdsWaitFailure,
 };
 pub use gds_issue::{GdsIssueFailure, GdsIssueFlow};
+#[cfg(test)]
 pub(in crate::service) use issue_staging::{
     confirm as confirm_issue_control, mark_attempted as mark_issue_control_attempted,
 };

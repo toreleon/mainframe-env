@@ -26,7 +26,7 @@ LOOKUP_OUTPUT_PATH = Path(
 PROVIDER_TAIL_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
 )
-PROVIDER_INLINE_OPERATIONS = 149
+PROVIDER_INLINE_OPERATIONS = 148
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -35,6 +35,9 @@ IR_REGISTRY_OUTPUT_PATH = Path(
 )
 CONTRACT_OUTPUT_PATH = Path(
     "conformance/0.9/generated/cics-application-command-contracts.json"
+)
+CONTRACT_SCHEMA_PATH = Path(
+    "conformance/0.9/schemas/cics-application-command-contracts.schema.json"
 )
 COMPILER_SPI_COMPAT_OUTPUT_PATH = Path(
     "crates/kernel/mainframe-env-compiler/src/hir/typed/"
@@ -576,6 +579,12 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("DefineActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0032"),
     ("DefineProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0037"),
     ("DeleteActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0041"),
+    ("DeleteChannel", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0042"),
+    ("DeleteContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0043"),
+    ("GetContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0086"),
+    ("MoveContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0144"),
+    ("PutContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0150"),
+    ("QueryChannel", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0152"),
     ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
     ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
     ("ResumeAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0172"),
@@ -827,6 +836,12 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DefineActivity",
         "DefineProcess",
         "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "MoveContainer",
+        "PutContainer",
+        "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
         "ResumeAcqActivity",
@@ -1602,7 +1617,7 @@ TYPED_RUNTIME_IR_EFFECTS.update(
 TYPED_RUNTIME_IR_EFFECTS.update(
     {
         name: _BTS_READ_EFFECTS
-        for name in ("CheckAcqActivity", "CheckAcqProcess")
+        for name in ("CheckAcqActivity", "CheckAcqProcess", "GetContainer", "QueryChannel")
     }
 )
 TYPED_RUNTIME_IR_EFFECTS.update(
@@ -1620,6 +1635,7 @@ TYPED_RUNTIME_IR_EFFECTS.update(
             "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
             "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
             "SuspendAcqProcess", "SuspendActivity",
+            "DeleteChannel", "DeleteContainer", "MoveContainer", "PutContainer",
         )
     }
 )
@@ -2000,6 +2016,12 @@ def _load_typed_execution_registrations(
         "DefineActivity",
         "DefineProcess",
         "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "MoveContainer",
+        "PutContainer",
+        "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
         "ResumeAcqActivity",
@@ -4261,7 +4283,7 @@ def _semantic_contract(
             raise DescriptorError(
                 f"{command['official_row']} typed IR effects omit resolved memory flow"
             )
-        option_sensitive = operation == "Read"
+        option_sensitive = operation in {"Read", "GetContainer"}
         capability = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",
             "route": "host.cics.execute",
@@ -5739,6 +5761,23 @@ def render(root: Path = ROOT) -> str:
     return render_provider(root)
 
 
+def render_contract_schema(root: Path, contracts: dict[str, Any]) -> str:
+    schema_path = root / CONTRACT_SCHEMA_PATH
+    if not schema_path.exists():
+        schema_path = ROOT / CONTRACT_SCHEMA_PATH
+    schema = json.loads(schema_path.read_text())
+    registry_properties = schema["$defs"]["registry-summary"]["properties"]
+    count_properties = schema["$defs"]["counts"]["properties"]
+    for name in ("typed_handlers", "advertised_commands", "unready_handlers"):
+        registry_properties[name]["const"] = contracts["registry"][name]
+    for name in (
+        "runtime_backed_commands", "typed_runtime_commands",
+        "advertised_commands", "unready_commands",
+    ):
+        count_properties[name]["const"] = contracts["counts"][name]
+    return json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
+
+
 def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     contracts = build_contracts(root)
     return {
@@ -5749,6 +5788,7 @@ def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),
         IR_REGISTRY_OUTPUT_PATH: render_ir_registry(root, contracts),
         CONTRACT_OUTPUT_PATH: json.dumps(contracts, indent=2, ensure_ascii=False) + "\n",
+        CONTRACT_SCHEMA_PATH: render_contract_schema(root, contracts),
     }
 
 

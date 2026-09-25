@@ -1084,13 +1084,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::EventControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::EnterTraceNum,
-        syntax: "ENTER TRACENUM",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0066",
-        family: CicsCommandFamily::Diagnostics,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1190,6 +1183,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[96],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[97],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[98],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[99],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[100],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[101],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[102],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[103],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[104],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[105],
 ];
 
 mod lookup;

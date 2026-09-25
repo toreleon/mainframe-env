@@ -8277,7 +8277,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 248);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 254);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -41181,7 +41181,11 @@ mod tests {
                 &effect(&parent.run_unit_id, channel_request.clone(), 5),
                 channel_request,
             ),
-            Err(HostProblem::Unsupported)
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 2,
+            })
         );
         assert!(
             store
@@ -41194,6 +41198,38 @@ mod tests {
                 .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
                 .unwrap()
                 .is_none()
+        );
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"INPUT")),
+                ("CONTAINER".into(), cics_literal(b"MESSAGE")),
+                ("FROM".into(), cics_literal(b"channel-data")),
+                ("FLENGTH".into(), cics_decimal(12)),
+            ]),
+            6,
+        );
+        cics.invoke(&effect(&parent.run_unit_id, put.clone(), 6), put)
+            .unwrap();
+        let run = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT04")),
+                ("CHANNEL".into(), argument(b"INPUT")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            7,
+        );
+        cics.invoke(&effect(&parent.run_unit_id, run.clone(), 7), run)
+            .unwrap();
+        let rows = store
+            .list_provider_state("cics-bts-transid-run-v1", 2)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let snapshot: serde_json::Value = serde_json::from_slice(&rows[0].payload).unwrap();
+        assert_eq!(
+            snapshot["containers"]["MESSAGE"]["bytes"],
+            "Y2hhbm5lbC1kYXRh"
         );
     }
 
@@ -52259,6 +52295,311 @@ mod tests {
             ]),
             sequence,
         )
+    }
+
+    #[test]
+    fn channel_container_character_append_set_and_nodata() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        for (sequence, bytes, append) in [
+            (1, b"AB".as_slice(), false),
+            (2, b"CD", true),
+            (3, b"EF", true),
+        ] {
+            let mut arguments = BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"TEXT")),
+                ("FROM".into(), cics_literal(bytes)),
+            ]);
+            if sequence != 3 {
+                arguments.insert("DATATYPE".into(), cics_literal(b"CHAR"));
+                arguments.insert("FROMCCSID".into(), cics_decimal(37));
+            }
+            if append {
+                arguments.insert("OPTION.APPEND".into(), cics_option());
+            }
+            let put = request(CicsOperation::PutContainer, arguments, sequence);
+            cics.invoke(&effect(&invocation.run_unit_id, put.clone(), sequence), put)
+                .unwrap();
+        }
+        let set = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"TEXT")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(6)),
+                ("FLENGTH".into(), argument(b"LEN-X")),
+                ("CCSID".into(), argument(b"CCSID-X")),
+            ]),
+            4,
+        );
+        let fetched = cics
+            .invoke(&effect(&invocation.run_unit_id, set.clone(), 4), set)
+            .unwrap();
+        assert_eq!(fetched.outputs["SET"].bytes(), b"ABCDEF");
+        assert_eq!(fetched.outputs["FLENGTH"].bytes(), b"6");
+        assert_eq!(fetched.outputs["CCSID"].bytes(), b"37");
+        let nodata = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"TEXT")),
+                ("FLENGTH".into(), argument(b"LEN-X")),
+                ("OPTION.NODATA".into(), cics_option()),
+            ]),
+            5,
+        );
+        let length = cics
+            .invoke(&effect(&invocation.run_unit_id, nodata.clone(), 5), nodata)
+            .unwrap();
+        assert_eq!(length.outputs["FLENGTH"].bytes(), b"6");
+        assert!(!length.outputs.contains_key("INTO"));
+    }
+
+    #[test]
+    fn channel_container_current_channel_binding_selects_omitted_channel() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let invocation = invocation_for(
+            "channel-current-run",
+            BTreeMap::from([(
+                "cics.channel".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.channel@1",
+                    b"WORK".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let session = SessionId::new("channel-current-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+        let delete_current = request(
+            CicsOperation::DeleteChannel,
+            BTreeMap::from([("CHANNEL".into(), cics_literal(b"WORK"))]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, delete_current.clone(), 3),
+                delete_current,
+            ),
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 4,
+            })
+        );
+
+        let (without_current, _) = registered(&cics);
+        let omitted = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("OPTION.NODATA".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&without_current.run_unit_id, omitted.clone(), 1),
+                omitted,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn channel_container_public_route_preserves_data_count_and_replay() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"ABCDEF")),
+                ("FLENGTH".into(), cics_decimal(6)),
+            ]),
+            1,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, put.clone(), 1),
+            put.clone(),
+        )
+        .unwrap();
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("FLENGTH".into(), cics_decimal(6)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCDEF");
+        assert_eq!(read.outputs["FLENGTH"].bytes(), b"6");
+        let short_get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("FLENGTH".into(), cics_decimal(3)),
+            ]),
+            23,
+        );
+        let truncated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, short_get.clone(), 23),
+                short_get,
+            )
+            .unwrap();
+        assert_eq!(truncated.condition, "LENGERR");
+        assert_eq!(truncated.response, 22);
+        assert_eq!(truncated.outputs["INTO"].bytes(), b"ABC");
+        assert_eq!(truncated.outputs["FLENGTH"].bytes(), b"6");
+        cics.lock()
+            .unwrap()
+            .runs
+            .get_mut(&invocation.run_unit_id)
+            .unwrap()
+            .current_program
+            .channel = Some("WORK".into());
+        let current_get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+            ]),
+            22,
+        );
+        let current_read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, current_get.clone(), 22),
+                current_get,
+            )
+            .unwrap();
+        assert_eq!(current_read.outputs["INTO"].bytes(), b"ABCDEF");
+        let query = request(
+            CicsOperation::QueryChannel,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINERCNT".into(), cics_literal(b"COUNT-X")),
+            ]),
+            3,
+        );
+        let count = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 3), query)
+            .unwrap();
+        assert_eq!(count.outputs["CONTAINERCNT"].bytes(), b"1");
+        let system_query = request(
+            CicsOperation::QueryChannel,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"DFHTRANSACTION")),
+                ("CONTAINERCNT".into(), cics_literal(b"COUNT-X")),
+            ]),
+            24,
+        );
+        let system_count = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, system_query.clone(), 24),
+                system_query,
+            )
+            .unwrap();
+        assert_eq!(system_count.outputs["CONTAINERCNT"].bytes(), b"0");
+        let system_delete = request(
+            CicsOperation::DeleteChannel,
+            BTreeMap::from([("CHANNEL".into(), cics_literal(b"DFHTRANSACTION"))]),
+            25,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, system_delete.clone(), 25),
+                system_delete,
+            ),
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 5,
+            })
+        );
+        for (sequence, selector) in [
+            "OPTION.PROCESS",
+            "OPTION.ACQPROCESS",
+            "OPTION.ACQACTIVITY",
+            "ACTIVITY",
+            "FROMACTIVITY",
+            "TOACTIVITY",
+            "OPTION.FROMPROCESS",
+            "OPTION.TOPROCESS",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let sequence = sequence as u64 + 40;
+            let bts = request(
+                CicsOperation::DeleteContainer,
+                BTreeMap::from([
+                    ("CONTAINER".into(), cics_literal(b"ITEM")),
+                    (
+                        selector.into(),
+                        if selector.starts_with("OPTION.") {
+                            cics_option()
+                        } else {
+                            cics_literal(b"CHILD")
+                        },
+                    ),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, bts.clone(), sequence), bts),
+                Err(HostProblem::Unsupported),
+                "{selector}"
+            );
+        }
     }
 
     #[test]

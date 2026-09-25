@@ -1,5 +1,38 @@
 use super::*;
 
+pub(super) const CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 6] = [
+    descriptor(
+        CicsPlanOperation::DeleteChannel,
+        "delete-channel",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::DeleteContainer,
+        "delete-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::GetContainer,
+        "get-container",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::MoveContainer,
+        "move-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::PutContainer,
+        "put-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::QueryChannel,
+        "query-channel",
+        BTS_READ_EFFECTS,
+    ),
+];
+
 const fn descriptor(
     operation: CicsPlanOperation,
     name: &'static str,
