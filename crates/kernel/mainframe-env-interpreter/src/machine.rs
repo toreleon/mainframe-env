@@ -10872,10 +10872,23 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         .windows(2)
         .find(|pair| pair[0] == pair[1] && matches!(pair[0], b'+' | b'-'))
         .map(|pair| pair[0]);
+    let leading_floating_slots = floating_sign.map_or(0, |sign| {
+        picture
+            .iter()
+            .take_while(|&&byte| byte == sign || byte == b',')
+            .filter(|&&byte| byte == sign)
+            .count()
+    });
+    let digit_positions = layout.digits.max(
+        picture
+            .iter()
+            .filter(|&&byte| matches!(byte, b'9' | b'Z' | b'*'))
+            .count()
+            + leading_floating_slots,
+    );
     let mut digits = value.coefficient.unsigned_abs().to_string();
     if floating_sign.is_some() {
-        let numeric_capacity = layout
-            .digits
+        let numeric_capacity = digit_positions
             .checked_sub(1)
             .ok_or(MachineProblem::UnsupportedForm)?;
         if digits.len() > numeric_capacity {
@@ -10889,11 +10902,11 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         // existing picture walk consume that reserved insertion position.
         digits.insert(0, '0');
     } else {
-        if digits.len() > layout.digits {
-            digits = digits[digits.len() - layout.digits..].to_string();
+        if digits.len() > digit_positions {
+            digits = digits[digits.len() - digit_positions..].to_string();
         }
-        if digits.len() < layout.digits {
-            digits = format!("{}{}", "0".repeat(layout.digits - digits.len()), digits);
+        if digits.len() < digit_positions {
+            digits = format!("{}{}", "0".repeat(digit_positions - digits.len()), digits);
         }
     }
     let mut digit_index = 0usize;
@@ -10916,7 +10929,7 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             b'Z' => {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
                 output.push(
-                    if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
+                    if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
                         b' '
                     } else {
                         suppressing = false;
@@ -10928,7 +10941,7 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             b'*' => {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
                 output.push(
-                    if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
+                    if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
                         b'*'
                     } else {
                         suppressing = false;
@@ -10939,7 +10952,11 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             }
             b'+' | b'-'
                 if picture.get(picture_index.wrapping_sub(1)) == Some(&byte)
-                    || picture.get(picture_index + 1) == Some(&byte) =>
+                    || picture.get(picture_index + 1) == Some(&byte)
+                    || (floating_sign == Some(byte)
+                        && picture[..picture_index]
+                            .iter()
+                            .all(|&prefix| prefix == byte || prefix == b',')) =>
             {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
                 if floating_sign_slot == Some(digit_index) {
@@ -10951,7 +10968,7 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
                         b' '
                     });
                     suppressing = false;
-                } else if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
+                } else if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
                     output.push(b' ');
                 } else {
                     output.push(digit);
@@ -10962,6 +10979,25 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             b'+' => output.push(if value.coefficient < 0 { b'-' } else { b'+' }),
             b'-' => output.push(if value.coefficient < 0 { b'-' } else { b' ' }),
             b'V' | b'S' | b'P' => {}
+            b',' => output.push(if suppressing {
+                if picture.contains(&b'*') { b'*' } else { b' ' }
+            } else {
+                b','
+            }),
+            b'C' | b'R'
+                if (byte == b'C' && picture.get(picture_index + 1) == Some(&b'R'))
+                    || (byte == b'R'
+                        && picture.get(picture_index.wrapping_sub(1)) == Some(&b'C')) =>
+            {
+                output.push(if value.coefficient < 0 { byte } else { b' ' });
+            }
+            b'D' | b'B'
+                if (byte == b'D' && picture.get(picture_index + 1) == Some(&b'B'))
+                    || (byte == b'B'
+                        && picture.get(picture_index.wrapping_sub(1)) == Some(&b'D')) =>
+            {
+                output.push(if value.coefficient < 0 { byte } else { b' ' });
+            }
             b'B' => output.push(b' '),
             b'.' => {
                 output.push(b'.');
@@ -12856,6 +12892,110 @@ mod tests {
             ),
             Ok(b"000000123.45 ".to_vec())
         );
+    }
+
+    #[test]
+    fn numeric_edited_suppresses_commas_through_leading_and_floating_positions() {
+        let cases = [
+            ("+ZZZ,ZZZ,ZZZ.ZZ", 11, 2, 9585, "+         95.85"),
+            ("-ZZZ,ZZZ,ZZZ.ZZ", 11, 2, -123456, "-      1,234.56"),
+            ("ZZZ,ZZ9.99-", 8, 2, 9585, "     95.85 "),
+            ("ZZZ,ZZ9.99-", 8, 2, 700, "      7.00 "),
+            ("Z,ZZZ,ZZ9", 7, 0, 42, "       42"),
+            ("****,**9.99", 9, 2, 9585, "******95.85"),
+            ("-,---,--9.99", 8, 2, -123456, "   -1,234.56"),
+            ("-,---,--9.99", 8, 2, 9585, "       95.85"),
+            ("++++,++9.99", 9, 2, 9585, "     +95.85"),
+            ("+ZZZ,ZZZ,ZZZ.ZZ", 11, 2, 1234567890, "+ 12,345,678.90"),
+            // "/" and "0" inside suppression follow GnuCOBOL 3.2 (kept); IBM source pending, #271.
+            ("ZZ/ZZ9", 5, 0, 42, "  / 42"),
+            ("ZZ0ZZ9", 5, 0, 42, "  0 42"),
+            ("ZZBZZ9", 5, 0, 42, "    42"),
+            ("ZZ/ZZ9", 5, 0, 0, "  /  0"),
+            ("ZZ0ZZ9", 5, 0, 0, "  0  0"),
+            ("ZZBZZ9", 5, 0, 0, "     0"),
+            ("****,**9.99", 9, 2, 0, "*******0.00"),
+            ("-,---,--9.99", 8, 2, 0, "        0.00"),
+        ];
+        for (picture, digits, scale, coefficient, expected) in cases {
+            let layout = edited_test_layout(picture, digits, scale, false);
+            assert_eq!(
+                encode_edited(&layout, Decimal { coefficient, scale }),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}, coefficient {coefficient}"
+            );
+        }
+        let layout = edited_test_layout("Z,ZZ9.99", 6, 2, true);
+        assert_eq!(
+            encode_edited(
+                &layout,
+                Decimal {
+                    coefficient: 0,
+                    scale: 2
+                }
+            ),
+            Ok(vec![b' '; layout.length])
+        );
+    }
+
+    #[test]
+    fn numeric_edited_cr_db_suffix_follows_value_sign() {
+        for (picture, coefficient, expected) in [
+            ("99999.99CR", 9585, "00095.85  "),
+            ("99999.99CR", -9585, "00095.85CR"),
+            ("99999.99DB", 9585, "00095.85  "),
+            ("99999.99DB", -9585, "00095.85DB"),
+        ] {
+            let layout = edited_test_layout(picture, 7, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient,
+                        scale: 2
+                    }
+                ),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}, coefficient {coefficient}"
+            );
+        }
+    }
+
+    fn edited_test_layout(
+        picture: &str,
+        digits: usize,
+        scale: u32,
+        blank_when_zero: bool,
+    ) -> LayoutMetadata {
+        LayoutMetadata {
+            name: "EDITED".into(),
+            simple_name: "EDITED".into(),
+            category: LayoutCategory::NumericEdited,
+            picture: picture.into(),
+            digits,
+            scale,
+            signed: true,
+            sign_separate: false,
+            justified_right: false,
+            blank_when_zero,
+            linkage: false,
+            offset: 0,
+            length: picture.len(),
+            element_length: picture.len(),
+            occurs: 1,
+            occurs_min: 1,
+            unbounded: false,
+            depending_on: None,
+            indexes: Vec::new(),
+            keys: Vec::new(),
+            dynamic: false,
+            dynamic_limit: 0,
+            parent: None,
+            alias_of: None,
+            occurs_clause: false,
+            condition_values: Vec::new(),
+            object_class: None,
+        }
     }
 
     #[test]
