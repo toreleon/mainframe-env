@@ -183,6 +183,27 @@ pub(super) struct AdmittedProgram {
 }
 
 impl CobolProgram {
+    pub(super) fn preflight_selected_program(
+        &self,
+        program: &str,
+        selection: &mainframe_env_host_api::ProgramLinkSelection,
+    ) -> Result<AdmittedProgram, HostProblem> {
+        let artifacts = self
+            .artifacts
+            .get()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let record = artifacts
+            .get_artifact(&selection.artifact)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .ok_or(HostProblem::NotFound)?;
+        let executable = admit_executable_artifact(&record)?;
+        Ok(AdmittedProgram {
+            artifact: selection.artifact.clone(),
+            executable,
+            name: program.to_ascii_uppercase(),
+        })
+    }
+
     pub(super) fn preflight_installed_program(
         &self,
         program: &str,

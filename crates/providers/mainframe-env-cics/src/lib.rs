@@ -3,11 +3,34 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod conversation_protocol;
+mod event_wait;
 mod generated;
 mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
+pub use conversation_protocol::{
+    ConversationIndicators, GdsExtractAttributesFailure, GdsExtractProcessFailure,
+};
+pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
+pub use service::IssuePassTransfer;
+pub use service::bts_lifecycle;
+pub use service::{
+    CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
+    CicsConversationTransport, ConversationAttachHeader, ConversationConnectFrame,
+    ConversationContext, ConversationDataFrame, ConversationDataReply, ConversationDataState,
+    ConversationExchangeState, ConversationKind, ConversationLedger, ConversationOutboundFrame,
+    ConversationOwner, ConversationPartnerDefinition, ConversationPartnerProcessDefinition,
+    ConversationPeerFrame, ConversationProblem, ConversationProfileDefinition, ConversationRecord,
+    ConversationReplay, ConversationReply, ConversationState, ConversationSystemDefinition,
+    ConversationTransmitOutcome, DataCondition, GdsAllocateFailure, GdsAssignFailure,
+    GdsConnectFailure, GdsFreeFailure, GdsIssueFailure, GdsIssueFlow, GdsReceiveFailure,
+    GdsReturnCode, GdsWaitFailure, IssuePendingControl, IssueRequestIdentity,
+    IssueValidationProblem, MAX_BASIC_PIP_BYTES, MAX_EXCHANGE_FRAME_BYTES, MAX_PENDING_PEER_FRAMES,
+    MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
+    SignalLuType, load_conversation_replay, prune_conversation_replays,
+};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -19,10 +42,33 @@ pub use retention::{
 };
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsContinuation, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus,
-    CicsIntervalError, CicsIntervalMode, CicsIntervalTime, CicsLimits, CicsReplayClock,
-    CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot,
-    CicsTraceEntry, cics_provider,
+    CicsApplicationEntryDefinition, CicsBmsControlSnapshot, CicsBtsChildCompletion,
+    CicsBtsLinkContext, CicsContinuation, CicsDiagnosticDumpRecord, CicsDiagnosticSnapshot,
+    CicsDiagnosticTraceRecord, CicsDocumentTemplateDefinition, CicsDumpCodeDefinition,
+    CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
+    CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsMonitorAction,
+    CicsMonitorPointDefinition, CicsOutboardDestinationDefinition, CicsOutboardKind,
+    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
+    CicsProgramDefinition, CicsReplayClock, CicsService, CicsSignalCaptureSpec, CicsSignalEmission,
+    CicsSpoolReportSnapshot, CicsStartTask, CicsStartTerminal, CicsTerminalExecution,
+    CicsTerminalSnapshot, CicsTraceConfiguration, CicsTraceEntry, CicsTransformContainerMode,
+    CicsTransformDefinition, CicsTransformFieldDefinition, CicsTransformFieldKind,
+    CicsTransformFormat, CicsTransientDataQueueDefinition, CicsTransientDataQueueKind,
+    CicsTransientDataQueueOpen, CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest,
+    CicsWebResponse, CicsWebServerResponse, CicsWebServiceDefinition, CicsWebTransport,
+    CicsWebUriMapDefinition, CicsWebVersion, CicsXmlTransformMetadata, cics_provider,
+};
+pub use service::{
+    BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply,
+    CICS_BRIDGE_START_WORK_GENERATION, CICS_OPERATOR_WORK_GENERATION, CICS_POST_WORK_GENERATION,
+    CicsBridgeAbiProfile, CicsBridgeAbiSelection, CicsBridgeExitDefault, CicsBridgeExitSelection,
+    CicsBridgeRuntime, CicsBridgeStartIntent, CicsCertificateName, CicsClientCertificate,
+    CicsCredentialChangeRequest, CicsCredentialDetails, CicsCredentialFailure, CicsCredentialKind,
+    CicsCredentialRequest, CicsCredentialVerification, CicsOperatorMessageView,
+    CicsPassTicketFailure, CicsPassTicketOutcome, CicsPassTicketRequest, CicsSecurityAccess,
+    CicsSecurityAccessReason, CicsSecurityAuthority, CicsSecurityTokenKind, CicsTcpipAuthenticate,
+    CicsTcpipContext, CicsTcpipPrivacy, CicsTcpipSslType, CicsTokenFailure, CicsTokenVerification,
+    CicsTokenVerificationRequest,
 };
 
 #[cfg(feature = "fault-injection")]

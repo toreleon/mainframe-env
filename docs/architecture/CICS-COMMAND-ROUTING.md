@@ -57,8 +57,8 @@ coverage, semantic and differential credit.
 
 The contract also binds one 121-name EIBRESP authority for dynamic
 `HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
-records 20 known mutating rows, 225 bounded-effect rows, one explicit UOW
-boundary and 244 bounded-UOW rows. Those values describe current contract
+records 61 known mutating rows, 178 bounded-effect rows, one explicit UOW
+boundary and 238 bounded-UOW rows. Those values describe current contract
 certainty; they are not execution or conformance counts.
 
 The same generator emits the compact
@@ -67,10 +67,10 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 38 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 184 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 225 `unready` rows that are recognized but fail explicitly as unsupported.
+- 79 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
@@ -82,7 +82,24 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 38 API routes are the only advertised application commands.
+The current 191 API routes are the only advertised application commands.
+The nine conversation-open and seven data/wait routes share the `cics-conversation-v1` ledger with
+the eight EXTRACT and POINT routes. Version 1 records remain readable; version
+2 adds bounded peer frames, staged CONVERSE sends, numbered data sends, and
+principal signal events. EXTRACT keeps only task
+presentation, POINT position, and mutation-reply metadata outside that ledger.
+The selected compiler and interpreter route mapped APPC and MRO forms; GDS
+basic forms remain assembler/C-only at the COBOL source boundary.
+The six BTS child/link routes use append-only MCEP v2 tags. FETCH/FREE own
+bounded parent child-token data; LINK reads the shared BTS lifecycle process
+tree, activity index, and UOW acquisition and records activation intent and
+completion with process CAS. An uncertain selected program call stays fenced
+as `UnknownOutcome` rather than being dispatched again. The separate BTS
+lifecycle command rows remain unready until their own slice registers them.
+The twelve COUNTER and DCOUNTER routes share a versioned local pool authority
+and bounded descriptor, compiler, interpreter, and provider children. See
+[ADR-0014](../decisions/0014-named-counter-authority.md) for the atomic
+state, tag, replay, and pool-rebuild boundaries.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -243,11 +260,196 @@ compiler-resolved INTO extent. SET returns a checked virtual address to an
 interpreter-owned copy of the complete record and participates in checkpoint
 restore. Zero or truncated INTO reads consume and return LENGERR 22/0, while
 negative length or insufficient SET capacity preserves the queue. Missing and
-empty queues return QIDERR 44/0 and QZERO 23/0. SYSID, NOSUSPEND, remote
-routing, and TDQUEUE definition-state conditions remain deferred. WRITEQ TD,
-READQ TD, and DELETEQ TD accept SYSID only when it identifies the current
-system; an unknown or unsupported remote name returns SYSIDERR 53/0 before
-authorization or queue mutation.
+empty queues return QIDERR 44/0 and QZERO 23/0. Durable installed TDQUEUE
+definitions select intrapartition or local extrapartition direction, enabled
+and open state, record-size policy, and bounded per-queue capacity. Those
+definitions drive exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR,
+QIDERR, and QZERO outcomes across reopen. First registration preflights every
+materialized compatibility-profile queue against the complete proposed
+definition set and atomically rejects undeclared queues or retained data that
+violates direction, fixed/maximum record size, record count, or byte limits.
+WRITEQ TD, READQ TD, and DELETEQ TD accept SYSID only when it identifies the
+current system; an unknown or unsupported remote name returns SYSIDERR 53/0
+before authorization or queue mutation. NOSUSPEND/QBUSY, indoubt locking,
+remote routing, and external data set integration remain deferred.
+Typed `DOCUMENT CREATE` starts the document-control family on a bounded durable
+authority owned by the issuing execution, run unit, and transaction. It returns
+a deterministic 16-byte token and optional fullword DOCSIZE for empty, FROM,
+TEXT, BINARY, FROMDOC, or registered-template content. Symbol-list length,
+delimiter and unescaping rules are checked before persistence. Template use
+performs a DOCTEMPLATE READ decision against the registered resource name.
+The document row and canonical outer replay are one atomic store mutation, so
+an unknown result replays the same token without duplicating content; rows
+reload from SQLite and are deleted when their owning task ends. Operation tag
+63, operand tags 132–147, option tag 84, and non-ASSIGN output tags 216–217 are
+append-only. `DOCUMENT DELETE` uses tag 64 and a storage-backed 16-byte
+DOCTOKEN input. It verifies task/transaction ownership and atomically deletes
+the durable row with its replay record, freeing aggregate capacity immediately;
+a missing token returns NOTFND 13/1. `DOCUMENT INSERT` uses operation tag 65 and the
+shared document operands to append, insert after a bookmark, or replace a
+bookmark interval. It applies source-specific conversion marks, copies
+FROMDOC bookmarks, and keeps a bounded internal tagged retrieval form for
+FROM round trips. Each insert updates the versioned document and effect replay
+atomically. Document symbol names preserve case, and template expansion is
+bounded before persistence. `DOCUMENT RETRIEVE` uses tag 66, input operand
+tags 132/145/146, and document DATAONLY option tag 85. It copies tagged or
+data-only content to a bounded application buffer, returns the exact required
+LENGTH on a short buffer, and performs the supported CP037 character-set
+conversions without changing document state. `DOCUMENT SET` uses tag 67 and
+the shared token, symbol, value, list, delimiter and length operands. It
+replaces case-sensitive symbol definitions atomically with the effect replay;
+previously inserted bytes retain their materialized values. The unused
+operand, option and output tags in the reserved ranges remain unassigned.
+Typed `WAIT JOURNALNAME` uses the journal-control family and a single durable
+`cics-journal-v1` authority shared with journal writes. A literal or
+storage-backed name is normalized to 1–8 uppercase alphanumeric, `$`, `@`, or
+`#` characters and authorized as `JOURNAL/CICS.JOURNAL.<name>`. An explicit
+fullword `REQID` selects only a token created by the issuing task; omission
+waits on the named journal's current buffer without inheriting the writer's
+task ownership. Hardened output returns immediately, pending output suspends
+and reissues through the coordinator (therefore retaining its cancellation and
+deadline fence), and durable I/O, unknown-journal, and unavailable states map
+to IOERR 17, JIDERR 43, and NOTOPEN 19. Denial maps to NOTAUTH 70. The bounded
+authority and completion state survive SQLite reopen; WAIT itself is
+non-mutating and therefore creates no independent mutation replay ledger.
+Typed `WAIT JOURNALNUM` keeps the compatibility operation separate while mapping
+numeric values 1–99 to `DFHJ01`–`DFHJ99` before the same SAF check and durable
+wait. The explicit REQID remains task-owned; an omitted REQID uses the selected
+journal's current buffer. Other numeric values and mixed name/number operand
+shapes are rejected before the wait.
+Typed `WRITE JOURNALNAME` requires a known 1–8 character journal, two-byte
+JTYPEID, and FROM area. Optional fullword FLENGTH and halfword PFXLENG select
+bounded data and PREFIX slices; invalid lengths return LENGERR 22 without an
+append. The local durable writer authorizes `JOURNAL/CICS.JOURNAL.<name>` for
+update, retains the exact record bytes and idempotency key, and returns a
+fullword REQID only for deferred output. An explicit WAIT creates a hardened
+record before returning. Deferred output remains pending until the trusted
+local output worker acknowledges it; a numbered or named WAIT then observes
+the same completion state. Two pending buffer slots enforce default suspension
+or NOSUSPEND/NOJBUFSP 45 without appending a rejected record. Unknown,
+disabled, and denied journals map to JIDERR 43, NOTOPEN 19, and NOTAUTH 70.
+The `cics-journal-v1` namespace now writes codec version 2 while reading
+version 1 WAIT state. Native System Logger/SMF transport and JOURNALMODEL
+resolution remain outside this local execution boundary.
+Typed `WRITE JOURNALNUM` uses a separate compatibility command identity and
+maps numeric values 1–99 to `DFHJnn` before the same authorization and durable
+writer. It reuses the reviewed WRITE JOURNALNAME record options and condition
+path with a numeric selector. The pinned 0255 page identifies the compatibility
+successor without an option diagram, so this local option mapping remains an
+explicit bounded inference rather than a source-projected equivalence claim.
+
+
+Typed `SPOOLCLOSE` captures an exact eight-character TOKEN and requires RESP or
+NOHANDLE. The provider verifies task/principal ownership and `JESSPOOL` update
+authority before one versioned state transition. KEEP returns either direction
+to the available-input queue; DELETE purges it. When neither option is present,
+an explicitly closed input report defaults to DELETE and an explicitly closed
+output report defaults to KEEP. The same provider row retains a bounded request
+digest/result ledger so a crash after state CAS but before the outer CICS replay
+row cannot duplicate or reverse the close. The route uses EIBFN `5610`; open,
+record transfer, implicit-close, and broader JES interface states are owned by
+the following spool-control slices.
+
+The diagnostics provider has a separate versioned `cics-diagnostics-v1`
+authority for local trace and dump records. A trusted region adapter can set
+`CicsTraceConfiguration`, register dump-code and MCT user-point definitions,
+and inspect `CicsDiagnosticSnapshot`; no trace
+destination is active by default. `CicsLimits` bounds retained entries,
+aggregate encoded bytes, replay keys, and each captured payload. Command
+handlers use this state through versioned compare-and-swap writes, so later
+diagnostic commands can retain exact results across SQLite reopen and a
+post-dispatch retry without adding state to the frozen CICS service root.
+`ENTER TRACENUM` requires a halfword numeric identifier in 0–199 and accepts
+an optional eight-character resource, source bytes, and halfword length in
+0–4000. A normal entry needs the user flag and an active destination;
+`EXCEPTION` always records to the internal destination even when it is off.
+The retained entry records its selected destination set, exact bytes, run,
+and principal. A `CICSDIAG` SAF update check precedes durable mutation.
+`MONITOR` uses additive trusted MCT definitions keyed by entry name and point.
+The supported local actions update one counter, start or stop one clock, or
+move bytes from a checked COBOL pointer into a bounded user character field.
+Clock actions read the host clock; MOVE uses the four-byte DATA2 length or the
+registered default. Missing DATA2 returns INVREQ/6 after the move, matching
+the source's successful-operation condition. Point, data, and definition
+errors retain their distinct INVREQ secondary codes.
+`DUMP TRANSACTION` stores a bounded `MECDMP01` section stream in the durable
+diagnostics row. FROM and SEGMENTLIST sections retain exact task storage bytes;
+other sections record only the local task and catalog state the provider owns.
+Registered dump-code maximum and suppression rules are applied before
+capture, and `CICSDIAG` authorization precedes every write. DUMPID uses a
+durable run/count counter; a fresh provider instance advances the run number
+on its first successful dump. System dump requests fail explicitly because
+this provider has no SDUMP backend.
+The standalone `DUMP` form uses the same bounded section codec and SAF check.
+It can include the local dump-code table (`DCT`) and accepts an omitted code,
+using the generic diagnostic resource in that case. Its exact CICS TS 6.x
+behavior is source-gapped; this route promises only the documented local
+capture and never claims a CICS dump dataset or system dump.
+The local `TRACE` form requires one ON/OFF direction and at least one of USER,
+SYSTEM, EI, or SINGLE. USER controls the user trace flag, SYSTEM the system
+destination, EI the internal destination, and SINGLE arms one internal user
+entry. The following `ENTER TRACENUM` consumes that one-shot flag. These
+switches are durable and share the diagnostic replay row; the configured
+`CICSDIAG` resource is checked before mutation. The exact CICS TS 6.x TRACE
+command page is absent from the pinned local corpus, so these are explicit
+local controls rather than a claim about every IBM trace facility.
+The local `ENTER TRACEID` form stores an exact bounded payload with its
+identifier, resource, entry name, issuing identity, selected destination, and
+ACCOUNT/MONITOR/PERFORM flags. MONITOR retains the event bytes in the local
+monitor text map; ACCOUNT and PERFORM increment their own durable event counts.
+It consumes a TRACE SINGLE arm when present. The CICS TS 6.x target command
+page and both committed compatibility bodies are absent locally, so these
+event counts are expressly local diagnostic behavior, not a claim about IBM
+MCT accounting or performance record layout.
+
+Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
+eight-character USERID value, optional one-character CLASS, and RESP or
+NOHANDLE. USERID must share the issuing CICS APPLID's first four characters.
+After JESSPOOL update authorization, the provider selects the first matching
+available report in token order and durably binds it to the exact run and
+principal. Only one input report can be open: another task receives SPOLBUSY
+88/4 and the current owner receives 88/8. A missing or held-equivalent report
+returns NOTFND 13/4 without mutation. The returned TOKEN is non-ASSIGN output
+tag 208, and the selected route uses EIBFN `5602`.
+
+Typed `SPOOLOPEN OUTPUT` requires writable TOKEN, destination USERID and NODE,
+and RESP or NOHANDLE. Output creation is multi-threaded and allocates one
+task-owned report with default class A, NOCC, PRINT, and maximum record length
+32,760. CLASS and halfword RECORDLENGTH override the defaults; NOCC, ASA, and
+MCC are exclusive, as are PRINT and PUNCH. NODE and USERID must both be `*`
+for the local OUTDESCR override. A POINTER or POINTER-32 OUTDESCR is followed
+through its address field to a bounded length-prefixed OUTPUT parameter string;
+invalid pointers and malformed strings return INVREQ 16/52 and 16/44. A bad
+NODE/USERID combination returns NODEIDERR 90/0, and RECORDLENGTH outside
+0–32,760 returns LENGERR 22 with the supplied value. State and returned token
+share one durable replay CAS; the compiled route uses EIBFN `5602`. Dynamic JES
+allocation, macro return codes, and implicit end-of-task close are outside the
+local spool boundary.
+
+Typed `SPOOLREAD` requires the task-owned eight-character TOKEN, a writable
+INTO area, fullword-binary MAXFLENGTH, and RESP or NOHANDLE. Optional writable
+fullword TOFLENGTH receives the actual record length. A short transfer writes
+the available prefix, returns LENGERR 22 with the omitted byte count in RESP2,
+and retains the same record for retry. MAXFLENGTH above 32,760 returns LENGERR
+22/0 without advancing. Successful reads advance the durable cursor; the first
+read beyond the final record returns ENDFILE 20 and marks EOF, and subsequent
+reads return INVREQ 16/12. Wrong ownership returns NOTOPEN 19/8, while a
+task-owned output report returns NOTOPEN 19/12. The reply and cursor/EOF state
+share one replay CAS. The selected compiled route uses EIBFN `5604`.
+
+Typed `SPOOLWRITE` requires a task-owned output TOKEN, a storage-backed FROM
+area, and RESP or NOHANDLE. Optional fullword FLENGTH selects a prefix of FROM;
+when omitted, the source area's full length is used. LINE is the default and
+PAGE marks an AFP page record; the source-backed choice excludes both flags
+at once. FLENGTH outside 1–32,760 returns LENGERR 22/0 without mutation.
+When the requested record exceeds the output report's RECORDLENGTH, the bounded
+prefix is appended and LENGERR 22 reports the omitted byte count in RESP2.
+Writing an input report returns NOTOPEN 19/16; wrong task ownership returns
+NOTOPEN 19/8. A JOB card with USER= on the INTRDR destination requires the
+task user's SURROGAT read authority for `job_user.SUBMIT`; a denial returns
+NOTAUTH 70/1 before append. The record and reply share one durable replay CAS,
+and the compiled route uses EIBFN `5606`.
+
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
@@ -264,6 +466,30 @@ owned by the current task, applies the replay-bound release intent, checkpoints
 the freed identity, and excludes released bytes and frames from current
 capacity accounting. Invalid, static, unassigned, or repeated release returns
 INVREQ 16/1; key/shared/load ownership remains deferred.
+GETMAIN64 is a separate typed Core-MIR operation for a checked non-LE
+AMODE(64) caller, never an alias of GETMAIN or a COBOL source form. The
+ownership and checkpoint boundary is recorded in
+[ADR-0012](../decisions/0012-checked-amode64-storage-boundary.md). The
+invocation binds the caller ABI and TASKDATAKEY, FLENGTH is fullword, and SET64
+requires an eight-byte pointer slot. The interpreter owns a monotonic virtual
+arena with distinct above-bar, LOC24, and LOC31 address ranges; allocation
+bytes, guard-zone charges, attributes, and cursors survive checkpoint v11.
+The provider returns a replay-bound allocation specification and exact
+conditions, while the interpreter creates the address. SHARED remains
+fail-closed until cross-task storage can be durable. The selected-route test
+uses a compiled layout scaffold translated to the distinct typed IR identity;
+it does not claim an assembler source frontend or native executable memory.
+FREEMAIN64 is a distinct typed operation over the same checked arena. It
+requires the same invocation ABI and exactly one DATAPOINTER or DATA operand.
+DATAPOINTER reads an eight-byte pointer slot; DATA uses an explicit binding
+from a declared area to a live allocation, never the area's stored bytes as a
+pointer. The binding and allocation survive checkpoint v12. The provider
+returns a replay-bound release intent, which the interpreter applies only
+when the returned address matches the pending request. A freed identity stays
+stale after restart and its charged bytes and frame leave the task budget.
+Source-defined INVREQ 16/1 rejects invalid ownership or pointer identity;
+INVREQ 16/2 rejects user-key release of CICS-key storage. The checked route
+has no COBOL-source or native assembler execution claim.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
@@ -395,8 +621,11 @@ differentials, or make 0.9.0 release-ready.
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 | `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
 | `storage-control` | bounded task-local virtual storage allocation and release |
+| `journal-control` | durable named-journal output state and task synchronization |
 
-This table describes the nine families already present in the 43-operation runtime
+| `spool-control` | durable CICS spool report open/read/write/close lifecycle |
+
+This table describes the runtime families in the typed operation
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing
@@ -435,6 +664,19 @@ outside a `dpl-synconreturn` context; CIC-905 owns populating both bindings from
 the eventual public DPL transport.
 
 ## Change contract
+
+The typed CICS effect-plan wire contract is
+`mainframe-env.cics-effect-plan@2` (`MCEP`, big-endian version 2). Operation,
+operand, option, and output identity tags each occupy a big-endian `u16` in v2.
+All previously assigned numeric tags retain their values, including reserved
+gaps and the ASSIGN output ranges. Counts, operand value-kind bytes, storage
+slots, and condition bytes retain their v1 layout. The encoder emits only
+canonical v2 plans, sorting named operands and outputs and rejecting duplicate
+identities. The decoder accepts canonical v1 bytes for retained artifacts and
+canonical v2 bytes; it rejects unsupported versions, unknown tags, truncation,
+trailing bytes, and noncanonical ordering. Re-encoding a decoded v1 plan
+migrates it to v2. This wire migration does not change command semantics or
+the reviewed registry readiness split.
 
 Adding an identity to the application projection requires a reviewed change to
 the pinned official denominator and regeneration. It never updates

@@ -224,7 +224,22 @@ fn fingerprint(
         payload.bytes(),
     ))
     .map_err(|_| HostProblem::InfrastructureFailure)?;
-    Ok(digest(&[b"fingerprint", &bytes]))
+    let base = digest(&[b"fingerprint", &bytes]);
+    if let HostRequest::Program(ProgramRequest::Link {
+        selection: Some(selection),
+        ..
+    }) = &effect.request
+    {
+        Ok(digest(&[
+            b"selected-link-fingerprint",
+            base.as_bytes(),
+            selection.artifact.as_str().as_bytes(),
+            &selection.generation.to_be_bytes(),
+            selection.content_identity.as_bytes(),
+        ]))
+    } else {
+        Ok(base)
+    }
 }
 
 fn decode_receipt(
@@ -619,6 +634,7 @@ impl CobolProgram {
         effect: &EffectRequest,
         program: &str,
         payload: &BoundedPayload,
+        selection: Option<&mainframe_env_host_api::ProgramLinkSelection>,
     ) -> Result<BoundedPayload, HostProblem> {
         if !matches!(
             payload.schema(),
@@ -629,24 +645,25 @@ impl CobolProgram {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let key = identity(parent, effect)?;
         let fingerprint = fingerprint(parent, effect, program, payload)?;
+        let preflight = || match selection {
+            Some(selection) => self.preflight_selected_program(program, selection),
+            None => self.preflight_installed_program(
+                program,
+                payload.schema() == "mainframe-env.program.input@1",
+            ),
+        };
         if let Some(record) = store
             .get_provider_state(CALL_REPLAY_NAMESPACE, &key)
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
             let result = previous(record, &fingerprint, parent)?;
-            self.preflight_installed_program(
-                program,
-                payload.schema() == "mainframe-env.program.input@1",
-            )?;
+            preflight()?;
             if payload.schema() == "mainframe-env.program.input@1" {
                 self.finish_run_unit(parent)?;
             }
             return Ok(result);
         }
-        let admitted = self.preflight_installed_program(
-            program,
-            payload.schema() == "mainframe-env.program.input@1",
-        )?;
+        let admitted = preflight()?;
         self.ensure_call_protocol(parent)?;
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"

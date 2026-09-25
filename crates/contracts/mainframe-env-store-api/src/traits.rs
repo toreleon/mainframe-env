@@ -1,10 +1,11 @@
 use crate::{
     ArtifactRecord, ArtifactStoreHealth, CheckpointRecord, EffectRecord, ExecutionRecord,
     ExecutionState, GenerationRecord, OutboxRecord, ProviderStateArchiveDeletion,
-    ProviderStateArchiveReplacement, ProviderStateMutation, ProviderStateRecord,
-    ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive, RetentionForecast,
-    RetentionLegacyRow, RetentionPolicy, RetentionReceipt, RetentionReconciliationReceipt,
-    RetentionRequest, RetentionTarget, SessionRecord, StoreError, WorkRecord,
+    ProviderStateArchiveDeletionWithCapacity, ProviderStateArchiveReplacement,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateWrite, RetentionAgeReconciliation,
+    RetentionArchive, RetentionForecast, RetentionLegacyRow, RetentionPolicy, RetentionReceipt,
+    RetentionReconciliationReceipt, RetentionRequest, RetentionTarget, SessionRecord, StoreError,
+    WorkRecord,
 };
 use mainframe_env_execution_api::{
     ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
@@ -500,6 +501,14 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
     fn archive_provider_state_deletion(
         &self,
         _request: ProviderStateArchiveDeletion,
+    ) -> Result<RetentionArchive, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Atomically archive private container replay rows and decrement their
+    /// command-data capacity CAS row. Other targets and namespaces are refused.
+    fn archive_provider_state_deletion_with_capacity(
+        &self,
+        _request: ProviderStateArchiveDeletionWithCapacity,
     ) -> Result<RetentionArchive, StoreError> {
         Err(StoreError::InvalidTransition)
     }

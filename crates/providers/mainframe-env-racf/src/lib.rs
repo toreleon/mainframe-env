@@ -50,3 +50,4 @@ pub use saf::{
     RacrouteResult, RacrouteState, SafDefineAction, SafExtractKind, SafRequestContext,
     SafVerifyAction, TokenMetadata,
 };
+pub use saf::{CredentialDetails, CredentialFailure, CredentialKind};

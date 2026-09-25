@@ -102,6 +102,14 @@ fn syncpoint(
             _ => return Err(HostProblem::IdempotencyConflict),
         }
     } else {
+        if outcome == CicsUnitOfWorkOutcome::Committed {
+            super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref())
+                .preflight_pending_definition(
+                    run.invocation.run_unit_id.as_str(),
+                    run.invocation.execution_id.as_str(),
+                    run.invocation.principal.id().as_str(),
+                )?;
+        }
         service
             .store
             .put_provider_state(
@@ -131,6 +139,12 @@ fn syncpoint(
     syncpoint_db2(service, run, outcome)?;
     syncpoint_ims(service, run, outcome)?;
     syncpoint_mq(service, run, outcome)?;
+    super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref()).finish_run_uow(
+        run.invocation.run_unit_id.as_str(),
+        run.invocation.execution_id.as_str(),
+        run.invocation.principal.id().as_str(),
+        outcome == CicsUnitOfWorkOutcome::Committed,
+    )?;
     super::release_uow_enqueues(service, run)?;
     if outcome == CicsUnitOfWorkOutcome::RolledBack {
         rollback_run(service, run)?;
@@ -140,7 +154,8 @@ fn syncpoint(
     // A syncpoint ends every no-token file update context regardless of
     // whether the unit of work commits or rolls back.
     run.current_records.clear();
-    run.current_record_values.clear();
+    run.file_updates.current_record_values.clear();
+    run.file_updates.file_tokens.clear();
     let terminal_tick = match &service.replay_clock {
         Some(clock) => match clock.now_tick() {
             Ok(tick) if tick != 0 => Some(tick.max(uow_deadline)),
@@ -467,7 +482,8 @@ fn rollback_run(service: &CicsService, run: &mut Run) -> Result<(), HostProblem>
         }
     }
     run.current_records.clear();
-    run.current_record_values.clear();
+    run.file_updates.current_record_values.clear();
+    run.file_updates.file_tokens.clear();
     service.clear_undo(run)
 }
 

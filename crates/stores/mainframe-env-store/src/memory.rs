@@ -17,16 +17,18 @@ use mainframe_env_store_api::{
     GenerationRecord, GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
     ProviderRetentionDependency, ProviderRetentionObservationDeletion,
     ProviderRetentionObservationSource, ProviderRetentionRow, ProviderStateArchiveDeletion,
-    ProviderStateArchiveReplacement, ProviderStateMutation, ProviderStateRecord,
-    ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
-    RetentionArchivePruneOutcome, RetentionArchivePruneReceipt, RetentionArchivePruneRequest,
-    RetentionForecast, RetentionLegacyRow, RetentionObservation, RetentionPolicy, RetentionReceipt,
+    ProviderStateArchiveDeletionWithCapacity, ProviderStateArchiveReplacement,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
+    RetentionAgeReconciliation, RetentionArchive, RetentionArchivePruneOutcome,
+    RetentionArchivePruneReceipt, RetentionArchivePruneRequest, RetentionForecast,
+    RetentionLegacyRow, RetentionObservation, RetentionPolicy, RetentionReceipt,
     RetentionReconciliationReceipt, RetentionRequest, RetentionStore, RetentionTarget,
     SessionRecord, SessionStore, StoreError, WorkRecord, WorkState, WorkStore,
 };
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
+mod container_retention;
 mod journal;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1449,61 +1451,14 @@ impl ProviderStateStore for MemoryStore {
         &self,
         request: ProviderStateArchiveDeletion,
     ) -> Result<RetentionArchive, StoreError> {
-        crate::retention::validate_provider_deletion(&request, self.limits.max_blob_bytes)?;
-        let mut state = self.lock()?;
-        if state.provider_epoch != request.expected_epoch {
-            return Err(StoreError::Conflict);
-        }
-        for candidate in &request.rows {
-            let current = state
-                .provider_state
-                .get(&(candidate.row.namespace.clone(), candidate.row.key.clone()))
-                .ok_or(StoreError::Conflict)?;
-            if current != &candidate.row {
-                return Err(StoreError::Conflict);
-            }
-            if let Some(proof) = &candidate.observation
-                && state.observations.get(&(
-                    request.target,
-                    proof.observation.namespace.clone(),
-                    proof.observation.key.clone(),
-                )) != Some(&(proof.version, proof.observation.clone()))
-            {
-                return Err(StoreError::Conflict);
-            }
-            validate_memory_provider_dependency(&state, candidate)?;
-        }
-        let archive = build_archive(
-            request.target,
-            request.archived_tick,
-            request.watermark_tick,
-            request
-                .rows
-                .into_iter()
-                .map(|candidate| ArchivedRetentionRow {
-                    namespace: candidate.row.namespace,
-                    key: candidate.row.key,
-                    version: candidate.row.version,
-                    payload: candidate.row.payload,
-                    retention_tick: candidate.retention_tick,
-                    owner_execution: candidate.owner_execution,
-                })
-                .collect(),
-        )?;
-        let mut staged = self.snapshot(&state);
-        for row in &archive.rows {
-            remove_memory_row(&mut staged, row)?;
-            remove_memory_observation(&mut staged, request.target, row)?;
-        }
-        staged.provider_epoch = staged
-            .provider_epoch
-            .checked_add(
-                u64::try_from(archive.rows.len()).map_err(|_| StoreError::CapacityExceeded)?,
-            )
-            .ok_or(StoreError::CapacityExceeded)?;
-        insert_memory_archive(&mut staged, archive.clone(), self.limits)?;
-        *state = staged;
-        Ok(archive)
+        self.archive_provider_deletion(request)
+    }
+
+    fn archive_provider_state_deletion_with_capacity(
+        &self,
+        request: ProviderStateArchiveDeletionWithCapacity,
+    ) -> Result<RetentionArchive, StoreError> {
+        self.archive_container_replay_with_capacity(request)
     }
 
     fn provider_retention_observations(
@@ -3301,6 +3256,13 @@ fn validate_memory_provider_dependency(
             if effect.execution_id != *owner
                 || effect.run_unit_id != *run
                 || effect.state != EffectState::Completed
+                || candidate.row.namespace == "cics-container-replay-v1"
+                    && effect
+                        .intent
+                        .capability
+                        .as_ref()
+                        .map(|value| value.as_str())
+                        != Some("host.cics.execute")
                 || effect.digest_format
                     != mainframe_env_store_api::EffectDigestFormat::CanonicalHostV1
                 || effect.request_digest != *request_digest

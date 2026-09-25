@@ -6,122 +6,512 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "target_version", "work_package", "status",
-    "automatic_registration", "semantic_authority", "execution_authority",
-    "coverage_credit", "semantic_credit", "differential_credit", "inputs",
-    "contract_dimensions", "host_limits", "policy_bindings", "condition_name_authority", "participant_contract", "registry",
-    "counts", "batches", "contract_sha256"
+    "schema_version",
+    "target_version",
+    "work_package",
+    "status",
+    "automatic_registration",
+    "semantic_authority",
+    "execution_authority",
+    "coverage_credit",
+    "semantic_credit",
+    "differential_credit",
+    "inputs",
+    "contract_dimensions",
+    "host_limits",
+    "policy_bindings",
+    "condition_name_authority",
+    "participant_contract",
+    "registry",
+    "counts",
+    "batches",
+    "contract_sha256"
   ],
   "properties": {
-    "schema_version": {"const": "mainframe-env.cics-application-command-contracts@2"},
-    "target_version": {"const": "0.9.0"},
-    "work_package": {"const": "CIC-901.command-contract"},
-    "status": {"enum": ["source-pending", "frozen", "frozen-with-bounded-ambiguities"]},
-    "automatic_registration": {"const": false},
-    "semantic_authority": {"type": "boolean"},
-    "execution_authority": {"const": false},
-    "coverage_credit": {"const": 0},
-    "semantic_credit": {"const": 0},
-    "differential_credit": {"const": 0},
+    "schema_version": {
+      "const": "mainframe-env.cics-application-command-contracts@2"
+    },
+    "target_version": {
+      "const": "0.9.0"
+    },
+    "work_package": {
+      "const": "CIC-901.command-contract"
+    },
+    "status": {
+      "enum": [
+        "source-pending",
+        "frozen",
+        "frozen-with-bounded-ambiguities"
+      ]
+    },
+    "automatic_registration": {
+      "const": false
+    },
+    "semantic_authority": {
+      "type": "boolean"
+    },
+    "execution_authority": {
+      "const": false
+    },
+    "coverage_credit": {
+      "const": 0
+    },
+    "semantic_credit": {
+      "const": 0
+    },
+    "differential_credit": {
+      "const": 0
+    },
     "inputs": {
-      "type": "object", "additionalProperties": false,
-      "required": ["command_descriptors"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_descriptors"
+      ],
       "properties": {
         "command_descriptors": {
-          "type": "object", "additionalProperties": false,
-          "required": ["path", "file_sha256", "application_identity_set_sha256"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "file_sha256",
+            "application_identity_set_sha256"
+          ],
           "properties": {
-            "path": {"const": "conformance/0.9/cics/command-descriptors.json"},
-            "file_sha256": {"$ref": "#/$defs/sha256"},
-            "application_identity_set_sha256": {"$ref": "#/$defs/sha256"}
+            "path": {
+              "const": "conformance/0.9/cics/command-descriptors.json"
+            },
+            "file_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "application_identity_set_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
           }
         }
       }
     },
-    "contract_dimensions": {"$ref": "#/$defs/exact-dimensions"},
+    "contract_dimensions": {
+      "$ref": "#/$defs/exact-dimensions"
+    },
     "host_limits": {
-      "type": "object", "additionalProperties": false,
-      "required": ["profile", "max_argument_count", "max_argument_name_bytes", "max_argument_value_bytes", "max_request_bytes"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "max_argument_count",
+        "max_argument_name_bytes",
+        "max_argument_value_bytes",
+        "max_request_bytes"
+      ],
       "properties": {
-        "profile": {"const": "mainframe-env.host-cics-bounds@1"},
-        "max_argument_count": {"const": 512},
-        "max_argument_name_bytes": {"const": 128},
-        "max_argument_value_bytes": {"const": 1048576},
-        "max_request_bytes": {"const": 4194304}
+        "profile": {
+          "const": "mainframe-env.host-cics-bounds@1"
+        },
+        "max_argument_count": {
+          "const": 512
+        },
+        "max_argument_name_bytes": {
+          "const": 128
+        },
+        "max_argument_value_bytes": {
+          "const": 1048576
+        },
+        "max_request_bytes": {
+          "const": 4194304
+        }
       }
     },
     "policy_bindings": {
-      "type": "object", "additionalProperties": false,
-      "required": ["authorization", "audit", "canonical_effect", "execution", "persistence", "storage"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorization",
+        "audit",
+        "canonical_effect",
+        "execution",
+        "persistence",
+        "storage"
+      ],
       "properties": {
-        "authorization": {"$ref": "#/$defs/policy-binding"},
-        "audit": {"$ref": "#/$defs/policy-binding"},
-        "canonical_effect": {"$ref": "#/$defs/policy-binding"},
-        "execution": {"$ref": "#/$defs/policy-binding"},
-        "persistence": {"$ref": "#/$defs/policy-binding"},
-        "storage": {"$ref": "#/$defs/policy-binding"}
+        "authorization": {
+          "$ref": "#/$defs/policy-binding"
+        },
+        "audit": {
+          "$ref": "#/$defs/policy-binding"
+        },
+        "canonical_effect": {
+          "$ref": "#/$defs/policy-binding"
+        },
+        "execution": {
+          "$ref": "#/$defs/policy-binding"
+        },
+        "persistence": {
+          "$ref": "#/$defs/policy-binding"
+        },
+        "storage": {
+          "$ref": "#/$defs/policy-binding"
+        }
       }
     },
-    "condition_name_authority": {"$ref": "#/$defs/condition-name-authority"},
-    "participant_contract": {"$ref": "#/$defs/participant-contract"},
-    "registry": {"$ref": "#/$defs/registry-summary"},
-    "counts": {"$ref": "#/$defs/counts"},
+    "condition_name_authority": {
+      "$ref": "#/$defs/condition-name-authority"
+    },
+    "participant_contract": {
+      "$ref": "#/$defs/participant-contract"
+    },
+    "registry": {
+      "$ref": "#/$defs/registry-summary"
+    },
+    "counts": {
+      "$ref": "#/$defs/counts"
+    },
     "batches": {
-      "type": "array", "minItems": 3, "maxItems": 3,
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
       "prefixItems": [
-        {"allOf": [{"$ref": "#/$defs/batch"}, {"properties": {"batch_id": {"const": "sources-a"}, "ordinal_start": {"const": 1}, "ordinal_end": {"const": 88}, "command_count": {"const": 88}, "commands": {"minItems": 88, "maxItems": 88}}}]},
-        {"allOf": [{"$ref": "#/$defs/batch"}, {"properties": {"batch_id": {"const": "sources-b"}, "ordinal_start": {"const": 89}, "ordinal_end": {"const": 176}, "command_count": {"const": 88}, "commands": {"minItems": 88, "maxItems": 88}}}]},
-        {"allOf": [{"$ref": "#/$defs/batch"}, {"properties": {"batch_id": {"const": "sources-c"}, "ordinal_start": {"const": 177}, "ordinal_end": {"const": 263}, "command_count": {"const": 87}, "commands": {"minItems": 87, "maxItems": 87}}}]}
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/batch"
+            },
+            {
+              "properties": {
+                "batch_id": {
+                  "const": "sources-a"
+                },
+                "ordinal_start": {
+                  "const": 1
+                },
+                "ordinal_end": {
+                  "const": 88
+                },
+                "command_count": {
+                  "const": 88
+                },
+                "commands": {
+                  "minItems": 88,
+                  "maxItems": 88
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/batch"
+            },
+            {
+              "properties": {
+                "batch_id": {
+                  "const": "sources-b"
+                },
+                "ordinal_start": {
+                  "const": 89
+                },
+                "ordinal_end": {
+                  "const": 176
+                },
+                "command_count": {
+                  "const": 88
+                },
+                "commands": {
+                  "minItems": 88,
+                  "maxItems": 88
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/batch"
+            },
+            {
+              "properties": {
+                "batch_id": {
+                  "const": "sources-c"
+                },
+                "ordinal_start": {
+                  "const": 177
+                },
+                "ordinal_end": {
+                  "const": 263
+                },
+                "command_count": {
+                  "const": 87
+                },
+                "commands": {
+                  "minItems": 87,
+                  "maxItems": 87
+                }
+              }
+            }
+          ]
+        }
       ],
       "items": false
     },
-    "contract_sha256": {"$ref": "#/$defs/sha256"}
+    "contract_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
   },
   "allOf": [
     {
-      "if": {"properties": {"status": {"const": "source-pending"}}},
-      "then": {"properties": {"semantic_authority": {"const": false}, "participant_contract": {"properties": {"status": {"const": "source-pending"}}}, "counts": {"properties": {"closed_contract_commands": {"const": 0}}}}},
-      "else": {"properties": {"semantic_authority": {"const": true}, "participant_contract": {"properties": {"status": {"enum": ["frozen", "bounded-ambiguity"]}}}, "counts": {"properties": {"source_projected_commands": {"const": 263}, "source_reviewed_commands": {"const": 263}, "closed_contract_commands": {"const": 263}}}}}
+      "if": {
+        "properties": {
+          "status": {
+            "const": "source-pending"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "semantic_authority": {
+            "const": false
+          },
+          "participant_contract": {
+            "properties": {
+              "status": {
+                "const": "source-pending"
+              }
+            }
+          },
+          "counts": {
+            "properties": {
+              "closed_contract_commands": {
+                "const": 0
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "semantic_authority": {
+            "const": true
+          },
+          "participant_contract": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "frozen",
+                  "bounded-ambiguity"
+                ]
+              }
+            }
+          },
+          "counts": {
+            "properties": {
+              "source_projected_commands": {
+                "const": 263
+              },
+              "source_reviewed_commands": {
+                "const": 263
+              },
+              "closed_contract_commands": {
+                "const": 263
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
-    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "text": {"type": "string", "minLength": 1},
-    "nullable-text": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
-    "nullable-boolean": {"type": ["boolean", "null"]},
-    "nullable-nonnegative-integer": {"type": ["integer", "null"], "minimum": 0},
-    "dimension-name": {"enum": ["grammar", "option-legality", "operand-direction", "option-bounds", "resource-key", "capability-intent", "eib-response", "conditions", "context-applicability", "effect-class", "cancellation", "audit", "recovery"]},
-    "exact-dimensions": {"const": ["grammar", "option-legality", "operand-direction", "option-bounds", "resource-key", "capability-intent", "eib-response", "conditions", "context-applicability", "effect-class", "cancellation", "audit", "recovery"]},
-    "dimension-status": {"enum": ["resolved", "not-applicable", "bounded-ambiguity", "pending"]},
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable-text": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/text"
+        }
+      ]
+    },
+    "nullable-boolean": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "nullable-nonnegative-integer": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "dimension-name": {
+      "enum": [
+        "grammar",
+        "option-legality",
+        "operand-direction",
+        "option-bounds",
+        "resource-key",
+        "capability-intent",
+        "eib-response",
+        "conditions",
+        "context-applicability",
+        "effect-class",
+        "cancellation",
+        "audit",
+        "recovery"
+      ]
+    },
+    "exact-dimensions": {
+      "const": [
+        "grammar",
+        "option-legality",
+        "operand-direction",
+        "option-bounds",
+        "resource-key",
+        "capability-intent",
+        "eib-response",
+        "conditions",
+        "context-applicability",
+        "effect-class",
+        "cancellation",
+        "audit",
+        "recovery"
+      ]
+    },
+    "dimension-status": {
+      "enum": [
+        "resolved",
+        "not-applicable",
+        "bounded-ambiguity",
+        "pending"
+      ]
+    },
     "condition-name-authority": {
-      "type": "object", "additionalProperties": false,
-      "required": ["profile", "topic_path", "topic_sha256", "table_id", "allowed_names", "conditions", "allowed_names_digest_definition", "allowed_names_sha256", "conditions_digest_definition", "conditions_sha256"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "topic_path",
+        "topic_sha256",
+        "table_id",
+        "allowed_names",
+        "conditions",
+        "allowed_names_digest_definition",
+        "allowed_names_sha256",
+        "conditions_digest_definition",
+        "conditions_sha256"
+      ],
       "properties": {
-        "profile": {"const": "cics-eibresp-condition-name@1"},
-        "topic_path": {"const": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"},
-        "topic_sha256": {"$ref": "#/$defs/sha256"},
-        "table_id": {"const": "dfhp4au__table_nt5_kw4_b1c"},
-        "allowed_names": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,31}$"}},
-        "conditions": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["name", "code"], "properties": {"name": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,31}$"}, "code": {"type": "integer", "minimum": 0, "maximum": 255}}}},
-        "allowed_names_digest_definition": {"type": "string", "minLength": 1},
-        "allowed_names_sha256": {"$ref": "#/$defs/sha256"},
-        "conditions_digest_definition": {"type": "string", "minLength": 1},
-        "conditions_sha256": {"$ref": "#/$defs/sha256"}
+        "profile": {
+          "const": "cics-eibresp-condition-name@1"
+        },
+        "topic_path": {
+          "const": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
+        },
+        "topic_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "table_id": {
+          "const": "dfhp4au__table_nt5_kw4_b1c"
+        },
+        "allowed_names": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]{0,31}$"
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "code"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]{0,31}$"
+              },
+              "code": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            }
+          }
+        },
+        "allowed_names_digest_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_names_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "conditions_digest_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "condition-clauses": {
       "oneOf": [
-        {"type": "null"},
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["name_authority", "name_authority_sha256", "minimum_occurrences", "maximum_occurrences", "label_operand", "occurrence_limit_fragment_sha256"],
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name_authority",
+            "name_authority_sha256",
+            "minimum_occurrences",
+            "maximum_occurrences",
+            "label_operand",
+            "occurrence_limit_fragment_sha256"
+          ],
           "properties": {
-            "name_authority": {"const": "cics-eibresp-condition-name@1"},
-            "name_authority_sha256": {"$ref": "#/$defs/sha256"},
-            "minimum_occurrences": {"const": 1},
-            "maximum_occurrences": {"const": 16},
-            "label_operand": {"enum": ["optional", "forbidden"]},
-            "occurrence_limit_fragment_sha256": {"$ref": "#/$defs/sha256"}
+            "name_authority": {
+              "const": "cics-eibresp-condition-name@1"
+            },
+            "name_authority_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "minimum_occurrences": {
+              "const": 1
+            },
+            "maximum_occurrences": {
+              "const": 16
+            },
+            "label_operand": {
+              "enum": [
+                "optional",
+                "forbidden"
+              ]
+            },
+            "occurrence_limit_fragment_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
           }
         }
       ]
@@ -129,205 +519,1876 @@
     "option-sensitive-semantic": {
       "oneOf": [
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["options", "predicate", "affected_dimensions", "status"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "options",
+            "predicate",
+            "affected_dimensions",
+            "status"
+          ],
           "properties": {
-            "options": {"const": ["TOKEN", "UPDATE"]},
-            "predicate": {"const": "presence-selects-read-for-update-or-lock-token"},
-            "affected_dimensions": {"const": ["resource-key", "capability-intent", "effect-class", "cancellation", "audit", "recovery"]},
-            "status": {"const": "bounded-ambiguity"}
+            "options": {
+              "const": [
+                "TOKEN",
+                "UPDATE"
+              ]
+            },
+            "predicate": {
+              "const": "presence-selects-read-for-update-or-lock-token"
+            },
+            "affected_dimensions": {
+              "const": [
+                "resource-key",
+                "capability-intent",
+                "effect-class",
+                "cancellation",
+                "audit",
+                "recovery"
+              ]
+            },
+            "status": {
+              "const": "bounded-ambiguity"
+            }
           }
         },
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["options", "predicate", "affected_dimensions", "status"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "options",
+            "predicate",
+            "affected_dimensions",
+            "status"
+          ],
           "properties": {
-            "options": {"const": ["ROLLBACK"]},
-            "predicate": {"const": "presence-selects-rollback-otherwise-commit"},
-            "affected_dimensions": {"const": ["recovery"]},
-            "status": {"const": "resolved"}
+            "options": {
+              "const": [
+                "ROLLBACK"
+              ]
+            },
+            "predicate": {
+              "const": "presence-selects-rollback-otherwise-commit"
+            },
+            "affected_dimensions": {
+              "const": [
+                "recovery"
+              ]
+            },
+            "status": {
+              "const": "resolved"
+            }
           }
         }
       ]
     },
-    "policy-binding": {"type": "object", "minProperties": 2, "required": ["contract"], "additionalProperties": {"$ref": "#/$defs/text"}},
+    "policy-binding": {
+      "type": "object",
+      "minProperties": 2,
+      "required": [
+        "contract"
+      ],
+      "additionalProperties": {
+        "$ref": "#/$defs/text"
+      }
+    },
     "file-binding": {
-      "type": "object", "additionalProperties": false,
-      "required": ["path", "file_sha256"],
-      "properties": {"path": {"$ref": "#/$defs/text"}, "file_sha256": {"$ref": "#/$defs/sha256"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "file_sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/text"
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     },
     "review-binding": {
-      "type": "object", "additionalProperties": false,
-      "required": ["path", "file_sha256", "review_status"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "file_sha256",
+        "review_status"
+      ],
       "properties": {
-        "path": {"$ref": "#/$defs/text"}, "file_sha256": {"$ref": "#/$defs/sha256"},
-        "review_status": {"enum": ["auto-accepted", "auto-accepted-with-bounded-ambiguities", "blocked", "stale"]}
+        "path": {
+          "$ref": "#/$defs/text"
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "review_status": {
+          "enum": [
+            "auto-accepted",
+            "auto-accepted-with-bounded-ambiguities",
+            "blocked",
+            "stale"
+          ]
+        }
       }
     },
     "source-input": {
-      "type": "object", "additionalProperties": false, "required": ["projection", "review"],
-      "properties": {"projection": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/file-binding"}]}, "review": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/review-binding"}]}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection",
+        "review"
+      ],
+      "properties": {
+        "projection": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/file-binding"
+            }
+          ]
+        },
+        "review": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/review-binding"
+            }
+          ]
+        }
+      }
     },
     "fact": {
-      "type": "object", "additionalProperties": false, "required": ["value", "candidate_ids"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "candidate_ids"
+      ],
       "properties": {
-        "value": {"type": "object", "minProperties": 1},
-        "candidate_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^cics-[abc]-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"}}
+        "value": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "candidate_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^cics-[abc]-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
+          }
+        }
       }
     },
     "source-dimension": {
-      "type": "object", "additionalProperties": false,
-      "required": ["name", "source_projection_state", "verification_status", "facts", "issue_ids"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "source_projection_state",
+        "verification_status",
+        "facts",
+        "issue_ids"
+      ],
       "properties": {
-        "name": {"enum": ["grammar", "option-legality", "operand-direction", "conditions", "context-applicability"]},
-        "source_projection_state": {"enum": ["not-projected", "projected", "declared-absent", "source-backed-not-applicable", "source-gap", "unmatched", "conflicting"]},
-        "verification_status": {"enum": ["not-projected", "verified", "verified-absent", "not-applicable", "verified-with-bounded-ambiguity", "projected-unverified", "projected-absent-unverified", "projected-not-applicable-unverified", "source-gap", "unmatched", "ambiguous"]},
-        "facts": {"type": "array", "items": {"$ref": "#/$defs/fact"}},
-        "issue_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}}
+        "name": {
+          "enum": [
+            "grammar",
+            "option-legality",
+            "operand-direction",
+            "conditions",
+            "context-applicability"
+          ]
+        },
+        "source_projection_state": {
+          "enum": [
+            "not-projected",
+            "projected",
+            "declared-absent",
+            "source-backed-not-applicable",
+            "source-gap",
+            "unmatched",
+            "conflicting"
+          ]
+        },
+        "verification_status": {
+          "enum": [
+            "not-projected",
+            "verified",
+            "verified-absent",
+            "not-applicable",
+            "verified-with-bounded-ambiguity",
+            "projected-unverified",
+            "projected-absent-unverified",
+            "projected-not-applicable-unverified",
+            "source-gap",
+            "unmatched",
+            "ambiguous"
+          ]
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fact"
+          }
+        },
+        "issue_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
       }
     },
     "dimension-disposition": {
-      "type": "object", "additionalProperties": false, "required": ["name", "status"],
-      "properties": {"name": {"$ref": "#/$defs/dimension-name"}, "status": {"$ref": "#/$defs/dimension-status"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "status"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/dimension-name"
+        },
+        "status": {
+          "$ref": "#/$defs/dimension-status"
+        }
+      }
     },
     "option-entry": {
-      "type": "object", "additionalProperties": false,
-      "required": ["name", "authorities", "argument_markers", "value_shape", "directions", "direction_status", "source_stacks", "bound_status", "source_max_value_bytes", "host_max_value_bytes"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "authorities",
+        "argument_markers",
+        "value_shape",
+        "directions",
+        "direction_status",
+        "source_stacks",
+        "bound_status",
+        "source_max_value_bytes",
+        "host_max_value_bytes"
+      ],
       "properties": {
-        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"},
-        "authorities": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["command-source", "global-command-format"]}},
-        "argument_markers": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
-        "value_shape": {"enum": ["flag", "value", "optional-value", "bounded-ambiguity"]},
-        "directions": {"type": "array", "uniqueItems": true, "items": {"enum": ["input", "output", "input-output", "none", "unknown"]}},
-        "direction_status": {"enum": ["resolved", "bounded-ambiguity"]},
-        "source_stacks": {"type": "array", "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}}},
-        "bound_status": {"enum": ["resolved", "not-applicable", "bounded-ambiguity"]},
-        "source_max_value_bytes": {"$ref": "#/$defs/nullable-nonnegative-integer"},
-        "host_max_value_bytes": {"type": "integer", "minimum": 0, "maximum": 1048576}
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "authorities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "command-source",
+              "global-command-format"
+            ]
+          }
+        },
+        "argument_markers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "value_shape": {
+          "enum": [
+            "flag",
+            "value",
+            "optional-value",
+            "bounded-ambiguity"
+          ]
+        },
+        "directions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "input",
+              "output",
+              "input-output",
+              "none",
+              "unknown"
+            ]
+          }
+        },
+        "direction_status": {
+          "enum": [
+            "resolved",
+            "bounded-ambiguity"
+          ]
+        },
+        "source_stacks": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        "bound_status": {
+          "enum": [
+            "resolved",
+            "not-applicable",
+            "bounded-ambiguity"
+          ]
+        },
+        "source_max_value_bytes": {
+          "$ref": "#/$defs/nullable-nonnegative-integer"
+        },
+        "host_max_value_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576
+        }
       }
     },
     "option-alternative": {
-      "type": "object", "additionalProperties": false,
-      "required": ["members", "required"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "members",
+        "required"
+      ],
       "properties": {
-        "members": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}},
-        "required": {"type": "boolean"}
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          }
+        },
+        "required": {
+          "type": "boolean"
+        }
       }
     },
     "option-dependency": {
-      "type": "object", "additionalProperties": false,
-      "required": ["option", "requires"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "option",
+        "requires"
+      ],
       "properties": {
-        "option": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"},
-        "requires": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}}
+        "option": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "requires": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          }
+        }
       }
     },
     "option-constraints": {
-      "type": "object", "additionalProperties": false,
-      "required": ["status", "source_scope", "required", "alternatives", "dependencies", "mutual_exclusions"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source_scope",
+        "required",
+        "alternatives",
+        "dependencies",
+        "mutual_exclusions"
+      ],
       "properties": {
-        "status": {"$ref": "#/$defs/dimension-status"},
-        "source_scope": {"enum": ["syntax-diagram-only", "not-applicable"]},
-        "required": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}},
-        "alternatives": {"type": "array", "items": {"$ref": "#/$defs/option-alternative"}},
-        "dependencies": {"type": "array", "items": {"$ref": "#/$defs/option-dependency"}},
-        "mutual_exclusions": {"type": "array", "items": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}}}
+        "status": {
+          "$ref": "#/$defs/dimension-status"
+        },
+        "source_scope": {
+          "enum": [
+            "syntax-diagram-only",
+            "not-applicable"
+          ]
+        },
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          }
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/option-alternative"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/option-dependency"
+          }
+        },
+        "mutual_exclusions": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            }
+          }
+        }
       }
     },
     "condition-outcome": {
-      "type": "object", "additionalProperties": false,
-      "required": ["resp2", "condition_stack", "trigger_fragment_sha256s", "trigger_predicate", "trigger_status", "candidate_ids"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resp2",
+        "condition_stack",
+        "trigger_fragment_sha256s",
+        "trigger_predicate",
+        "trigger_status",
+        "candidate_ids"
+      ],
       "properties": {
-        "resp2": {"type": ["integer", "null"], "minimum": 0},
-        "condition_stack": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
-        "trigger_fragment_sha256s": {"type": "array", "items": {"$ref": "#/$defs/sha256"}},
-        "trigger_predicate": {"type": ["object", "null"]},
-        "trigger_status": {"enum": ["resolved", "not-applicable", "bounded-ambiguity"]},
-        "candidate_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^cics-[abc]-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"}}
+        "resp2": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "condition_stack": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "trigger_fragment_sha256s": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "trigger_predicate": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "trigger_status": {
+          "enum": [
+            "resolved",
+            "not-applicable",
+            "bounded-ambiguity"
+          ]
+        },
+        "candidate_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^cics-[abc]-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
+          }
+        }
       }
     },
     "condition": {
-      "type": "object", "additionalProperties": false, "required": ["resp", "condition", "outcomes"],
-      "properties": {"resp": {"type": "integer", "minimum": 0}, "condition": {"$ref": "#/$defs/text"}, "outcomes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/condition-outcome"}}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resp",
+        "condition",
+        "outcomes"
+      ],
+      "properties": {
+        "resp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "condition": {
+          "$ref": "#/$defs/text"
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/condition-outcome"
+          }
+        }
+      }
     },
     "resource-selector": {
-      "type": "object", "additionalProperties": false,
-      "required": ["option", "directions"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "option",
+        "directions"
+      ],
       "properties": {
-        "option": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"},
-        "directions": {"type": "array", "uniqueItems": true, "items": {"enum": ["input", "output", "input-output", "none", "unknown"]}}
+        "option": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]*$"
+        },
+        "directions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "input",
+              "output",
+              "input-output",
+              "none",
+              "unknown"
+            ]
+          }
+        }
       }
     },
     "registry-row": {
-      "type": "object", "additionalProperties": false,
-      "required": ["family", "handler_id", "handler_sha256", "readiness", "advertised", "runtime_operation", "legacy_execution_options", "unready_result"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "handler_id",
+        "handler_sha256",
+        "readiness",
+        "advertised",
+        "runtime_operation",
+        "legacy_execution_options",
+        "unready_result"
+      ],
       "properties": {
-        "family": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
-        "handler_id": {"type": "string", "pattern": "^mainframe-env-cics\\.handlers\\.[a-z0-9-]+\\.[a-z0-9-]+@1$"},
-        "handler_sha256": {"$ref": "#/$defs/sha256"},
-        "readiness": {"enum": ["typed-runtime", "legacy-compatibility", "unready"]}, "advertised": {"type": "boolean"},
-        "runtime_operation": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"}]},
-        "legacy_execution_options": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}},
-        "unready_result": {"oneOf": [{"type": "null"}, {"const": "explicit-unsupported"}]}
+        "family": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+        },
+        "handler_id": {
+          "type": "string",
+          "pattern": "^mainframe-env-cics\\.handlers\\.[a-z0-9-]+\\.[a-z0-9-]+@1$"
+        },
+        "handler_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "readiness": {
+          "enum": [
+            "typed-runtime",
+            "legacy-compatibility",
+            "unready"
+          ]
+        },
+        "advertised": {
+          "type": "boolean"
+        },
+        "runtime_operation": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9]*$"
+            }
+          ]
+        },
+        "legacy_execution_options": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*$"
+          }
+        },
+        "unready_result": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "const": "explicit-unsupported"
+            }
+          ]
+        }
       }
     },
     "semantic-contract": {
-      "type": "object", "additionalProperties": false,
-      "required": ["grammar", "option_sensitive_semantics", "options", "eib_response", "applicability", "resource", "capability", "effect", "cancellation", "audit", "recovery", "registry"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grammar",
+        "option_sensitive_semantics",
+        "options",
+        "eib_response",
+        "applicability",
+        "resource",
+        "capability",
+        "effect",
+        "cancellation",
+        "audit",
+        "recovery",
+        "registry"
+      ],
       "properties": {
-        "grammar": {"type": "object", "additionalProperties": false, "required": ["status", "variants"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "variants": {"type": "array", "items": {"type": "object", "minProperties": 1}}}},
-        "option_sensitive_semantics": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/option-sensitive-semantic"}},
-        "options": {"type": "object", "additionalProperties": false, "required": ["status", "direction_status", "bounds_status", "entries", "condition_clauses", "constraints", "unknown_option", "duplicate_option", "max_argument_count", "max_aggregate_value_bytes"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "direction_status": {"$ref": "#/$defs/dimension-status"}, "bounds_status": {"$ref": "#/$defs/dimension-status"}, "entries": {"type": "array", "items": {"$ref": "#/$defs/option-entry"}}, "condition_clauses": {"$ref": "#/$defs/condition-clauses"}, "constraints": {"$ref": "#/$defs/option-constraints"}, "unknown_option": {"const": "reject"}, "duplicate_option": {"const": "reject"}, "max_argument_count": {"const": 512}, "max_aggregate_value_bytes": {"const": 4194304}}},
-        "eib_response": {"type": "object", "additionalProperties": false, "required": ["status", "response_authority", "eibfn", "eibfn_bytes", "normal_return", "conditions", "symbolic_fragments", "condition_policy"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "response_authority": {"const": "SSJL4D_6.x/reference-diagnostics/eib/dfha8me.html"}, "eibfn": {"type": "string", "pattern": "^[0-9A-F]{4}$"}, "eibfn_bytes": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 0, "maximum": 255}}, "normal_return": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["condition", "resp", "resp2"], "properties": {"condition": {"const": "NORMAL"}, "resp": {"const": 0}, "resp2": {"const": 0}}}]}, "conditions": {"type": "array", "items": {"$ref": "#/$defs/condition"}}, "symbolic_fragments": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}}, "condition_policy": {"type": "object", "additionalProperties": false, "required": ["authority", "default", "nohandle", "resp", "resp2", "resp2_requires_resp"], "properties": {"authority": {"const": "global-command-format"}, "default": {"const": true}, "nohandle": {"type": "boolean"}, "resp": {"type": "boolean"}, "resp2": {"type": "boolean"}, "resp2_requires_resp": {"const": true}}}}},
-        "applicability": {"type": "object", "additionalProperties": false, "required": ["status", "local_task", "dpl_server", "threadsafe", "cobol", "dpl_restriction", "language_restriction", "threadsafe_condition", "context_predicates", "source_selectors"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "local_task": {"$ref": "#/$defs/text"}, "dpl_server": {"$ref": "#/$defs/text"}, "threadsafe": {"$ref": "#/$defs/text"}, "cobol": {"enum": ["allowed", "not-applicable", "conditional", "bounded-ambiguity"]}, "dpl_restriction": {"type": "object", "additionalProperties": false, "required": ["kind", "source_kind", "table_command", "prohibited_options", "requirement", "restriction_predicates", "restriction_match", "condition", "resp2"], "properties": {"kind": {"enum": ["allowed", "not-applicable", "prohibited", "option-restricted", "conditional", "bounded-ambiguity"]}, "source_kind": {"type": ["string", "null"], "enum": ["table", "prose", null]}, "table_command": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[A-Z][A-Z0-9 ]*$"}]}, "prohibited_options": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*(?:\\([A-Z0-9]+\\))?$"}}, "requirement": {"enum": ["none", "synconreturn-required", "termid-not-intersystem-session"]}, "restriction_predicates": {"type": "array", "uniqueItems": true, "items": {"enum": ["principal-facility", "connect-process-principal-facility-error-is-dpl"]}}, "restriction_match": {"type": ["string", "null"], "enum": ["any-of", null]}, "condition": {"type": ["string", "null"], "enum": ["INVREQ", null]}, "resp2": {"type": ["integer", "null"], "enum": [1, 5, 200, null]}}}, "language_restriction": {"type": "object", "minProperties": 1}, "threadsafe_condition": {"type": ["object", "null"]}, "context_predicates": {"type": "array", "items": {"type": "object", "minProperties": 1}}, "source_selectors": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}}}},
-        "resource": {"type": "object", "additionalProperties": false, "required": ["status", "scope", "selectors", "ambiguous_selectors", "excluded_output_options", "selector_authority", "selector_completeness", "fallback_selector", "access_intent", "authorization"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "scope": {"$ref": "#/$defs/text"}, "selectors": {"type": "array", "items": {"$ref": "#/$defs/resource-selector"}}, "ambiguous_selectors": {"type": "array", "items": {"$ref": "#/$defs/resource-selector"}}, "excluded_output_options": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}}, "selector_authority": {"enum": ["source-candidate-only", "source-bound-runtime", "not-applicable"]}, "selector_completeness": {"enum": ["resolved", "bounded-ambiguity", "not-applicable"]}, "fallback_selector": {"$ref": "#/$defs/nullable-text"}, "access_intent": {"enum": ["read", "update", "execute", "bounded-ambiguity", "not-applicable"]}, "authorization": {"enum": ["typed-saf-before-dispatch", "not-applicable"]}}},
-        "capability": {"type": "object", "additionalProperties": false, "required": ["status", "route", "required"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "route": {"oneOf": [{"type": "null"}, {"const": "host.cics.execute"}]}, "required": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^host\\.[a-z]+(?:\\.[a-z]+)*$"}}}},
-        "effect": {"type": "object", "additionalProperties": false, "required": ["status", "class", "mutating", "ir_effects", "canonical_identity"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "class": {"enum": ["observational", "mutating", "bounded-ambiguity", "not-applicable"]}, "mutating": {"$ref": "#/$defs/nullable-boolean"}, "ir_effects": {"type": "array", "uniqueItems": true, "items": {"enum": ["audit", "clock", "condition", "dataset-read", "dataset-write", "memory-read", "memory-write", "program-control", "security", "spool", "suspension", "terminal-read", "terminal-write", "transaction"]}}, "canonical_identity": {"oneOf": [{"type": "null"}, {"const": "mainframe-env.effect-canonical@1"}]}}},
-        "cancellation": {"type": "object", "additionalProperties": false, "required": ["status", "finite_deadline", "live_probe", "post_dispatch"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "finite_deadline": {"$ref": "#/$defs/nullable-boolean"}, "live_probe": {"enum": ["before-dispatch-and-blocking-boundaries", "not-applicable"]}, "post_dispatch": {"enum": ["cancelled", "unknown-outcome", "bounded-ambiguity", "not-applicable"]}}},
-        "audit": {"type": "object", "additionalProperties": false, "required": ["status", "required", "deny_and_failure_paths", "atomic_with_effect_and_lifecycle"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "required": {"$ref": "#/$defs/nullable-boolean"}, "deny_and_failure_paths": {"$ref": "#/$defs/nullable-boolean"}, "atomic_with_effect_and_lifecycle": {"$ref": "#/$defs/nullable-boolean"}}},
-        "recovery": {"type": "object", "additionalProperties": false, "required": ["status", "durable_effect_intent", "uow_participation", "prepare", "rollback", "compensation", "replay_namespace", "unknown_outcome", "automatic_redispatch", "fenced_reconciliation", "retention_protected"], "properties": {"status": {"$ref": "#/$defs/dimension-status"}, "durable_effect_intent": {"$ref": "#/$defs/nullable-boolean"}, "uow_participation": {"enum": ["explicit-command-boundary", "not-applicable", "bounded-ambiguity"]}, "prepare": {"enum": ["command-defined", "not-applicable", "bounded-ambiguity"]}, "rollback": {"enum": ["command-defined", "not-applicable", "bounded-ambiguity"]}, "compensation": {"enum": ["command-defined", "not-applicable", "bounded-ambiguity"]}, "replay_namespace": {"oneOf": [{"type": "null"}, {"const": "cics-effect-replay-v1"}]}, "unknown_outcome": {"enum": ["preserve", "not-applicable", "bounded-ambiguity"]}, "automatic_redispatch": {"const": false}, "fenced_reconciliation": {"$ref": "#/$defs/nullable-boolean"}, "retention_protected": {"$ref": "#/$defs/nullable-boolean"}}},
-        "registry": {"$ref": "#/$defs/registry-row"}
+        "grammar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "variants"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "variants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "option_sensitive_semantics": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/option-sensitive-semantic"
+          }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "direction_status",
+            "bounds_status",
+            "entries",
+            "condition_clauses",
+            "constraints",
+            "unknown_option",
+            "duplicate_option",
+            "max_argument_count",
+            "max_aggregate_value_bytes"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "direction_status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "bounds_status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/option-entry"
+              }
+            },
+            "condition_clauses": {
+              "$ref": "#/$defs/condition-clauses"
+            },
+            "constraints": {
+              "$ref": "#/$defs/option-constraints"
+            },
+            "unknown_option": {
+              "const": "reject"
+            },
+            "duplicate_option": {
+              "const": "reject"
+            },
+            "max_argument_count": {
+              "const": 512
+            },
+            "max_aggregate_value_bytes": {
+              "const": 4194304
+            }
+          }
+        },
+        "eib_response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "response_authority",
+            "eibfn",
+            "eibfn_bytes",
+            "normal_return",
+            "conditions",
+            "symbolic_fragments",
+            "condition_policy"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "response_authority": {
+              "const": "SSJL4D_6.x/reference-diagnostics/eib/dfha8me.html"
+            },
+            "eibfn": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{4}$"
+            },
+            "eibfn_bytes": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "normal_return": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "condition",
+                    "resp",
+                    "resp2"
+                  ],
+                  "properties": {
+                    "condition": {
+                      "const": "NORMAL"
+                    },
+                    "resp": {
+                      "const": 0
+                    },
+                    "resp2": {
+                      "const": 0
+                    }
+                  }
+                }
+              ]
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            },
+            "symbolic_fragments": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/text"
+              }
+            },
+            "condition_policy": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authority",
+                "default",
+                "nohandle",
+                "resp",
+                "resp2",
+                "resp2_requires_resp"
+              ],
+              "properties": {
+                "authority": {
+                  "const": "global-command-format"
+                },
+                "default": {
+                  "const": true
+                },
+                "nohandle": {
+                  "type": "boolean"
+                },
+                "resp": {
+                  "type": "boolean"
+                },
+                "resp2": {
+                  "type": "boolean"
+                },
+                "resp2_requires_resp": {
+                  "const": true
+                }
+              }
+            }
+          }
+        },
+        "applicability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "local_task",
+            "dpl_server",
+            "threadsafe",
+            "cobol",
+            "dpl_restriction",
+            "language_restriction",
+            "threadsafe_condition",
+            "context_predicates",
+            "source_selectors"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "local_task": {
+              "$ref": "#/$defs/text"
+            },
+            "dpl_server": {
+              "$ref": "#/$defs/text"
+            },
+            "threadsafe": {
+              "$ref": "#/$defs/text"
+            },
+            "cobol": {
+              "enum": [
+                "allowed",
+                "not-applicable",
+                "conditional",
+                "bounded-ambiguity"
+              ]
+            },
+            "dpl_restriction": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source_kind",
+                "table_command",
+                "prohibited_options",
+                "requirement",
+                "restriction_predicates",
+                "restriction_match",
+                "condition",
+                "resp2"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "allowed",
+                    "not-applicable",
+                    "prohibited",
+                    "option-restricted",
+                    "conditional",
+                    "bounded-ambiguity"
+                  ]
+                },
+                "source_kind": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "table",
+                    "prose",
+                    null
+                  ]
+                },
+                "table_command": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9 ]*$"
+                    }
+                  ]
+                },
+                "prohibited_options": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9-]*(?:\\([A-Z0-9]+\\))?$"
+                  }
+                },
+                "requirement": {
+                  "enum": [
+                    "none",
+                    "synconreturn-required",
+                    "termid-not-intersystem-session"
+                  ]
+                },
+                "restriction_predicates": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "principal-facility",
+                      "connect-process-principal-facility-error-is-dpl"
+                    ]
+                  }
+                },
+                "restriction_match": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "any-of",
+                    null
+                  ]
+                },
+                "condition": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "INVREQ",
+                    null
+                  ]
+                },
+                "resp2": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    1,
+                    5,
+                    200,
+                    null
+                  ]
+                }
+              }
+            },
+            "language_restriction": {
+              "type": "object",
+              "minProperties": 1
+            },
+            "threadsafe_condition": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "context_predicates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "minProperties": 1
+              }
+            },
+            "source_selectors": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "scope",
+            "selectors",
+            "ambiguous_selectors",
+            "excluded_output_options",
+            "selector_authority",
+            "selector_completeness",
+            "fallback_selector",
+            "access_intent",
+            "authorization"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "scope": {
+              "$ref": "#/$defs/text"
+            },
+            "selectors": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/resource-selector"
+              }
+            },
+            "ambiguous_selectors": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/resource-selector"
+              }
+            },
+            "excluded_output_options": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9-]*$"
+              }
+            },
+            "selector_authority": {
+              "enum": [
+                "source-candidate-only",
+                "source-bound-runtime",
+                "not-applicable"
+              ]
+            },
+            "selector_completeness": {
+              "enum": [
+                "resolved",
+                "bounded-ambiguity",
+                "not-applicable"
+              ]
+            },
+            "fallback_selector": {
+              "$ref": "#/$defs/nullable-text"
+            },
+            "access_intent": {
+              "enum": [
+                "read",
+                "update",
+                "execute",
+                "bounded-ambiguity",
+                "not-applicable"
+              ]
+            },
+            "authorization": {
+              "enum": [
+                "typed-saf-before-dispatch",
+                "not-applicable"
+              ]
+            }
+          }
+        },
+        "capability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "route",
+            "required"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "route": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "const": "host.cics.execute"
+                }
+              ]
+            },
+            "required": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^host\\.[a-z]+(?:\\.[a-z]+)*$"
+              }
+            }
+          }
+        },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "class",
+            "mutating",
+            "ir_effects",
+            "canonical_identity"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "class": {
+              "enum": [
+                "observational",
+                "mutating",
+                "bounded-ambiguity",
+                "not-applicable"
+              ]
+            },
+            "mutating": {
+              "$ref": "#/$defs/nullable-boolean"
+            },
+            "ir_effects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "audit",
+                  "clock",
+                  "condition",
+                  "dataset-read",
+                  "dataset-write",
+                  "memory-read",
+                  "memory-write",
+                  "program-control",
+                  "security",
+                  "security-profile",
+                  "spool",
+                  "suspension",
+                  "terminal-read",
+                  "terminal-write",
+                  "transaction"
+                ]
+              }
+            },
+            "canonical_identity": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "const": "mainframe-env.effect-canonical@1"
+                }
+              ]
+            }
+          }
+        },
+        "cancellation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "finite_deadline",
+            "live_probe",
+            "post_dispatch"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "finite_deadline": {
+              "$ref": "#/$defs/nullable-boolean"
+            },
+            "live_probe": {
+              "enum": [
+                "before-dispatch-and-blocking-boundaries",
+                "not-applicable"
+              ]
+            },
+            "post_dispatch": {
+              "enum": [
+                "cancelled",
+                "unknown-outcome",
+                "bounded-ambiguity",
+                "not-applicable"
+              ]
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "required",
+            "deny_and_failure_paths",
+            "atomic_with_effect_and_lifecycle"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "required": {
+              "$ref": "#/$defs/nullable-boolean"
+            },
+            "deny_and_failure_paths": {
+              "$ref": "#/$defs/nullable-boolean"
+            },
+            "atomic_with_effect_and_lifecycle": {
+              "$ref": "#/$defs/nullable-boolean"
+            }
+          }
+        },
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "durable_effect_intent",
+            "uow_participation",
+            "prepare",
+            "rollback",
+            "compensation",
+            "replay_namespace",
+            "unknown_outcome",
+            "automatic_redispatch",
+            "fenced_reconciliation",
+            "retention_protected"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/dimension-status"
+            },
+            "durable_effect_intent": {
+              "$ref": "#/$defs/nullable-boolean"
+            },
+            "uow_participation": {
+              "enum": [
+                "explicit-command-boundary",
+                "not-applicable",
+                "bounded-ambiguity"
+              ]
+            },
+            "prepare": {
+              "enum": [
+                "command-defined",
+                "not-applicable",
+                "bounded-ambiguity"
+              ]
+            },
+            "rollback": {
+              "enum": [
+                "command-defined",
+                "not-applicable",
+                "bounded-ambiguity"
+              ]
+            },
+            "compensation": {
+              "enum": [
+                "command-defined",
+                "not-applicable",
+                "bounded-ambiguity"
+              ]
+            },
+            "replay_namespace": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "const": "cics-effect-replay-v1"
+                }
+              ]
+            },
+            "unknown_outcome": {
+              "enum": [
+                "preserve",
+                "not-applicable",
+                "bounded-ambiguity"
+              ]
+            },
+            "automatic_redispatch": {
+              "const": false
+            },
+            "fenced_reconciliation": {
+              "$ref": "#/$defs/nullable-boolean"
+            },
+            "retention_protected": {
+              "$ref": "#/$defs/nullable-boolean"
+            }
+          }
+        },
+        "registry": {
+          "$ref": "#/$defs/registry-row"
+        }
       }
     },
     "command": {
-      "type": "object", "additionalProperties": false,
-      "required": ["official_row", "label", "eibfn", "source_status", "contract_status", "implementation_status", "registration_status", "existing_runtime_operation", "source_dimensions", "dimension_dispositions", "unresolved_dimensions", "bounded_ambiguity_dimensions", "source_issue_ids", "contract", "row_contract_sha256"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "official_row",
+        "label",
+        "eibfn",
+        "source_status",
+        "contract_status",
+        "implementation_status",
+        "registration_status",
+        "existing_runtime_operation",
+        "source_dimensions",
+        "dimension_dispositions",
+        "unresolved_dimensions",
+        "bounded_ambiguity_dimensions",
+        "source_issue_ids",
+        "contract",
+        "row_contract_sha256"
+      ],
       "properties": {
-        "official_row": {"type": "string", "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"}, "label": {"type": "string", "minLength": 2}, "eibfn": {"type": "string", "pattern": "^[0-9A-F]{4}$"},
-        "source_status": {"enum": ["not-projected", "projected-unreviewed", "stale-review", "blocked-review", "bounded-ambiguity", "verified"]},
-        "contract_status": {"enum": ["source-pending", "frozen", "frozen-with-bounded-ambiguity"]},
-        "implementation_status": {"enum": ["typed-runtime", "legacy-compatibility", "unimplemented"]}, "registration_status": {"enum": ["typed-runtime", "legacy-compatibility", "unready"]},
-        "existing_runtime_operation": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"}]},
-        "source_dimensions": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/source-dimension"}},
-        "dimension_dispositions": {"type": "array", "minItems": 13, "maxItems": 13, "items": {"$ref": "#/$defs/dimension-disposition"}},
-        "unresolved_dimensions": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/dimension-name"}},
-        "bounded_ambiguity_dimensions": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/dimension-name"}},
-        "source_issue_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
-        "contract": {"$ref": "#/$defs/semantic-contract"}, "row_contract_sha256": {"$ref": "#/$defs/sha256"}
+        "official_row": {
+          "type": "string",
+          "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 2
+        },
+        "eibfn": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{4}$"
+        },
+        "source_status": {
+          "enum": [
+            "not-projected",
+            "projected-unreviewed",
+            "stale-review",
+            "blocked-review",
+            "bounded-ambiguity",
+            "verified"
+          ]
+        },
+        "contract_status": {
+          "enum": [
+            "source-pending",
+            "frozen",
+            "frozen-with-bounded-ambiguity"
+          ]
+        },
+        "implementation_status": {
+          "enum": [
+            "typed-runtime",
+            "legacy-compatibility",
+            "unimplemented"
+          ]
+        },
+        "registration_status": {
+          "enum": [
+            "typed-runtime",
+            "legacy-compatibility",
+            "unready"
+          ]
+        },
+        "existing_runtime_operation": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9]*$"
+            }
+          ]
+        },
+        "source_dimensions": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/source-dimension"
+          }
+        },
+        "dimension_dispositions": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "items": {
+            "$ref": "#/$defs/dimension-disposition"
+          }
+        },
+        "unresolved_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/dimension-name"
+          }
+        },
+        "bounded_ambiguity_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/dimension-name"
+          }
+        },
+        "source_issue_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "contract": {
+          "$ref": "#/$defs/semantic-contract"
+        },
+        "row_contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
-    "batch": {"type": "object", "additionalProperties": false, "required": ["batch_id", "ordinal_start", "ordinal_end", "command_count", "source_input", "commands"], "properties": {"batch_id": {"enum": ["sources-a", "sources-b", "sources-c"]}, "ordinal_start": {"type": "integer", "minimum": 1, "maximum": 263}, "ordinal_end": {"type": "integer", "minimum": 1, "maximum": 263}, "command_count": {"type": "integer", "minimum": 1, "maximum": 263}, "source_input": {"$ref": "#/$defs/source-input"}, "commands": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/command"}}}},
+    "batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batch_id",
+        "ordinal_start",
+        "ordinal_end",
+        "command_count",
+        "source_input",
+        "commands"
+      ],
+      "properties": {
+        "batch_id": {
+          "enum": [
+            "sources-a",
+            "sources-b",
+            "sources-c"
+          ]
+        },
+        "ordinal_start": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 263
+        },
+        "ordinal_end": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 263
+        },
+        "command_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 263
+        },
+        "source_input": {
+          "$ref": "#/$defs/source-input"
+        },
+        "commands": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/command"
+          }
+        }
+      }
+    },
     "participant-contract": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "status", "owner", "mutating_rows", "bounded_effect_rows", "explicit_uow_boundary_rows", "bounded_uow_rows", "execution_credit", "prepare_before_dispatch", "completion", "compensation", "mutation_identity", "effect_order", "fencing", "cancellation", "unknown_outcome", "reconciliation", "schema_compatibility", "retention", "backend_applicability"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "owner",
+        "mutating_rows",
+        "bounded_effect_rows",
+        "explicit_uow_boundary_rows",
+        "bounded_uow_rows",
+        "execution_credit",
+        "prepare_before_dispatch",
+        "completion",
+        "compensation",
+        "mutation_identity",
+        "effect_order",
+        "fencing",
+        "cancellation",
+        "unknown_outcome",
+        "reconciliation",
+        "schema_compatibility",
+        "retention",
+        "backend_applicability"
+      ],
       "properties": {
-        "id": {"const": "INT-1601.cics-participant"}, "status": {"enum": ["source-pending", "frozen", "bounded-ambiguity"]}, "owner": {"const": "shared-execution-coordinator-and-cics-provider"},
-        "mutating_rows": {"type": "integer", "minimum": 0, "maximum": 263}, "bounded_effect_rows": {"type": "integer", "minimum": 0, "maximum": 263}, "explicit_uow_boundary_rows": {"type": "integer", "minimum": 0, "maximum": 263}, "bounded_uow_rows": {"type": "integer", "minimum": 0, "maximum": 263}, "execution_credit": {"const": 0},
-        "prepare_before_dispatch": {"type": "object", "additionalProperties": false, "required": ["durable_effect_intent", "universal_prepare", "uow_applicability", "provider_dispatch_after_intent"], "properties": {"durable_effect_intent": {"const": true}, "universal_prepare": {"const": false}, "uow_applicability": {"const": "per-row-recovery-contract"}, "provider_dispatch_after_intent": {"const": true}}},
-        "completion": {"type": "object", "additionalProperties": false, "required": ["outcomes", "decision_owner"], "properties": {"outcomes": {"const": ["committed", "rolled-back", "failed", "unknown-outcome"]}, "decision_owner": {"const": "command-family-handler"}}},
-        "compensation": {"type": "object", "additionalProperties": false, "required": ["automatic", "scope"], "properties": {"automatic": {"const": false}, "scope": {"const": "service-specific-explicit-only"}}},
-        "mutation_identity": {"type": "object", "additionalProperties": false, "required": ["canonical_schema", "request_schema", "idempotency_scope"], "properties": {"canonical_schema": {"const": "mainframe-env.effect-canonical@1"}, "request_schema": {"const": "mainframe-env.cics.request@1"}, "idempotency_scope": {"const": "execution-run-unit-effect-sequence"}}},
-        "effect_order": {"const": ["validate-bounds-and-deadline", "authorize-typed-resource", "persist-audit-and-effect-intent", "dispatch-once", "persist-result-or-unknown-outcome"]},
-        "fencing": {"type": "object", "additionalProperties": false, "required": ["lease_epoch", "stale_owner_rejected"], "properties": {"lease_epoch": {"const": true}, "stale_owner_rejected": {"const": true}}},
-        "cancellation": {"type": "object", "additionalProperties": false, "required": ["live_probe", "finite_deadline", "post_dispatch_unknown"], "properties": {"live_probe": {"const": true}, "finite_deadline": {"const": true}, "post_dispatch_unknown": {"const": true}}},
-        "unknown_outcome": {"type": "object", "additionalProperties": false, "required": ["preserved", "automatic_redispatch"], "properties": {"preserved": {"const": true}, "automatic_redispatch": {"const": false}}},
-        "reconciliation": {"type": "object", "additionalProperties": false, "required": ["mode", "provider_replay_namespace"], "properties": {"mode": {"const": "service-specific-fenced-observation"}, "provider_replay_namespace": {"const": "cics-effect-replay-v1"}}},
-        "schema_compatibility": {"type": "object", "additionalProperties": false, "required": ["uow_namespace", "undo_namespace", "read_versions", "rollback"], "properties": {"uow_namespace": {"const": "cics-uow"}, "undo_namespace": {"const": "cics-uow-undo"}, "read_versions": {"const": "current-and-retained-legacy"}, "rollback": {"const": "stop-admission-and-restore-compatible-backup"}}},
-        "retention": {"type": "object", "additionalProperties": false, "required": ["protect_live_checkpoint_audit_replay", "deadline_is_conservative_lower_bound"], "properties": {"protect_live_checkpoint_audit_replay": {"const": true}, "deadline_is_conservative_lower_bound": {"const": true}}},
-        "backend_applicability": {"const": ["memory", "sqlite", "postgresql"]}
+        "id": {
+          "const": "INT-1601.cics-participant"
+        },
+        "status": {
+          "enum": [
+            "source-pending",
+            "frozen",
+            "bounded-ambiguity"
+          ]
+        },
+        "owner": {
+          "const": "shared-execution-coordinator-and-cics-provider"
+        },
+        "mutating_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "bounded_effect_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "explicit_uow_boundary_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "bounded_uow_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "execution_credit": {
+          "const": 0
+        },
+        "prepare_before_dispatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "durable_effect_intent",
+            "universal_prepare",
+            "uow_applicability",
+            "provider_dispatch_after_intent"
+          ],
+          "properties": {
+            "durable_effect_intent": {
+              "const": true
+            },
+            "universal_prepare": {
+              "const": false
+            },
+            "uow_applicability": {
+              "const": "per-row-recovery-contract"
+            },
+            "provider_dispatch_after_intent": {
+              "const": true
+            }
+          }
+        },
+        "completion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcomes",
+            "decision_owner"
+          ],
+          "properties": {
+            "outcomes": {
+              "const": [
+                "committed",
+                "rolled-back",
+                "failed",
+                "unknown-outcome"
+              ]
+            },
+            "decision_owner": {
+              "const": "command-family-handler"
+            }
+          }
+        },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "automatic",
+            "scope"
+          ],
+          "properties": {
+            "automatic": {
+              "const": false
+            },
+            "scope": {
+              "const": "service-specific-explicit-only"
+            }
+          }
+        },
+        "mutation_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "canonical_schema",
+            "request_schema",
+            "idempotency_scope"
+          ],
+          "properties": {
+            "canonical_schema": {
+              "const": "mainframe-env.effect-canonical@1"
+            },
+            "request_schema": {
+              "const": "mainframe-env.cics.request@1"
+            },
+            "idempotency_scope": {
+              "const": "execution-run-unit-effect-sequence"
+            }
+          }
+        },
+        "effect_order": {
+          "const": [
+            "validate-bounds-and-deadline",
+            "authorize-typed-resource",
+            "persist-audit-and-effect-intent",
+            "dispatch-once",
+            "persist-result-or-unknown-outcome"
+          ]
+        },
+        "fencing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lease_epoch",
+            "stale_owner_rejected"
+          ],
+          "properties": {
+            "lease_epoch": {
+              "const": true
+            },
+            "stale_owner_rejected": {
+              "const": true
+            }
+          }
+        },
+        "cancellation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "live_probe",
+            "finite_deadline",
+            "post_dispatch_unknown"
+          ],
+          "properties": {
+            "live_probe": {
+              "const": true
+            },
+            "finite_deadline": {
+              "const": true
+            },
+            "post_dispatch_unknown": {
+              "const": true
+            }
+          }
+        },
+        "unknown_outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "preserved",
+            "automatic_redispatch"
+          ],
+          "properties": {
+            "preserved": {
+              "const": true
+            },
+            "automatic_redispatch": {
+              "const": false
+            }
+          }
+        },
+        "reconciliation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "provider_replay_namespace"
+          ],
+          "properties": {
+            "mode": {
+              "const": "service-specific-fenced-observation"
+            },
+            "provider_replay_namespace": {
+              "const": "cics-effect-replay-v1"
+            }
+          }
+        },
+        "schema_compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "uow_namespace",
+            "undo_namespace",
+            "read_versions",
+            "rollback"
+          ],
+          "properties": {
+            "uow_namespace": {
+              "const": "cics-uow"
+            },
+            "undo_namespace": {
+              "const": "cics-uow-undo"
+            },
+            "read_versions": {
+              "const": "current-and-retained-legacy"
+            },
+            "rollback": {
+              "const": "stop-admission-and-restore-compatible-backup"
+            }
+          }
+        },
+        "retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "protect_live_checkpoint_audit_replay",
+            "deadline_is_conservative_lower_bound"
+          ],
+          "properties": {
+            "protect_live_checkpoint_audit_replay": {
+              "const": true
+            },
+            "deadline_is_conservative_lower_bound": {
+              "const": true
+            }
+          }
+        },
+        "backend_applicability": {
+          "const": [
+            "memory",
+            "sqlite",
+            "postgresql"
+          ]
+        }
       }
     },
-    "registry-summary": {"type": "object", "additionalProperties": false, "required": ["shape_commands", "typed_handlers", "legacy_compatibility_handlers", "advertised_commands", "unready_handlers", "automatic_registration", "default_handler", "unready_result", "family_counts", "registry_sha256"], "properties": {"shape_commands": {"const": 263}, "typed_handlers": {"const": 41}, "legacy_compatibility_handlers": {"const": 0}, "advertised_commands": {"const": 41}, "unready_handlers": {"const": 222}, "automatic_registration": {"const": false}, "default_handler": {"type": "null"}, "unready_result": {"const": "explicit-unsupported"}, "family_counts": {"type": "object", "minProperties": 24, "maxProperties": 24, "additionalProperties": {"type": "integer", "minimum": 1, "maximum": 263}}, "registry_sha256": {"$ref": "#/$defs/sha256"}}},
-    "counts": {"type": "object", "additionalProperties": false, "required": ["batches", "commands", "source_projected_commands", "source_reviewed_commands", "source_ambiguous_commands", "source_verified_candidates", "source_ambiguous_candidates", "source_fact_groups", "source_candidate_references", "closed_contract_commands", "bounded_contract_commands", "registry_shape_commands", "runtime_backed_commands", "typed_runtime_commands", "legacy_compatibility_commands", "advertised_commands", "unready_commands"], "properties": {"batches": {"const": 3}, "commands": {"const": 263}, "source_projected_commands": {"type": "integer", "minimum": 0, "maximum": 263}, "source_reviewed_commands": {"type": "integer", "minimum": 0, "maximum": 263}, "source_ambiguous_commands": {"type": "integer", "minimum": 0, "maximum": 263}, "source_verified_candidates": {"type": "integer", "minimum": 0}, "source_ambiguous_candidates": {"type": "integer", "minimum": 0}, "source_fact_groups": {"type": "integer", "minimum": 0}, "source_candidate_references": {"type": "integer", "minimum": 0}, "closed_contract_commands": {"enum": [0, 263]}, "bounded_contract_commands": {"type": "integer", "minimum": 0, "maximum": 263}, "registry_shape_commands": {"const": 263}, "runtime_backed_commands": {"const": 41}, "typed_runtime_commands": {"const": 41}, "legacy_compatibility_commands": {"const": 0}, "advertised_commands": {"const": 41}, "unready_commands": {"const": 222}}}
+    "registry-summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shape_commands",
+        "typed_handlers",
+        "legacy_compatibility_handlers",
+        "advertised_commands",
+        "unready_handlers",
+        "automatic_registration",
+        "default_handler",
+        "unready_result",
+        "family_counts",
+        "registry_sha256"
+      ],
+      "properties": {
+        "shape_commands": {
+          "const": 263
+        },
+        "typed_handlers": {
+          "const": 231
+        },
+        "legacy_compatibility_handlers": {
+          "const": 0
+        },
+        "advertised_commands": {
+          "const": 231
+        },
+        "unready_handlers": {
+          "const": 32
+        },
+        "automatic_registration": {
+          "const": false
+        },
+        "default_handler": {
+          "type": "null"
+        },
+        "unready_result": {
+          "const": "explicit-unsupported"
+        },
+        "family_counts": {
+          "type": "object",
+          "minProperties": 24,
+          "maxProperties": 24,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 263
+          }
+        },
+        "registry_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batches",
+        "commands",
+        "source_projected_commands",
+        "source_reviewed_commands",
+        "source_ambiguous_commands",
+        "source_verified_candidates",
+        "source_ambiguous_candidates",
+        "source_fact_groups",
+        "source_candidate_references",
+        "closed_contract_commands",
+        "bounded_contract_commands",
+        "registry_shape_commands",
+        "runtime_backed_commands",
+        "typed_runtime_commands",
+        "legacy_compatibility_commands",
+        "advertised_commands",
+        "unready_commands"
+      ],
+      "properties": {
+        "batches": {
+          "const": 3
+        },
+        "commands": {
+          "const": 263
+        },
+        "source_projected_commands": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "source_reviewed_commands": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "source_ambiguous_commands": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "source_verified_candidates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_ambiguous_candidates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_fact_groups": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_candidate_references": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "closed_contract_commands": {
+          "enum": [
+            0,
+            263
+          ]
+        },
+        "bounded_contract_commands": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 263
+        },
+        "registry_shape_commands": {
+          "const": 263
+        },
+        "runtime_backed_commands": {
+          "const": 231
+        },
+        "typed_runtime_commands": {
+          "const": 231
+        },
+        "legacy_compatibility_commands": {
+          "const": 0
+        },
+        "advertised_commands": {
+          "const": 231
+        },
+        "unready_commands": {
+          "const": 32
+        }
+      }
+    }
   }
 }

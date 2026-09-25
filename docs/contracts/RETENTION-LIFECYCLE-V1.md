@@ -227,6 +227,20 @@ removal. An archive is evidence, not a replay cache: after the documented
 idempotency lifetime and source pruning, reuse of the old key is a new
 operation.
 
+The additive BTS container command-data extension retains the same sixteen
+targets. `cics-container-replay-v1` can enter `cics-replay` only through
+`archive_provider_state_deletion_with_capacity`: a provider-validated plan
+supplies exact same-key outer receipts and the current
+`cics-container-capacity-v1` row. The store rechecks those rows and the
+completed core-effect dependency under one provider epoch, archives exact
+private rows, deletes them, and CAS-replaces the capacity row with only its
+replay count reduced in one transaction. The ordinary deletion API continues
+to reject private rows. The core effect must be a completed
+`host.cics.execute` call with exact canonical digests. The provider planner
+must validate the full private
+and outer codecs and conservative age before calling this method; an absent
+or corrupt outer receipt cannot be inferred from the private replay.
+
 ### Batch and historical-archive rules
 
 - A new source transaction moves no more than the request bound, configured

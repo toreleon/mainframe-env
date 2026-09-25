@@ -15,6 +15,14 @@ PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted
 | reset | `cargo xtask carddemo-operator-reset --check` | recreates the declared disposable CardDemo data/catalog fixtures and verifies the reset result; do not aim it at an authority containing unretained operator data |
 | certify | `cargo xtask carddemo-full --check` | derives all 20 journeys from lower-profile application runs, then executes memory overload/isolation, SQLite backup/restore, and PostgreSQL restart controls |
 
+For a clean 0.9 development candidate, run
+`CARDDEMO_CORPUS_DIR=<pinned-clean-checkout> cargo xtask carddemo-v09-host --check`.
+This bounded selector compares the current host token receipt with a versioned
+0.9 observation, verifies the immutable CD-008 receipt and its documented
+Db2 SQL delta, and repeats the exact resource and nine-journey base online
+comparisons. Its printed receipt includes the checked Git commit and tree.
+It does not run `carddemo-full` or grant licensed or 0.9 completion credit.
+
 The commands are certification-safe substitutions for the pinned helper
 scripts; they do not invoke the scripts, native runtime archives, Micro Focus,
 UniKix, or a legacy compiler.

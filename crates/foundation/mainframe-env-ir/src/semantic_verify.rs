@@ -869,7 +869,8 @@ fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
             | CicsOutputName::Milliseconds
             | CicsOutputName::Resp
             | CicsOutputName::Resp2
-            | CicsOutputName::Length => SlotUse::NUMERIC_WRITE,
+            | CicsOutputName::Length
+            | CicsOutputName::NumItems => SlotUse::NUMERIC_WRITE,
             _ => SlotUse::WRITE,
         },
     }));

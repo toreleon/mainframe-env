@@ -84,3 +84,70 @@ command then reports `licensed-credit=0 differential=pending`. It derives the
 candidate, compiled-spec, fixture, accepted-review, comparison-policy and
 environment identities from the current checkout; a capture for any other
 candidate fails instead of being normalized or re-bound.
+
+## Bounded v0.9 BIF family extension
+
+The sealed `bif-builtins-v1` manifest at
+`conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json` covers only
+catalog rows `0013 BIF DEEDIT` and `0014 BIF DIGEST`. Its six named observations
+and exact UTF-8 application output and output-field bytes are in
+`cics-bif-builtins-fixtures.json`. The `record_hex` capture field means the
+post-command `FIELD` or `RESULT` bytes for this family; it is empty for the two
+condition observations. The DEEDIT example and LENGTH<1 condition come from
+IBM CICS TS 6.x `dfhp4_bifdeedit.html`; the three SHA-1 formats and RECORDLEN<1
+condition come from `dfhp4_bifdigest.html`. Their baseline, catalog rows, and
+verified hashes are in `cics-bif-builtins-source-review.json`. These are
+source-derived comparison expectations, not a licensed run result.
+
+The protected runner needs an exact, external environment manifest with schema
+`mainframe-env.cics-oracle-environment@1` and **only** these nonempty string
+fields: `cics_version_and_maintenance`,
+`enterprise_cobol_version_and_maintenance`, `compiler_options`, `encoding`
+(including CP037 and transport conversion), `cpacf_msa_availability`,
+`program_and_transaction_definition`, `principal_and_saf_configuration`, and
+`capture_serialization_version`. Record exact values, not `6.x` placeholders.
+The host needs licensed CICS TS and Enterprise COBOL, a runnable transaction,
+the authorized principal, and CPACF MSA for BIF DIGEST. Keep credentials and
+unredacted configuration outside both manifest and capture. The environment
+file and 32-byte Ed25519 public key stay outside Git.
+
+Run all six observations on the **same exact candidate** through Enterprise
+COBOL and CICS. DEEDIT uses the documented nine-byte `14-6704/B` field and a
+zero LENGTH negative case. DIGEST uses the literal three bytes `X'616263'`,
+RECORDLEN 3 for HEX, BINARY and BASE64, and RECORDLEN 0 for LENGERR. Each
+application emits the fixture's exact UTF-8 line after explicit transport
+conversion and returns raw field bytes as lowercase hex (binary DIGEST remains
+binary). Capture one
+observation per name in manifest order. Serialize
+`mainframe-env.cics-oracle-capture@2` with `family_id=bif-builtins-v1`,
+`family_manifest_digest` equal to the SHA-256 of the manifest file, and exact
+candidate, compiled-spec, fixture, source-review, and environment byte digests.
+Hash the canonical ordered observation array as `raw_capture_digest`. Sign the
+canonical identity-and-digest payload, including family ID and manifest digest,
+with the protected runner's Ed25519 private key. The runner must retain its
+run/job ID and raw capture artifact; the private key never leaves it.
+
+From that exact checkout, import the bounded capture with:
+
+```text
+cargo xtask cics-oracle --family bif-builtins-v1 \
+  --capture /protected-handoff/cics-bif-capture.json \
+  --environment-manifest /protected-handoff/cics-bif-environment.json \
+  --public-key /protected-handoff/cics-oracle-ed25519.pub
+```
+
+The importer checks manifest/fixture closure, exact behavior and all identity
+digests before Ed25519 authority; missing, duplicate, unknown, malformed,
+tampered, wrong-candidate, wrong-environment and behavior-mismatched captures
+fail. Local/model/synthetic contract fixtures may omit `--public-key` and
+always get zero licensed credit. A valid signed family import grants at most
+one **scoped family capture** result; it does not complete either whole command
+or the full-minor licensed gate. No real protected runner or signed capture is
+available in this checkout: **adapter ready; licensed campaign not run;
+differential pending**.
+
+The remaining miscellaneous rows `0031`, `0070`, `0074`, `0147`, `0206`,
+`0207`, `0239`, and `0256`, all BTS child/LINK and conversation-open rows,
+the other executable command families, all unready rows, and the integrated
+263-command final-candidate campaign remain outstanding. Each needs its own
+source-reviewed bounded manifest and protected environment/runner evidence.

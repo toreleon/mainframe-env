@@ -25,6 +25,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
+mod browse_ops;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DatasetLimits {
     pub max_datasets: usize,
@@ -4546,26 +4548,7 @@ impl DatasetService {
                 key,
                 relation,
             } => {
-                let identities = browse_identities(state, dataset)?;
-                let lower =
-                    identities.partition_point(|(logical, _)| logical.as_slice() < key.as_slice());
-                let upper =
-                    identities.partition_point(|(logical, _)| logical.as_slice() <= key.as_slice());
-                let index = match relation {
-                    mainframe_env_host_api::KeyRelation::Equal if lower < upper => lower,
-                    mainframe_env_host_api::KeyRelation::Greater => upper,
-                    mainframe_env_host_api::KeyRelation::GreaterOrEqual => lower,
-                    mainframe_env_host_api::KeyRelation::Less if lower > 0 => lower - 1,
-                    mainframe_env_host_api::KeyRelation::LessOrEqual if upper > 0 => upper - 1,
-                    mainframe_env_host_api::KeyRelation::Equal
-                    | mainframe_env_host_api::KeyRelation::Less
-                    | mainframe_env_host_api::KeyRelation::LessOrEqual => {
-                        return Err(condition("NOTFND", 13));
-                    }
-                };
-                if index >= identities.len() {
-                    state.require_eof_browse(dataset, key, *relation, !identities.is_empty())?;
-                }
+                let (identities, index) = browse_ops::position(state, dataset, key, *relation)?;
                 let active_identities = state
                     .cursors
                     .values()
@@ -4574,8 +4557,7 @@ impl DatasetService {
                 let active_bytes = state
                     .cursors
                     .values()
-                    .flat_map(|cursor| &cursor.identities)
-                    .map(|(logical, identity)| logical.len() + identity.len())
+                    .map(|cursor| browse_ops::identity_bytes(&cursor.identities))
                     .sum::<usize>();
                 let added_bytes = identities
                     .iter()
@@ -4611,6 +4593,12 @@ impl DatasetService {
                     key: None,
                 })
             }
+            DatasetRequest::ResetBrowse {
+                dataset,
+                cursor,
+                key,
+                relation,
+            } => browse_ops::reset(state, dataset, cursor, key, *relation, self.limits),
             DatasetRequest::ReadNext {
                 dataset,
                 cursor,
@@ -8459,6 +8447,18 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
         } => {
             digest_field(&mut digest, b"start-browse");
             digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, key);
+            digest_field(&mut digest, &[key_relation_tag(*relation)]);
+        }
+        DatasetRequest::ResetBrowse {
+            dataset,
+            cursor,
+            key,
+            relation,
+        } => {
+            digest_field(&mut digest, b"reset-browse");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, cursor.as_bytes());
             digest_field(&mut digest, key);
             digest_field(&mut digest, &[key_relation_tag(*relation)]);
         }
@@ -15137,6 +15137,93 @@ mod tests {
                 relation: KeyRelation::Equal,
             }),
             Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+    }
+
+    #[test]
+    fn reset_browse_repositions_only_the_owned_cursor_and_preserves_it_on_notfnd() {
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.RESET", 44).unwrap();
+        let other = DatasetName::new("USER.OTHER", 44).unwrap();
+        for (name, sequence) in [(&dataset, 1), (&other, 2)] {
+            service
+                .invoke(DatasetRequest::Create {
+                    dataset: name.clone(),
+                    attributes: attrs(DatasetOrganization::KeySequenced),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(3),
+            })
+            .unwrap();
+        let start = || match service
+            .invoke(DatasetRequest::StartBrowse {
+                dataset: dataset.clone(),
+                key: b"AA".to_vec(),
+                relation: KeyRelation::Equal,
+            })
+            .unwrap()
+        {
+            DatasetResult::Browse { cursor, .. } => cursor,
+            other => panic!("unexpected browse result: {other:?}"),
+        };
+        let first = start();
+        let second = start();
+        let reset = |name: DatasetName, cursor: String, key: &[u8], relation| {
+            service.invoke(DatasetRequest::ResetBrowse {
+                dataset: name,
+                cursor,
+                key: key.to_vec(),
+                relation,
+            })
+        };
+        assert!(matches!(
+            reset(other, first.clone(), b"BB", KeyRelation::Equal),
+            Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "INVREQ"
+        ));
+        assert!(matches!(
+            reset(dataset.clone(), first.clone(), b"BD", KeyRelation::Equal),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: dataset.clone(),
+                cursor: first.clone(),
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"AA01"
+        ));
+        assert!(matches!(
+            reset(dataset.clone(), first.clone(), b"BA", KeyRelation::GreaterOrEqual),
+            Ok(DatasetResult::Browse { cursor, record: None, .. }) if cursor == first
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: dataset.clone(),
+                cursor: first,
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"BB02"
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset,
+                cursor: second,
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"AA01"
         ));
     }
 

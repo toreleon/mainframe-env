@@ -1857,7 +1857,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@10"
+            "mainframe-env.reference-machine-checkpoint@12"
         );
         let mut restored = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -1956,7 +1956,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@10"
+            "mainframe-env.reference-machine-checkpoint@12"
         );
         let mut restored =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
@@ -2526,6 +2526,236 @@ mod tests {
             MachineDrive::Completed(_)
         ));
         assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x06]);
+    }
+
+    #[test]
+    fn cics_readq_ts_crosses_the_compiled_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 DATA-X PIC X(8). 01 PTR-X POINTER. 01 ITEM-X PIC S9(4) COMP VALUE 1. 01 LENGTH-X PIC S9(4) COMP VALUE 8. 01 COUNT-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READQ TS QUEUE('TEMPQ') INTO(DATA-X) ITEM(ITEM-X) LENGTH(LENGTH-X) NUMITEMS(COUNT-X) SYSID('S001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS READQ TS QNAME(QNAME-X) SET(PTR-X) LENGTH(LENGTH-X) NEXT END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(item) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("READQ TS ITEM did not call host");
+        };
+        assert!(matches!(
+            &item.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QUEUE"].bytes() == b"TEMPQ"
+                && arguments["ITEM"].bytes() == b"1"
+                && arguments["LENGTH"].bytes() == b"8"
+                && arguments["SYSID"].bytes() == b"S001"
+                && arguments.contains_key("NUMITEMS")
+                && !arguments.contains_key("OPTION.NEXT")
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response =
+            |bytes: &[u8],
+             outputs: BTreeMap<String, mainframe_env_execution_api::BoundedPayload>| {
+                CicsResponse {
+                    disposition: CicsDisposition::Complete,
+                    condition: "NORMAL".into(),
+                    response: 0,
+                    response2: 0,
+                    applid: "APP".into(),
+                    sysid: "S001".into(),
+                    transaction: "T001".into(),
+                    aid: 0,
+                    target: None,
+                    next_transaction: None,
+                    payload: payload("mainframe-env.cics.payload@1", bytes),
+                    outputs,
+                    unit_of_work: None,
+                }
+            };
+        let MachineDrive::HostCall(next) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: item.sequence,
+                outcome: Ok(HostResult::Cics(response(
+                    b"ABCD",
+                    BTreeMap::from([
+                        (
+                            "LENGTH".into(),
+                            payload("mainframe-env.cics.decimal@1", b"4"),
+                        ),
+                        (
+                            "NUMITEMS".into(),
+                            payload("mainframe-env.cics.decimal@1", b"2"),
+                        ),
+                    ]),
+                ))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READQ TS NEXT did not call host");
+        };
+        assert_eq!(machine.variable("DATA-X").unwrap().bytes(), b"ABCD    ");
+        assert_eq!(machine.variable("LENGTH-X").unwrap().bytes(), &[0, 4]);
+        assert_eq!(machine.variable("COUNT-X").unwrap().bytes(), &[0, 2]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x04]);
+        assert!(matches!(
+            &next.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QNAME"].bytes() == b"LONG-QUEUE      "
+                && arguments["OPTION.NEXT"].bytes().is_empty()
+                && arguments.contains_key("SET")
+                && arguments.contains_key("SET.MAXLENGTH")
+        ));
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: next.sequence,
+                    outcome: Ok(HostResult::Cics(response(
+                        &[],
+                        BTreeMap::from([
+                            (
+                                "SET".into(),
+                                payload("mainframe-env.cics.payload@1", b"XYZ"),
+                            ),
+                            (
+                                "LENGTH".into(),
+                                payload("mainframe-env.cics.decimal@1", b"3"),
+                            ),
+                        ]),
+                    ))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_ne!(machine.variable("PTR-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(machine.variable("LENGTH-X").unwrap().bytes(), &[0, 3]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x04]);
+    }
+
+    #[test]
+    fn cics_writeq_ts_crosses_the_compiled_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITETS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. 01 ITEM-X PIC S9(4) COMP VALUE 0. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 COUNT-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('TEMPQ') FROM(DATA-X) ITEM(ITEM-X) LENGTH(LENGTH-X) NUMITEMS(COUNT-X) MAIN NOSUSPEND SYSID('S001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS WRITEQ TS QNAME(QNAME-X) FROM(DATA-X) ITEM(ITEM-X) REWRITE AUXILIARY END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(append) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WRITEQ TS append did not call host");
+        };
+        assert!(matches!(
+            &append.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WriteTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QUEUE"].bytes() == b"TEMPQ"
+                && arguments["FROM"].bytes() == b"PAYLOAD "
+                && arguments["ITEM"].bytes() == b"0"
+                && arguments["LENGTH"].bytes() == b"7"
+                && arguments["SYSID"].bytes() == b"S001"
+                && arguments["OPTION.MAIN"].bytes().is_empty()
+                && arguments["OPTION.NOSUSPEND"].bytes().is_empty()
+                && arguments.contains_key("NUMITEMS")
+                && !arguments.contains_key("OPTION.REWRITE")
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response =
+            |outputs: BTreeMap<String, mainframe_env_execution_api::BoundedPayload>| CicsResponse {
+                disposition: CicsDisposition::Complete,
+                condition: "NORMAL".into(),
+                response: 0,
+                response2: 0,
+                applid: "APP".into(),
+                sysid: "S001".into(),
+                transaction: "T001".into(),
+                aid: 0,
+                target: None,
+                next_transaction: None,
+                payload: payload("mainframe-env.cics.payload@1", &[]),
+                outputs,
+                unit_of_work: None,
+            };
+        let MachineDrive::HostCall(rewrite) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: append.sequence,
+                outcome: Ok(HostResult::Cics(response(BTreeMap::from([
+                    ("ITEM".into(), payload("mainframe-env.cics.decimal@1", b"1")),
+                    (
+                        "NUMITEMS".into(),
+                        payload("mainframe-env.cics.decimal@1", b"1"),
+                    ),
+                ])))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("WRITEQ TS rewrite did not call host");
+        };
+        assert_eq!(machine.variable("ITEM-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(machine.variable("COUNT-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x02]);
+        assert!(matches!(
+            &rewrite.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WriteTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QNAME"].bytes() == b"LONG-QUEUE      "
+                && arguments["ITEM"].bytes() == b"1"
+                && arguments["OPTION.REWRITE"].bytes().is_empty()
+                && arguments["OPTION.AUXILIARY"].bytes().is_empty()
+                && !arguments.contains_key("NUMITEMS")
+        ));
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: rewrite.sequence,
+                    outcome: Ok(HostResult::Cics(response(BTreeMap::new()))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x02]);
     }
 
     #[test]
@@ -4240,6 +4470,180 @@ mod tests {
         ));
         assert_eq!(machine.variable("PTR-X").unwrap().bytes(), &[0xff, 0, 0, 0]);
         assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x02, 0x02]);
+    }
+
+    #[test]
+    fn cics_wait_event_reissues_until_posted_and_updates_the_ecb() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEVT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-X PIC S9(9) COMP VALUE 1. 01 ECB-PTR POINTER. 01 DONE-X PIC X VALUE '0'. PROCEDURE DIVISION. SET ECB-PTR TO ADDRESS OF ECB-X. EXEC CICS WAIT EVENT ECADDR(ECB-PTR) NAME('EVENT001') END-EXEC. MOVE '1' TO DONE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(wait) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WAIT EVENT did not call host");
+        };
+        assert!(matches!(
+            &wait.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WaitEvent,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["ECADDR"].schema() == "mainframe-env.cics.event-list@1"
+                && arguments["ECADDR"].bytes().len() == 4
+                && arguments["EVENT.POSTED"].bytes() == [0]
+                && arguments["NAME"].bytes() == b"EVENT001"
+        ));
+        let response = |disposition, outputs| CicsResponse {
+            disposition,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs,
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: wait.sequence,
+                    outcome: Ok(HostResult::Cics(response(
+                        CicsDisposition::Suspended,
+                        BTreeMap::new(),
+                    ))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Suspended(suspension) if suspension.kind == "cics-event"
+        ));
+        let MachineDrive::HostCall(reissued) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WAIT EVENT did not reissue after suspension");
+        };
+        let posted = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.event-index@1",
+            b"0".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: reissued.sequence,
+                    outcome: Ok(HostResult::Cics(response(
+                        CicsDisposition::Complete,
+                        BTreeMap::from([("EVENT.POSTED".into(), posted)]),
+                    ))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("ECB-X").unwrap().bytes(), &[0x40, 0, 0, 0]);
+        assert_eq!(machine.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x12, 0x02]);
+    }
+
+    #[test]
+    fn cics_wait_external_posts_the_selected_ecb_from_a_typed_list() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEXT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-ONE PIC S9(9) COMP VALUE 0. 01 ECB-TWO PIC S9(9) COMP VALUE 1. 01 ECB-LIST. 05 ECB-PTR-ONE POINTER-32. 05 ECB-PTR-TWO POINTER-32. 01 ECB-LIST-PTR POINTER. 01 DONE-X PIC X VALUE '0'. PROCEDURE DIVISION. SET ECB-PTR-ONE TO ADDRESS OF ECB-ONE. SET ECB-PTR-TWO TO ADDRESS OF ECB-TWO. SET ECB-LIST-PTR TO ADDRESS OF ECB-LIST. EXEC CICS WAIT EXTERNAL ECBLIST(ECB-LIST-PTR) NUMEVENTS(2) NOTPURGEABLE NAME('EXTERNAL') END-EXEC. MOVE '1' TO DONE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(wait) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WAIT EXTERNAL did not call host");
+        };
+        assert!(matches!(
+            &wait.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WaitExternal,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["ECBLIST"].schema()
+                    == "mainframe-env.cics.external-event-list@1"
+                && arguments["ECBLIST"].bytes().len() == 16
+                && arguments["EVENT.POSTED"].bytes().is_empty()
+                && arguments["NUMEVENTS"].bytes() == b"2"
+                && arguments.contains_key("OPTION.NOTPURGEABLE")
+                && arguments["NAME"].bytes() == b"EXTERNAL"
+        ));
+        let posted = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.event-index@1",
+            b"0".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([("EVENT.POSTED".into(), posted)]),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: wait.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(
+            machine.variable("ECB-ONE").unwrap().bytes(),
+            &[0x40, 0, 0, 0]
+        );
+        assert_eq!(machine.variable("ECB-TWO").unwrap().bytes(), &[0, 0, 0, 1]);
+        assert_eq!(machine.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x5e, 0x22]);
     }
 
     #[test]

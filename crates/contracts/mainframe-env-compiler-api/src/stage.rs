@@ -237,7 +237,7 @@ pub(crate) mod tests {
                 Attribute::Bytes(plan_bytes)
             }
             CicsPlanFixture::WrongVersion => {
-                plan_bytes[4..6].copy_from_slice(&2u16.to_be_bytes());
+                plan_bytes[4..6].copy_from_slice(&3u16.to_be_bytes());
                 Attribute::Bytes(plan_bytes)
             }
             CicsPlanFixture::Oversized => {
@@ -664,13 +664,9 @@ pub(crate) mod tests {
     }
 
     fn cics_read_effects() -> Vec<Effect> {
-        vec![
-            Effect::DatasetRead,
-            Effect::MemoryRead,
-            Effect::MemoryWrite,
-            Effect::Condition,
-            Effect::Transaction,
-        ]
+        mainframe_env_ir::cics_executable_descriptor(CicsPlanOperation::Read)
+            .effects
+            .to_vec()
     }
 
     #[test]
