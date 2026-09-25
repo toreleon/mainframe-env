@@ -5,6 +5,7 @@
   "status": "pass",
   "rows": [
     {"id": "registry-all-builtins", "result": "pass", "evidence": "program::tests::every_accepted_builtin_has_a_real_route"},
+    {"id": "registered-control-declarations", "result": "pass", "evidence": "program::tests::every_registered_handler_rejects_undeclared_control; program::tests::utility_operands_and_sort_ordering_fail_closed; service::tests::undeclared_utility_control_fails_step_with_unsupported_category"},
     {"id": "durable-registration-substitution", "result": "pass", "evidence": "service::tests::durable_program_registration_substitution_fails_closed_before_execution"},
     {"id": "iefbr14-allocation", "result": "pass", "evidence": "service::tests::temporary_dataset_pass_and_normal_delete_follow_disp_positions"},
     {"id": "iebgener-copy", "result": "pass", "evidence": "service::tests::iebgener_reads_and_writes_dataset_backed_dds"},

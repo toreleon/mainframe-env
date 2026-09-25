@@ -8,7 +8,8 @@ use crate::controller::{
 use crate::dd_hydration::{is_program_library_dd, retains_flattened_dataset_bytes};
 use crate::program::{
     ProgramRegistration, RegisteredProgramHandler, TsoProgramExecution,
-    resolve_program_registration, tso_program_execution,
+    resolve_program_registration, tso_program_execution, validate_program_controls,
+    validate_tso_action_controls,
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
@@ -1597,6 +1598,9 @@ impl BatchService {
                     .filter(|registration| registration.program == step.program)
                     .cloned()
                     .ok_or(HostProblem::InfrastructureFailure)?;
+                if registration.handler != RegisteredProgramHandler::ProgramService {
+                    validate_program_controls(&registration.program, &input)?;
+                }
                 let dataset_resolutions = job.dataset_resolutions.clone();
                 let idcams_return_code = if registration.handler
                     == RegisteredProgramHandler::Utility(crate::UtilityHandler::Idcams)
@@ -2189,7 +2193,8 @@ impl BatchService {
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
-        let controls = parse_sdsf_file_controls(&input_dd_text(input, "ISFIN")?)?;
+        let controls = parse_sdsf_file_controls(&input_dd_text(input, "ISFIN")?)
+            .map_err(|_| HostProblem::Unsupported)?;
         let arguments = controls
             .iter()
             .map(|control| {
@@ -2268,9 +2273,11 @@ impl BatchService {
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
         let control = input_dd_text(input, "SYSTSIN")?;
-        if control.to_ascii_uppercase().contains("FREE PLAN")
-            || control.to_ascii_uppercase().contains("FREE PACKAGE")
-        {
+        let normalized = control.trim().to_ascii_uppercase();
+        if normalized.starts_with("FREE PLAN(") || normalized.starts_with("FREE PACKAGE(") {
+            if !normalized.ends_with(')') || normalized.contains('\n') {
+                return Err(HostProblem::Unsupported);
+            }
             let result = self.db2_call(
                 invocation,
                 job,
@@ -2304,6 +2311,7 @@ impl BatchService {
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
+        validate_tso_action_controls(&program, &control)?;
         let statement = input_dd_text(input, "SYSIN")?;
         let operation = match tso_program_execution(&program).ok_or(HostProblem::Unsupported)? {
             TsoProgramExecution::ExecuteScript => Db2Operation::ExecuteScript,
@@ -5971,12 +5979,11 @@ fn input_dd_text(input: &ProgramInput, name: &str) -> Result<String, HostProblem
 
 fn tso_run_program(control: &str) -> Result<String, HostProblem> {
     let upper = control.to_ascii_uppercase();
-    let start = upper.find("RUN PROGRAM(").ok_or(HostProblem::Unsupported)? + "RUN PROGRAM(".len();
-    let end = upper[start..]
-        .find(')')
-        .map(|offset| start + offset)
-        .ok_or(HostProblem::Malformed)?;
-    let program = upper[start..end].trim();
+    let normalized = upper.trim();
+    let program = normalized
+        .strip_prefix("RUN PROGRAM(")
+        .and_then(|tail| tail.strip_suffix(')'))
+        .ok_or(HostProblem::Unsupported)?;
     if program.is_empty()
         || program.len() > 128
         || !program.bytes().all(|byte| byte.is_ascii_alphanumeric())
@@ -5992,6 +5999,9 @@ fn ims_controller_selector(parameter: &str) -> Result<BatchControllerSelector, H
         .trim()
         .trim_matches(|character| matches!(character, '\'' | '"' | '(' | ')'));
     let fields = normalized.split(',').map(str::trim).collect::<Vec<_>>();
+    if fields.len() < 2 || fields.len() > 3 {
+        return Err(HostProblem::Unsupported);
+    }
     let mode = fields.first().copied().ok_or(HostProblem::Malformed)?;
     let program = fields.get(1).copied().ok_or(HostProblem::Malformed)?;
     let qualifier = fields.get(2).copied().filter(|value| !value.is_empty());
@@ -8936,6 +8946,41 @@ mod tests {
     }
 
     #[test]
+    fn undeclared_utility_control_fails_step_with_unsupported_category() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BADCTL JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nDATA\n/*\n//SYSUT2 DD DUMMY\n//SYSIN DD *\n COPY\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("undeclared-utility-control", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.steps[0].state, StepState::Failed);
+        assert_eq!(
+            failed.steps[0].termination,
+            Some(StepTermination::Failed {
+                category: "unsupported".into()
+            })
+        );
+        assert!(
+            service
+                .spool(&invocation, &submitted.id, "JESMSGLG", 0, 20)
+                .unwrap()
+                .0
+                .iter()
+                .any(|record| String::from_utf8_lossy(record).contains("Unsupported"))
+        );
+    }
+
+    #[test]
     fn sdsf_applies_carddemo_cics_file_controls_as_one_typed_effect() {
         let controls = Arc::new(Mutex::new(Vec::new()));
         let limits = InvocationLimits::default();
@@ -9233,7 +9278,7 @@ mod tests {
                 &invocation,
                 &JclBundle {
                     primary: "//HYDRATE JOB CLASS=A\n\
-//COPY EXEC PGM=IEBGENER\n\
+//COPY EXEC PGM=IEFBR14\n\
 //SYSUT1 DD DSN=IBMUSER.INPUT,DISP=SHR\n\
 //SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n\
 //PLAIN DD DSN=IBMUSER.PLAIN,DISP=SHR\n\
