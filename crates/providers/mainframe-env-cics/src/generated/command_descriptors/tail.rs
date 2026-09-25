@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 84] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 90] = [
     CicsCommandDescriptor {
         operation: CicsOperation::Monitor,
         syntax: "MONITOR",
@@ -464,6 +464,48 @@ pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 84] = [
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0041",
         family: CicsCommandFamily::BtsControl,
         mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::DeleteChannel,
+        syntax: "DELETE CHANNEL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0042",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::DeleteContainer,
+        syntax: "DELETE CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0043",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::GetContainer,
+        syntax: "GET CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0086",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::MoveContainer,
+        syntax: "MOVE CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0144",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::PutContainer,
+        syntax: "PUT CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0150",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::QueryChannel,
+        syntax: "QUERY CHANNEL",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0152",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::ResetAcqProcess,

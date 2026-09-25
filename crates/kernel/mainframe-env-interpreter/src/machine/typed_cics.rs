@@ -417,6 +417,10 @@ pub(super) fn execute(
                         | CicsOperandName::WebReceiveStatusLength
                         | CicsOperandName::WebPortNumber
                         | CicsOperandName::BtsTimeout
+                        | CicsOperandName::ContainerLength
+                        | CicsOperandName::ContainerCcsid
+                        | CicsOperandName::ContainerByteOffset
+                        | CicsOperandName::ContainerIntoCcsid
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -524,7 +528,7 @@ pub(super) fn execute(
             tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
         }
         match output.name {
-            CicsOutputName::ConversationDataInto => {
+            CicsOutputName::ContainerInto | CicsOutputName::ConversationDataInto => {
                 let CicsTarget::Resolved(slot) = &target else {
                     return Err(MachineProblem::UnexpectedHostResult);
                 };
@@ -540,7 +544,7 @@ pub(super) fn execute(
                 );
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::ConversationDataSet => {
+            CicsOutputName::ContainerSet | CicsOutputName::ConversationDataSet => {
                 arguments.extend(retrieve::allocation_arguments(
                     machine,
                     &target,
@@ -644,6 +648,9 @@ pub(super) fn execute(
             | CicsOutputName::BtsAbCode
             | CicsOutputName::BtsAbProgram
             | CicsOutputName::BtsChildToken
+            | CicsOutputName::ContainerLength
+            | CicsOutputName::ContainerCcsid
+            | CicsOutputName::ContainerCount
             | CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate

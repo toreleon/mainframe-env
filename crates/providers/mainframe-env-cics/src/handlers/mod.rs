@@ -6,8 +6,6 @@ mod bridge_runtime;
 mod bridge_start;
 mod bridge_terminal;
 mod bts_child_link;
-// The read port is private until the later command slices install its routes.
-#[allow(dead_code)]
 mod bts_container;
 pub mod bts_lifecycle;
 mod bts_link;
@@ -243,6 +241,7 @@ pub use conversation_control::{
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
+#[cfg(test)]
 pub(in crate::service) use conversation_control::{
     confirm_issue_control, mark_issue_control_attempted,
 };
@@ -406,6 +405,14 @@ pub(super) fn invoke_extended_control(
             }
         }
         crate::generated::CicsCommandFamily::BtsControl => match request.operation {
+            CicsOperation::DeleteChannel
+            | CicsOperation::DeleteContainer
+            | CicsOperation::GetContainer
+            | CicsOperation::MoveContainer
+            | CicsOperation::PutContainer
+            | CicsOperation::QueryChannel => {
+                bts_container::invoke_channel_container(service, run, request)
+            }
             mainframe_env_host_api::CicsOperation::FetchAny
             | mainframe_env_host_api::CicsOperation::FetchChild
             | mainframe_env_host_api::CicsOperation::FreeChild => {

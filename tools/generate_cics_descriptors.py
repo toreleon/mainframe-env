@@ -576,6 +576,12 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("DefineActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0032"),
     ("DefineProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0037"),
     ("DeleteActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0041"),
+    ("DeleteChannel", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0042"),
+    ("DeleteContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0043"),
+    ("GetContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0086"),
+    ("MoveContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0144"),
+    ("PutContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0150"),
+    ("QueryChannel", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0152"),
     ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
     ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
     ("ResumeAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0172"),
@@ -809,6 +815,12 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DefineActivity",
         "DefineProcess",
         "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "MoveContainer",
+        "PutContainer",
+        "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
         "ResumeAcqActivity",
@@ -1568,7 +1580,7 @@ _BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
 TYPED_RUNTIME_IR_EFFECTS.update(
     {
         name: _BTS_READ_EFFECTS
-        for name in ("CheckAcqActivity", "CheckAcqProcess")
+        for name in ("CheckAcqActivity", "CheckAcqProcess", "GetContainer", "QueryChannel")
     }
 )
 TYPED_RUNTIME_IR_EFFECTS.update(
@@ -1586,6 +1598,7 @@ TYPED_RUNTIME_IR_EFFECTS.update(
             "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
             "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
             "SuspendAcqProcess", "SuspendActivity",
+            "DeleteChannel", "DeleteContainer", "MoveContainer", "PutContainer",
         )
     }
 )
@@ -1966,6 +1979,12 @@ def _load_typed_execution_registrations(
         "DefineActivity",
         "DefineProcess",
         "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "MoveContainer",
+        "PutContainer",
+        "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
         "ResumeAcqActivity",
@@ -4212,7 +4231,7 @@ def _semantic_contract(
             raise DescriptorError(
                 f"{command['official_row']} typed IR effects omit resolved memory flow"
             )
-        option_sensitive = operation == "Read"
+        option_sensitive = operation in {"Read", "GetContainer"}
         capability = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",
             "route": "host.cics.execute",

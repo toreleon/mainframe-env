@@ -2,11 +2,17 @@
 
 mod browse_read;
 mod channel;
+mod command;
 mod scope;
 mod state;
 
 pub(super) use browse_read::{ContainerReadError, ReadReply, ReadRequest};
 pub(super) use scope::ContainerSelector;
+pub(in crate::service::handlers) use state::ContainerDatatype;
+pub(in crate::service::handlers) fn valid_task_channel_name(name: &str) -> bool {
+    state::valid_name(name, 16)
+}
+pub(in crate::service::handlers) use command::invoke as invoke_channel_container;
 
 use crate::service::{CicsService, Run};
 use mainframe_env_host_api::AccessIntent;
@@ -14,6 +20,7 @@ use mainframe_env_host_api::AccessIntent;
 impl CicsService {
     /// Read command data only for this authenticated invocation. The nested
     /// SAF request persists its allow/deny audit through the shared host path.
+    #[allow(dead_code)]
     pub(in crate::service::handlers) fn read_bts_container(
         &self,
         run: &mut Run,
@@ -477,6 +484,32 @@ mod tests {
     }
 
     #[test]
+    fn channel_container_delete_requires_the_creating_program() {
+        let store = MemoryStore::new(Default::default());
+        let mut allow = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| Ok(());
+        {
+            let mut creator = channel::ChannelPort::new_with_program(
+                &store,
+                owner("UOW1"),
+                "CREATOR",
+                &mut allow,
+            );
+            creator.put("WORK", "ITEM", b"data", false, "put").unwrap();
+        }
+        {
+            let mut other =
+                channel::ChannelPort::new_with_program(&store, owner("UOW1"), "OTHER", &mut allow);
+            assert_eq!(
+                other.delete_channel("WORK", "wrong-program"),
+                Err(mainframe_env_host_api::HostProblem::Unauthorized)
+            );
+        }
+        let mut creator =
+            channel::ChannelPort::new_with_program(&store, owner("UOW1"), "CREATOR", &mut allow);
+        creator.delete_channel("WORK", "owner-delete").unwrap();
+    }
+
+    #[test]
     fn channel_container_metadata_and_denial_precede_mutation() {
         let store = MemoryStore::new(Default::default());
         let audit = std::cell::RefCell::new(Vec::new());
@@ -491,7 +524,7 @@ mod tests {
             "DATA",
             "TEXT",
             b"hello",
-            ContainerDatatype::Character,
+            Some(ContainerDatatype::Character),
             Some(37),
             false,
             "put-text",
@@ -504,7 +537,7 @@ mod tests {
                 "DATA",
                 "TEXT",
                 b"!",
-                ContainerDatatype::Bit,
+                Some(ContainerDatatype::Bit),
                 None,
                 true,
                 "bad-append"

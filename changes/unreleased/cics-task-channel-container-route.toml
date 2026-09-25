@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Route 32-bit CICS task-channel container commands through typed compiled execution with owner-scoped storage and audited authorization."

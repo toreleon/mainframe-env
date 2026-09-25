@@ -13,6 +13,7 @@ pub(super) struct OwnerIdentity<'a> {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub(in crate::service::handlers) enum ContainerSelector<'a> {
     Channel(&'a str),
     Process {

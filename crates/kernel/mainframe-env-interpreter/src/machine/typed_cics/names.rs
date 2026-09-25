@@ -83,6 +83,13 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::BtsLinkActivity
         | CicsOperandName::BtsLinkInputEvent
         | CicsOperandName::BtsChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::ContainerName
+        | CicsOperandName::ContainerAs
+        | CicsOperandName::ContainerToChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::ContainerLength
+        | CicsOperandName::ContainerCcsid
+        | CicsOperandName::ContainerByteOffset
+        | CicsOperandName::ContainerIntoCcsid => SlotUse::FullwordInput,
         CicsOperandName::BtsFacilityToken => SlotUse::BtsExactInput(8),
         CicsOperandName::BtsChild => SlotUse::BtsExactInput(16),
         CicsOperandName::BtsTimeout => SlotUse::FullwordInput,
@@ -234,6 +241,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
             SlotUse::Output
         }
         CicsOutputName::BtsChildCompStatus => SlotUse::FullwordOutput,
+        CicsOutputName::ContainerLength
+        | CicsOutputName::ContainerCcsid
+        | CicsOutputName::ContainerCount => SlotUse::FullwordOutput,
+        CicsOutputName::ContainerInto | CicsOutputName::ContainerSet => SlotUse::Output,
         CicsOutputName::AttachIuType
         | CicsOutputName::AttachDataStream
         | CicsOutputName::AttachRecordFormat
@@ -422,6 +433,18 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::BtsUserId => "USERID",
         CicsOperandName::BtsFacilityToken => "FACILITYTOKN",
         CicsOperandName::BtsChannel => "CHANNEL",
+        CicsOperandName::ContainerName => "CONTAINER",
+        CicsOperandName::ContainerAs => "AS",
+        CicsOperandName::ContainerToChannel => "TOCHANNEL",
+        CicsOperandName::ContainerFrom => "FROM",
+        CicsOperandName::ContainerLength => "FLENGTH",
+        CicsOperandName::ContainerDatatype => "DATATYPE",
+        CicsOperandName::ContainerCcsid => "FROMCCSID",
+        CicsOperandName::ContainerByteOffset => "BYTEOFFSET",
+        CicsOperandName::ContainerIntoCcsid => "INTOCCSID",
+        CicsOperandName::ContainerFromCodepage => "FROMCODEPAGE",
+        CicsOperandName::ContainerIntoCodepage => "INTOCODEPAGE",
+        CicsOperandName::ContainerConvertst => "CONVERTST",
         CicsOperandName::BtsChild => "CHILD",
         CicsOperandName::BtsLinkActivity => "ACTIVITY",
         CicsOperandName::BtsLinkInputEvent => "INPUTEVENT",
@@ -798,6 +821,11 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::BtsChildCompStatus => "COMPSTATUS",
         CicsOutputName::BtsChannel => "CHANNEL",
         CicsOutputName::BtsAbcode => "ABCODE",
+        CicsOutputName::ContainerInto => "INTO",
+        CicsOutputName::ContainerSet => "SET",
+        CicsOutputName::ContainerLength => "FLENGTH",
+        CicsOutputName::ContainerCcsid => "CCSID",
+        CicsOutputName::ContainerCount => "CONTAINERCNT",
         CicsOutputName::AttachProcess => "PROCESS",
         CicsOutputName::AttachResource => "RESOURCE",
         CicsOutputName::AttachReturnProcess => "RPROCESS",
@@ -963,6 +991,13 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::BtsNoSuspend => "NOSUSPEND",
         CicsPlanOption::BtsAcqActivity => "ACQACTIVITY",
         CicsPlanOption::BtsAcqProcess => "ACQPROCESS",
+        CicsPlanOption::ContainerAppend => "APPEND",
+        CicsPlanOption::ContainerNoData => "NODATA",
+        CicsPlanOption::ContainerProcess => "PROCESS",
+        CicsPlanOption::ContainerAcqProcess => "ACQPROCESS",
+        CicsPlanOption::ContainerAcqActivity => "ACQACTIVITY",
+        CicsPlanOption::ContainerFromProcess => "FROMPROCESS",
+        CicsPlanOption::ContainerToProcess => "TOPROCESS",
         CicsPlanOption::ConversationNoQueue => "NOQUEUE",
         CicsPlanOption::ConversationNotruncate => "NOTRUNCATE",
         CicsPlanOption::ConversationDefresp => "DEFRESP",

@@ -42,7 +42,7 @@ enum Action<'a> {
         channel: &'a str,
         name: &'a str,
         bytes: &'a [u8],
-        datatype: ContainerDatatype,
+        datatype: Option<ContainerDatatype>,
         ccsid: Option<u16>,
         append: bool,
     },
@@ -65,9 +65,11 @@ pub(super) struct ChannelPort<'a> {
     store: &'a dyn ProviderStateStore,
     identity: OwnerIdentity<'a>,
     authorize: &'a mut dyn FnMut(&str, &str, AccessIntent) -> Result<(), HostProblem>,
+    creator_program: Option<&'a str>,
 }
 
 impl<'a> ChannelPort<'a> {
+    #[cfg(test)]
     pub fn new(
         store: &'a dyn ProviderStateStore,
         identity: OwnerIdentity<'a>,
@@ -77,6 +79,21 @@ impl<'a> ChannelPort<'a> {
             store,
             identity,
             authorize,
+            creator_program: None,
+        }
+    }
+
+    pub fn new_with_program(
+        store: &'a dyn ProviderStateStore,
+        identity: OwnerIdentity<'a>,
+        creator_program: &'a str,
+        authorize: &'a mut dyn FnMut(&str, &str, AccessIntent) -> Result<(), HostProblem>,
+    ) -> Self {
+        Self {
+            store,
+            identity,
+            authorize,
+            creator_program: Some(creator_program),
         }
     }
 
@@ -96,6 +113,7 @@ impl<'a> ChannelPort<'a> {
         }
     }
 
+    #[cfg(test)]
     pub fn get(&mut self, channel: &str, name: &str) -> Result<Vec<u8>, HostProblem> {
         Ok(self.get_value(channel, name)?.bytes)
     }
@@ -115,6 +133,7 @@ impl<'a> ChannelPort<'a> {
         }
     }
 
+    #[cfg(test)]
     pub fn put(
         &mut self,
         channel: &str,
@@ -123,15 +142,7 @@ impl<'a> ChannelPort<'a> {
         append: bool,
         replay: &str,
     ) -> Result<(), HostProblem> {
-        self.put_value(
-            channel,
-            name,
-            bytes,
-            ContainerDatatype::Bit,
-            None,
-            append,
-            replay,
-        )
+        self.put_value(channel, name, bytes, None, None, append, replay)
     }
 
     pub fn put_value(
@@ -139,7 +150,7 @@ impl<'a> ChannelPort<'a> {
         channel: &str,
         name: &str,
         bytes: &[u8],
-        datatype: ContainerDatatype,
+        datatype: Option<ContainerDatatype>,
         ccsid: Option<u16>,
         append: bool,
         replay: &str,
@@ -304,22 +315,27 @@ impl<'a> ChannelPort<'a> {
                     }
                     let mut value = old.as_ref().map_or_else(
                         || ContainerValue {
-                            datatype: *datatype,
-                            ccsid: *ccsid,
+                            datatype: datatype.unwrap_or(if ccsid.is_some() {
+                                ContainerDatatype::Character
+                            } else {
+                                ContainerDatatype::Bit
+                            }),
+                            ccsid: ccsid.or(if *datatype == Some(ContainerDatatype::Character) {
+                                Some(37)
+                            } else {
+                                None
+                            }),
                             read_only: false,
                             bytes: Vec::new(),
                         },
                         |(_, value)| value.clone(),
                     );
-                    if *append
-                        && old.is_some()
-                        && (value.datatype != *datatype || value.ccsid != *ccsid)
-                    {
+                    if old.is_some() && datatype.is_some_and(|kind| kind != value.datatype) {
                         return Err(HostProblem::Malformed);
                     }
-                    if !*append {
-                        value.datatype = *datatype;
-                        value.ccsid = *ccsid;
+                    if old.is_some() && ccsid.is_some_and(|codepage| Some(codepage) != value.ccsid)
+                    {
+                        return Err(HostProblem::Unsupported);
                     }
                     if *append {
                         value.bytes.extend_from_slice(bytes);
@@ -372,6 +388,11 @@ impl<'a> ChannelPort<'a> {
                 }
                 Action::DeleteChannel { .. } => {
                     let old_channel = source_channel.as_ref().ok_or(HostProblem::NotFound)?;
+                    if state::channel_creator(old_channel, &source.owner)?
+                        != self.creator_program.map(str::to_owned)
+                    {
+                        return Err(HostProblem::Unauthorized);
+                    }
                     for row in self.names(&source.owner)? {
                         self.load_container(&source.owner, &row.key)?
                             .ok_or(HostProblem::UnknownOutcome)?;
@@ -577,7 +598,14 @@ impl<'a> ChannelPort<'a> {
         writes: &mut Vec<ProviderStateMutation>,
         capacity: &mut Capacity,
     ) -> Result<(), HostProblem> {
-        let mut record = state::channel_record(owner)?;
+        let creator = old
+            .map(|row| state::channel_creator(row, owner))
+            .transpose()?
+            .flatten();
+        let mut record = state::channel_record_with_program(
+            owner,
+            old.map_or(self.creator_program, |_| creator.as_deref()),
+        )?;
         let expected = old.map(|row| row.version);
         record.version = next_version(expected)?;
         if old.is_none() {

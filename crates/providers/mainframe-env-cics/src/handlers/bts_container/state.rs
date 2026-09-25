@@ -96,9 +96,40 @@ struct ContainerRow {
 struct ChannelRow {
     schema: String,
     owner: ContainerOwner,
+    #[serde(default)]
+    creator_program: Option<String>,
 }
 
 pub(super) fn valid_name(name: &str, max: usize) -> bool {
+    if max == 16 {
+        return !name.is_empty()
+            && name.chars().count() <= max
+            && name.chars().all(|character| {
+                character.is_ascii_alphanumeric()
+                    || matches!(
+                        character,
+                        '$' | '@'
+                            | '#'
+                            | '.'
+                            | '/'
+                            | '-'
+                            | '_'
+                            | '%'
+                            | '&'
+                            | '?'
+                            | '!'
+                            | ':'
+                            | '|'
+                            | '"'
+                            | '='
+                            | '¬'
+                            | ','
+                            | ';'
+                            | '<'
+                            | '>'
+                    )
+            });
+    }
     !name.is_empty()
         && name.len() <= max
         && name.bytes().all(|byte| {
@@ -191,13 +222,22 @@ pub(super) fn container_record(
     Ok(record)
 }
 
+#[cfg(test)]
 pub(super) fn channel_record(owner: &ContainerOwner) -> Result<ProviderStateRecord, HostProblem> {
+    channel_record_with_program(owner, None)
+}
+
+pub(super) fn channel_record_with_program(
+    owner: &ContainerOwner,
+    creator_program: Option<&str>,
+) -> Result<ProviderStateRecord, HostProblem> {
     if !matches!(owner, ContainerOwner::Channel { .. }) {
         return Err(HostProblem::Malformed);
     }
     let saved = ChannelRow {
         schema: CHANNEL_SCHEMA.into(),
         owner: owner.clone(),
+        creator_program: creator_program.map(str::to_owned),
     };
     Ok(ProviderStateRecord {
         namespace: "cics-channel-v1".into(),
@@ -205,4 +245,14 @@ pub(super) fn channel_record(owner: &ContainerOwner) -> Result<ProviderStateReco
         version: 1,
         payload: serde_json::to_vec(&saved).map_err(|_| HostProblem::InfrastructureFailure)?,
     })
+}
+
+pub(super) fn channel_creator(
+    row: &ProviderStateRecord,
+    owner: &ContainerOwner,
+) -> Result<Option<String>, HostProblem> {
+    decode_channel(row, owner)?;
+    let saved: ChannelRow =
+        serde_json::from_slice(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Ok(saved.creator_program)
 }

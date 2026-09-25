@@ -8,7 +8,8 @@ mod security_entries;
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 234] = [
+#[allow(clippy::large_const_arrays)] // Required by the public const descriptor lookup.
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 240] = [
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[0],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[1],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[2],
@@ -243,4 +244,10 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 234] = [
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[17],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[18],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[19],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[0],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[1],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[2],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[3],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[4],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[5],
 ];

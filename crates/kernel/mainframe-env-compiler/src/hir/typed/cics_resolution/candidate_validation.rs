@@ -124,6 +124,7 @@ pub(super) fn validate_candidate(
                 }
                 if web_control::reviewed_ambiguous_shape(descriptor, name, has_value)
                     || bts_lifecycle::reviewed_ambiguous_shape(descriptor, name, has_value)
+                    || channel_container::reviewed_ambiguous_shape(descriptor, name, has_value)
                 {
                     continue;
                 }

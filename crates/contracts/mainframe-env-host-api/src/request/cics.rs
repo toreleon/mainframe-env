@@ -29,6 +29,12 @@ pub enum CicsOperation {
     RunAcqProcess,
     RunActivity,
     RunTransId,
+    DeleteChannel,
+    DeleteContainer,
+    GetContainer,
+    MoveContainer,
+    PutContainer,
+    QueryChannel,
     SuspendAcqActivity,
     SuspendAcqProcess,
     SuspendActivity,
@@ -444,6 +450,12 @@ impl CicsOperation {
             Self::RunAcqProcess => "RunAcqProcess",
             Self::RunActivity => "RunActivity",
             Self::RunTransId => "RunTransId",
+            Self::DeleteChannel => "DeleteChannel",
+            Self::DeleteContainer => "DeleteContainer",
+            Self::GetContainer => "GetContainer",
+            Self::MoveContainer => "MoveContainer",
+            Self::PutContainer => "PutContainer",
+            Self::QueryChannel => "QueryChannel",
             Self::SuspendAcqActivity => "SuspendAcqActivity",
             Self::SuspendAcqProcess => "SuspendAcqProcess",
             Self::SuspendActivity => "SuspendActivity",
@@ -706,6 +718,10 @@ impl CicsOperation {
                 | Self::RunAcqProcess
                 | Self::RunActivity
                 | Self::RunTransId
+                | Self::DeleteChannel
+                | Self::DeleteContainer
+                | Self::MoveContainer
+                | Self::PutContainer
                 | Self::SuspendAcqActivity
                 | Self::SuspendAcqProcess
                 | Self::SuspendActivity

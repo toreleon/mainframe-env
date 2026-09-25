@@ -265,6 +265,11 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::BtsChildCompStatus
         | HirCicsOutputName::BtsChannel
         | HirCicsOutputName::BtsAbcode => Ok(()),
+        HirCicsOutputName::ContainerInto
+        | HirCicsOutputName::ContainerSet
+        | HirCicsOutputName::ContainerLength
+        | HirCicsOutputName::ContainerCcsid
+        | HirCicsOutputName::ContainerCount => Ok(()),
         HirCicsOutputName::ConversationConvid
         | HirCicsOutputName::ConversationRetcode
         | HirCicsOutputName::ConversationPrinConvid
