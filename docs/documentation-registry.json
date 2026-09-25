@@ -56,6 +56,7 @@
     "docs/decisions/0021-conversation-issue-control-staging.md",
     "docs/decisions/0022-issue-pass-target-handoff.md",
     "docs/decisions/0023-bts-lifecycle-authority.md",
+    "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -119,6 +120,7 @@
         {"label": "ADR-0021: Conversation ISSUE control staging", "path": "docs/decisions/0021-conversation-issue-control-staging.md"},
         {"label": "ADR-0022: ISSUE PASS target handoff", "path": "docs/decisions/0022-issue-pass-target-handoff.md"},
         {"label": "ADR-0023: BTS lifecycle authority", "path": "docs/decisions/0023-bts-lifecycle-authority.md"},
+        {"label": "ADR-0025: Licence and provenance policy for IBM oracle evidence", "path": "docs/decisions/0025-licence-and-provenance-policy.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 210,
+    "markdown_documents": 211,
     "navigation_groups": 5,
-    "normative_documents": 53,
+    "normative_documents": 54,
     "xtask_commands": 197
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 88,
-      "sha256": "sha256:0944b3a8e5c072a1f5b2a587b4aef982a96531a9cef54d3f9364f4f23d4be332",
+      "relative_links": 89,
+      "sha256": "sha256:b5c2446f078454409317fda5558c99a3444f80e8d0cac7ba279b4ec59695ce47",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -903,10 +903,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.17 licensed-evidence planning, subject to acceptance",
+      "normative": true,
+      "owner": "repository owner",
+      "path": "docs/decisions/0025-licence-and-provenance-policy.md",
+      "relative_links": 4,
+      "scope": "licensed IBM oracles, customer captures, and IBM-derived material",
+      "sha256": "sha256:684daa7294032eae6bb4a753f0ef779d35b59830a58b7513c46b6929ea2221c6",
+      "status": "Proposed",
+      "title": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 23,
-      "sha256": "sha256:41093e342b8888396afeefd30c796f60a85dca2c91b32b26ec817f5a1394d850",
+      "relative_links": 24,
+      "sha256": "sha256:79e91aed66ada7238b41d1e4f69239073aa20f3b7e3ee847e54fc44fa838a26b",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2100,6 +2112,10 @@
           "path": "docs/decisions/0023-bts-lifecycle-authority.md"
         },
         {
+          "label": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+          "path": "docs/decisions/0025-licence-and-provenance-policy.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2263,7 +2279,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:2d41f7a509a682f1b26eb6f09e5dd7d692265b7538b099848828dec3df388b44",
+  "registry_sha256": "sha256:dd3b8c953fd41aace61f7b80f2c5043b9dd3f83338298ed98e092ad6badcd108",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,
