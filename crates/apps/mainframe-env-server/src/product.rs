@@ -23591,6 +23591,73 @@ mod tests {
         assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
     }
 
+    #[tokio::test]
+    async fn abended_installed_cobol_retains_display_spool() {
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. ABDSPOOL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nDISPLAY 'BEFORE ABEND'.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n";
+        let published = published_source_fixture("ABDSPOOL", source);
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_batch_programs(vec![BatchProgramDefinition::current(
+                "ABDSPOOL", &published,
+            )])
+            .unwrap();
+        let app = server.router();
+        let response = call(
+            &app,
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            "//ABDSPOOL JOB CLASS=A\n//FAIL EXEC PGM=ABDSPOOL\n",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
+        let id = job["jobid"].as_str().unwrap();
+        let completed = wait_for_terminal_job(&server, id).await;
+        assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
+        assert_eq!(
+            completed.steps[0].state,
+            mainframe_env_batch::StepState::Abended
+        );
+        assert_eq!(
+            completed.steps[0].termination,
+            Some(mainframe_env_batch::StepTermination::Abend {
+                code: "U0999".into(),
+                system: true,
+            })
+        );
+        let files = call(
+            &app,
+            Method::GET,
+            &format!("/zosmf/restjobs/jobs/ABDSPOOL/{id}/files"),
+            "",
+        )
+        .await;
+        assert_eq!(files.status(), StatusCode::OK);
+        let files: Value =
+            serde_json::from_slice(&to_bytes(files.into_body(), 65_536).await.unwrap()).unwrap();
+        let sysprint = files
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|file| file["ddname"] == "FAIL:SYSPRINT")
+            .expect("abended step SYSOUT file");
+        let records = call(
+            &app,
+            Method::GET,
+            &format!(
+                "/zosmf/restjobs/jobs/ABDSPOOL/{id}/files/{}/records",
+                sysprint["id"].as_u64().unwrap()
+            ),
+            "",
+        )
+        .await;
+        assert_eq!(records.status(), StatusCode::OK);
+        let records_body = to_bytes(records.into_body(), 65_536).await.unwrap();
+        assert_eq!(&records_body[..], b"BEFORE ABEND");
+    }
+
     #[test]
     fn invocation_grants_are_selector_scoped_and_generation_pinned() {
         let (server, _, _) = worker_test_server(500);
