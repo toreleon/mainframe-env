@@ -33,6 +33,7 @@
         "schema_version",
         "status",
         "corpus_commit",
+        "business_date",
         "journeys_passed",
         "initialization_jobs",
         "operational_jobs",
@@ -41,6 +42,8 @@
         "warm_restart_controls",
         "rollback_controls",
         "cancellation_controls",
+        "tranrept_selected_records",
+        "tranrept_report_records",
         "dataset_sha256",
         "spool_sha256",
         "journey_shape_sha256"
