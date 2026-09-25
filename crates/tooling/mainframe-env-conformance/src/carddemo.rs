@@ -628,6 +628,7 @@ pub struct CardDemoBaseBatchReceipt {
     pub schema_version: String,
     pub status: String,
     pub corpus_commit: String,
+    pub business_date: String,
     pub journeys_passed: usize,
     pub initialization_jobs: usize,
     pub operational_jobs: usize,
@@ -636,6 +637,8 @@ pub struct CardDemoBaseBatchReceipt {
     pub warm_restart_controls: usize,
     pub rollback_controls: usize,
     pub cancellation_controls: usize,
+    pub tranrept_selected_records: usize,
+    pub tranrept_report_records: usize,
     pub dataset_sha256: BTreeMap<String, String>,
     pub spool_sha256: BTreeMap<String, String>,
     pub journey_shape_sha256: String,
@@ -8983,12 +8986,15 @@ async fn exercise_base_batch_routes(
     online: OnlineApplicationDefinition,
     definitions: Vec<BatchProgramDefinition>,
 ) -> Result<CardDemoBaseBatchReceipt, CorpusProblem> {
+    const BUSINESS_DATE: &str = "2022-07-06";
+    const COBOL_CURRENT_DATE: &str = "2022070600000000+0000";
     let artifact_root = env::temp_dir().join(format!(
         "mainframe-env-carddemo-base-batch-{}",
         std::process::id()
     ));
     let config = ServerConfig {
         store_profile: StoreProfile::Memory,
+        cobol_current_date: Some(COBOL_CURRENT_DATE.into()),
         artifact_root: artifact_root.clone(),
         tls: TlsConfig {
             enabled: false,
@@ -9188,6 +9194,18 @@ async fn exercise_base_batch_routes(
                 },
             )?;
         }
+    }
+    let tranrept_selected_records =
+        utility_records(&server, "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00", None)?.len();
+    let tranrept_report_records =
+        utility_records(&server, "AWS.M2.CARDDEMO.TRANREPT.G0001V00", None)?.len();
+    if tranrept_selected_records == 0 || tranrept_report_records == 0 {
+        return Err(CorpusProblem::new(
+            "carddemo.base_batch.tranrept_empty",
+            format!(
+                "TRANREPT selected {tranrept_selected_records} records and wrote {tranrept_report_records} report records"
+            ),
+        ));
     }
     let post_id = job_ids
         .get("POSTTRAN")
@@ -9448,6 +9466,7 @@ async fn exercise_base_batch_routes(
     let cancellation_controls = 1usize;
     let mut shape = Sha256::new();
     digest_field(&mut shape, corpus_commit.as_bytes());
+    digest_field(&mut shape, BUSINESS_DATE.as_bytes());
     for value in [
         journeys_passed,
         initialization_jobs,
@@ -9457,6 +9476,8 @@ async fn exercise_base_batch_routes(
         warm_restart_controls,
         rollback_controls,
         cancellation_controls,
+        tranrept_selected_records,
+        tranrept_report_records,
     ] {
         digest_field(&mut shape, &(value as u64).to_be_bytes());
     }
@@ -9473,6 +9494,7 @@ async fn exercise_base_batch_routes(
         schema_version: "mainframe-env.carddemo-base-batch-receipt@1".into(),
         status: "pass".into(),
         corpus_commit,
+        business_date: BUSINESS_DATE.into(),
         journeys_passed,
         initialization_jobs,
         operational_jobs,
@@ -9481,6 +9503,8 @@ async fn exercise_base_batch_routes(
         warm_restart_controls,
         rollback_controls,
         cancellation_controls,
+        tranrept_selected_records,
+        tranrept_report_records,
         dataset_sha256,
         spool_sha256,
         journey_shape_sha256: format!("{:x}", shape.finalize()),

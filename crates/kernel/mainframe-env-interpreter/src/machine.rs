@@ -4099,7 +4099,7 @@ impl ReferenceMachine {
             "write" => {
                 let record = position(args, "FROM")
                     .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.get(1))
+                    .or_else(|| args.first())
                     .map(|value| self.resolve(value))
                     .transpose()?
                     .unwrap_or_default();
@@ -4588,6 +4588,11 @@ impl ReferenceMachine {
             .reference(&args[..to])
             .ok()
             .map(|reference| reference.layout.category);
+        let alphanumeric_sender = matches!(source_category, Some(LayoutCategory::Alphanumeric))
+            || (to == 1
+                && args[0].len() >= 2
+                && matches!(args[0].as_bytes().first(), Some(b'\'' | b'"'))
+                && args[0].as_bytes().first() == args[0].as_bytes().last());
         let targets = &args[to + 1..];
         let control = targets
             .iter()
@@ -4665,7 +4670,43 @@ impl ReferenceMachine {
                 }
                 (_, _, value) => value,
             };
-            self.write_reference_value(&targets[at..end], &value)?;
+            // Digit-only elementary alphanumeric senders have an implicit integer point.
+            if alphanumeric_sender
+                && target.layout.category == LayoutCategory::NumericDisplay
+                && target.length == target.layout.length
+                && let CobolValue::Bytes(bytes) = &value
+                && !bytes.is_empty()
+                && bytes.iter().all(u8::is_ascii_digit)
+            {
+                let integer_places = target
+                    .layout
+                    .digits
+                    .saturating_sub(target.layout.scale as usize);
+                let digits = &bytes[bytes.len().saturating_sub(integer_places)..];
+                let significant = digits
+                    .iter()
+                    .position(|digit| *digit != b'0')
+                    .unwrap_or(digits.len());
+                let coefficient = std::str::from_utf8(&digits[significant..])
+                    .ok()
+                    .and_then(|digits| {
+                        if digits.is_empty() {
+                            Some(0)
+                        } else {
+                            digits.parse::<i128>().ok()
+                        }
+                    })
+                    .ok_or(MachineProblem::SizeError)?;
+                self.write_reference_value(
+                    &targets[at..end],
+                    &CobolValue::Decimal(Decimal {
+                        coefficient,
+                        scale: 0,
+                    }),
+                )?;
+            } else {
+                self.write_reference_value(&targets[at..end], &value)?;
+            }
             at = end;
         }
         Ok(())
@@ -12574,6 +12615,163 @@ mod tests {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"HELLO\n"),
             other => panic!("{other:?}"),
         }
+    }
+    #[test]
+    fn write_without_from_uses_record_name_and_preserves_fixed_length() {
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        for (name, length) in [("REC", 5), ("WS-ITEM", 5), ("FILE-STATUS", 2)] {
+            builder.add_storage(name, length, None).unwrap();
+        }
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let binary =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut machine =
+            ReferenceMachine::from_binary(&binary, invocation(), CodecLimits::default()).unwrap();
+        machine.files.insert(
+            "TESTFILE".into(),
+            FileMetadata {
+                assignment: "TESTFILE".into(),
+                record_name: Some("REC".into()),
+                organization: "SEQUENTIAL".into(),
+                access_mode: "SEQUENTIAL".into(),
+                record_key: None,
+                alternate_record_keys: Vec::new(),
+                relative_key: None,
+                file_status: Some("FILE-STATUS".into()),
+                sort_merge: false,
+                description: String::new(),
+                record_min: Some(5),
+                record_max: Some(5),
+                ccsid: None,
+                linage: Some(10),
+            },
+        );
+        machine.write_raw("REC", b"REC01").unwrap();
+        machine.write_raw("WS-ITEM", b"FROM2").unwrap();
+        for (args, expected) in [
+            (vec!["REC"], b"REC01".as_slice()),
+            (vec!["REC", "FROM", "WS-ITEM"], b"FROM2".as_slice()),
+            (
+                vec!["REC", "AFTER", "ADVANCING", "1", "LINE"],
+                b"REC01".as_slice(),
+            ),
+            (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
+        ] {
+            let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
+            let step = machine.dataset_effect("write", &args).unwrap();
+            let Step::Effect(effect) = step else {
+                panic!("WRITE did not request a dataset effect");
+            };
+            let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = &effect.request
+            else {
+                panic!("WRITE did not append a sequential record");
+            };
+            assert_eq!(records, &vec![expected.to_vec()]);
+            machine
+                .resume_host(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Dataset(
+                        mainframe_env_host_api::DatasetResult::Mutated { version: 1 },
+                    )),
+                })
+                .unwrap();
+            assert_eq!(machine.resolve("FILE-STATUS").unwrap(), b"00");
+        }
+    }
+    #[test]
+    fn quoted_numeric_literal_move_zero_fills_numeric_display() {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        let layout = |name: &str, category, length, scale, signed| LayoutMetadata {
+            name: name.into(),
+            simple_name: name.into(),
+            category,
+            picture: String::new(),
+            digits: length,
+            scale,
+            signed,
+            sign_separate: false,
+            justified_right: false,
+            blank_when_zero: false,
+            linkage: false,
+            offset: 0,
+            length,
+            element_length: length,
+            occurs: 1,
+            occurs_min: 1,
+            unbounded: false,
+            depending_on: None,
+            indexes: Vec::new(),
+            keys: Vec::new(),
+            dynamic: false,
+            dynamic_limit: 0,
+            parent: None,
+            alias_of: None,
+            occurs_clause: false,
+            condition_values: Vec::new(),
+            object_class: None,
+        };
+        for (name, category, length, scale, signed) in [
+            ("N4", LayoutCategory::NumericDisplay, 4, 0, false),
+            ("SIGNED4", LayoutCategory::NumericDisplay, 4, 0, true),
+            (
+                "SIGNED4-SEPARATE",
+                LayoutCategory::NumericDisplay,
+                5,
+                0,
+                true,
+            ),
+            ("N5", LayoutCategory::NumericDisplay, 5, 2, false),
+            ("SEND-UNSIGNED", LayoutCategory::NumericDisplay, 2, 0, false),
+            ("SEND-ALPHA", LayoutCategory::Alphanumeric, 2, 0, false),
+        ] {
+            let mut view = machine.views["MSG"].clone();
+            view.length = length;
+            machine.views.insert(name.into(), view);
+            let mut item = layout(name, category, length, scale, signed);
+            if name == "SIGNED4-SEPARATE" {
+                item.digits = 4;
+                item.sign_separate = true;
+            }
+            machine.layouts.insert(name.into(), item);
+        }
+        let move_to = |machine: &mut ReferenceMachine, source: &str, receiver: &str| {
+            machine
+                .move_op(&[source.into(), "TO".into(), receiver.into()])
+                .unwrap();
+            machine.read(receiver).unwrap()
+        };
+        assert_eq!(move_to(&mut machine, "'05'", "N4"), b"0005");
+        assert_eq!(move_to(&mut machine, "'123456'", "N4"), b"3456");
+        let numeric_signed = move_to(&mut machine, "5", "SIGNED4");
+        assert_eq!(numeric_signed, b"000E");
+        assert_eq!(move_to(&mut machine, "'05'", "SIGNED4"), numeric_signed);
+        assert_eq!(move_to(&mut machine, "'12'", "N5"), b"01200");
+        let source = machine.reference(&["SEND-UNSIGNED".into()]).unwrap();
+        machine.write_reference(&source, b"05").unwrap();
+        assert_eq!(
+            move_to(&mut machine, "SEND-UNSIGNED", "SIGNED4-SEPARATE"),
+            b"0005+"
+        );
+        let source = machine.reference(&["SEND-ALPHA".into()]).unwrap();
+        machine.write_reference(&source, b"05").unwrap();
+        assert_eq!(move_to(&mut machine, "SEND-ALPHA", "N4"), b"0005");
+        machine.write_reference(&source, b"05").unwrap();
+        assert_eq!(move_to(&mut machine, "SEND-ALPHA", "SIGNED4"), b"000E");
     }
     #[test]
     fn output_limit_fails_typed() {
