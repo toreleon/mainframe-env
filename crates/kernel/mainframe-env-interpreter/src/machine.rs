@@ -12566,6 +12566,101 @@ mod tests {
         mainframe_env_ir::encode_binary(&b.finish().unwrap(), CodecLimits::default()).unwrap()
     }
     #[test]
+    fn sequential_empty_browse_maps_to_open_read_close_statuses() {
+        use mainframe_env_host_api::{DatasetResult, HostResult, KeyRelation};
+
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        machine.files.insert(
+            "INPUT-FILE".into(),
+            FileMetadata {
+                assignment: "USER.EMPTY.G0001V00".into(),
+                record_name: None,
+                organization: "SEQUENTIAL".into(),
+                access_mode: "SEQUENTIAL".into(),
+                record_key: None,
+                alternate_record_keys: Vec::new(),
+                relative_key: None,
+                file_status: None,
+                sort_merge: false,
+                description: String::new(),
+                record_min: None,
+                record_max: None,
+                ccsid: None,
+                linage: None,
+            },
+        );
+        let file = "INPUT-FILE".to_string();
+        let Step::Effect(open) = machine
+            .dataset_effect("open", &["INPUT".into(), file.clone()])
+            .unwrap()
+        else {
+            panic!("OPEN INPUT did not call the dataset provider");
+        };
+        assert!(matches!(
+            open.request,
+            HostRequest::Dataset(DatasetRequest::StartBrowse {
+                ref key,
+                relation: KeyRelation::GreaterOrEqual,
+                ..
+            }) if key.is_empty()
+        ));
+        let cursor = "empty-cursor".to_string();
+        machine
+            .resume_host(EffectResult {
+                sequence: open.sequence,
+                outcome: Ok(HostResult::Dataset(DatasetResult::Browse {
+                    cursor: cursor.clone(),
+                    record: None,
+                    identity: None,
+                    key: None,
+                })),
+            })
+            .unwrap();
+        assert_eq!(machine.last_file_status, "00");
+        let Step::Effect(read) = machine.dataset_effect("read", &[file.clone()]).unwrap() else {
+            panic!("READ did not call the dataset provider");
+        };
+        assert!(matches!(
+            read.request,
+            HostRequest::Dataset(DatasetRequest::ReadNext { ref cursor, .. })
+                if cursor == "empty-cursor"
+        ));
+        machine
+            .resume_host(EffectResult {
+                sequence: read.sequence,
+                outcome: Ok(HostResult::Dataset(DatasetResult::Browse {
+                    cursor: cursor.clone(),
+                    record: None,
+                    identity: None,
+                    key: None,
+                })),
+            })
+            .unwrap();
+        assert_eq!(machine.last_file_status, "10");
+        let Step::Effect(close) = machine.dataset_effect("close", &[file]).unwrap() else {
+            panic!("CLOSE did not call the dataset provider");
+        };
+        assert!(matches!(
+            close.request,
+            HostRequest::Dataset(DatasetRequest::Close { ref cursor, .. })
+                if cursor.as_deref() == Some("empty-cursor")
+        ));
+        machine
+            .resume_host(EffectResult {
+                sequence: close.sequence,
+                outcome: Ok(HostResult::Dataset(DatasetResult::Browse {
+                    cursor,
+                    record: None,
+                    identity: None,
+                    key: None,
+                })),
+            })
+            .unwrap();
+        assert_eq!(machine.last_file_status, "00");
+    }
+
+    #[test]
     fn hello_executes_in_bounded_quanta() {
         let mut m =
             ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
