@@ -1,10 +1,23 @@
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsFileDefinition {
+    pub dataset: DatasetName,
+    pub ccsid: Option<u16>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(in crate::service) struct DurableFileStatus {
+    pub(in crate::service) status: CicsFileStatus,
+    pub(in crate::service) version: u64,
+}
+
 #[cfg(feature = "fault-injection")]
 use super::super::CicsFileFaultPoint;
 use super::super::{
-    CicsFileStatus, CicsService, DatasetUndo, DurableFileStatus, Run, access_for, argument_bytes,
-    argument_optional, argument_text, bounded, decode_dataset_bytes, encode_dataset_bytes,
-    encode_file_status, nested_mutation, normalize_terminal_name, store_error,
+    CicsFileStatus, CicsService, DatasetUndo, Run, argument_bytes, argument_optional,
+    argument_text, bounded, decode_dataset_bytes, encode_dataset_bytes, encode_file_status,
+    nested_mutation, normalize_terminal_name, store_error,
 };
+use super::file_tokens::{self, FileUpdateToken};
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, DatasetName, DatasetRequest,
     DatasetResult, HostProblem, HostRequest, HostResult, MemberName, RecordFormat,
@@ -26,7 +39,9 @@ pub(in crate::service) fn invoke(
         | CicsOperation::StartBrowse
         | CicsOperation::ReadNext
         | CicsOperation::ReadPrev
+        | CicsOperation::ResetBrowse
         | CicsOperation::EndBrowse => file(service, run, request),
+        CicsOperation::Unlock => super::file_unlock::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -159,6 +174,31 @@ fn file(
         }
     }
     let definition = {
+        let state = service.lock()?;
+        state.file_aliases.get(&logical_name).cloned()
+    };
+    let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
+    let name = definition
+        .map(|definition| definition.dataset.as_str().to_string())
+        .unwrap_or_else(|| logical_name.clone());
+    let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
+    let dataset_key = dataset.as_str().to_string();
+    service
+        .authorize(
+            run,
+            "DATASET",
+            dataset.as_str(),
+            super::super::access_for(request.operation),
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized => HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            },
+            other => other,
+        })?;
+    {
         let mut state = service.lock()?;
         match state.file_statuses.get(&logical_name).copied() {
             Some(DurableFileStatus {
@@ -217,29 +257,7 @@ fn file(
             })
             | None => {}
         }
-        state.file_aliases.get(&logical_name).cloned()
-    };
-    let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
-    let name = definition
-        .map(|definition| definition.dataset.as_str().to_string())
-        .unwrap_or_else(|| logical_name.clone());
-    let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
-    let dataset_key = dataset.as_str().to_string();
-    service
-        .authorize(
-            run,
-            "DATASET",
-            dataset.as_str(),
-            access_for(request.operation),
-        )
-        .map_err(|problem| match problem {
-            HostProblem::Unauthorized => HostProblem::Condition {
-                name: "NOTAUTH".into(),
-                response: 70,
-                response2: 101,
-            },
-            other => other,
-        })?;
+    }
     let length = decimal_argument(request, "LENGTH")?;
     let key_length = signed_decimal_argument(request, "KEYLENGTH")?;
     let attributes = if (length.is_some()
@@ -255,6 +273,7 @@ fn file(
                 | CicsOperation::Rewrite
                 | CicsOperation::Delete
                 | CicsOperation::StartBrowse
+                | CicsOperation::ResetBrowse
                 | CicsOperation::ReadNext
                 | CicsOperation::ReadPrev
         ) {
@@ -308,6 +327,40 @@ fn file(
     let member = argument_optional(request, "MEMBER")
         .map(|name| MemberName::new(name, 8).map_err(|_| HostProblem::Malformed))
         .transpose()?;
+    let token_id = if matches!(
+        request.operation,
+        CicsOperation::Rewrite | CicsOperation::Delete
+    ) {
+        file_tokens::argument(request)?
+    } else {
+        None
+    };
+    if token_id.is_some() && request.arguments.contains_key("RIDFLD") {
+        return Err(HostProblem::Malformed);
+    }
+    let token_hold = token_id
+        .map(|id| file_tokens::held(run, id, &dataset_key).cloned())
+        .transpose()?;
+    let token_output = request.arguments.contains_key("TOKEN")
+        && matches!(
+            request.operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        );
+    let update_requested = token_output || request.arguments.contains_key("OPTION.UPDATE");
+    if update_requested
+        && !token_output
+        && matches!(
+            request.operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        )
+        && run.current_records.contains_key(&dataset_key)
+    {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 28,
+        });
+    }
     let pending_undo = match request.operation {
         CicsOperation::Write => argument_bytes(request, "RIDFLD")
             .map(|key| encode_dataset_bytes(ccsid, &key))
@@ -317,16 +370,27 @@ fn file(
                 key,
             }),
         CicsOperation::Rewrite | CicsOperation::Delete => {
-            let key = argument_bytes(request, "RIDFLD")
-                .map(|value| encode_dataset_bytes(ccsid, &value))
-                .transpose()?
-                .or_else(|| run.current_records.get(&dataset_key).cloned());
-            key.zip(run.current_record_values.get(&dataset_key).cloned())
-                .map(|(key, record)| DatasetUndo::Restore {
-                    dataset: dataset.clone(),
-                    key,
-                    record,
-                })
+            let key = token_hold
+                .as_ref()
+                .map(|hold| hold.identity.clone())
+                .or(argument_bytes(request, "RIDFLD")
+                    .map(|value| encode_dataset_bytes(ccsid, &value))
+                    .transpose()?
+                    .or_else(|| run.current_records.get(&dataset_key).cloned()));
+            let previous = token_hold
+                .as_ref()
+                .map(|hold| hold.record.clone())
+                .or_else(|| {
+                    run.file_updates
+                        .current_record_values
+                        .get(&dataset_key)
+                        .cloned()
+                });
+            key.zip(previous).map(|(key, record)| DatasetUndo::Restore {
+                dataset: dataset.clone(),
+                key,
+                record,
+            })
         }
         _ => None,
     };
@@ -383,9 +447,9 @@ fn file(
                 .checked_add(1)
                 .ok_or(HostProblem::ResourceExhausted)?;
             let mutation = nested_mutation(run, sequence)?;
-            let key = argument_bytes(request, "RIDFLD")
-                .map(|value| encode_dataset_bytes(ccsid, &value))
-                .transpose()?
+            let key = token_hold
+                .as_ref()
+                .map(|hold| hold.identity.clone())
                 .or_else(|| run.current_records.get(&dataset_key).cloned())
                 .ok_or_else(|| HostProblem::Condition {
                     name: "INVREQ".into(),
@@ -408,9 +472,12 @@ fn file(
                 .checked_add(1)
                 .ok_or(HostProblem::ResourceExhausted)?;
             let mutation = nested_mutation(run, sequence)?;
-            let key = argument_bytes(request, "RIDFLD")
-                .map(|value| encode_dataset_bytes(ccsid, &value))
-                .transpose()?
+            let key = token_hold
+                .as_ref()
+                .map(|hold| hold.identity.clone())
+                .or(argument_bytes(request, "RIDFLD")
+                    .map(|value| encode_dataset_bytes(ccsid, &value))
+                    .transpose()?)
                 .or_else(|| run.current_records.get(&dataset_key).cloned())
                 .ok_or_else(|| HostProblem::Condition {
                     name: "INVREQ".into(),
@@ -441,27 +508,34 @@ fn file(
                 mainframe_env_host_api::KeyRelation::GreaterOrEqual
             },
         },
+        CicsOperation::ResetBrowse => {
+            let cursor = owned_browse_cursor(run, request, &dataset_key, 36)?;
+            DatasetRequest::ResetBrowse {
+                dataset: dataset.clone(),
+                cursor,
+                key: encode_dataset_bytes(
+                    ccsid,
+                    &truncate_key(
+                        argument_bytes(request, "RIDFLD").ok_or(HostProblem::Malformed)?,
+                        key_length,
+                    )?,
+                )?,
+                relation: if !gteq && !generic {
+                    mainframe_env_host_api::KeyRelation::Equal
+                } else {
+                    mainframe_env_host_api::KeyRelation::GreaterOrEqual
+                },
+            }
+        }
         CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
             dataset: dataset.clone(),
-            cursor: argument_optional(request, "CURSOR")
-                .or_else(|| run.browses.get(&dataset_key).cloned())
-                .ok_or_else(|| HostProblem::Condition {
-                    name: "INVREQ".into(),
-                    response: 16,
-                    response2: 0,
-                })?,
+            cursor: owned_browse_cursor(run, request, &dataset_key, 0)?,
             reverse: request.operation == CicsOperation::ReadPrev,
             control: Default::default(),
         },
         CicsOperation::EndBrowse => DatasetRequest::EndBrowse {
             dataset: dataset.clone(),
-            cursor: argument_optional(request, "CURSOR")
-                .or_else(|| run.browses.get(&dataset_key).cloned())
-                .ok_or_else(|| HostProblem::Condition {
-                    name: "INVREQ".into(),
-                    response: 16,
-                    response2: 0,
-                })?,
+            cursor: owned_browse_cursor(run, request, &dataset_key, 0)?,
         },
         _ => return Err(HostProblem::Malformed),
     };
@@ -477,7 +551,9 @@ fn file(
     if service.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterIntent)? {
         return Err(HostProblem::InfrastructureFailure);
     }
-    if operation == CicsOperation::StartBrowse && generic && equal {
+    if (operation == CicsOperation::StartBrowse && generic && equal)
+        || (operation == CicsOperation::ResetBrowse && generic && !gteq)
+    {
         let key = argument_bytes(request, "RIDFLD")
             .map(|value| truncate_key(value, key_length))
             .transpose()?
@@ -485,7 +561,7 @@ fn file(
             .transpose()?
             .ok_or(HostProblem::Malformed)?;
         read_relational(service, run, dataset.clone(), key, true)
-            .map_err(|problem| normalize_file_not_found(CicsOperation::StartBrowse, problem))?;
+            .map_err(|problem| normalize_file_not_found(operation, problem))?;
     }
     let result = if operation == CicsOperation::Read && (gteq || generic) {
         let key = argument_bytes(request, "RIDFLD")
@@ -500,22 +576,33 @@ fn file(
     }
     .map_err(|problem| normalize_file_not_found(operation, problem))?;
     let mut browse_key = None;
+    let mut issued_token = None;
     let mut payload = match result {
         HostResult::Dataset(DatasetResult::Records {
             records,
             identities,
             ..
         }) => {
-            if request.arguments.contains_key("OPTION.UPDATE")
-                && let Some(identity) = identities.first()
-            {
-                run.current_records
-                    .insert(dataset_key.clone(), identity.clone());
-            }
             let record = records.into_iter().next().unwrap_or_default();
-            if request.arguments.contains_key("OPTION.UPDATE") {
-                run.current_record_values
-                    .insert(dataset_key.clone(), record.clone());
+            if update_requested && let Some(identity) = identities.first() {
+                if token_output {
+                    issued_token = Some(file_tokens::issue(
+                        service,
+                        run,
+                        FileUpdateToken {
+                            dataset: dataset_key.clone(),
+                            identity: identity.clone(),
+                            record: record.clone(),
+                            browse_cursor: None,
+                        },
+                    )?);
+                } else {
+                    run.current_records
+                        .insert(dataset_key.clone(), identity.clone());
+                    run.file_updates
+                        .current_record_values
+                        .insert(dataset_key.clone(), record.clone());
+                }
             }
             decode_dataset_bytes(ccsid, &record)?
         }
@@ -526,15 +613,18 @@ fn file(
             key,
         }) => {
             if operation == CicsOperation::StartBrowse {
-                run.browses.insert(dataset_key.clone(), cursor);
+                run.browses.insert(dataset_key.clone(), cursor.clone());
+            } else if operation == CicsOperation::ResetBrowse {
+                run.current_records.remove(&dataset_key);
+                run.file_updates.current_record_values.remove(&dataset_key);
+                file_tokens::invalidate_dataset(run, &dataset_key);
             } else if operation == CicsOperation::EndBrowse {
                 run.browses.remove(&dataset_key);
                 run.current_records.remove(&dataset_key);
-            }
-            if request.arguments.contains_key("OPTION.UPDATE")
-                && let Some(identity) = identity
-            {
-                run.current_records.insert(dataset_key.clone(), identity);
+                run.file_updates.current_record_values.remove(&dataset_key);
+                file_tokens::invalidate_browse(run, &dataset_key, &cursor);
+            } else if matches!(operation, CicsOperation::ReadNext | CicsOperation::ReadPrev) {
+                file_tokens::invalidate_browse(run, &dataset_key, &cursor);
             }
             browse_key = key
                 .map(|key| decode_dataset_bytes(ccsid, &key))
@@ -549,9 +639,27 @@ fn file(
                 });
             }
             let record = record.unwrap_or_default();
-            if !record.is_empty() && request.arguments.contains_key("OPTION.UPDATE") {
-                run.current_record_values
-                    .insert(dataset_key.clone(), record.clone());
+            if !record.is_empty()
+                && update_requested
+                && let Some(identity) = identity
+            {
+                if token_output {
+                    issued_token = Some(file_tokens::issue(
+                        service,
+                        run,
+                        FileUpdateToken {
+                            dataset: dataset_key.clone(),
+                            identity,
+                            record: record.clone(),
+                            browse_cursor: Some(cursor.clone()),
+                        },
+                    )?);
+                } else {
+                    run.current_records.insert(dataset_key.clone(), identity);
+                    run.file_updates
+                        .current_record_values
+                        .insert(dataset_key.clone(), record.clone());
+                }
             }
             decode_dataset_bytes(ccsid, &record)?
         }
@@ -560,18 +668,12 @@ fn file(
     };
     let actual_length = apply_read_length(operation, length, &mut payload, &mut length_condition)?;
     if matches!(operation, CicsOperation::Delete | CicsOperation::Rewrite) {
-        run.current_records.remove(&dataset_key);
-        run.current_record_values.remove(&dataset_key);
-    } else if operation == CicsOperation::Write
-        && let Some(identity) = argument_bytes(request, "RIDFLD")
-    {
-        run.current_records
-            .insert(dataset_key.clone(), encode_dataset_bytes(ccsid, &identity)?);
-    }
-    if let Some(record) = mutated_record
-        && operation != CicsOperation::Rewrite
-    {
-        run.current_record_values.insert(dataset_key, record);
+        if let Some(token) = token_id {
+            file_tokens::consume(run, token, &dataset_key)?;
+        } else if operation == CicsOperation::Rewrite || !request.arguments.contains_key("RIDFLD") {
+            run.current_records.remove(&dataset_key);
+            run.file_updates.current_record_values.remove(&dataset_key);
+        }
     }
     let (condition, response_code, response2) = length_condition.unwrap_or(("NORMAL", 0, 0));
     let mut response = service.response(
@@ -586,6 +688,12 @@ fn file(
     )?;
     if let Some(key) = browse_key {
         response.outputs.insert("RIDFLD".into(), bounded(key)?);
+    }
+    if let Some(token) = issued_token {
+        response.outputs.insert(
+            "TOKEN".into(),
+            super::super::decimal_payload(i64::from(token))?,
+        );
     }
     if matches!(
         operation,
@@ -683,17 +791,42 @@ fn truncate_key(mut value: Vec<u8>, key_length: Option<i32>) -> Result<Vec<u8>, 
     Ok(value)
 }
 
+fn owned_browse_cursor(
+    run: &Run,
+    request: &CicsRequest,
+    dataset_key: &str,
+    response2: i32,
+) -> Result<String, HostProblem> {
+    let cursor = run
+        .browses
+        .get(dataset_key)
+        .ok_or_else(|| HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2,
+        })?;
+    if argument_optional(request, "CURSOR").is_some_and(|requested| requested.as_str() != cursor) {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2,
+        });
+    }
+    Ok(cursor.clone())
+}
+
 fn normalize_file_not_found(operation: CicsOperation, problem: HostProblem) -> HostProblem {
     match (operation, problem) {
-        (CicsOperation::Read | CicsOperation::StartBrowse, HostProblem::NotFound) => {
-            HostProblem::Condition {
-                name: "NOTFND".into(),
-                response: 13,
-                response2: 80,
-            }
-        }
         (
-            CicsOperation::Read | CicsOperation::StartBrowse,
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse,
+            HostProblem::NotFound,
+        ) => HostProblem::Condition {
+            name: "NOTFND".into(),
+            response: 13,
+            response2: 80,
+        },
+        (
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse,
             HostProblem::Condition {
                 name, response: 13, ..
             },
@@ -714,7 +847,10 @@ fn validate_key_length(
     gteq: bool,
 ) -> Result<(), HostProblem> {
     if generic {
-        if !matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) {
+        if !matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse
+        ) {
             return Err(HostProblem::Malformed);
         }
         let key_length = key_length.ok_or(HostProblem::Malformed)?;
@@ -744,8 +880,10 @@ fn validate_key_length(
         }
         return Ok(());
     }
-    if matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse)
-        && gteq
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse
+    ) && gteq
         && key_length == Some(0)
     {
         return Ok(());
@@ -756,6 +894,7 @@ fn validate_key_length(
             | CicsOperation::Write
             | CicsOperation::Delete
             | CicsOperation::StartBrowse
+            | CicsOperation::ResetBrowse
     ) && let Some(key_length) = key_length
         && attributes
             .and_then(|attributes| attributes.key_length)
@@ -776,7 +915,12 @@ fn validate_search_relation(
     equal: bool,
     gteq: bool,
 ) -> Result<(), HostProblem> {
-    if equal && (!matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) || gteq) {
+    if equal
+        && (!matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::StartBrowse | CicsOperation::ResetBrowse
+        ) || gteq)
+    {
         Err(HostProblem::Malformed)
     } else {
         Ok(())

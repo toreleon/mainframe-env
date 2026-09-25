@@ -1,5 +1,9 @@
 use crate::FixedValue;
 use crate::runtime::CobolArithmeticMode;
+use crate::storage64::{
+    Storage64Allocation, Storage64Arena, Storage64Attributes, Storage64Key, Storage64Limits,
+    Storage64Location, Storage64Problem, Storage64Snapshot,
+};
 use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
@@ -26,12 +30,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
+mod amode64_access;
+mod completion;
 mod condition_literals;
 mod corresponding;
 mod decimal_commit;
 mod eib;
 mod layout_admission;
 mod layout_resolution;
+mod snapshot_codec;
 mod typed_cics;
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};
@@ -341,6 +348,7 @@ enum PendingKind {
     },
     Cics {
         operation: CicsOperation,
+        storage64_intent: Option<typed_cics::Storage64Intent>,
         argument_summary: String,
         into: Option<typed_cics::CicsTarget>,
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
@@ -407,6 +415,8 @@ pub struct MachineSnapshot {
     pub linkage_addresses: BTreeMap<String, Option<(usize, usize, usize)>>,
     pub freed_allocations: BTreeSet<usize>,
     pub random_state: Option<u64>,
+    pub storage64: Storage64Snapshot,
+    pub storage64_area_bindings: BTreeMap<String, u64>,
 }
 
 pub type MachineSnapshotSortIo = (
@@ -455,6 +465,8 @@ pub struct ReferenceMachine {
     search_results: BTreeMap<usize, bool>,
     linkage_addresses: BTreeMap<String, Option<StorageView>>,
     freed_allocations: BTreeSet<usize>,
+    storage64: Storage64Arena,
+    storage64_area_bindings: BTreeMap<String, u64>,
     random_state: Cell<Option<u64>>,
     pc: usize,
     output: Vec<u8>,
@@ -476,6 +488,10 @@ impl ReferenceMachine {
         let (bases, views, views_by_id, storage_names_by_id) =
             storage(&module, invocation.limits.max_storage_bytes)?;
         let static_base_count = bases.len();
+        let storage64_limits = Storage64Limits {
+            max_allocations: invocation.limits.max_frames,
+            max_bytes: invocation.limits.max_storage_bytes,
+        };
         let mut entry_initials = BTreeMap::new();
         let entry_commarea_len = invocation
             .bindings
@@ -774,6 +790,8 @@ impl ReferenceMachine {
             search_results: BTreeMap::new(),
             linkage_addresses: BTreeMap::new(),
             freed_allocations: BTreeSet::new(),
+            storage64: Storage64Arena::new(storage64_limits),
+            storage64_area_bindings: BTreeMap::new(),
             random_state: Cell::new(None),
             pc: 0,
             output: Vec::new(),
@@ -847,7 +865,7 @@ impl ReferenceMachine {
     #[must_use]
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 10,
+            schema_version: 12,
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -921,11 +939,13 @@ impl ReferenceMachine {
                 .collect(),
             freed_allocations: self.freed_allocations.clone(),
             random_state: self.random_state.get(),
+            storage64: self.storage64.snapshot(),
+            storage64_area_bindings: self.storage64_area_bindings.clone(),
         }
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
-        if !matches!(snapshot.schema_version, 1..=10)
+        if !matches!(snapshot.schema_version, 1..=12)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -940,6 +960,33 @@ impl ReferenceMachine {
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
+        let mut restored_storage64 = self.new_storage64_arena();
+        self.restore_storage64_snapshot(&mut restored_storage64, &snapshot)?;
+        let base_used = snapshot
+            .base_storage
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !snapshot.freed_allocations.contains(index))
+            .try_fold(0u64, |total, (_, bytes)| {
+                total.checked_add(bytes.len() as u64)
+            })
+            .ok_or(MachineProblem::IncompatibleSnapshot)?;
+        let live_base_count = (self.static_base_count..snapshot.base_storage.len())
+            .filter(|base| !snapshot.freed_allocations.contains(base))
+            .count();
+        if base_used
+            .checked_add(
+                restored_storage64
+                    .charged_bytes()
+                    .ok_or(MachineProblem::IncompatibleSnapshot)?,
+            )
+            .is_none_or(|total| total > self.invocation.limits.max_storage_bytes)
+            || live_base_count + restored_storage64.live_allocations()
+                > self.invocation.limits.max_frames as usize
+        {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        let area_bindings = self.restore_area64_bindings(&snapshot, &restored_storage64)?;
         self.pc = snapshot.program_counter;
         self.effect_sequence = snapshot.effect_sequence;
         self.executed_steps = if snapshot.schema_version < 6 {
@@ -1116,6 +1163,7 @@ impl ReferenceMachine {
         } else {
             None
         });
+        self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
         self.deferred_drive = None;
         Ok(())
@@ -1134,6 +1182,8 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@8"
                 | "mainframe-env.reference-machine-checkpoint@9"
                 | "mainframe-env.reference-machine-checkpoint@10"
+                | "mainframe-env.reference-machine-checkpoint@11"
+                | "mainframe-env.reference-machine-checkpoint@12"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -1925,6 +1975,7 @@ impl ReferenceMachine {
             (
                 PendingKind::Cics {
                     operation,
+                    storage64_intent,
                     argument_summary: _,
                     into,
                     outputs,
@@ -1936,11 +1987,14 @@ impl ReferenceMachine {
                 HostResult::Cics(response),
             ) => {
                 let responded = response_target.is_some() || no_handle;
-                typed_cics::write_response_state(
+                let load_base = typed_cics::write_response_state(
                     self,
+                    operation,
+                    storage64_intent,
                     response_target.as_ref(),
                     response2_target.as_ref(),
                     address_set.as_ref(),
+                    &outputs,
                     &response,
                 )?;
                 if let Some(target) = into
@@ -1985,51 +2039,11 @@ impl ReferenceMachine {
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
-                    typed_cics::write_output(self, name, target, value)?;
+                    typed_cics::write_output(self, operation, name, target, value, load_base)?;
                 }
                 eib::write_context(self, operation, &response)?;
-                self.deferred_drive = match response.disposition {
-                    CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
-                        MachineDrive::Condition(Condition {
-                            name: response.condition,
-                            response: response.response,
-                            response2: response.response2,
-                            handled: false,
-                        }),
-                    ),
-                    CicsDisposition::Ignored => None,
-                    CicsDisposition::Suspended => Some(typed_cics::suspension(
-                        self,
-                        operation,
-                        response.payload.bytes().len(),
-                    )),
-                    CicsDisposition::Transfer => {
-                        let target = response
-                            .target
-                            .ok_or(MachineProblem::UnexpectedHostResult)?;
-                        Some(MachineDrive::Transfer(Transfer {
-                            selector: Selector::new(target, InvocationLimits::default())
-                                .map_err(|_| MachineProblem::UnexpectedHostResult)?,
-                            payload: response.payload,
-                            replace_frame: true,
-                        }))
-                    }
-                    CicsDisposition::Handler => {
-                        let target = response
-                            .target
-                            .ok_or(MachineProblem::UnexpectedHostResult)?;
-                        self.pc = self
-                            .labels
-                            .get(&normalize(&target))
-                            .copied()
-                            .ok_or(MachineProblem::UnexpectedHostResult)?;
-                        None
-                    }
-                    CicsDisposition::Returned => Some(MachineDrive::Completed(self.complete()?)),
-                    CicsDisposition::Abended => Some(MachineDrive::Abend(
-                        typed_cics::abend_outcome(operation, &response)?,
-                    )),
-                };
+                self.deferred_drive =
+                    typed_cics::drive_response(self, operation, response, responded)?;
             }
             (
                 PendingKind::DatasetRead { .. }
@@ -4928,13 +4942,30 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::InvalidOperation)?
                 .length
         };
-        let allocated_count = self.bases.len().saturating_sub(self.static_base_count);
+        let allocated_count = (self.static_base_count..self.bases.len())
+            .filter(|base| !self.freed_allocations.contains(base))
+            .count();
         let used = self
             .bases
             .iter()
-            .try_fold(0usize, |total, storage| total.checked_add(storage.len()))
+            .enumerate()
+            .filter(|(base, _)| !self.freed_allocations.contains(base))
+            .try_fold(0usize, |total, (_, storage)| {
+                total.checked_add(storage.len())
+            })
             .ok_or(MachineProblem::ResourceExhausted)?;
-        if allocated_count >= self.invocation.limits.max_frames as usize
+        let used = used
+            .checked_add(
+                usize::try_from(
+                    self.storage64
+                        .charged_bytes()
+                        .ok_or(MachineProblem::ResourceExhausted)?,
+                )
+                .map_err(|_| MachineProblem::ResourceExhausted)?,
+            )
+            .ok_or(MachineProblem::ResourceExhausted)?;
+        if allocated_count + self.storage64.live_allocations()
+            >= self.invocation.limits.max_frames as usize
             || used
                 .checked_add(size)
                 .is_none_or(|total| total > self.invocation.limits.max_storage_bytes as usize)
@@ -8320,21 +8351,10 @@ impl ReferenceMachine {
             .copied()
             .ok_or(MachineProblem::UnknownLabel)
     }
-    fn complete(&self) -> Result<Completion, MachineProblem> {
-        let limits = InvocationLimits {
-            max_payload_bytes: self.invocation.limits.max_output_bytes as usize,
-            ..InvocationLimits::default()
-        };
-        Ok(Completion {
-            return_code: match self.implicit.get("RETURN-CODE") {
-                Some(CobolValue::Decimal(value)) if value.scale == 0 => {
-                    i32::try_from(value.coefficient).map_err(|_| MachineProblem::SizeError)?
-                }
-                _ => 0,
-            },
-            output: BoundedPayload::new("mainframe-env.output@1", self.output.clone(), limits)
-                .map_err(|_| MachineProblem::ResourceExhausted)?,
-        })
+    fn release_storage64_task(&mut self) {
+        self.storage64
+            .end_task(self.invocation.run_unit_id.as_str());
+        self.retain_storage64_task_bindings();
     }
 }
 
@@ -8382,12 +8402,14 @@ impl Machine for ReferenceMachine {
                 MachineResume::Start if self.pending.is_none() => {}
                 MachineResume::HostResult(result) => self.resume_host(result)?,
                 MachineResume::Cancelled => {
+                    self.release_storage64_task();
                     return Ok(failure_drive(
                         FailureCategory::Cancelled,
                         "execution cancelled",
                     ));
                 }
                 MachineResume::TimedOut => {
+                    self.release_storage64_task();
                     return Ok(failure_drive(
                         FailureCategory::TimedOut,
                         "execution timed out",
@@ -8467,9 +8489,9 @@ impl Machine for ReferenceMachine {
         if self.pending.is_some() {
             return None;
         }
-        let bytes = encode_snapshot(&self.snapshot())?;
+        let bytes = snapshot_codec::encode_snapshot(&self.snapshot())?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@10",
+            "mainframe-env.reference-machine-checkpoint@12",
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -8491,8 +8513,22 @@ impl Machine for ReferenceMachine {
     }
 }
 
-fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0010".to_vec();
+fn push_bytes(output: &mut Vec<u8>, value: &[u8]) -> Option<()> {
+    output.extend_from_slice(&u64::try_from(value.len()).ok()?.to_be_bytes());
+    output.extend_from_slice(value);
+    Some(())
+}
+
+fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
+    output.extend_from_slice(&u32::try_from(values.len()).ok()?.to_be_bytes());
+    for value in values {
+        push_bytes(output, value.as_bytes())?;
+    }
+    Some(())
+}
+
+pub(super) fn encode_snapshot_prefix(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
+    let mut bytes = b"MECP0012".to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -8523,163 +8559,7 @@ fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         push_bytes(&mut bytes, from.as_bytes())?;
         push_bytes(&mut bytes, to.as_bytes())?;
     }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.loop_reentry.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for node in &snapshot.loop_reentry {
-        bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.loop_counts.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (node, count) in &snapshot.loop_counts {
-        bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
-        bytes.extend_from_slice(&count.to_be_bytes());
-    }
-    push_bytes(&mut bytes, snapshot.last_file_status.as_bytes())?;
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.dataset_cursors.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (dataset, cursor) in &snapshot.dataset_cursors {
-        push_bytes(&mut bytes, dataset.as_bytes())?;
-        push_bytes(&mut bytes, cursor.as_bytes())?;
-    }
-    bytes.push(snapshot.condition_statuses);
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.dynamic_lengths.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (name, length) in &snapshot.dynamic_lengths {
-        push_bytes(&mut bytes, name.as_bytes())?;
-        bytes.extend_from_slice(&u64::try_from(*length).ok()?.to_be_bytes());
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.implicit_values.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (name, value) in &snapshot.implicit_values {
-        push_bytes(&mut bytes, name.as_bytes())?;
-        match value {
-            MachineSnapshotValue::Bytes(value) => {
-                bytes.push(0);
-                push_bytes(&mut bytes, value)?;
-            }
-            MachineSnapshotValue::Decimal { coefficient, scale } => {
-                bytes.push(1);
-                bytes.extend_from_slice(&coefficient.to_be_bytes());
-                bytes.extend_from_slice(&scale.to_be_bytes());
-            }
-        }
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.search_results.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (node, found) in &snapshot.search_results {
-        bytes.extend_from_slice(&u64::try_from(*node).ok()?.to_be_bytes());
-        bytes.push(u8::from(*found));
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.sql_cursors.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (name, values) in &snapshot.sql_cursors {
-        push_bytes(&mut bytes, name.as_bytes())?;
-        push_string_list(&mut bytes, values)?;
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.sort_workspaces.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (name, (records, cursor)) in &snapshot.sort_workspaces {
-        push_bytes(&mut bytes, name.as_bytes())?;
-        bytes.extend_from_slice(&u64::try_from(*cursor).ok()?.to_be_bytes());
-        bytes.extend_from_slice(&u32::try_from(records.len()).ok()?.to_be_bytes());
-        for record in records {
-            push_bytes(&mut bytes, record)?;
-        }
-    }
-    match &snapshot.active_sort_procedure {
-        Some((sort_pc, sort_file, phase, arguments)) => {
-            bytes.push(1);
-            bytes.extend_from_slice(&u64::try_from(*sort_pc).ok()?.to_be_bytes());
-            push_bytes(&mut bytes, sort_file.as_bytes())?;
-            bytes.push(*phase);
-            push_string_list(&mut bytes, arguments)?;
-        }
-        None => bytes.push(0),
-    }
-    match &snapshot.sort_io {
-        Some((sort_pc, sort_file, arguments, inputs, outputs, next_input, next_output)) => {
-            bytes.push(1);
-            bytes.extend_from_slice(&u64::try_from(*sort_pc).ok()?.to_be_bytes());
-            push_bytes(&mut bytes, sort_file.as_bytes())?;
-            push_string_list(&mut bytes, arguments)?;
-            push_string_list(&mut bytes, inputs)?;
-            push_string_list(&mut bytes, outputs)?;
-            bytes.extend_from_slice(&u64::try_from(*next_input).ok()?.to_be_bytes());
-            bytes.extend_from_slice(&u64::try_from(*next_output).ok()?.to_be_bytes());
-        }
-        None => bytes.push(0),
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.linkage_addresses.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for (name, view) in &snapshot.linkage_addresses {
-        push_bytes(&mut bytes, name.as_bytes())?;
-        match view {
-            Some((base, offset, length)) => {
-                bytes.push(1);
-                bytes.extend_from_slice(&u64::try_from(*base).ok()?.to_be_bytes());
-                bytes.extend_from_slice(&u64::try_from(*offset).ok()?.to_be_bytes());
-                bytes.extend_from_slice(&u64::try_from(*length).ok()?.to_be_bytes());
-            }
-            None => bytes.push(0),
-        }
-    }
-    bytes.extend_from_slice(
-        &u32::try_from(snapshot.freed_allocations.len())
-            .ok()?
-            .to_be_bytes(),
-    );
-    for base in &snapshot.freed_allocations {
-        bytes.extend_from_slice(&u64::try_from(*base).ok()?.to_be_bytes());
-    }
-    match snapshot.random_state {
-        Some(state) => {
-            bytes.push(1);
-            bytes.extend_from_slice(&state.to_be_bytes());
-        }
-        None => bytes.push(0),
-    }
     Some(bytes)
-}
-
-fn push_bytes(output: &mut Vec<u8>, value: &[u8]) -> Option<()> {
-    output.extend_from_slice(&u64::try_from(value.len()).ok()?.to_be_bytes());
-    output.extend_from_slice(value);
-    Some(())
-}
-
-fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
-    output.extend_from_slice(&u32::try_from(values.len()).ok()?.to_be_bytes());
-    for value in values {
-        push_bytes(output, value.as_bytes())?;
-    }
-    Some(())
 }
 
 fn decode_snapshot(
@@ -8701,6 +8581,8 @@ fn decode_snapshot(
         b"MECP0008" => 8,
         b"MECP0009" => 9,
         b"MECP0010" => 10,
+        b"MECP0011" => 11,
+        b"MECP0012" => 12,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -9025,6 +8907,12 @@ fn decode_snapshot(
             _ => return Err(MachineProblem::IncompatibleSnapshot),
         };
     }
+    let (storage64, storage64_area_bindings) = snapshot_codec::decode_storage64(
+        &mut input,
+        header_version,
+        max_frames,
+        &mut remaining_storage,
+    )?;
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -9052,6 +8940,8 @@ fn decode_snapshot(
         linkage_addresses,
         freed_allocations,
         random_state,
+        storage64,
+        storage64_area_bindings,
     })
 }
 
@@ -12631,7 +12521,7 @@ mod tests {
         )
         .unwrap()
     }
-    fn binary() -> Vec<u8> {
+    pub(super) fn binary() -> Vec<u8> {
         let mut b = ModuleBuilder::new(IrLimits::default());
         let s = b.add_storage("msg", 5, None).unwrap();
         let r = b.add_region().unwrap();
@@ -12731,7 +12621,7 @@ mod tests {
         let checkpoint = first.checkpoint().unwrap();
         assert_eq!(
             checkpoint.schema(),
-            "mainframe-env.reference-machine-checkpoint@10"
+            "mainframe-env.reference-machine-checkpoint@12"
         );
         let mut restored =
             ReferenceMachine::from_binary(&binary(), test_invocation, CodecLimits::default())
@@ -12746,7 +12636,7 @@ mod tests {
         let restored_done = restored.drive(MachineResume::Start, Quantum::new(100, 1024).unwrap());
         assert_eq!(first_done, restored_done);
 
-        let mut version_nine = checkpoint.bytes()[..checkpoint.bytes().len() - 9].to_vec();
+        let mut version_nine = checkpoint.bytes()[..checkpoint.bytes().len() - 37].to_vec();
         version_nine[..8].copy_from_slice(b"MECP0009");
         version_nine[8..12].copy_from_slice(&9u32.to_be_bytes());
         let version_nine = BoundedPayload::new(
@@ -12832,6 +12722,78 @@ mod tests {
         assert_eq!(migrated.pc, snapshot.program_counter);
         assert_eq!(migrated.bases, snapshot.base_storage);
         assert!(migrated.sort_workspaces.is_empty());
+    }
+
+    #[test]
+    fn checkpoint_preserves_disjoint_storage64_identity_and_rejects_cross_width_decode() {
+        let limits = CodecLimits::default();
+        let binary = binary();
+        let mut machine = ReferenceMachine::from_binary(&binary, invocation(), limits).unwrap();
+        let attributes = Storage64Attributes {
+            location: Storage64Location::AboveBar,
+            key: Storage64Key::User,
+            shared: false,
+            executable: false,
+        };
+        let address = machine.storage64.allocate("run", 17, attributes).unwrap();
+        assert_eq!(
+            machine.decode_address(&address.to_be_bytes()),
+            Err(MachineProblem::DataException)
+        );
+        let checkpoint = machine.checkpoint().unwrap();
+        assert_eq!(
+            checkpoint.schema(),
+            "mainframe-env.reference-machine-checkpoint@12"
+        );
+        let mut previous_bytes = checkpoint.bytes()[..checkpoint.bytes().len() - 4].to_vec();
+        previous_bytes[..8].copy_from_slice(b"MECP0011");
+        previous_bytes[8..12].copy_from_slice(&11u32.to_be_bytes());
+        let previous = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@11",
+            previous_bytes,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut migrated = ReferenceMachine::from_binary(&binary, invocation(), limits).unwrap();
+        migrated.restore_checkpoint(&previous).unwrap();
+        assert_eq!(migrated.storage64.get(address).unwrap().bytes.len(), 17);
+        let mut restored = ReferenceMachine::from_binary(&binary, invocation(), limits).unwrap();
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(restored.storage64.get(address).unwrap().bytes.len(), 17);
+        restored
+            .storage64
+            .release(address, "run", Storage64Key::User)
+            .unwrap();
+        assert!(restored.storage64.get(address).is_none());
+        let next = restored.storage64.allocate("run", 17, attributes).unwrap();
+        assert_ne!(address, next);
+        let reopened = restored.checkpoint().unwrap();
+        let mut restored_again =
+            ReferenceMachine::from_binary(&binary, invocation(), limits).unwrap();
+        restored_again.restore_checkpoint(&reopened).unwrap();
+        assert!(restored_again.storage64.get(address).is_none());
+        assert_eq!(restored_again.storage64.get(next).unwrap().bytes.len(), 17);
+    }
+
+    #[test]
+    fn storage64_cancellation_and_deadline_discard_private_allocations() {
+        let attributes = Storage64Attributes {
+            location: Storage64Location::AboveBar,
+            key: Storage64Key::User,
+            shared: false,
+            executable: false,
+        };
+        for resume in [MachineResume::Cancelled, MachineResume::TimedOut] {
+            let mut machine =
+                ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default())
+                    .unwrap();
+            let address = machine.storage64.allocate("run", 1, attributes).unwrap();
+            assert!(matches!(
+                machine.drive(resume, Quantum::new(1, 1024).unwrap()),
+                MachineDrive::Failed(_)
+            ));
+            assert!(machine.storage64.get(address).is_none());
+        }
     }
     #[test]
     fn cics_tokens_lower_to_named_typed_arguments() {

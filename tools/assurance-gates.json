@@ -26,6 +26,16 @@
         "corpus": "fuzz/corpus/ir_decoder",
         "name": "ir_decoder",
         "source": "fuzz/fuzz_targets/ir_decoder.rs"
+      },
+      {
+        "corpus": "fuzz/corpus/cics_source_parser",
+        "name": "cics_source_parser",
+        "source": "fuzz/fuzz_targets/cics_source_parser.rs"
+      },
+      {
+        "corpus": "fuzz/corpus/cics_plan_decoder",
+        "name": "cics_plan_decoder",
+        "source": "fuzz/fuzz_targets/cics_plan_decoder.rs"
       }
     ],
     "tool": "cargo-fuzz",
@@ -33,7 +43,7 @@
     "toolchain": "nightly-2026-09-01"
   },
   "model": {
-    "minimum_tests": 3,
+    "minimum_tests": 5,
     "package": "mainframe-env-store-api",
     "test_name": "loom_durable_state",
     "test_target": "crates/contracts/mainframe-env-store-api/tests/loom_durable_state.rs",

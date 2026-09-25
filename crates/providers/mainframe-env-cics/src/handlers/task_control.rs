@@ -92,7 +92,7 @@ pub(in crate::service) fn new_run_with_state(
         latest_abend,
         retrieve: seed.retrieve,
         current_records: BTreeMap::new(),
-        current_record_values: BTreeMap::new(),
+        file_updates: Default::default(),
         undo: seed.undo,
         undo_version: seed.undo_version,
         browses: BTreeMap::new(),
@@ -124,7 +124,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECSB".to_vec();
+    let mut out = b"MECSC".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -200,6 +200,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
             .unwrap_or("")
             .as_bytes(),
     )?;
+    super::encode_terminal_identity(&mut out, &session.terminal_identity)?;
     Ok(out)
 }
 
@@ -248,7 +249,9 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
         CicsOperation::Freemain => super::storage_control::invoke(service, run, request),
+        CicsOperation::Freemain64 => super::storage_control::invoke(service, run, request),
         CicsOperation::Getmain => super::storage_control::invoke(service, run, request),
+        CicsOperation::Getmain64 => super::storage_control::invoke(service, run, request),
         CicsOperation::HandleAid => handle_aid(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
         CicsOperation::IgnoreCondition => ignore_condition(service, run, request),
@@ -261,6 +264,9 @@ pub(in crate::service) fn invoke(
             set_association_user_corr_data(service, run, request)
         }
         CicsOperation::Suspend => suspend(service, run, request),
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
+            super::task_wait::invoke(service, run, request)
+        }
         CicsOperation::Abend => abend(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }

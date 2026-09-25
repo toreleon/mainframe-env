@@ -1,0 +1,86 @@
+//! Executable descriptors for the sealed miscellaneous CICS rows.
+
+use super::*;
+
+pub(super) const MISC_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 10] = [
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ConvertTime,
+        namespace: "cics.time",
+        name: "convert-time",
+        major: 1,
+        effects: FORMAT_TIME_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::BifDeedit,
+        namespace: "cics.builtin",
+        name: "deedit",
+        major: 1,
+        effects: BUILTIN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::BifDigest,
+        namespace: "cics.builtin",
+        name: "digest",
+        major: 1,
+        effects: BUILTIN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WaitCics,
+        namespace: "cics.task",
+        name: "wait-cics",
+        major: 1,
+        effects: WAIT_EVENT_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Post,
+        namespace: "cics.interval",
+        name: "post",
+        major: 1,
+        effects: START_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WriteOperator,
+        namespace: "cics.operator",
+        name: "write-operator",
+        major: 1,
+        effects: OPERATOR_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ExtractCertificate,
+        namespace: "cics.network",
+        name: "extract-certificate",
+        major: 1,
+        effects: ASSIGN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ExtractTcpip,
+        namespace: "cics.network",
+        name: "extract-tcpip",
+        major: 1,
+        effects: ASSIGN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::StartAttach,
+        namespace: "cics.interval",
+        name: "start-attach",
+        major: 1,
+        effects: START_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::StartBrexit,
+        namespace: "cics.interval",
+        name: "start-brexit",
+        major: 1,
+        effects: START_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+];

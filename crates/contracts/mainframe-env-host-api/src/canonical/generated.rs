@@ -1809,9 +1809,9 @@ impl Canonical for DatasetRequest {
                 out.text("key")?;
                 key.encode(out)?;
                 out.text("relation")?;
-                relation.encode(out)?;
-                Ok(())
+                relation.encode(out)
             }
+            Self::ResetBrowse { .. } => browse::encode_browse_request(self, out),
             Self::ReadNext {
                 control,
                 cursor,
@@ -2094,13 +2094,13 @@ impl Canonical for ProgramRequest {
                 receiver.encode(out)?;
                 Ok(())
             }
-            Self::Link { payload, program } => {
-                out.variant("ProgramRequest", "Link", 2)?;
-                out.text("payload")?;
-                payload.encode(out)?;
-                out.text("program")?;
-                program.encode(out)?;
-                Ok(())
+            Self::Link {
+                payload,
+                program,
+                selection,
+            } => {
+                let selection = selection.as_ref();
+                encode_program_link(out, payload, program, selection)
             }
             Self::Xctl { payload, program } => {
                 out.variant("ProgramRequest", "Xctl", 2)?;

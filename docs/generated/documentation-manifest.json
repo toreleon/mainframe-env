@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 194,
+    "markdown_documents": 210,
     "navigation_groups": 5,
-    "normative_documents": 40,
-    "xtask_commands": 191
+    "normative_documents": 53,
+    "xtask_commands": 197
   },
   "documents": [
     {
@@ -17,8 +17,8 @@
     {
       "normative": false,
       "path": "CHANGELOG.md",
-      "relative_links": 2,
-      "sha256": "sha256:cdec556bdaaac1fcdd151a5cfe612eadb5186c646100e60224cd8a4948e4ecc0",
+      "relative_links": 1,
+      "sha256": "sha256:5a6d69bad26b1fb4baef34c2c54c41f154bd0830b9fd3f52ea7aeb18b0f225c9",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -33,8 +33,8 @@
     {
       "normative": false,
       "path": "README.md",
-      "relative_links": 22,
-      "sha256": "sha256:74e372cb62d5a144d24d4fa40aae75d563df14fa64034d4b661883aa2bd6ddaf",
+      "relative_links": 21,
+      "sha256": "sha256:de9b8f1741ef04426a311cc172ed84bdbc04175f32f4f737cd4caa1188573f68",
       "title": "mainframe-env",
       "xtask_commands": 4
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 75,
-      "sha256": "sha256:d9310f21776856f85c1ec27089d15cdfef049c3d6b354204bb9582e074610776",
+      "relative_links": 88,
+      "sha256": "sha256:0944b3a8e5c072a1f5b2a587b4aef982a96531a9cef54d3f9364f4f23d4be332",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -359,12 +359,24 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 22,
+      "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:673ebb93f8db7c9e059be129d17ba21d27b8163afcdf1fdd1fccd44660db3cc0",
+      "sha256": "sha256:4251639af133995505cca70a3d3c92add7bc380169a41bda33b236825bd9ffe5",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider maintainers",
+      "path": "docs/architecture/CICS-TERMINAL-CONTROL.md",
+      "relative_links": 0,
+      "scope": "typed terminal-control routes and durable terminal state",
+      "sha256": "sha256:7109e621d5425b78f3e49d490c7f286ef9714b40567e549e6742d25c161e1656",
+      "status": "Implemented incrementally",
+      "title": "CICS terminal control in the v0.9 typed route",
+      "xtask_commands": 0
     },
     {
       "applies_from": "mainframe-env 0.4.0",
@@ -373,7 +385,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:a5fb31fd477d3da90bb7036056b4be91f87dee6072cd00ffb85be8d09e43129e",
+      "sha256": "sha256:c38a90a4df52113d0495d41d81cbec93f4243271393ccec4600467315a92a8b1",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -597,7 +609,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:28fd33e20bda77796c51533421f036916ff1f1c50f320fc83fa47f511e81ab55",
+      "sha256": "sha256:201cf7656f941ead6975c21971513049cfceda1e549ab9da8853a2e6eaf80608",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -729,7 +741,7 @@
       "path": "docs/decisions/0010-rust-module-review-budgets.md",
       "relative_links": 1,
       "scope": "Rust production-module size, crate facades, generated sources, and CICS family growth",
-      "sha256": "sha256:c8387c5f638bd0454095d669f6ebc3cc8464e70733b27605d67051c4082c6a5d",
+      "sha256": "sha256:c3e0a0039d738a30c6351b0bdead46fec0c353d390b47fb1f486b3fd4a39ad7a",
       "status": "Accepted by repository owner",
       "title": "ADR-0010: Enforce Rust module review budgets and stable split boundaries",
       "xtask_commands": 1
@@ -747,10 +759,154 @@
       "xtask_commands": 1
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and execution maintainers",
+      "path": "docs/decisions/0012-checked-amode64-storage-boundary.md",
+      "relative_links": 0,
+      "scope": "GETMAIN64 and FREEMAIN64 typed IR, host effects, virtual addresses, and checkpoints",
+      "sha256": "sha256:4ad1c12cf41b05ab63873e2b680dbe984c8b86ef6fa05d7c4e3a225b953c4564",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0012: Keep AMODE(64) storage in a checked virtual task arena",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and execution maintainers",
+      "path": "docs/decisions/0013-cics-web-service-control-boundary.md",
+      "relative_links": 1,
+      "scope": "Eight typed web-service-control rows, local service transport, and durable channel state",
+      "sha256": "sha256:3eef96d1a8691d39099c414372db89d28b7d2e6fa3e5544a52ad02fd497ba03a",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0013: Bounded CICS web-service-control authority",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0014-named-counter-authority.md",
+      "relative_links": 1,
+      "scope": "twelve COUNTER and DCOUNTER application rows, typed plans, and durable replay",
+      "sha256": "sha256:0854c20ca051f133f68de15f55f98941dfcbe60b42b00a4400094af76edce4f8",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0014: Keep named counters in one versioned pool authority",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and console maintainers",
+      "path": "docs/decisions/0015-cics-operator-reply-boundary.md",
+      "relative_links": 0,
+      "scope": "WRITE OPERATOR, virtual console ingress, and suspended COBOL tasks",
+      "sha256": "sha256:ab1a3863502974bc0ad8920ebff9740d12dd628750ed0de8a1cc3f4e76cf5e76",
+      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "title": "ADR-0015: Bind CICS operator replies to durable command positions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and network maintainers",
+      "path": "docs/decisions/0016-cics-tcpip-ingress-context.md",
+      "relative_links": 0,
+      "scope": "EXTRACT TCPIP and EXTRACT CERTIFICATE task context",
+      "sha256": "sha256:f6190a6b17425744c4339a929d7cbaf8290c0501b2061de9894cda13ca411cc9",
+      "status": "Accepted for v0.9 development; typed EXTRACT routes executable",
+      "title": "ADR-0016: Keep CICS TCP/IP and certificate facts in trusted ingress context",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS and server maintainers",
+      "path": "docs/decisions/0017-cics-immediate-start-target-authority.md",
+      "relative_links": 0,
+      "scope": "START ATTACH and START BREXIT transaction admission",
+      "sha256": "sha256:88a5fd527dc84e2a69ad2bc503d0a6a54d1e70c796ffe55b8ad606d2e1884448",
+      "status": "Proposed for v0.9 development; command rows pending",
+      "title": "ADR-0017: Resolve immediate START targets from installed durable definitions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS, compiler, and runtime maintainers",
+      "path": "docs/decisions/0018-cics-start-attach-lifetime.md",
+      "relative_links": 0,
+      "scope": "START ATTACH row 0206",
+      "sha256": "sha256:6db692e85b6fe38fb46241ece31f47eb391810a5af2715040352a4866f20e5cf",
+      "status": "Proposed for v0.9 development; FROM route pending",
+      "title": "ADR-0018: Keep START ATTACH work noncancelable and address-bearing",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0019-bts-lifecycle-authority.md",
+      "relative_links": 0,
+      "scope": "shared BTS process/activity state for 23 lifecycle application rows",
+      "sha256": "sha256:963068d0943fc6dd2d2f70a5762ee328699213b7694c2762e20b9ee7565190ba",
+      "status": "Superseded by ADR-0021 after lifecycle and child/LINK integration",
+      "title": "ADR-0019: Shared BTS lifecycle authority",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md",
+      "relative_links": 1,
+      "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
+      "sha256": "sha256:6fdb627d819b8df702dbeddbbff33625c3af8d70bd05f17e8194eab409b4bfc7",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0020: Persist explicit conversation peer frames with protocol state",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0021-conversation-issue-control-staging.md",
+      "relative_links": 2,
+      "scope": "CIC-905 mapped and GDS ISSUE controls",
+      "sha256": "sha256:199326dab8d940d2ba4c007981ca143f6f3e79af29ecd08f1d09ff2d3da89719",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0021: Stage ISSUE controls in the shared conversation ledger",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS terminal and Communications Server adapter maintainers",
+      "path": "docs/decisions/0022-issue-pass-target-handoff.md",
+      "relative_links": 0,
+      "scope": "CIC-905 ISSUE PASS and target CICS EXTRACT LOGONMSG",
+      "sha256": "sha256:86a2ca133a8c7a00f5fe18eef87d64706b872103dd16a75b9a218eaa7feebad1",
+      "status": "Proposed for v0.9 development",
+      "title": "ADR-0022: Retain and claim an ISSUE PASS target handoff",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and execution maintainers",
+      "path": "docs/decisions/0023-bts-lifecycle-authority.md",
+      "relative_links": 0,
+      "scope": "shared BTS process/activity state for 23 lifecycle application rows",
+      "sha256": "sha256:77302cd1e33b09d8a3d9637a1bda063528f1c07e42a88d5b4339b86d89652aeb",
+      "status": "Proposed for the incremental CIC-904.bts-lifecycle slice",
+      "title": "ADR-0023: Shared BTS lifecycle authority",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 11,
-      "sha256": "sha256:6fba710ae25b2fc16ab04d01c471d1d2d3b80a72a61aae5dccf31d11f1f9d352",
+      "relative_links": 23,
+      "sha256": "sha256:41093e342b8888396afeefd30c796f60a85dca2c91b32b26ec817f5a1394d850",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1000,6 +1156,22 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/CIC-906-POSTGRES-VALIDATION.md",
+      "relative_links": 0,
+      "sha256": "sha256:3eb472f090a6822f7b97de8db615b05d9a5f9c2c6e4461ba6667e2ce8bb06f31",
+      "title": "CIC-906 durable-profile validation slice",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/CIC-906-SAF-AUDIT-UNCERTAINTY.md",
+      "relative_links": 0,
+      "sha256": "sha256:1027ac27c6c75c935692f4e6af111a931f5384b2326606a57e9881404e3fb113",
+      "title": "CIC-906 representative SAF, audit, and uncertainty validation",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
       "relative_links": 64,
       "sha256": "sha256:817db9bfc52c077be93dad07f7d8fe897ec1eb2b55fa8eae7dec2375cbbde58f",
@@ -1020,6 +1192,14 @@
       "relative_links": 45,
       "sha256": "sha256:92988c21b60bbfe41e273145c97b0b7f9bc594830e8187ab38e488cffa7cf7ac",
       "title": "IBM coverage release plans",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/cic-906-bounded-validation.md",
+      "relative_links": 1,
+      "sha256": "sha256:d855d43e8511c8bc6734a1d72966e28532c9ff1e3db4170bf80d447077fe60cf",
+      "title": "CIC-906 bounded CICS validation slice",
       "xtask_commands": 0
     },
     {
@@ -1121,10 +1301,10 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 80,
-      "sha256": "sha256:1bcf1e23e6f0f7e35ae8caf6a15d851b2e908df56b5c34b2d44b1cd186485f94",
+      "relative_links": 93,
+      "sha256": "sha256:6dc65ba345c10069d0aa9851ec23fdbe3a61aa642a23399d83a4c7fc9ef287c9",
       "title": "mainframe-env 0.9.0 implementation status",
-      "xtask_commands": 0
+      "xtask_commands": 4
     },
     {
       "normative": false,
@@ -1473,8 +1653,8 @@
     {
       "normative": false,
       "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md",
-      "relative_links": 32,
-      "sha256": "sha256:79da452100f6f938d1ae35cbe4a29fd4adbf6702db210018143712beca3aa526",
+      "relative_links": 31,
+      "sha256": "sha256:f1c07ce882b71239b7603520e42bf4b7779bbd442699617c88c00828e7a35f9a",
       "title": "Pre-0.9.0 deep review",
       "xtask_commands": 5
     },
@@ -1506,9 +1686,9 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 0,
-      "sha256": "sha256:703b73496ea5fa2d24b205df0377b37dd576de76d217283da658ee16fff0b7ff",
+      "sha256": "sha256:c2eae35405b61ce84000117820ec7bd2d030ff1fd7fba4bb6daed0cc42049438",
       "title": "CardDemo operator compatibility",
-      "xtask_commands": 5
+      "xtask_commands": 6
     },
     {
       "normative": false,
@@ -1554,9 +1734,9 @@
       "normative": false,
       "path": "docs/runbooks/cics-licensed-pilot.md",
       "relative_links": 0,
-      "sha256": "sha256:cf0079cf3411b7e91d936f29b405716accee28f25dc45aecf211bd7af765da11",
+      "sha256": "sha256:104f5432499b52a4a6cebab3e42d86d1e96d6416a8e14ed04abbe7451e42765c",
       "title": "Licensed CICS file/UOW pilot handoff",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -1779,6 +1959,10 @@
           "path": "docs/architecture/CICS-COMMAND-ROUTING.md"
         },
         {
+          "label": "CICS terminal control",
+          "path": "docs/architecture/CICS-TERMINAL-CONTROL.md"
+        },
+        {
           "label": "Db2 application catalog",
           "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"
         },
@@ -1866,6 +2050,54 @@
         {
           "label": "ADR-0011: Typed language HIR and semantic IR",
           "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md"
+        },
+        {
+          "label": "ADR-0012: Checked AMODE64 storage boundary",
+          "path": "docs/decisions/0012-checked-amode64-storage-boundary.md"
+        },
+        {
+          "label": "ADR-0013: CICS web service control boundary",
+          "path": "docs/decisions/0013-cics-web-service-control-boundary.md"
+        },
+        {
+          "label": "ADR-0014: Named-counter pool authority",
+          "path": "docs/decisions/0014-named-counter-authority.md"
+        },
+        {
+          "label": "ADR-0015: CICS operator reply boundary",
+          "path": "docs/decisions/0015-cics-operator-reply-boundary.md"
+        },
+        {
+          "label": "ADR-0016: CICS TCP/IP ingress context",
+          "path": "docs/decisions/0016-cics-tcpip-ingress-context.md"
+        },
+        {
+          "label": "ADR-0017: CICS immediate START target authority",
+          "path": "docs/decisions/0017-cics-immediate-start-target-authority.md"
+        },
+        {
+          "label": "ADR-0018: CICS START ATTACH lifetime",
+          "path": "docs/decisions/0018-cics-start-attach-lifetime.md"
+        },
+        {
+          "label": "ADR-0019: BTS lifecycle authority",
+          "path": "docs/decisions/0019-bts-lifecycle-authority.md"
+        },
+        {
+          "label": "ADR-0020: Conversation peer exchange ledger",
+          "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md"
+        },
+        {
+          "label": "ADR-0021: Conversation ISSUE control staging",
+          "path": "docs/decisions/0021-conversation-issue-control-staging.md"
+        },
+        {
+          "label": "ADR-0022: ISSUE PASS target handoff",
+          "path": "docs/decisions/0022-issue-pass-target-handoff.md"
+        },
+        {
+          "label": "ADR-0023: BTS lifecycle authority",
+          "path": "docs/decisions/0023-bts-lifecycle-authority.md"
         },
         {
           "label": "Decision index and template",
@@ -2031,7 +2263,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:5ead8ea7fd33a16346d5aa71fa319f1245bda218cee667147036bc1d08712667",
+  "registry_sha256": "sha256:2d41f7a509a682f1b26eb6f09e5dd7d692265b7538b099848828dec3df388b44",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

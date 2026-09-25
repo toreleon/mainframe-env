@@ -163,24 +163,66 @@ pub(super) fn invalid_shape(
             let set_form = outputs.contains(&CicsOutputName::SetPointer);
             into_form == set_form
                 || if into_form {
-                    *inputs != BTreeSet::from([CicsOperandName::Length])
+                    !inputs.is_subset(&BTreeSet::from([CicsOperandName::Length]))
+                        || outputs.contains(&CicsOutputName::Length)
+                            != inputs.contains(&CicsOperandName::Length)
+                        || match operand_value(plan, CicsOperandName::Length) {
+                            Some(CicsOperandValue::Storage(slot)) => {
+                                output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
+                            }
+                            Some(_) => true,
+                            None => false,
+                        }
                 } else {
-                    !inputs.is_empty()
+                    !inputs.is_empty() || !outputs.contains(&CicsOutputName::Length)
                 }
                 || !outputs.is_subset(&allowed_outputs)
-                || !outputs.contains(&CicsOutputName::Length)
-                || if into_form {
-                    match operand_value(plan, CicsOperandName::Length) {
-                        Some(CicsOperandValue::Storage(slot)) => {
-                            output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
-                        }
-                        Some(_) | None => true,
-                    }
-                } else {
-                    operand_value(plan, CicsOperandName::Length).is_some()
-                }
                 || scheduling_options
+        }
+        CicsPlanOperation::StartBrexit => {
+            invalid_brexit_shape(plan, inputs, outputs, scheduling_options)
         }
         _ => true,
     }
+}
+
+fn invalid_brexit_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+    scheduling_options: bool,
+) -> bool {
+    let allowed = BTreeSet::from([
+        CicsOperandName::TransId,
+        CicsOperandName::BrExit,
+        CicsOperandName::BrData,
+        CicsOperandName::BrDataLength,
+        CicsOperandName::UserId,
+    ]);
+    !inputs.contains(&CicsOperandName::TransId)
+        || !inputs.is_subset(&allowed)
+        || inputs.contains(&CicsOperandName::BrData)
+            != inputs.contains(&CicsOperandName::BrDataLength)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::TransId | CicsOperandName::BrExit | CicsOperandName::UserId => {
+                !matches!(
+                    operand.value,
+                    CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                )
+            }
+            CicsOperandName::BrData => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::BrDataLength => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(1..=32_767) | CicsOperandValue::Storage(_)
+            ),
+            _ => true,
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || scheduling_options
 }

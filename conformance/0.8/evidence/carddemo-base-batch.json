@@ -7,7 +7,8 @@
     "JES-803 retains step and DD ownership instead of aggregating same-name spool files at job scope",
     "JES-802 models NEW allocation before program output and therefore retains the allocation transition in dataset versions",
     "typed JCL DCB projection preserves blocked record formats from the accepted plan",
-    "PR #179 / #219: c6b487d corrects Cp037 fixed-record padding (USRSEC PS/KSDS) and retains every digit when adding a negative sign in SORT editing (TCATBALF.REPT). These are the only dataset digest differences from the previous 0.8 receipt; spool hashes and workload counts are unchanged. CD-023 remains byte-identical to its historical completion commit."
+    "PR #179 / #219: c6b487d corrects Cp037 fixed-record padding (USRSEC PS/KSDS) and retains every digit when adding a negative sign in SORT editing (TCATBALF.REPT).",
+    "These are the only dataset digest differences from the previous 0.8 receipt; spool hashes and workload counts are unchanged. CD-023 remains byte-identical to its historical completion commit."
   ],
   "evidence_digest": "sha256:9516f51ff809d6c21ea70d21c1c751b4a6fedc760629c10adb40f8d824c721f1",
   "receipt": {

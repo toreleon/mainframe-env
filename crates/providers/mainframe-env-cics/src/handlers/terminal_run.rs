@@ -1,6 +1,11 @@
 use super::super::{CicsService, CicsTraceEntry, handlers};
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId, RunUnitId};
 use mainframe_env_host_api::{CicsUnitOfWorkOutcome, HostProblem, SessionId};
+use sha2::{Digest, Sha256};
+
+pub(in crate::service) fn terminal_secret_digest(value: &str) -> String {
+    format!("{:x}", Sha256::digest(value.as_bytes()))
+}
 
 impl CicsService {
     pub fn complete_terminal_run(
@@ -109,8 +114,19 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        if let Some(run) = state.runs.get(&run_id).cloned() {
+        let run = state.runs.get(&run_id).cloned();
+        drop(state);
+        if let Some(run) = &run {
             handlers::release_task_state(self, &run)?;
+        }
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_some_and(|current| {
+            run.as_ref().is_none_or(|run| {
+                current.session != run.session
+                    || current.invocation.principal.id() != run.invocation.principal.id()
+            })
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
         }
         state.runs.remove(&run_id);
         Ok(trace)
@@ -138,6 +154,7 @@ impl CicsService {
         }
         if let Some(outcome) = outcome {
             super::interval_control::finish_protected_starts(self, &run, outcome)?;
+            super::issue_device::finish_task(self, &run, outcome)?;
         }
         let mut state = self.lock()?;
         if state.runs.get(&run_id).is_none_or(|current| {
@@ -170,7 +187,15 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
+        drop(state);
         handlers::release_task_state(self, &run)?;
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_none_or(|current| {
+            current.session != run.session
+                || current.invocation.principal.id() != run.invocation.principal.id()
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         state.runs.remove(&run_id);
         Ok(())
     }

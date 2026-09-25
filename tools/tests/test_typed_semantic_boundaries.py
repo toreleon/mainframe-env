@@ -12,12 +12,10 @@ SPEC.loader.exec_module(typed_boundaries)
 
 class TypedSemanticBoundaryTests(unittest.TestCase):
     def test_typed_cics_region_uses_current_legacy_helper_boundary(self):
-        source = typed_boundaries.production(
-            typed_boundaries.read(
-                ROOT,
-                "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics.rs",
-            )
-        )
+        source = typed_boundaries.read(
+            ROOT,
+            "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics.rs",
+        ).split("#[cfg(test)]\nmod tests", 1)[0]
         region = typed_boundaries.between(
             source,
             "pub(super) fn execute(\n",

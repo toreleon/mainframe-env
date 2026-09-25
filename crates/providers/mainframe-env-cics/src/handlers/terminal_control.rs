@@ -9,6 +9,18 @@ use mainframe_env_host_api::{
 };
 use std::collections::BTreeMap;
 
+mod bms;
+mod outboard;
+mod partition_set;
+pub use bms::CicsBmsControlSnapshot;
+pub(in crate::service) use bms::release_task as release_bms_message_for_task;
+pub(in crate::service) use outboard::release_task as release_outboard_task;
+pub use outboard::{
+    CicsOutboardDestinationDefinition, CicsOutboardKind, CicsOutboardRecord, CicsOutboardSnapshot,
+};
+pub(in crate::service) use partition_set::release_task as release_partition_set_for_task;
+pub use partition_set::{CicsPartitionDefinition, CicsPartitionSetDefinition};
+
 #[derive(Clone, Debug, Default)]
 pub(in crate::service) struct TerminalInput {
     pub(in crate::service) payload: Option<Vec<u8>>,
@@ -53,37 +65,48 @@ pub(in crate::service) const fn valid_aid(aid: u8) -> bool {
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    if run.invocation.bindings.contains_key("cics.bridge-request")
+        && matches!(
+            request.operation,
+            CicsOperation::SendMap | CicsOperation::SendText | CicsOperation::ReceiveMap
+        )
+    {
+        return super::bridge_terminal::invoke(service, run, request);
+    }
     match request.operation {
+        CicsOperation::SendPartnset => partition_set::invoke(service, run, request),
+        CicsOperation::ReceivePartn => partition_set::invoke_receive(service, run, request),
+        CicsOperation::SendControl => bms::invoke_control(service, run, request),
+        CicsOperation::SendPage => bms::invoke_page(service, run, request),
+        CicsOperation::IssueEraseAup => bms::issue_eraseaup(service, run, request),
+        CicsOperation::IssueCopy => bms::issue_copy(service, run, request),
+        CicsOperation::Route => bms::invoke_route(service, run, request),
+        CicsOperation::IssueAbort
+        | CicsOperation::IssueAdd
+        | CicsOperation::IssueEnd
+        | CicsOperation::IssueErase
+        | CicsOperation::IssueNote
+        | CicsOperation::IssueQuery
+        | CicsOperation::IssueReceive
+        | CicsOperation::IssueReplace
+        | CicsOperation::IssueSend
+        | CicsOperation::IssueWait => outboard::invoke(service, run, request),
+        CicsOperation::IssueEndfile
+        | CicsOperation::IssueEndoutput
+        | CicsOperation::IssueEods
+        | CicsOperation::IssueLoad
+        | CicsOperation::IssuePass
+        | CicsOperation::IssuePrint
+        | CicsOperation::IssueDisconnect
+        | CicsOperation::IssueReset => super::issue_device::invoke(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
-        CicsOperation::PurgeMessage => purge_message(service, run, request),
+        CicsOperation::PurgeMessage => bms::purge(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
-}
-
-fn purge_message(
-    service: &CicsService,
-    run: &Run,
-    request: &CicsRequest,
-) -> Result<CicsResponse, HostProblem> {
-    validate_purge_message_request(request)?;
-    validate_purge_message_context(run)?;
-    // The local runtime exposes no ACCUM/page-building route, so its reachable
-    // logical-message state is empty. Purging that state is deliberately
-    // idempotent and must not erase the already displayed terminal image.
-    service.response(
-        run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        Vec::new(),
-    )
 }
 
 fn validate_purge_message_request(request: &CicsRequest) -> Result<(), HostProblem> {
@@ -125,7 +148,7 @@ fn validate_purge_message_context(run: &Run) -> Result<(), HostProblem> {
     }
 }
 
-fn send(
+pub(super) fn send(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
@@ -224,7 +247,7 @@ fn send(
         next.field_modified = field_modified.unwrap_or_default();
         next.field_values = field_values.unwrap_or_default();
     }
-    service.persist_session(&run.session, &next, Some(current.version))?;
+    partition_set::persist_send(service, run, &current, &next)?;
     state.sessions.insert(run.session.clone(), next);
     service.response(
         run,
@@ -292,7 +315,7 @@ fn length_problem(operation: CicsOperation) -> HostProblem {
     }
 }
 
-fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
+pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const SEND_MAP_ALLOWED: &[&str] = &[
         "FROM",
         "LENGTH",
@@ -365,7 +388,7 @@ fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
     }
 }
 
-fn receive(
+pub(super) fn receive(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
@@ -378,6 +401,7 @@ fn receive(
         .get(&run.session)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
+    partition_set::require_intervening_send(service, run)?;
     let requested_names = if request.arguments.contains_key("MAP") {
         Some(map_names(request)?)
     } else {
@@ -461,7 +485,7 @@ fn receive(
     Ok(response)
 }
 
-fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
+pub(super) fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "FROM",
         "INTO",
@@ -518,7 +542,7 @@ fn receive_from(request: &CicsRequest) -> Result<Option<Vec<u8>>, HostProblem> {
     Ok(Some(input))
 }
 
-fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
+pub(super) fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
     let map = argument_text(request, "MAP")?
         .trim_end()
         .to_ascii_uppercase();

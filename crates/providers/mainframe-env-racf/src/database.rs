@@ -1,3 +1,5 @@
+// Wall-clock observation is isolated from snapshot persistence.
+mod retention_clock;
 use crate::model::{
     AccessControlEntry, AccessLevel, AuditFieldValue, AuditPolicy, ClassDescriptor,
     CredentialVerifier, DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection,
@@ -12,6 +14,7 @@ use mainframe_env_store_api::{
     ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
     RetentionLegacyRow, RetentionTarget, StoreError,
 };
+use retention_clock::retention_wall_tick;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -378,9 +381,13 @@ impl SecurityDatabase {
                             algorithm: "argon2id".into(),
                             encoded_verifier: user.hash.clone(),
                             changed_tick: 0,
+                            is_phrase: false,
                             history_digests: Vec::new(),
                             history_verifiers: Vec::new(),
                         }),
+                        phrase_credential: None,
+                        invalid_count: None,
+                        last_use_tick: None,
                         profile_template: None,
                         segments: BTreeMap::new(),
                         security_level: 0,
@@ -963,9 +970,13 @@ impl LegacySnapshot {
                         algorithm: "argon2id".into(),
                         encoded_verifier: user.hash.clone(),
                         changed_tick: 0,
+                        is_phrase: false,
                         history_digests: Vec::new(),
                         history_verifiers: Vec::new(),
                     }),
+                    phrase_credential: None,
+                    invalid_count: None,
+                    last_use_tick: None,
                     profile_template: None,
                     segments: BTreeMap::new(),
                     security_level: 0,
@@ -1403,17 +1414,6 @@ pub(crate) fn store_problem(problem: StoreError) -> HostProblem {
         StoreError::NotFound => HostProblem::NotFound,
         _ => HostProblem::InfrastructureFailure,
     }
-}
-
-fn retention_wall_tick() -> Result<u64, HostProblem> {
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| HostProblem::InfrastructureFailure)?
-        .as_millis();
-    let tick = u64::try_from(millis).map_err(|_| HostProblem::ResourceExhausted)?;
-    (tick != 0)
-        .then_some(tick)
-        .ok_or(HostProblem::InfrastructureFailure)
 }
 
 #[cfg(test)]

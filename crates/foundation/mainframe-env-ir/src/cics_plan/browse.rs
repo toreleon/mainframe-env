@@ -29,11 +29,16 @@ pub(super) fn invalid_shape(
         plan.operation,
         CicsPlanOperation::ReadNext | CicsPlanOperation::ReadPrev
     );
-    let starting = plan.operation == CicsPlanOperation::StartBrowse;
+    let starting = matches!(
+        plan.operation,
+        CicsPlanOperation::StartBrowse | CicsPlanOperation::ResetBrowse
+    );
     let generic = plan.options.contains(&CicsPlanOption::Generic);
-    let positions = matches!(plan.operation, CicsPlanOperation::StartBrowse) || reading;
+    let positions = starting || reading;
     resources != 1
         || !inputs.is_subset(&allowed_inputs)
+        || (plan.operation == CicsPlanOperation::ResetBrowse
+            && inputs.contains(&CicsOperandName::Length))
         || positions != inputs.contains(&CicsOperandName::Ridfld)
         || ridfld.is_some_and(|operand| !matches!(operand.value, CicsOperandValue::Storage(_)))
         || match ridfld.map(|operand| &operand.value) {
@@ -45,6 +50,10 @@ pub(super) fn invalid_shape(
         || reading != outputs.contains(&CicsOutputName::Into)
         || match length {
             Some(CicsOperandValue::Storage(slot)) if reading => length_output != Some(slot),
+            Some(CicsOperandValue::LengthOf(slot)) if reading => {
+                length_output.is_some()
+                    || output_target(&plan.outputs, CicsOutputName::Into) != Some(slot)
+            }
             Some(_) => true,
             None => length_output.is_some(),
         }
@@ -78,9 +87,7 @@ pub(super) fn invalid_shape(
             })
         || plan.options.iter().any(|option| match option {
             CicsPlanOption::NoHandle => false,
-            CicsPlanOption::Gteq | CicsPlanOption::Equal | CicsPlanOption::Generic => {
-                plan.operation != CicsPlanOperation::StartBrowse
-            }
+            CicsPlanOption::Gteq | CicsPlanOption::Equal | CicsPlanOption::Generic => !starting,
             _ => true,
         })
 }

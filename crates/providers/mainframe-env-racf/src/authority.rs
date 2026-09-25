@@ -1,4 +1,6 @@
+mod credential_support;
 mod principal_status;
+use credential_support::credential_host_problem;
 
 use crate::command::CommandDiagnostic;
 use crate::database::SecurityDatabase;
@@ -936,6 +938,8 @@ impl RacfService {
         Ok(principal_with_credential(user, credential))
     }
 
+    /// Build an Argon2 verifier under the current password or phrase policy.
+    /// The clear credential remains in the caller's secret authority.
     pub(crate) fn credential_from_bytes(
         &self,
         policy: &crate::model::SecurityPolicyOptions,
@@ -995,6 +999,7 @@ impl RacfService {
             algorithm: "argon2id".into(),
             encoded_verifier: verifier,
             changed_tick: tick,
+            is_phrase: phrase,
             history_digests,
             history_verifiers,
         })
@@ -1124,14 +1129,6 @@ impl RacfService {
     }
 }
 
-fn credential_host_problem(problem: CredentialPolicyProblem) -> HostProblem {
-    match problem {
-        CredentialPolicyProblem::Invalid => HostProblem::Malformed,
-        CredentialPolicyProblem::Reused => HostProblem::IdempotencyConflict,
-        CredentialPolicyProblem::Infrastructure => HostProblem::ProviderFailure,
-    }
-}
-
 fn retained_credential_history(
     credential: &CredentialVerifier,
     retain: usize,
@@ -1165,6 +1162,9 @@ fn principal_with_credential(user: &str, credential: CredentialVerifier) -> Prin
         default_group: None,
         state: PrincipalState::Active,
         credential: Some(credential),
+        phrase_credential: None,
+        invalid_count: None,
+        last_use_tick: None,
         profile_template: None,
         segments: BTreeMap::new(),
         security_level: 0,
@@ -1663,6 +1663,7 @@ mod tests {
             algorithm: "argon2id".into(),
             encoded_verifier: "current".into(),
             changed_tick: 1,
+            is_phrase: false,
             history_digests: vec!["legacy-1".into(), "legacy-2".into(), "legacy-3".into()],
             history_verifiers: vec!["modern-1".into(), "modern-2".into()],
         };

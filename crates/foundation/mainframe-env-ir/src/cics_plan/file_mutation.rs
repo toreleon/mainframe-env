@@ -24,10 +24,15 @@ pub(super) fn invalid_shape(
         CicsOperandName::Ridfld,
         CicsOperandName::Length,
         CicsOperandName::KeyLength,
+        CicsOperandName::Token,
     ]);
     resources != 1
         || !inputs.is_subset(&allowed_inputs)
         || (explicit_key_write && !inputs.contains(&CicsOperandName::Ridfld))
+        || (explicit_key_write && inputs.contains(&CicsOperandName::Token))
+        || (inputs.contains(&CicsOperandName::Token)
+            && (inputs.contains(&CicsOperandName::Ridfld)
+                || inputs.contains(&CicsOperandName::KeyLength)))
         || (inputs.contains(&CicsOperandName::KeyLength)
             && !inputs.contains(&CicsOperandName::Ridfld))
         || writes_record != inputs.contains(&CicsOperandName::From)
@@ -53,6 +58,7 @@ pub(super) fn invalid_shape(
                     | CicsOperandValue::Storage(_)
                     | CicsOperandValue::LengthOf(_)
             ),
+            CicsOperandName::Token => !matches!(operand.value, CicsOperandValue::Storage(_)),
             _ => false,
         })
         || match (
@@ -95,6 +101,34 @@ pub(super) fn invalid_shape(
             ) => ridfld != length,
             _ => false,
         }
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}
+
+pub(super) fn invalid_unlock_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let resources = usize::from(inputs.contains(&CicsOperandName::File))
+        + usize::from(inputs.contains(&CicsOperandName::Dataset));
+    resources != 1
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::File,
+            CicsOperandName::Dataset,
+            CicsOperandName::Token,
+            CicsOperandName::SysId,
+        ]))
+        || plan.operands.iter().any(|operand| {
+            operand.name == CicsOperandName::Token
+                && !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
         || !outputs.is_subset(&BTreeSet::from([
             CicsOutputName::Resp,
             CicsOutputName::Resp2,

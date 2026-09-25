@@ -9,7 +9,9 @@ use mainframe_env_store_api::{
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+mod container_capacity;
 pub(crate) mod observation;
+pub(crate) use container_capacity::validate_container_replay_archive;
 pub(crate) use observation::{matches_source as observation_matches_source, source_digest};
 
 pub(crate) const fn dependency_sensitive_core_target(target: RetentionTarget) -> bool {
@@ -212,6 +214,7 @@ pub(crate) fn validate_provider_replacement(
 pub(crate) fn validate_provider_deletion(
     request: &ProviderStateArchiveDeletion,
     max_payload_bytes: usize,
+    allow_container_replay: bool,
 ) -> Result<(), StoreError> {
     if request.archived_tick == 0
         || request.watermark_tick > request.archived_tick
@@ -224,6 +227,7 @@ pub(crate) fn validate_provider_deletion(
         RetentionTarget::Db2Replay => &["db2-v1-replay"],
         RetentionTarget::ImsReplay => &["ims-v1-replay"],
         RetentionTarget::MqReplay => &["mq-v1-replay"],
+        RetentionTarget::CicsReplay if allow_container_replay => &["cics-container-replay-v1"],
         RetentionTarget::CicsReplay => &["cics-effect-replay-v1"],
         RetentionTarget::DatasetReplay => &["dataset-replay"],
         RetentionTarget::CicsUnitOfWork => &["cics-uow", "cics-uow-undo"],
@@ -989,7 +993,10 @@ pub(crate) fn validate_archive_row_domain(
             row.namespace == "mq-v1-replay" && row.owner_execution.is_some()
         }
         RetentionTarget::CicsReplay => {
-            row.namespace == "cics-effect-replay-v1" && row.owner_execution.is_some()
+            matches!(
+                row.namespace.as_str(),
+                "cics-effect-replay-v1" | "cics-container-replay-v1"
+            ) && row.owner_execution.is_some()
         }
         RetentionTarget::DatasetReplay => {
             row.namespace == "dataset-replay" && row.owner_execution.is_some()

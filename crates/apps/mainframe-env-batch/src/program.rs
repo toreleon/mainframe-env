@@ -276,7 +276,11 @@ impl HostProvider for ProgramRouter {
                     payload,
                     service: None,
                 })
-                | HostRequest::Program(ProgramRequest::Link { program, payload })
+                | HostRequest::Program(ProgramRequest::Link {
+                    program,
+                    payload,
+                    selection: None,
+                })
                 | HostRequest::Program(ProgramRequest::Xctl { program, payload }) => {
                     (program, payload)
                 }
@@ -963,6 +967,7 @@ mod tests {
         ArtifactRef, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
         ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
+    use mainframe_env_host_api::{ProgramLinkSelection, ProgramName};
     use std::collections::{BTreeMap, BTreeSet};
 
     fn invocation() -> Invocation {
@@ -991,6 +996,34 @@ mod tests {
             limits,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn selected_link_cannot_fall_back_to_builtin_name_dispatch() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let request = HostRequest::Program(ProgramRequest::Link {
+            program: ProgramName::new("IEFBR14", 128).unwrap(),
+            payload: BoundedPayload::new("mainframe-env.program.input@1", b"{}".to_vec(), limits)
+                .unwrap(),
+            selection: Some(ProgramLinkSelection {
+                artifact: ArtifactRef::new(format!("sha256:{:064x}", 1), limits).unwrap(),
+                generation: 1,
+                content_identity: format!("sha256:{:064x}", 2),
+            }),
+        });
+        let router = ProgramRouter::with_builtins(limits);
+        let result = router.invoke(
+            &invocation,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: 1,
+                deadline_tick: 100,
+                idempotency_key: None,
+                request,
+            },
+        );
+        assert_eq!(result.outcome, Err(HostProblem::Unsupported));
     }
 
     fn input(name: &str, bytes: &[u8]) -> ProgramInput {
