@@ -6,6 +6,9 @@ mod bridge_runtime;
 mod bridge_start;
 mod bridge_terminal;
 mod bts_child_link;
+// The read port is private until the later command slices install its routes.
+#[allow(dead_code)]
+mod bts_container;
 pub mod bts_lifecycle;
 mod bts_link;
 mod builtin_function;
