@@ -44,6 +44,14 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::BtsEndBrowseActivity => 196,
+        CicsPlanOperation::BtsGetNextActivity => 201,
+        CicsPlanOperation::BtsInquireActivity => 206,
+        CicsPlanOperation::BtsStartBrowseActivity => 211,
+        CicsPlanOperation::BtsEndBrowseProcess => 199,
+        CicsPlanOperation::BtsGetNextProcess => 204,
+        CicsPlanOperation::BtsInquireProcess => 209,
+        CicsPlanOperation::BtsStartBrowseProcess => 214,
         CicsPlanOperation::IssueAbend
         | CicsPlanOperation::GdsIssueAbend
         | CicsPlanOperation::IssueConfirmation
@@ -268,6 +276,14 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        196 => Ok(CicsPlanOperation::BtsEndBrowseActivity),
+        201 => Ok(CicsPlanOperation::BtsGetNextActivity),
+        206 => Ok(CicsPlanOperation::BtsInquireActivity),
+        211 => Ok(CicsPlanOperation::BtsStartBrowseActivity),
+        199 => Ok(CicsPlanOperation::BtsEndBrowseProcess),
+        204 => Ok(CicsPlanOperation::BtsGetNextProcess),
+        209 => Ok(CicsPlanOperation::BtsInquireProcess),
+        214 => Ok(CicsPlanOperation::BtsStartBrowseProcess),
         165 => Ok(CicsPlanOperation::AcquireActivityId),
         166 => Ok(CicsPlanOperation::AcquireProcess),
         167 => Ok(CicsPlanOperation::CancelAcqActivity),
@@ -473,6 +489,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
+        CicsOperandName::BtsBrowse(name) => name.tag(),
         CicsOperandName::IssueConvid
         | CicsOperandName::IssueSession
         | CicsOperandName::IssueTermId
@@ -804,6 +821,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
+        960..=963 => super::BtsBrowseInput::from_tag(value)
+            .map(CicsOperandName::BtsBrowse)
+            .ok_or(CicsPlanCodecProblem::Malformed),
         704 => Ok(CicsOperandName::BtsActivityId),
         705 => Ok(CicsOperandName::BtsProcess),
         706 => Ok(CicsOperandName::BtsProcessType),

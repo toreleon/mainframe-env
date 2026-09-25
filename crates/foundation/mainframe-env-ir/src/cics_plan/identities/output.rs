@@ -3,6 +3,7 @@ use super::super::{CicsAssignOutput, CicsCertificateOutput, CicsTcpipOutput};
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
+    BtsBrowse(super::super::BtsBrowseOutput),
     /// Source-visible APPC ISSUE state CVDA.
     IssueState,
     /// Twenty-four-byte GDS conversation indicator area.

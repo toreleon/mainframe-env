@@ -261,7 +261,8 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::TctSysId
         | HirCicsOutputName::TctTermId
         | HirCicsOutputName::Assign(_) => Ok(()),
-        HirCicsOutputName::BtsAny
+        HirCicsOutputName::BtsBrowse(_)
+        | HirCicsOutputName::BtsAny
         | HirCicsOutputName::BtsChildCompStatus
         | HirCicsOutputName::BtsChannel
         | HirCicsOutputName::BtsAbcode => Ok(()),

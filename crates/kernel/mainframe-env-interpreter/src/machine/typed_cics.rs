@@ -417,6 +417,7 @@ pub(super) fn execute(
                         | CicsOperandName::WebReceiveStatusLength
                         | CicsOperandName::WebPortNumber
                         | CicsOperandName::BtsTimeout
+                        | CicsOperandName::BtsBrowse(mainframe_env_ir::BtsBrowseInput::BrowseToken)
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -637,7 +638,8 @@ pub(super) fn execute(
             | CicsOutputName::ConversationToFullLength => {
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::BtsActivityId
+            CicsOutputName::BtsBrowse(_)
+            | CicsOutputName::BtsActivityId
             | CicsOutputName::BtsCompStatus
             | CicsOutputName::BtsMode
             | CicsOutputName::BtsSuspStatus

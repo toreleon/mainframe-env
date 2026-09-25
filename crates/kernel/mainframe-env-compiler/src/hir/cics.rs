@@ -184,6 +184,7 @@ impl PlanContext<'_> {
         Ok(CicsNamedOperand {
             name: match operand.name {
                 HirCicsOperandName::BtsActivityId => CicsOperandName::BtsActivityId,
+                HirCicsOperandName::BtsBrowse(name) => CicsOperandName::BtsBrowse(name),
                 HirCicsOperandName::BtsProcess => CicsOperandName::BtsProcess,
                 HirCicsOperandName::BtsProcessType => CicsOperandName::BtsProcessType,
                 HirCicsOperandName::BtsActivity => CicsOperandName::BtsActivity,
@@ -594,6 +595,7 @@ impl PlanContext<'_> {
         Ok(CicsOutputBinding {
             name: match output.name {
                 HirCicsOutputName::BtsActivityId => CicsOutputName::BtsActivityId,
+                HirCicsOutputName::BtsBrowse(name) => CicsOutputName::BtsBrowse(name),
                 HirCicsOutputName::BtsCompStatus => CicsOutputName::BtsCompStatus,
                 HirCicsOutputName::BtsMode => CicsOutputName::BtsMode,
                 HirCicsOutputName::BtsSuspStatus => CicsOutputName::BtsSuspStatus,
@@ -817,6 +819,14 @@ impl PlanContext<'_> {
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
         HirCicsOperation::AcquireActivityId => CicsPlanOperation::AcquireActivityId,
+        HirCicsOperation::BtsStartBrowseActivity => CicsPlanOperation::BtsStartBrowseActivity,
+        HirCicsOperation::BtsGetNextActivity => CicsPlanOperation::BtsGetNextActivity,
+        HirCicsOperation::BtsEndBrowseActivity => CicsPlanOperation::BtsEndBrowseActivity,
+        HirCicsOperation::BtsInquireActivity => CicsPlanOperation::BtsInquireActivity,
+        HirCicsOperation::BtsStartBrowseProcess => CicsPlanOperation::BtsStartBrowseProcess,
+        HirCicsOperation::BtsGetNextProcess => CicsPlanOperation::BtsGetNextProcess,
+        HirCicsOperation::BtsEndBrowseProcess => CicsPlanOperation::BtsEndBrowseProcess,
+        HirCicsOperation::BtsInquireProcess => CicsPlanOperation::BtsInquireProcess,
         HirCicsOperation::AcquireProcess => CicsPlanOperation::AcquireProcess,
         HirCicsOperation::CancelAcqActivity => CicsPlanOperation::CancelAcqActivity,
         HirCicsOperation::CancelAcqProcess => CicsPlanOperation::CancelAcqProcess,

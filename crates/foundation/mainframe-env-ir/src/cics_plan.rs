@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 mod address;
 mod assign;
 mod browse;
+mod bts_browse;
 mod bts_child_link;
 mod bts_lifecycle;
 mod certificate;
@@ -47,6 +48,7 @@ mod web_service_control;
 mod write_operator;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
+pub use bts_browse::{BtsBrowseInput, BtsBrowseOutput};
 pub use certificate::{CICS_CERTIFICATE_OUTPUT_NAMES, CicsCertificateOutput};
 pub use codec_problem::CicsPlanCodecProblem;
 pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
@@ -183,6 +185,7 @@ fn encode_cics_effect_plan_version(
         && ((91..=104).contains(&operation_tag(plan.operation))
             || (130..=139).contains(&operation_tag(plan.operation))
             || (165..=187).contains(&operation_tag(plan.operation))
+            || (196..=215).contains(&operation_tag(plan.operation))
             || (154..=164).contains(&operation_tag(plan.operation))
             || (231..=238).contains(&operation_tag(plan.operation))
             || (222..=230).contains(&operation_tag(plan.operation))
@@ -262,6 +265,7 @@ pub fn decode_cics_effect_plan(
         && ((91..=104).contains(&operation_tag)
             || (130..=139).contains(&operation_tag)
             || (165..=187).contains(&operation_tag)
+            || (196..=215).contains(&operation_tag)
             || (154..=164).contains(&operation_tag)
             || (231..=238).contains(&operation_tag)
             || (222..=230).contains(&operation_tag)
@@ -454,6 +458,16 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
+        CicsPlanOperation::BtsStartBrowseActivity
+        | CicsPlanOperation::BtsGetNextActivity
+        | CicsPlanOperation::BtsEndBrowseActivity
+        | CicsPlanOperation::BtsInquireActivity
+        | CicsPlanOperation::BtsStartBrowseProcess
+        | CicsPlanOperation::BtsGetNextProcess
+        | CicsPlanOperation::BtsEndBrowseProcess
+        | CicsPlanOperation::BtsInquireProcess => {
+            bts_browse::invalid_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::AcquireActivityId
         | CicsPlanOperation::AcquireProcess
         | CicsPlanOperation::CancelAcqActivity

@@ -5185,6 +5185,70 @@ mod tests {
     }
 
     #[test]
+    fn bts_browse_eight_rows_lower_with_exact_receivers() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 ACT-X PIC X(16). 01 ACTID-X PIC X(52). 01 PROC-X PIC X(36). 01 LEVEL-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
+        for (source, expected) in [
+            (
+                "ENDBROWSE ACTIVITY BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseActivity,
+            ),
+            (
+                "GETNEXT ACTIVITY(ACT-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextActivity,
+            ),
+            (
+                "INQUIRE ACTIVITYID('A1') ACTIVITY(ACT-X)",
+                HirCicsOperation::BtsInquireActivity,
+            ),
+            (
+                "STARTBROWSE ACTIVITY BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseActivity,
+            ),
+            (
+                "ENDBROWSE PROCESS BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseProcess,
+            ),
+            (
+                "GETNEXT PROCESS(PROC-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextProcess,
+            ),
+            (
+                "INQUIRE PROCESS('P1') PROCESSTYPE('TYPE') ACTIVITYID(ACTID-X)",
+                HirCicsOperation::BtsInquireProcess,
+            ),
+            (
+                "STARTBROWSE PROCESS PROCESSTYPE('TYPE') BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseProcess,
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let selected = hir
+                .statements
+                .iter()
+                .find_map(|statement| match &statement.resolved {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command.operation),
+                    _ => None,
+                });
+            assert_eq!(selected, Some(expected), "{source}");
+        }
+        for source in [
+            "STARTBROWSE ACTIVITY PROCESS('P1') BROWSETOKEN(TOKEN-X)",
+            "GETNEXT ACTIVITY(PROC-X) BROWSETOKEN(TOKEN-X)",
+            "INQUIRE ACTIVITYID('A1') MODE(LEVEL-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_operation) in [
             (

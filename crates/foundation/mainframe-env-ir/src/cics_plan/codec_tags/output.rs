@@ -2,6 +2,7 @@ use super::*;
 
 pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
+        CicsOutputName::BtsBrowse(name) => name.tag(),
         CicsOutputName::IssueState => 1528,
         CicsOutputName::IssueConvData => 1529,
         CicsOutputName::IssueRetCode => 1530,
@@ -185,6 +186,9 @@ pub(in crate::cics_plan) fn output_from_tag(
     value: u16,
 ) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
+        1016..=1027 => super::super::BtsBrowseOutput::from_tag(value)
+            .map(CicsOutputName::BtsBrowse)
+            .ok_or(CicsPlanCodecProblem::Malformed),
         1528 => Ok(CicsOutputName::IssueState),
         1529 => Ok(CicsOutputName::IssueConvData),
         1530 => Ok(CicsOutputName::IssueRetCode),

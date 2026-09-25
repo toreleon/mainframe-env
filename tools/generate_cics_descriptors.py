@@ -594,6 +594,14 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
     ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
     ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
+    ("BtsEndBrowseActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0059"),
+    ("BtsGetNextActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0089"),
+    ("BtsInquireActivity", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0101"),
+    ("BtsStartBrowseActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0209"),
+    ("BtsEndBrowseProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0062"),
+    ("BtsGetNextProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0092"),
+    ("BtsInquireProcess", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0104"),
+    ("BtsStartBrowseProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0212"),
 ]
 
 CONTRACT_BATCHES = (
@@ -798,6 +806,8 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsInquireActivity", "BtsStartBrowseActivity",
+        "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsInquireProcess", "BtsStartBrowseProcess",
         "AcquireActivityId",
         "AcquireProcess",
         "CancelAcqActivity",
@@ -1568,6 +1578,21 @@ _BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
 TYPED_RUNTIME_IR_EFFECTS.update(
     {
         name: _BTS_READ_EFFECTS
+        for name in ("BtsInquireActivity", "BtsInquireProcess")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_MUTATE_EFFECTS
+        for name in (
+            "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsStartBrowseActivity",
+            "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsStartBrowseProcess",
+        )
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_READ_EFFECTS
         for name in ("CheckAcqActivity", "CheckAcqProcess")
     }
 )
@@ -1978,6 +2003,14 @@ def _load_typed_execution_registrations(
         "SuspendAcqActivity",
         "SuspendAcqProcess",
         "SuspendActivity",
+        "BtsEndBrowseActivity",
+        "BtsGetNextActivity",
+        "BtsInquireActivity",
+        "BtsStartBrowseActivity",
+        "BtsEndBrowseProcess",
+        "BtsGetNextProcess",
+        "BtsInquireProcess",
+        "BtsStartBrowseProcess",
         "FetchAny",
         "FetchChild",
         "FreeChild",

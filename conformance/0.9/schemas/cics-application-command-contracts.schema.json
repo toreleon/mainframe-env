@@ -2264,16 +2264,16 @@
           "const": 263
         },
         "typed_handlers": {
-          "const": 231
+          "const": 239
         },
         "legacy_compatibility_handlers": {
           "const": 0
         },
         "advertised_commands": {
-          "const": 231
+          "const": 239
         },
         "unready_handlers": {
-          "const": 32
+          "const": 24
         },
         "automatic_registration": {
           "const": false
@@ -2374,19 +2374,19 @@
           "const": 263
         },
         "runtime_backed_commands": {
-          "const": 231
+          "const": 239
         },
         "typed_runtime_commands": {
-          "const": 231
+          "const": 239
         },
         "legacy_compatibility_commands": {
           "const": 0
         },
         "advertised_commands": {
-          "const": 231
+          "const": 239
         },
         "unready_commands": {
-          "const": 32
+          "const": 24
         }
       }
     }

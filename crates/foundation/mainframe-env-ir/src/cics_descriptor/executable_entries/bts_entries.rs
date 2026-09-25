@@ -15,7 +15,7 @@ const fn descriptor(
     }
 }
 
-pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
+pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 37] = [
     descriptor(
         CicsPlanOperation::AcquireActivityId,
         "acquire-activityid",
@@ -179,4 +179,44 @@ pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
         effects: CONTROL_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseActivity,
+        "endbrowse-activity",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextActivity,
+        "getnext-activity",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireActivity,
+        "inquire-activityid",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseActivity,
+        "startbrowse-activity",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseProcess,
+        "endbrowse-process",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextProcess,
+        "getnext-process",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireProcess,
+        "inquire-process",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseProcess,
+        "startbrowse-process",
+        BTS_MUTATE_EFFECTS,
+    ),
 ];

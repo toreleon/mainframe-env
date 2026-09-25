@@ -9,6 +9,14 @@ mod parse;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    BtsStartBrowseActivity,
+    BtsGetNextActivity,
+    BtsEndBrowseActivity,
+    BtsInquireActivity,
+    BtsStartBrowseProcess,
+    BtsGetNextProcess,
+    BtsEndBrowseProcess,
+    BtsInquireProcess,
     AcquireActivityId,
     AcquireProcess,
     CancelAcqActivity,
@@ -424,6 +432,14 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::BtsStartBrowseActivity => "BtsStartBrowseActivity",
+            Self::BtsGetNextActivity => "BtsGetNextActivity",
+            Self::BtsEndBrowseActivity => "BtsEndBrowseActivity",
+            Self::BtsInquireActivity => "BtsInquireActivity",
+            Self::BtsStartBrowseProcess => "BtsStartBrowseProcess",
+            Self::BtsGetNextProcess => "BtsGetNextProcess",
+            Self::BtsEndBrowseProcess => "BtsEndBrowseProcess",
+            Self::BtsInquireProcess => "BtsInquireProcess",
             Self::AcquireActivityId => "AcquireActivityId",
             Self::AcquireProcess => "AcquireProcess",
             Self::CancelAcqActivity => "CancelAcqActivity",
@@ -688,7 +704,13 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::AcquireActivityId
+            Self::BtsStartBrowseActivity
+                | Self::BtsGetNextActivity
+                | Self::BtsEndBrowseActivity
+                | Self::BtsStartBrowseProcess
+                | Self::BtsGetNextProcess
+                | Self::BtsEndBrowseProcess
+                | Self::AcquireActivityId
                 | Self::AcquireProcess
                 | Self::CancelAcqActivity
                 | Self::CancelAcqProcess

@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 231);
+        assert_eq!(typed.len(), 239);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 32);
+        assert_eq!(unready.len(), 24);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -297,6 +297,14 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::BtsStartBrowseActivity,
+                CicsPlanOperation::BtsGetNextActivity,
+                CicsPlanOperation::BtsEndBrowseActivity,
+                CicsPlanOperation::BtsInquireActivity,
+                CicsPlanOperation::BtsStartBrowseProcess,
+                CicsPlanOperation::BtsGetNextProcess,
+                CicsPlanOperation::BtsEndBrowseProcess,
+                CicsPlanOperation::BtsInquireProcess,
                 CicsPlanOperation::AcquireActivityId,
                 CicsPlanOperation::AcquireProcess,
                 CicsPlanOperation::CancelAcqActivity,

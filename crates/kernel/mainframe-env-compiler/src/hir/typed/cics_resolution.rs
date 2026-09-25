@@ -16,6 +16,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
 mod assign_validation;
+mod bts_browse;
 mod bts_child_link;
 mod bts_lifecycle;
 mod builtin_function;
@@ -60,12 +61,10 @@ mod transform_control;
 mod value;
 mod web_control;
 mod web_service_control;
-
 use candidate_validation::{keep_best_failure, validate_candidate};
 use clause_parser::{clauses, matching_close};
 use numeric_value::{cics_cvda_value, cics_integer_value};
 use value::{cics_address_value, cics_value, complete_data_reference, output};
-
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
     clauses: Clauses,
@@ -84,14 +83,15 @@ pub(super) fn validated_command(
     Clauses,
     Vec<String>,
 )> {
-    let candidates = cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
-    if candidates.is_empty() {
+    let mut candidates = cics_application_registry_candidates_for_tokens(body)
+        .filter(|candidate| bts_browse::selector_matches(candidate.descriptor, body))
+        .peekable();
+    if candidates.peek().is_none() {
         return Err(ResolutionFailure::Invalid(format!(
             "unknown CICS application command: {}",
             body.first().map_or("<empty>", String::as_str)
         )));
     }
-
     let mut valid = BTreeMap::<&'static str, ValidatedCandidate>::new();
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {
@@ -194,7 +194,6 @@ pub(super) fn validated_command(
         {
             options.push((*kind).into());
         }
-
         let validated = ValidatedCandidate {
             descriptor: candidate.descriptor,
             clauses,
@@ -326,10 +325,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let web_shape = web_service_control::shape(operation);
     let event_shape = event_control::shape(operation);
     let bts_shape = bts_child_link::shape(operation);
+    let browse_shape = bts_browse::shape(operation);
     let command_shape = transform_shape
         .as_ref()
         .or(event_shape.as_ref())
-        .or(bts_shape.as_ref());
+        .or(bts_shape.as_ref())
+        .or(browse_shape.as_ref());
     let allowed_clauses: &[&str] = match operation {
         op if conversation_control::is_operation(op) => conversation_control::allowed_clauses(op),
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
@@ -712,6 +713,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     transform_control::validate_constraints(&clauses, operation)?;
     event_control::validate_constraints(operation, &raw_options)?;
     bts_child_link::validate(&clauses, &raw_options, operation)?;
+    bts_browse::validate(&clauses, &raw_options, operation)?;
     web_service_control::validate(&clauses, operation)?;
     for required in match operation {
         op if conversation_control::is_operation(op) => &[][..],
@@ -1000,6 +1002,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
     operands.extend(event_control::operands(&clauses, operation, semantic)?);
     operands.extend(bts_child_link::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_browse::operands(&clauses, operation, semantic)?);
     operands.extend(web_service_control::operands(
         &clauses, operation, semantic,
     )?);
@@ -1087,6 +1090,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(conversation_data::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(bts_child_link::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_browse::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_open::outputs(&clauses, operation, semantic)?);
     outputs.extend(issue_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve

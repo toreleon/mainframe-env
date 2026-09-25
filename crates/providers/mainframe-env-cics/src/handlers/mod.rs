@@ -5,6 +5,7 @@ mod bridge_profile;
 mod bridge_runtime;
 mod bridge_start;
 mod bridge_terminal;
+pub mod bts_browse;
 mod bts_child_link;
 pub mod bts_lifecycle;
 mod bts_link;
@@ -403,6 +404,16 @@ pub(super) fn invoke_extended_control(
             }
         }
         crate::generated::CicsCommandFamily::BtsControl => match request.operation {
+            mainframe_env_host_api::CicsOperation::BtsStartBrowseActivity
+            | mainframe_env_host_api::CicsOperation::BtsGetNextActivity
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseActivity
+            | mainframe_env_host_api::CicsOperation::BtsInquireActivity
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseProcess
+            | mainframe_env_host_api::CicsOperation::BtsGetNextProcess
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseProcess
+            | mainframe_env_host_api::CicsOperation::BtsInquireProcess => {
+                bts_browse::invoke(service, run, request)
+            }
             mainframe_env_host_api::CicsOperation::FetchAny
             | mainframe_env_host_api::CicsOperation::FetchChild
             | mainframe_env_host_api::CicsOperation::FreeChild => {
@@ -463,6 +474,7 @@ pub(super) fn invoke_interval_or_spool_control(
 }
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    bts_browse::release_task(service, run)?;
     bts_child_link::release_task(service, run)?;
     bts_link::release_task(service, run)?;
     task_enqueue::release_task(service, run)?;

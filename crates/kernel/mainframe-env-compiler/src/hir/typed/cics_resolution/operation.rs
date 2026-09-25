@@ -15,6 +15,14 @@ pub(super) fn resolve(
     descriptor: &CicsApplicationRegistryDescriptor,
 ) -> Resolution<HirCicsOperation> {
     Ok(match descriptor.label_tokens {
+        ["STARTBROWSE", "ACTIVITY"] => HirCicsOperation::BtsStartBrowseActivity,
+        ["GETNEXT", "ACTIVITY"] => HirCicsOperation::BtsGetNextActivity,
+        ["ENDBROWSE", "ACTIVITY"] => HirCicsOperation::BtsEndBrowseActivity,
+        ["INQUIRE", "ACTIVITYID"] => HirCicsOperation::BtsInquireActivity,
+        ["STARTBROWSE", "PROCESS"] => HirCicsOperation::BtsStartBrowseProcess,
+        ["GETNEXT", "PROCESS"] => HirCicsOperation::BtsGetNextProcess,
+        ["ENDBROWSE", "PROCESS"] => HirCicsOperation::BtsEndBrowseProcess,
+        ["INQUIRE", "PROCESS"] => HirCicsOperation::BtsInquireProcess,
         ["ACQUIRE", "ACTIVITYID"] => HirCicsOperation::AcquireActivityId,
         ["ACQUIRE", "PROCESS"] => HirCicsOperation::AcquireProcess,
         ["CANCEL", "ACQACTIVITY"] => HirCicsOperation::CancelAcqActivity,

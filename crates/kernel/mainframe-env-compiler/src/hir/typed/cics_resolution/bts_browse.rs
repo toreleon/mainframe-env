@@ -1,0 +1,320 @@
+//! Source-bounded lowering for the eight ACTIVITY and PROCESS browse rows.
+
+use super::super::{
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
+};
+use super::{
+    Clauses, cics_integer_value, cics_value, complete_data_reference, shape::CommandShape,
+};
+use crate::{CobolUsage, DataCategory, SemanticModel};
+use mainframe_env_ir::{
+    BtsBrowseInput as I, BtsBrowseOutput as O, CicsApplicationRegistryDescriptor,
+};
+
+pub(super) const fn is_browse(operation: HirCicsOperation) -> bool {
+    matches!(
+        operation,
+        HirCicsOperation::BtsStartBrowseActivity
+            | HirCicsOperation::BtsGetNextActivity
+            | HirCicsOperation::BtsEndBrowseActivity
+            | HirCicsOperation::BtsInquireActivity
+            | HirCicsOperation::BtsStartBrowseProcess
+            | HirCicsOperation::BtsGetNextProcess
+            | HirCicsOperation::BtsEndBrowseProcess
+            | HirCicsOperation::BtsInquireProcess
+    )
+}
+
+pub(super) fn selector_matches(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    body: &[String],
+) -> bool {
+    let resource = match descriptor.label_tokens {
+        ["STARTBROWSE" | "GETNEXT" | "ENDBROWSE", "ACTIVITY"] | ["INQUIRE", "ACTIVITYID"] => {
+            Some(descriptor.label_tokens[1])
+        }
+        [
+            "STARTBROWSE" | "GETNEXT" | "ENDBROWSE" | "INQUIRE",
+            "PROCESS",
+        ] => Some("PROCESS"),
+        _ => None,
+    };
+    resource.is_none_or(|resource| {
+        body.get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case(resource))
+    })
+}
+
+pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
+    Some(match operation {
+        HirCicsOperation::BtsStartBrowseActivity => CommandShape {
+            clauses: &[
+                "ACTIVITYID",
+                "PROCESS",
+                "PROCESSTYPE",
+                "BROWSETOKEN",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsStartBrowseProcess => CommandShape {
+            clauses: &["PROCESSTYPE", "BROWSETOKEN", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["PROCESSTYPE", "BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsGetNextActivity => CommandShape {
+            clauses: &[
+                "BROWSETOKEN",
+                "ACTIVITY",
+                "ACTIVITYID",
+                "LEVEL",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN", "ACTIVITY"],
+        },
+        HirCicsOperation::BtsGetNextProcess => CommandShape {
+            clauses: &["BROWSETOKEN", "PROCESS", "ACTIVITYID", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN", "PROCESS"],
+        },
+        HirCicsOperation::BtsEndBrowseActivity | HirCicsOperation::BtsEndBrowseProcess => {
+            CommandShape {
+                clauses: &["BROWSETOKEN", "RESP", "RESP2"],
+                options: &["NOHANDLE"],
+                required: &["BROWSETOKEN"],
+            }
+        }
+        HirCicsOperation::BtsInquireProcess => CommandShape {
+            clauses: &["PROCESS", "PROCESSTYPE", "ACTIVITYID", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["PROCESS", "PROCESSTYPE"],
+        },
+        HirCicsOperation::BtsInquireActivity => CommandShape {
+            clauses: &[
+                "ACTIVITYID",
+                "ABCODE",
+                "ABPROGRAM",
+                "ACTIVITY",
+                "COMPSTATUS",
+                "EVENT",
+                "MODE",
+                "PROCESS",
+                "PROCESSTYPE",
+                "PROGRAM",
+                "SUSPSTATUS",
+                "TRANSID",
+                "USERID",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["NOHANDLE"],
+            required: &["ACTIVITYID"],
+        },
+        _ => return None,
+    })
+}
+
+pub(super) fn reviewed_ambiguous_shape(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    name: &str,
+    has_value: bool,
+) -> bool {
+    has_value
+        && matches!(
+            descriptor.label_tokens,
+            ["INQUIRE", "ACTIVITYID"]
+                if matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS")
+        )
+}
+
+pub(super) fn validate(
+    clauses: &Clauses,
+    options: &[String],
+    operation: HirCicsOperation,
+) -> Resolution<()> {
+    if operation == HirCicsOperation::BtsStartBrowseActivity
+        && (clauses.contains_key("PROCESS") != clauses.contains_key("PROCESSTYPE")
+            || clauses.contains_key("PROCESS") && clauses.contains_key("ACTIVITYID"))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS STARTBROWSE ACTIVITY requires PROCESS with PROCESSTYPE, or ACTIVITYID".into(),
+        ));
+    }
+    if operation == HirCicsOperation::BtsInquireActivity
+        && ["COMPSTATUS", "MODE", "SUSPSTATUS"]
+            .iter()
+            .any(|name| clauses.contains_key(*name) || options.iter().any(|option| option == name))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS INQUIRE ACTIVITYID COMPSTATUS, MODE, and SUSPSTATUS are not implemented".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn operands(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if !is_browse(operation) {
+        return Ok(Vec::new());
+    }
+    let mut values = Vec::new();
+    for (name, identity, width) in [
+        ("ACTIVITYID", I::ActivityId, 52),
+        ("PROCESS", I::Process, 36),
+        ("PROCESSTYPE", I::ProcessType, 8),
+        ("BROWSETOKEN", I::BrowseToken, 4),
+    ] {
+        let input = matches!(
+            (operation, identity),
+            (
+                HirCicsOperation::BtsStartBrowseActivity,
+                I::ActivityId | I::Process | I::ProcessType,
+            ) | (HirCicsOperation::BtsStartBrowseProcess, I::ProcessType)
+                | (
+                    HirCicsOperation::BtsGetNextActivity
+                        | HirCicsOperation::BtsGetNextProcess
+                        | HirCicsOperation::BtsEndBrowseActivity
+                        | HirCicsOperation::BtsEndBrowseProcess,
+                    I::BrowseToken,
+                )
+                | (HirCicsOperation::BtsInquireActivity, I::ActivityId)
+                | (
+                    HirCicsOperation::BtsInquireProcess,
+                    I::Process | I::ProcessType
+                )
+        );
+        if !input {
+            continue;
+        }
+        if let Some(tokens) = clauses.get(name) {
+            let value = if identity == I::BrowseToken {
+                cics_integer_value(tokens, semantic)?
+            } else {
+                cics_value(tokens, semantic)?
+            };
+            let valid = match &value {
+                HirCicsValue::Literal(text) if identity != I::BrowseToken => {
+                    !text.is_empty() && text.chars().count() <= width
+                }
+                HirCicsValue::Integer(number) if identity == I::BrowseToken => {
+                    (1..=i32::MAX as i64).contains(number)
+                }
+                HirCicsValue::Data(reference) if identity == I::BrowseToken => fullword(reference),
+                HirCicsValue::Data(reference) => {
+                    (1..=width).contains(&reference.length)
+                        && matches!(
+                            reference.category,
+                            DataCategory::Alphabetic | DataCategory::Alphanumeric
+                        )
+                }
+                _ => false,
+            };
+            if !valid {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS BTS browse {name} requires a checked input area"
+                )));
+            }
+            values.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::BtsBrowse(identity),
+                value,
+            });
+        }
+    }
+    Ok(values)
+}
+
+pub(super) fn outputs(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if !is_browse(operation) {
+        return Ok(Vec::new());
+    }
+    let mut values = Vec::new();
+    for field in [
+        O::BrowseToken,
+        O::Activity,
+        O::ActivityId,
+        O::Level,
+        O::Process,
+        O::Abcode,
+        O::Abprogram,
+        O::Event,
+        O::ProcessType,
+        O::Program,
+        O::TransId,
+        O::UserId,
+    ] {
+        let Some(tokens) = clauses.get(field.name()) else {
+            continue;
+        };
+        let output = matches!(
+            (operation, field),
+            (
+                HirCicsOperation::BtsStartBrowseActivity | HirCicsOperation::BtsStartBrowseProcess,
+                O::BrowseToken,
+            ) | (
+                HirCicsOperation::BtsGetNextActivity,
+                O::Activity | O::ActivityId | O::Level
+            ) | (
+                HirCicsOperation::BtsGetNextProcess,
+                O::Process | O::ActivityId
+            ) | (HirCicsOperation::BtsInquireProcess, O::ActivityId)
+                | (
+                    HirCicsOperation::BtsInquireActivity,
+                    O::Abcode
+                        | O::Abprogram
+                        | O::Activity
+                        | O::Event
+                        | O::Process
+                        | O::ProcessType
+                        | O::Program
+                        | O::TransId
+                        | O::UserId,
+                )
+        );
+        if !output {
+            continue;
+        }
+        let target = complete_data_reference(tokens, semantic)?;
+        require_writable(&target)?;
+        let valid = if matches!(field, O::BrowseToken | O::Level) {
+            fullword(&target)
+        } else {
+            target.length == field.width()
+                && matches!(
+                    target.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                )
+        };
+        if !valid {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS BTS browse {} requires a checked {}-byte receiver",
+                field.name(),
+                field.width()
+            )));
+        }
+        values.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::BtsBrowse(field),
+            target,
+        });
+    }
+    Ok(values)
+}
+
+fn fullword(reference: &super::super::HirDataReference) -> bool {
+    reference.allocated
+        && reference.length == 4
+        && reference.category == DataCategory::Binary
+        && reference.usage == CobolUsage::Binary
+        && reference.scale == 0
+}

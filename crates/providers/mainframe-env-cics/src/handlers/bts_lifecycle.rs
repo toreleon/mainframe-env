@@ -577,7 +577,7 @@ fn activity_id(process_key: &str, incarnation: &str, sequence: u64) -> String {
     result
 }
 
-fn validate_activity_id(value: &str) -> Result<(), HostProblem> {
+pub(super) fn validate_activity_id(value: &str) -> Result<(), HostProblem> {
     if value.len() != 52 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(HostProblem::Malformed);
     }
@@ -596,7 +596,7 @@ fn validate_identifier(value: &str, max: usize) -> Result<(), HostProblem> {
     Ok(())
 }
 
-fn validate_name(value: &str, max: usize, blanks: bool) -> Result<(), HostProblem> {
+pub(super) fn validate_name(value: &str, max: usize, blanks: bool) -> Result<(), HostProblem> {
     if value.is_empty()
         || value.chars().count() > max
         || value.trim_ascii().is_empty()

@@ -239,6 +239,14 @@ pub(crate) const fn command_descriptor(
         CicsOperation::LinkAcqActivity => Some(&CICS_COMMAND_DESCRIPTORS[230]),
         CicsOperation::LinkAcqProcess => Some(&CICS_COMMAND_DESCRIPTORS[231]),
         CicsOperation::LinkActivity => Some(&CICS_COMMAND_DESCRIPTORS[232]),
+        CicsOperation::BtsEndBrowseActivity => Some(&CICS_COMMAND_DESCRIPTORS[233]),
+        CicsOperation::BtsGetNextActivity => Some(&CICS_COMMAND_DESCRIPTORS[234]),
+        CicsOperation::BtsInquireActivity => Some(&CICS_COMMAND_DESCRIPTORS[235]),
+        CicsOperation::BtsStartBrowseActivity => Some(&CICS_COMMAND_DESCRIPTORS[236]),
+        CicsOperation::BtsEndBrowseProcess => Some(&CICS_COMMAND_DESCRIPTORS[237]),
+        CicsOperation::BtsGetNextProcess => Some(&CICS_COMMAND_DESCRIPTORS[238]),
+        CicsOperation::BtsInquireProcess => Some(&CICS_COMMAND_DESCRIPTORS[239]),
+        CicsOperation::BtsStartBrowseProcess => Some(&CICS_COMMAND_DESCRIPTORS[240]),
         _ => None,
     }
 }

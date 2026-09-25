@@ -6,6 +6,14 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    BtsStartBrowseActivity,
+    BtsGetNextActivity,
+    BtsEndBrowseActivity,
+    BtsInquireActivity,
+    BtsStartBrowseProcess,
+    BtsGetNextProcess,
+    BtsEndBrowseProcess,
+    BtsInquireProcess,
     /// BTS process and activity lifecycle commands, catalog rows 0002–0217.
     AcquireActivityId,
     AcquireProcess,
@@ -449,6 +457,7 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    BtsBrowse(super::BtsBrowseInput),
     /// Four-byte ISSUE conversation token.
     IssueConvid,
     /// Legacy SESSION alias for a mapped ISSUE conversation token.

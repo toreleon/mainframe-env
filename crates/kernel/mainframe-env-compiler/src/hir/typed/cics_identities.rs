@@ -1,5 +1,13 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    BtsStartBrowseActivity,
+    BtsGetNextActivity,
+    BtsEndBrowseActivity,
+    BtsInquireActivity,
+    BtsStartBrowseProcess,
+    BtsGetNextProcess,
+    BtsEndBrowseProcess,
+    BtsInquireProcess,
     AcquireActivityId,
     AcquireProcess,
     CancelAcqActivity,
@@ -231,6 +239,7 @@ pub enum HirCicsOperation {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
+    BtsBrowse(mainframe_env_ir::BtsBrowseInput),
     IssueConvid,
     IssueSession,
     IssueTermId,

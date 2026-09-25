@@ -1,7 +1,8 @@
 #[cfg(test)]
 use mainframe_env_host_api::CicsOperation;
 use mainframe_env_ir::{
-    CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption,
+    BtsBrowseInput, BtsBrowseOutput, CicsAssignOutput, CicsOperandName, CicsOutputName,
+    CicsPlanOperation, CicsPlanOption,
 };
 
 pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Option<(usize, bool)> {
@@ -71,6 +72,8 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::BtsBrowse(BtsBrowseInput::BrowseToken) => SlotUse::FullwordInput,
+        CicsOperandName::BtsBrowse(field) => SlotUse::BtsTextInput(field.width()),
         CicsOperandName::BtsActivityId => SlotUse::BtsTextInput(52),
         CicsOperandName::BtsProcess => SlotUse::BtsTextInput(36),
         CicsOperandName::BtsProcessType
@@ -223,6 +226,10 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::BtsBrowse(BtsBrowseOutput::BrowseToken | BtsBrowseOutput::Level) => {
+            SlotUse::FullwordOutput
+        }
+        CicsOutputName::BtsBrowse(field) => SlotUse::BtsExactOutput(field.width()),
         CicsOutputName::BtsActivityId => SlotUse::BtsExactOutput(52),
         CicsOutputName::BtsAbCode => SlotUse::BtsExactOutput(4),
         CicsOutputName::BtsAbProgram => SlotUse::BtsExactOutput(8),
@@ -402,6 +409,7 @@ pub(super) use super::host_operation::host_operation;
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::BtsBrowse(field) => field.name(),
         CicsOperandName::IssueConvid => "CONVID",
         CicsOperandName::IssueSession => "SESSION",
         CicsOperandName::IssueTermId => "TERMID",
@@ -784,6 +792,7 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::BtsBrowse(field) => field.name(),
         CicsOutputName::IssueState => "STATE",
         CicsOutputName::IssueConvData => "CONVDATA",
         CicsOutputName::IssueRetCode => "RETCODE",

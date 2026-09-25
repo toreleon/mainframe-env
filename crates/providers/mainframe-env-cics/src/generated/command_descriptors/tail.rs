@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 84] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 92] = [
     CicsCommandDescriptor {
         operation: CicsOperation::Monitor,
         syntax: "MONITOR",
@@ -588,6 +588,62 @@ pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 84] = [
         operation: CicsOperation::LinkActivity,
         syntax: "LINK ACTIVITY",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0141",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsEndBrowseActivity,
+        syntax: "ENDBROWSE ACTIVITY",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0059",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsGetNextActivity,
+        syntax: "GETNEXT ACTIVITY",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0089",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsInquireActivity,
+        syntax: "INQUIRE ACTIVITYID",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0101",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsStartBrowseActivity,
+        syntax: "STARTBROWSE ACTIVITY",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0209",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsEndBrowseProcess,
+        syntax: "ENDBROWSE PROCESS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0062",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsGetNextProcess,
+        syntax: "GETNEXT PROCESS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0092",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsInquireProcess,
+        syntax: "INQUIRE PROCESS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0104",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsStartBrowseProcess,
+        syntax: "STARTBROWSE PROCESS",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0212",
         family: CicsCommandFamily::BtsControl,
         mutating: true,
     },

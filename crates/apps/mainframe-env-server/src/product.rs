@@ -6302,6 +6302,7 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    include!("product/bts_browse.rs");
     use super::*;
     use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
