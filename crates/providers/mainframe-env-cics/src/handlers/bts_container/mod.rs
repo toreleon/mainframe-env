@@ -1,6 +1,7 @@
 //! Private, owner-scoped command-data read port for BTS and task channels.
 
 mod browse_read;
+mod channel;
 mod scope;
 mod state;
 
@@ -36,7 +37,7 @@ impl CicsService {
 
 #[cfg(test)]
 mod tests {
-    use super::{browse_read::*, scope::*, state::*};
+    use super::{browse_read::*, channel, scope::*, state::*};
     use crate::service::handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::ProviderStateStore;
@@ -419,6 +420,185 @@ mod tests {
             assert_eq!(
                 port.read(target, ReadRequest::Names { max: 256 }).unwrap(),
                 ReadReply::Names(vec!["ALPHA".into()])
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn channel_container_mutations_are_owner_scoped_and_atomic() {
+        let store = MemoryStore::new(Default::default());
+        let mut allow = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| Ok(());
+        let mut port = channel::ChannelPort::new(&store, owner("UOW1"), &mut allow);
+        port.put("INPUT", "ITEM", b"first", false, "put-1").unwrap();
+        assert_eq!(port.count("INPUT").unwrap(), 1);
+        assert_eq!(port.get("INPUT", "ITEM").unwrap(), b"first");
+        port.put("INPUT", "ITEM", b"next", true, "put-2").unwrap();
+        assert_eq!(port.get("INPUT", "ITEM").unwrap(), b"firstnext");
+        port.move_to("INPUT", "ITEM", "OUTPUT", "COPIED", "move-1")
+            .unwrap();
+        assert_eq!(port.count("INPUT").unwrap(), 0);
+        assert_eq!(port.count("OUTPUT").unwrap(), 1);
+        port.delete_channel("OUTPUT", "delete-1").unwrap();
+        assert!(port.count("OUTPUT").is_err());
+        let mut other = channel::ChannelPort::new(
+            &store,
+            OwnerIdentity {
+                principal: "OTHER",
+                ..owner("UOW1")
+            },
+            &mut allow,
+        );
+        assert!(other.get("INPUT", "ITEM").is_err());
+    }
+
+    #[test]
+    fn channel_container_replay_conflict_preserves_prior_value() {
+        let store = MemoryStore::new(Default::default());
+        let mut allow = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| Ok(());
+        let mut port = channel::ChannelPort::new(&store, owner("UOW1"), &mut allow);
+        port.put("INPUT", "ITEM", b"first", false, "effect-1")
+            .unwrap();
+        port.put("INPUT", "ITEM", b"first", false, "effect-1")
+            .unwrap();
+        assert_eq!(
+            port.put("INPUT", "ITEM", b"changed", false, "effect-1"),
+            Err(mainframe_env_host_api::HostProblem::IdempotencyConflict)
+        );
+        assert_eq!(port.get("INPUT", "ITEM").unwrap(), b"first");
+        let capacity = store
+            .get_provider_state("cics-container-capacity-v1", "global")
+            .unwrap()
+            .unwrap();
+        let capacity: serde_json::Value = serde_json::from_slice(&capacity.payload).unwrap();
+        assert_eq!(capacity["channels"], 1);
+        assert_eq!(capacity["containers"], 1);
+        assert_eq!(capacity["replays"], 1);
+    }
+
+    #[test]
+    fn channel_container_metadata_and_denial_precede_mutation() {
+        let store = MemoryStore::new(Default::default());
+        let audit = std::cell::RefCell::new(Vec::new());
+        let mut authorize = |class: &str, resource: &str, intent| {
+            audit
+                .borrow_mut()
+                .push((class.to_owned(), resource.to_owned(), intent));
+            Ok(())
+        };
+        let mut port = channel::ChannelPort::new(&store, owner("UOW1"), &mut authorize);
+        port.put_value(
+            "DATA",
+            "TEXT",
+            b"hello",
+            ContainerDatatype::Character,
+            Some(37),
+            false,
+            "put-text",
+        )
+        .unwrap();
+        assert_eq!(port.get_value("DATA", "TEXT").unwrap().ccsid, Some(37));
+        assert_eq!(port.get("DATA", "TEXT").unwrap(), b"hello");
+        assert_eq!(
+            port.put_value(
+                "DATA",
+                "TEXT",
+                b"!",
+                ContainerDatatype::Bit,
+                None,
+                true,
+                "bad-append"
+            ),
+            Err(mainframe_env_host_api::HostProblem::Malformed)
+        );
+        assert_eq!(port.get("DATA", "TEXT").unwrap(), b"hello");
+        assert_eq!(
+            audit.borrow()[0].2,
+            mainframe_env_host_api::AccessIntent::Update
+        );
+        let mut deny = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| {
+            Err(mainframe_env_host_api::HostProblem::Unauthorized)
+        };
+        let mut denied = channel::ChannelPort::new(&store, owner("UOW1"), &mut deny);
+        assert_eq!(
+            denied.delete_channel("DATA", "denied"),
+            Err(mainframe_env_host_api::HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-container-replay-v1", 3)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn channel_container_capacity_refuses_a_257th_member_without_replay() {
+        let store = MemoryStore::new(Default::default());
+        let mut allow = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| Ok(());
+        let mut port = channel::ChannelPort::new(&store, owner("UOW1"), &mut allow);
+        for index in 0..256 {
+            let name = format!("I{index:03}");
+            port.put("INPUT", &name, b"x", false, &format!("put-{index}"))
+                .unwrap();
+        }
+        assert_eq!(port.count("INPUT").unwrap(), 256);
+        assert_eq!(
+            port.put("INPUT", "EXTRA", b"x", false, "put-extra"),
+            Err(mainframe_env_host_api::HostProblem::ResourceExhausted)
+        );
+        assert_eq!(port.count("INPUT").unwrap(), 256);
+        assert!(
+            store
+                .get_provider_state("cics-container-replay-v1", "put-extra")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn channel_container_sqlite_reopen_preserves_atomic_delete() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-channel-container-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        {
+            let store = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let mut allow = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| Ok(());
+            let mut port = channel::ChannelPort::new(&store, owner("UOW1"), &mut allow);
+            port.put("INPUT", "A", b"one", false, "put-a").unwrap();
+            port.put("INPUT", "B", b"two", false, "put-b").unwrap();
+        }
+        {
+            let store = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let mut allow = |_: &str, _: &str, _: mainframe_env_host_api::AccessIntent| Ok(());
+            let mut port = channel::ChannelPort::new(&store, owner("UOW1"), &mut allow);
+            assert_eq!(port.count("INPUT").unwrap(), 2);
+            port.delete_channel("INPUT", "delete-input").unwrap();
+            port.delete_channel("INPUT", "delete-input").unwrap();
+            assert_eq!(
+                port.count("INPUT"),
+                Err(mainframe_env_host_api::HostProblem::NotFound)
+            );
+        }
+        {
+            let store = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let namespace = container_namespace(&ContainerOwner::Channel {
+                execution: "EXEC".into(),
+                principal: "USER".into(),
+                run_unit: "UOW1".into(),
+                channel: "INPUT".into(),
+            })
+            .unwrap();
+            assert!(
+                store
+                    .list_provider_state(&namespace, 257)
+                    .unwrap()
+                    .is_empty()
             );
         }
         std::fs::remove_dir_all(directory).unwrap();
