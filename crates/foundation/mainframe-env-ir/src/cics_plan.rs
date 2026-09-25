@@ -6226,12 +6226,10 @@ mod tests {
         assert_eq!(option_from_tag(124), Ok(CicsPlanOption::AsIs));
         assert_eq!(output_tag(CicsOutputName::Partn), 248);
         assert_eq!(output_from_tag(248), Ok(CicsOutputName::Partn));
-        for tag in [u16::MAX] {
-            assert_eq!(
-                operation_from_tag(tag),
-                Err(CicsPlanCodecProblem::Malformed)
-            );
-        }
+        assert_eq!(
+            operation_from_tag(u16::MAX),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         for tag in 116..=123 {
             assert_eq!(option_from_tag(tag), Err(CicsPlanCodecProblem::Malformed));
         }

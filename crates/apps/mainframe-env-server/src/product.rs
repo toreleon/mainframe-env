@@ -18965,6 +18965,19 @@ mod tests {
         };
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.TERMINAL.PAGE", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.TERMINAL.PAGE",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
             InvocationLimits::default(),
