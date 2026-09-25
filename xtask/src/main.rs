@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod carddemo_base_batch_provenance;
 mod carddemo_v09_host;
 mod changelog;
 mod docs;
@@ -6573,25 +6574,9 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
     )?;
 
     let versioned_path = root.join("conformance/0.8/evidence/carddemo-base-batch.json");
-    let expected = if versioned_path.is_file() {
-        let versioned = json(&versioned_path)?;
-        require(
-            versioned["schema_version"]
-                == Value::String("mainframe-env.carddemo-base-batch-version-evidence@1".into())
-                && versioned["target_version"] == Value::String("0.8.0".into())
-                && versioned["supersedes"]
-                    == Value::String("conformance/0.1.1/evidence/issues/CD-023.json".into())
-                && versioned["historical_receipt_rewritten"] == Value::Bool(false),
-            "0.8 CardDemo base-batch evidence header is invalid",
-        )?;
-        let expected = versioned["receipt"]
-            .as_object()
-            .ok_or("0.8 CardDemo base-batch receipt is malformed")?;
-        let expected_digest = canonical_evidence_digest(expected)?;
-        require(
-            versioned["evidence_digest"].as_str() == Some(expected_digest.as_str()),
-            "0.8 CardDemo base-batch evidence digest differs",
-        )?;
+    let (expected, credit) =
+        carddemo_base_batch_provenance::read_carddemo_evidence(root, historical_receipt)?;
+    if versioned_path.is_file() {
         for field in [
             "schema_version",
             "status",
@@ -6610,10 +6595,7 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
                 &format!("0.8 CardDemo compatibility projection changed {field}"),
             )?;
         }
-        Value::Object(expected.clone())
-    } else {
-        Value::Object(historical_receipt.clone())
-    };
+    }
     require(
         expected == receipt_value,
         "CardDemo base-batch receipt is stale",
@@ -6623,6 +6605,7 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
             || evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
         "CD-023 evidence digest differs",
     )?;
+    credit.print();
     Ok(())
 }
 
@@ -8662,6 +8645,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         (
             "conformance/0.8/evidence/carddemo-base-batch.json",
             "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json",
+        ),
+        (
+            "conformance/0.8/evidence/carddemo-base-batch@2.json",
+            "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json",
         ),
         (
             "conformance/0.8/inventory/jes-dd-surface.json",

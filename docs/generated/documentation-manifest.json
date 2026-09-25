@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 210,
+    "markdown_documents": 211,
     "navigation_groups": 5,
-    "normative_documents": 53,
+    "normative_documents": 54,
     "xtask_commands": 197
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 88,
-      "sha256": "sha256:0944b3a8e5c072a1f5b2a587b4aef982a96531a9cef54d3f9364f4f23d4be332",
+      "relative_links": 89,
+      "sha256": "sha256:ce9df8a080e8a3110f5fd15f829a27412806bd4139e3c9ee6dadc6ebceaaffb0",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -903,10 +903,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.8 evidence contract v2",
+      "normative": true,
+      "owner": "conformance and xtask maintainers",
+      "path": "docs/decisions/0024-per-assertion-oracle-provenance.md",
+      "relative_links": 0,
+      "scope": "CardDemo 0.8 base-batch expected values and conformance credit",
+      "sha256": "sha256:f678116b64af9d152ce4469039d0d4930b066cb78a6b72198a21fb063221615f",
+      "status": "Proposed for the first increment of issue #245",
+      "title": "ADR-0024: Per-assertion oracle provenance for CardDemo base batch",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 23,
-      "sha256": "sha256:41093e342b8888396afeefd30c796f60a85dca2c91b32b26ec817f5a1394d850",
+      "relative_links": 24,
+      "sha256": "sha256:eaa1cb3a27b0a4c77cb15f245535c6aad312a4fd19c14be75572e9212a62bc2f",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2100,6 +2112,10 @@
           "path": "docs/decisions/0023-bts-lifecycle-authority.md"
         },
         {
+          "label": "ADR-0024: Per-assertion oracle provenance",
+          "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2263,7 +2279,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:2d41f7a509a682f1b26eb6f09e5dd7d692265b7538b099848828dec3df388b44",
+  "registry_sha256": "sha256:6dd315895961865b933dee7a5ec8e9b7939693aa7f2ea68e17872dae21ded071",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,
