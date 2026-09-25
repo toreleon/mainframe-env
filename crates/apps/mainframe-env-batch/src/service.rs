@@ -1553,6 +1553,7 @@ impl BatchService {
             self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
             let allocation_plans = plan_dd_allocations(&step.dds)?;
             let mut allocations = Vec::new();
+            let mut program_abend_code = None;
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
                 allocations = self.allocate_dds(
                     invocation,
@@ -1652,14 +1653,25 @@ impl BatchService {
                 Ok(output)
             })();
             let step_result = step_result.and_then(|output| {
-                if let Some(crate::ProgramTermination::Abend { code }) = &output.termination {
-                    let problem = HostProblem::Condition {
+                if let Some(crate::ProgramTermination::Abend {
+                    code,
+                    condition_name,
+                }) = &output.termination
+                {
+                    let mut problem = HostProblem::Condition {
                         name: format!("ABEND:{code}"),
                         response: -1,
                         response2: 0,
                     };
                     if abend_code(&problem).is_none() {
                         return Err(HostProblem::Malformed);
+                    }
+                    if let Some(name) = condition_name {
+                        problem = HostProblem::Condition {
+                            name: name.clone(),
+                            response: -1,
+                            response2: 0,
+                        };
                     }
                     self.append_spool_records(
                         invocation,
@@ -1671,6 +1683,7 @@ impl BatchService {
                         "SYSPRINT",
                         output.records,
                     )?;
+                    program_abend_code = Some(code.clone());
                     return Err(problem);
                 }
                 Ok(output)
@@ -1698,7 +1711,8 @@ impl BatchService {
                         )?;
                     }
                     let terminal_problem = problem;
-                    if let Some(code) = abend_code(&terminal_problem) {
+                    if let Some(code) = program_abend_code.or_else(|| abend_code(&terminal_problem))
+                    {
                         first_abend.get_or_insert_with(|| code.clone());
                         job.abend_code = Some(code.clone());
                         self.mark_step(

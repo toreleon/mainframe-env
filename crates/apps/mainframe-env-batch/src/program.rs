@@ -42,7 +42,11 @@ pub struct ProgramInput {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum ProgramTermination {
-    Abend { code: String },
+    Abend {
+        code: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        condition_name: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
