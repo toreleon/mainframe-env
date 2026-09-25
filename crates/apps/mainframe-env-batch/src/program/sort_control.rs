@@ -109,7 +109,11 @@ fn symbols(input: &ProgramInput) -> Result<BTreeMap<String, Symbol>, HostProblem
             .first()
             .ok_or(HostProblem::Unsupported)?
             .to_ascii_uppercase();
-        if name.is_empty() || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-'))
+        {
             return unsupported();
         }
         let symbol = match parts.as_slice() {

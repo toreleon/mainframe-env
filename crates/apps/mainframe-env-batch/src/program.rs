@@ -1138,6 +1138,23 @@ mod tests {
     }
 
     #[test]
+    fn sort_accepts_hyphenated_carddemo_symbol() {
+        let records = ["Z012345678901234", "A012345678901234"]
+            .map(|record| CodePage::Cp037.encode(record, 16).unwrap());
+        let refs = records.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        assert_eq!(
+            sort_case(
+                &refs,
+                " SORT FIELDS=(TRAN-ID,A)\n",
+                Some("TRAN-ID,1,16,CH                                                         \n"),
+                Some(37),
+            )
+            .unwrap(),
+            [records[1].clone(), records[0].clone()]
+        );
+    }
+
+    #[test]
     fn sort_orders_by_two_keys_like_creastmt() {
         assert_eq!(
             sort_case(
