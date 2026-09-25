@@ -13886,6 +13886,216 @@ mod tests {
     }
 
     #[test]
+    fn compiled_bts_container_route_uses_attached_process_fence() {
+        use mainframe_env_cics::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsProcessTypeDefinition, BtsReply,
+            BtsTransactionDefinition,
+        };
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CNTBTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4) VALUE 'DATA'. 01 PROC-X PIC X(4). 01 ACT-X PIC X(4). 01 LEN-X PIC S9(9) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('ORDER') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS PUT CONTAINER('P1') PROCESS FROM(DATA-X) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS GET CONTAINER('P1') PROCESS INTO(PROC-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS MOVE CONTAINER('P1') AS('A1') FROMPROCESS TOACTIVITY('CHILD') END-EXEC. EXEC CICS GET CONTAINER('A1') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS MOVE CONTAINER('A1') AS('P2') FROMACTIVITY('CHILD') TOPROCESS END-EXEC. EXEC CICS DELETE CONTAINER('P2') PROCESS END-EXEC. EXEC CICS PUT CONTAINER('A2') ACTIVITY('CHILD') FROM(DATA-X) END-EXEC. EXEC CICS GET CONTAINER('A2') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS DELETE CONTAINER('A2') ACTIVITY('CHILD') END-EXEC. EXEC CICS SYNCPOINT END-EXEC. EXEC CICS SUSPEND END-EXEC. STOP RUN.";
+        let artifact = published_source_fixture("CNTBTS", source);
+        let worker = published_source_fixture(
+            "BTSROOT",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSROOT. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let worker_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(worker.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-bts-container-route-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let mut settings = config();
+        settings.store_profile = crate::StoreProfile::Sqlite;
+        settings.sqlite_url = url.clone();
+        settings.artifact_root = root.join("artifacts");
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let session = SessionId::new("bts-container-selected", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let invocation;
+        {
+            let store: Arc<dyn PlatformStore> =
+                Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let server = ProductServer::open(
+                settings.clone(),
+                store.clone(),
+                secrets.clone(),
+                default_program_router(),
+            )
+            .unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .install_online_application(OnlineApplicationDefinition {
+                    programs: vec![
+                        OnlineProgramDefinition {
+                            name: "CNTBTS".into(),
+                            artifact: artifact_ref.clone(),
+                            payload: artifact.payload().to_vec(),
+                            manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                            semantic_identity: artifact.semantic_id().to_reference(),
+                        },
+                        OnlineProgramDefinition {
+                            name: "BTSROOT".into(),
+                            artifact: worker_ref,
+                            payload: worker.payload().to_vec(),
+                            manifest: VersionedArtifactManifest::V3(worker.manifest().clone()),
+                            semantic_identity: worker.semantic_id().to_reference(),
+                        },
+                    ],
+                    transactions: BTreeMap::from([
+                        ("CB01".into(), "CNTBTS".into()),
+                        ("BT01".into(), "BTSROOT".into()),
+                    ]),
+                    maps: vec![BmsMapDefinition {
+                        mapset: "CNTBTS".into(),
+                        map: "CNTBTS".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    }],
+                })
+                .unwrap();
+            server
+                .cics
+                .register_bts_process_type(
+                    BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+                )
+                .unwrap();
+            server
+                .cics
+                .register_bts_transaction(
+                    BtsTransactionDefinition::new("BT01", "BTSROOT", true, false).unwrap(),
+                )
+                .unwrap();
+            server
+                .racf
+                .define_profile("BTSREPO", "BTS.REPO", "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Update)
+                .unwrap();
+            let lifecycle_resource = BtsLifecycleStore::saf_resource("TYPE", "ORDER").unwrap();
+            server
+                .racf
+                .define_profile("BTSLIFE", &lifecycle_resource, "IBMUSER", None)
+                .unwrap();
+            for intent in [AccessIntent::Read, AccessIntent::Update] {
+                server
+                    .racf
+                    .permit("BTSLIFE", &lifecycle_resource, "IBMUSER", intent)
+                    .unwrap();
+            }
+            invocation = server
+                .cics_invocation("IBMUSER", "CB01", Some(artifact_ref.clone()))
+                .unwrap();
+            server
+                .cics
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "CB01",
+                    24,
+                    80,
+                    "bts-container-csrf",
+                    1,
+                    10_000,
+                )
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CNTBTS", 2)
+                .unwrap();
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+            let root_id = process.root_id;
+            let uow = invocation.run_unit_id.as_str();
+            let execution = invocation.execution_id.as_str();
+            authority
+                .mutate_process(
+                    "TYPE",
+                    "ORDER",
+                    uow,
+                    execution,
+                    "IBMUSER",
+                    "activate",
+                    [1; 32],
+                    |process| {
+                        process.start(&root_id, None, true)?;
+                        process.checkpoint(&root_id, 1, 7, "selected-checkpoint")?;
+                        Ok(BtsReply::normal())
+                    },
+                )
+                .unwrap();
+            authority
+                .define_child(
+                    "TYPE",
+                    "ORDER",
+                    &root_id,
+                    &BtsChildDefinition {
+                        name: "CHILD".into(),
+                        completion_event: "DONE".into(),
+                        program: "BTSROOT".into(),
+                        transid: "BT01".into(),
+                        userid: "IBMUSER".into(),
+                    },
+                    uow,
+                    execution,
+                    "IBMUSER",
+                    "child",
+                    [2; 32],
+                )
+                .unwrap();
+            server
+                .cics
+                .bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ORDER", &root_id, 1, 7)
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CNTBTS", 3)
+                .unwrap();
+        }
+        {
+            let store: Arc<dyn PlatformStore> =
+                Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let server =
+                ProductServer::open(settings, store, secrets, default_program_router()).unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CNTBTS", 4)
+                .unwrap();
+            let continuation = server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .unwrap();
+            let mut restored = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation,
+                CodecLimits::default(),
+            )
+            .unwrap();
+            restored
+                .restore_checkpoint(&continuation.checkpoint)
+                .unwrap();
+            assert_eq!(restored.variable("PROC-X").unwrap().bytes(), b"DATA");
+            assert_eq!(restored.variable("ACT-X").unwrap().bytes(), b"DATA");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn compiled_document_retrieve_reports_truncation_and_required_length() {
         let artifact = published_source_fixture(
             "DOCRETRV",

@@ -1,13 +1,14 @@
 //! Public task-channel command profile over the owner-scoped port.
 
 use super::{channel::ChannelPort, scope::OwnerIdentity, state::ContainerDatatype};
+use crate::service::handlers::bts_lifecycle::BtsLifecycleStore;
 use crate::service::{CicsService, Run};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
 
-fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
+pub(super) fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
     HostProblem::Condition {
         name: name.into(),
         response,
@@ -15,7 +16,7 @@ fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
     }
 }
 
-fn name(request: &CicsRequest, key: &str) -> Result<Option<String>, HostProblem> {
+pub(super) fn name(request: &CicsRequest, key: &str) -> Result<Option<String>, HostProblem> {
     let Some(value) = request.arguments.get(key) else {
         return Ok(None);
     };
@@ -47,7 +48,7 @@ fn name(request: &CicsRequest, key: &str) -> Result<Option<String>, HostProblem>
     Ok(Some(text.to_owned()))
 }
 
-fn number(request: &CicsRequest, key: &str) -> Result<Option<i64>, HostProblem> {
+pub(super) fn number(request: &CicsRequest, key: &str) -> Result<Option<i64>, HostProblem> {
     let Some(value) = request.arguments.get(key) else {
         return Ok(None);
     };
@@ -67,7 +68,7 @@ fn number(request: &CicsRequest, key: &str) -> Result<Option<i64>, HostProblem> 
     Ok(Some(parsed))
 }
 
-fn output(
+pub(super) fn output(
     response: &mut CicsResponse,
     key: &str,
     schema: &'static str,
@@ -90,7 +91,7 @@ fn channel_error(problem: HostProblem) -> HostProblem {
     }
 }
 
-fn container_error(problem: HostProblem) -> HostProblem {
+pub(super) fn container_error(problem: HostProblem) -> HostProblem {
     match problem {
         HostProblem::NotFound => condition("CONTAINERERR", 110, 1),
         HostProblem::Malformed => condition("INVREQ", 16, 1),
@@ -104,6 +105,36 @@ pub(in crate::service::handlers) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let operation = request.operation;
+    if matches!(
+        operation,
+        CicsOperation::DeleteContainer
+            | CicsOperation::GetContainer
+            | CicsOperation::MoveContainer
+            | CicsOperation::PutContainer
+    ) && (request.arguments.keys().any(|key| {
+        matches!(
+            key.as_str(),
+            "ACTIVITY"
+                | "FROMACTIVITY"
+                | "TOACTIVITY"
+                | "OPTION.PROCESS"
+                | "OPTION.ACQPROCESS"
+                | "OPTION.ACQACTIVITY"
+                | "OPTION.FROMPROCESS"
+                | "OPTION.TOPROCESS"
+        )
+    }) || !request.arguments.contains_key("CHANNEL")
+        && !request.arguments.contains_key("TOCHANNEL")
+        && BtsLifecycleStore::new(service.store.as_ref())
+            .active_context(
+                run.invocation.run_unit_id.as_str(),
+                run.invocation.execution_id.as_str(),
+                run.invocation.principal.id().as_str(),
+            )?
+            .is_some())
+    {
+        return super::bts::invoke(service, run, request);
+    }
     if request.arguments.keys().any(|key| {
         matches!(
             key.as_str(),

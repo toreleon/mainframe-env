@@ -710,6 +710,16 @@ a different program and the current channel. RUN TRANSID CHANNEL reads the
 owner-scoped channel at issue time and passes its bytes and metadata to the
 existing child snapshot authority.
 
+The same typed container operations also select BTS owners when issued in a
+fenced activity context or with PROCESS, ACTIVITY, ACQPROCESS, or ACQACTIVITY.
+The command route resolves the owner through the shared lifecycle process row,
+authorizes its BTSLIFE resource, and stages mutations under the owning UOW.
+Each staging write CAS-fences the process row and saves the replay receipt in
+the same atomic batch. UOW settlement publishes or discards staged contents;
+activity removal and completion delete their containers in the lifecycle
+transition batch. GET ACQPROCESS under an acquired descendant is rejected
+because the pinned GET and ACQUIRE topics do not settle that selector.
+
 ## Verification
 
 ```bash

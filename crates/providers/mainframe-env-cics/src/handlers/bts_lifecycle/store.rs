@@ -803,6 +803,12 @@ impl<'a> BtsLifecycleStore<'a> {
                 delete_process,
             )?);
             if delete_process {
+                writes.extend(super::super::bts_container::cleanup_bts_containers(
+                    self.store,
+                    &process,
+                    &[process.root_id.clone()],
+                    true,
+                )?);
                 writes.push(ProviderStateMutation::Delete {
                     namespace: PROCESS_NAMESPACE.into(),
                     key,

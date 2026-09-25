@@ -85,6 +85,9 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::BtsChannel => SlotUse::BtsTextInput(16),
         CicsOperandName::ContainerName
         | CicsOperandName::ContainerAs
+        | CicsOperandName::ContainerActivity
+        | CicsOperandName::ContainerFromActivity
+        | CicsOperandName::ContainerToActivity
         | CicsOperandName::ContainerToChannel => SlotUse::BtsTextInput(16),
         CicsOperandName::ContainerLength
         | CicsOperandName::ContainerCcsid
@@ -435,6 +438,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::BtsChannel => "CHANNEL",
         CicsOperandName::ContainerName => "CONTAINER",
         CicsOperandName::ContainerAs => "AS",
+        CicsOperandName::ContainerActivity => "ACTIVITY",
+        CicsOperandName::ContainerFromActivity => "FROMACTIVITY",
+        CicsOperandName::ContainerToActivity => "TOACTIVITY",
         CicsOperandName::ContainerToChannel => "TOCHANNEL",
         CicsOperandName::ContainerFrom => "FROM",
         CicsOperandName::ContainerLength => "FLENGTH",

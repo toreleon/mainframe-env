@@ -296,6 +296,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/bridge_start.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bridge_terminal.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_child_link.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/bts.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_container/browse_read.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_container/channel.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_container/command.rs",

@@ -1,4 +1,4 @@
-//! Validated MCEP profile for task-channel container commands.
+//! Validated MCEP profile for task-channel and BTS container commands.
 
 use super::{
     CicsEffectPlan, CicsOperandName as I, CicsOutputName as O, CicsPlanOperation as P,
@@ -39,11 +39,12 @@ pub(super) fn invalid_shape(
 ) -> bool {
     let (required, optional): (&[I], &[I]) = match plan.operation {
         P::DeleteChannel | P::QueryChannel => (&[I::BtsChannel], &[]),
-        P::DeleteContainer => (&[I::ContainerName], &[I::BtsChannel]),
+        P::DeleteContainer => (&[I::ContainerName], &[I::BtsChannel, I::ContainerActivity]),
         P::GetContainer => (
             &[I::ContainerName],
             &[
                 I::BtsChannel,
+                I::ContainerActivity,
                 I::ContainerLength,
                 I::ContainerByteOffset,
                 I::ContainerIntoCcsid,
@@ -53,12 +54,18 @@ pub(super) fn invalid_shape(
         ),
         P::MoveContainer => (
             &[I::ContainerName, I::ContainerAs],
-            &[I::BtsChannel, I::ContainerToChannel],
+            &[
+                I::BtsChannel,
+                I::ContainerToChannel,
+                I::ContainerFromActivity,
+                I::ContainerToActivity,
+            ],
         ),
         P::PutContainer => (
             &[I::ContainerName, I::ContainerFrom],
             &[
                 I::BtsChannel,
+                I::ContainerActivity,
                 I::ContainerLength,
                 I::ContainerDatatype,
                 I::ContainerCcsid,
@@ -81,9 +88,63 @@ pub(super) fn invalid_shape(
         !matches!(option, F::NoHandle)
             && !matches!(
                 (plan.operation, option),
-                (P::PutContainer, F::ContainerAppend) | (P::GetContainer, F::ContainerNoData)
+                (P::PutContainer, F::ContainerAppend)
+                    | (P::GetContainer, F::ContainerNoData)
+                    | (
+                        P::DeleteContainer | P::GetContainer | P::PutContainer,
+                        F::ContainerProcess | F::ContainerAcqProcess | F::ContainerAcqActivity
+                    )
+                    | (
+                        P::MoveContainer,
+                        F::ContainerFromProcess | F::ContainerToProcess
+                    )
             )
     }) {
+        return true;
+    }
+    let bts = inputs.contains(&I::ContainerActivity)
+        || inputs.contains(&I::ContainerFromActivity)
+        || inputs.contains(&I::ContainerToActivity)
+        || plan.options.iter().any(|option| {
+            matches!(
+                option,
+                F::ContainerProcess
+                    | F::ContainerAcqProcess
+                    | F::ContainerAcqActivity
+                    | F::ContainerFromProcess
+                    | F::ContainerToProcess
+            )
+        });
+    let selectors = usize::from(inputs.contains(&I::ContainerActivity))
+        + plan
+            .options
+            .iter()
+            .filter(|option| {
+                matches!(
+                    option,
+                    F::ContainerProcess | F::ContainerAcqProcess | F::ContainerAcqActivity
+                )
+            })
+            .count();
+    let from = usize::from(inputs.contains(&I::ContainerFromActivity))
+        + usize::from(plan.options.contains(&F::ContainerFromProcess));
+    let to = usize::from(inputs.contains(&I::ContainerToActivity))
+        + usize::from(plan.options.contains(&F::ContainerToProcess));
+    if bts
+        && (inputs.contains(&I::BtsChannel)
+            || inputs.contains(&I::ContainerToChannel)
+            || inputs.contains(&I::ContainerDatatype)
+            || inputs.contains(&I::ContainerCcsid)
+            || inputs.contains(&I::ContainerByteOffset)
+            || inputs.contains(&I::ContainerIntoCcsid)
+            || inputs.contains(&I::ContainerIntoCodepage)
+            || inputs.contains(&I::ContainerFromCodepage)
+            || inputs.contains(&I::ContainerConvertst)
+            || outputs.contains(&O::ContainerCcsid))
+        || selectors > 1
+        || from > 1
+        || to > 1
+    {
         return true;
     }
     match plan.operation {

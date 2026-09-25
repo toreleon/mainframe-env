@@ -49,6 +49,14 @@ impl<'a> BtsLifecycleStore<'a> {
             })
             .collect::<Result<Vec<_>, HostProblem>>()?;
         let mut writes = Vec::new();
+        let mut cleanup_ids = removed.clone();
+        cleanup_ids.push(parent_id.to_owned());
+        writes.extend(super::super::bts_container::cleanup_bts_containers(
+            self.store,
+            process,
+            &cleanup_ids,
+            parent_id == process.root_id,
+        )?);
         if !direct.is_empty()
             && let Some(event) = super::super::event_control::activity_completion::delete_many(
                 self.store, parent_id, &direct,
@@ -169,6 +177,12 @@ impl<'a> BtsLifecycleStore<'a> {
                 retire_ids.push(activity_id.clone());
             }
             let mut writes = self.retire_deferred_for_ids(&old, &retire_ids)?;
+            writes.extend(super::super::bts_container::cleanup_bts_containers(
+                self.store,
+                &old,
+                &retire_ids,
+                matches!(removal, BtsRemoval::Reset { activity_id } if activity_id == &old.root_id),
+            )?);
             match removal {
                 BtsRemoval::Reset { activity_id } => {
                     let subject = original
