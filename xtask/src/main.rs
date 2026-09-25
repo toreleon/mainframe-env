@@ -4,6 +4,7 @@
 
 mod carddemo_v09_host;
 mod changelog;
+mod cobol_differential;
 mod docs;
 mod evidence_seal;
 mod jcl_catalog;
@@ -208,6 +209,7 @@ enum XtaskCommand {
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
+    CobolDifferential(cobol_differential::Args),
     CicsOracle(CicsOracleArgs),
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
@@ -470,6 +472,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             args,
             check_cobol_reference(root, &args.receipt)
         ),
+        XtaskCommand::CobolDifferential(args) => (
+            "cobol-differential",
+            args.check,
+            cobol_differential::run(root, &args),
+        ),
         XtaskCommand::CicsOracle(args) => (
             "cics-oracle",
             false,
@@ -706,6 +713,7 @@ fn check_spec(root: &Path) -> TaskResult {
                 "cobol-language.schema.json",
                 "cobol-gnucobol-reference-allowlist.schema.json",
                 "cobol-gnucobol-reference-receipt.schema.json",
+                "cobol-differential-receipt.schema.json",
                 "cobol-licensed-differential-adapter.schema.json",
                 "cobol-licensed-differential-receipt.schema.json",
                 "cobol-condition-fixtures.schema.json",

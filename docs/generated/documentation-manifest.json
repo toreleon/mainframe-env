@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 210,
+    "markdown_documents": 211,
     "navigation_groups": 5,
     "normative_documents": 53,
-    "xtask_commands": 197
+    "xtask_commands": 198
   },
   "documents": [
     {
@@ -1696,6 +1696,14 @@
       "relative_links": 0,
       "sha256": "sha256:616ea9f5b00f2dfb2c8898bbb667c7bb72dfc863746790f19a1008f904f6e1a9",
       "title": "CI supply-chain inputs",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/COBOL-DIFFERENTIAL.md",
+      "relative_links": 0,
+      "sha256": "sha256:05c7524148c902c378d1e3e05261ab2f9485ea729105a589522ff3ef24ca8882",
+      "title": "COBOL semantic differential pilot",
       "xtask_commands": 1
     },
     {

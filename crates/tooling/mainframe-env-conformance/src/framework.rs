@@ -4,10 +4,10 @@
 
 use crate::{
     abi, carddemo, cics_licensed, cics_pilot, cobol_arithmetic_pilot, cobol_assurance,
-    cobol_clauses, cobol_conditions, cobol_data, cobol_exit, cobol_files, cobol_frontend,
-    cobol_function_boundaries, cobol_functions, cobol_intrinsics, cobol_licensed, cobol_move_pilot,
-    cobol_phrases, cobol_recovery, cobol_reference, cobol_registers, cobol_runtime,
-    cobol_statements, dataset, dataset_reference, jcl, racf, racf_oracle,
+    cobol_clauses, cobol_conditions, cobol_data, cobol_differential, cobol_exit, cobol_files,
+    cobol_frontend, cobol_function_boundaries, cobol_functions, cobol_intrinsics, cobol_licensed,
+    cobol_move_pilot, cobol_phrases, cobol_recovery, cobol_reference, cobol_registers,
+    cobol_runtime, cobol_statements, dataset, dataset_reference, jcl, racf, racf_oracle,
 };
 use mainframe_env_compiler::CobolCompiler;
 use mainframe_env_compiler_api::{
@@ -78,6 +78,9 @@ pub use cobol_assurance::verify_cobol_assurance_sources;
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
 pub use cobol_conditions::verify_cobol_condition_fixtures;
 pub use cobol_data::verify_cobol_data_runtime_fixtures;
+pub use cobol_differential::{
+    CobolDifferentialReceipt, observe_cobol_source, run_cobol_differential,
+};
 pub use cobol_exit::{CobolExitReceipt, verify_cobol_exit};
 pub use cobol_files::verify_cobol_file_runtime_fixtures;
 pub use cobol_frontend::{
