@@ -16,6 +16,7 @@ pub(crate) use common_programs::TsoProgramExecution;
 use common_programs::{
     BuiltinProgram, COMMON_PROGRAM_CATALOG_SHA256, COMMON_PROGRAMS, SYSTEM_SERVICES, TSO_PROGRAMS,
 };
+mod sort_control;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProgramExecutionContext {
@@ -378,9 +379,7 @@ impl Program for Builtin {
                 output(0, vec![format!("IDCAMS {command}").into_bytes()])
             }
             BuiltinProgram::Sort => {
-                let mut records = dd_records(input, "SORTIN")?;
-                records.sort();
-                records = sort_outrec(input, records)?;
+                let mut records = sort_control::execute(input, dd_records(input, "SORTIN")?)?;
                 fit_sortout_records(input, &mut records)?;
                 output_to(0, records, "SORTOUT")
             }
@@ -420,32 +419,6 @@ fn inline_records(bytes: &[u8]) -> Vec<Vec<u8>> {
     records
 }
 
-fn sort_outrec(input: &ProgramInput, records: Vec<Vec<u8>>) -> Result<Vec<Vec<u8>>, HostProblem> {
-    let control = match dd_text(input, "SYSIN") {
-        Ok(control) => control,
-        Err(HostProblem::NotFound) => return Ok(records),
-        Err(problem) => return Err(problem),
-    };
-    let Some(fields) = control_parenthesized(&control, "OUTREC FIELDS=")? else {
-        return Ok(records);
-    };
-    let symbols = dd_text(input, "SYMNAMES")
-        .ok()
-        .map(|text| sort_symbols(&text))
-        .transpose()?
-        .unwrap_or_default();
-    let tokens = split_control_fields(&fields)?;
-    let ccsid = input
-        .dds
-        .iter()
-        .find(|dd| dd.name.eq_ignore_ascii_case("SORTIN"))
-        .and_then(|dd| dd.ccsid);
-    records
-        .into_iter()
-        .map(|record| project_sort_record(&record, &tokens, &symbols, ccsid))
-        .collect()
-}
-
 fn fit_sortout_records(input: &ProgramInput, records: &mut [Vec<u8>]) -> Result<(), HostProblem> {
     let Some(dd) = input
         .dds
@@ -476,30 +449,6 @@ fn dd_text(input: &ProgramInput, name: &str) -> Result<String, HostProblem> {
     )
     .map(|text| text.to_ascii_uppercase())
     .map_err(|_| HostProblem::Malformed)
-}
-
-fn control_parenthesized(control: &str, keyword: &str) -> Result<Option<String>, HostProblem> {
-    let Some(start) = control.find(keyword) else {
-        return Ok(None);
-    };
-    let open = control[start + keyword.len()..]
-        .find('(')
-        .map(|offset| start + keyword.len() + offset)
-        .ok_or(HostProblem::Malformed)?;
-    let mut depth = 0usize;
-    for (offset, character) in control[open..].char_indices() {
-        match character {
-            '(' => depth += 1,
-            ')' => {
-                depth = depth.checked_sub(1).ok_or(HostProblem::Malformed)?;
-                if depth == 0 {
-                    return Ok(Some(control[open + 1..open + offset].to_string()));
-                }
-            }
-            _ => {}
-        }
-    }
-    Err(HostProblem::Malformed)
 }
 
 fn split_control_fields(fields: &str) -> Result<Vec<String>, HostProblem> {
@@ -540,31 +489,6 @@ fn split_control_fields(fields: &str) -> Result<Vec<String>, HostProblem> {
         tokens.push(current.trim().to_string());
     }
     Ok(tokens)
-}
-
-fn sort_symbols(control: &str) -> Result<BTreeMap<String, (usize, usize)>, HostProblem> {
-    let mut symbols = BTreeMap::new();
-    for line in control.lines().filter(|line| !line.trim().is_empty()) {
-        let parts = line.split(',').map(str::trim).collect::<Vec<_>>();
-        if parts.len() < 3 {
-            return Err(HostProblem::Malformed);
-        }
-        let start = parts[1]
-            .parse::<usize>()
-            .map_err(|_| HostProblem::Malformed)?;
-        let length = parts[2]
-            .parse::<usize>()
-            .map_err(|_| HostProblem::Malformed)?;
-        if start == 0
-            || length == 0
-            || symbols
-                .insert(parts[0].to_string(), (start, length))
-                .is_some()
-        {
-            return Err(HostProblem::Malformed);
-        }
-    }
-    Ok(symbols)
 }
 
 fn project_sort_record(
@@ -1115,6 +1039,166 @@ mod tests {
                 .unwrap()
                 .records,
             vec![b"SORTOUT RECORDS=2".to_vec()]
+        );
+        assert_eq!(
+            Builtin(common_program("SORT").unwrap())
+                .execute(&invocation(), &sort_input)
+                .unwrap()
+                .dd_outputs["SORTOUT"],
+            [b"A".to_vec(), b"B".to_vec()]
+        );
+    }
+
+    fn sort_case(
+        records: &[&[u8]],
+        sysin: &str,
+        symnames: Option<&str>,
+        ccsid: Option<u16>,
+    ) -> Result<Vec<Vec<u8>>, HostProblem> {
+        let mut case = input("SORTIN", b"");
+        case.dd_records.insert(
+            "SORTIN".into(),
+            records.iter().map(|record| record.to_vec()).collect(),
+        );
+        case.dds[0].ccsid = ccsid;
+        add_dd(&mut case, "SORTOUT", b"");
+        add_dd(&mut case, "SYSIN", sysin.as_bytes());
+        if let Some(symbols) = symnames {
+            add_dd(&mut case, "SYMNAMES", symbols.as_bytes());
+        }
+        Builtin(common_program("SORT").unwrap())
+            .execute(&invocation(), &case)
+            .map(|out| out.dd_outputs["SORTOUT"].clone())
+    }
+
+    #[test]
+    fn sort_orders_by_positional_key_not_leading_bytes() {
+        assert_eq!(
+            sort_case(
+                &[b"AAAAAAAAAAB", b"ZZZZZZZZZZA"],
+                " SORT FIELDS=(11,1,CH,A)\n",
+                None,
+                None
+            )
+            .unwrap(),
+            [b"ZZZZZZZZZZA".to_vec(), b"AAAAAAAAAAB".to_vec()]
+        );
+    }
+
+    #[test]
+    fn sort_orders_by_symnames_zd_key_stably() {
+        let records = [b"B\xF0\xF2".as_slice(), b"Z\xF0\xD1", b"A\xF0\xF2"];
+        assert_eq!(
+            sort_case(
+                &records,
+                " SORT FIELDS=(AMOUNT,A)\n",
+                Some("AMOUNT,2,2,ZD\n"),
+                Some(37)
+            )
+            .unwrap(),
+            [
+                records[1].to_vec(),
+                records[0].to_vec(),
+                records[2].to_vec()
+            ]
+        );
+    }
+
+    #[test]
+    fn sort_orders_by_two_keys_like_creastmt() {
+        assert_eq!(
+            sort_case(
+                &[b"ZAa", b"ABa", b"YAb"],
+                " SORT FIELDS=(3,1,CH,A,1,1,CH,A)\n",
+                None,
+                None
+            )
+            .unwrap(),
+            [b"ABa".to_vec(), b"ZAa".to_vec(), b"YAb".to_vec()]
+        );
+    }
+
+    #[test]
+    fn include_cond_keeps_only_records_in_date_range() {
+        let records = ["20240101", "20240615", "20250101"]
+            .map(|date| CodePage::Cp037.encode(date, 8).unwrap());
+        let refs = records.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let symbols = "DATE,1,8,CH //Date\nFROM,C'20240601' //Date\nTHRU,C'20241231' //Date\n";
+        assert_eq!(sort_case(&refs, " INCLUDE COND=(DATE,GE,FROM,\n               AND,DATE,LE,THRU)\n SORT FIELDS=(DATE,A)\n", Some(symbols), Some(37)).unwrap(), [records[1].clone()]);
+    }
+
+    #[test]
+    fn omit_cond_drops_matching_records() {
+        assert_eq!(
+            sort_case(
+                &[b"A1", b"B2", b"C3"],
+                " OMIT COND=(1,1,CH,EQ,C'B')\n SORT FIELDS=(1,1,CH,A)\n",
+                None,
+                None
+            )
+            .unwrap(),
+            [b"A1".to_vec(), b"C3".to_vec()]
+        );
+    }
+
+    #[test]
+    fn include_cond_applies_and_before_or() {
+        assert_eq!(
+            sort_case(
+                &[b"A0", b"B1", b"B2", b"C2"],
+                " INCLUDE COND=(1,1,CH,EQ,C'A',OR,1,1,CH,EQ,C'B',\n AND,2,1,CH,EQ,C'2')\n SORT FIELDS=(1,1,CH,A)\n",
+                None,
+                None
+            )
+            .unwrap(),
+            [b"A0".to_vec(), b"B2".to_vec()]
+        );
+    }
+
+    #[test]
+    fn sort_ignores_comment_and_columns_after_71() {
+        let control = format!(
+            "* SUM FIELDS=NONE\n {:<70}OUTFIL FNAMES=X\n",
+            "SORT FIELDS=(1,1,CH,A)"
+        );
+        assert_eq!(
+            sort_case(&[b"B", b"A"], &control, None, None).unwrap(),
+            [b"A".to_vec(), b"B".to_vec()]
+        );
+    }
+
+    #[test]
+    fn sort_rejects_unsupported_statement() {
+        for control in [
+            " SUM FIELDS=NONE\n",
+            " OUTFIL FNAMES=X\n",
+            " SORT FIELDS=COPY\n",
+            " OPTION EQUALS\n",
+            " SORT FIELDS=(1,1,BI,A)\n",
+            " SORT FIELDS=(1,1,CH,A),EQUALS\n",
+            " INCLUDE COND=((1,1,CH,EQ,C'A'))\n",
+        ] {
+            assert_eq!(
+                sort_case(&[b"A"], control, None, None),
+                Err(HostProblem::Unsupported)
+            );
+        }
+    }
+
+    #[test]
+    fn sort_rejects_unknown_symbol_and_malformed_symnames() {
+        assert_eq!(
+            sort_case(&[b"A"], " SORT FIELDS=(UNKNOWN,A)\n", None, None),
+            Err(HostProblem::Unsupported)
+        );
+        assert_eq!(
+            sort_case(
+                &[b"A"],
+                " SORT FIELDS=(FIELD,A)\n",
+                Some("FIELD,BOGUS,1,CH\n"),
+                None
+            ),
+            Err(HostProblem::Unsupported)
         );
     }
 
