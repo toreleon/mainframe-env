@@ -99,22 +99,39 @@ def check(root: Path) -> None:
         "typed CICS compiler ownership",
     )
 
-    cics_descriptors = production(
+    cics_descriptor_root = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
     )
+    cics_descriptor_entries = production(
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries.rs")
+    )
+    cics_descriptor_effects = production(
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/effects.rs")
+    )
+    for required in [
+        "mod executable_registry;",
+        "pub use executable_registry::*;",
+        "mod executable_entries;",
+        "mod effects;",
+        "use effects::*;",
+        "pub use executable_entries::CICS_EXECUTABLE_DESCRIPTORS;",
+        'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
+    ]:
+        require(required in cics_descriptor_root, f"typed CICS descriptor facade omits {required}")
+    for required in ["Effect::DatasetRead", "Effect::DatasetWrite", "Effect::Transaction"]:
+        require(
+            required in cics_descriptor_effects,
+            f"typed CICS descriptor effects omit {required}",
+        )
     for required in [
         "pub const CICS_EXECUTABLE_DESCRIPTORS",
-        'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
         'namespace: "cics.file"',
         'namespace: "cics.recovery"',
         "operation: CicsPlanOperation::Read",
         "operation: CicsPlanOperation::Rewrite",
         "operation: CicsPlanOperation::Syncpoint",
-        "Effect::DatasetRead",
-        "Effect::DatasetWrite",
-        "Effect::Transaction",
     ]:
-        require(required in cics_descriptors, f"typed CICS descriptor registry omits {required}")
+        require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
 
     lower = production(read(root, "crates/kernel/mainframe-env-compiler/src/lower.rs"))
     for required in [
@@ -170,9 +187,9 @@ def check(root: Path) -> None:
         "typed decimal condition runtime",
     )
 
-    cics_runtime = production(
-        read(root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics.rs")
-    )
+    cics_runtime = read(
+        root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics.rs"
+    ).split("#[cfg(test)]\nmod tests", 1)[0]
     typed_execute = between(
         cics_runtime,
         "pub(super) fn execute(\n",
@@ -190,11 +207,28 @@ def check(root: Path) -> None:
         ],
         "typed CICS runtime",
     )
-    validation = between(cics_runtime, "fn plan(operation: &Operation)", "pub(super) fn legacy_arguments")
+    cics_runtime_validation = production(
+        read(root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics/runtime_validation.rs")
+    )
+    require(
+        "fn plan(operation: &Operation)" in cics_runtime,
+        "typed CICS plan validation is missing",
+    )
+    require(
+        "fn validate_runtime_plan" in cics_runtime_validation,
+        "typed CICS runtime validation is missing",
+    )
+    validation = (
+        cics_runtime.split("fn plan(operation: &Operation)", 1)[1]
+        + cics_runtime_validation
+    )
     reject(
         validation,
         ["CicsOperation::from_tokens", "legacy_arguments(", "legacy_destination("],
         "typed CICS validation",
+    )
+    cics_runtime_registry = production(
+        read(root, "crates/kernel/mainframe-env-interpreter/src/machine/typed_cics/registry.rs")
     )
     for required in [
         "decode_cics_effect_plan",
@@ -203,7 +237,10 @@ def check(root: Path) -> None:
         "cics_executable_descriptor",
         ".runtime_import",
     ]:
-        require(required in cics_runtime, f"typed CICS runtime omits {required}")
+        require(
+            required in cics_runtime or required in cics_runtime_registry,
+            f"typed CICS runtime omits {required}",
+        )
     reject(
         cics_runtime,
         ['"cics.file"', '"cics.recovery"', "Effect::DatasetRead", "Effect::DatasetWrite"],

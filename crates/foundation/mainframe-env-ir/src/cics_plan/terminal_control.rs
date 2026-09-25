@@ -9,6 +9,166 @@ pub(super) fn invalid_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
+    if plan.operation == CicsPlanOperation::SendControl {
+        let allowed_inputs = BTreeSet::from([
+            CicsOperandName::ControlCursor,
+            CicsOperandName::Msr,
+            CicsOperandName::Outpartn,
+            CicsOperandName::Actpartn,
+            CicsOperandName::Ldc,
+            CicsOperandName::ReqId,
+        ]);
+        let allowed_outputs = BTreeSet::from([
+            CicsOutputName::SetPointer,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]);
+        let allowed_options = BTreeSet::from([
+            CicsPlanOption::Accum,
+            CicsPlanOption::Formfeed,
+            CicsPlanOption::DefaultScreen,
+            CicsPlanOption::AlternateScreen,
+            CicsPlanOption::Erase,
+            CicsPlanOption::EraseAup,
+            CicsPlanOption::Print,
+            CicsPlanOption::FreeKb,
+            CicsPlanOption::Alarm,
+            CicsPlanOption::Frset,
+            CicsPlanOption::Paging,
+            CicsPlanOption::Terminal,
+            CicsPlanOption::Wait,
+            CicsPlanOption::Last,
+            CicsPlanOption::Honeom,
+            CicsPlanOption::L40,
+            CicsPlanOption::L64,
+            CicsPlanOption::L80,
+            CicsPlanOption::NoHandle,
+        ]);
+        return !inputs.is_subset(&allowed_inputs)
+            || !outputs.is_subset(&allowed_outputs)
+            || !plan.options.is_subset(&allowed_options)
+            || [
+                plan.options.contains(&CicsPlanOption::Terminal),
+                plan.options.contains(&CicsPlanOption::Paging),
+                outputs.contains(&CicsOutputName::SetPointer),
+            ]
+            .into_iter()
+            .filter(|value| *value)
+            .count()
+                > 1
+            || [
+                CicsPlanOption::L40,
+                CicsPlanOption::L64,
+                CicsPlanOption::L80,
+            ]
+            .into_iter()
+            .filter(|value| plan.options.contains(value))
+            .count()
+                > 1
+            || plan.options.contains(&CicsPlanOption::DefaultScreen)
+                && plan.options.contains(&CicsPlanOption::AlternateScreen)
+            || plan.operands.iter().any(|operand| match operand.name {
+                CicsOperandName::ControlCursor => !matches!(
+                    operand.value,
+                    CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                ),
+                CicsOperandName::Msr => !matches!(
+                    operand.value,
+                    CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                ),
+                CicsOperandName::Outpartn
+                | CicsOperandName::Actpartn
+                | CicsOperandName::Ldc
+                | CicsOperandName::ReqId => !matches!(
+                    operand.value,
+                    CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                ),
+                _ => true,
+            });
+    }
+    if plan.operation == CicsPlanOperation::SendPage {
+        let allowed_inputs = BTreeSet::from([
+            CicsOperandName::TransId,
+            CicsOperandName::Trailer,
+            CicsOperandName::Fmhparm,
+        ]);
+        let allowed_outputs = BTreeSet::from([
+            CicsOutputName::SetPointer,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]);
+        let allowed_options = BTreeSet::from([
+            CicsPlanOption::ReleasePage,
+            CicsPlanOption::RetainPage,
+            CicsPlanOption::Autopage,
+            CicsPlanOption::CurrentPage,
+            CicsPlanOption::AllPages,
+            CicsPlanOption::NoAutopage,
+            CicsPlanOption::OperPurge,
+            CicsPlanOption::Last,
+            CicsPlanOption::NoHandle,
+        ]);
+        return !inputs.is_subset(&allowed_inputs)
+            || !outputs.is_subset(&allowed_outputs)
+            || !plan.options.is_subset(&allowed_options)
+            || plan.options.contains(&CicsPlanOption::ReleasePage)
+                && plan.options.contains(&CicsPlanOption::RetainPage)
+            || plan.options.contains(&CicsPlanOption::Autopage)
+                && plan.options.contains(&CicsPlanOption::NoAutopage)
+            || inputs.contains(&CicsOperandName::TransId)
+                && !plan.options.contains(&CicsPlanOption::ReleasePage)
+            || plan.operands.iter().any(|operand| match operand.name {
+                CicsOperandName::TransId | CicsOperandName::Fmhparm => !matches!(
+                    operand.value,
+                    CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                ),
+                CicsOperandName::Trailer => !matches!(operand.value, CicsOperandValue::Storage(_)),
+                _ => true,
+            });
+    }
+    if plan.operation == CicsPlanOperation::ReceivePartn {
+        return !inputs.is_subset(&BTreeSet::from([CicsOperandName::Length]))
+            || !outputs.is_subset(&BTreeSet::from([
+                CicsOutputName::Partn,
+                CicsOutputName::Into,
+                CicsOutputName::SetPointer,
+                CicsOutputName::Length,
+                CicsOutputName::Resp,
+                CicsOutputName::Resp2,
+            ]))
+            || !outputs.contains(&CicsOutputName::Partn)
+            || outputs.contains(&CicsOutputName::Into)
+                && outputs.contains(&CicsOutputName::SetPointer)
+            || outputs.contains(&CicsOutputName::Into)
+                != inputs.contains(&CicsOperandName::Length)
+            || outputs.contains(&CicsOutputName::Into)
+                != outputs.contains(&CicsOutputName::Length)
+            || plan.operands.iter().any(|operand| {
+                operand.name != CicsOperandName::Length
+                    || !matches!(operand.value, CicsOperandValue::Storage(_))
+            })
+            || plan
+                .options
+                .iter()
+                .any(|option| !matches!(option, CicsPlanOption::AsIs | CicsPlanOption::NoHandle));
+    }
+    if plan.operation == CicsPlanOperation::SendPartnset {
+        return !inputs.is_subset(&BTreeSet::from([CicsOperandName::Partnset]))
+            || plan.operands.iter().any(|operand| {
+                operand.name != CicsOperandName::Partnset
+                    || !matches!(
+                        operand.value,
+                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                    )
+            })
+            || plan
+                .options
+                .iter()
+                .any(|option| *option != CicsPlanOption::NoHandle)
+            || outputs
+                .iter()
+                .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2));
+    }
     let allowed_inputs = BTreeSet::from([
         CicsOperandName::Map,
         CicsOperandName::Mapset,

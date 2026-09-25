@@ -159,10 +159,15 @@ pub(in crate::service) fn assign(
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
         .iter()
         .any(|name| request.arguments.contains_key(*name));
-    let bdi_missing = !dpl
-        && ["DESTID", "DESTIDLENG"]
-            .iter()
-            .any(|name| request.arguments.contains_key(*name));
+    let bdi_requested = ["DESTID", "DESTIDLENG"]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
+    let bdi_destination = if !dpl && bdi_requested {
+        service.outboard_last_inbound_destination(&run.invocation.run_unit_id)?
+    } else {
+        None
+    };
+    let bdi_missing = !dpl && bdi_requested && bdi_destination.is_none();
     let bms_overflow_missing = !dpl
         && BMS_OVERFLOW_OPTIONS
             .iter()
@@ -284,6 +289,19 @@ pub(in crate::service) fn assign(
             "INPUTMSGLEN".into(),
             decimal_payload(session_input_message_length(service, run)?)?,
         );
+    }
+    if let Some(destination) = bdi_destination {
+        if request.arguments.contains_key("DESTID") {
+            let mut bytes = destination.as_bytes().to_vec();
+            bytes.resize(8, b' ');
+            response.outputs.insert("DESTID".into(), bounded(bytes)?);
+        }
+        if request.arguments.contains_key("DESTIDLENG") {
+            response.outputs.insert(
+                "DESTIDLENG".into(),
+                decimal_payload(destination.len() as i64)?,
+            );
+        }
     }
     if request.arguments.contains_key("ABOFFSET") {
         response

@@ -1,12 +1,14 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use ring::signature::{ED25519, UnparsedPublicKey};
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
 const CAPTURE_CONTRACT: &str = "mainframe-env.cics-oracle-capture@1";
+const FAMILY_CAPTURE_CONTRACT: &str = "mainframe-env.cics-oracle-capture@2";
 const TRUSTED_AUTHORITY: &str = "ibm-cics-protected-runner";
 const CAPTURE_SCHEMA: &str =
     include_str!("../../../../conformance/0.9/schemas/cics-oracle-capture.schema.json");
@@ -41,6 +43,10 @@ pub struct CicsOracleOrigin {
 #[serde(deny_unknown_fields)]
 pub struct CicsOracleCapture {
     pub schema_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub family_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub family_manifest_digest: Option<String>,
     pub candidate_digest: String,
     pub spec_digest: String,
     pub fixture_digest: String,
@@ -53,6 +59,8 @@ pub struct CicsOracleCapture {
 }
 
 pub struct CicsOracleExpectation<'a> {
+    pub family_id: Option<&'a str>,
+    pub family_manifest_digest: Option<&'a str>,
     pub candidate_digest: &'a str,
     pub spec_digest: &'a str,
     pub fixture_digest: &'a str,
@@ -60,6 +68,7 @@ pub struct CicsOracleExpectation<'a> {
     pub environment_manifest_digest: &'a str,
     pub comparison_policy: &'a str,
     pub required_scenarios: &'a BTreeSet<String>,
+    pub required_order: Option<Vec<String>>,
     pub expected_observations: &'a BTreeMap<String, CicsOracleObservation>,
 }
 
@@ -92,8 +101,20 @@ pub fn import_cics_oracle_capture(
         return Err("CICS oracle capture is empty or exceeds its byte limit".into());
     }
     let capture = parse_cics_oracle_capture(bytes)?;
-    if capture.schema_version != CAPTURE_CONTRACT {
+    let family_capture = expected.family_id.is_some() && expected.family_manifest_digest.is_some();
+    if capture.schema_version
+        != if family_capture {
+            FAMILY_CAPTURE_CONTRACT
+        } else {
+            CAPTURE_CONTRACT
+        }
+        || capture.family_id.as_deref() != expected.family_id
+        || capture.family_manifest_digest.as_deref() != expected.family_manifest_digest
+    {
         return Err("CICS oracle capture contract is stale".into());
+    }
+    if let Some(manifest_digest) = &capture.family_manifest_digest {
+        validate_digest(manifest_digest)?;
     }
     for value in [
         &capture.candidate_digest,
@@ -121,6 +142,16 @@ pub fn import_cics_oracle_capture(
         .collect::<BTreeSet<_>>();
     if scenarios.len() != capture.observations.len() || &scenarios != expected.required_scenarios {
         return Err("CICS oracle scenario set is missing, duplicate, or unknown".into());
+    }
+    if expected.required_order.as_ref().is_some_and(|order| {
+        capture
+            .observations
+            .iter()
+            .map(|item| &item.scenario_id)
+            .collect::<Vec<_>>()
+            != order.iter().collect::<Vec<_>>()
+    }) {
+        return Err("CICS oracle family observation order differs from its sealed manifest".into());
     }
     if expected
         .expected_observations
@@ -193,8 +224,13 @@ pub fn import_cics_oracle_capture(
 }
 
 fn parse_cics_oracle_capture(bytes: &[u8]) -> Result<CicsOracleCapture, String> {
-    let value: serde_json::Value =
-        serde_json::from_slice(bytes).map_err(|error| format!("CICS oracle capture: {error}"))?;
+    let mut parser = serde_json::Deserializer::from_slice(bytes);
+    let value = StrictJson::deserialize(&mut parser)
+        .map_err(|error| format!("CICS oracle capture: {error}"))?
+        .0;
+    parser
+        .end()
+        .map_err(|error| format!("CICS oracle capture: {error}"))?;
     let schema: serde_json::Value = serde_json::from_str(CAPTURE_SCHEMA)
         .map_err(|error| format!("CICS oracle capture schema: {error}"))?;
     let validator = jsonschema::draft202012::options()
@@ -207,8 +243,76 @@ fn parse_cics_oracle_capture(bytes: &[u8]) -> Result<CicsOracleCapture, String> 
     serde_json::from_value(value).map_err(|error| format!("CICS oracle capture: {error}"))
 }
 
+// JSON duplicate members can make two parsers disagree about signed identity.
+struct StrictJson(serde_json::Value);
+
+impl<'de> Deserialize<'de> for StrictJson {
+    fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct StrictVisitor;
+
+        impl<'de> Visitor<'de> for StrictVisitor {
+            type Value = StrictJson;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("JSON without duplicate object members")
+            }
+
+            fn visit_bool<E: de::Error>(self, value: bool) -> Result<Self::Value, E> {
+                Ok(StrictJson(value.into()))
+            }
+
+            fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
+                Ok(StrictJson(value.into()))
+            }
+
+            fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
+                Ok(StrictJson(value.into()))
+            }
+
+            fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
+                serde_json::Number::from_f64(value)
+                    .map(serde_json::Value::Number)
+                    .map(StrictJson)
+                    .ok_or_else(|| E::custom("non-finite JSON number"))
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                Ok(StrictJson(value.into()))
+            }
+
+            fn visit_string<E: de::Error>(self, value: String) -> Result<Self::Value, E> {
+                Ok(StrictJson(value.into()))
+            }
+
+            fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+                Ok(StrictJson(serde_json::Value::Null))
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut values = Vec::new();
+                while let Some(value) = seq.next_element::<StrictJson>()? {
+                    values.push(value.0);
+                }
+                Ok(StrictJson(serde_json::Value::Array(values)))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                let mut values = serde_json::Map::new();
+                while let Some((key, value)) = map.next_entry::<String, StrictJson>()? {
+                    if values.insert(key.clone(), value.0).is_some() {
+                        return Err(de::Error::custom(format!("duplicate JSON member {key}")));
+                    }
+                }
+                Ok(StrictJson(serde_json::Value::Object(values)))
+            }
+        }
+
+        deserializer.deserialize_any(StrictVisitor)
+    }
+}
+
 fn signed_payload(capture: &CicsOracleCapture) -> Result<Vec<u8>, String> {
-    serde_json::to_vec(&serde_json::json!({
+    let mut payload = serde_json::json!({
         "schema_version": capture.schema_version,
         "candidate_digest": capture.candidate_digest,
         "spec_digest": capture.spec_digest,
@@ -219,8 +323,12 @@ fn signed_payload(capture: &CicsOracleCapture) -> Result<Vec<u8>, String> {
         "raw_capture_digest": capture.raw_capture_digest,
         "authority": capture.origin.authority,
         "run_job_id": capture.origin.run_job_id,
-    }))
-    .map_err(|error| error.to_string())
+    });
+    if capture.schema_version == FAMILY_CAPTURE_CONTRACT {
+        payload["family_id"] = serde_json::json!(capture.family_id);
+        payload["family_manifest_digest"] = serde_json::json!(capture.family_manifest_digest);
+    }
+    serde_json::to_vec(&payload).map_err(|error| error.to_string())
 }
 
 fn validate_digest(value: &str) -> Result<(), String> {
@@ -278,6 +386,8 @@ mod tests {
         let raw_capture_digest = digest(&serde_json::to_vec(&observations).unwrap());
         CicsOracleCapture {
             schema_version: CAPTURE_CONTRACT.into(),
+            family_id: None,
+            family_manifest_digest: None,
             candidate_digest: D.into(),
             spec_digest: D.into(),
             fixture_digest: D.into(),
@@ -314,6 +424,8 @@ mod tests {
         observations: &'a BTreeMap<String, CicsOracleObservation>,
     ) -> CicsOracleExpectation<'a> {
         CicsOracleExpectation {
+            family_id: None,
+            family_manifest_digest: None,
             candidate_digest: D,
             spec_digest: D,
             fixture_digest: D,
@@ -321,6 +433,7 @@ mod tests {
             environment_manifest_digest: D,
             comparison_policy: "policy@1",
             required_scenarios: required,
+            required_order: None,
             expected_observations: observations,
         }
     }
@@ -465,6 +578,217 @@ mod tests {
             )
             .unwrap_err()
             .contains("reviewed comparison fixture")
+        );
+    }
+
+    fn family_capture(kind: &str) -> CicsOracleCapture {
+        let mut capture = capture(kind);
+        capture.schema_version = FAMILY_CAPTURE_CONTRACT.into();
+        capture.family_id = Some("bif-builtins-v1".into());
+        capture.family_manifest_digest = Some(D.into());
+        capture
+    }
+
+    fn family_expectation<'a>(
+        required: &'a BTreeSet<String>,
+        observations: &'a BTreeMap<String, CicsOracleObservation>,
+    ) -> CicsOracleExpectation<'a> {
+        let mut expected = expectation(required, observations);
+        expected.family_id = Some("bif-builtins-v1");
+        expected.family_manifest_digest = Some(D);
+        expected.required_order = Some(vec!["plain-read".into(), "rollback".into()]);
+        expected
+    }
+
+    #[test]
+    fn family_capture_has_exact_closure_and_zero_credit_without_protected_origin() {
+        let required = scenarios();
+        let reviewed = expected_observations(&family_capture("local"));
+        let expected = family_expectation(&required, &reviewed);
+        for kind in ["local", "model", "synthetic"] {
+            let actual = family_capture(kind);
+            assert_eq!(
+                import_cics_oracle_capture(&serde_json::to_vec(&actual).unwrap(), &expected, None)
+                    .unwrap()
+                    .licensed_credit(),
+                0
+            );
+        }
+        let mut missing = family_capture("local");
+        missing.observations.pop();
+        assert!(
+            import_cics_oracle_capture(&serde_json::to_vec(&missing).unwrap(), &expected, None)
+                .is_err()
+        );
+        let mut duplicate = family_capture("local");
+        duplicate
+            .observations
+            .push(duplicate.observations[0].clone());
+        assert!(
+            import_cics_oracle_capture(&serde_json::to_vec(&duplicate).unwrap(), &expected, None)
+                .is_err()
+        );
+        let mut unknown = family_capture("local");
+        unknown.observations[0].scenario_id = "other-family".into();
+        unknown.raw_capture_digest = digest(&serde_json::to_vec(&unknown.observations).unwrap());
+        assert!(
+            import_cics_oracle_capture(&serde_json::to_vec(&unknown).unwrap(), &expected, None)
+                .is_err()
+        );
+        let mut reordered = family_capture("local");
+        reordered.observations.reverse();
+        reordered.raw_capture_digest =
+            digest(&serde_json::to_vec(&reordered.observations).unwrap());
+        assert!(
+            import_cics_oracle_capture(&serde_json::to_vec(&reordered).unwrap(), &expected, None)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn family_identity_and_protected_signature_reject_tampering() {
+        let required = scenarios();
+        let mut signed = family_capture("licensed-ibm");
+        let reviewed = expected_observations(&signed);
+        let expected = family_expectation(&required, &reviewed);
+        let random = SystemRandom::new();
+        let document = Ed25519KeyPair::generate_pkcs8(&random).unwrap();
+        let key = Ed25519KeyPair::from_pkcs8(document.as_ref()).unwrap();
+        signed.origin.signature =
+            Some(STANDARD.encode(key.sign(&signed_payload(&signed).unwrap())));
+        let valid = serde_json::to_vec(&signed).unwrap();
+        assert_eq!(
+            import_cics_oracle_capture(&valid, &expected, Some(key.public_key().as_ref()))
+                .unwrap()
+                .licensed_credit(),
+            1
+        );
+        for changed in [
+            {
+                let mut value = signed.clone();
+                value.family_id = Some("other-family".into());
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.family_manifest_digest = Some(
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .into(),
+                );
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.candidate_digest =
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .into();
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.spec_digest =
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .into();
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.fixture_digest =
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .into();
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.source_review_digest =
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .into();
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.environment_manifest_digest =
+                    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        .into();
+                value
+            },
+            {
+                let mut value = signed.clone();
+                value.comparison_policy = "policy@2".into();
+                value
+            },
+        ] {
+            assert!(
+                import_cics_oracle_capture(
+                    &serde_json::to_vec(&changed).unwrap(),
+                    &expected,
+                    Some(key.public_key().as_ref())
+                )
+                .is_err()
+            );
+        }
+        let mut changed_run = signed.clone();
+        changed_run.origin.run_job_id = "forged".into();
+        assert!(
+            import_cics_oracle_capture(
+                &serde_json::to_vec(&changed_run).unwrap(),
+                &expected,
+                Some(key.public_key().as_ref())
+            )
+            .is_err()
+        );
+        let mut changed_authority = signed.clone();
+        changed_authority.origin.authority = "forged-runner".into();
+        assert!(
+            import_cics_oracle_capture(
+                &serde_json::to_vec(&changed_authority).unwrap(),
+                &expected,
+                Some(key.public_key().as_ref())
+            )
+            .is_err()
+        );
+        let mut changed_raw_digest = signed.clone();
+        changed_raw_digest.raw_capture_digest = D.into();
+        assert!(
+            import_cics_oracle_capture(
+                &serde_json::to_vec(&changed_raw_digest).unwrap(),
+                &expected,
+                Some(key.public_key().as_ref())
+            )
+            .is_err()
+        );
+        let mut behavior = signed.clone();
+        behavior.observations[0].record_hex = "c1".into();
+        behavior.raw_capture_digest = digest(&serde_json::to_vec(&behavior.observations).unwrap());
+        assert!(
+            import_cics_oracle_capture(
+                &serde_json::to_vec(&behavior).unwrap(),
+                &expected,
+                Some(key.public_key().as_ref())
+            )
+            .is_err()
+        );
+        assert!(import_cics_oracle_capture(&valid, &expected, None).is_err());
+    }
+
+    #[test]
+    fn v1_and_v2_schema_disallow_cross_contract_identity_fields() {
+        let mut v1 = serde_json::to_value(capture("local")).unwrap();
+        v1["family_id"] = serde_json::json!("bif-builtins-v1");
+        assert!(parse_cics_oracle_capture(&serde_json::to_vec(&v1).unwrap()).is_err());
+        let mut v2 = serde_json::to_value(family_capture("local")).unwrap();
+        v2.as_object_mut().unwrap().remove("family_manifest_digest");
+        assert!(parse_cics_oracle_capture(&serde_json::to_vec(&v2).unwrap()).is_err());
+        let duplicate = serde_json::to_string(&family_capture("local")).unwrap();
+        let duplicate = duplicate.replacen(
+            "\"family_id\":\"bif-builtins-v1\"",
+            "\"family_id\":\"bif-builtins-v1\",\"family_id\":\"other-family\"",
+            1,
+        );
+        assert!(
+            parse_cics_oracle_capture(duplicate.as_bytes())
+                .unwrap_err()
+                .contains("duplicate JSON member")
         );
     }
 }

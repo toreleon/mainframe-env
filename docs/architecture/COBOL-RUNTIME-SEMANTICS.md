@@ -262,13 +262,11 @@ Typed local WRITEQ TD captures a 1–4 character QUEUE name and one FROM storage
 area. An omitted LENGTH selects the complete area; a present integer LENGTH
 selects that exact leading byte count and raises LENGERR before mutation when
 it exceeds the captured area. The persisted prefix and mutation identity drive
-idempotent replay, and normal completion updates EIBFN to `0802`. Remote SYSID
-and unavailable queue-definition state remain outside this typed subset.
+idempotent replay, and normal completion updates EIBFN to `0802`.
 Typed local DELETEQ TD captures the same bounded QUEUE name, requires update
 authorization for that queue resource, and atomically removes its durable
 records and retained-byte accounting. A missing queue returns QIDERR 44/0;
-remote SYSID and definition-driven extrapartition, disabled, or locked states
-remain outside this typed subset.
+extrapartition DELETE returns INVREQ.
 Typed local READQ TD accepts exactly one INTO or SET destination and an optional
 writable halfword LENGTH. INTO uses either the supplied positive maximum or the
 compiler-derived area extent. SET returns a checked POINTER/POINTER-32 address
@@ -276,9 +274,120 @@ to interpreter-owned storage containing the complete record and survives a
 checkpoint restore. Zero length and INTO truncation consume the record and
 return LENGERR 22/0; a negative length or insufficient SET allocation capacity
 does not consume. Missing and empty queues remain distinct as QIDERR 44/0 and
-QZERO 23/0. All three typed TDQ commands accept an explicit local-system SYSID;
-any other name returns SYSIDERR 53/0 before authorization or mutation. Remote
-routing, NOSUSPEND, and definition-driven modes remain fail-closed.
+QZERO 23/0. Durable installed TDQUEUE definitions select intrapartition or
+local extrapartition behavior, enabled/open direction, record-size rules, and
+per-queue record/byte bounds. Definition state survives provider reopen and
+produces exact DISABLED, INVREQ, NOTOPEN, LENGERR, NOSPACE, IOERR, QIDERR, and
+QZERO conditions. On first registration, all compatibility-profile queues must
+be declared by the complete proposed set, and retained records must satisfy the
+new direction, record-size, record-count, and byte limits before any definition
+is persisted. All three typed TDQ commands accept an explicit local-system
+SYSID; any other name returns SYSIDERR 53/0 before authorization or mutation.
+Remote routing, NOSUSPEND/QBUSY, indoubt locking, and external data set
+integration remain fail-closed.
+
+`DOCUMENT CREATE` lowers to a typed document plan whose DOCTOKEN is a writable
+16-byte output and whose optional DOCSIZE is writable fullword binary storage.
+Exactly one content source may be selected; buffer sources require a fullword
+LENGTH, and SYMBOLLIST requires LISTLENGTH. The interpreter captures all input
+bytes before dispatch and writes only typed DOCTOKEN/DOCSIZE outputs. The CICS
+provider owns the bounded durable document/template state, source conditions,
+template SAF decision, transaction ownership, atomic replay, SQLite reload and
+task-end reclamation.
+
+`DOCUMENT DELETE` lowers a 16-byte DOCTOKEN data area as an input and accepts
+only common condition options. The interpreter captures its token bytes before
+dispatch; the provider checks document ownership, releases the durable record
+and aggregate capacity, and records the replay result in the same mutation.
+
+`DOCUMENT INSERT` requires a 16-byte token and one content source or a
+bookmark, with fullword LENGTH for buffer sources. The interpreter snapshots
+all operands and writes optional DOCSIZE. The provider performs bounded
+bookmark positioning and AT/TO overlay, template READ authorization, symbol
+substitution, and atomic versioned persistence with replay. Its internal
+tagged buffer preserves conversion blocks and bookmarks when a document from
+this runtime is supplied through FROM.
+
+`DOCUMENT RETRIEVE` lowers a 16-byte input DOCTOKEN, writable INTO byte area,
+and writable fullword LENGTH. Optional fullword MAXLENGTH is capped by the
+actual INTO extent; DATAONLY uses reserved document option tag 85. The
+interpreter writes the available prefix and required LENGTH even on LENGERR
+22/2. The provider emits a bounded tagged or data-only copy, converts the
+supported CP037 client character sets on request, and leaves the source
+document unchanged.
+
+`DOCUMENT SET` lowers either SYMBOL/VALUE or SYMBOLLIST with a fullword
+LENGTH and the shared 16-byte DOCTOKEN. DELIMITER is confined to symbol-list
+mode and UNESCAPED keeps value bytes literal. The provider applies
+case-sensitive symbol updates to the transaction-owned document with a
+versioned document-plus-replay write. Existing inserted segments are not
+rewritten when a symbol definition changes.
+Typed WAIT JOURNALNAME accepts one 1–8 character named journal and an optional
+fullword-binary REQID. The explicit token is task-owned; without it, the command
+synchronizes the journal's current buffer even when another task created the
+latest record. Completed output returns immediately, pending output suspends
+and reissues the same typed statement under the execution deadline and
+cancellation fence, and the durable provider authority maps IOERR, JIDERR,
+NOTOPEN, and SAF denial to exact EIB response codes. The authority survives a
+SQLite reopen without turning this non-mutating wait into a replayed mutation.
+Typed WAIT JOURNALNUM uses a distinct numeric 1–99 operand and resolves it to
+the corresponding `DFHJnn` journal before applying the same token ownership,
+current-buffer, authorization, and completion rules.
+Typed WRITE JOURNALNAME persists FROM bytes with a two-byte JTYPEID and an
+optional PREFIX. FLENGTH and PFXLENG truncate their respective areas after
+checked fullword and halfword input; invalid lengths leave journal state
+unchanged with LENGERR. Deferred output returns a fullword REQID and waits for
+trusted local output acknowledgement; WAIT hardens synchronously and excludes
+REQID. NOSUSPEND returns NOJBUFSP when both local output buffer slots are
+pending. The version 2 durable record retains data, prefix, token ownership,
+and replay identity while remaining able to read version 1 WAIT records.
+Typed WRITE JOURNALNUM is a separate compatibility operation. It accepts a
+numeric 1–99 selector, maps that selector to `DFHJnn`, and uses the same local
+record, output token, WAIT, NOSUSPEND, and condition rules as the named form.
+The pinned compatibility page has no full option syntax; this bounded option
+mapping is inferred from the adjacent named WRITE contract.
+`EXEC CICS SPOOLCLOSE` lowers through the typed spool-control route with one
+eight-character TOKEN input and optional KEEP or DELETE. RESP or NOHANDLE is
+mandatory. The provider applies owner and JESSPOOL checks before its bounded
+durable CAS; explicit input close defaults to DELETE while explicit output
+close defaults to KEEP. A request-digest replay entry is committed with the
+report transition, so recovery after a lost result returns the original
+response without applying a second disposition. Successful or handled
+negative completion records EIBFN `5610`.
+
+`EXEC CICS SPOOLOPEN INPUT` resolves USERID and optional CLASS before dispatch
+and writes the provider's exact eight-byte TOKEN only after normal completion.
+The provider checks the four-character APPLID prefix and JESSPOOL authority,
+then selects one durable available report and records run/principal ownership.
+The input interface is single-threaded across tasks and distinguishes current-
+owner from other-owner SPOLBUSY. Replay returns the same token without a second
+claim, including after SQLite reopen. The command records EIBFN `5602`.
+
+`EXEC CICS SPOOLOPEN OUTPUT` resolves USERID, NODE, optional CLASS, halfword
+RECORDLENGTH, output format flags, and optional double-indirect OUTDESCR. The
+provider allocates a task-owned report without taking the input single thread,
+then returns an eight-byte TOKEN. Default class A, NOCC, PRINT, and 32,760-byte
+record length are applied before the bounded durable CAS. Invalid destination
+pairing, length, or OUTDESCR returns the documented condition before report
+creation. The command records EIBFN `5602` and survives SQLite reopen.
+
+`EXEC CICS SPOOLREAD` reads one record from a task-owned input token. The
+compiler requires fullword MAXFLENGTH and optional writable fullword TOFLENGTH;
+the interpreter sends the actual INTO capacity to the provider. On LENGERR,
+the prefix is written to INTO, TOFLENGTH receives the original length, RESP2
+counts the omitted bytes, and the cursor stays on that record. A corrected
+retry returns the full record and advances. ENDFILE is emitted once and then
+INVREQ 16/12 is returned for read-after-EOF. The cursor and exact reply are
+durable and replay-safe. The command records EIBFN `5604`.
+
+`EXEC CICS SPOOLWRITE` reads its FROM area without modifying it. A fullword
+FLENGTH selects a prefix, or the full source area is used when FLENGTH is
+omitted. The provider appends LINE records by default and PAGE records when
+requested. It enforces the report's RECORDLENGTH, returns LENGERR with the
+omitted byte count when a bounded prefix is accepted, and keeps the append and
+response in one durable replay CAS. A JOB card with a different USER on an
+INTRDR report is checked against task-user SURROGAT authority before append.
+The command records EIBFN `5606`.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
@@ -291,6 +400,9 @@ unavailable capacity returns NOSTG 42/2, which is ignored by default. LENGTH
 selects the source-defined below-line compatibility policy, but the virtual
 allocator exposes no native 24-bit address. Native addresses, storage keys,
 SHARED/EXECUTABLE policy and GETMAIN64 remain outside this subset.
+The separate GETMAIN64 typed IR route requires a non-LE AMODE(64) invocation
+binding and an eight-byte pointer target. COBOL source continues to reject
+GETMAIN64; a 64-bit COBOL pointer alone does not grant that caller ABI.
 Typed local FREEMAIN accepts exactly one of DATAPOINTER or DATA. DATAPOINTER
 requires a POINTER or POINTER-32 value that the current machine can prove names
 a live, offset-zero GETMAIN allocation. DATA accepts a declared COBOL area only

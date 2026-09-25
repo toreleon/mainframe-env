@@ -93,6 +93,7 @@ pub(super) fn invoke(
         .map(|_| name_argument(request, "REQID", 8))
         .transpose()?;
     let definition = delay_definition(request)?;
+    super::post::supersede_for_run(service, run)?;
     let DelayDefinition::Scheduled { identity, time } = definition else {
         return match definition {
             DelayDefinition::Immediate if request_id.is_none() => complete(service, run),

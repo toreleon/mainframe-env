@@ -5,14 +5,77 @@ use super::super::{
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference, numeric_literal};
 use crate::{DataCategory, SemanticModel};
 
+pub(super) const fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static str] {
+    match operation {
+        HirCicsOperation::StartBrowse => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::ResetBrowse => {
+            &["FILE", "DATASET", "RIDFLD", "KEYLENGTH", "RESP", "RESP2"]
+        }
+        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &[
+            "FILE",
+            "DATASET",
+            "INTO",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
+        HirCicsOperation::Delete => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "KEYLENGTH",
+            "TOKEN",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Unlock => &["FILE", "DATASET", "TOKEN", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::Write => &[
+            "FILE",
+            "DATASET",
+            "FROM",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Read => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "INTO",
+            "LENGTH",
+            "KEYLENGTH",
+            "TOKEN",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Rewrite => &[
+            "FILE", "DATASET", "FROM", "LENGTH", "TOKEN", "RESP", "RESP2",
+        ],
+        _ => &[],
+    }
+}
+
 pub(super) fn validate_constraints(
     clauses: &Clauses,
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     let required: &[&str] = match operation {
-        HirCicsOperation::StartBrowse => &["RIDFLD"],
-        HirCicsOperation::Delete | HirCicsOperation::EndBrowse => &[],
+        HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse => &["RIDFLD"],
+        HirCicsOperation::Delete | HirCicsOperation::EndBrowse | HirCicsOperation::Unlock => &[],
         HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev | HirCicsOperation::Read => {
             &["RIDFLD", "INTO"]
         }
@@ -39,9 +102,17 @@ pub(super) fn validate_constraints(
             "CICS {operation:?} KEYLENGTH requires RIDFLD"
         )));
     }
+    if operation == HirCicsOperation::Delete
+        && clauses.contains_key("TOKEN")
+        && clauses.contains_key("RIDFLD")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS DELETE TOKEN and RIDFLD are mutually exclusive".into(),
+        ));
+    }
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse
     ) && options.iter().any(|option| option == "GENERIC")
         && !clauses.contains_key("KEYLENGTH")
     {
@@ -51,7 +122,7 @@ pub(super) fn validate_constraints(
     }
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse
     ) && options.iter().any(|option| option == "EQUAL")
         && options.iter().any(|option| option == "GTEQ")
     {
@@ -61,7 +132,7 @@ pub(super) fn validate_constraints(
     }
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse | HirCicsOperation::ResetBrowse
     ) && !options.iter().any(|option| option == "GTEQ")
         && matches!(
             clauses.get("KEYLENGTH").map(Vec::as_slice),
@@ -84,6 +155,7 @@ pub(super) fn resolve(
     if !matches!(
         operation,
         HirCicsOperation::StartBrowse
+            | HirCicsOperation::ResetBrowse
             | HirCicsOperation::ReadNext
             | HirCicsOperation::ReadPrev
             | HirCicsOperation::EndBrowse
@@ -91,12 +163,16 @@ pub(super) fn resolve(
             | HirCicsOperation::Write
             | HirCicsOperation::Read
             | HirCicsOperation::Rewrite
+            | HirCicsOperation::Unlock
     ) {
         return Ok(Vec::new());
     }
     let browse = matches!(
         operation,
-        HirCicsOperation::StartBrowse | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+        HirCicsOperation::StartBrowse
+            | HirCicsOperation::ResetBrowse
+            | HirCicsOperation::ReadNext
+            | HirCicsOperation::ReadPrev
     );
     let stored_file_input = matches!(
         operation,
@@ -108,10 +184,18 @@ pub(super) fn resolve(
         ("DATASET", HirCicsOperandName::Dataset),
         ("FROM", HirCicsOperandName::From),
         ("RIDFLD", HirCicsOperandName::Ridfld),
+        ("TOKEN", HirCicsOperandName::Token),
+        ("SYSID", HirCicsOperandName::SysId),
     ] {
         let Some(tokens) = clauses.get(name) else {
             continue;
         };
+        if name == "TOKEN" && operation == HirCicsOperation::Read {
+            continue;
+        }
+        if name == "SYSID" && operation != HirCicsOperation::Unlock {
+            continue;
+        }
         let value = if browse && name == "RIDFLD" {
             let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {
                 return Err(ResolutionFailure::Invalid(
@@ -119,6 +203,21 @@ pub(super) fn resolve(
                 ));
             };
             require_writable(&reference)?;
+            HirCicsValue::Data(reference)
+        } else if name == "TOKEN" {
+            let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS TOKEN requires a fullword binary data area".into(),
+                ));
+            };
+            if reference.category != DataCategory::Binary
+                || reference.length != 4
+                || reference.scale != 0
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS TOKEN requires a fullword binary data area".into(),
+                ));
+            }
             HirCicsValue::Data(reference)
         } else if stored_file_input && matches!(name, "FROM" | "RIDFLD") {
             let HirCicsValue::Data(reference) = cics_value(tokens, semantic)? else {
@@ -152,6 +251,7 @@ pub(super) fn resolve(
                     | HirCicsOperation::Write
                     | HirCicsOperation::Delete
                     | HirCicsOperation::StartBrowse
+                    | HirCicsOperation::ResetBrowse
             ) && name == "KEYLENGTH"
             {
                 file_key_length_value(tokens, operation, semantic)?
@@ -179,10 +279,22 @@ pub(super) fn resolve(
             }
             if matches!(
                 operation,
+                HirCicsOperation::Read | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+            ) && name == "LENGTH"
+                && let HirCicsValue::LengthOf(length) = &value
+                && complete_data_reference(&clauses["INTO"], semantic)? != *length
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS {operation:?} LENGTH OF must name the INTO data area"
+                )));
+            }
+            if matches!(
+                operation,
                 HirCicsOperation::Read
                     | HirCicsOperation::Write
                     | HirCicsOperation::Delete
                     | HirCicsOperation::StartBrowse
+                    | HirCicsOperation::ResetBrowse
             ) && name == "KEYLENGTH"
                 && let HirCicsValue::LengthOf(length) = &value
                 && !operands.iter().any(|operand| {
@@ -264,7 +376,9 @@ fn file_key_length_value(
         HirCicsValue::Integer(value)
             if !(if matches!(
                 operation,
-                HirCicsOperation::Read | HirCicsOperation::StartBrowse
+                HirCicsOperation::Read
+                    | HirCicsOperation::StartBrowse
+                    | HirCicsOperation::ResetBrowse
             ) {
                 0..=32_767
             } else {

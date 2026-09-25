@@ -9,11 +9,11 @@ use mainframe_env_store_api::{
     EffectRecord, EffectState, EventStore, ExecutionRecord, ExecutionState, OutboxRecord,
     PlatformStore, ProviderRetentionDependency, ProviderRetentionObservationDeletion,
     ProviderRetentionObservationSource, ProviderRetentionRow, ProviderStateArchiveDeletion,
-    ProviderStateArchiveReplacement, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
-    RetentionAgeReconciliation, RetentionArchive, RetentionArchivePruneOutcome,
-    RetentionArchivePruneRequest, RetentionObservation, RetentionObservationProof, RetentionPolicy,
-    RetentionReconciliationReceipt, RetentionRequest, RetentionStore, RetentionTarget,
-    SaturationLevel, StoreError, WorkRecord, WorkState,
+    ProviderStateArchiveDeletionWithCapacity, ProviderStateArchiveReplacement, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
+    RetentionArchivePruneOutcome, RetentionArchivePruneRequest, RetentionObservation,
+    RetentionObservationProof, RetentionPolicy, RetentionReconciliationReceipt, RetentionRequest,
+    RetentionStore, RetentionTarget, SaturationLevel, StoreError, WorkRecord, WorkState,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -1574,6 +1574,96 @@ fn sqlite_cics_replay_full_validation_and_legacy_migration() {
     );
 }
 
+fn run_checkpointed_cics_replay_retention(store: &dyn PlatformStore) {
+    let owner = ids("cics-checkpoint-owner");
+    finish_execution(store, &owner);
+    store.put_checkpoint(checkpoint(&owner)).unwrap();
+    let intent = effect(&owner, "cics-checkpoint-effect", EffectState::Intent);
+    store.record_intent(intent.clone()).unwrap();
+    store
+        .record_result(
+            &intent.key,
+            EffectRecord {
+                state: EffectState::Completed,
+                result_digest: Some([2; 32]),
+                resolved_tick: Some(10),
+                ..intent.clone()
+            },
+        )
+        .unwrap();
+    // The store treats provider payloads as opaque. CICS codec validation is
+    // owned by the provider before it submits this deletion candidate.
+    let source = cics_replay(intent.key.as_str(), 1, &owner.execution, false);
+    store.put_provider_state(source.clone(), None).unwrap();
+    let candidate = ProviderRetentionRow {
+        row: source,
+        owner_execution: Some(owner.execution.clone()),
+        owner_run_unit: Some(owner.run.clone()),
+        retention_tick: 10,
+        observation: None,
+        dependency: ProviderRetentionDependency::CoreEffect {
+            key: intent.key,
+            request_digest: [1; 32],
+            result_digest: [2; 32],
+        },
+    };
+    let deletion = || ProviderStateArchiveDeletion {
+        expected_epoch: store.provider_state_retention_epoch().unwrap(),
+        target: RetentionTarget::CicsReplay,
+        archived_tick: 20,
+        watermark_tick: 10,
+        rows: vec![candidate.clone()],
+    };
+    assert_eq!(
+        store.archive_provider_state_deletion(deletion()),
+        Err(StoreError::Conflict)
+    );
+    assert!(
+        store
+            .get_provider_state("cics-effect-replay-v1", "cics-checkpoint-effect")
+            .unwrap()
+            .is_some()
+    );
+    assert!(store.get_checkpoint(&owner.execution).unwrap().is_some());
+
+    store.delete_checkpoint(&owner.execution).unwrap();
+    assert_eq!(
+        store
+            .archive_provider_state_deletion(deletion())
+            .unwrap()
+            .rows
+            .len(),
+        1
+    );
+    assert!(
+        store
+            .get_provider_state("cics-effect-replay-v1", "cics-checkpoint-effect")
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn memory_checkpoint_protects_cics_replay_until_release() {
+    run_checkpointed_cics_replay_retention(&MemoryStore::new(StoreLimits::default()));
+}
+
+#[test]
+fn sqlite_checkpoint_protects_cics_replay_until_release() {
+    run_checkpointed_cics_replay_retention(
+        &SqliteStateStore::open("sqlite::memory:", 1024 * 1024, 128).unwrap(),
+    );
+}
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+fn postgres_checkpoint_protects_cics_replay_until_release() {
+    let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+        .expect("explicit PostgreSQL 18 test URL required");
+    let store = PostgresStateStore::open(&url, 1024 * 1024, 128).unwrap();
+    run_checkpointed_cics_replay_retention(&store);
+}
+
 #[test]
 fn memory_legacy_replay_reconciliation_is_cas_fenced_and_conservative() {
     run_legacy_replay_reconciliation(&MemoryStore::new(StoreLimits::default()));
@@ -2683,6 +2773,154 @@ fn run_provider_archive_atomic_contract(store: &dyn PlatformStore) {
         .unwrap();
 }
 
+fn run_private_container_replay_archive_contract(store: &dyn PlatformStore, cics_effect: bool) {
+    let owner = ids("container-replay-archive");
+    finish_execution(store, &owner);
+    let mut intent = effect(&owner, "private-container-effect", EffectState::Intent);
+    if cics_effect {
+        intent.intent.capability =
+            Some(CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap());
+    }
+    store.record_intent(intent.clone()).unwrap();
+    store
+        .record_result(
+            &intent.key,
+            EffectRecord {
+                state: EffectState::Completed,
+                result_digest: Some([2; 32]),
+                resolved_tick: Some(10),
+                ..intent.clone()
+            },
+        )
+        .unwrap();
+    let private = ProviderStateRecord {
+        namespace: "cics-container-replay-v1".into(),
+        key: intent.key.as_str().into(),
+        version: 1,
+        payload: b"private-replay".to_vec(),
+    };
+    let outer = ProviderStateRecord {
+        namespace: "cics-effect-replay-v1".into(),
+        key: intent.key.as_str().into(),
+        version: 1,
+        payload: b"outer-replay".to_vec(),
+    };
+    let capacity = ProviderStateRecord {
+        namespace: "cics-container-capacity-v1".into(),
+        key: "global".into(),
+        version: 1,
+        payload: br#"{"schema_version":1,"channels":0,"containers":0,"replays":1}"#.to_vec(),
+    };
+    store.put_provider_state(private.clone(), None).unwrap();
+    store.put_provider_state(outer.clone(), None).unwrap();
+    store.put_provider_state(capacity.clone(), None).unwrap();
+    let deletion = ProviderStateArchiveDeletion {
+        expected_epoch: store.provider_state_retention_epoch().unwrap(),
+        target: RetentionTarget::CicsReplay,
+        archived_tick: 20,
+        watermark_tick: 10,
+        rows: vec![ProviderRetentionRow {
+            row: private.clone(),
+            owner_execution: Some(owner.execution.clone()),
+            owner_run_unit: Some(owner.run.clone()),
+            retention_tick: 10,
+            observation: None,
+            dependency: ProviderRetentionDependency::CoreEffect {
+                key: intent.key.clone(),
+                request_digest: [1; 32],
+                result_digest: [2; 32],
+            },
+        }],
+    };
+    assert!(
+        store
+            .archive_provider_state_deletion(deletion.clone())
+            .is_err()
+    );
+    let replacement = ProviderStateWrite {
+        record: ProviderStateRecord {
+            version: 2,
+            payload: br#"{"schema_version":1,"channels":0,"containers":0,"replays":0}"#.to_vec(),
+            ..capacity.clone()
+        },
+        expected_version: Some(1),
+    };
+    let request = ProviderStateArchiveDeletionWithCapacity {
+        deletion,
+        outer_receipts: vec![outer.clone()],
+        capacity_source: capacity.clone(),
+        capacity_replacement: replacement.clone(),
+    };
+    let mut wrong_count = request.clone();
+    wrong_count.capacity_replacement.record.payload = capacity.payload.clone();
+    assert_eq!(
+        store.archive_provider_state_deletion_with_capacity(wrong_count),
+        Err(StoreError::IncompatibleVersion)
+    );
+    let mut stale = request.clone();
+    stale.capacity_source.version = 2;
+    stale.capacity_replacement.expected_version = Some(2);
+    stale.capacity_replacement.record.version = 3;
+    assert_eq!(
+        store.archive_provider_state_deletion_with_capacity(stale),
+        Err(StoreError::Conflict)
+    );
+    let mut forged_outer = request.clone();
+    forged_outer.outer_receipts[0].payload = b"forged-outer".to_vec();
+    assert_eq!(
+        store.archive_provider_state_deletion_with_capacity(forged_outer),
+        Err(StoreError::Conflict)
+    );
+    assert_eq!(
+        store
+            .get_provider_state(&private.namespace, &private.key)
+            .unwrap(),
+        Some(private.clone())
+    );
+    if !cics_effect {
+        assert_eq!(
+            store.archive_provider_state_deletion_with_capacity(request),
+            Err(StoreError::Conflict)
+        );
+        assert_eq!(
+            store
+                .get_provider_state(&capacity.namespace, &capacity.key)
+                .unwrap(),
+            Some(capacity)
+        );
+        return;
+    }
+    let archive = store
+        .archive_provider_state_deletion_with_capacity(request)
+        .unwrap();
+    assert_eq!(archive.rows.len(), 1);
+    assert_eq!(archive.rows[0].namespace, private.namespace);
+    assert!(
+        store
+            .get_provider_state(&private.namespace, &private.key)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        store
+            .get_provider_state(&outer.namespace, &outer.key)
+            .unwrap(),
+        Some(outer)
+    );
+    assert_eq!(
+        store
+            .get_provider_state(&capacity.namespace, &capacity.key)
+            .unwrap(),
+        Some(replacement.record)
+    );
+    assert_eq!(
+        store
+            .retention_archives(RetentionTarget::CicsReplay, 2)
+            .unwrap()[0],
+        archive
+    );
+}
+
 fn run_provider_dependency_rejects_same_run_unresolved_effect(store: &dyn PlatformStore) {
     let owner = ids("provider-unresolved-owner");
     finish_execution(store, &owner);
@@ -2906,6 +3144,82 @@ fn memory_provider_archives_are_atomic_at_full_live_capacity() {
         max_retention_archive_rows: 1,
         ..Default::default()
     }));
+}
+
+#[test]
+fn memory_container_replay_archive_replaces_capacity_atomically() {
+    run_private_container_replay_archive_contract(&MemoryStore::new(StoreLimits::default()), true);
+}
+
+#[test]
+fn container_replay_archive_rejects_non_cics_core_effect() {
+    run_private_container_replay_archive_contract(&MemoryStore::new(StoreLimits::default()), false);
+    run_private_container_replay_archive_contract(
+        &SqliteStateStore::open("sqlite::memory:", 1024 * 1024, 64).unwrap(),
+        false,
+    );
+}
+
+#[test]
+fn sqlite_container_replay_archive_replaces_capacity_atomically() {
+    run_private_container_replay_archive_contract(
+        &SqliteStateStore::open("sqlite::memory:", 1024 * 1024, 64).unwrap(),
+        true,
+    );
+}
+
+#[test]
+fn sqlite_container_replay_archive_survives_reopen() {
+    let directory = std::env::temp_dir().join(format!(
+        "mainframe-env-container-archive-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let url = format!(
+        "sqlite://{}?mode=rwc",
+        directory.join("retention.db").display()
+    );
+    {
+        let store = SqliteStateStore::open(&url, 1024 * 1024, 64).unwrap();
+        run_private_container_replay_archive_contract(&store, true);
+    }
+    {
+        let store = SqliteStateStore::open(&url, 1024 * 1024, 64).unwrap();
+        let capacity = store
+            .get_provider_state("cics-container-capacity-v1", "global")
+            .unwrap()
+            .unwrap();
+        assert_eq!(capacity.version, 2);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&capacity.payload).unwrap()["replays"],
+            0
+        );
+        assert!(
+            store
+                .get_provider_state("cics-container-replay-v1", "private-container-effect")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            store
+                .retention_archives(RetentionTarget::CicsReplay, 2)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+fn postgres_container_replay_archive_replaces_capacity_atomically() {
+    let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL").unwrap();
+    run_private_container_replay_archive_contract(
+        &PostgresStateStore::open(&url, 1024 * 1024, 64).unwrap(),
+        true,
+    );
 }
 
 #[test]

@@ -7,3 +7,4 @@ license.workspace = true
 
 [dependencies]
 mainframe-env-diagnostics.workspace = true
+zeroize.workspace = true

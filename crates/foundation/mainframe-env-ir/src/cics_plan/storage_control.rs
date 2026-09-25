@@ -56,3 +56,81 @@ pub(super) fn invalid_freemain_shape(
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
 }
+
+const AMODE64_ABI: &[u8] = b"mainframe-env.cics-amode64-nonle@1";
+
+pub(super) fn invalid_getmain64_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::Flength64)
+        || !inputs.contains(&CicsOperandName::Abi64)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::Flength64,
+            CicsOperandName::Location64,
+            CicsOperandName::Abi64,
+        ]))
+        || !outputs.contains(&CicsOutputName::SetPointer64)
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::SetPointer64,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::Flength64 => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::Location64 => !matches!(
+                &operand.value,
+                CicsOperandValue::Literal(value) if matches!(value.as_slice(), b"LOC24" | b"LOC31")
+            ),
+            CicsOperandName::Abi64 => !matches!(
+                &operand.value,
+                CicsOperandValue::Literal(value) if value == AMODE64_ABI
+            ),
+            _ => true,
+        })
+        || (plan.options.contains(&CicsPlanOption::CicsDataKey64)
+            && plan.options.contains(&CicsPlanOption::UserDataKey64))
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle
+                    | CicsPlanOption::NoSuspend
+                    | CicsPlanOption::CicsDataKey64
+                    | CicsPlanOption::UserDataKey64
+                    | CicsPlanOption::Shared64
+                    | CicsPlanOption::Executable64
+            )
+        })
+}
+
+pub(super) fn invalid_freemain64_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let pointer = BTreeSet::from([CicsOperandName::Abi64, CicsOperandName::DataPointer64]);
+    let data = BTreeSet::from([CicsOperandName::Abi64, CicsOperandName::DataArea64]);
+    (inputs != &pointer && inputs != &data)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::Abi64 => !matches!(
+                &operand.value,
+                CicsOperandValue::Literal(value) if value == AMODE64_ABI
+            ),
+            CicsOperandName::DataPointer64 | CicsOperandName::DataArea64 => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            _ => true,
+        })
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}

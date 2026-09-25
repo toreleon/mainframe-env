@@ -1,6 +1,5 @@
 use super::{
     HirDataReference, Resolution, ResolutionFailure, data_reference_at, is_add_corresponding_group,
-    matching_close,
 };
 use crate::SemanticModel;
 
@@ -53,4 +52,21 @@ pub(super) fn corresponding_group_reference_at(
         ));
     }
     data_reference_at(tokens, start, semantic)
+}
+
+fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate().skip(open) {
+        match token.as_str() {
+            "(" => depth += 1,
+            ")" => {
+                depth = depth.checked_sub(1).ok_or(ResolutionFailure::Unsupported)?;
+                if depth == 0 {
+                    return Ok(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    Err(ResolutionFailure::Unsupported)
 }

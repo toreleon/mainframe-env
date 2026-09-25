@@ -1,4 +1,35 @@
-use super::super::{BmsFieldDefinition, BmsMapDefinition, CicsLimits, Session};
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BmsMapDefinition {
+    pub mapset: String,
+    pub map: String,
+    /// One-based terminal line at which the map is positioned.
+    pub line: u16,
+    /// One-based terminal column at which the map is positioned.
+    pub column: u16,
+    pub rows: u16,
+    pub columns: u16,
+    pub fields: Vec<BmsFieldDefinition>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BmsFieldDefinition {
+    pub name: String,
+    pub row: u16,
+    pub column: u16,
+    pub length: u16,
+    pub initial: Vec<u8>,
+    pub color: Option<String>,
+    pub highlight: Option<String>,
+    pub protected: bool,
+    pub secret: bool,
+    pub fset: bool,
+    pub justify_right: bool,
+    pub fill_zero: bool,
+    pub output_offset: Option<u32>,
+    pub attribute_offset: Option<u32>,
+}
+
+use super::super::{CicsLimits, Session};
 use mainframe_env_host_api::HostProblem;
 
 pub(in crate::service) fn terminal_field_address(

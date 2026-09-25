@@ -91,10 +91,43 @@ and `service.rs` set must live in one of those two layers. The pre-adoption
 `retention.rs` module is a provider-lifecycle codec and dependency boundary,
 not a command-description or command-semantics family. Descriptor modules have
 a readable catalog/schema authority and contain no handwritten behavior. The
-task, time, program, terminal, file, queue, and recovery handler modules contain
+task, time, program, terminal, file, queue, recovery, interval, storage, and
+journal handler modules contain
 reviewed semantics, are never generated, and remain subject to the 1,200-line
 hard limit. This establishes the layout before CIC-901 adds broad families
 rather than promising a later cleanup.
+
+### Amendment: journal-control family (2026-09-23)
+
+The reviewed CICS handler inventory now includes
+`handlers/journal_control.rs`. It owns one bounded durable named-journal
+authority for WAIT/WRITE command slices; it does not add a crate, provider,
+dispatch bypass, condition authority, or second state owner. The readable
+typed-execution registration declares `journal-control`, the descriptor
+generator emits its route, and `module-budgets.json` admits the module under the unchanged
+1,200-production-line limit. This amendment is limited to that family boundary
+and does not authorize rows that remain unready.
+
+### Amendment: security-control family (2026-09-23)
+
+The reviewed handler inventory includes `handlers/security_control.rs` and its
+bounded `authority.rs` child. CICS owns command-shape, task-context, and
+EIB/condition translation, while the server binds the accepted RACF/SAF
+authority through one narrow interface. The family adds no security database
+or credential store. The descriptor generator admits `security-control` only
+for individually registered rows, and the exact protected service root ceiling
+is unchanged. Both handler modules retain the ordinary 1,200-line limit.
+
+### Amendment: integrated security registry split (2026-09-24)
+
+After rebasing the ten security rows onto the 141-route integration head, the
+generated CICS provider descriptor exceeds the ordinary module limit if its
+lookup remains inline. The generator now emits that lookup as a bounded child
+of the descriptor module. The executable security descriptor entries and CICS
+output identities also occupy bounded children. These are ownership-preserving
+module splits: the existing generators, codec tags, runtime imports, and
+single CICS provider remain authoritative. No protected root or ordinary
+module ceiling changes.
 
 ## Consequences
 

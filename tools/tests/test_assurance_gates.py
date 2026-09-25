@@ -75,9 +75,9 @@ class AssuranceGateTests(unittest.TestCase):
 
     def test_repository_inventory_has_bounded_parser_decoder_and_model_gates(self):
         inventory = GATES.validate_inventory(REPOSITORY)
-        self.assertEqual(inventory["fuzz_targets"], 2)
-        self.assertGreaterEqual(inventory["corpus_files"], 2)
-        self.assertGreaterEqual(inventory["model_tests"], 3)
+        self.assertEqual(inventory["fuzz_targets"], 4)
+        self.assertGreaterEqual(inventory["corpus_files"], 4)
+        self.assertGreaterEqual(inventory["model_tests"], 5)
         self.assertEqual(inventory["coverage_packages"], 4)
 
     def test_missing_corpus_and_empty_model_fail_closed(self):

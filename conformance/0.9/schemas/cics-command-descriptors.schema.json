@@ -72,7 +72,7 @@
         "families": {
           "type": "array",
           "minItems": 9,
-          "maxItems": 9,
+          "maxItems": 11,
           "items": {
             "type": "object",
             "additionalProperties": false,

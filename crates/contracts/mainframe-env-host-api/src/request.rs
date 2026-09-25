@@ -5,10 +5,7 @@ use crate::dataset::{
     DatasetLockTarget, DatasetProviderCapabilities, DatasetSnapshot, TvsRecordOperation,
     TvsUnitOfWorkReceipt,
 };
-use crate::{
-    ClassName, DatasetName, JobName, MemberName, MethodName, ProgramName, ResourceName,
-    RuntimeServiceName, SessionId,
-};
+use crate::{DatasetName, JobName, MemberName, ResourceName, RuntimeServiceName, SessionId};
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
 };
@@ -491,6 +488,17 @@ pub enum DatasetRequest {
         key: Vec<u8>,
         relation: KeyRelation,
     },
+    /// Reposition an existing browse cursor for one dataset.
+    ResetBrowse {
+        /// Dataset owning the cursor.
+        dataset: DatasetName,
+        /// Cursor identity returned by STARTBR.
+        cursor: String,
+        /// Target record key for the new browse position.
+        key: Vec<u8>,
+        /// Comparison used to select the new position.
+        relation: KeyRelation,
+    },
     ReadNext {
         dataset: DatasetName,
         cursor: String,
@@ -585,42 +593,6 @@ pub enum DatasetResult {
     Condition {
         name: String,
         status: String,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ProgramRequest {
-    Inquire {
-        program: ProgramName,
-    },
-    Call {
-        program: ProgramName,
-        payload: BoundedPayload,
-        service: Option<RuntimeServiceSelector>,
-    },
-    Invoke {
-        class: ClassName,
-        method: MethodName,
-        receiver: BoundedPayload,
-        payload: BoundedPayload,
-    },
-    Link {
-        program: ProgramName,
-        payload: BoundedPayload,
-    },
-    Xctl {
-        program: ProgramName,
-        payload: BoundedPayload,
-    },
-    Return {
-        next_transaction: Option<String>,
-        payload: BoundedPayload,
-    },
-    Cancel {
-        programs: Vec<ProgramName>,
-    },
-    Abend {
-        code: String,
     },
 }
 
@@ -950,8 +922,11 @@ pub struct MqResult {
     pub trigger_program: Option<String>,
 }
 
+mod browse;
 mod cics;
 pub use cics::*;
+mod program;
+pub use program::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HostRequest {
@@ -962,6 +937,8 @@ pub enum HostRequest {
     Security(SecurityRequest),
     Clock(ClockRequest),
     State(StateRequest),
+    /// Typed CICS command with its command-owned validation and replay identity.
+    /// Mutation identity is checked before provider dispatch.
     Cics(CicsRequest),
     Db2(Db2Request),
     Ims(ImsRequest),
@@ -995,6 +972,7 @@ impl HostRequest {
                 | DatasetRequest::ResolveGeneration { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
+                | DatasetRequest::ResetBrowse { .. }
                 | DatasetRequest::EndBrowse { .. }
                 | DatasetRequest::Close { .. },
             ) => "host.dataset.read",
@@ -1069,7 +1047,7 @@ impl HostRequest {
                     | ProgramRequest::Cancel { .. }
                     | ProgramRequest::Abend { .. }
             ) | Self::State(StateRequest::Put { .. } | StateRequest::Delete { .. })
-        ) || matches!(self, Self::Cics(CicsRequest { operation, .. }) if operation.is_mutating())
+        ) || matches!(self, Self::Cics(request) if request.is_mutating())
             || matches!(self, Self::Db2(request) if request.operation.is_mutating())
             || matches!(self, Self::Ims(request) if request.operation.is_mutating())
             || matches!(self, Self::Mq(request) if request.operation.is_mutating())
@@ -1136,6 +1114,10 @@ impl HostRequest {
                 service: Some(service),
                 ..
             }) if service.abi_version == 0 => Err(HostProblem::Malformed),
+            Self::Program(ProgramRequest::Link {
+                selection: Some(selection),
+                ..
+            }) if !selection.is_valid() => Err(HostProblem::Malformed),
             Self::Program(ProgramRequest::Cancel { programs })
                 if programs.is_empty() || programs.len() > limits.max_fields =>
             {
@@ -1185,19 +1167,7 @@ impl HostRequest {
                 mutation.validate(limits)
             }
             Self::State(StateRequest::Delete { mutation, .. }) => mutation.validate(limits),
-            Self::Cics(request) => {
-                if request.arguments.len() > limits.max_fields {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-                if self.is_mutating() {
-                    request
-                        .mutation
-                        .as_ref()
-                        .ok_or(HostProblem::MissingIdempotency)?
-                        .validate(limits)?;
-                }
-                Ok(())
-            }
+            Self::Cics(request) => request.validate(limits),
             Self::Db2(request) => {
                 if request.statement.len() > limits.max_state_bytes
                     || request.cursor.as_ref().is_some_and(|cursor| {
@@ -2026,14 +1996,11 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
                 mutation.validate(limits)
             }
         }
-        DatasetRequest::StartBrowse { key, .. } if key.len() > limits.max_record_bytes => {
-            Err(HostProblem::ResourceExhausted)
-        }
-        DatasetRequest::ReadNext { cursor, .. } | DatasetRequest::EndBrowse { cursor, .. }
-            if cursor.is_empty() || cursor.len() > limits.max_name_bytes =>
-        {
-            Err(HostProblem::Malformed)
-        }
+        // Browse key and cursor bounds share one validator.
+        DatasetRequest::StartBrowse { .. }
+        | DatasetRequest::ResetBrowse { .. }
+        | DatasetRequest::ReadNext { .. }
+        | DatasetRequest::EndBrowse { .. } => browse::validate(request, limits),
         DatasetRequest::Close {
             cursor, control, ..
         } if cursor
@@ -2358,6 +2325,34 @@ mod tests {
     }
 
     #[test]
+    fn token_producing_read_requires_mutation_replay_identity() {
+        let token_target = BoundedPayload::new(
+            "mainframe-env.cics.argument@1",
+            b"TOKEN-X".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let token_read = HostRequest::Cics(CicsRequest {
+            operation: CicsOperation::Read,
+            arguments: BTreeMap::from([("TOKEN".into(), token_target)]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        });
+        assert!(token_read.is_mutating());
+        assert_eq!(
+            token_read.validate(HostLimits::default()),
+            Err(HostProblem::MissingIdempotency)
+        );
+        let plain_read = HostRequest::Cics(CicsRequest {
+            operation: CicsOperation::Read,
+            arguments: BTreeMap::new(),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        });
+        assert!(!plain_read.is_mutating());
+    }
+
+    #[test]
     fn records_are_bounded() {
         let invocation = InvocationLimits::default();
         let limits = HostLimits {
@@ -2415,26 +2410,48 @@ mod tests {
     fn all_cics_runtime_operation_names_are_unique() {
         let forms = [
             CicsOperation::Abend,
+            CicsOperation::AddSubevent,
             CicsOperation::Address,
             CicsOperation::AddressSet,
             CicsOperation::Asktime,
+            CicsOperation::BifDeedit,
+            CicsOperation::BifDigest,
             CicsOperation::AsktimeEib,
             CicsOperation::Assign,
             CicsOperation::ChangeTask,
+            CicsOperation::Post,
+            CicsOperation::WriteOperator,
+            CicsOperation::ExtractCertificate,
+            CicsOperation::ExtractTcpip,
             CicsOperation::Deq,
             CicsOperation::Delete,
+            CicsOperation::DefineInputEvent,
+            CicsOperation::DefineCompositeEvent,
+            CicsOperation::DocumentCreate,
+            CicsOperation::DocumentDelete,
+            CicsOperation::DocumentInsert,
+            CicsOperation::DocumentRetrieve,
+            CicsOperation::DocumentSet,
             CicsOperation::DeleteTransientData,
             CicsOperation::DeleteTemporaryStorage,
+            CicsOperation::ReadTemporaryStorage,
+            CicsOperation::WriteTemporaryStorage,
             CicsOperation::Enq,
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
+            CicsOperation::ConvertTime,
             CicsOperation::Freemain,
+            CicsOperation::Freemain64,
             CicsOperation::Getmain,
+            CicsOperation::Getmain64,
             CicsOperation::HandleAbend,
             CicsOperation::HandleAid,
             CicsOperation::HandleCondition,
             CicsOperation::IgnoreCondition,
             CicsOperation::Inquire,
+            CicsOperation::InvokeApplication,
+            CicsOperation::Load,
+            CicsOperation::Release,
             CicsOperation::Link,
             CicsOperation::PopHandle,
             CicsOperation::PushHandle,
@@ -2442,23 +2459,87 @@ mod tests {
             CicsOperation::Read,
             CicsOperation::ReadNext,
             CicsOperation::ReadPrev,
+            CicsOperation::ResetBrowse,
             CicsOperation::ReadTransientData,
+            CicsOperation::RemoveSubevent,
+            CicsOperation::DeleteEvent,
+            CicsOperation::CheckTimer,
+            CicsOperation::DefineTimer,
+            CicsOperation::DeleteTimer,
+            CicsOperation::ForceTimer,
+            CicsOperation::RetrieveReattachEvent,
+            CicsOperation::RetrieveSubevent,
+            CicsOperation::TestEvent,
+            CicsOperation::SignalEvent,
+            CicsOperation::DefineCounter,
+            CicsOperation::DefineDCounter,
+            CicsOperation::DeleteCounter,
+            CicsOperation::DeleteDCounter,
+            CicsOperation::GetCounter,
+            CicsOperation::GetDCounter,
+            CicsOperation::QueryCounter,
+            CicsOperation::QueryDCounter,
+            CicsOperation::RewindCounter,
+            CicsOperation::RewindDCounter,
+            CicsOperation::UpdateCounter,
+            CicsOperation::UpdateDCounter,
             CicsOperation::ReceiveMap,
+            CicsOperation::ReceivePartn,
             CicsOperation::Retrieve,
             CicsOperation::Return,
             CicsOperation::Rewrite,
             CicsOperation::SendText,
             CicsOperation::SendMap,
+            CicsOperation::SendControl,
+            CicsOperation::SendPage,
+            CicsOperation::SendPartnset,
             CicsOperation::SetAssociationUserCorrData,
             CicsOperation::SetFileStatus,
+            CicsOperation::SpoolClose,
+            CicsOperation::SpoolOpenInput,
+            CicsOperation::SpoolOpenOutput,
+            CicsOperation::SpoolRead,
+            CicsOperation::SpoolWrite,
+            CicsOperation::Start,
             CicsOperation::StartBrowse,
+            CicsOperation::StartAttach,
             CicsOperation::Suspend,
+            CicsOperation::WaitEvent,
+            CicsOperation::WaitExternal,
+            CicsOperation::WaitCics,
             CicsOperation::Syncpoint,
+            CicsOperation::InvokeService,
+            CicsOperation::SoapFaultAdd,
+            CicsOperation::SoapFaultCreate,
+            CicsOperation::SoapFaultDelete,
+            CicsOperation::WsaContextBuild,
+            CicsOperation::WsaContextDelete,
+            CicsOperation::WsaContextGet,
+            CicsOperation::WsaEprCreate,
+            CicsOperation::TransformDataToJson,
+            CicsOperation::TransformDataToXml,
+            CicsOperation::TransformJsonToData,
+            CicsOperation::TransformXmlToData,
+            CicsOperation::WebParseUrl,
+            CicsOperation::WebOpen,
+            CicsOperation::WebClose,
+            CicsOperation::WebExtract,
+            CicsOperation::ExtractWeb,
+            CicsOperation::WebRead,
+            CicsOperation::WebStartBrowse,
+            CicsOperation::WebReadNext,
+            CicsOperation::WebEndBrowse,
+            CicsOperation::WebWrite,
+            CicsOperation::WebSend,
+            CicsOperation::WebRetrieve,
+            CicsOperation::WebReceive,
+            CicsOperation::WebConverse,
+            CicsOperation::Unlock,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 43);
+        assert_eq!(forms.len(), 129);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

@@ -71,7 +71,7 @@ fn require_separator(name: &str, value: &HirCicsValue) -> Resolution<()> {
 pub(super) fn require_output_shape(
     name: HirCicsOutputName,
     target: &HirDataReference,
-    _clauses: &Clauses,
+    clauses: &Clauses,
     _options: &[String],
 ) -> Resolution<()> {
     match name {
@@ -104,7 +104,15 @@ pub(super) fn require_output_shape(
                 HirCicsOutputName::Yyddd => 6,
                 _ => unreachable!(),
             };
-            if target.length == field
+            let compact = target.length == 6
+                && match name {
+                    HirCicsOutputName::Time => !clauses.contains_key("TIMESEP"),
+                    HirCicsOutputName::Mmddyy | HirCicsOutputName::Yymmdd => {
+                        !clauses.contains_key("DATESEP")
+                    }
+                    _ => false,
+                };
+            if (target.length == field || compact)
                 && matches!(
                     target.category,
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
@@ -118,13 +126,160 @@ pub(super) fn require_output_shape(
             }
         }
         HirCicsOutputName::Commarea
+        | HirCicsOutputName::Partn
+        | HirCicsOutputName::Field
+        | HirCicsOutputName::DigestResult
+        | HirCicsOutputName::OperatorReply
+        | HirCicsOutputName::OperatorReplyLength
+        | HirCicsOutputName::Certificate(_)
+        | HirCicsOutputName::Tcpip(_)
         | HirCicsOutputName::Into
         | HirCicsOutputName::SetPointer
         | HirCicsOutputName::Ridfld
+        | HirCicsOutputName::Token
         | HirCicsOutputName::Length
         | HirCicsOutputName::ReturnTransId
         | HirCicsOutputName::ReturnTermId
         | HirCicsOutputName::Queue
+        | HirCicsOutputName::NumItems
+        | HirCicsOutputName::DocumentToken
+        | HirCicsOutputName::DocumentSize
+        | HirCicsOutputName::ElementName
+        | HirCicsOutputName::ElementNameLength
+        | HirCicsOutputName::ElementNamespace
+        | HirCicsOutputName::ElementNamespaceLength
+        | HirCicsOutputName::TypeName
+        | HirCicsOutputName::TypeNameLength
+        | HirCicsOutputName::TypeNamespace
+        | HirCicsOutputName::TypeNamespaceLength
+        | HirCicsOutputName::JournalReqId
+        | HirCicsOutputName::SpoolToken
+        | HirCicsOutputName::SpoolToFlength
+        | HirCicsOutputName::WebAction
+        | HirCicsOutputName::WebMessageId
+        | HirCicsOutputName::WebRelatesUri
+        | HirCicsOutputName::WebRelatesType
+        | HirCicsOutputName::WebEprInto
+        | HirCicsOutputName::WebEprSet
+        | HirCicsOutputName::WebEprLength
+        | HirCicsOutputName::CounterValue
+        | HirCicsOutputName::CounterMinimum
+        | HirCicsOutputName::CounterMaximum
+        | HirCicsOutputName::TimerStatus
+        | HirCicsOutputName::EventName
+        | HirCicsOutputName::SubEventName
+        | HirCicsOutputName::EventType
+        | HirCicsOutputName::FireStatus
+        | HirCicsOutputName::DumpId
+        | HirCicsOutputName::WebSchemeName
+        | HirCicsOutputName::WebHost
+        | HirCicsOutputName::WebHostLength
+        | HirCicsOutputName::WebHostType
+        | HirCicsOutputName::WebPortNumber
+        | HirCicsOutputName::WebPath
+        | HirCicsOutputName::WebPathLength
+        | HirCicsOutputName::WebQueryString
+        | HirCicsOutputName::WebQueryStringLength
+        | HirCicsOutputName::WebSessionToken
+        | HirCicsOutputName::WebHttpVNum
+        | HirCicsOutputName::WebHttpRNum
+        | HirCicsOutputName::WebScheme
+        | HirCicsOutputName::WebHttpMethod
+        | HirCicsOutputName::WebMethodLength
+        | HirCicsOutputName::WebHttpVersion
+        | HirCicsOutputName::WebVersionLength
+        | HirCicsOutputName::WebRequestType
+        | HirCicsOutputName::WebUriMap
+        | HirCicsOutputName::WebRealm
+        | HirCicsOutputName::WebRealmLength
+        | HirCicsOutputName::WebValue
+        | HirCicsOutputName::WebValueLength
+        | HirCicsOutputName::WebBrowseName
+        | HirCicsOutputName::WebBrowseNameLength
+        | HirCicsOutputName::WebRetrieveDocumentToken
+        | HirCicsOutputName::WebReceiveInto
+        | HirCicsOutputName::WebReceiveLength
+        | HirCicsOutputName::WebReceiveStatusCode
+        | HirCicsOutputName::WebReceiveStatusText
+        | HirCicsOutputName::WebReceiveStatusLength
+        | HirCicsOutputName::WebReceiveMediaType
+        | HirCicsOutputName::WebReceiveBodyCharset
+        | HirCicsOutputName::WebConverseInto
+        | HirCicsOutputName::WebConverseToLength
+        | HirCicsOutputName::WebConverseStatusCode
+        | HirCicsOutputName::WebConverseStatusText
+        | HirCicsOutputName::WebConverseStatusLength
+        | HirCicsOutputName::WebConverseMediaType
+        | HirCicsOutputName::WebConverseBodyCharset
+        | HirCicsOutputName::SecurityRead
+        | HirCicsOutputName::IssueState
+        | HirCicsOutputName::SecurityUpdate
+        | HirCicsOutputName::SecurityControl
+        | HirCicsOutputName::SecurityAlter
+        | HirCicsOutputName::SecurityChangeTime
+        | HirCicsOutputName::SecurityDaysLeft
+        | HirCicsOutputName::SecurityEsmReason
+        | HirCicsOutputName::SecurityEsmResp
+        | HirCicsOutputName::SecurityExpiryTime
+        | HirCicsOutputName::SecurityInvalidCount
+        | HirCicsOutputName::SecurityLastUseTime
+        | HirCicsOutputName::SecurityPassTicket
+        | HirCicsOutputName::SecurityIsUserId
+        | HirCicsOutputName::SecurityEncryptKey
+        | HirCicsOutputName::SecurityOutToken
+        | HirCicsOutputName::SecurityOutTokenLength
+        | HirCicsOutputName::SecurityEncryptPassTicket
+        | HirCicsOutputName::SecurityEncryptLength
+        | HirCicsOutputName::SecurityLangInUse
+        | HirCicsOutputName::SecurityNatLangInUse
+        | HirCicsOutputName::BtsActivityId
+        | HirCicsOutputName::BtsCompStatus
+        | HirCicsOutputName::BtsMode
+        | HirCicsOutputName::BtsSuspStatus
+        | HirCicsOutputName::BtsAbCode
+        | HirCicsOutputName::BtsAbProgram
+        | HirCicsOutputName::BtsChildToken
+        | HirCicsOutputName::AttachProcess
+        | HirCicsOutputName::AttachResource
+        | HirCicsOutputName::AttachReturnProcess
+        | HirCicsOutputName::AttachReturnResource
+        | HirCicsOutputName::AttachQueue
+        | HirCicsOutputName::AttachIuType
+        | HirCicsOutputName::AttachDataStream
+        | HirCicsOutputName::AttachRecordFormat
+        | HirCicsOutputName::ConversationState
+        | HirCicsOutputName::ConversationData
+        | HirCicsOutputName::ConversationRetCode
+        | HirCicsOutputName::LogonInto
+        | HirCicsOutputName::LogonSet
+        | HirCicsOutputName::LogonLength
+        | HirCicsOutputName::ProcessName
+        | HirCicsOutputName::ProcessLength
+        | HirCicsOutputName::SyncLevel
+        | HirCicsOutputName::PipList
+        | HirCicsOutputName::PipLength
+        | HirCicsOutputName::TctSysId
+        | HirCicsOutputName::TctTermId
         | HirCicsOutputName::Assign(_) => Ok(()),
+        HirCicsOutputName::BtsAny
+        | HirCicsOutputName::BtsChildCompStatus
+        | HirCicsOutputName::BtsChannel
+        | HirCicsOutputName::BtsAbcode => Ok(()),
+        HirCicsOutputName::ConversationConvid
+        | HirCicsOutputName::ConversationRetcode
+        | HirCicsOutputName::ConversationPrinConvid
+        | HirCicsOutputName::ConversationPrinSysid
+        | HirCicsOutputName::ConversationConvData
+        | HirCicsOutputName::ConversationInto
+        | HirCicsOutputName::ConversationSet
+        | HirCicsOutputName::ConversationToLength
+        | HirCicsOutputName::ConversationToFullLength
+        | HirCicsOutputName::ConversationDataInto
+        | HirCicsOutputName::ConversationDataSet
+        | HirCicsOutputName::ConversationDataLength
+        | HirCicsOutputName::ConversationDataFullLength
+        | HirCicsOutputName::ConversationDataRetcode
+        | HirCicsOutputName::ConversationDataConvData
+        | HirCicsOutputName::ConversationDataState => Ok(()),
     }
 }

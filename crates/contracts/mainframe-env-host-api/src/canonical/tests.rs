@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::*;
 
 fn bytes<T: Canonical + ?Sized>(value: &T, domain: &[u8]) -> Vec<u8> {
@@ -34,6 +36,44 @@ fn golden_request_and_unknown_result_are_versioned_and_domain_separated() {
 }
 
 #[test]
+fn browse_request_variants_keep_their_frozen_canonical_bytes() {
+    let dataset = DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap();
+    let cases = [
+        (
+            DatasetRequest::StartBrowse {
+                dataset: dataset.clone(),
+                key: b"AA".to_vec(),
+                relation: KeyRelation::GreaterOrEqual,
+            },
+            206,
+            "4b16e6c153ba020279a02234c1e62c08f5b5f6406665e9c1be4184d4962b9a9d",
+        ),
+        (
+            DatasetRequest::ResetBrowse {
+                dataset: dataset.clone(),
+                cursor: "CURSOR-1".into(),
+                key: b"BB".to_vec(),
+                relation: KeyRelation::GreaterOrEqual,
+            },
+            238,
+            "a0065f358f2631f2c4c15827a8ce47aa7f7e10db7156ed4b1d6d18dd65c9da48",
+        ),
+        (
+            DatasetRequest::EndBrowse {
+                dataset,
+                cursor: "CURSOR-1".into(),
+            },
+            144,
+            "e1ec2e136a887a753dda5193666dee679560def2b22f1add2ef20988839730cb",
+        ),
+    ];
+    for (request, size, expected_digest) in cases {
+        assert_eq!(bytes(&request, b"").len(), size);
+        assert_eq!(hex(&digest(&request, b"").unwrap()), expected_digest);
+    }
+}
+
+#[test]
 fn principal_validation_is_a_frozen_named_security_variant() {
     let principal = PrincipalId::new(
         "TARGET",
@@ -47,6 +87,56 @@ fn principal_validation_is_a_frozen_named_security_variant() {
         )),
         "41010f0000000000000053656375726974795265717565737401110000000000000056616c69646174655072696e636970616c01000000000000000109000000000000007072696e636970616c42010b000000000000005072696e636970616c4964010600000000000000544152474554"
     );
+}
+
+#[test]
+fn selected_program_link_is_additive_identity_bound_and_validated() {
+    let limits = mainframe_env_execution_api::InvocationLimits::default();
+    let program = ProgramName::new("APPMAIN", 128).unwrap();
+    let payload = BoundedPayload::new("payload@1", b"DATA".to_vec(), limits).unwrap();
+    let artifact = ArtifactRef::new(format!("sha256:{:064x}", 1), limits).unwrap();
+    let plain = HostRequest::Program(ProgramRequest::Link {
+        program: program.clone(),
+        payload: payload.clone(),
+        selection: None,
+    });
+    let selected = HostRequest::Program(ProgramRequest::Link {
+        program: program.clone(),
+        payload: payload.clone(),
+        selection: Some(ProgramLinkSelection {
+            artifact: artifact.clone(),
+            generation: 7,
+            content_identity: format!("sha256:{:064x}", 2),
+        }),
+    });
+    assert_eq!(plain.validate(HostLimits::default()), Ok(()));
+    assert_eq!(selected.validate(HostLimits::default()), Ok(()));
+    assert_ne!(
+        canonical_request_digest(&plain).unwrap(),
+        canonical_request_digest(&selected).unwrap()
+    );
+    for selection in [
+        ProgramLinkSelection {
+            artifact: artifact.clone(),
+            generation: 0,
+            content_identity: format!("sha256:{:064x}", 2),
+        },
+        ProgramLinkSelection {
+            artifact,
+            generation: 7,
+            content_identity: "sha256:not-a-content-identity".into(),
+        },
+    ] {
+        assert_eq!(
+            HostRequest::Program(ProgramRequest::Link {
+                program: program.clone(),
+                payload: payload.clone(),
+                selection: Some(selection),
+            })
+            .validate(HostLimits::default()),
+            Err(HostProblem::Malformed)
+        );
+    }
 }
 
 #[test]
@@ -94,6 +184,14 @@ fn cics_additive_wire_identities_are_frozen_named_variants() {
     assert_eq!(
         hex(&bytes(&CicsOperation::Suspend, b"")),
         "41010d00000000000000436963734f7065726174696f6e01070000000000000053757370656e640000000000000000"
+    );
+    assert_eq!(
+        hex(&bytes(&CicsOperation::WaitEvent, b"")),
+        "41010d00000000000000436963734f7065726174696f6e010900000000000000576169744576656e740000000000000000"
+    );
+    assert_eq!(
+        hex(&bytes(&CicsOperation::WaitExternal, b"")),
+        "41010d00000000000000436963734f7065726174696f6e010c000000000000005761697445787465726e616c0000000000000000"
     );
 }
 
