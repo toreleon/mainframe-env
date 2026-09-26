@@ -137,7 +137,12 @@ pub(super) fn resolve(
         ("YYMMDD", HirCicsOutputName::Yymmdd),
         ("YYYYMMDD", HirCicsOutputName::Yyyymmdd),
     ] {
-        if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
+        if name == "ABSTIME"
+            && matches!(
+                operation,
+                HirCicsOperation::FormatTime | HirCicsOperation::BtsInquireTimer
+            )
+        {
             continue;
         }
         if name == "PARTN" && operation != HirCicsOperation::ReceivePartn {

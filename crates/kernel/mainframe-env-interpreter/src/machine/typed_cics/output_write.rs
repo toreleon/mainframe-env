@@ -166,7 +166,7 @@ pub(in crate::machine) fn write_output(
             }),
         );
     }
-    if matches!(name, "EVENTTYPE" | "FIRESTATUS") {
+    if matches!(name, "EVENTTYPE" | "FIRESTATUS") && operation != CicsOperation::BtsInquireEvent {
         if value.schema() != "mainframe-env.cics.cvda@1" {
             return Err(MachineProblem::UnexpectedHostResult);
         }

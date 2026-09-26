@@ -1293,12 +1293,22 @@ mod merge_tag_tests {
             BtsBrowseOutput::Program,
             BtsBrowseOutput::TransId,
             BtsBrowseOutput::UserId,
+            BtsBrowseOutput::CompStatus,
+            BtsBrowseOutput::Mode,
+            BtsBrowseOutput::SuspStatus,
+            BtsBrowseOutput::EventType,
+            BtsBrowseOutput::FireStatus,
+            BtsBrowseOutput::Composite,
+            BtsBrowseOutput::Predicate,
+            BtsBrowseOutput::Timer,
+            BtsBrowseOutput::Status,
+            BtsBrowseOutput::Abstime,
         ] {
             let output = CicsOutputName::BtsBrowse(field);
             let tag = output_tag(output);
             assert!(seen.insert(tag), "duplicate output tag {tag}");
             assert_eq!(output_from_tag(tag), Ok(output));
         }
-        assert_eq!(seen.len(), 18);
+        assert_eq!(seen.len(), 28);
     }
 }

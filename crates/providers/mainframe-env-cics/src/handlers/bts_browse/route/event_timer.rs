@@ -198,13 +198,76 @@ pub(super) fn invoke(
                 AccessIntent::Read,
             )?;
             let state = event_control::load_activity(service, &id)?;
-            if event && !state.events.contains_key(&name) {
-                return Err(condition("EVENTERR", 111, 4));
+            let mut outputs = Vec::new();
+            if event {
+                let record = state
+                    .events
+                    .get(&name)
+                    .ok_or_else(|| condition("EVENTERR", 111, 4))?;
+                let kind = event_type_code(&record.kind);
+                for (field, code) in [
+                    ("EVENTTYPE", kind),
+                    ("FIRESTATUS", fire_status_code(record.fired)),
+                ] {
+                    if has(request, field) {
+                        outputs.push((
+                            field,
+                            "mainframe-env.cics.decimal@1",
+                            code.to_string().into_bytes(),
+                        ));
+                    }
+                }
+                if has(request, "COMPOSITE") {
+                    outputs.push((
+                        "COMPOSITE",
+                        "mainframe-env.cics.payload@1",
+                        padded(record.parent.as_deref().unwrap_or(""), 16)?,
+                    ));
+                }
+                if has(request, "PREDICATE") {
+                    outputs.push((
+                        "PREDICATE",
+                        "mainframe-env.cics.decimal@1",
+                        predicate_code(&record.kind)?.to_string().into_bytes(),
+                    ));
+                }
+                if has(request, "TIMER") {
+                    let timer = match &record.kind {
+                        event_control::EventKind::Timer { timer } => timer.as_str(),
+                        _ => "",
+                    };
+                    outputs.push(("TIMER", "mainframe-env.cics.payload@1", padded(timer, 16)?));
+                }
+            } else {
+                let record = state
+                    .timers
+                    .get(&name)
+                    .ok_or_else(|| condition("TIMERERR", 110, 13))?;
+                if has(request, "EVENT") {
+                    outputs.push((
+                        "EVENT",
+                        "mainframe-env.cics.payload@1",
+                        padded(&record.event, 16)?,
+                    ));
+                }
+                if has(request, "STATUS") {
+                    let code = timer_status_code(record.status);
+                    outputs.push((
+                        "STATUS",
+                        "mainframe-env.cics.decimal@1",
+                        code.to_string().into_bytes(),
+                    ));
+                }
+                if has(request, "ABSTIME") {
+                    let rounded = rounded_abstime(record.due_tick)?;
+                    outputs.push((
+                        "ABSTIME",
+                        "mainframe-env.cics.decimal@1",
+                        rounded.to_string().into_bytes(),
+                    ));
+                }
             }
-            if !event && !state.timers.contains_key(&name) {
-                return Err(condition("TIMERERR", 110, 13));
-            }
-            Ok(Vec::new())
+            Ok(outputs)
         }
         _ => Err(HostProblem::Unsupported),
     }
@@ -212,4 +275,109 @@ pub(super) fn invoke(
 
 fn is_system(name: &str) -> bool {
     name.to_ascii_uppercase().starts_with("DFH")
+}
+
+fn event_type_code(kind: &event_control::EventKind) -> i32 {
+    match kind {
+        event_control::EventKind::Input => 226,
+        event_control::EventKind::Activity { .. } => 1002,
+        event_control::EventKind::Composite { .. } => 1003,
+        event_control::EventKind::Timer { .. } => 1004,
+    }
+}
+
+fn fire_status_code(fired: bool) -> i32 {
+    if fired { 1001 } else { 1000 }
+}
+
+fn predicate_code(kind: &event_control::EventKind) -> Result<i32, HostProblem> {
+    match kind {
+        event_control::EventKind::Composite { all: true, .. } => Ok(1005),
+        event_control::EventKind::Composite { all: false, .. } => Ok(1006),
+        _ => Err(HostProblem::Unsupported),
+    }
+}
+
+fn timer_status_code(status: event_control::TimerStatus) -> i32 {
+    match status {
+        event_control::TimerStatus::Pending => 1018,
+        event_control::TimerStatus::Expired => 1017,
+        event_control::TimerStatus::Forced => 1013,
+    }
+}
+
+fn rounded_abstime(millis: u64) -> Result<u64, HostProblem> {
+    millis
+        .checked_add(5)
+        .map(|value| value / 10 * 10)
+        .ok_or(HostProblem::ResourceExhausted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn bts_browse_inquire_event_timer_cvda_table_and_1900_epoch() {
+        use event_control::EventKind as K;
+        for (kind, code) in [
+            (K::Input, 226),
+            (
+                K::Activity {
+                    child_id: "CHILD".into(),
+                },
+                1002,
+            ),
+            (
+                K::Composite {
+                    all: true,
+                    children: vec![],
+                    fired_queue: VecDeque::new(),
+                },
+                1003,
+            ),
+            (
+                K::Timer {
+                    timer: "WAKE".into(),
+                },
+                1004,
+            ),
+        ] {
+            assert_eq!(event_type_code(&kind), code);
+        }
+        for (all, code) in [(true, 1005), (false, 1006)] {
+            assert_eq!(
+                predicate_code(&K::Composite {
+                    all,
+                    children: vec![],
+                    fired_queue: VecDeque::new()
+                }),
+                Ok(code)
+            );
+        }
+        assert_eq!(fire_status_code(false), 1000);
+        assert_eq!(fire_status_code(true), 1001);
+        assert_eq!(predicate_code(&K::Input), Err(HostProblem::Unsupported));
+        for (status, code) in [
+            (event_control::TimerStatus::Pending, 1018),
+            (event_control::TimerStatus::Expired, 1017),
+            (event_control::TimerStatus::Forced, 1013),
+        ] {
+            assert_eq!(timer_status_code(status), code);
+        }
+        assert_eq!(rounded_abstime(0), Ok(0));
+        assert_eq!(
+            crate::service::handlers::time::absolute_milliseconds(
+                crate::service::handlers::time::parse_clock_timestamp("20000101000000000").unwrap()
+            ),
+            Ok(3_155_673_600_000)
+        );
+        assert_eq!(rounded_abstime(3_155_673_600_004), Ok(3_155_673_600_000));
+        assert_eq!(rounded_abstime(3_155_673_600_005), Ok(3_155_673_600_010));
+        assert_eq!(
+            rounded_abstime(u64::MAX),
+            Err(HostProblem::ResourceExhausted)
+        );
+    }
 }

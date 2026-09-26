@@ -337,16 +337,40 @@ fn inquiry_outputs(
     process: &super::super::bts_lifecycle::BtsProcess,
     activity: &BtsActivity,
 ) -> Result<Outputs, HostProblem> {
-    if ["COMPSTATUS", "MODE", "SUSPSTATUS"]
-        .into_iter()
-        .any(|name| has(request, name))
-    {
-        return Err(HostProblem::Unsupported);
-    }
     if has(request, "ACTIVITY") && activity.name.len() > 16 {
         return Err(HostProblem::Unsupported);
     }
     let mut outputs = Vec::new();
+    for (name, code) in [
+        (
+            "COMPSTATUS",
+            match activity.completion {
+                super::super::bts_lifecycle::BtsCompletion::Abend => 900,
+                super::super::bts_lifecycle::BtsCompletion::Forced => 1013,
+                super::super::bts_lifecycle::BtsCompletion::Incomplete => 1014,
+                super::super::bts_lifecycle::BtsCompletion::Normal => 1016,
+            },
+        ),
+        (
+            "MODE",
+            match activity.mode {
+                super::super::bts_lifecycle::BtsMode::Active => 181,
+                super::super::bts_lifecycle::BtsMode::Initial => 789,
+                super::super::bts_lifecycle::BtsMode::Dormant => 1024,
+                super::super::bts_lifecycle::BtsMode::Cancelling => 1025,
+                super::super::bts_lifecycle::BtsMode::Complete => 1026,
+            },
+        ),
+        ("SUSPSTATUS", if activity.suspended { 231 } else { 1027 }),
+    ] {
+        if has(request, name) {
+            outputs.push((
+                name,
+                "mainframe-env.cics.decimal@1",
+                code.to_string().into_bytes(),
+            ));
+        }
+    }
     for (name, value, width) in [
         ("ABCODE", activity.abcode.as_deref().unwrap_or(""), 4),
         ("ABPROGRAM", activity.abprogram.as_deref().unwrap_or(""), 8),
@@ -374,6 +398,17 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         && ["COMPSTATUS", "MODE", "SUSPSTATUS"]
             .iter()
             .any(|name| request.arguments.contains_key(*name))
+        && request
+            .arguments
+            .keys()
+            .filter(|name| {
+                !matches!(
+                    name.as_str(),
+                    "ACTIVITYID" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
+                )
+            })
+            .count()
+            != 1
     {
         return Err(HostProblem::Unsupported);
     }
@@ -403,8 +438,18 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         CicsOperation::BtsEndBrowseEvent | CicsOperation::BtsEndBrowseTimer => {
             (&["BROWSETOKEN"], &[], &[], &[])
         }
-        CicsOperation::BtsInquireEvent => (&["EVENT"], &["ACTIVITYID"], &[], &[]),
-        CicsOperation::BtsInquireTimer => (&["TIMER"], &["ACTIVITYID"], &[], &[]),
+        CicsOperation::BtsInquireEvent => (
+            &["EVENT"],
+            &["ACTIVITYID"],
+            &[],
+            &["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"],
+        ),
+        CicsOperation::BtsInquireTimer => (
+            &["TIMER"],
+            &["ACTIVITYID"],
+            &[],
+            &["EVENT", "STATUS", "ABSTIME"],
+        ),
         CicsOperation::BtsStartBrowseProcess => (&["PROCESSTYPE"], &[], &["BROWSETOKEN"], &[]),
         CicsOperation::BtsStartBrowseActivity => (
             &[],
@@ -677,23 +722,133 @@ mod tests {
     use mainframe_env_host_api::CicsConditionPolicy;
 
     #[test]
-    fn bts_browse_inquire_activity_cvda_forms_fail_before_authority_access() {
+    fn bts_browse_inquire_activity_cvda_forms_are_individually_admitted() {
         for field in ["COMPSTATUS", "MODE", "SUSPSTATUS"] {
             let request = CicsRequest {
                 operation: CicsOperation::BtsInquireActivity,
-                arguments: std::collections::BTreeMap::from([(
-                    field.into(),
-                    BoundedPayload::new(
-                        "mainframe-env.cics.argument@1",
-                        b"OUT".to_vec(),
-                        InvocationLimits::default(),
-                    )
-                    .unwrap(),
-                )]),
+                arguments: std::collections::BTreeMap::from([
+                    (
+                        "ACTIVITYID".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.literal@1",
+                            b"A1".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                    (
+                        field.into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.argument@1",
+                            b"OUT".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                ]),
                 condition_policy: CicsConditionPolicy::Default,
                 mutation: None,
             };
-            assert_eq!(validate(&request), Err(HostProblem::Unsupported));
+            assert_eq!(validate(&request), Ok(()));
+            let mut ambiguous = request.clone();
+            ambiguous.arguments.insert(
+                "ACTIVITY".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.argument@1",
+                    b"OUT".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+            assert_eq!(validate(&ambiguous), Err(HostProblem::Unsupported));
+        }
+    }
+
+    #[test]
+    fn bts_browse_inquire_activity_cvda_values_match_pinned_table() {
+        use crate::service::handlers::bts_lifecycle::{BtsCompletion, BtsMode, BtsProcess};
+        let id = BtsLifecycleStore::root_id("TYPE", "ORDER", "UOW").unwrap();
+        let process = BtsProcess::new("TYPE", "ORDER", &id, "PROG", "BT01", "USER", "UOW").unwrap();
+        let mut activity = process.activities[&id].clone();
+        let argument = |schema: &str| {
+            BoundedPayload::new(schema, b"X".to_vec(), InvocationLimits::default()).unwrap()
+        };
+        for (completion, expected) in [
+            (BtsCompletion::Abend, "900"),
+            (BtsCompletion::Forced, "1013"),
+            (BtsCompletion::Incomplete, "1014"),
+            (BtsCompletion::Normal, "1016"),
+        ] {
+            activity.completion = completion;
+            let request = CicsRequest {
+                operation: CicsOperation::BtsInquireActivity,
+                arguments: [
+                    (
+                        "ACTIVITYID".into(),
+                        argument("mainframe-env.cics.literal@1"),
+                    ),
+                    (
+                        "COMPSTATUS".into(),
+                        argument("mainframe-env.cics.argument@1"),
+                    ),
+                ]
+                .into(),
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: None,
+            };
+            assert_eq!(
+                inquiry_outputs(&request, &process, &activity).unwrap()[0].2,
+                expected.as_bytes()
+            );
+        }
+        for (mode, expected) in [
+            (BtsMode::Active, "181"),
+            (BtsMode::Initial, "789"),
+            (BtsMode::Dormant, "1024"),
+            (BtsMode::Cancelling, "1025"),
+            (BtsMode::Complete, "1026"),
+        ] {
+            activity.mode = mode;
+            let request = CicsRequest {
+                operation: CicsOperation::BtsInquireActivity,
+                arguments: [
+                    (
+                        "ACTIVITYID".into(),
+                        argument("mainframe-env.cics.literal@1"),
+                    ),
+                    ("MODE".into(), argument("mainframe-env.cics.argument@1")),
+                ]
+                .into(),
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: None,
+            };
+            assert_eq!(
+                inquiry_outputs(&request, &process, &activity).unwrap()[0].2,
+                expected.as_bytes()
+            );
+        }
+        for (suspended, expected) in [(false, "1027"), (true, "231")] {
+            activity.suspended = suspended;
+            let request = CicsRequest {
+                operation: CicsOperation::BtsInquireActivity,
+                arguments: [
+                    (
+                        "ACTIVITYID".into(),
+                        argument("mainframe-env.cics.literal@1"),
+                    ),
+                    (
+                        "SUSPSTATUS".into(),
+                        argument("mainframe-env.cics.argument@1"),
+                    ),
+                ]
+                .into(),
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: None,
+            };
+            assert_eq!(
+                inquiry_outputs(&request, &process, &activity).unwrap()[0].2,
+                expected.as_bytes()
+            );
         }
     }
 
@@ -717,7 +872,15 @@ mod tests {
                 CicsOperation::BtsInquireTimer,
                 [
                     ("TIMER".into(), argument(b"WAKE")),
-                    ("ABSTIME".into(), argument(b"OUT")),
+                    (
+                        "ABSTIME".into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.literal@1",
+                            b"OUT".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
                 ]
                 .into(),
                 HostProblem::Malformed,

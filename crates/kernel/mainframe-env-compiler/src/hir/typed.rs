@@ -5280,12 +5280,44 @@ mod tests {
             "INQUIRE TIMER('WAKE') ABSTIME(LEVEL-X)",
             "STARTBROWSE ACTIVITY PROCESS('P1') BROWSETOKEN(TOKEN-X)",
             "GETNEXT ACTIVITY(PROC-X) BROWSETOKEN(TOKEN-X)",
-            "INQUIRE ACTIVITYID('A1') MODE(LEVEL-X)",
+            "INQUIRE ACTIVITYID('A1') MODE(LEVEL-X) COMPSTATUS(DATA-X)",
         ] {
             let analysis = analyze(&format!(
                 "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn bts_browse_inquiry_receivers_are_source_bounded() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSIQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 CVDA-X PIC S9(9) COMP. 01 TEXT-X PIC X(16). 01 ABS-X PIC S9(15) COMP-3. PROCEDURE DIVISION. ";
+        for command in [
+            "INQUIRE ACTIVITYID('A1') COMPSTATUS(CVDA-X)",
+            "INQUIRE ACTIVITYID('A1') MODE(CVDA-X)",
+            "INQUIRE ACTIVITYID('A1') SUSPSTATUS(CVDA-X)",
+            "INQUIRE EVENT('READY') EVENTTYPE(CVDA-X) FIRESTATUS(CVDA-X) COMPOSITE(TEXT-X) PREDICATE(CVDA-X) TIMER(TEXT-X)",
+            "INQUIRE TIMER('WAKE') EVENT(TEXT-X) STATUS(CVDA-X) ABSTIME(ABS-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(
+                analysis.hir.is_some(),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+        for command in [
+            "INQUIRE ACTIVITYID('A1') MODE(CVDA-X) COMPSTATUS(CVDA-X)",
+            "INQUIRE ACTIVITYID('A1') MODE(CVDA-X) ACTIVITY(TEXT-X)",
+            "INQUIRE EVENT('DFHINITIAL') EVENTTYPE(CVDA-X)",
+            "INQUIRE TIMER('WAKE') ABSTIME(CVDA-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
         }
     }
 
