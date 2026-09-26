@@ -10872,11 +10872,19 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         .windows(2)
         .find(|pair| pair[0] == pair[1] && matches!(pair[0], b'+' | b'-'))
         .map(|pair| pair[0]);
-    let leading_floating_slots = floating_sign.map_or(0, |sign| {
+    let floating_currency = (picture
+        .iter()
+        .take_while(|&&byte| matches!(byte, b'$' | b','))
+        .filter(|&&byte| byte == b'$')
+        .count()
+        >= 2)
+        .then_some(b'$');
+    let floating_symbol = floating_sign.or(floating_currency);
+    let leading_floating_slots = floating_symbol.map_or(0, |symbol| {
         picture
             .iter()
-            .take_while(|&&byte| byte == sign || byte == b',')
-            .filter(|&&byte| byte == sign)
+            .take_while(|&&byte| byte == symbol || byte == b',')
+            .filter(|&&byte| byte == symbol)
             .count()
     });
     let digit_positions = layout.digits.max(
@@ -10887,7 +10895,7 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             + leading_floating_slots,
     );
     let mut digits = value.coefficient.unsigned_abs().to_string();
-    if floating_sign.is_some() {
+    if floating_symbol.is_some() {
         let numeric_capacity = digit_positions
             .checked_sub(1)
             .ok_or(MachineProblem::UnsupportedForm)?;
@@ -10912,13 +10920,6 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
     let mut digit_index = 0usize;
     let mut output = Vec::with_capacity(layout.length);
     let mut suppressing = true;
-    let first_nonzero = digits.bytes().position(|digit| digit != b'0');
-    let has_floating_plus = floating_sign == Some(b'+');
-    let floating_sign_slot = if value.coefficient < 0 || has_floating_plus {
-        first_nonzero.and_then(|position| position.checked_sub(1))
-    } else {
-        None
-    };
     for (picture_index, byte) in picture.iter().copied().enumerate() {
         match byte {
             b'9' => {
@@ -10950,25 +10951,17 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
                 );
                 digit_index += 1;
             }
-            b'+' | b'-'
-                if picture.get(picture_index.wrapping_sub(1)) == Some(&byte)
-                    || picture.get(picture_index + 1) == Some(&byte)
-                    || (floating_sign == Some(byte)
+            b'+' | b'-' | b'$'
+                if (byte != b'$'
+                    && (picture.get(picture_index.wrapping_sub(1)) == Some(&byte)
+                        || picture.get(picture_index + 1) == Some(&byte)))
+                    || (floating_symbol == Some(byte)
                         && picture[..picture_index]
                             .iter()
                             .all(|&prefix| prefix == byte || prefix == b',')) =>
             {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
-                if floating_sign_slot == Some(digit_index) {
-                    output.push(if value.coefficient < 0 {
-                        b'-'
-                    } else if byte == b'+' {
-                        b'+'
-                    } else {
-                        b' '
-                    });
-                    suppressing = false;
-                } else if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
+                if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
                     output.push(b' ');
                 } else {
                     output.push(digit);
@@ -11004,6 +10997,31 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
                 suppressing = false;
             }
             other => output.push(other),
+        }
+    }
+    if let Some(symbol) = floating_symbol {
+        let insertion = match symbol {
+            b'$' => Some(b'$'),
+            _ if value.coefficient < 0 => Some(b'-'),
+            b'+' => Some(b'+'),
+            _ => None,
+        };
+        // The floating symbol takes the position immediately left of the first
+        // significant digit, even when that position holds an insertion comma;
+        // with no significant digit inside the floating string it takes the
+        // string's last position.
+        let region = picture
+            .iter()
+            .take_while(|&&byte| byte == symbol || byte == b',')
+            .count();
+        if let Some(insertion) = insertion
+            && region > 0
+        {
+            let slot = output[..region.min(output.len())]
+                .iter()
+                .position(u8::is_ascii_digit)
+                .map_or(region - 1, |first| first.saturating_sub(1));
+            output[slot] = insertion;
         }
     }
     if output.len() != layout.length {
@@ -12936,6 +12954,84 @@ mod tests {
             ),
             Ok(vec![b' '; layout.length])
         );
+    }
+
+    #[test]
+    fn floating_currency_places_symbol_before_significant_digits() {
+        // Expected bytes from GnuCOBOL 3.2 with -std=ibm.
+        let cases = [
+            ("$$$,$$9.99", 7, 9585, "    $95.85"),
+            ("$$$,$$9.99", 7, 0, "     $0.00"),
+            ("$$$,$$9.99", 7, 85, "     $0.85"),
+            ("$$$,$$9.99", 7, 1234567, "$12,345.67"),
+            ("$$,$$$,$$9.99", 9, 9585, "       $95.85"),
+            ("$$,$$$,$$9.99", 9, 1234567, "   $12,345.67"),
+            ("$$$.99", 4, 85, "  $.85"),
+            ("$$$.99", 4, 0, "  $.00"),
+            ("$ZZ,ZZ9.99", 7, 9585, "$    95.85"),
+            ("$$$,$$9.99-", 7, -9585, "    $95.85-"),
+            ("$$$,$$9.99CR", 7, -9585, "    $95.85CR"),
+            ("$$$,$$9.99", 7, 123450, " $1,234.50"),
+            ("$$$,$$9.99", 7, 23450, "   $234.50"),
+            ("$$$.99", 4, 1234, "$12.34"),
+            ("$$$.99", 4, 150, " $1.50"),
+            ("$$,$$$,$$9.99", 9, 100000000, "$1,000,000.00"),
+            ("$$,$$$,$$9.99", 9, 10000000, "  $100,000.00"),
+        ];
+        for (picture, digits, coefficient, expected) in cases {
+            let layout = edited_test_layout(picture, digits, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient,
+                        scale: 2
+                    }
+                ),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}, coefficient {coefficient}"
+            );
+        }
+        let layout = edited_test_layout("$$$,$$9.99", 7, 2, true);
+        assert_eq!(
+            encode_edited(
+                &layout,
+                Decimal {
+                    coefficient: 0,
+                    scale: 2
+                }
+            ),
+            Ok(vec![b' '; layout.length])
+        );
+    }
+
+    #[test]
+    fn floating_insertion_replaces_comma_before_first_significant_digit() {
+        // Expected bytes from GnuCOBOL 3.2 with -std=ibm: the floating symbol takes
+        // the position immediately left of the first significant digit, even when
+        // that position is an insertion comma.
+        let cases = [
+            ("---,--9.99", 7, -23450, "   -234.50"),
+            ("---,--9.99", 7, -123450, " -1,234.50"),
+            ("+++,++9.99", 7, 23450, "   +234.50"),
+            ("$$$,$$9.99", 7, 23450, "   $234.50"),
+            ("$$,$$$.99", 6, 23450, "  $234.50"),
+            ("$$,$$$.99", 6, 50, "     $.50"),
+        ];
+        for (picture, digits, coefficient, expected) in cases {
+            let layout = edited_test_layout(picture, digits, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient,
+                        scale: 2
+                    }
+                ),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}, coefficient {coefficient}"
+            );
+        }
     }
 
     #[test]
