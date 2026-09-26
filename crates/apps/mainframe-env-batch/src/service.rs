@@ -9544,6 +9544,40 @@ mod tests {
         }
     }
 
+    #[test]
+    fn exec_parm_reaches_batch_program_input() {
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let program = Arc::new(ProgramInputCapture {
+            inner: builtins(),
+            captured: captured.clone(),
+        });
+        let service = service_with_datasets_and_program(
+            Arc::new(Mutex::new(BTreeMap::new())),
+            program,
+            false,
+        );
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//J JOB\n//S EXEC PGM=IEFBR14,PARM='2022071800'\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("exec-parm-input", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        assert_eq!(
+            captured.lock().unwrap()[0].parameter.as_deref(),
+            Some("2022071800")
+        );
+    }
+
     /// After `hydrate_dds`, only `SYSIN` and `SYSLIB*` DDs keep a flattened
     /// `inline_data` copy of dataset-backed records; every dataset-backed DD
     /// carries its records exactly once, in `dd_records` (#182).
