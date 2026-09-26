@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Resolve JCL DCB DD referbacks and catalogued data set references when allocating new data sets."
