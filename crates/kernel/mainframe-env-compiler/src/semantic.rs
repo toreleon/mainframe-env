@@ -1170,7 +1170,8 @@ fn layout_one(
                 &value_source.words,
                 element_length,
                 picture.category,
-            )
+                picture.scale,
+            )?
             .repeat(spec.occurs_max)
         }
     } else {
@@ -2635,7 +2636,8 @@ fn initial_value(
     words: &[String],
     length: usize,
     category: DataCategory,
-) -> Vec<u8> {
+    scale: usize,
+) -> Result<Vec<u8>, SemanticProblem> {
     let mut result = vec![
         if matches!(
             category,
@@ -2665,23 +2667,23 @@ fn initial_value(
         length
     ];
     let Some(value_index) = keyword_index(sentence, "VALUE") else {
-        return result;
+        return Ok(result);
     };
     let tail = sentence[value_index + "VALUE".len()..].trim();
     let upper_tail = tail.to_ascii_uppercase();
     if upper_tail.starts_with("SPACE") {
-        return vec![b' '; length];
+        return Ok(vec![b' '; length]);
     }
     if upper_tail.starts_with("LOW-VALUE") {
-        return vec![0; length];
+        return Ok(vec![0; length]);
     }
     if upper_tail.starts_with("HIGH-VALUE") {
-        return vec![0xff; length];
+        return Ok(vec![0xff; length]);
     }
     if let Some(hex) = hexadecimal_literal(tail) {
         let copy = hex.len().min(result.len());
         result[..copy].copy_from_slice(&hex[..copy]);
-        return result;
+        return Ok(result);
     }
     let (clean, repeat_all) = if upper_tail.starts_with("ALL ") {
         (quoted_or_word(tail[4..].trim(), words), true)
@@ -2692,29 +2694,66 @@ fn initial_value(
         for (index, byte) in result.iter_mut().enumerate() {
             *byte = clean.as_bytes()[index % clean.len()];
         }
-        return result;
+        return Ok(result);
     }
+    let numeric = matches!(
+        category,
+        DataCategory::Binary | DataCategory::PackedDecimal | DataCategory::NumericDisplay
+    );
+    let (digits, negative) = if numeric {
+        // declaration_words strips leading periods, so read the numeric token
+        // from the sentence to preserve VALUE .5.
+        numeric_value_digits(tail.split_whitespace().next().unwrap_or_default(), scale)?
+    } else {
+        (Vec::new(), false)
+    };
     match category {
-        DataCategory::PackedDecimal => packed_decimal(&clean, length),
-        DataCategory::Binary => binary_integer(&clean, length),
+        DataCategory::PackedDecimal => Ok(packed_decimal(&digits, negative, length)),
+        DataCategory::Binary => Ok(binary_integer(&digits, negative, length)),
         DataCategory::NumericDisplay => {
-            let negative = clean.trim_start().starts_with('-');
-            let digits = clean.bytes().filter(u8::is_ascii_digit).collect::<Vec<_>>();
             let copy = digits.len().min(result.len());
             let result_start = result.len() - copy;
             result[result_start..].copy_from_slice(&digits[digits.len() - copy..]);
             if negative && let Some(last) = result.last_mut() {
                 *last = negative_overpunch(*last);
             }
-            result
+            Ok(result)
         }
         _ => {
             let bytes = clean.as_bytes();
             let copy = bytes.len().min(result.len());
             result[..copy].copy_from_slice(&bytes[..copy]);
-            result
+            Ok(result)
         }
     }
+}
+
+fn numeric_value_digits(value: &str, scale: usize) -> Result<(Vec<u8>, bool), SemanticProblem> {
+    let value = value.trim();
+    let value = if matches!(
+        value.to_ascii_uppercase().as_str(),
+        "ZERO" | "ZEROS" | "ZEROES"
+    ) {
+        "0"
+    } else {
+        value
+    };
+    let negative = value.starts_with('-');
+    let unsigned = value.strip_prefix(['-', '+']).unwrap_or(value);
+    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    if (integer.is_empty() && fraction.is_empty())
+        || !integer.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+        || fraction.len() > scale
+    {
+        return Err(SemanticProblem::InvalidDeclaration(format!(
+            "numeric VALUE {value} does not fit the PICTURE scale"
+        )));
+    }
+    let mut digits = integer.as_bytes().to_vec();
+    digits.extend_from_slice(fraction.as_bytes());
+    digits.extend(std::iter::repeat_n(b'0', scale - fraction.len()));
+    Ok((digits, negative))
 }
 
 fn hexadecimal_literal(value: &str) -> Option<Vec<u8>> {
@@ -2776,11 +2815,10 @@ fn quoted_or_word(tail: &str, words: &[String]) -> String {
     find_after_owned(words, "VALUE").unwrap_or_default()
 }
 
-fn packed_decimal(value: &str, length: usize) -> Vec<u8> {
-    let negative = value.trim_start().starts_with('-');
+fn packed_decimal(value: &[u8], negative: bool, length: usize) -> Vec<u8> {
     let mut nibbles = value
-        .bytes()
-        .filter(u8::is_ascii_digit)
+        .iter()
+        .copied()
         .map(|byte| byte - b'0')
         .collect::<Vec<_>>();
     let digits = length.saturating_mul(2).saturating_sub(1);
@@ -2797,8 +2835,12 @@ fn packed_decimal(value: &str, length: usize) -> Vec<u8> {
         .collect()
 }
 
-fn binary_integer(value: &str, length: usize) -> Vec<u8> {
-    let parsed = value.parse::<i128>().unwrap_or(0).to_be_bytes();
+fn binary_integer(digits: &[u8], negative: bool, length: usize) -> Vec<u8> {
+    let parsed = std::str::from_utf8(digits)
+        .ok()
+        .and_then(|digits| digits.parse::<i128>().ok())
+        .unwrap_or(0);
+    let parsed = if negative { -parsed } else { parsed }.to_be_bytes();
     parsed[parsed.len().saturating_sub(length)..].to_vec()
 }
 
@@ -2835,6 +2877,108 @@ pub(crate) enum SemanticProblem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn packed_value_aligns_fraction_to_picture_scale() {
+        let model = SemanticModel::analyze(
+            &program("01 R PIC 9(7)V99 USAGE COMP-3 VALUE 95.8"),
+            1024,
+            32,
+        )
+        .unwrap();
+        assert_eq!(
+            model.layout("R").unwrap().initial,
+            packed_decimal(b"9580", false, 5)
+        );
+    }
+
+    #[test]
+    fn display_value_aligns_fraction_to_picture_scale() {
+        let model =
+            SemanticModel::analyze(&program("01 R PIC 9(7)V99 VALUE 95.8"), 1024, 32).unwrap();
+        assert_eq!(model.layout("R").unwrap().initial, b"000009580");
+    }
+
+    #[test]
+    fn numeric_value_aligns_fraction_to_picture_scale() {
+        for usage in ["COMP", "COMP-3", "DISPLAY"] {
+            for (picture, value, coefficient) in [
+                ("9(7)V99", "95.8", "000009580"),
+                ("9(7)V99", "95", "000009500"),
+                ("V9(4)", ".5", "5000"),
+                ("S9(5)V99", "-1.25", "0000125"),
+                ("9(7)V99", "ZERO", "000000000"),
+            ] {
+                let declaration = format!("01 R PIC {picture} USAGE {usage} VALUE {value}");
+                let model = SemanticModel::analyze(&program(&declaration), 1024, 32).unwrap();
+                let layout = model.layout("R").unwrap();
+                let negative = value.starts_with('-');
+                let expected = match usage {
+                    "COMP" => {
+                        let number = coefficient.parse::<i128>().unwrap();
+                        let number = if negative { -number } else { number };
+                        number.to_be_bytes()[16 - layout.length..].to_vec()
+                    }
+                    "COMP-3" => packed_decimal(coefficient.as_bytes(), negative, layout.length),
+                    _ => {
+                        let mut bytes = coefficient.as_bytes().to_vec();
+                        if negative {
+                            *bytes.last_mut().unwrap() = b'N';
+                        }
+                        bytes
+                    }
+                };
+                assert_eq!(layout.initial, expected, "{declaration}");
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_value_rejects_excess_fractional_digits() {
+        for usage in ["COMP", "COMP-3", "DISPLAY"] {
+            let declaration = format!("01 R PIC 9(3)V9 USAGE {usage} VALUE 1.25");
+            assert!(
+                matches!(
+                    SemanticModel::analyze(&program(&declaration), 1024, 32),
+                    Err(SemanticProblem::InvalidDeclaration(_))
+                ),
+                "{declaration}"
+            );
+        }
+    }
+
+    #[test]
+    fn scaled_binary_value_initializes_stored_coefficient_for_each_usage_and_sign() {
+        for usage in ["COMP", "COMP-4", "BINARY", "COMP-5"] {
+            for (picture, value, coefficient) in [
+                ("9(7)V9", "95.8", 958i128),
+                ("9(7)V99", "95.85", 9585),
+                ("9(7)V9(4)", "95.8125", 958125),
+            ] {
+                for signed in [false, true] {
+                    let picture = if signed {
+                        format!("S{picture}")
+                    } else {
+                        picture.to_string()
+                    };
+                    let value = if signed {
+                        format!("-{value}")
+                    } else {
+                        value.to_string()
+                    };
+                    let declaration = format!("01 R PIC {picture} USAGE {usage} VALUE {value}");
+                    let model = SemanticModel::analyze(&program(&declaration), 1024, 32).unwrap();
+                    let layout = model.layout("R").unwrap();
+                    let expected = if signed { -coefficient } else { coefficient };
+                    assert_eq!(
+                        layout.initial,
+                        expected.to_be_bytes()[16 - layout.length..],
+                        "{declaration}"
+                    );
+                }
+            }
+        }
+    }
 
     fn program(declarations: &str) -> String {
         format!(

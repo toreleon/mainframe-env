@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Align numeric VALUE to PICTURE scale, apply fixed TRUNC(STD) to ordinary binary while COMP-5 retains native range, and preserve precision for rounded DIVIDE INTO."
