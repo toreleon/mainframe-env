@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Refreshed CardDemo base-batch evidence after phase 2 fixes and derived TRANREPT dataset framing from its JCL DCB referback."
