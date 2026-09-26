@@ -177,6 +177,7 @@ pub struct CobolFileBinding {
     pub select_name: String,
     pub assignment: String,
     pub record_name: Option<String>,
+    pub record_names: Vec<String>,
     pub organization: String,
     pub access_mode: String,
     pub record_key: Option<String>,
@@ -254,7 +255,14 @@ impl SemanticModel {
                 files.push(CobolFileBinding {
                     select_name: description.name.clone(),
                     assignment: description.name.clone(),
-                    record_name: record_names.get(&description.name).cloned(),
+                    record_name: record_names
+                        .get(&description.name)
+                        .and_then(|names| names.first())
+                        .cloned(),
+                    record_names: record_names
+                        .get(&description.name)
+                        .cloned()
+                        .unwrap_or_default(),
                     organization: "SORT-MERGE".into(),
                     access_mode: "SEQUENTIAL".into(),
                     record_key: None,
@@ -533,7 +541,11 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
             })
             .unwrap_or_else(|| "SEQUENTIAL".into());
         bindings.push(CobolFileBinding {
-            record_name: record_names.get(&select_name).cloned(),
+            record_name: record_names
+                .get(&select_name)
+                .and_then(|names| names.first())
+                .cloned(),
+            record_names: record_names.get(&select_name).cloned().unwrap_or_default(),
             select_name: select_name.clone(),
             assignment,
             organization,
@@ -604,7 +616,7 @@ fn file_descriptions(source: &str) -> BTreeMap<String, String> {
         .collect()
 }
 
-fn file_record_names(source: &str) -> BTreeMap<String, String> {
+fn file_record_names(source: &str) -> BTreeMap<String, Vec<String>> {
     let upper = source.to_ascii_uppercase();
     let Some(start) = upper.find("FILE SECTION") else {
         return BTreeMap::new();
@@ -618,7 +630,7 @@ fn file_record_names(source: &str) -> BTreeMap<String, String> {
     .filter_map(|marker| upper[start..].find(marker).map(|offset| start + offset))
     .min()
     .unwrap_or(source.len());
-    let mut current = None;
+    let mut current: Option<String> = None;
     let mut records = BTreeMap::new();
     for sentence in source[start..end].split('.') {
         let words = declaration_words(sentence);
@@ -629,11 +641,14 @@ fn file_record_names(source: &str) -> BTreeMap<String, String> {
             current = words.get(index + 1).cloned();
             continue;
         }
-        if let Some(file) = current.take()
+        if let Some(file) = current.as_ref()
             && let Some(index) = words.iter().position(|word| word == "01")
             && let Some(record) = words.get(index + 1)
         {
-            records.insert(file, record.clone());
+            records
+                .entry(file.clone())
+                .or_insert_with(Vec::new)
+                .push(record.clone());
         }
     }
     records
@@ -3451,6 +3466,14 @@ mod tests {
         assert_eq!(model.files[0].file_status.as_deref(), Some("FILE-STATUS"));
         assert_eq!(model.files[1].organization, "RELATIVE");
         assert_eq!(model.files[1].relative_key.as_deref(), Some("REL-NUM"));
+    }
+
+    #[test]
+    fn file_binding_keeps_each_fd_record_name() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT VBFILE ASSIGN TO VBPS ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS. 01 SHORT-REC PIC X(12). 01 LONG-REC PIC X(39). PROCEDURE DIVISION. WRITE LONG-REC. STOP RUN.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.files[0].record_name.as_deref(), Some("SHORT-REC"));
+        assert_eq!(model.files[0].record_names, ["SHORT-REC", "LONG-REC"]);
     }
 
     #[test]
