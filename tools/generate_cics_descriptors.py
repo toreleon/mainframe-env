@@ -26,7 +26,7 @@ LOOKUP_OUTPUT_PATH = Path(
 PROVIDER_TAIL_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
 )
-PROVIDER_INLINE_OPERATIONS = 148
+PROVIDER_INLINE_OPERATIONS = 147
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -603,6 +603,10 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
     ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
     ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
+    ("BtsEndBrowseContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0060"),
+    ("BtsGetNextContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0090"),
+    ("BtsInquireContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0102"),
+    ("BtsStartBrowseContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0210"),
     ("BtsEndBrowseEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0061"),
     ("BtsGetNextEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0091"),
     ("BtsInquireEvent", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0103"),
@@ -823,6 +827,7 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "BtsEndBrowseEvent", "BtsGetNextEvent", "BtsInquireEvent", "BtsStartBrowseEvent", "BtsEndBrowseTimer", "BtsInquireTimer", "BtsStartBrowseTimer",
+        "BtsEndBrowseContainer", "BtsGetNextContainer", "BtsInquireContainer", "BtsStartBrowseContainer",
         "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsInquireActivity", "BtsStartBrowseActivity",
         "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsInquireProcess", "BtsStartBrowseProcess",
         "AcquireActivityId",
@@ -1601,7 +1606,7 @@ _BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
 TYPED_RUNTIME_IR_EFFECTS.update(
     {
         name: _BTS_READ_EFFECTS
-        for name in ("BtsInquireActivity", "BtsInquireProcess", "BtsInquireEvent", "BtsInquireTimer")
+        for name in ("BtsInquireContainer", "BtsInquireActivity", "BtsInquireProcess", "BtsInquireEvent", "BtsInquireTimer")
     }
 )
 TYPED_RUNTIME_IR_EFFECTS.update(
@@ -1609,6 +1614,7 @@ TYPED_RUNTIME_IR_EFFECTS.update(
         name: _BTS_MUTATE_EFFECTS
         for name in (
             "BtsEndBrowseEvent", "BtsGetNextEvent", "BtsStartBrowseEvent", "BtsEndBrowseTimer", "BtsStartBrowseTimer",
+            "BtsEndBrowseContainer", "BtsGetNextContainer", "BtsStartBrowseContainer",
             "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsStartBrowseActivity",
             "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsStartBrowseProcess",
         )
@@ -2034,6 +2040,10 @@ def _load_typed_execution_registrations(
         "SuspendAcqActivity",
         "SuspendAcqProcess",
         "SuspendActivity",
+        "BtsEndBrowseContainer",
+        "BtsGetNextContainer",
+        "BtsInquireContainer",
+        "BtsStartBrowseContainer",
         "BtsEndBrowseEvent",
         "BtsGetNextEvent",
         "BtsInquireEvent",

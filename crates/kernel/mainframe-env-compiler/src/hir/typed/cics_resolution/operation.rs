@@ -15,6 +15,10 @@ pub(super) fn resolve(
     descriptor: &CicsApplicationRegistryDescriptor,
 ) -> Resolution<HirCicsOperation> {
     Ok(match descriptor.label_tokens {
+        ["ENDBROWSE", "CONTAINER"] => HirCicsOperation::BtsEndBrowseContainer,
+        ["GETNEXT", "CONTAINER"] => HirCicsOperation::BtsGetNextContainer,
+        ["INQUIRE", "CONTAINER"] => HirCicsOperation::BtsInquireContainer,
+        ["STARTBROWSE", "CONTAINER"] => HirCicsOperation::BtsStartBrowseContainer,
         ["ENDBROWSE", "EVENT"] => HirCicsOperation::BtsEndBrowseEvent,
         ["GETNEXT", "EVENT"] => HirCicsOperation::BtsGetNextEvent,
         ["INQUIRE", "EVENT"] => HirCicsOperation::BtsInquireEvent,

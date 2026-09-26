@@ -47,6 +47,12 @@ pub enum BrowseEffect {
         live_epoch: u64,
         expected: BrowseItem,
     },
+    NextSkipping {
+        token: u32,
+        live_epoch: u64,
+        expected: BrowseItem,
+        skipped: usize,
+    },
     End {
         token: u32,
         kind: BrowseKind,
@@ -146,6 +152,21 @@ impl State {
                 .book
                 .next(*token, *kind, *live_epoch, expected)
                 .map(BrowseOutcome::Item),
+            BrowseEffect::NextSkipping {
+                token,
+                live_epoch,
+                expected,
+                skipped,
+            } => self
+                .book
+                .next_skipping(
+                    *token,
+                    BrowseKind::Container,
+                    *live_epoch,
+                    expected,
+                    *skipped,
+                )
+                .map(BrowseOutcome::Item),
             BrowseEffect::End { token, kind } => {
                 self.book.end(*token, *kind)?;
                 Ok(BrowseOutcome::Ended)
@@ -179,6 +200,19 @@ impl<'a> BtsBrowseStore<'a> {
             return Err(HostProblem::NotFound);
         }
         state.book.peek(token, kind)
+    }
+
+    pub fn remaining(
+        &self,
+        owner: &BrowseOwner,
+        token: u32,
+        kind: BrowseKind,
+    ) -> Result<Vec<BrowseItem>, HostProblem> {
+        let state = self.load_state(owner)?;
+        if state.closed {
+            return Err(HostProblem::NotFound);
+        }
+        state.book.remaining(token, kind)
     }
 
     pub fn scope(
@@ -339,6 +373,9 @@ impl<'a> BtsBrowseStore<'a> {
                 BrowseEffect::Start { scope, .. } => Some(scope.clone()),
                 BrowseEffect::Next { token, kind, .. } | BrowseEffect::End { token, kind } => {
                     Some(state.book.scope(*token, *kind)?)
+                }
+                BrowseEffect::NextSkipping { token, .. } => {
+                    Some(state.book.scope(*token, BrowseKind::Container)?)
                 }
                 BrowseEffect::Close => None,
             };

@@ -45,6 +45,10 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         .racf
         .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Read)
         .unwrap();
+    first
+        .racf
+        .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Update)
+        .unwrap();
     let resource = BtsLifecycleStore::saf_resource("TYPE", "ORDER").unwrap();
     first
         .racf
@@ -53,6 +57,10 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
     first
         .racf
         .permit("BTSLIFE", &resource, "IBMUSER", AccessIntent::Read)
+        .unwrap();
+    first
+        .racf
+        .permit("BTSLIFE", &resource, "IBMUSER", AccessIntent::Update)
         .unwrap();
     let authority = BtsLifecycleStore::new(first_store.as_ref());
     let root_id = BtsLifecycleStore::root_id("TYPE", "ORDER", "SEED-UOW").unwrap();
@@ -77,6 +85,8 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         "01 TOKEN-X PIC S9(9) COMP. 01 PROCESS-X PIC X(36). ",
         "01 ROOT-X PIC X(52). 01 ACT-TOKEN PIC S9(9) COMP. ",
         "01 ACT-NAME PIC X(16). 01 ACT-ID PIC X(52). 01 EVENT-X PIC X(16). ",
+        "01 ITEM-X PIC X(16). 01 DATA-X PIC X(4) VALUE 'DATA'. ",
+        "01 LEN-X PIC S9(9) COMP. 01 RESP-X PIC S9(9) COMP. ",
         "PROCEDURE DIVISION. ",
         "EXEC CICS STARTBROWSE PROCESS PROCESSTYPE('TYPE') BROWSETOKEN(TOKEN-X) END-EXEC. ",
         "EXEC CICS GETNEXT PROCESS(PROCESS-X) BROWSETOKEN(TOKEN-X) ACTIVITYID(ROOT-X) END-EXEC. ",
@@ -95,6 +105,12 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         "EXEC CICS STARTBROWSE TIMER('WAKE') ACTIVITYID(ROOT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
         "EXEC CICS ENDBROWSE TIMER BROWSETOKEN(TOKEN-X) END-EXEC. ",
         "EXEC CICS INQUIRE TIMER('WAKE') ACTIVITYID(ROOT-X) END-EXEC. ",
+        "EXEC CICS PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) FLENGTH(4) END-EXEC. ",
+        "EXEC CICS STARTBROWSE CONTAINER CHANNEL('WORK') BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS GETNEXT CONTAINER(ITEM-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS ENDBROWSE CONTAINER BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS ACQUIRE PROCESS('ORDER') PROCESSTYPE('TYPE') END-EXEC. ",
+        "EXEC CICS INQUIRE CONTAINER('MISSING') PROCESS('ORDER') PROCESSTYPE('TYPE') DATALENGTH(LEN-X) RESP(RESP-X) END-EXEC. ",
         "STOP RUN."
     );
     let artifact = published_source_fixture("BTSBR", source);
@@ -148,6 +164,9 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
     let timer_resource = format!("CICS.BTS.{root_id}.WAKE");
     second.racf.define_profile("BTSTIMER", &timer_resource, "IBMUSER", None).unwrap();
     second.racf.permit("BTSTIMER", &timer_resource, "IBMUSER", AccessIntent::Update).unwrap();
+    second.racf.define_profile("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", None).unwrap();
+    second.racf.permit("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", AccessIntent::Read).unwrap();
+    second.racf.permit("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", AccessIntent::Update).unwrap();
     let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
     let tick = session_tick().unwrap();
     let context = second
@@ -166,7 +185,7 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         .expect("selected browse route persisted task-owned cursor state");
     let state: serde_json::Value = serde_json::from_slice(&cursor.payload).unwrap();
     assert_eq!(state["closed"], true);
-    assert_eq!(state["book"]["next_token"], 5);
+    assert_eq!(state["book"]["next_token"], 6);
     drop(second);
     drop(second_store);
     std::fs::remove_dir_all(root).unwrap();

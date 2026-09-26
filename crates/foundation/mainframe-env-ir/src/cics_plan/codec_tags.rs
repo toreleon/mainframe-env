@@ -1,38 +1,19 @@
+mod bts_browse;
+mod common;
 mod conversation;
 mod issue;
 mod options;
 mod output;
-pub(super) use options::{option_from_tag, option_tag};
-pub(super) use output::{output_from_tag, output_tag};
-
 use super::{
     CicsAssignOutput, CicsCertificateOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem,
     CicsPlanOperation, CicsPlanOption, CicsTcpipOutput,
 };
-
+pub(super) use common::{bounded_count, require_order};
+pub(super) use options::{option_from_tag, option_tag};
+pub(super) use output::{output_from_tag, output_tag};
 const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
 const ASSIGN_OUTPUT_LEGACY_COUNT: u16 = 78;
 const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u16 = 96;
-
-pub(super) fn bounded_count(value: usize, maximum: usize) -> Result<(), CicsPlanCodecProblem> {
-    if value > maximum || u32::try_from(value).is_err() {
-        Err(CicsPlanCodecProblem::LimitExceeded)
-    } else {
-        Ok(())
-    }
-}
-
-pub(super) fn require_order<T: Copy + Ord>(
-    previous: Option<T>,
-    current: T,
-) -> Result<(), CicsPlanCodecProblem> {
-    match previous {
-        Some(previous) if previous == current => Err(CicsPlanCodecProblem::Malformed),
-        Some(previous) if previous > current => Err(CicsPlanCodecProblem::NonCanonical),
-        _ => Ok(()),
-    }
-}
-
 #[cfg(test)]
 pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u16> = 68..=71;
 #[cfg(test)]
@@ -44,6 +25,10 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::BtsEndBrowseContainer
+        | CicsPlanOperation::BtsGetNextContainer
+        | CicsPlanOperation::BtsInquireContainer
+        | CicsPlanOperation::BtsStartBrowseContainer => bts_browse::operation_tag(value),
         CicsPlanOperation::BtsEndBrowseEvent => 198,
         CicsPlanOperation::BtsGetNextEvent => 203,
         CicsPlanOperation::BtsInquireEvent => 208,
@@ -289,6 +274,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        197 | 202 | 207 | 212 => bts_browse::operation_from_tag(value),
         198 => Ok(CicsPlanOperation::BtsEndBrowseEvent),
         203 => Ok(CicsPlanOperation::BtsGetNextEvent),
         208 => Ok(CicsPlanOperation::BtsInquireEvent),
@@ -859,7 +845,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
-        960..=965 => super::BtsBrowseInput::from_tag(value)
+        960..=967 => super::BtsBrowseInput::from_tag(value)
             .map(CicsOperandName::BtsBrowse)
             .ok_or(CicsPlanCodecProblem::Malformed),
         704 => Ok(CicsOperandName::BtsActivityId),
@@ -1211,6 +1197,10 @@ mod merge_tag_tests {
             P::MoveContainer,
             P::PutContainer,
             P::QueryChannel,
+            P::BtsEndBrowseContainer,
+            P::BtsGetNextContainer,
+            P::BtsInquireContainer,
+            P::BtsStartBrowseContainer,
             P::BtsEndBrowseActivity,
             P::BtsGetNextActivity,
             P::BtsInquireActivity,
@@ -1233,8 +1223,8 @@ mod merge_tag_tests {
             assert!(seen.insert(tag), "duplicate operation tag {tag}");
             assert_eq!(operation_from_tag(tag), Ok(operation));
         }
-        assert_eq!(seen.len(), 21);
-        for held in [191, 194, 197, 202, 205, 207, 212] {
+        assert_eq!(seen.len(), 25);
+        for held in [191, 194, 205] {
             assert!(operation_from_tag(held).is_err());
         }
 

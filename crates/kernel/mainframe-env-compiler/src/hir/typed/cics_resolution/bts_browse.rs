@@ -1,4 +1,4 @@
-//! Source-bounded lowering for ACTIVITY, PROCESS, EVENT, and TIMER browse rows.
+//! Source-bounded lowering for BTS browse rows.
 
 use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
@@ -15,7 +15,11 @@ use mainframe_env_ir::{
 pub(super) const fn is_browse(operation: HirCicsOperation) -> bool {
     matches!(
         operation,
-        HirCicsOperation::BtsStartBrowseActivity
+        HirCicsOperation::BtsEndBrowseContainer
+            | HirCicsOperation::BtsGetNextContainer
+            | HirCicsOperation::BtsInquireContainer
+            | HirCicsOperation::BtsStartBrowseContainer
+            | HirCicsOperation::BtsStartBrowseActivity
             | HirCicsOperation::BtsEndBrowseEvent
             | HirCicsOperation::BtsGetNextEvent
             | HirCicsOperation::BtsInquireEvent
@@ -43,7 +47,7 @@ pub(super) fn selector_matches(
         }
         [
             "STARTBROWSE" | "GETNEXT" | "ENDBROWSE" | "INQUIRE",
-            "PROCESS" | "EVENT" | "TIMER",
+            "PROCESS" | "EVENT" | "TIMER" | "CONTAINER",
         ] => Some(descriptor.label_tokens[1]),
         _ => None,
     };
@@ -55,6 +59,43 @@ pub(super) fn selector_matches(
 
 pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
     Some(match operation {
+        HirCicsOperation::BtsStartBrowseContainer => CommandShape {
+            clauses: &[
+                "ACTIVITYID",
+                "PROCESS",
+                "PROCESSTYPE",
+                "CHANNEL",
+                "BROWSETOKEN",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsGetNextContainer => CommandShape {
+            clauses: &["BROWSETOKEN", "CONTAINER", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN", "CONTAINER"],
+        },
+        HirCicsOperation::BtsEndBrowseContainer => CommandShape {
+            clauses: &["BROWSETOKEN", "RESP", "RESP2"],
+            options: &["NOHANDLE"],
+            required: &["BROWSETOKEN"],
+        },
+        HirCicsOperation::BtsInquireContainer => CommandShape {
+            clauses: &[
+                "CONTAINER",
+                "ACTIVITYID",
+                "PROCESS",
+                "PROCESSTYPE",
+                "DATALENGTH",
+                "SET",
+                "RESP",
+                "RESP2",
+            ],
+            options: &["NOHANDLE"],
+            required: &["CONTAINER"],
+        },
         HirCicsOperation::BtsStartBrowseEvent => CommandShape {
             clauses: &["ACTIVITYID", "BROWSETOKEN", "RESP", "RESP2"],
             options: &["NOHANDLE"],
@@ -173,6 +214,18 @@ pub(super) fn validate(
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    if matches!(
+        operation,
+        HirCicsOperation::BtsStartBrowseContainer | HirCicsOperation::BtsInquireContainer
+    ) && (clauses.contains_key("PROCESS") != clauses.contains_key("PROCESSTYPE")
+        || clauses.contains_key("PROCESS") && clauses.contains_key("ACTIVITYID")
+        || clauses.contains_key("CHANNEL")
+            && (clauses.contains_key("PROCESS") || clauses.contains_key("ACTIVITYID")))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS CONTAINER browse selectors conflict".into(),
+        ));
+    }
     if operation == HirCicsOperation::BtsStartBrowseActivity
         && (clauses.contains_key("PROCESS") != clauses.contains_key("PROCESSTYPE")
             || clauses.contains_key("PROCESS") && clauses.contains_key("ACTIVITYID"))
@@ -223,10 +276,21 @@ pub(super) fn operands(
         ("BROWSETOKEN", I::BrowseToken, 4),
         ("EVENT", I::Event, 16),
         ("TIMER", I::Timer, 16),
+        ("CONTAINER", I::Container, 16),
+        ("CHANNEL", I::Channel, 16),
     ] {
         let input = matches!(
             (operation, identity),
             (
+                HirCicsOperation::BtsStartBrowseContainer,
+                I::ActivityId | I::Process | I::ProcessType | I::Channel
+            ) | (
+                HirCicsOperation::BtsInquireContainer,
+                I::Container | I::ActivityId | I::Process | I::ProcessType
+            ) | (
+                HirCicsOperation::BtsGetNextContainer | HirCicsOperation::BtsEndBrowseContainer,
+                I::BrowseToken
+            ) | (
                 HirCicsOperation::BtsStartBrowseActivity,
                 I::ActivityId | I::Process | I::ProcessType,
             ) | (HirCicsOperation::BtsStartBrowseProcess, I::ProcessType)
@@ -323,19 +387,31 @@ pub(super) fn outputs(
         O::Program,
         O::TransId,
         O::UserId,
+        O::Container,
+        O::DataLength,
+        O::Set,
     ] {
         let Some(tokens) = clauses.get(field.name()) else {
             continue;
         };
         let output = matches!(
             (operation, field),
-            (
-                HirCicsOperation::BtsStartBrowseActivity | HirCicsOperation::BtsStartBrowseProcess,
-                O::BrowseToken,
-            ) | (
-                HirCicsOperation::BtsStartBrowseEvent | HirCicsOperation::BtsStartBrowseTimer,
-                O::BrowseToken,
-            ) | (HirCicsOperation::BtsGetNextEvent, O::Event,)
+            (HirCicsOperation::BtsStartBrowseContainer, O::BrowseToken)
+                | (HirCicsOperation::BtsGetNextContainer, O::Container)
+                | (
+                    HirCicsOperation::BtsInquireContainer,
+                    O::DataLength | O::Set
+                )
+                | (
+                    HirCicsOperation::BtsStartBrowseActivity
+                        | HirCicsOperation::BtsStartBrowseProcess,
+                    O::BrowseToken,
+                )
+                | (
+                    HirCicsOperation::BtsStartBrowseEvent | HirCicsOperation::BtsStartBrowseTimer,
+                    O::BrowseToken,
+                )
+                | (HirCicsOperation::BtsGetNextEvent, O::Event,)
                 | (
                     HirCicsOperation::BtsGetNextActivity,
                     O::Activity | O::ActivityId | O::Level
@@ -363,7 +439,12 @@ pub(super) fn outputs(
         }
         let target = complete_data_reference(tokens, semantic)?;
         require_writable(&target)?;
-        let valid = if matches!(field, O::BrowseToken | O::Level) {
+        let valid = if field == O::Set {
+            matches!(
+                target.category,
+                DataCategory::Pointer | DataCategory::Pointer32
+            )
+        } else if matches!(field, O::BrowseToken | O::Level | O::DataLength) {
             fullword(&target)
         } else {
             target.length == field.width()

@@ -48,7 +48,7 @@ const fn descriptor(
     }
 }
 
-pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 44] = [
+pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 48] = [
     descriptor(
         CicsPlanOperation::AcquireActivityId,
         "acquire-activityid",
@@ -285,6 +285,26 @@ pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 44] = [
     descriptor(
         CicsPlanOperation::BtsStartBrowseTimer,
         "startbrowse-timer",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseContainer,
+        "endbrowse-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextContainer,
+        "getnext-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireContainer,
+        "inquire-container",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseContainer,
+        "startbrowse-container",
         BTS_MUTATE_EFFECTS,
     ),
 ];

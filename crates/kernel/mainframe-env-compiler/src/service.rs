@@ -1846,6 +1846,18 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::BtsEndBrowseContainer => {
+                    crate::HirCicsOperation::BtsEndBrowseContainer
+                }
+                CicsPlanOperation::BtsGetNextContainer => {
+                    crate::HirCicsOperation::BtsGetNextContainer
+                }
+                CicsPlanOperation::BtsInquireContainer => {
+                    crate::HirCicsOperation::BtsInquireContainer
+                }
+                CicsPlanOperation::BtsStartBrowseContainer => {
+                    crate::HirCicsOperation::BtsStartBrowseContainer
+                }
                 CicsPlanOperation::BtsEndBrowseEvent => crate::HirCicsOperation::BtsEndBrowseEvent,
                 CicsPlanOperation::BtsGetNextEvent => crate::HirCicsOperation::BtsGetNextEvent,
                 CicsPlanOperation::BtsInquireEvent => crate::HirCicsOperation::BtsInquireEvent,

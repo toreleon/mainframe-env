@@ -1460,6 +1460,34 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
     },
     {
+      "operation": "BtsEndBrowseContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0060"
+    },
+    {
+      "operation": "BtsGetNextContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0090"
+    },
+    {
+      "operation": "BtsInquireContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0102"
+    },
+    {
+      "operation": "BtsStartBrowseContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0210"
+    },
+    {
       "operation": "BtsEndBrowseEvent",
       "interface": "api",
       "family": "bts-control",

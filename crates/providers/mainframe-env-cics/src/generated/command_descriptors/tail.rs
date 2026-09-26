@@ -2,7 +2,14 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 106] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 111] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::RemoveSubevent,
+        syntax: "REMOVE SUBEVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0166",
+        family: CicsCommandFamily::EventControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::EnterTraceNum,
         syntax: "ENTER TRACENUM",
@@ -637,6 +644,34 @@ pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 106] = [
         operation: CicsOperation::LinkActivity,
         syntax: "LINK ACTIVITY",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0141",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsEndBrowseContainer,
+        syntax: "ENDBROWSE CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0060",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsGetNextContainer,
+        syntax: "GETNEXT CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0090",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsInquireContainer,
+        syntax: "INQUIRE CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0102",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::BtsStartBrowseContainer,
+        syntax: "STARTBROWSE CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0210",
         family: CicsCommandFamily::BtsControl,
         mutating: true,
     },

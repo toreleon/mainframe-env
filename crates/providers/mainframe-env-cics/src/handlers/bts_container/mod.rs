@@ -45,6 +45,10 @@ impl CicsService {
 #[cfg(test)]
 mod tests {
     use super::{browse_read::*, channel, scope::*, state::*};
+    use crate::service::handlers::bts_browse::{
+        BrowseEffect, BrowseItem, BrowseKind, BrowseOutcome, BrowseOwner, BrowseScope,
+        BtsBrowseStore, MAX_CURSOR_ITEMS,
+    };
     use crate::service::handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::ProviderStateStore;
@@ -136,6 +140,133 @@ mod tests {
         );
         assert_eq!(audit.borrow().len(), 3);
         assert!(audit.borrow().iter().all(|(class, _)| class == "BTSLIFE"));
+    }
+
+    #[test]
+    fn bts_browse_container_cursor_uses_scoped_snapshot_and_epoch() {
+        let store = MemoryStore::new(Default::default());
+        let root = define(&store, "UOW1");
+        seed_process(&store, &root, "ZETA", b"z");
+        seed_process(&store, &root, "ALPHA", b"a");
+        let mut allow = |_: &str, _: &str| Ok(());
+        let selector = ContainerSelector::Process {
+            process_type: "TYPE",
+            process_name: "ORDER",
+            epoch: 1,
+        };
+        let ReadReply::Names(names) = ReadPort::new(&store, owner("UOW1"), &mut allow)
+            .read(
+                selector,
+                ReadRequest::Names {
+                    max: MAX_CURSOR_ITEMS,
+                },
+            )
+            .unwrap()
+        else {
+            panic!("expected names")
+        };
+        assert_eq!(names, ["ALPHA", "ZETA"]);
+        let browse_owner = BrowseOwner::new("UOW1", "EXEC", "USER").unwrap();
+        let cursors = BtsBrowseStore::new(&store);
+        let items = names
+            .iter()
+            .map(|name| {
+                BrowseItem::new(name, None, 0)
+                    .unwrap()
+                    .with_epoch(1)
+                    .unwrap()
+            })
+            .collect();
+        let BrowseOutcome::Token(token) = cursors
+            .apply(
+                &browse_owner,
+                "START",
+                [1; 32],
+                &BrowseEffect::Start {
+                    scope: BrowseScope::new(
+                        BrowseKind::Container,
+                        "BTSLIFE",
+                        "CICS.BTS.TYPE.ORDER",
+                        1,
+                    )
+                    .unwrap()
+                    .with_process("TYPE", "ORDER")
+                    .unwrap(),
+                    items,
+                },
+            )
+            .unwrap()
+        else {
+            panic!("expected token")
+        };
+        assert_eq!(
+            cursors
+                .peek(&browse_owner, token, BrowseKind::Container)
+                .unwrap()
+                .name,
+            "ALPHA"
+        );
+        assert_eq!(
+            cursors.peek(
+                &BrowseOwner::new("UOW1", "OTHER", "USER").unwrap(),
+                token,
+                BrowseKind::Container
+            ),
+            Err(mainframe_env_host_api::HostProblem::Unauthorized)
+        );
+        let item = cursors
+            .peek(&browse_owner, token, BrowseKind::Container)
+            .unwrap();
+        assert!(
+            cursors
+                .apply(
+                    &browse_owner,
+                    "NEXT-BAD",
+                    [2; 32],
+                    &BrowseEffect::Next {
+                        token,
+                        kind: BrowseKind::Container,
+                        live_epoch: 2,
+                        expected: item.clone(),
+                    }
+                )
+                .is_err()
+        );
+        assert_eq!(
+            cursors
+                .apply(
+                    &browse_owner,
+                    "NEXT",
+                    [3; 32],
+                    &BrowseEffect::Next {
+                        token,
+                        kind: BrowseKind::Container,
+                        live_epoch: 1,
+                        expected: item,
+                    }
+                )
+                .unwrap(),
+            BrowseOutcome::Item(
+                BrowseItem::new("ALPHA", None, 0)
+                    .unwrap()
+                    .with_epoch(1)
+                    .unwrap()
+            )
+        );
+        BtsLifecycleStore::new(&store)
+            .finish_uow("UOW1", "EXEC", "USER", true)
+            .unwrap();
+        assert_eq!(
+            ReadPort::new(&store, owner("UOW1"), &mut allow)
+                .read(selector, ReadRequest::Exists("ZETA")),
+            Err(ContainerReadError::StaleEpoch)
+        );
+        cursors.clear_existing(&browse_owner, true).unwrap();
+        assert!(
+            cursors
+                .peek(&browse_owner, token, BrowseKind::Container)
+                .is_err()
+        );
     }
 
     #[test]

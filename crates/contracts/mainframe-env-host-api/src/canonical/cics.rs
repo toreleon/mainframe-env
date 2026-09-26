@@ -5,6 +5,12 @@ use super::*;
 impl Canonical for CicsOperation {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
+            Self::BtsEndBrowseContainer => out.variant("CicsOperation", "BtsEndBrowseContainer", 0),
+            Self::BtsGetNextContainer => out.variant("CicsOperation", "BtsGetNextContainer", 0),
+            Self::BtsInquireContainer => out.variant("CicsOperation", "BtsInquireContainer", 0),
+            Self::BtsStartBrowseContainer => {
+                out.variant("CicsOperation", "BtsStartBrowseContainer", 0)
+            }
             Self::BtsEndBrowseEvent => out.variant("CicsOperation", "BtsEndBrowseEvent", 0),
             Self::BtsGetNextEvent => out.variant("CicsOperation", "BtsGetNextEvent", 0),
             Self::BtsInquireEvent => out.variant("CicsOperation", "BtsInquireEvent", 0),

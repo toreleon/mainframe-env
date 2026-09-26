@@ -14,6 +14,8 @@ pub enum BtsBrowseInput {
     BrowseToken,
     Event,
     Timer,
+    Container,
+    Channel,
 }
 
 impl BtsBrowseInput {
@@ -29,6 +31,8 @@ impl BtsBrowseInput {
             963 => Some(Self::BrowseToken),
             964 => Some(Self::Event),
             965 => Some(Self::Timer),
+            966 => Some(Self::Container),
+            967 => Some(Self::Channel),
             _ => None,
         }
     }
@@ -41,6 +45,8 @@ impl BtsBrowseInput {
             Self::BrowseToken => "BROWSETOKEN",
             Self::Event => "EVENT",
             Self::Timer => "TIMER",
+            Self::Container => "CONTAINER",
+            Self::Channel => "CHANNEL",
         }
     }
 
@@ -50,7 +56,7 @@ impl BtsBrowseInput {
             Self::Process => 36,
             Self::ProcessType => 8,
             Self::BrowseToken => 4,
-            Self::Event | Self::Timer => 16,
+            Self::Event | Self::Timer | Self::Container | Self::Channel => 16,
         }
     }
 }
@@ -69,6 +75,9 @@ pub enum BtsBrowseOutput {
     Program,
     TransId,
     UserId,
+    Container,
+    DataLength,
+    Set,
 }
 
 impl BtsBrowseOutput {
@@ -90,6 +99,9 @@ impl BtsBrowseOutput {
             1025 => Some(Self::Program),
             1026 => Some(Self::TransId),
             1027 => Some(Self::UserId),
+            1028 => Some(Self::Container),
+            1029 => Some(Self::DataLength),
+            1030 => Some(Self::Set),
             _ => None,
         }
     }
@@ -108,18 +120,21 @@ impl BtsBrowseOutput {
             Self::Program => "PROGRAM",
             Self::TransId => "TRANSID",
             Self::UserId => "USERID",
+            Self::Container => "CONTAINER",
+            Self::DataLength => "DATALENGTH",
+            Self::Set => "SET",
         }
     }
 
     pub const fn width(self) -> usize {
         match self {
-            Self::BrowseToken | Self::Level => 4,
+            Self::BrowseToken | Self::Level | Self::DataLength | Self::Set => 4,
             Self::Activity => 16,
             Self::ActivityId => 52,
             Self::Process => 36,
             Self::Abcode => 4,
             Self::Abprogram | Self::ProcessType | Self::Program | Self::UserId => 8,
-            Self::Event => 16,
+            Self::Event | Self::Container => 16,
             Self::TransId => 4,
         }
     }
@@ -128,7 +143,11 @@ impl BtsBrowseOutput {
 pub(super) const fn is_operation(operation: CicsPlanOperation) -> bool {
     matches!(
         operation,
-        CicsPlanOperation::BtsStartBrowseActivity
+        CicsPlanOperation::BtsEndBrowseContainer
+            | CicsPlanOperation::BtsGetNextContainer
+            | CicsPlanOperation::BtsInquireContainer
+            | CicsPlanOperation::BtsStartBrowseContainer
+            | CicsPlanOperation::BtsStartBrowseActivity
             | CicsPlanOperation::BtsEndBrowseEvent
             | CicsPlanOperation::BtsGetNextEvent
             | CicsPlanOperation::BtsInquireEvent
@@ -160,6 +179,25 @@ pub(super) fn invalid_shape(
         &[O],
         &[O],
     ) = match plan.operation {
+        P::BtsStartBrowseContainer => (
+            &[I::ActivityId, I::Process, I::ProcessType, I::Channel],
+            &[],
+            &[O::BrowseToken],
+            &[O::BrowseToken],
+        ),
+        P::BtsGetNextContainer => (
+            &[I::BrowseToken],
+            &[I::BrowseToken],
+            &[O::Container],
+            &[O::Container],
+        ),
+        P::BtsEndBrowseContainer => (&[I::BrowseToken], &[I::BrowseToken], &[], &[]),
+        P::BtsInquireContainer => (
+            &[I::Container, I::ActivityId, I::Process, I::ProcessType],
+            &[I::Container],
+            &[O::DataLength, O::Set],
+            &[],
+        ),
         P::BtsStartBrowseEvent => (&[I::ActivityId], &[], &[O::BrowseToken], &[O::BrowseToken]),
         P::BtsStartBrowseTimer => (
             &[I::ActivityId, I::Timer],
@@ -259,7 +297,13 @@ pub(super) fn invalid_shape(
                 }
                 (
                     CicsOperandValue::Literal(bytes),
-                    I::ActivityId | I::Process | I::ProcessType | I::Event | I::Timer,
+                    I::ActivityId
+                    | I::Process
+                    | I::ProcessType
+                    | I::Event
+                    | I::Timer
+                    | I::Container
+                    | I::Channel,
                 ) => std::str::from_utf8(bytes).map_or(true, |value| {
                     value.is_empty()
                         || value.chars().count() > field.width()
@@ -291,6 +335,13 @@ pub(super) fn invalid_shape(
         || plan.operation == P::BtsStartBrowseActivity
             && (actual_inputs.contains(&I::Process) != actual_inputs.contains(&I::ProcessType)
                 || actual_inputs.contains(&I::Process) && actual_inputs.contains(&I::ActivityId))
+        || matches!(
+            plan.operation,
+            P::BtsStartBrowseContainer | P::BtsInquireContainer
+        ) && (actual_inputs.contains(&I::Process) != actual_inputs.contains(&I::ProcessType)
+            || actual_inputs.contains(&I::Process) && actual_inputs.contains(&I::ActivityId)
+            || actual_inputs.contains(&I::Channel)
+                && (actual_inputs.contains(&I::Process) || actual_inputs.contains(&I::ActivityId)))
 }
 
 #[cfg(test)]
@@ -387,14 +438,14 @@ mod tests {
                 assert!(encode_cics_effect_plan(&invalid, CicsPlanLimits::default()).is_err());
             }
         }
-        assert!(BtsBrowseInput::from_tag(966).is_none());
-        assert!(BtsBrowseOutput::from_tag(1028).is_none());
+        assert!(BtsBrowseInput::from_tag(968).is_none());
+        assert!(BtsBrowseOutput::from_tag(1031).is_none());
         let mut future_tag = encode_cics_effect_plan(
             &plan(P::BtsEndBrowseActivity, &[I::BrowseToken], &[]),
             CicsPlanLimits::default(),
         )
         .unwrap();
-        future_tag[6..8].copy_from_slice(&197u16.to_be_bytes());
+        future_tag[6..8].copy_from_slice(&205u16.to_be_bytes());
         assert!(decode_cics_effect_plan(&future_tag, CicsPlanLimits::default()).is_err());
         let mut bad_token = plan(P::BtsGetNextActivity, &[I::BrowseToken], &[O::Activity]);
         bad_token.operands[0].value = CicsOperandValue::Literal(b"1".to_vec());
@@ -441,5 +492,55 @@ mod tests {
         let mut system = plan(P::BtsInquireEvent, &[I::Event], &[]);
         system.operands[0].value = CicsOperandValue::Literal(b"DFHINITIAL".to_vec());
         assert!(encode_cics_effect_plan(&system, CicsPlanLimits::default()).is_err());
+    }
+
+    #[test]
+    fn bts_browse_container_reserved_operation_tags() {
+        use CicsPlanOperation as P;
+        for (operation, tag) in [
+            (P::BtsEndBrowseContainer, 197),
+            (P::BtsGetNextContainer, 202),
+            (P::BtsInquireContainer, 207),
+            (P::BtsStartBrowseContainer, 212),
+        ] {
+            assert_eq!(super::super::codec_tags::operation_tag(operation), tag);
+            assert_eq!(
+                super::super::codec_tags::operation_from_tag(tag).unwrap(),
+                operation
+            );
+        }
+        use BtsBrowseInput as I;
+        use BtsBrowseOutput as O;
+        for (operation, inputs, outputs) in [
+            (P::BtsEndBrowseContainer, vec![I::BrowseToken], vec![]),
+            (
+                P::BtsGetNextContainer,
+                vec![I::BrowseToken],
+                vec![O::Container],
+            ),
+            (
+                P::BtsInquireContainer,
+                vec![I::Container],
+                vec![O::DataLength, O::Set],
+            ),
+            (
+                P::BtsStartBrowseContainer,
+                vec![I::Channel],
+                vec![O::BrowseToken],
+            ),
+        ] {
+            let valid = plan(operation, &inputs, &outputs);
+            let bytes = encode_cics_effect_plan(&valid, CicsPlanLimits::default()).unwrap();
+            assert_eq!(
+                decode_cics_effect_plan(&bytes, CicsPlanLimits::default()).unwrap(),
+                valid
+            );
+            let mut invalid = valid.clone();
+            invalid.outputs.push(CicsOutputBinding {
+                name: CicsOutputName::BtsBrowse(O::Event),
+                target: slot(29),
+            });
+            assert!(encode_cics_effect_plan(&invalid, CicsPlanLimits::default()).is_err());
+        }
     }
 }

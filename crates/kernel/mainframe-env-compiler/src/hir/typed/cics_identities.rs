@@ -1,5 +1,9 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    BtsEndBrowseContainer,
+    BtsGetNextContainer,
+    BtsInquireContainer,
+    BtsStartBrowseContainer,
     BtsEndBrowseEvent,
     BtsGetNextEvent,
     BtsInquireEvent,

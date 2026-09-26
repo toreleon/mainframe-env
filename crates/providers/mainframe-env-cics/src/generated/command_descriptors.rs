@@ -1077,13 +1077,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::SpoolControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::RemoveSubevent,
-        syntax: "REMOVE SUBEVENT",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0166",
-        family: CicsCommandFamily::EventControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1190,6 +1183,11 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[103],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[104],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[105],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[106],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[107],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[108],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[109],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[110],
 ];
 
 mod lookup;

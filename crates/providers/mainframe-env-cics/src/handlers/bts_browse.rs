@@ -167,6 +167,28 @@ pub struct BrowseItem {
 }
 
 impl BrowseItem {
+    pub fn container(name: &str) -> Result<Self, HostProblem> {
+        if !super::bts_container::valid_task_channel_name(name) {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(Self {
+            name: name.into(),
+            activity_id: None,
+            level: 0,
+            resource_epoch: 0,
+        })
+    }
+
+    fn valid_for(&self, kind: BrowseKind) -> bool {
+        if kind == BrowseKind::Container {
+            self.activity_id.is_none() && self.level == 0 && Self::container(&self.name).is_ok()
+        } else {
+            Self::new(&self.name, self.activity_id.as_deref(), self.level).is_ok()
+                && (self.activity_id.is_some()
+                    == matches!(kind, BrowseKind::Activity | BrowseKind::Process))
+        }
+    }
+
     pub fn new(name: &str, activity_id: Option<&str>, level: u16) -> Result<Self, HostProblem> {
         if super::bts_lifecycle::validate_name(name, 36, true).is_err()
             || activity_id.is_some_and(|id| super::bts_lifecycle::validate_activity_id(id).is_err())
@@ -224,12 +246,10 @@ impl BrowseBook {
         if self.cursors.len() >= MAX_CURSORS || items.len() > MAX_CURSOR_ITEMS {
             return Err(HostProblem::ResourceExhausted);
         }
-        if items.iter().any(|item| {
-            BrowseItem::new(&item.name, item.activity_id.as_deref(), item.level).is_err()
-                || item.resource_epoch == 0
-                || item.activity_id.is_some()
-                    != matches!(scope.kind, BrowseKind::Activity | BrowseKind::Process)
-        }) {
+        if items
+            .iter()
+            .any(|item| !item.valid_for(scope.kind) || item.resource_epoch == 0)
+        {
             return Err(HostProblem::Malformed);
         }
         scope.validate()?;
@@ -259,6 +279,14 @@ impl BrowseBook {
             .ok_or_else(end_of_browse)
     }
 
+    pub fn remaining(&self, token: u32, kind: BrowseKind) -> Result<Vec<BrowseItem>, HostProblem> {
+        let cursor = self.cursors.get(&token).ok_or_else(token_error)?;
+        if cursor.scope.kind != kind {
+            return Err(wrong_kind());
+        }
+        Ok(cursor.items[cursor.position..].to_vec())
+    }
+
     pub fn scope(&self, token: u32, kind: BrowseKind) -> Result<BrowseScope, HostProblem> {
         let cursor = self.cursors.get(&token).ok_or_else(token_error)?;
         if cursor.scope.kind != kind {
@@ -274,14 +302,29 @@ impl BrowseBook {
         live_epoch: u64,
         expected: &BrowseItem,
     ) -> Result<BrowseItem, HostProblem> {
+        self.next_skipping(token, kind, live_epoch, expected, 0)
+    }
+
+    pub fn next_skipping(
+        &mut self,
+        token: u32,
+        kind: BrowseKind,
+        live_epoch: u64,
+        expected: &BrowseItem,
+        skipped: usize,
+    ) -> Result<BrowseItem, HostProblem> {
         let cursor = self.cursors.get_mut(&token).ok_or_else(token_error)?;
         if cursor.scope.kind != kind {
             return Err(wrong_kind());
         }
-        let item = cursor
-            .items
-            .get(cursor.position)
-            .ok_or_else(end_of_browse)?;
+        if skipped > MAX_CURSOR_ITEMS || skipped != 0 && kind != BrowseKind::Container {
+            return Err(token_error());
+        }
+        let index = cursor
+            .position
+            .checked_add(skipped)
+            .ok_or_else(token_error)?;
+        let item = cursor.items.get(index).ok_or_else(end_of_browse)?;
         let epoch = if matches!(
             kind,
             BrowseKind::Process | BrowseKind::Event | BrowseKind::Timer
@@ -293,7 +336,7 @@ impl BrowseBook {
         if epoch != live_epoch || item != expected {
             return Err(token_error());
         }
-        cursor.position += 1;
+        cursor.position = index + 1;
         Ok(item.clone())
     }
 
@@ -320,15 +363,10 @@ impl BrowseBook {
                 || cursor.items.len() > MAX_CURSOR_ITEMS
                 || cursor.position > cursor.items.len()
                 || cursor.scope.validate().is_err()
-                || cursor.items.iter().any(|item| {
-                    BrowseItem::new(&item.name, item.activity_id.as_deref(), item.level).is_err()
-                        || item.resource_epoch == 0
-                        || item.activity_id.is_some()
-                            != matches!(
-                                cursor.scope.kind,
-                                BrowseKind::Activity | BrowseKind::Process
-                            )
-                })
+                || cursor
+                    .items
+                    .iter()
+                    .any(|item| !item.valid_for(cursor.scope.kind) || item.resource_epoch == 0)
             {
                 return Err(HostProblem::InfrastructureFailure);
             }
@@ -409,6 +447,41 @@ mod tests {
             assert!(book.peek(token, kind).is_err());
             book.end(token, kind).unwrap();
         }
+    }
+
+    #[test]
+    fn bts_browse_container_skips_deleted_snapshot_names_atomically() {
+        let mut book = BrowseBook::default();
+        let scope = BrowseScope::new(BrowseKind::Container, "BTSLIFE", "PROCESS", 3).unwrap();
+        let items = ["ALPHA", "BETA", "name.with/slash"]
+            .iter()
+            .map(|name| BrowseItem::container(name).unwrap().with_epoch(3).unwrap())
+            .collect();
+        let token = book.start(scope, items).unwrap();
+        let remaining = book.remaining(token, BrowseKind::Container).unwrap();
+        assert_eq!(remaining.len(), 3);
+        assert_eq!(
+            book.next_skipping(token, BrowseKind::Container, 2, &remaining[1], 1),
+            Err(token_error())
+        );
+        assert_eq!(
+            book.next_skipping(token, BrowseKind::Container, 3, &remaining[1], 1),
+            Ok(remaining[1].clone())
+        );
+        assert_eq!(
+            book.peek(token, BrowseKind::Container),
+            Ok(remaining[2].clone())
+        );
+        assert_eq!(
+            book.next_skipping(token, BrowseKind::Container, 3, &remaining[2], 0),
+            Ok(remaining[2].clone())
+        );
+        assert_eq!(
+            book.peek(token, BrowseKind::Container),
+            Err(super::end_of_browse())
+        );
+        book.end(token, BrowseKind::Container).unwrap();
+        assert_eq!(book.peek(token, BrowseKind::Container), Err(token_error()));
     }
 
     #[test]

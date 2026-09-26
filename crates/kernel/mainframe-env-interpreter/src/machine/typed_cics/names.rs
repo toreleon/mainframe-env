@@ -233,9 +233,10 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
-        CicsOutputName::BtsBrowse(BtsBrowseOutput::BrowseToken | BtsBrowseOutput::Level) => {
-            SlotUse::FullwordOutput
-        }
+        CicsOutputName::BtsBrowse(
+            BtsBrowseOutput::BrowseToken | BtsBrowseOutput::Level | BtsBrowseOutput::DataLength,
+        ) => SlotUse::FullwordOutput,
+        CicsOutputName::BtsBrowse(BtsBrowseOutput::Set) => SlotUse::PointerOutput,
         CicsOutputName::BtsBrowse(field) => SlotUse::BtsExactOutput(field.width()),
         CicsOutputName::BtsActivityId => SlotUse::BtsExactOutput(52),
         CicsOutputName::BtsAbCode => SlotUse::BtsExactOutput(4),

@@ -545,7 +545,9 @@ pub(super) fn execute(
                 );
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::ContainerSet | CicsOutputName::ConversationDataSet => {
+            CicsOutputName::ContainerSet
+            | CicsOutputName::ConversationDataSet
+            | CicsOutputName::BtsBrowse(mainframe_env_ir::BtsBrowseOutput::Set) => {
                 arguments.extend(retrieve::allocation_arguments(
                     machine,
                     &target,

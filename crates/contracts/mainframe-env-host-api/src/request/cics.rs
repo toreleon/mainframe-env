@@ -9,6 +9,10 @@ mod parse;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    BtsEndBrowseContainer,
+    BtsGetNextContainer,
+    BtsInquireContainer,
+    BtsStartBrowseContainer,
     BtsEndBrowseEvent,
     BtsGetNextEvent,
     BtsInquireEvent,
@@ -445,6 +449,10 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::BtsEndBrowseContainer => "BtsEndBrowseContainer",
+            Self::BtsGetNextContainer => "BtsGetNextContainer",
+            Self::BtsInquireContainer => "BtsInquireContainer",
+            Self::BtsStartBrowseContainer => "BtsStartBrowseContainer",
             Self::BtsEndBrowseEvent => "BtsEndBrowseEvent",
             Self::BtsGetNextEvent => "BtsGetNextEvent",
             Self::BtsInquireEvent => "BtsInquireEvent",
@@ -730,7 +738,10 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::BtsEndBrowseEvent
+            Self::BtsEndBrowseContainer
+                | Self::BtsGetNextContainer
+                | Self::BtsStartBrowseContainer
+                | Self::BtsEndBrowseEvent
                 | Self::BtsGetNextEvent
                 | Self::BtsStartBrowseEvent
                 | Self::BtsEndBrowseTimer

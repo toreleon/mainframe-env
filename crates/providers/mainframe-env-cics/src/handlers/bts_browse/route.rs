@@ -9,6 +9,7 @@ use mainframe_env_host_api::{
 };
 
 type Outputs = Vec<(&'static str, &'static str, Vec<u8>)>;
+mod container;
 mod event_timer;
 
 pub(in crate::service) fn invoke(
@@ -49,6 +50,9 @@ pub(in crate::service) fn invoke(
         }
     }
     let outputs = match request.operation {
+        operation if container::is_operation(operation) => {
+            container::invoke(service, run, request, &authority, &cursors, &owner)?
+        }
         operation if event_timer::is_operation(operation) => {
             event_timer::invoke(service, run, request, &authority, &cursors, &owner)?
         }
@@ -379,6 +383,20 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         &[&str],
         &[&str],
     ) = match request.operation {
+        CicsOperation::BtsStartBrowseContainer => (
+            &[],
+            &["ACTIVITYID", "PROCESS", "PROCESSTYPE", "CHANNEL"],
+            &["BROWSETOKEN"],
+            &[],
+        ),
+        CicsOperation::BtsGetNextContainer => (&["BROWSETOKEN"], &[], &["CONTAINER"], &[]),
+        CicsOperation::BtsEndBrowseContainer => (&["BROWSETOKEN"], &[], &[], &[]),
+        CicsOperation::BtsInquireContainer => (
+            &["CONTAINER"],
+            &["ACTIVITYID", "PROCESS", "PROCESSTYPE", "SET.MAXLENGTH"],
+            &[],
+            &["DATALENGTH", "SET"],
+        ),
         CicsOperation::BtsStartBrowseEvent => (&[], &["ACTIVITYID"], &["BROWSETOKEN"], &[]),
         CicsOperation::BtsStartBrowseTimer => (&["TIMER"], &["ACTIVITYID"], &["BROWSETOKEN"], &[]),
         CicsOperation::BtsGetNextEvent => (&["BROWSETOKEN"], &[], &["EVENT"], &[]),
@@ -434,6 +452,12 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         .chain(required_outputs)
         .any(|name| !has(name))
         || has("RESP2") && !has("RESP")
+        || matches!(
+            request.operation,
+            CicsOperation::BtsStartBrowseContainer | CicsOperation::BtsInquireContainer
+        ) && (has("PROCESS") != has("PROCESSTYPE")
+            || has("ACTIVITYID") && has("PROCESS")
+            || has("CHANNEL") && (has("ACTIVITYID") || has("PROCESS")))
         || request.operation == CicsOperation::BtsStartBrowseActivity
             && (has("PROCESS") != has("PROCESSTYPE") || has("ACTIVITYID") && has("PROCESS"))
     {
@@ -443,7 +467,11 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         let role = if required_inputs.contains(&name.as_str())
             || optional_inputs.contains(&name.as_str())
         {
-            if name == "BROWSETOKEN" { 1 } else { 0 }
+            if name == "BROWSETOKEN" || name == "SET.MAXLENGTH" {
+                1
+            } else {
+                0
+            }
         } else if required_outputs.contains(&name.as_str())
             || optional_outputs.contains(&name.as_str())
             || matches!(name.as_str(), "RESP" | "RESP2")
@@ -482,6 +510,11 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
     {
         return Err(HostProblem::Unsupported);
     }
+    if request.operation == CicsOperation::BtsInquireContainer
+        && request.arguments.contains_key("SET.MAXLENGTH") != request.arguments.contains_key("SET")
+    {
+        return Err(HostProblem::Malformed);
+    }
     Ok(())
 }
 
@@ -519,7 +552,9 @@ fn padded(value: &str, width: usize) -> Result<Vec<u8>, HostProblem> {
 fn replay_outputs(request: &CicsRequest, outcome: BrowseOutcome) -> Result<Outputs, HostProblem> {
     match (request.operation, outcome) {
         (
-            CicsOperation::BtsStartBrowseActivity | CicsOperation::BtsStartBrowseProcess,
+            CicsOperation::BtsStartBrowseActivity
+            | CicsOperation::BtsStartBrowseProcess
+            | CicsOperation::BtsStartBrowseContainer,
             BrowseOutcome::Token(token),
         ) => Ok(vec![(
             "BROWSETOKEN",
@@ -533,6 +568,11 @@ fn replay_outputs(request: &CicsRequest, outcome: BrowseOutcome) -> Result<Outpu
             "BROWSETOKEN",
             "mainframe-env.cics.decimal@1",
             token.to_string().into_bytes(),
+        )]),
+        (CicsOperation::BtsGetNextContainer, BrowseOutcome::Item(item)) => Ok(vec![(
+            "CONTAINER",
+            "mainframe-env.cics.payload@1",
+            padded(&item.name, 16)?,
         )]),
         (CicsOperation::BtsGetNextEvent, BrowseOutcome::Item(item)) => Ok(vec![(
             "EVENT",
@@ -588,6 +628,7 @@ fn replay_outputs(request: &CicsRequest, outcome: BrowseOutcome) -> Result<Outpu
         }
         (
             CicsOperation::BtsEndBrowseActivity
+            | CicsOperation::BtsEndBrowseContainer
             | CicsOperation::BtsEndBrowseProcess
             | CicsOperation::BtsEndBrowseEvent
             | CicsOperation::BtsEndBrowseTimer,
@@ -690,5 +731,58 @@ mod tests {
             };
             assert_eq!(validate(&request), Err(expected));
         }
+    }
+
+    #[test]
+    fn bts_browse_container_selector_and_pointer_shape_fail_before_authority_access() {
+        let argument = |bytes: &[u8]| {
+            BoundedPayload::new(
+                "mainframe-env.cics.argument@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let request = |operation, arguments| CicsRequest {
+            operation,
+            arguments,
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        };
+        assert_eq!(
+            validate(&request(
+                CicsOperation::BtsStartBrowseContainer,
+                [
+                    ("CHANNEL".into(), argument(b"CH")),
+                    ("PROCESS".into(), argument(b"P")),
+                    ("PROCESSTYPE".into(), argument(b"TYPE")),
+                    ("BROWSETOKEN".into(), argument(b"OUT")),
+                ]
+                .into(),
+            )),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate(&request(
+                CicsOperation::BtsInquireContainer,
+                [
+                    ("CONTAINER".into(), argument(b"ITEM")),
+                    ("OPTION.ACQPROCESS".into(), argument(b"")),
+                ]
+                .into(),
+            )),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate(&request(
+                CicsOperation::BtsInquireContainer,
+                [
+                    ("CONTAINER".into(), argument(b"ITEM")),
+                    ("SET".into(), argument(b"OUT")),
+                ]
+                .into(),
+            )),
+            Err(HostProblem::Malformed)
+        );
     }
 }

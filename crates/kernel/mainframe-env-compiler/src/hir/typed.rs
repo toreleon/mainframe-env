@@ -5185,9 +5185,25 @@ mod tests {
     }
 
     #[test]
-    fn bts_browse_fifteen_rows_lower_with_exact_receivers() {
-        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 ACT-X PIC X(16). 01 ACTID-X PIC X(52). 01 PROC-X PIC X(36). 01 EVENT-X PIC X(16). 01 LEVEL-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
+    fn bts_browse_nineteen_rows_lower_with_exact_receivers() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 ACT-X PIC X(16). 01 ACTID-X PIC X(52). 01 PROC-X PIC X(36). 01 EVENT-X PIC X(16). 01 LEVEL-X PIC S9(9) COMP. 01 DATA-X PIC S9(9) COMP. 01 PTR-X USAGE POINTER. PROCEDURE DIVISION. ";
         for (source, expected) in [
+            (
+                "ENDBROWSE CONTAINER BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseContainer,
+            ),
+            (
+                "GETNEXT CONTAINER(EVENT-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextContainer,
+            ),
+            (
+                "INQUIRE CONTAINER('ITEM') DATALENGTH(DATA-X) SET(PTR-X)",
+                HirCicsOperation::BtsInquireContainer,
+            ),
+            (
+                "STARTBROWSE CONTAINER CHANNEL('CH') BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseContainer,
+            ),
             (
                 "ENDBROWSE EVENT BROWSETOKEN(TOKEN-X)",
                 HirCicsOperation::BtsEndBrowseEvent,
