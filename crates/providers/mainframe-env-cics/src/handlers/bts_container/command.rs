@@ -91,78 +91,6 @@ fn channel_error(problem: HostProblem) -> HostProblem {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{ChannelPort, OwnerIdentity, channel_error};
-    use crate::service::handlers::bts_container::state::{ContainerOwner, container_namespace};
-    use mainframe_env_host_api::{AccessIntent, HostProblem};
-    use mainframe_env_store::MemoryStore;
-    use mainframe_env_store_api::ProviderStateStore;
-
-    #[test]
-    fn channel_container_delete_channel_without_alter_returns_channelerr_6_before_mutation() {
-        let store = MemoryStore::new(Default::default());
-        let identity = OwnerIdentity {
-            run_unit: "UOW1",
-            execution: "EXEC",
-            principal: "USER",
-        };
-        let mut authorize = |_: &str, _: &str, intent| {
-            if intent == AccessIntent::Alter {
-                Err(HostProblem::Unauthorized)
-            } else {
-                Ok(())
-            }
-        };
-        let mut port = ChannelPort::new_with_program(&store, identity, "CREATOR", &mut authorize);
-        port.put("WORK", "ITEM", b"data", false, "put").unwrap();
-        let container_namespace = container_namespace(&ContainerOwner::Channel {
-            execution: "EXEC".into(),
-            principal: "USER".into(),
-            run_unit: "UOW1".into(),
-            channel: "WORK".into(),
-        })
-        .unwrap();
-        let channel_before = store.list_provider_state("cics-channel-v1", 8).unwrap();
-        let container_before = store.list_provider_state(&container_namespace, 8).unwrap();
-        let replay_before = store
-            .list_provider_state("cics-container-replay-v1", 8)
-            .unwrap();
-        let capacity_before = store
-            .get_provider_state("cics-container-capacity-v1", "global")
-            .unwrap();
-
-        assert_eq!(
-            port.delete_channel("WORK", "delete").map_err(channel_error),
-            Err(HostProblem::Condition {
-                name: "CHANNELERR".into(),
-                response: 122,
-                response2: 6,
-            })
-        );
-        assert_eq!(
-            store.list_provider_state("cics-channel-v1", 8).unwrap(),
-            channel_before
-        );
-        assert_eq!(
-            store.list_provider_state(&container_namespace, 8).unwrap(),
-            container_before
-        );
-        assert_eq!(
-            store
-                .list_provider_state("cics-container-replay-v1", 8)
-                .unwrap(),
-            replay_before
-        );
-        assert_eq!(
-            store
-                .get_provider_state("cics-container-capacity-v1", "global")
-                .unwrap(),
-            capacity_before
-        );
-    }
-}
-
 pub(super) fn container_error(problem: HostProblem) -> HostProblem {
     match problem {
         HostProblem::NotFound => condition("CONTAINERERR", 110, 1),
@@ -698,4 +626,76 @@ pub(in crate::service::handlers) fn invoke(
         _ => unreachable!(),
     }
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ChannelPort, OwnerIdentity, channel_error};
+    use crate::service::handlers::bts_container::state::{ContainerOwner, container_namespace};
+    use mainframe_env_host_api::{AccessIntent, HostProblem};
+    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store_api::ProviderStateStore;
+
+    #[test]
+    fn channel_container_delete_channel_without_alter_returns_channelerr_6_before_mutation() {
+        let store = MemoryStore::new(Default::default());
+        let identity = OwnerIdentity {
+            run_unit: "UOW1",
+            execution: "EXEC",
+            principal: "USER",
+        };
+        let mut authorize = |_: &str, _: &str, intent| {
+            if intent == AccessIntent::Alter {
+                Err(HostProblem::Unauthorized)
+            } else {
+                Ok(())
+            }
+        };
+        let mut port = ChannelPort::new_with_program(&store, identity, "CREATOR", &mut authorize);
+        port.put("WORK", "ITEM", b"data", false, "put").unwrap();
+        let container_namespace = container_namespace(&ContainerOwner::Channel {
+            execution: "EXEC".into(),
+            principal: "USER".into(),
+            run_unit: "UOW1".into(),
+            channel: "WORK".into(),
+        })
+        .unwrap();
+        let channel_before = store.list_provider_state("cics-channel-v1", 8).unwrap();
+        let container_before = store.list_provider_state(&container_namespace, 8).unwrap();
+        let replay_before = store
+            .list_provider_state("cics-container-replay-v1", 8)
+            .unwrap();
+        let capacity_before = store
+            .get_provider_state("cics-container-capacity-v1", "global")
+            .unwrap();
+
+        assert_eq!(
+            port.delete_channel("WORK", "delete").map_err(channel_error),
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 6,
+            })
+        );
+        assert_eq!(
+            store.list_provider_state("cics-channel-v1", 8).unwrap(),
+            channel_before
+        );
+        assert_eq!(
+            store.list_provider_state(&container_namespace, 8).unwrap(),
+            container_before
+        );
+        assert_eq!(
+            store
+                .list_provider_state("cics-container-replay-v1", 8)
+                .unwrap(),
+            replay_before
+        );
+        assert_eq!(
+            store
+                .get_provider_state("cics-container-capacity-v1", "global")
+                .unwrap(),
+            capacity_before
+        );
+    }
 }
