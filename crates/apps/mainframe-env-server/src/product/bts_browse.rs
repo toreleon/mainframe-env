@@ -1,5 +1,15 @@
 #[test]
 fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
+    compiled_bts_browse_recovers_after_restart(None);
+}
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+fn postgres_compiled_bts_browse_cursor_recovers_after_restart() {
+    compiled_bts_browse_recovers_after_restart(Some(required_postgres_route_url()));
+}
+
+fn compiled_bts_browse_recovers_after_restart(postgres_url: Option<String>) {
     use mainframe_env_cics::bts_lifecycle::{BtsProcessTypeDefinition, BtsTransactionDefinition};
     use mainframe_env_cics::bts_browse::{BrowseEffect, BrowseEventMetadata, BrowseItem, BrowseKind, BrowseOutcome, BrowseOwner, BrowseScope, BtsBrowseStore};
 
@@ -10,21 +20,16 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         session_tick().unwrap()
     ));
     std::fs::create_dir_all(&root).unwrap();
-    let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
-    let mut settings = config();
-    settings.store_profile = crate::StoreProfile::Sqlite;
-    settings.sqlite_url = url.clone();
-    settings.artifact_root = root.join("artifacts");
+    let backend = match postgres_url {
+        Some(url) => RouteRestartBackend::Postgres(url),
+        None => RouteRestartBackend::Sqlite(format!(
+            "sqlite://{}?mode=rwc",
+            root.join("state.db").display()
+        )),
+    };
+    let settings = backend.settings(root.join("artifacts"));
     let secrets = Arc::new(MemorySecretResolver::default());
-    let first_store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
-    let first_platform: Arc<dyn PlatformStore> = first_store.clone();
-    let first = ProductServer::open(
-        settings.clone(),
-        first_platform,
-        secrets.clone(),
-        default_program_router(),
-    )
-    .unwrap();
+    let (first, first_store) = backend.open_server(settings.clone(), secrets.clone());
     first.bootstrap_administrator("IBMUSER", b"TESTPASS").unwrap();
     first
         .cics
@@ -89,10 +94,21 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
             predicate: None,
             timer: Some("WAKE".into()),
         });
+    let next_item = BrowseItem::new("CHIME", None, 0)
+        .unwrap()
+        .with_epoch(1)
+        .unwrap()
+        .with_event_metadata(BrowseEventMetadata {
+            event_type: 1004,
+            fire_status: 1000,
+            composite: None,
+            predicate: None,
+            timer: Some("LATER".into()),
+        });
     let replay_store = BtsBrowseStore::new(first_store.as_ref());
     let BrowseOutcome::Token(replay_token) = replay_store.apply(&replay_owner, "START", [1; 32], &BrowseEffect::Start {
         scope: BrowseScope::new(BrowseKind::Event, "BTSEVENT", "CICS.BTS.BROWSE", 1).unwrap(),
-        items: vec![replay_item.clone()],
+        items: vec![replay_item.clone(), next_item.clone()],
     }).unwrap() else { panic!("expected browse token") };
     let first_metadata = replay_store.apply(&replay_owner, "NEXT", [2; 32], &BrowseEffect::Next {
         token: replay_token,
@@ -147,7 +163,7 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         InvocationLimits::default(),
     )
     .unwrap();
-    let second_store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    let (second, second_store) = backend.open_server(settings, secrets);
     assert_eq!(
         BtsBrowseStore::new(second_store.as_ref())
             .replay(&replay_owner, "NEXT", [2; 32])
@@ -156,9 +172,20 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
             .0,
         first_metadata
     );
-    let second_platform: Arc<dyn PlatformStore> = second_store.clone();
-    let second = ProductServer::open(settings, second_platform, secrets, default_program_router())
+    let next_metadata = BtsBrowseStore::new(second_store.as_ref())
+        .apply(
+            &replay_owner,
+            "NEXT-AGAIN",
+            [3; 32],
+            &BrowseEffect::Next {
+                token: replay_token,
+                kind: BrowseKind::Event,
+                live_epoch: 1,
+                expected: next_item.clone(),
+            },
+        )
         .unwrap();
+    assert_eq!(next_metadata, BrowseOutcome::Item(next_item));
     second
         .install_online_application(OnlineApplicationDefinition {
             programs: vec![OnlineProgramDefinition {
@@ -224,5 +251,29 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
     assert_eq!(state["book"]["next_token"], 6);
     drop(second);
     drop(second_store);
+    let reopened = backend.open_store();
+    assert_eq!(
+        reopened
+            .get_provider_state("cics-bts-browse-v1", invocation.run_unit_id.as_str())
+            .unwrap(),
+        Some(cursor)
+    );
+    assert_eq!(
+        BtsBrowseStore::new(reopened.as_ref())
+            .replay(&replay_owner, "NEXT", [2; 32])
+            .unwrap()
+            .unwrap()
+            .0,
+        first_metadata
+    );
+    assert_eq!(
+        BtsBrowseStore::new(reopened.as_ref())
+            .replay(&replay_owner, "NEXT-AGAIN", [3; 32])
+            .unwrap()
+            .unwrap()
+            .0,
+        next_metadata
+    );
+    drop(reopened);
     std::fs::remove_dir_all(root).unwrap();
 }

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fix #289's channel restart fixture by granting DELETE CHANNEL Alter authority and exercising the same path on SQLite; add PostgreSQL restart selectors for channel containers, BTS containers, and BTS browse cursors."
