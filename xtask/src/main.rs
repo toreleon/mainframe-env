@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod carddemo_base_batch_provenance;
+mod carddemo_readacct;
 mod carddemo_v09_host;
 mod changelog;
 mod docs;
@@ -243,6 +244,7 @@ enum XtaskCommand {
     CarddemoUtilities(CheckArgs),
     CarddemoBatchPrograms(CheckArgs),
     CarddemoBaseBatch(CheckArgs),
+    CarddemoReadacct(CheckArgs),
     CarddemoDb2(CheckArgs),
     CarddemoIms(CheckArgs),
     CarddemoMqAuthorization(CheckArgs),
@@ -608,6 +610,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         ),
         XtaskCommand::CarddemoBaseBatch(args) => {
             checked!("carddemo-base-batch", args, check_carddemo_base_batch(root))
+        }
+        XtaskCommand::CarddemoReadacct(args) => {
+            checked!(
+                "carddemo-readacct",
+                args,
+                carddemo_readacct::run(root, args.check)
+            )
         }
         XtaskCommand::CarddemoDb2(args) => {
             checked!("carddemo-db2", args, check_carddemo_db2(root))
@@ -8444,6 +8453,7 @@ fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
         }
     }
     files.sort();
+    files.retain(|file| !file.components().any(|part| part.as_os_str() == "vendor"));
     Ok(files)
 }
 

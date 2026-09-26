@@ -3,6 +3,9 @@
 mod bms;
 mod control_library;
 mod online_authorities;
+mod readacct;
+
+pub use readacct::{capture_carddemo_readacct_from_env, verify_carddemo_readacct_from_env};
 
 use online_authorities::install_base_online_authorities;
 

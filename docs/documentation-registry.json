@@ -57,6 +57,7 @@
     "docs/decisions/0022-issue-pass-target-handoff.md",
     "docs/decisions/0023-bts-lifecycle-authority.md",
     "docs/decisions/0024-per-assertion-oracle-provenance.md",
+    "docs/decisions/0026-run-bundle.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -121,6 +122,7 @@
         {"label": "ADR-0022: ISSUE PASS target handoff", "path": "docs/decisions/0022-issue-pass-target-handoff.md"},
         {"label": "ADR-0023: BTS lifecycle authority", "path": "docs/decisions/0023-bts-lifecycle-authority.md"},
         {"label": "ADR-0024: Per-assertion oracle provenance", "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"},
+        {"label": "ADR-0026: CardDemo run bundle", "path": "docs/decisions/0026-run-bundle.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
@@ -148,6 +150,7 @@
         {"label": "Capacity and recovery", "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md"},
         {"label": "Local Jenkins", "path": "docs/runbooks/JENKINS-LOCAL.md"},
         {"label": "CardDemo operator guide", "path": "docs/runbooks/CARDDEMO-OPERATOR.md"},
+        {"label": "CardDemo READACCT run bundle", "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md"},
         {"label": "CICS licensed pilot", "path": "docs/runbooks/cics-licensed-pilot.md"},
         {"label": "Conformance family rollout", "path": "docs/runbooks/conformance-family-rollout.md"}
       ]

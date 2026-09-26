@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 211,
+    "markdown_documents": 213,
     "navigation_groups": 5,
-    "normative_documents": 54,
-    "xtask_commands": 197
+    "normative_documents": 55,
+    "xtask_commands": 200
   },
   "documents": [
     {
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 89,
-      "sha256": "sha256:ce9df8a080e8a3110f5fd15f829a27412806bd4139e3c9ee6dadc6ebceaaffb0",
+      "relative_links": 91,
+      "sha256": "sha256:ddf4c34451c0bd2ef462b4fc9cc1560473360d7cb14e66ccb7490c3b6b30c7e9",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -915,10 +915,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.8 run bundle v1",
+      "normative": true,
+      "owner": "conformance and xtask maintainers",
+      "path": "docs/decisions/0026-run-bundle.md",
+      "relative_links": 0,
+      "scope": "0.8 READACCT batch regression evidence",
+      "sha256": "sha256:bba7bdb3c90b2a71d6fe7c9da29e2eaddef6505e4bb2ba13369c1530c293e671",
+      "status": "Proposed",
+      "title": "ADR-0026: Self-recorded CardDemo run bundle",
+      "xtask_commands": 1
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 24,
-      "sha256": "sha256:eaa1cb3a27b0a4c77cb15f245535c6aad312a4fd19c14be75572e9212a62bc2f",
+      "relative_links": 25,
+      "sha256": "sha256:242253d217134dc32ac7b95b4b62bff1e4a21c298beef822d0232c8b1d9c33f7",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1704,6 +1716,14 @@
     },
     {
       "normative": false,
+      "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md",
+      "relative_links": 1,
+      "sha256": "sha256:396634191e01c20881b3543c7ebbc6e8d752ea8ee8838056a328f25a82cddff1",
+      "title": "CardDemo READACCT run bundle",
+      "xtask_commands": 2
+    },
+    {
+      "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
       "sha256": "sha256:616ea9f5b00f2dfb2c8898bbb667c7bb72dfc863746790f19a1008f904f6e1a9",
@@ -2116,6 +2136,10 @@
           "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"
         },
         {
+          "label": "ADR-0026: CardDemo run bundle",
+          "path": "docs/decisions/0026-run-bundle.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2186,6 +2210,10 @@
         {
           "label": "CardDemo operator guide",
           "path": "docs/runbooks/CARDDEMO-OPERATOR.md"
+        },
+        {
+          "label": "CardDemo READACCT run bundle",
+          "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md"
         },
         {
           "label": "CICS licensed pilot",
@@ -2279,7 +2307,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:6dd315895961865b933dee7a5ec8e9b7939693aa7f2ea68e17872dae21ded071",
+  "registry_sha256": "sha256:2e173d106021f8daf2f7304cb96c069b30b6c18aa764f3c9ec9ae24d0a01a869",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,
