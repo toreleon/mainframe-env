@@ -11104,6 +11104,27 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         >= 2)
         .then_some(b'$');
     let floating_symbol = floating_sign.or(floating_currency);
+    if value.coefficient == 0
+        && !picture.contains(&b'9')
+        && (picture.contains(&b'Z') || picture.contains(&b'*') || floating_symbol.is_some())
+    {
+        let asterisk_suppression = picture.contains(&b'*');
+        let output = picture
+            .iter()
+            .filter(|&&byte| !matches!(byte, b'V' | b'S' | b'P'))
+            .map(|&byte| {
+                if asterisk_suppression {
+                    if byte == b'.' { b'.' } else { b'*' }
+                } else {
+                    b' '
+                }
+            })
+            .collect::<Vec<_>>();
+        if output.len() != layout.length {
+            return Err(MachineProblem::UnsupportedForm);
+        }
+        return Ok(output);
+    }
     let leading_floating_slots = floating_symbol.map_or(0, |symbol| {
         picture
             .iter()
@@ -13656,6 +13677,101 @@ mod tests {
             );
         }
         let layout = edited_test_layout("Z,ZZ9.99", 6, 2, true);
+        assert_eq!(
+            encode_edited(
+                &layout,
+                Decimal {
+                    coefficient: 0,
+                    scale: 2
+                }
+            ),
+            Ok(vec![b' '; layout.length])
+        );
+    }
+
+    #[test]
+    fn zero_suppression_blanks_every_all_z_position() {
+        for (picture, digits, expected) in [
+            ("-ZZZ,ZZZ,ZZZ.ZZ", 11, "               "),
+            ("+ZZZ,ZZZ,ZZZ.ZZ", 11, "               "),
+            ("ZZZ.ZZ", 5, "      "),
+            ("$ZZZ.ZZ", 5, "       "),
+        ] {
+            let layout = edited_test_layout(picture, digits, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient: 0,
+                        scale: 2
+                    }
+                ),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn zero_suppression_keeps_asterisks_and_decimal_point() {
+        for (picture, digits, expected) in [
+            ("***.**", 5, "***.**"),
+            ("+***.**", 5, "****.**"),
+            ("***,***.**", 8, "*******.**"),
+        ] {
+            let layout = edited_test_layout(picture, digits, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient: 0,
+                        scale: 2
+                    }
+                ),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn zero_suppression_blanks_all_floating_insertion_pictures() {
+        // GnuCOBOL 3.2 -std=ibm prints seven, seven, and six spaces respectively.
+        for (picture, digits) in [("----.--", 6), ("++++.++", 6), ("$$$.$$", 5)] {
+            let layout = edited_test_layout(picture, digits, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient: 0,
+                        scale: 2
+                    }
+                ),
+                Ok(vec![b' '; layout.length]),
+                "picture {picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn zero_suppression_preserves_nine_fraction_and_blank_when_zero_controls() {
+        for (picture, digits, coefficient, expected) in
+            [("ZZ9.99", 5, 0, "  0.00"), ("ZZZ.ZZ", 5, 5, "   .05")]
+        {
+            let layout = edited_test_layout(picture, digits, 2, false);
+            assert_eq!(
+                encode_edited(
+                    &layout,
+                    Decimal {
+                        coefficient,
+                        scale: 2
+                    }
+                ),
+                Ok(expected.as_bytes().to_vec()),
+                "picture {picture}, coefficient {coefficient}"
+            );
+        }
+        let layout = edited_test_layout("ZZ9.99", 5, 2, true);
         assert_eq!(
             encode_edited(
                 &layout,
