@@ -609,6 +609,36 @@ mod tests {
     use super::*;
 
     #[test]
+    fn exec_parm_preserves_text_and_absence_for_main_program() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//J JOB\n//WITH EXEC PGM=PARMTEST,PARM='2022071800'\n//WITHOUT EXEC PGM=PARMTEST\n".into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.steps[0].parameter.as_deref(), Some("2022071800"));
+        assert_eq!(plan.steps[1].parameter.as_deref(), None);
+    }
+
+    #[test]
+    fn exec_parm_unquotes_doubled_apostrophes_and_accepts_empty() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary:
+                    "//J JOB\n//Q EXEC PGM=PARMTEST,PARM='A''B'\n//E EXEC PGM=PARMTEST,PARM=''\n"
+                        .into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.steps[0].parameter.as_deref(), Some("A'B"));
+        assert_eq!(plan.steps[1].parameter.as_deref(), Some(""));
+    }
+
+    #[test]
     fn compatibility_adapter_uses_the_new_converter_plan() {
         let plan = parse_jcl(
             &JclBundle {

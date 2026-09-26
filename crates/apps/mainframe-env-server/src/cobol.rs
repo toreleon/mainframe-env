@@ -475,6 +475,10 @@ impl CobolProgram {
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
         replay::bind_protocol_owner(parent, &mut bindings)?;
+        bindings.insert(
+            "cobol.call.arguments".into(),
+            batch_main_call_arguments(input.parameter.as_deref())?,
+        );
         for dd in &input.dds {
             if let Some(dataset) = &dd.dataset {
                 bindings.insert(
@@ -698,7 +702,14 @@ impl Program for CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             parent.attempt,
             parent.limits,
-            parent.bindings.clone(),
+            {
+                let mut bindings = parent.bindings.clone();
+                bindings.insert(
+                    "cobol.call.arguments".into(),
+                    batch_main_call_arguments(input.parameter.as_deref())?,
+                );
+                bindings
+            },
             limits,
         )
         .and_then(|invocation| {
@@ -789,7 +800,10 @@ fn install_batch_environment(
 }
 
 fn decode_cobol_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, HostProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
+    if !matches!(
+        payload.schema(),
+        "mainframe-env.cobol.call@1" | "mainframe-env.cobol.batch-main@1"
+    ) {
         return Err(HostProblem::Malformed);
     }
     let bytes = payload.bytes();
@@ -835,6 +849,34 @@ fn decode_cobol_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, Ho
         return Err(HostProblem::Malformed);
     }
     Ok(values)
+}
+
+fn batch_main_call_arguments(parameter: Option<&str>) -> Result<BoundedPayload, HostProblem> {
+    // The interpreter keeps DISPLAY storage in its native encoding (CP037 is applied only at
+    // dataset/JSON/national boundaries), so the PARM text is passed natively; z/OS passes the
+    // same text in EBCDIC to EBCDIC storage. JCL conversion already bounds it to 100 characters.
+    let text = parameter.unwrap_or_default().as_bytes().to_vec();
+    if text.len() > 100 {
+        return Err(HostProblem::Malformed);
+    }
+    let mut area = u16::try_from(text.len())
+        .map_err(|_| HostProblem::Malformed)?
+        .to_be_bytes()
+        .to_vec();
+    area.extend_from_slice(&text);
+    let name = b"PARM-AREA";
+    let mut bytes = 1u32.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&(name.len() as u64).to_be_bytes());
+    bytes.extend_from_slice(name);
+    bytes.push(1);
+    bytes.extend_from_slice(&(area.len() as u64).to_be_bytes());
+    bytes.extend_from_slice(&area);
+    BoundedPayload::new(
+        "mainframe-env.cobol.batch-main@1",
+        bytes,
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
 }
 
 fn execute_ceedays(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
@@ -1216,8 +1258,7 @@ mod tests {
     #[test]
     fn default_cobol_program_compiles_and_runs_reference_machine() {
         let program = CobolProgram::new();
-        let output = program
-            .execute(&parent(), &ProgramInput {
+        let input = ProgramInput {
                 parameter: None,
                 dds: vec![DdPlan {
                     name: "SYSIN".into(),
@@ -1239,10 +1280,84 @@ mod tests {
                 }],
                 dd_records: BTreeMap::new(),
                 execution: None,
-            })
-            .unwrap();
+            };
+        let output = program.execute(&parent(), &input).unwrap();
         assert_eq!(output.return_code, 0);
         assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+        let mut with_parm = input;
+        with_parm.parameter = Some("IGNORED".into());
+        let output = program.execute(&parent(), &with_parm).unwrap();
+        assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+    }
+
+    #[test]
+    fn batch_main_receives_exec_parm_length_and_ebcdic_text() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PARMTEST.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DISPLAY-LENGTH PIC 9(4).\nLINKAGE SECTION.\n01 PARM-AREA.\n  05 PARM-LENGTH PIC S9(4) COMP.\n  05 PARM-DATE PIC X(10).\nPROCEDURE DIVISION USING PARM-AREA.\nMOVE PARM-LENGTH TO DISPLAY-LENGTH.\nDISPLAY DISPLAY-LENGTH.\nDISPLAY PARM-DATE.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=PARMTEST,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records[0], b"0010");
+        assert_eq!(output.records[1], b"2022071800");
+        let mut absent = input;
+        absent.parameter = None;
+        let output = CobolProgram::new().execute(&parent(), &absent).unwrap();
+        assert_eq!(output.records[0], b"0000");
+    }
+
+    #[test]
+    fn batch_main_parm_text_concatenates_with_native_storage() {
+        // CardDemo CBACT01C builds TRAN-ID with STRING PARM-DATE, WS-TRANID-SUFFIX (#266):
+        // the PARM text must be in the runtime's native storage encoding, not raw CP037.
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PARMSTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-SUFFIX PIC 9(6) VALUE 1.\n01 TRAN-ID PIC X(16).\nLINKAGE SECTION.\n01 PARM-AREA.\n  05 PARM-LENGTH PIC S9(4) COMP.\n  05 PARM-DATE PIC X(10).\nPROCEDURE DIVISION USING PARM-AREA.\nSTRING PARM-DATE WS-SUFFIX DELIMITED BY SIZE INTO TRAN-ID.\nDISPLAY TRAN-ID.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=PARMSTR,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records[0], b"2022071800000001");
+    }
+
+    #[test]
+    fn batch_main_invocation_contains_halfword_length_and_native_text() {
+        let payload = batch_main_call_arguments(Some("2022071800")).unwrap();
+        assert_eq!(
+            decode_cobol_call_values(&payload).unwrap(),
+            vec![[&[0u8, 10][..], b"2022071800"].concat()]
+        );
+        assert_eq!(
+            decode_cobol_call_values(&batch_main_call_arguments(None).unwrap()).unwrap(),
+            vec![vec![0, 0]]
+        );
     }
 
     #[test]

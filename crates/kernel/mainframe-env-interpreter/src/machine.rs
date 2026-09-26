@@ -706,13 +706,14 @@ impl ReferenceMachine {
                 }));
         }
         if let Some(call) = invocation.bindings.get("cobol.call.arguments") {
+            let batch_main = call.schema() == "mainframe-env.cobol.batch-main@1";
             let values = decode_call_arguments(call)?;
             let mut linkage = layouts
                 .values()
                 .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
                 .collect::<Vec<_>>();
             linkage.sort_by_key(|layout| layout.offset);
-            if linkage.len() < values.len() {
+            if linkage.len() < values.len() && !(batch_main && linkage.is_empty()) {
                 return Err(MachineProblem::InvalidOperation);
             }
             for (layout, value) in linkage.into_iter().zip(values) {
@@ -12306,7 +12307,10 @@ fn encode_call_values(
 }
 
 fn decode_call_arguments(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, MachineProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
+    if !matches!(
+        payload.schema(),
+        "mainframe-env.cobol.call@1" | "mainframe-env.cobol.batch-main@1"
+    ) {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let mut input = SnapshotInput::new(payload.bytes());
