@@ -1,4 +1,4 @@
-//! Source-selected task-channel forms; BTS selectors remain fenced.
+//! Source-selected task-channel and BTS container forms.
 
 use super::super::{
     HirCicsNamedOperand, HirCicsOperandName as I, HirCicsOperation as P, HirCicsOption as F,
@@ -103,6 +103,17 @@ pub(super) fn option(operation: P, name: &str) -> Option<F> {
     match (operation, name) {
         (P::GetContainer, "NODATA") => Some(F::ContainerNoData),
         (P::PutContainer, "APPEND") => Some(F::ContainerAppend),
+        (P::DeleteContainer | P::GetContainer | P::PutContainer, "PROCESS") => {
+            Some(F::ContainerProcess)
+        }
+        (P::DeleteContainer | P::GetContainer | P::PutContainer, "ACQPROCESS") => {
+            Some(F::ContainerAcqProcess)
+        }
+        (P::DeleteContainer | P::GetContainer | P::PutContainer, "ACQACTIVITY") => {
+            Some(F::ContainerAcqActivity)
+        }
+        (P::MoveContainer, "FROMPROCESS") => Some(F::ContainerFromProcess),
+        (P::MoveContainer, "TOPROCESS") => Some(F::ContainerToProcess),
         _ => None,
     }
 }
@@ -111,7 +122,7 @@ pub(super) fn validate(clauses: &Clauses, options: &[String], operation: P) -> R
     if !is_channel_container(operation) {
         return Ok(());
     }
-    if clauses
+    let bts = clauses
         .keys()
         .any(|name| matches!(name.as_str(), "ACTIVITY" | "FROMACTIVITY" | "TOACTIVITY"))
         || options.iter().any(|name| {
@@ -119,10 +130,45 @@ pub(super) fn validate(clauses: &Clauses, options: &[String], operation: P) -> R
                 name.as_str(),
                 "PROCESS" | "ACQPROCESS" | "ACQACTIVITY" | "FROMPROCESS" | "TOPROCESS"
             )
-        })
+        });
+    let channel = clauses.contains_key("CHANNEL") || clauses.contains_key("TOCHANNEL");
+    let selectors = usize::from(clauses.contains_key("ACTIVITY"))
+        + options
+            .iter()
+            .filter(|name| matches!(name.as_str(), "PROCESS" | "ACQPROCESS" | "ACQACTIVITY"))
+            .count();
+    let from_selectors = usize::from(clauses.contains_key("FROMACTIVITY"))
+        + options
+            .iter()
+            .filter(|name| name.as_str() == "FROMPROCESS")
+            .count();
+    let to_selectors = usize::from(clauses.contains_key("TOACTIVITY"))
+        + options
+            .iter()
+            .filter(|name| name.as_str() == "TOPROCESS")
+            .count();
+    if channel && bts
+        || selectors > 1
+        || from_selectors > 1
+        || to_selectors > 1
+        || matches!(operation, P::DeleteChannel | P::QueryChannel) && bts
     {
         return Err(ResolutionFailure::Invalid(
-            "CICS container BTS selector is unsupported in the task-channel profile".into(),
+            "CICS container selectors cannot mix channel and BTS scopes".into(),
+        ));
+    }
+    if bts
+        && (clauses.contains_key("INTOCODEPAGE")
+            || clauses.contains_key("CONVERTST")
+            || clauses.contains_key("FROMCODEPAGE")
+            || clauses.contains_key("DATATYPE")
+            || clauses.contains_key("FROMCCSID")
+            || clauses.contains_key("INTOCCSID")
+            || clauses.contains_key("CCSID")
+            || clauses.contains_key("BYTEOFFSET"))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS BTS container conversion and metadata options are unsupported".into(),
         ));
     }
     if operation == P::GetContainer {
@@ -153,6 +199,9 @@ pub(super) fn operands(
         ("CHANNEL", I::BtsChannel),
         ("CONTAINER", I::ContainerName),
         ("AS", I::ContainerAs),
+        ("ACTIVITY", I::ContainerActivity),
+        ("FROMACTIVITY", I::ContainerFromActivity),
+        ("TOACTIVITY", I::ContainerToActivity),
         ("TOCHANNEL", I::ContainerToChannel),
         ("FROM", I::ContainerFrom),
         ("FLENGTH", I::ContainerLength),

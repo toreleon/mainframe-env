@@ -1,6 +1,7 @@
 //! Private, owner-scoped command-data read port for BTS and task channels.
 
 mod browse_read;
+mod bts;
 mod channel;
 mod command;
 mod scope;
@@ -12,6 +13,8 @@ pub(in crate::service::handlers) use state::ContainerDatatype;
 pub(in crate::service::handlers) fn valid_task_channel_name(name: &str) -> bool {
     state::valid_name(name, 16)
 }
+pub(in crate::service::handlers) use bts::cleanup_removed as cleanup_bts_containers;
+pub(in crate::service::handlers) use bts::settle_uow as settle_bts_container_uow;
 pub(in crate::service::handlers) use command::invoke as invoke_channel_container;
 
 use crate::service::{CicsService, Run};
@@ -529,6 +532,94 @@ mod tests {
         assert_eq!(
             port.read(target, ReadRequest::Value("SECRET")).unwrap(),
             ReadReply::Value(None)
+        );
+    }
+
+    #[test]
+    fn bts_container_lifecycle_removal_deletes_child_contents_atomically() {
+        use crate::service::handlers::bts_lifecycle::{BtsChildDefinition, BtsRemoval, BtsReply};
+        let store = MemoryStore::new(Default::default());
+        let root = define(&store, "UOW1");
+        let lifecycle = BtsLifecycleStore::new(&store);
+        lifecycle.finish_uow("UOW1", "EXEC", "USER", true).unwrap();
+        lifecycle
+            .acquire("UOW2", "EXEC", "USER", "TYPE", "ORDER", &root)
+            .unwrap();
+        lifecycle
+            .mutate_process(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC",
+                "USER",
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let child = lifecycle
+            .define_child(
+                "TYPE",
+                "ORDER",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: "USER".into(),
+                },
+                "UOW2",
+                "EXEC",
+                "USER",
+                "child",
+                [2; 32],
+            )
+            .unwrap();
+        lifecycle
+            .finish_child_uow("TYPE", "ORDER", "UOW2", true)
+            .unwrap();
+        let owner = ContainerOwner::Activity {
+            process_type: "TYPE".into(),
+            process_name: "ORDER".into(),
+            root_activity_id: root.clone(),
+            activity_id: child.clone(),
+        };
+        let row = container_record(
+            &owner,
+            "ITEM",
+            &ContainerValue {
+                datatype: ContainerDatatype::Bit,
+                ccsid: None,
+                read_only: false,
+                bytes: b"private".to_vec(),
+            },
+        )
+        .unwrap();
+        store.put_provider_state(row.clone(), None).unwrap();
+        lifecycle
+            .remove_subtree(
+                "TYPE",
+                "ORDER",
+                "UOW2",
+                "EXEC",
+                "USER",
+                "remove",
+                [3; 32],
+                &BtsRemoval::Delete {
+                    parent_id: root,
+                    child_name: "CHILD".into(),
+                },
+            )
+            .unwrap();
+        assert!(
+            store
+                .get_provider_state(&row.namespace, &row.key)
+                .unwrap()
+                .is_none()
         );
     }
 

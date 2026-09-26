@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 6] = [
+pub(super) const CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 8] = [
     descriptor(
         CicsPlanOperation::DeleteChannel,
         "delete-channel",
@@ -30,6 +30,16 @@ pub(super) const CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescri
         CicsPlanOperation::QueryChannel,
         "query-channel",
         BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::GetContainer64,
+        "get64-container",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::PutContainer64,
+        "put64-container",
+        BTS_MUTATE_EFFECTS,
     ),
 ];
 

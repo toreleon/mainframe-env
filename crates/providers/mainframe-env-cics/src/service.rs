@@ -8277,7 +8277,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 258);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 260);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -52359,6 +52359,577 @@ mod tests {
     }
 
     #[test]
+    fn channel_container_64_bit_provider_reuses_checked_channel_data() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let payload64 = |schema, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let put = request(
+            CicsOperation::PutContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "FROM".into(),
+                    payload64("mainframe-env.cics.storage64-value@1", b"ABCD"),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("FLENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "INTO".into(),
+                    payload64("mainframe-env.cics.pointer64@1", &123u64.to_be_bytes()),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("FLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCD");
+        assert_eq!(read.outputs["FLENGTH"].bytes(), b"4");
+        let negative_offset = request(
+            CicsOperation::GetContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                (
+                    "INTO".into(),
+                    payload64("mainframe-env.cics.pointer64@1", &123u64.to_be_bytes()),
+                ),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("BYTEOFFSET".into(), cics_decimal(-1)),
+            ]),
+            4,
+        );
+        let read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, negative_offset.clone(), 4),
+                negative_offset,
+            )
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCD");
+        let invalid = request(
+            CicsOperation::PutContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "FROM".into(),
+                    payload64("mainframe-env.cics.length-error64@1", b""),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+            ]),
+            3,
+        );
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                response: 22,
+                response2: 1,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn bts_container_process_put_and_get_use_held_root() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", principal, run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                principal,
+            )
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+    }
+
+    #[test]
+    fn bts_container_current_activity_and_named_child_move() {
+        use handlers::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsProcess, BtsReply,
+        };
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let uow = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ACTIVITY", uow).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ACTIVITY", &root, "MAIN", "BTS1", principal, uow).unwrap(),
+                uow,
+                execution,
+                principal,
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ACTIVITY",
+                uow,
+                execution,
+                principal,
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 7, "checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        authority
+            .define_child(
+                "TYPE",
+                "ACTIVITY",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: principal.into(),
+                },
+                uow,
+                execution,
+                principal,
+                "child",
+                [2; 32],
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ACTIVITY", &root, 1, 7)
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let move_item = request(
+            CicsOperation::MoveContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("AS".into(), cics_literal(b"NEXT")),
+                ("TOACTIVITY".into(), cics_literal(b"CHILD")),
+            ]),
+            2,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, move_item.clone(), 2),
+            move_item,
+        )
+        .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"NEXT")),
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            3,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 3), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+        let delete = request(
+            CicsOperation::DeleteContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"NEXT")),
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+            ]),
+            4,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, delete.clone(), 4), delete)
+            .unwrap();
+    }
+
+    #[test]
+    fn bts_container_uow_rollback_discards_acquired_process_write() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let creator = registered_counter_run(&cics, "bts-container-rollback-creator");
+        let writer = registered_counter_run(&cics, "bts-container-rollback-writer");
+        let reader = registered_counter_run(&cics, "bts-container-rollback-reader");
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "ROLLBACK", creator.run_unit_id.as_str()).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "ROLLBACK",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    creator.principal.id().as_str(),
+                    creator.run_unit_id.as_str(),
+                )
+                .unwrap(),
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+            )
+            .unwrap();
+        authority
+            .finish_run_uow(
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                writer.run_unit_id.as_str(),
+                writer.execution_id.as_str(),
+                writer.principal.id().as_str(),
+                "TYPE",
+                "ROLLBACK",
+                &root,
+            )
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&writer.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        authority
+            .finish_run_uow(
+                writer.run_unit_id.as_str(),
+                writer.execution_id.as_str(),
+                writer.principal.id().as_str(),
+                false,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                reader.run_unit_id.as_str(),
+                reader.execution_id.as_str(),
+                reader.principal.id().as_str(),
+                "TYPE",
+                "ROLLBACK",
+                &root,
+            )
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&reader.run_unit_id, get.clone(), 1), get),
+            Err(HostProblem::Condition {
+                name: "CONTAINERERR".into(),
+                response: 110,
+                response2: 1
+            })
+        );
+    }
+
+    #[test]
+    fn bts_container_descendant_acqprocess_get_is_explicitly_unsupported() {
+        use handlers::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsProcess, BtsReply,
+        };
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let creator = registered_counter_run(&cics, "bts-container-descend-creator");
+        let root_owner = registered_counter_run(&cics, "bts-container-descend-root");
+        let descendant = registered_counter_run(&cics, "bts-container-descend-child");
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "DESCEND", creator.run_unit_id.as_str()).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "DESCEND",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    creator.principal.id().as_str(),
+                    creator.run_unit_id.as_str(),
+                )
+                .unwrap(),
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+            )
+            .unwrap();
+        authority
+            .finish_run_uow(
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                "TYPE",
+                "DESCEND",
+                &root,
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "DESCEND",
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let child = authority
+            .define_child(
+                "TYPE",
+                "DESCEND",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: root_owner.principal.id().as_str().into(),
+                },
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                "child",
+                [2; 32],
+            )
+            .unwrap();
+        authority
+            .finish_child_uow("TYPE", "DESCEND", root_owner.run_unit_id.as_str(), true)
+            .unwrap();
+        authority
+            .finish_run_uow(
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                descendant.run_unit_id.as_str(),
+                descendant.execution_id.as_str(),
+                descendant.principal.id().as_str(),
+                "TYPE",
+                "DESCEND",
+                &child,
+            )
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&descendant.run_unit_id, get.clone(), 1), get),
+            Err(HostProblem::Unsupported)
+        );
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQACTIVITY".into(), cics_option()),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&descendant.run_unit_id, put.clone(), 2), put)
+            .unwrap();
+        let read = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQACTIVITY".into(), cics_option()),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&descendant.run_unit_id, read.clone(), 3), read)
+                .unwrap()
+                .outputs["INTO"]
+                .bytes(),
+            b"DATA"
+        );
+    }
+
+    #[test]
+    fn bts_container_owner_saf_denial_precedes_staged_write_and_is_audited() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = deny_exact_class_authorities("BTSLIFE", None);
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let uow = invocation.run_unit_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "DENIED", uow).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "DENIED",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    invocation.principal.id().as_str(),
+                    uow,
+                )
+                .unwrap(),
+                uow,
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let before = authority.load_process("TYPE", "DENIED").unwrap().unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            authority.load_process("TYPE", "DENIED").unwrap(),
+            Some(before)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-bts-container-pending-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, _, intent)| class == "BTSLIFE" && *intent == AccessIntent::Update)
+        );
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| {
+                    record.capability.as_str() == "host.security.authorize"
+                        && record.decision == AuditDecision::Deny
+                        && record.run_unit_id == invocation.run_unit_id
+                })
+        );
+    }
+
+    #[test]
     fn channel_container_current_channel_binding_selects_omitted_channel() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let cics = service(store);
@@ -52596,7 +53167,18 @@ mod tests {
             );
             assert_eq!(
                 cics.invoke(&effect(&invocation.run_unit_id, bts.clone(), sequence), bts),
-                Err(HostProblem::Unsupported),
+                if matches!(
+                    selector,
+                    "OPTION.FROMPROCESS" | "OPTION.TOPROCESS" | "FROMACTIVITY" | "TOACTIVITY"
+                ) {
+                    Err(HostProblem::Unsupported)
+                } else {
+                    Err(HostProblem::Condition {
+                        name: "INVREQ".into(),
+                        response: 16,
+                        response2: 1,
+                    })
+                },
                 "{selector}"
             );
         }

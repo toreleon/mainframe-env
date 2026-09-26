@@ -26,6 +26,7 @@ pub enum CicsOutputName {
     /// Four-character child abend code.
     BtsAbcode,
     ContainerInto,
+    ContainerInto64,
     ContainerSet,
     ContainerLength,
     ContainerCcsid,

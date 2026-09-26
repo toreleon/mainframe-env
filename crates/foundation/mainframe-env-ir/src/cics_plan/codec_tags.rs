@@ -90,8 +90,10 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::DeleteChannel => 188,
         CicsPlanOperation::DeleteContainer => 189,
         CicsPlanOperation::GetContainer => 190,
+        CicsPlanOperation::GetContainer64 => 191,
         CicsPlanOperation::MoveContainer => 192,
         CicsPlanOperation::PutContainer => 193,
+        CicsPlanOperation::PutContainer64 => 194,
         CicsPlanOperation::QueryChannel => 195,
         CicsPlanOperation::FetchAny => 216,
         CicsPlanOperation::FetchChild => 217,
@@ -316,8 +318,10 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         188 => Ok(CicsPlanOperation::DeleteChannel),
         189 => Ok(CicsPlanOperation::DeleteContainer),
         190 => Ok(CicsPlanOperation::GetContainer),
+        191 => Ok(CicsPlanOperation::GetContainer64),
         192 => Ok(CicsPlanOperation::MoveContainer),
         193 => Ok(CicsPlanOperation::PutContainer),
+        194 => Ok(CicsPlanOperation::PutContainer64),
         195 => Ok(CicsPlanOperation::QueryChannel),
         216 => Ok(CicsPlanOperation::FetchAny),
         217 => Ok(CicsPlanOperation::FetchChild),
@@ -524,8 +528,12 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::BtsChannel => 714,
         CicsOperandName::ContainerName => 1720,
         CicsOperandName::ContainerAs => 1721,
+        CicsOperandName::ContainerActivity => 1732,
+        CicsOperandName::ContainerFromActivity => 1733,
+        CicsOperandName::ContainerToActivity => 1734,
         CicsOperandName::ContainerToChannel => 1722,
         CicsOperandName::ContainerFrom => 1723,
+        CicsOperandName::ContainerFrom64 => 1735,
         CicsOperandName::ContainerLength => 1724,
         CicsOperandName::ContainerDatatype => 1725,
         CicsOperandName::ContainerCcsid => 1726,
@@ -861,8 +869,12 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         714 => Ok(CicsOperandName::BtsChannel),
         1720 => Ok(CicsOperandName::ContainerName),
         1721 => Ok(CicsOperandName::ContainerAs),
+        1732 => Ok(CicsOperandName::ContainerActivity),
+        1733 => Ok(CicsOperandName::ContainerFromActivity),
+        1734 => Ok(CicsOperandName::ContainerToActivity),
         1722 => Ok(CicsOperandName::ContainerToChannel),
         1723 => Ok(CicsOperandName::ContainerFrom),
+        1735 => Ok(CicsOperandName::ContainerFrom64),
         1724 => Ok(CicsOperandName::ContainerLength),
         1725 => Ok(CicsOperandName::ContainerDatatype),
         1726 => Ok(CicsOperandName::ContainerCcsid),
@@ -1194,8 +1206,10 @@ mod merge_tag_tests {
             P::DeleteChannel,
             P::DeleteContainer,
             P::GetContainer,
+            P::GetContainer64,
             P::MoveContainer,
             P::PutContainer,
+            P::PutContainer64,
             P::QueryChannel,
             P::BtsEndBrowseContainer,
             P::BtsGetNextContainer,
@@ -1223,13 +1237,13 @@ mod merge_tag_tests {
             assert!(seen.insert(tag), "duplicate operation tag {tag}");
             assert_eq!(operation_from_tag(tag), Ok(operation));
         }
-        assert_eq!(seen.len(), 25);
-        for held in [191, 194, 205] {
-            assert!(operation_from_tag(held).is_err());
-        }
+        assert_eq!(seen.len(), 27);
+        assert_eq!(operation_tag(P::GetContainer64), 191);
+        assert_eq!(operation_tag(P::PutContainer64), 194);
+        assert!(operation_from_tag(205).is_err());
 
         let mut seen = BTreeSet::new();
-        for tag in 1720..=1731 {
+        for tag in 1720..=1735 {
             let operand = operand_from_tag(tag).unwrap();
             assert!(seen.insert(operand_tag(operand)));
             assert_eq!(operand_tag(operand), tag);
@@ -1247,7 +1261,7 @@ mod merge_tag_tests {
             assert!(seen.insert(tag), "duplicate operand tag {tag}");
             assert_eq!(operand_from_tag(tag), Ok(operand));
         }
-        assert_eq!(seen.len(), 18);
+        assert_eq!(seen.len(), 22);
 
         let mut seen = BTreeSet::new();
         for tag in 1550..=1556 {
@@ -1261,7 +1275,7 @@ mod merge_tag_tests {
         assert_eq!(seen.len(), 7);
 
         let mut seen = BTreeSet::new();
-        for tag in 1720..=1724 {
+        for tag in 1720..=1725 {
             let output = output_from_tag(tag).unwrap();
             assert!(seen.insert(output_tag(output)));
             assert_eq!(output_tag(output), tag);
@@ -1285,6 +1299,6 @@ mod merge_tag_tests {
             assert!(seen.insert(tag), "duplicate output tag {tag}");
             assert_eq!(output_from_tag(tag), Ok(output));
         }
-        assert_eq!(seen.len(), 17);
+        assert_eq!(seen.len(), 18);
     }
 }

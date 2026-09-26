@@ -487,13 +487,15 @@ pub use container_scope::{BtsAcquiredProcessContainerScope, BtsProcessContainerA
 pub use context::BtsActivityContext;
 pub(super) use dispatch::invoke;
 pub(in crate::service) use participant::settle_recorded_uow;
+#[cfg(test)]
+pub(in crate::service::handlers) use removal::BtsRemoval;
 pub use run::{BTS_RUN_WORK_GENERATION, BtsRunRecord, BtsRunState};
 pub use store::BtsLifecycleStore;
 pub use transid::{
     BTS_TRANSID_WORK_GENERATION, BtsTransidContainer, BtsTransidRecord, BtsTransidState,
 };
 
-fn put_process(
+pub(in crate::service::handlers) fn put_process(
     key: &str,
     process: &BtsProcess,
     expected_version: Option<u64>,

@@ -1912,8 +1912,14 @@ mod tests {
                 CicsPlanOperation::DeleteChannel => crate::HirCicsOperation::DeleteChannel,
                 CicsPlanOperation::DeleteContainer => crate::HirCicsOperation::DeleteContainer,
                 CicsPlanOperation::GetContainer => crate::HirCicsOperation::GetContainer,
+                CicsPlanOperation::GetContainer64 => {
+                    panic!("GET64 CONTAINER must not originate from COBOL source")
+                }
                 CicsPlanOperation::MoveContainer => crate::HirCicsOperation::MoveContainer,
                 CicsPlanOperation::PutContainer => crate::HirCicsOperation::PutContainer,
+                CicsPlanOperation::PutContainer64 => {
+                    panic!("PUT64 CONTAINER must not originate from COBOL source")
+                }
                 CicsPlanOperation::QueryChannel => crate::HirCicsOperation::QueryChannel,
                 CicsPlanOperation::SuspendAcqActivity => {
                     crate::HirCicsOperation::SuspendAcqActivity

@@ -5371,7 +5371,7 @@ mod tests {
     }
 
     #[test]
-    fn channel_container_compiler_selects_only_task_channel_forms() {
+    fn channel_container_compiler_selects_task_channel_and_bts_forms() {
         let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. CNTNFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LEN-X PIC S9(9) COMP. 01 COUNT-X PIC S9(9) COMP. 01 PTR-X POINTER-32. PROCEDURE DIVISION. ";
         for (command, expected) in [
             ("DELETE CHANNEL('WORK')", HirCicsOperation::DeleteChannel),
@@ -5407,6 +5407,30 @@ mod tests {
                 "QUERY CHANNEL('WORK') CONTAINERCNT(COUNT-X)",
                 HirCicsOperation::QueryChannel,
             ),
+            (
+                "DELETE CONTAINER('ITEM') PROCESS",
+                HirCicsOperation::DeleteContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') ACQPROCESS INTO(DATA-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') ACQACTIVITY INTO(DATA-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') ACTIVITY('CHILD') INTO(DATA-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "PUT CONTAINER('ITEM') ACTIVITY('CHILD') FROM(DATA-X)",
+                HirCicsOperation::PutContainer,
+            ),
+            (
+                "MOVE CONTAINER('ITEM') AS('NEXT') FROMPROCESS TOPROCESS",
+                HirCicsOperation::MoveContainer,
+            ),
         ] {
             let source = format!("{prefix}EXEC CICS {command} END-EXEC. STOP RUN.");
             let analysis = analyze(&source);
@@ -5418,11 +5442,10 @@ mod tests {
             }));
         }
         for command in [
-            "DELETE CONTAINER('ITEM') PROCESS",
-            "GET CONTAINER('ITEM') ACQPROCESS INTO(DATA-X)",
-            "GET CONTAINER('ITEM') ACQACTIVITY INTO(DATA-X)",
-            "PUT CONTAINER('ITEM') ACTIVITY('CHILD') FROM(DATA-X)",
-            "MOVE CONTAINER('ITEM') AS('NEXT') FROMPROCESS TOPROCESS",
+            "DELETE CONTAINER('ITEM') CHANNEL('WORK') PROCESS",
+            "GET CONTAINER('ITEM') PROCESS ACQPROCESS INTO(DATA-X)",
+            "PUT CONTAINER('ITEM') ACTIVITY('CHILD') FROM(DATA-X) DATATYPE(DFHVALUE(BIT))",
+            "MOVE CONTAINER('ITEM') AS('NEXT') FROMPROCESS FROMACTIVITY('CHILD')",
         ] {
             let source = format!("{prefix}EXEC CICS {command} END-EXEC. STOP RUN.");
             assert!(analyze(&source).hir.is_none(), "{command}");
@@ -5521,7 +5544,13 @@ mod tests {
 
     #[test]
     fn cics_non_cobol_application_forms_fail_closed() {
-        for command in ["CICSMESSAGE", "GETMAIN64", "FREEMAIN64"] {
+        for command in [
+            "CICSMESSAGE",
+            "GETMAIN64",
+            "FREEMAIN64",
+            "GET64 CONTAINER('ITEM') INTO(X)",
+            "PUT64 CONTAINER('ITEM') FROM(X)",
+        ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSCOB. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );

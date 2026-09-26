@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 111] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 113] = [
     CicsCommandDescriptor {
         operation: CicsOperation::RemoveSubevent,
         syntax: "REMOVE SUBEVENT",
@@ -501,6 +501,13 @@ pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 111] = [
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::GetContainer64,
+        syntax: "GET64 CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0096",
+        family: CicsCommandFamily::BtsControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::MoveContainer,
         syntax: "MOVE CONTAINER",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0144",
@@ -511,6 +518,13 @@ pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 111] = [
         operation: CicsOperation::PutContainer,
         syntax: "PUT CONTAINER",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0150",
+        family: CicsCommandFamily::BtsControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::PutContainer64,
+        syntax: "PUT64 CONTAINER",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0151",
         family: CicsCommandFamily::BtsControl,
         mutating: true,
     },

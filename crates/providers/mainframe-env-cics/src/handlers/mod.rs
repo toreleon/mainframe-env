@@ -430,8 +430,10 @@ pub(super) fn invoke_extended_control(
             CicsOperation::DeleteChannel
             | CicsOperation::DeleteContainer
             | CicsOperation::GetContainer
+            | CicsOperation::GetContainer64
             | CicsOperation::MoveContainer
             | CicsOperation::PutContainer
+            | CicsOperation::PutContainer64
             | CicsOperation::QueryChannel => {
                 bts_container::invoke_channel_container(service, run, request)
             }

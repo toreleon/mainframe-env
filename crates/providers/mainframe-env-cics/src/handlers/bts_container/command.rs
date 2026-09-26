@@ -1,13 +1,14 @@
 //! Public task-channel command profile over the owner-scoped port.
 
 use super::{channel::ChannelPort, scope::OwnerIdentity, state::ContainerDatatype};
+use crate::service::handlers::bts_lifecycle::BtsLifecycleStore;
 use crate::service::{CicsService, Run};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
 
-fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
+pub(super) fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
     HostProblem::Condition {
         name: name.into(),
         response,
@@ -15,7 +16,7 @@ fn condition(name: &str, response: i32, response2: i32) -> HostProblem {
     }
 }
 
-fn name(request: &CicsRequest, key: &str) -> Result<Option<String>, HostProblem> {
+pub(super) fn name(request: &CicsRequest, key: &str) -> Result<Option<String>, HostProblem> {
     let Some(value) = request.arguments.get(key) else {
         return Ok(None);
     };
@@ -47,7 +48,7 @@ fn name(request: &CicsRequest, key: &str) -> Result<Option<String>, HostProblem>
     Ok(Some(text.to_owned()))
 }
 
-fn number(request: &CicsRequest, key: &str) -> Result<Option<i64>, HostProblem> {
+pub(super) fn number(request: &CicsRequest, key: &str) -> Result<Option<i64>, HostProblem> {
     let Some(value) = request.arguments.get(key) else {
         return Ok(None);
     };
@@ -67,7 +68,7 @@ fn number(request: &CicsRequest, key: &str) -> Result<Option<i64>, HostProblem> 
     Ok(Some(parsed))
 }
 
-fn output(
+pub(super) fn output(
     response: &mut CicsResponse,
     key: &str,
     schema: &'static str,
@@ -90,7 +91,7 @@ fn channel_error(problem: HostProblem) -> HostProblem {
     }
 }
 
-fn container_error(problem: HostProblem) -> HostProblem {
+pub(super) fn container_error(problem: HostProblem) -> HostProblem {
     match problem {
         HostProblem::NotFound => condition("CONTAINERERR", 110, 1),
         HostProblem::Malformed => condition("INVREQ", 16, 1),
@@ -104,6 +105,152 @@ pub(in crate::service::handlers) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let operation = request.operation;
+    if matches!(
+        operation,
+        CicsOperation::GetContainer64 | CicsOperation::PutContainer64
+    ) {
+        let allowed: &[&str] = if operation == CicsOperation::GetContainer64 {
+            &[
+                "CONTAINER",
+                "CHANNEL",
+                "ABI64",
+                "INTO",
+                "INTO.MAXLENGTH",
+                "FLENGTH",
+                "BYTEOFFSET",
+                "RESP",
+                "RESP2",
+                "OPTION.NOHANDLE",
+            ]
+        } else {
+            &[
+                "CONTAINER",
+                "CHANNEL",
+                "ABI64",
+                "FROM",
+                "FLENGTH",
+                "RESP",
+                "RESP2",
+                "OPTION.APPEND",
+                "OPTION.NOHANDLE",
+            ]
+        };
+        if request
+            .arguments
+            .keys()
+            .any(|key| !allowed.contains(&key.as_str()))
+        {
+            return Err(HostProblem::Unsupported);
+        }
+        if request.arguments.get("ABI64").is_none_or(|value| {
+            value.schema() != "mainframe-env.cics.literal@1"
+                || value.bytes() != b"mainframe-env.cics-amode64-nonle@1"
+        }) {
+            return Err(HostProblem::Unsupported);
+        }
+        let key = if operation == CicsOperation::GetContainer64 {
+            "INTO"
+        } else {
+            "FROM"
+        };
+        let data = request.arguments.get(key).ok_or(HostProblem::Malformed)?;
+        if data.schema() == "mainframe-env.cics.invalid-pointer64@1" {
+            return Err(condition("INVREQ", 16, 1));
+        }
+        if data.schema() == "mainframe-env.cics.length-error64@1" {
+            return Err(condition("LENGERR", 22, 1));
+        }
+        let expected = if operation == CicsOperation::GetContainer64 {
+            "mainframe-env.cics.pointer64@1"
+        } else {
+            "mainframe-env.cics.storage64-value@1"
+        };
+        if data.schema() != expected {
+            return Err(HostProblem::Unsupported);
+        }
+        if operation == CicsOperation::GetContainer64 && data.bytes().len() != 8 {
+            return Err(condition("INVREQ", 16, 1));
+        }
+        let mut routed = request.clone();
+        routed.arguments.remove("ABI64");
+        routed.operation = if operation == CicsOperation::GetContainer64 {
+            CicsOperation::GetContainer
+        } else {
+            CicsOperation::PutContainer
+        };
+        for key in ["FLENGTH", "BYTEOFFSET"] {
+            if let Some(value) = number(request, key)? {
+                if value > i64::from(i32::MAX) || value < i64::from(i32::MIN) {
+                    return Err(condition(
+                        if key == "FLENGTH" {
+                            "LENGERR"
+                        } else {
+                            "INVREQ"
+                        },
+                        if key == "FLENGTH" { 22 } else { 16 },
+                        1,
+                    ));
+                }
+                if operation == CicsOperation::GetContainer64 && value < 0 {
+                    routed.arguments.insert(
+                        key.into(),
+                        BoundedPayload::new(
+                            "mainframe-env.cics.decimal@1",
+                            b"0".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .map_err(|_| HostProblem::ResourceExhausted)?,
+                    );
+                }
+            }
+        }
+        let value = if operation == CicsOperation::GetContainer64 {
+            BoundedPayload::new(
+                "mainframe-env.cics.argument@1",
+                b"INTO64".to_vec(),
+                InvocationLimits::default(),
+            )
+        } else {
+            BoundedPayload::new(
+                "mainframe-env.cics.storage-value@1",
+                data.bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+        }
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+        routed.arguments.insert(key.into(), value);
+        return invoke(service, run, &routed);
+    }
+    if matches!(
+        operation,
+        CicsOperation::DeleteContainer
+            | CicsOperation::GetContainer
+            | CicsOperation::MoveContainer
+            | CicsOperation::PutContainer
+    ) && (request.arguments.keys().any(|key| {
+        matches!(
+            key.as_str(),
+            "ACTIVITY"
+                | "FROMACTIVITY"
+                | "TOACTIVITY"
+                | "OPTION.PROCESS"
+                | "OPTION.ACQPROCESS"
+                | "OPTION.ACQACTIVITY"
+                | "OPTION.FROMPROCESS"
+                | "OPTION.TOPROCESS"
+        )
+    }) || !request.arguments.contains_key("CHANNEL")
+        && !request.arguments.contains_key("TOCHANNEL")
+        && BtsLifecycleStore::new(service.store.as_ref())
+            .active_context(
+                run.invocation.run_unit_id.as_str(),
+                run.invocation.execution_id.as_str(),
+                run.invocation.principal.id().as_str(),
+            )?
+            .is_some())
+    {
+        return super::bts::invoke(service, run, request);
+    }
     if request.arguments.keys().any(|key| {
         matches!(
             key.as_str(),
