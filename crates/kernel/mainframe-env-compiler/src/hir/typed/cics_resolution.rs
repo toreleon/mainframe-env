@@ -84,15 +84,26 @@ pub(super) fn validated_command(
     Clauses,
     Vec<String>,
 )> {
-    let mut candidates = cics_application_registry_candidates_for_tokens(body)
+    let syntax_candidates =
+        cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
+    let selected_candidates = syntax_candidates
+        .iter()
+        .copied()
         .filter(|candidate| bts_browse::selector_matches(candidate.descriptor, body))
-        .peekable();
-    if candidates.peek().is_none() {
+        .collect::<Vec<_>>();
+    if syntax_candidates.is_empty() {
         return Err(ResolutionFailure::Invalid(format!(
             "unknown CICS application command: {}",
             body.first().map_or("<empty>", String::as_str)
         )));
     }
+    // A selector can follow another option. If no selector matches in the
+    // canonical position, let the catalog validators resolve or diagnose it.
+    let candidates = if selected_candidates.is_empty() {
+        syntax_candidates
+    } else {
+        selected_candidates
+    };
     let mut valid = BTreeMap::<&'static str, ValidatedCandidate>::new();
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {

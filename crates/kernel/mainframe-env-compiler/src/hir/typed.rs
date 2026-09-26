@@ -6500,11 +6500,38 @@ mod tests {
         let reordered_application = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBTSA. DATA DIVISION. WORKING-STORAGE SECTION. 01 PGM-OUT PIC X(8). PROCEDURE DIVISION. EXEC CICS INQUIRE PROGRAM(PGM-OUT) ACTIVITYID('A1') END-EXEC. STOP RUN.",
         );
-        assert!(reordered_application.hir.is_none());
-        assert!(reordered_application.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("INQUIRE ACTIVITYID") && message.contains("handler is unready")
+        let hir = reordered_application.hir.unwrap_or_else(|| {
+            panic!(
+                "reordered INQUIRE ACTIVITYID: {:?}",
+                reordered_application.diagnostics
+            )
+        });
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match &statement.resolved {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed INQUIRE ACTIVITYID");
+        assert_eq!(command.operation, HirCicsOperation::BtsInquireActivity);
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::BtsBrowse(mainframe_env_ir::BtsBrowseOutput::Program)
+                && output.target.qualified_name == "PGM-OUT"
         }));
+
+        let unready_timer = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBTSU. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETNEXT TIMER('WAKE') BROWSETOKEN(TOKEN-X) END-EXEC. STOP RUN.",
+        );
+        assert!(unready_timer.hir.is_none());
+        assert!(
+            unready_timer.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains("GETNEXT TIMER") && message.contains("handler is unready")
+            }),
+            "{:?}",
+            unready_timer.diagnostics
+        );
     }
 
     #[test]
