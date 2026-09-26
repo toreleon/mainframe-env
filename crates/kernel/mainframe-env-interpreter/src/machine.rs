@@ -4848,7 +4848,18 @@ impl ReferenceMachine {
                 let target = self.reference(std::slice::from_ref(&target.name))?;
                 let bytes = if is_numeric(source.layout.category) {
                     let value = decode_decimal(&source.layout, &self.read_reference(&source)?)?;
-                    encode_decimal(&target.layout, decimal_rescale(value, target.layout.scale)?)?
+                    let value = decimal_rescale(value, target.layout.scale)?;
+                    let value = if matches!(
+                        target.layout.category,
+                        LayoutCategory::NumericDisplay | LayoutCategory::PackedDecimal
+                    ) || target.layout.category == LayoutCategory::Binary
+                        && !target.layout.native_binary
+                    {
+                        truncate_to_picture(&target.layout, value)?
+                    } else {
+                        value
+                    };
+                    encode_decimal(&target.layout, value)?
                 } else {
                     FixedValue::fit(
                         &self.read_reference(&source)?,
@@ -7992,7 +8003,10 @@ impl ReferenceMachine {
                 } else {
                     decimal_rescale(*value, reference.layout.scale)?
                 };
-                let scaled = if reference.layout.category == LayoutCategory::Binary
+                let scaled = if matches!(
+                    reference.layout.category,
+                    LayoutCategory::NumericDisplay | LayoutCategory::PackedDecimal
+                ) || reference.layout.category == LayoutCategory::Binary
                     && !reference.layout.native_binary
                 {
                     truncate_to_picture(&reference.layout, scaled)?
@@ -14249,3 +14263,5 @@ mod tests {
 }
 
 mod instance;
+#[cfg(test)]
+mod size_truncation_tests;
