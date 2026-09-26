@@ -1,6 +1,7 @@
 #[test]
 fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
     use mainframe_env_cics::bts_lifecycle::{BtsProcessTypeDefinition, BtsTransactionDefinition};
+    use mainframe_env_cics::bts_browse::{BrowseEffect, BrowseEventMetadata, BrowseItem, BrowseKind, BrowseOutcome, BrowseOwner, BrowseScope, BtsBrowseStore};
 
     let root = std::env::temp_dir().join(format!(
         "mainframe-env-bts-browse-restart-{}-{:?}-{}",
@@ -76,6 +77,29 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
     authority
         .finish_uow("SEED-UOW", "SEED-EXEC", "IBMUSER", true)
         .unwrap();
+    let replay_owner = BrowseOwner::new("METADATA-RUN", "METADATA-EXEC", "IBMUSER").unwrap();
+    let replay_item = BrowseItem::new("BELL", None, 0)
+        .unwrap()
+        .with_epoch(1)
+        .unwrap()
+        .with_event_metadata(BrowseEventMetadata {
+            event_type: 1004,
+            fire_status: 1000,
+            composite: None,
+            predicate: None,
+            timer: Some("WAKE".into()),
+        });
+    let replay_store = BtsBrowseStore::new(first_store.as_ref());
+    let BrowseOutcome::Token(replay_token) = replay_store.apply(&replay_owner, "START", [1; 32], &BrowseEffect::Start {
+        scope: BrowseScope::new(BrowseKind::Event, "BTSEVENT", "CICS.BTS.BROWSE", 1).unwrap(),
+        items: vec![replay_item.clone()],
+    }).unwrap() else { panic!("expected browse token") };
+    let first_metadata = replay_store.apply(&replay_owner, "NEXT", [2; 32], &BrowseEffect::Next {
+        token: replay_token,
+        kind: BrowseKind::Event,
+        live_epoch: 1,
+        expected: replay_item,
+    }).unwrap();
     drop(first);
     drop(first_store);
 
@@ -103,7 +127,7 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
         "EXEC CICS DEFINE INPUT EVENT('READY') END-EXEC. ",
         "EXEC CICS DEFINE TIMER('WAKE') EVENT('BELL') AFTER SECONDS(5) END-EXEC. ",
         "EXEC CICS STARTBROWSE EVENT ACTIVITYID(ROOT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
-        "EXEC CICS GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
+        "EXEC CICS GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) TIMER(ITEM-X) END-EXEC. ",
         "EXEC CICS ENDBROWSE EVENT BROWSETOKEN(TOKEN-X) END-EXEC. ",
         "EXEC CICS INQUIRE EVENT('READY') ACTIVITYID(ROOT-X) EVENTTYPE(CVDA-X) FIRESTATUS(CVDA-X) COMPOSITE(EVENT-X) TIMER(ITEM-X) END-EXEC. ",
         "EXEC CICS STARTBROWSE TIMER('WAKE') ACTIVITYID(ROOT-X) BROWSETOKEN(TOKEN-X) END-EXEC. ",
@@ -124,6 +148,14 @@ fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
     )
     .unwrap();
     let second_store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    assert_eq!(
+        BtsBrowseStore::new(second_store.as_ref())
+            .replay(&replay_owner, "NEXT", [2; 32])
+            .unwrap()
+            .unwrap()
+            .0,
+        first_metadata
+    );
     let second_platform: Arc<dyn PlatformStore> = second_store.clone();
     let second = ProductServer::open(settings, second_platform, secrets, default_program_router())
         .unwrap();

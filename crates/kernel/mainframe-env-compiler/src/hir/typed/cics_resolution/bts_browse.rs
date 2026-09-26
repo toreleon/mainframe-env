@@ -107,7 +107,17 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             required: &["TIMER", "BROWSETOKEN"],
         },
         HirCicsOperation::BtsGetNextEvent => CommandShape {
-            clauses: &["BROWSETOKEN", "EVENT", "RESP", "RESP2"],
+            clauses: &[
+                "BROWSETOKEN",
+                "EVENT",
+                "EVENTTYPE",
+                "FIRESTATUS",
+                "COMPOSITE",
+                "PREDICATE",
+                "TIMER",
+                "RESP",
+                "RESP2",
+            ],
             options: &["NOHANDLE"],
             required: &["BROWSETOKEN", "EVENT"],
         },
@@ -222,6 +232,10 @@ pub(super) fn reviewed_ambiguous_shape(
 ) -> bool {
     has_value
         && match descriptor.label_tokens {
+            ["GETNEXT", "EVENT"] => matches!(
+                name,
+                "EVENTTYPE" | "FIRESTATUS" | "COMPOSITE" | "PREDICATE" | "TIMER"
+            ),
             ["INQUIRE", "ACTIVITYID"] => matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS"),
             ["INQUIRE", "EVENT"] => matches!(
                 name,
@@ -237,6 +251,17 @@ pub(super) fn validate(
     _options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::BtsGetNextEvent
+        && ["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"]
+            .iter()
+            .filter(|name| clauses.contains_key(**name))
+            .count()
+            > 1
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS GETNEXT EVENT metadata output combinations are unsupported".into(),
+        ));
+    }
     if matches!(
         operation,
         HirCicsOperation::BtsStartBrowseContainer | HirCicsOperation::BtsInquireContainer
@@ -449,7 +474,15 @@ pub(super) fn outputs(
                     HirCicsOperation::BtsStartBrowseEvent | HirCicsOperation::BtsStartBrowseTimer,
                     O::BrowseToken,
                 )
-                | (HirCicsOperation::BtsGetNextEvent, O::Event,)
+                | (
+                    HirCicsOperation::BtsGetNextEvent,
+                    O::Event
+                        | O::EventType
+                        | O::FireStatus
+                        | O::Composite
+                        | O::Predicate
+                        | O::Timer
+                )
                 | (
                     HirCicsOperation::BtsInquireEvent,
                     O::EventType | O::FireStatus | O::Composite | O::Predicate | O::Timer

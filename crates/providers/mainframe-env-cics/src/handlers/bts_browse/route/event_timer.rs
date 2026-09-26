@@ -86,11 +86,19 @@ pub(super) fn invoke(
             )?;
             let state = event_control::load_activity(service, &id)?;
             let version = state.version.max(1);
-            let names: Vec<&str> = if kind == BrowseKind::Event {
+            let items = if kind == BrowseKind::Event {
                 if state.events.keys().any(|name| is_system(name)) {
                     return Err(HostProblem::Unsupported);
                 }
-                state.events.keys().map(String::as_str).collect()
+                state
+                    .events
+                    .iter()
+                    .map(|(name, record)| {
+                        Ok(BrowseItem::new(name, None, 0)?
+                            .with_epoch(version)?
+                            .with_event_metadata(event_metadata(record)))
+                    })
+                    .collect::<Result<Vec<_>, HostProblem>>()?
             } else {
                 let timer = text_arg(request, "TIMER", 16)?;
                 let name = state
@@ -98,12 +106,8 @@ pub(super) fn invoke(
                     .get_key_value(&timer)
                     .ok_or_else(|| condition("TIMERERR", 110, 13))?
                     .0;
-                vec![name.as_str()]
+                vec![BrowseItem::new(name, None, 0)?.with_epoch(version)?]
             };
-            let items = names
-                .into_iter()
-                .map(|name| BrowseItem::new(name, None, 0)?.with_epoch(version))
-                .collect::<Result<Vec<_>, _>>()?;
             let token = start(cursors, owner, request, scope, items)?;
             Ok(vec![(
                 "BROWSETOKEN",
@@ -142,6 +146,7 @@ pub(super) fn invoke(
             if !state.events.contains_key(&item.name) {
                 return Err(super::super::token_error());
             }
+            let values = event_outputs(request, &item)?;
             let outcome = effect(
                 cursors,
                 owner,
@@ -156,11 +161,7 @@ pub(super) fn invoke(
             if outcome != BrowseOutcome::Item(item.clone()) {
                 return Err(HostProblem::InfrastructureFailure);
             }
-            Ok(vec![(
-                "EVENT",
-                "mainframe-env.cics.payload@1",
-                padded(&item.name, 16)?,
-            )])
+            Ok(values)
         }
         CicsOperation::BtsEndBrowseEvent | CicsOperation::BtsEndBrowseTimer => {
             let kind = if request.operation == CicsOperation::BtsEndBrowseEvent {
@@ -277,6 +278,78 @@ fn is_system(name: &str) -> bool {
     name.to_ascii_uppercase().starts_with("DFH")
 }
 
+fn event_metadata(record: &event_control::EventRecord) -> BrowseEventMetadata {
+    BrowseEventMetadata {
+        event_type: event_type_code(&record.kind),
+        fire_status: fire_status_code(record.fired),
+        composite: record.parent.clone(),
+        predicate: predicate_code(&record.kind).ok(),
+        timer: match &record.kind {
+            event_control::EventKind::Timer { timer } => Some(timer.clone()),
+            _ => None,
+        },
+    }
+}
+
+pub(super) fn event_outputs(
+    request: &CicsRequest,
+    item: &BrowseItem,
+) -> Result<Outputs, HostProblem> {
+    let mut outputs = vec![(
+        "EVENT",
+        "mainframe-env.cics.payload@1",
+        padded(&item.name, 16)?,
+    )];
+    let metadata_requested = ["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"]
+        .iter()
+        .any(|name| has(request, name));
+    if !metadata_requested {
+        return Ok(outputs);
+    }
+    let metadata = item
+        .event_metadata
+        .as_ref()
+        .ok_or(HostProblem::Unsupported)?;
+    for (field, value) in [
+        ("EVENTTYPE", metadata.event_type),
+        ("FIRESTATUS", metadata.fire_status),
+    ] {
+        if has(request, field) {
+            outputs.push((
+                field,
+                "mainframe-env.cics.decimal@1",
+                value.to_string().into_bytes(),
+            ));
+        }
+    }
+    if has(request, "COMPOSITE") {
+        outputs.push((
+            "COMPOSITE",
+            "mainframe-env.cics.payload@1",
+            padded(metadata.composite.as_deref().unwrap_or(""), 16)?,
+        ));
+    }
+    if has(request, "PREDICATE") {
+        outputs.push((
+            "PREDICATE",
+            "mainframe-env.cics.decimal@1",
+            metadata
+                .predicate
+                .ok_or(HostProblem::Unsupported)?
+                .to_string()
+                .into_bytes(),
+        ));
+    }
+    if has(request, "TIMER") {
+        outputs.push((
+            "TIMER",
+            "mainframe-env.cics.payload@1",
+            padded(metadata.timer.as_deref().unwrap_or(""), 16)?,
+        ));
+    }
+    Ok(outputs)
+}
+
 fn event_type_code(kind: &event_control::EventKind) -> i32 {
     match kind {
         event_control::EventKind::Input => 226,
@@ -317,6 +390,100 @@ fn rounded_abstime(millis: u64) -> Result<u64, HostProblem> {
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    #[test]
+    fn bts_browse_event_metadata_matches_each_event_kind() {
+        use event_control::EventKind as K;
+        let cases = [
+            (K::Input, 226, None, None),
+            (
+                K::Activity {
+                    child_id: "CHILD".into(),
+                },
+                1002,
+                None,
+                None,
+            ),
+            (
+                K::Composite {
+                    all: true,
+                    children: vec![],
+                    fired_queue: VecDeque::new(),
+                },
+                1003,
+                Some(1005),
+                None,
+            ),
+            (
+                K::Timer {
+                    timer: "WAKE".into(),
+                },
+                1004,
+                None,
+                Some("WAKE"),
+            ),
+        ];
+        for (kind, event_type, predicate, timer) in cases {
+            let record = event_control::EventRecord {
+                kind,
+                fired: true,
+                parent: Some("PARENT".into()),
+            };
+            let metadata = event_metadata(&record);
+            assert_eq!(metadata.event_type, event_type);
+            assert_eq!(metadata.fire_status, 1001);
+            assert_eq!(metadata.composite.as_deref(), Some("PARENT"));
+            assert_eq!(metadata.predicate, predicate);
+            assert_eq!(metadata.timer.as_deref(), timer);
+        }
+    }
+
+    #[test]
+    fn bts_browse_event_metadata_outputs_are_individual_and_system_is_fenced() {
+        use mainframe_env_host_api::CicsConditionPolicy;
+        let record = event_control::EventRecord {
+            kind: event_control::EventKind::Composite {
+                all: false,
+                children: vec![],
+                fired_queue: VecDeque::new(),
+            },
+            fired: false,
+            parent: Some("PARENT".into()),
+        };
+        let item = BrowseItem::new("READY", None, 0)
+            .unwrap()
+            .with_epoch(1)
+            .unwrap()
+            .with_event_metadata(event_metadata(&record));
+        for (field, expected) in [
+            ("EVENTTYPE", b"1003".as_slice()),
+            ("FIRESTATUS", b"1000".as_slice()),
+            ("COMPOSITE", b"PARENT          ".as_slice()),
+            ("PREDICATE", b"1006".as_slice()),
+            ("TIMER", b"                ".as_slice()),
+        ] {
+            let request = CicsRequest {
+                operation: CicsOperation::BtsGetNextEvent,
+                arguments: [(
+                    field.into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.argument@1",
+                        b"OUT".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]
+                .into(),
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: None,
+            };
+            let outputs = event_outputs(&request, &item).unwrap();
+            assert_eq!(outputs[0].2, b"READY           ");
+            assert_eq!(outputs[1].2, expected, "{field}");
+        }
+        assert!(is_system("DFHINITIAL"));
+        assert!(is_system("dfhOther"));
+    }
 
     #[test]
     fn bts_browse_inquire_event_timer_cvda_table_and_1900_epoch() {

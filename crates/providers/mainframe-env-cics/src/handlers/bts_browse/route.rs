@@ -394,6 +394,15 @@ fn inquiry_outputs(
 }
 
 fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
+    if request.operation == CicsOperation::BtsGetNextEvent
+        && ["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"]
+            .iter()
+            .filter(|name| request.arguments.contains_key(**name))
+            .count()
+            > 1
+    {
+        return Err(HostProblem::Unsupported);
+    }
     if request.operation == CicsOperation::BtsInquireActivity
         && ["COMPSTATUS", "MODE", "SUSPSTATUS"]
             .iter()
@@ -434,7 +443,12 @@ fn validate(request: &CicsRequest) -> Result<(), HostProblem> {
         ),
         CicsOperation::BtsStartBrowseEvent => (&[], &["ACTIVITYID"], &["BROWSETOKEN"], &[]),
         CicsOperation::BtsStartBrowseTimer => (&["TIMER"], &["ACTIVITYID"], &["BROWSETOKEN"], &[]),
-        CicsOperation::BtsGetNextEvent => (&["BROWSETOKEN"], &[], &["EVENT"], &[]),
+        CicsOperation::BtsGetNextEvent => (
+            &["BROWSETOKEN"],
+            &[],
+            &["EVENT"],
+            &["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"],
+        ),
         CicsOperation::BtsEndBrowseEvent | CicsOperation::BtsEndBrowseTimer => {
             (&["BROWSETOKEN"], &[], &[], &[])
         }
@@ -619,11 +633,9 @@ fn replay_outputs(request: &CicsRequest, outcome: BrowseOutcome) -> Result<Outpu
             "mainframe-env.cics.payload@1",
             padded(&item.name, 16)?,
         )]),
-        (CicsOperation::BtsGetNextEvent, BrowseOutcome::Item(item)) => Ok(vec![(
-            "EVENT",
-            "mainframe-env.cics.payload@1",
-            padded(&item.name, 16)?,
-        )]),
+        (CicsOperation::BtsGetNextEvent, BrowseOutcome::Item(item)) => {
+            event_timer::event_outputs(request, &item)
+        }
         (CicsOperation::BtsGetNextProcess, BrowseOutcome::Item(item)) => {
             let mut values = vec![(
                 "PROCESS",
@@ -720,6 +732,44 @@ fn response(
 mod tests {
     use super::*;
     use mainframe_env_host_api::CicsConditionPolicy;
+
+    #[test]
+    fn bts_browse_getnext_event_metadata_profile_is_fenced_before_dispatch() {
+        let argument = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        for field in ["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"] {
+            let request = CicsRequest {
+                operation: CicsOperation::BtsGetNextEvent,
+                arguments: [
+                    (
+                        "BROWSETOKEN".into(),
+                        argument("mainframe-env.cics.decimal@1", b"1"),
+                    ),
+                    (
+                        "EVENT".into(),
+                        argument("mainframe-env.cics.argument@1", b"OUT"),
+                    ),
+                    (
+                        field.into(),
+                        argument("mainframe-env.cics.argument@1", b"OUT"),
+                    ),
+                ]
+                .into(),
+                condition_policy: CicsConditionPolicy::Default,
+                mutation: None,
+            };
+            assert_eq!(validate(&request), Ok(()), "{field}");
+            let mut combined = request.clone();
+            combined.arguments.insert(
+                "FIRESTATUS".into(),
+                argument("mainframe-env.cics.argument@1", b"OUT"),
+            );
+            if field != "FIRESTATUS" {
+                assert_eq!(validate(&combined), Err(HostProblem::Unsupported));
+            }
+        }
+    }
 
     #[test]
     fn bts_browse_inquire_activity_cvda_forms_are_individually_admitted() {

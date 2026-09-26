@@ -249,7 +249,14 @@ pub(super) fn invalid_shape(
         P::BtsGetNextEvent => (
             &[I::BrowseToken],
             &[I::BrowseToken],
-            &[O::Event],
+            &[
+                O::Event,
+                O::EventType,
+                O::FireStatus,
+                O::Composite,
+                O::Predicate,
+                O::Timer,
+            ],
             &[O::Event],
         ),
         P::BtsEndBrowseEvent | P::BtsEndBrowseTimer => {
@@ -397,6 +404,12 @@ pub(super) fn invalid_shape(
                 .iter()
                 .any(|name| matches!(name, O::CompStatus | O::Mode | O::SuspStatus))
             && actual_outputs.len() != 1
+        || plan.operation == P::BtsGetNextEvent
+            && actual_outputs
+                .iter()
+                .filter(|name| **name != O::Event)
+                .count()
+                > 1
         || plan.operation == P::BtsStartBrowseActivity
             && (actual_inputs.contains(&I::Process) != actual_inputs.contains(&I::ProcessType)
                 || actual_inputs.contains(&I::Process) && actual_inputs.contains(&I::ActivityId))
@@ -614,6 +627,29 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn bts_getnext_event_metadata_is_individual() {
+        use BtsBrowseInput as I;
+        use BtsBrowseOutput as O;
+        use CicsPlanOperation as P;
+        for field in [
+            O::EventType,
+            O::FireStatus,
+            O::Composite,
+            O::Predicate,
+            O::Timer,
+        ] {
+            let individual = plan(P::BtsGetNextEvent, &[I::BrowseToken], &[O::Event, field]);
+            assert!(encode_cics_effect_plan(&individual, CicsPlanLimits::default()).is_ok());
+        }
+        let combined = plan(
+            P::BtsGetNextEvent,
+            &[I::BrowseToken],
+            &[O::Event, O::EventType, O::FireStatus],
+        );
+        assert!(encode_cics_effect_plan(&combined, CicsPlanLimits::default()).is_err());
     }
 
     #[test]

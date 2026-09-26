@@ -5276,7 +5276,7 @@ mod tests {
         }
         for source in [
             "INQUIRE EVENT('DFHINITIAL')",
-            "GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) EVENTTYPE(LEVEL-X)",
+            "GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) EVENTTYPE(EVENT-X)",
             "INQUIRE TIMER('WAKE') ABSTIME(LEVEL-X)",
             "STARTBROWSE ACTIVITY PROCESS('P1') BROWSETOKEN(TOKEN-X)",
             "GETNEXT ACTIVITY(PROC-X) BROWSETOKEN(TOKEN-X)",
@@ -5319,6 +5319,32 @@ mod tests {
             ));
             assert!(analysis.hir.is_none(), "{command}");
         }
+    }
+
+    #[test]
+    fn bts_browse_getnext_event_metadata_is_individual() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSEV. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 EVENT-X PIC X(16). 01 TEXT-X PIC X(16). 01 CVDA-X PIC S9(9) COMP. PROCEDURE DIVISION. ";
+        for field in [
+            "EVENTTYPE(CVDA-X)",
+            "FIRESTATUS(CVDA-X)",
+            "COMPOSITE(TEXT-X)",
+            "PREDICATE(CVDA-X)",
+            "TIMER(TEXT-X)",
+        ] {
+            let command = format!("GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) {field}");
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(
+                analysis.hir.is_some(),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+        let analysis = analyze(&format!(
+            "{declarations}EXEC CICS GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) EVENTTYPE(CVDA-X) FIRESTATUS(CVDA-X) END-EXEC. STOP RUN."
+        ));
+        assert!(analysis.hir.is_none());
     }
 
     #[test]
