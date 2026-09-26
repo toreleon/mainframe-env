@@ -1307,6 +1307,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
+        let mut nodata = response.clone();
+        nodata.outputs.clear();
+        nodata.outputs.insert(
+            "FLENGTH".into(),
+            payload("mainframe-env.cics.decimal@1", b"4".to_vec()).unwrap(),
+        );
+        response::write_response_state(
+            &mut machine,
+            CicsOperation::GetContainer64,
+            Some(Storage64Intent::GetContainer(None)),
+            None,
+            None,
+            None,
+            &BTreeMap::new(),
+            &nodata,
+        )
+        .unwrap();
+        assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
         let mut oversized = response;
         oversized.outputs.insert(
             "INTO".into(),

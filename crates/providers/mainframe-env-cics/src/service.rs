@@ -52463,6 +52463,205 @@ mod tests {
     }
 
     #[test]
+    fn channel_container_64_bit_bounded_options_and_fences() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let base = BTreeMap::from([
+            ("CHANNEL".into(), cics_literal(b"WORK")),
+            ("CONTAINER".into(), cics_literal(b"TEXT")),
+            (
+                "ABI64".into(),
+                cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+            ),
+        ]);
+        let mut put = base.clone();
+        put.insert(
+            "FROM".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.storage64-value@1",
+                b"AB".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        put.insert("DATATYPE".into(), cics_literal(b"CHAR"));
+        put.insert("FROMCCSID".into(), cics_decimal(37));
+        let command = request(CicsOperation::PutContainer64, put.clone(), 1);
+        cics.invoke(
+            &effect(&invocation.run_unit_id, command.clone(), 1),
+            command,
+        )
+        .unwrap();
+
+        let mut get = base.clone();
+        get.insert("FLENGTH".into(), argument(b"LEN-X"));
+        get.insert("OPTION.NODATA".into(), cics_option());
+        let command = request(CicsOperation::GetContainer64, get, 2);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 2),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["FLENGTH"].bytes(), b"2");
+        assert!(!result.outputs.contains_key("INTO"));
+
+        let mut invalid_nodata = base.clone();
+        invalid_nodata.insert("FLENGTH".into(), cics_decimal(2));
+        invalid_nodata.insert("OPTION.NODATA".into(), cics_option());
+        let command = request(CicsOperation::GetContainer64, invalid_nodata, 12);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 12),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let mut invalid_nodata = base.clone();
+        invalid_nodata.insert("FLENGTH".into(), argument(b"LEN-X"));
+        invalid_nodata.insert("BYTEOFFSET".into(), cics_decimal(1));
+        invalid_nodata.insert("OPTION.NODATA".into(), cics_option());
+        let command = request(CicsOperation::GetContainer64, invalid_nodata, 13);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 13),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+
+        let mut get = base.clone();
+        get.insert(
+            "INTO".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.pointer64@1",
+                123u64.to_be_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        get.insert("INTO.MAXLENGTH".into(), cics_decimal(2));
+        get.insert("CCSID".into(), argument(b"CCSID-X"));
+        get.insert("CONVERTST".into(), cics_literal(b"NOCONVERT"));
+        get.insert("INTOCCSID".into(), cics_decimal(37));
+        let command = request(CicsOperation::GetContainer64, get.clone(), 3);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 3),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"AB");
+        assert_eq!(result.outputs["CCSID"].bytes(), b"37");
+
+        let mut set = base.clone();
+        set.insert("SET".into(), argument(b"PTR-X"));
+        set.insert("FLENGTH".into(), argument(b"LEN-X"));
+        let command = request(CicsOperation::GetContainer64, set, 11);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 11),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+
+        let mut codepage = get.clone();
+        codepage.remove("INTOCCSID");
+        codepage.insert("INTOCODEPAGE".into(), cics_literal(b"37"));
+        let command = request(CicsOperation::GetContainer64, codepage, 6);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 6),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"AB");
+
+        let mut unsupported = get.clone();
+        unsupported.insert("INTOCCSID".into(), cics_decimal(500));
+        let command = request(CicsOperation::GetContainer64, unsupported, 4);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 4),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let mut unsupported = put.clone();
+        unsupported.insert("OPTION.PREPEND".into(), cics_option());
+        let command = request(CicsOperation::PutContainer64, unsupported, 5);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 5),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let mut unsupported = put;
+        unsupported.insert("FROMCODEPAGE".into(), cics_literal(b"UTF-8"));
+        let command = request(CicsOperation::PutContainer64, unsupported, 9);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 9),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let command = request(CicsOperation::GetContainer64, get, 10);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 10),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"AB");
+
+        let mut bit = base.clone();
+        bit.insert("CONTAINER".into(), cics_literal(b"BITS"));
+        bit.insert(
+            "FROM".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.storage64-value@1",
+                vec![0, 255],
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        bit.insert("DATATYPE".into(), cics_literal(b"BIT"));
+        let command = request(CicsOperation::PutContainer64, bit.clone(), 7);
+        cics.invoke(
+            &effect(&invocation.run_unit_id, command.clone(), 7),
+            command,
+        )
+        .unwrap();
+        let mut bit_get = base;
+        bit_get.insert("CONTAINER".into(), cics_literal(b"BITS"));
+        bit_get.insert(
+            "INTO".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.pointer64@1",
+                123u64.to_be_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        bit_get.insert("INTO.MAXLENGTH".into(), cics_decimal(2));
+        bit_get.insert("CCSID".into(), argument(b"CCSID-X"));
+        bit_get.insert("CONVERTST".into(), cics_literal(b"NOCONVERT"));
+        let command = request(CicsOperation::GetContainer64, bit_get, 8);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 8),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), &[0, 255]);
+        assert_eq!(result.outputs["CCSID"].bytes(), b"0");
+    }
+
+    #[test]
     fn bts_container_process_put_and_get_use_held_root() {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
         let store = Arc::new(MemoryStore::new(Default::default()));

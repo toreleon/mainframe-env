@@ -108,7 +108,17 @@ pub(super) fn validate_response(
                 {
                     return Err(MachineProblem::UnexpectedHostResult);
                 }
-            } else if response.condition == "NORMAL" && response.response == 0 {
+            } else if response.condition == "NORMAL"
+                && response.response == 0
+                && (target.is_some()
+                    || response.outputs.get("FLENGTH").is_none_or(|length| {
+                        length.schema() != "mainframe-env.cics.decimal@1"
+                            || std::str::from_utf8(length.bytes())
+                                .ok()
+                                .and_then(|text| text.parse::<u32>().ok())
+                                .is_none()
+                    }))
+            {
                 return Err(MachineProblem::UnexpectedHostResult);
             }
             Ok(())

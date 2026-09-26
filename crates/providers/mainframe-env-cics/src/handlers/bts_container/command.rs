@@ -118,6 +118,11 @@ pub(in crate::service::handlers) fn invoke(
                 "INTO.MAXLENGTH",
                 "FLENGTH",
                 "BYTEOFFSET",
+                "CCSID",
+                "INTOCCSID",
+                "INTOCODEPAGE",
+                "CONVERTST",
+                "OPTION.NODATA",
                 "RESP",
                 "RESP2",
                 "OPTION.NOHANDLE",
@@ -129,6 +134,8 @@ pub(in crate::service::handlers) fn invoke(
                 "ABI64",
                 "FROM",
                 "FLENGTH",
+                "DATATYPE",
+                "FROMCCSID",
                 "RESP",
                 "RESP2",
                 "OPTION.APPEND",
@@ -148,38 +155,104 @@ pub(in crate::service::handlers) fn invoke(
         }) {
             return Err(HostProblem::Unsupported);
         }
+        if operation == CicsOperation::GetContainer64 {
+            let nodata = request.arguments.contains_key("OPTION.NODATA");
+            let convertst = request.arguments.get("CONVERTST");
+            if request.arguments.contains_key("INTO") == nodata
+                || nodata && !request.arguments.contains_key("FLENGTH")
+                || nodata && request.arguments.contains_key("BYTEOFFSET")
+                || nodata && request.arguments.contains_key("INTO.MAXLENGTH")
+                || nodata
+                    && request
+                        .arguments
+                        .get("FLENGTH")
+                        .is_some_and(|value| value.schema() != "mainframe-env.cics.argument@1")
+                || request.arguments.contains_key("CCSID") && convertst.is_none()
+                || convertst.is_some_and(|value| {
+                    value.schema() != "mainframe-env.cics.literal@1"
+                        || value.bytes() != b"NOCONVERT"
+                })
+                || request.arguments.contains_key("INTOCCSID")
+                    && request.arguments.contains_key("INTOCODEPAGE")
+                || request.arguments.get("INTOCODEPAGE").is_some_and(|value| {
+                    value.schema() != "mainframe-env.cics.literal@1" || value.bytes() != b"37"
+                })
+            {
+                return Err(HostProblem::Unsupported);
+            }
+        } else if request.arguments.get("DATATYPE").is_some_and(|value| {
+            value.schema() != "mainframe-env.cics.literal@1"
+                || !matches!(value.bytes(), b"BIT" | b"CHAR")
+        }) || request
+            .arguments
+            .get("DATATYPE")
+            .is_some_and(|value| value.bytes() == b"BIT")
+            && request.arguments.contains_key("FROMCCSID")
+        {
+            return Err(HostProblem::Unsupported);
+        }
         let key = if operation == CicsOperation::GetContainer64 {
             "INTO"
         } else {
             "FROM"
         };
-        let data = request.arguments.get(key).ok_or(HostProblem::Malformed)?;
-        if data.schema() == "mainframe-env.cics.invalid-pointer64@1" {
-            return Err(condition("INVREQ", 16, 1));
-        }
-        if data.schema() == "mainframe-env.cics.length-error64@1" {
-            return Err(condition("LENGERR", 22, 1));
-        }
-        let expected = if operation == CicsOperation::GetContainer64 {
-            "mainframe-env.cics.pointer64@1"
+        let data = if operation == CicsOperation::GetContainer64
+            && request.arguments.contains_key("OPTION.NODATA")
+        {
+            None
         } else {
-            "mainframe-env.cics.storage64-value@1"
+            Some(request.arguments.get(key).ok_or(HostProblem::Malformed)?)
         };
-        if data.schema() != expected {
-            return Err(HostProblem::Unsupported);
-        }
-        if operation == CicsOperation::GetContainer64 && data.bytes().len() != 8 {
-            return Err(condition("INVREQ", 16, 1));
+        if let Some(data) = data {
+            if data.schema() == "mainframe-env.cics.invalid-pointer64@1" {
+                return Err(condition("INVREQ", 16, 1));
+            }
+            if data.schema() == "mainframe-env.cics.length-error64@1" {
+                return Err(condition("LENGERR", 22, 1));
+            }
+            let expected = if operation == CicsOperation::GetContainer64 {
+                "mainframe-env.cics.pointer64@1"
+            } else {
+                "mainframe-env.cics.storage64-value@1"
+            };
+            if data.schema() != expected {
+                return Err(HostProblem::Unsupported);
+            }
+            if operation == CicsOperation::GetContainer64 && data.bytes().len() != 8 {
+                return Err(condition("INVREQ", 16, 1));
+            }
         }
         let mut routed = request.clone();
         routed.arguments.remove("ABI64");
+        routed.arguments.remove("CONVERTST");
+        if routed.arguments.remove("INTOCODEPAGE").is_some() {
+            routed.arguments.insert(
+                "INTOCCSID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.decimal@1",
+                    b"37".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            );
+        }
         routed.operation = if operation == CicsOperation::GetContainer64 {
             CicsOperation::GetContainer
         } else {
             CicsOperation::PutContainer
         };
         for key in ["FLENGTH", "BYTEOFFSET"] {
-            if let Some(value) = number(request, key)? {
+            if let Some(value) = if operation == CicsOperation::GetContainer64
+                && key == "FLENGTH"
+                && request
+                    .arguments
+                    .get(key)
+                    .is_some_and(|value| value.schema() == "mainframe-env.cics.argument@1")
+            {
+                None
+            } else {
+                number(request, key)?
+            } {
                 if value > i64::from(i32::MAX) || value < i64::from(i32::MIN) {
                     return Err(condition(
                         if key == "FLENGTH" {
@@ -213,12 +286,14 @@ pub(in crate::service::handlers) fn invoke(
         } else {
             BoundedPayload::new(
                 "mainframe-env.cics.storage-value@1",
-                data.bytes().to_vec(),
+                data.ok_or(HostProblem::Malformed)?.bytes().to_vec(),
                 InvocationLimits::default(),
             )
         }
         .map_err(|_| HostProblem::ResourceExhausted)?;
-        routed.arguments.insert(key.into(), value);
+        if !request.arguments.contains_key("OPTION.NODATA") {
+            routed.arguments.insert(key.into(), value);
+        }
         return invoke(service, run, &routed);
     }
     if matches!(

@@ -1269,6 +1269,129 @@ mod tests {
     }
 
     #[test]
+    fn channel_container_64_bit_bounded_shapes_and_fences() {
+        let limits = CicsPlanLimits::default();
+        let mut get = CicsEffectPlan {
+            operation: CicsPlanOperation::GetContainer64,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::ContainerName,
+                    value: CicsOperandValue::Literal(b"ITEM".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Abi64,
+                    value: CicsOperandValue::Literal(
+                        b"mainframe-env.cics-amode64-nonle@1".to_vec(),
+                    ),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::ContainerNoData]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::ContainerLength,
+                target: slot(1, "LEN-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        get.operands.sort_by_key(|operand| operand.name);
+        assert!(encode_cics_effect_plan(&get, limits).is_ok());
+        get.operands.push(CicsNamedOperand {
+            name: CicsOperandName::ContainerIntoCcsid,
+            value: CicsOperandValue::Literal(b"37".to_vec()),
+        });
+        get.operands.sort_by_key(|operand| operand.name);
+        assert!(encode_cics_effect_plan(&get, limits).is_ok());
+        get.operands
+            .retain(|operand| operand.name != CicsOperandName::ContainerIntoCcsid);
+        get.operands.push(CicsNamedOperand {
+            name: CicsOperandName::ContainerIntoCodepage,
+            value: CicsOperandValue::Literal(b"37".to_vec()),
+        });
+        get.operands.sort_by_key(|operand| operand.name);
+        assert!(encode_cics_effect_plan(&get, limits).is_ok());
+        get.operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::ContainerIntoCodepage)
+            .unwrap()
+            .value = CicsOperandValue::Literal(b"UTF-8".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&get, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        get.operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::ContainerIntoCodepage)
+            .unwrap()
+            .value = CicsOperandValue::Literal(b"37".to_vec());
+        get.operands.push(CicsNamedOperand {
+            name: CicsOperandName::ContainerByteOffset,
+            value: CicsOperandValue::Integer(1),
+        });
+        get.operands.sort_by_key(|operand| operand.name);
+        assert_eq!(
+            encode_cics_effect_plan(&get, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+
+        let mut put = CicsEffectPlan {
+            operation: CicsPlanOperation::PutContainer64,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::ContainerName,
+                    value: CicsOperandValue::Literal(b"ITEM".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Abi64,
+                    value: CicsOperandValue::Literal(
+                        b"mainframe-env.cics-amode64-nonle@1".to_vec(),
+                    ),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ContainerFrom64,
+                    value: CicsOperandValue::Storage(slot(2, "PTR-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ContainerDatatype,
+                    value: CicsOperandValue::Literal(b"CHAR".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::ContainerCcsid,
+                    value: CicsOperandValue::Literal(b"37".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![],
+            condition: CicsCondition::Default,
+        };
+        put.operands.sort_by_key(|operand| operand.name);
+        assert!(encode_cics_effect_plan(&put, limits).is_ok());
+        put.options.insert(CicsPlanOption::ContainerAppend);
+        assert!(encode_cics_effect_plan(&put, limits).is_ok());
+        put.operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::ContainerCcsid)
+            .unwrap()
+            .value = CicsOperandValue::Literal(b"500".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&put, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        put.operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::ContainerCcsid)
+            .unwrap()
+            .value = CicsOperandValue::Literal(b"37".to_vec());
+        put.operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::ContainerDatatype)
+            .unwrap()
+            .value = CicsOperandValue::Literal(b"BIT".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&put, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
     fn channel_container_v2_tags_round_trip_and_v1_rejects_them() {
         let limits = CicsPlanLimits::default();
         for (operation, tag) in [
