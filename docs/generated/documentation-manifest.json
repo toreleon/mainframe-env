@@ -1702,7 +1702,7 @@
       "normative": false,
       "path": "docs/runbooks/COBOL-DIFFERENTIAL.md",
       "relative_links": 0,
-      "sha256": "sha256:05c7524148c902c378d1e3e05261ab2f9485ea729105a589522ff3ef24ca8882",
+      "sha256": "sha256:ccffa273c310b031cc96a96f59a5e2e15d1464f7346d2d1e08ec0e74d2e2d945",
       "title": "COBOL semantic differential pilot",
       "xtask_commands": 1
     },

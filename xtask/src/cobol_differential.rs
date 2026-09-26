@@ -45,8 +45,8 @@ pub fn run(root: &Path, args: &Args) -> Result<(), String> {
         .ok_or("receipt has no parent directory")?;
     let parent = fs::canonicalize(parent).map_err(|error| format!("receipt parent: {error}"))?;
     let root = fs::canonicalize(root).map_err(|error| error.to_string())?;
-    if parent.starts_with(root) {
-        return Err("receipt must be outside the checkout".into());
+    if parent.starts_with(&root) && parent != root.join(".codex-runs") {
+        return Err("receipt must be outside the checkout or in its .codex-runs directory".into());
     }
     let path = parent.join(args.receipt.file_name().ok_or("receipt has no filename")?);
     if path.exists() {
