@@ -720,6 +720,15 @@ activity removal and completion delete their containers in the lifecycle
 transition batch. GET ACQPROCESS under an acquired descendant is rejected
 because the pinned GET and ACQUIRE topics do not settle that selector.
 
+GET64 CONTAINER and PUT64 CONTAINER use distinct typed operations over the
+same task-channel port. The MCEP profile requires the non-LE AMODE(64) ABI
+marker; the interpreter checks the caller binding, eight-byte virtual pointer,
+task ownership, data key, and fullword FLENGTH before a data transfer. Provider
+responses are checked before the interpreter copies GET64 bytes into its
+checkpointed virtual allocation. COBOL source cannot select these rows.
+Conversion, SET/NODATA, and PUT64 DATATYPE/CCSID variants remain fenced until
+their source-bounded semantics are implemented.
+
 ## Verification
 
 ```bash

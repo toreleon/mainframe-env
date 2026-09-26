@@ -562,7 +562,7 @@ pub(super) fn invoke(
 
 fn request_digest(request: &CicsRequest) -> String {
     let mut digest = Sha256::new();
-    digest.update(format!("{:?}", request.operation));
+    digest.update(request.operation.runtime_name().as_bytes());
     for (key, value) in &request.arguments {
         digest.update((key.len() as u64).to_be_bytes());
         digest.update(key.as_bytes());

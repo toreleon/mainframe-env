@@ -32,8 +32,10 @@ pub enum CicsOperation {
     DeleteChannel,
     DeleteContainer,
     GetContainer,
+    GetContainer64,
     MoveContainer,
     PutContainer,
+    PutContainer64,
     QueryChannel,
     SuspendAcqActivity,
     SuspendAcqProcess,
@@ -453,8 +455,10 @@ impl CicsOperation {
             Self::DeleteChannel => "DeleteChannel",
             Self::DeleteContainer => "DeleteContainer",
             Self::GetContainer => "GetContainer",
+            Self::GetContainer64 => "GetContainer64",
             Self::MoveContainer => "MoveContainer",
             Self::PutContainer => "PutContainer",
+            Self::PutContainer64 => "PutContainer64",
             Self::QueryChannel => "QueryChannel",
             Self::SuspendAcqActivity => "SuspendAcqActivity",
             Self::SuspendAcqProcess => "SuspendAcqProcess",
@@ -722,6 +726,7 @@ impl CicsOperation {
                 | Self::DeleteContainer
                 | Self::MoveContainer
                 | Self::PutContainer
+                | Self::PutContainer64
                 | Self::SuspendAcqActivity
                 | Self::SuspendAcqProcess
                 | Self::SuspendActivity

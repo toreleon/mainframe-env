@@ -8277,7 +8277,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 239);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 241);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -52356,6 +52356,110 @@ mod tests {
             .unwrap();
         assert_eq!(length.outputs["FLENGTH"].bytes(), b"6");
         assert!(!length.outputs.contains_key("INTO"));
+    }
+
+    #[test]
+    fn channel_container_64_bit_provider_reuses_checked_channel_data() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let payload64 = |schema, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let put = request(
+            CicsOperation::PutContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "FROM".into(),
+                    payload64("mainframe-env.cics.storage64-value@1", b"ABCD"),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("FLENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "INTO".into(),
+                    payload64("mainframe-env.cics.pointer64@1", &123u64.to_be_bytes()),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("FLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCD");
+        assert_eq!(read.outputs["FLENGTH"].bytes(), b"4");
+        let negative_offset = request(
+            CicsOperation::GetContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                (
+                    "INTO".into(),
+                    payload64("mainframe-env.cics.pointer64@1", &123u64.to_be_bytes()),
+                ),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("BYTEOFFSET".into(), cics_decimal(-1)),
+            ]),
+            4,
+        );
+        let read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, negative_offset.clone(), 4),
+                negative_offset,
+            )
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCD");
+        let invalid = request(
+            CicsOperation::PutContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "FROM".into(),
+                    payload64("mainframe-env.cics.length-error64@1", b""),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+            ]),
+            3,
+        );
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                response: 22,
+                response2: 1,
+                ..
+            })
+        ));
     }
 
     #[test]

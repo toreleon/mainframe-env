@@ -579,8 +579,10 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("DeleteChannel", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0042"),
     ("DeleteContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0043"),
     ("GetContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0086"),
+    ("GetContainer64", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0096"),
     ("MoveContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0144"),
     ("PutContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0150"),
+    ("PutContainer64", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0151"),
     ("QueryChannel", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0152"),
     ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
     ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
@@ -818,8 +820,10 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DeleteChannel",
         "DeleteContainer",
         "GetContainer",
+        "GetContainer64",
         "MoveContainer",
         "PutContainer",
+        "PutContainer64",
         "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
@@ -1580,7 +1584,7 @@ _BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
 TYPED_RUNTIME_IR_EFFECTS.update(
     {
         name: _BTS_READ_EFFECTS
-        for name in ("CheckAcqActivity", "CheckAcqProcess", "GetContainer", "QueryChannel")
+        for name in ("CheckAcqActivity", "CheckAcqProcess", "GetContainer", "GetContainer64", "QueryChannel")
     }
 )
 TYPED_RUNTIME_IR_EFFECTS.update(
@@ -1598,7 +1602,7 @@ TYPED_RUNTIME_IR_EFFECTS.update(
             "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
             "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
             "SuspendAcqProcess", "SuspendActivity",
-            "DeleteChannel", "DeleteContainer", "MoveContainer", "PutContainer",
+            "DeleteChannel", "DeleteContainer", "MoveContainer", "PutContainer", "PutContainer64",
         )
     }
 )
@@ -1982,8 +1986,10 @@ def _load_typed_execution_registrations(
         "DeleteChannel",
         "DeleteContainer",
         "GetContainer",
+        "GetContainer64",
         "MoveContainer",
         "PutContainer",
+        "PutContainer64",
         "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",

@@ -89,6 +89,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::ContainerFromActivity
         | CicsOperandName::ContainerToActivity
         | CicsOperandName::ContainerToChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::ContainerFrom64 => SlotUse::Pointer64Input,
         CicsOperandName::ContainerLength
         | CicsOperandName::ContainerCcsid
         | CicsOperandName::ContainerByteOffset
@@ -248,6 +249,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::ContainerCcsid
         | CicsOutputName::ContainerCount => SlotUse::FullwordOutput,
         CicsOutputName::ContainerInto | CicsOutputName::ContainerSet => SlotUse::Output,
+        CicsOutputName::ContainerInto64 => SlotUse::Pointer64Input,
         CicsOutputName::AttachIuType
         | CicsOutputName::AttachDataStream
         | CicsOutputName::AttachRecordFormat
@@ -443,6 +445,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::ContainerToActivity => "TOACTIVITY",
         CicsOperandName::ContainerToChannel => "TOCHANNEL",
         CicsOperandName::ContainerFrom => "FROM",
+        CicsOperandName::ContainerFrom64 => "FROM",
         CicsOperandName::ContainerLength => "FLENGTH",
         CicsOperandName::ContainerDatatype => "DATATYPE",
         CicsOperandName::ContainerCcsid => "FROMCCSID",
@@ -828,6 +831,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::BtsChannel => "CHANNEL",
         CicsOutputName::BtsAbcode => "ABCODE",
         CicsOutputName::ContainerInto => "INTO",
+        CicsOutputName::ContainerInto64 => "INTO",
         CicsOutputName::ContainerSet => "SET",
         CicsOutputName::ContainerLength => "FLENGTH",
         CicsOutputName::ContainerCcsid => "CCSID",

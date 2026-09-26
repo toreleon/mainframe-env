@@ -11,6 +11,14 @@ pub(in crate::machine) fn write_response_state(
     response: &CicsResponse,
 ) -> Result<Option<usize>, MachineProblem> {
     storage64::validate_response(operation, storage64_intent, response)?;
+    if let (CicsOperation::GetContainer64, Some(Storage64Intent::GetContainer(Some((address, _))))) =
+        (operation, storage64_intent)
+        && let Some(value) = response.outputs.get("INTO")
+    {
+        machine
+            .write_storage64(address, 0, value.bytes())
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    }
     web_service_control::validate_response(operation, outputs, response)?;
     for (target, value) in [
         (response_target, response.response),
@@ -48,6 +56,9 @@ pub(in crate::machine) fn write_runtime_output(
         return Ok(true);
     }
     if retrieve::release_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
+    if operation == CicsOperation::GetContainer64 && name == "INTO" {
         return Ok(true);
     }
     if storage64::release_output(machine, operation, name, value)? {

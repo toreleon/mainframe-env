@@ -1,8 +1,8 @@
 //! Validated MCEP profile for task-channel and BTS container commands.
 
 use super::{
-    CicsEffectPlan, CicsOperandName as I, CicsOutputName as O, CicsPlanOperation as P,
-    CicsPlanOption as F,
+    CicsEffectPlan, CicsOperandName as I, CicsOperandValue, CicsOutputName as O,
+    CicsPlanOperation as P, CicsPlanOption as F,
 };
 use std::collections::BTreeSet;
 
@@ -12,8 +12,10 @@ pub(super) const fn is_channel_container(operation: P) -> bool {
         P::DeleteChannel
             | P::DeleteContainer
             | P::GetContainer
+            | P::GetContainer64
             | P::MoveContainer
             | P::PutContainer
+            | P::PutContainer64
             | P::QueryChannel
     )
 }
@@ -27,6 +29,7 @@ pub(super) const fn allowed_output(operation: P, output: O) -> bool {
             output,
             O::ContainerInto | O::ContainerSet | O::ContainerLength | O::ContainerCcsid
         ),
+        P::GetContainer64 => matches!(output, O::ContainerInto64 | O::ContainerLength),
         P::QueryChannel => matches!(output, O::ContainerCount),
         _ => false,
     }
@@ -52,6 +55,10 @@ pub(super) fn invalid_shape(
                 I::ContainerConvertst,
             ],
         ),
+        P::GetContainer64 => (
+            &[I::ContainerName, I::Abi64],
+            &[I::BtsChannel, I::ContainerLength, I::ContainerByteOffset],
+        ),
         P::MoveContainer => (
             &[I::ContainerName, I::ContainerAs],
             &[
@@ -72,6 +79,10 @@ pub(super) fn invalid_shape(
                 I::ContainerFromCodepage,
             ],
         ),
+        P::PutContainer64 => (
+            &[I::ContainerName, I::ContainerFrom64, I::Abi64],
+            &[I::BtsChannel, I::ContainerLength],
+        ),
         _ => return true,
     };
     if required.iter().any(|name| !inputs.contains(name))
@@ -84,11 +95,25 @@ pub(super) fn invalid_shape(
     {
         return true;
     }
+    if matches!(plan.operation, P::GetContainer64 | P::PutContainer64)
+        && (plan.operands.iter().any(|operand| {
+            operand.name == I::Abi64
+                && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"mainframe-env.cics-amode64-nonle@1")
+        })
+            || plan.operation == P::PutContainer64
+                && plan.operands.iter().any(|operand| {
+                    operand.name == I::ContainerFrom64
+                        && !matches!(operand.value, CicsOperandValue::Storage(_))
+                }))
+    {
+        return true;
+    }
     if plan.options.iter().any(|option| {
         !matches!(option, F::NoHandle)
             && !matches!(
                 (plan.operation, option),
                 (P::PutContainer, F::ContainerAppend)
+                    | (P::PutContainer64, F::ContainerAppend)
                     | (P::GetContainer, F::ContainerNoData)
                     | (
                         P::DeleteContainer | P::GetContainer | P::PutContainer,
@@ -148,6 +173,10 @@ pub(super) fn invalid_shape(
         return true;
     }
     match plan.operation {
+        P::GetContainer64 => {
+            !outputs.contains(&O::ContainerInto64)
+                || outputs.contains(&O::ContainerLength) != inputs.contains(&I::ContainerLength)
+        }
         P::GetContainer => {
             let destinations = usize::from(outputs.contains(&O::ContainerInto))
                 + usize::from(outputs.contains(&O::ContainerSet))

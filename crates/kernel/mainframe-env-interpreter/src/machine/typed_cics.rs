@@ -28,6 +28,7 @@ mod retrieve;
 mod runtime_validation;
 mod slot_access;
 use runtime_validation::validate_machine_slot;
+mod container_route;
 mod spool_control;
 mod storage64;
 mod task_wait;
@@ -286,6 +287,9 @@ pub(super) fn execute(
             {
                 storage64::freemain_argument(machine, slot, operand.name)?
             }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::ContainerFrom64 => {
+                ("mainframe-env.cics.pointer64@1", read_slot(machine, slot)?)
+            }
             CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
@@ -469,6 +473,10 @@ pub(super) fn execute(
         );
     }
 
+    if plan.operation == CicsPlanOperation::PutContainer64 {
+        container_route::prepare_from(machine, &mut arguments)?;
+    }
+
     if plan.operation == CicsPlanOperation::DumpTransaction
         && plan
             .operands
@@ -528,6 +536,9 @@ pub(super) fn execute(
             tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
         }
         match output.name {
+            CicsOutputName::ContainerInto64 => {
+                container_route::prepare_into(machine, &output.target, &mut arguments)?;
+            }
             CicsOutputName::ContainerInto | CicsOutputName::ConversationDataInto => {
                 let CicsTarget::Resolved(slot) = &target else {
                     return Err(MachineProblem::UnexpectedHostResult);
@@ -1174,6 +1185,144 @@ mod tests {
         CicsNamedOperand, CicsOutputBinding, IrLimits, Module, ModuleBuilder, StorageReference,
         encode_cics_effect_plan,
     };
+
+    #[test]
+    fn channel_container_64_bit_pointer_and_length_are_checked_before_copy() {
+        use crate::storage64::{Storage64Attributes, Storage64Key, Storage64Location};
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PTR-X", 8);
+        machine.invocation.bindings.insert(
+            "cics.amode64.caller".into(),
+            payload(
+                "mainframe-env.cics.amode64-caller@1",
+                b"non-le-amode64".to_vec(),
+            )
+            .unwrap(),
+        );
+        machine.invocation.bindings.insert(
+            "cics.amode64.taskdatakey".into(),
+            payload("mainframe-env.cics.taskdatakey@1", b"USER".to_vec()).unwrap(),
+        );
+        let owner = machine.invocation.run_unit_id.as_str().to_owned();
+        let address = machine
+            .storage64
+            .allocate(
+                &owner,
+                8,
+                Storage64Attributes {
+                    location: Storage64Location::AboveBar,
+                    key: Storage64Key::User,
+                    shared: false,
+                    executable: false,
+                },
+            )
+            .unwrap();
+        machine.write_storage64(address, 0, b"ABCDEFGH").unwrap();
+        machine.write("PTR-X", &address.to_be_bytes()).unwrap();
+        let mut from = BTreeMap::from([
+            (
+                "FROM".into(),
+                payload(
+                    "mainframe-env.cics.pointer64@1",
+                    address.to_be_bytes().to_vec(),
+                )
+                .unwrap(),
+            ),
+            (
+                "FLENGTH".into(),
+                payload("mainframe-env.cics.decimal@1", b"4".to_vec()).unwrap(),
+            ),
+        ]);
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(
+            from["FROM"].schema(),
+            "mainframe-env.cics.storage64-value@1"
+        );
+        assert_eq!(from["FROM"].bytes(), b"ABCD");
+        from.insert(
+            "FROM".into(),
+            payload(
+                "mainframe-env.cics.pointer64@1",
+                address.to_be_bytes().to_vec(),
+            )
+            .unwrap(),
+        );
+        from.insert(
+            "FLENGTH".into(),
+            payload("mainframe-env.cics.decimal@1", b"9".to_vec()).unwrap(),
+        );
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(from["FROM"].schema(), "mainframe-env.cics.length-error64@1");
+        from.insert(
+            "FROM".into(),
+            payload(
+                "mainframe-env.cics.pointer64@1",
+                address.to_be_bytes().to_vec(),
+            )
+            .unwrap(),
+        );
+        from.insert(
+            "FLENGTH".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                b"18446744073709551616".to_vec(),
+            )
+            .unwrap(),
+        );
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(from["FROM"].schema(), "mainframe-env.cics.length-error64@1");
+        let mut into = BTreeMap::new();
+        container_route::prepare_into(&machine, &slot, &mut into).unwrap();
+        assert_eq!(into["INTO.MAXLENGTH"].bytes(), b"8");
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: String::new(),
+            sysid: String::new(),
+            transaction: String::new(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", Vec::new()).unwrap(),
+            outputs: BTreeMap::from([(
+                "INTO".into(),
+                payload("mainframe-env.cics.payload@1", b"WXYZ".to_vec()).unwrap(),
+            )]),
+            unit_of_work: None,
+        };
+        response::write_response_state(
+            &mut machine,
+            CicsOperation::GetContainer64,
+            Some(Storage64Intent::GetContainer(Some((address, 8)))),
+            None,
+            None,
+            None,
+            &BTreeMap::new(),
+            &response,
+        )
+        .unwrap();
+        assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
+        let mut oversized = response;
+        oversized.outputs.insert(
+            "INTO".into(),
+            payload("mainframe-env.cics.payload@1", b"123456789".to_vec()).unwrap(),
+        );
+        assert!(
+            response::write_response_state(
+                &mut machine,
+                CicsOperation::GetContainer64,
+                Some(Storage64Intent::GetContainer(Some((address, 8)))),
+                None,
+                None,
+                None,
+                &BTreeMap::new(),
+                &oversized,
+            )
+            .is_err()
+        );
+        assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
+    }
 
     fn syncpoint_plan() -> CicsEffectPlan {
         CicsEffectPlan {

@@ -30,8 +30,12 @@ pub enum CicsPlanOperation {
     DeleteChannel,
     DeleteContainer,
     GetContainer,
+    /// Read a channel container into checked AMODE(64) storage.
+    GetContainer64,
     MoveContainer,
     PutContainer,
+    /// Write a channel container from checked AMODE(64) storage.
+    PutContainer64,
     QueryChannel,
     SuspendAcqActivity,
     SuspendAcqProcess,
@@ -491,6 +495,7 @@ pub enum CicsOperandName {
     ContainerToActivity,
     ContainerToChannel,
     ContainerFrom,
+    ContainerFrom64,
     ContainerLength,
     ContainerDatatype,
     ContainerCcsid,
