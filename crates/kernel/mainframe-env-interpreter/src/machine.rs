@@ -2136,17 +2136,28 @@ impl ReferenceMachine {
                     .unwrap_or(args.len());
                 let mut at = 0usize;
                 while at < operand_end {
-                    if matches!(args[at].as_str(), "ADDRESS" | "LENGTH")
+                    let reference_end = (at..operand_end)
+                        .find(|index| display_literal(&args[*index]))
+                        .unwrap_or(operand_end);
+                    if display_literal(&args[at]) {
+                        line.extend(self.resolve(&args[at])?);
+                        at += 1;
+                    } else if args[at] == "ALL"
+                        && args.get(at + 1).is_some_and(|token| display_literal(token))
+                    {
+                        line.extend(self.resolve(&args[at + 1])?);
+                        at += 2;
+                    } else if matches!(args[at].as_str(), "ADDRESS" | "LENGTH")
                         && args.get(at + 1).is_some_and(|token| token == "OF")
                     {
-                        let end = (at + 3..=operand_end)
+                        let end = (at + 3..=reference_end)
                             .rev()
                             .find(|end| self.eval_value(&args[at..*end]).is_ok())
                             .ok_or(MachineProblem::InvalidOperation)?;
                         line.extend(value_bytes(self.eval_value(&args[at..end])?)?);
                         at = end;
                     } else if let Some((end, reference)) =
-                        (at + 1..=operand_end).rev().find_map(|end| {
+                        (at + 1..=reference_end).rev().find_map(|end| {
                             self.reference(&args[at..end])
                                 .ok()
                                 .map(|reference| (end, reference))
@@ -8144,6 +8155,11 @@ impl ReferenceMachine {
     }
 
     fn layout_qualified(&self, tokens: &[String]) -> Option<&LayoutMetadata> {
+        // A quoted literal is never a data reference, even when its text starts with, or
+        // equals, a data name ('ACCT-ID   :' used to resolve as ACCT-ID via normalize; #277).
+        if display_literal(tokens.first()?) {
+            return None;
+        }
         let simple = tokens.first()?.to_ascii_uppercase();
         if tokens.len() == 1 {
             return self.layout(&simple);
@@ -9773,6 +9789,12 @@ fn normalize(value: &str) -> String {
     value
         .trim_matches(['\'', '"', '.', ','])
         .to_ascii_uppercase()
+}
+
+fn display_literal(token: &str) -> bool {
+    token.len() >= 2
+        && matches!(token.as_bytes().first(), Some(b'\'' | b'"'))
+        && token.as_bytes().first() == token.as_bytes().last()
 }
 
 fn alternate_dd_name(assignment: &str, ordinal: usize) -> String {
@@ -12761,6 +12783,194 @@ mod tests {
         )
         .unwrap();
         mainframe_env_ir::encode_binary(&b.finish().unwrap(), CodecLimits::default()).unwrap()
+    }
+    fn display_fixture() -> ReferenceMachine {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        fn add(machine: &mut ReferenceMachine, name: &str, bytes: &[u8], occurs: usize) {
+            let simple_name = name.split('.').next_back().unwrap().to_string();
+            let layout = LayoutMetadata {
+                name: name.into(),
+                simple_name: simple_name.clone(),
+                category: LayoutCategory::NumericDisplay,
+                picture: "9(11)".into(),
+                digits: 11,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
+                justified_right: false,
+                blank_when_zero: false,
+                linkage: false,
+                offset: 0,
+                length: bytes.len(),
+                element_length: bytes.len() / occurs,
+                occurs,
+                occurs_min: 1,
+                unbounded: false,
+                depending_on: None,
+                indexes: Vec::new(),
+                keys: Vec::new(),
+                dynamic: false,
+                dynamic_limit: 0,
+                parent: name.split_once('.').map(|(parent, _)| parent.into()),
+                alias_of: None,
+                occurs_clause: occurs > 1,
+                condition_values: Vec::new(),
+                object_class: None,
+            };
+            let base = machine.bases.len();
+            machine.bases.push(bytes.to_vec());
+            machine.views.insert(
+                name.into(),
+                StorageView {
+                    base,
+                    offset: 0,
+                    length: bytes.len(),
+                },
+            );
+            machine.layouts.insert(name.into(), layout);
+            machine
+                .simple_layouts
+                .entry(simple_name)
+                .or_default()
+                .push(name.into());
+        }
+        add(&mut machine, "ACCT-ID", b"00000000042", 1);
+        add(&mut machine, "OTHER-ID", b"00000000007", 1);
+        add(&mut machine, "REC.ITEM", b"00000000009", 1);
+        add(&mut machine, "TABLE-ITEM", b"0000000000100000000002", 2);
+        machine
+    }
+
+    fn display_operands(machine: &mut ReferenceMachine, operands: &[&str]) -> Vec<u8> {
+        let mut operation = machine
+            .operations
+            .iter()
+            .find(|op| op.identity.name() == "display")
+            .unwrap()
+            .clone();
+        let args = operands
+            .iter()
+            .map(|arg| (*arg).to_string())
+            .collect::<Vec<_>>();
+        let mut encoded = Vec::new();
+        for arg in args {
+            encoded.extend_from_slice(&(arg.len() as u64).to_be_bytes());
+            encoded.extend_from_slice(arg.as_bytes());
+        }
+        operation
+            .attributes
+            .insert("arguments".into(), Attribute::Bytes(encoded));
+        machine.output.clear();
+        machine.execute(&operation).unwrap();
+        machine.output.clone()
+    }
+
+    #[test]
+    fn display_keeps_leading_literals_before_identifiers() {
+        let machine = &mut display_fixture();
+        for (tokens, expected) in [
+            (
+                vec!["'ACCT-ID                 :'", "ACCT-ID"],
+                "ACCT-ID                 :00000000042\n",
+            ),
+            (
+                vec!["'LABEL                   :'", "ACCT-ID"],
+                "LABEL                   :00000000042\n",
+            ),
+            (vec!["'ACCT-ID'", "OTHER-ID"], "ACCT-ID00000000007\n"),
+            (
+                vec!["'ACCT-ID'", "OTHER-ID", "'END'"],
+                "ACCT-ID00000000007END\n",
+            ),
+            (
+                vec!["'ACCT-ID OF (: '", "OTHER-ID"],
+                "ACCT-ID OF (: 00000000007\n",
+            ),
+        ] {
+            assert_eq!(
+                display_operands(machine, &tokens),
+                expected.as_bytes(),
+                "{tokens:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn quoted_literals_never_resolve_as_data_references() {
+        let machine = display_fixture();
+        for literal in [
+            "'ACCT-ID'",
+            "\"ACCT-ID\"",
+            "'ACCT-ID                 :'",
+            "'ACCT-ID.'",
+        ] {
+            assert!(
+                machine.layout_qualified(&[literal.to_string()]).is_none(),
+                "{literal} resolved as a data reference"
+            );
+        }
+        assert!(machine.layout_qualified(&["ACCT-ID".to_string()]).is_some());
+    }
+
+    #[test]
+    fn display_preserves_qualified_modified_and_subscripted_references() {
+        let machine = &mut display_fixture();
+        assert_eq!(
+            display_operands(machine, &["'X'", "ITEM", "OF", "REC"]),
+            b"X00000000009\n"
+        );
+        assert_eq!(
+            display_operands(machine, &["'X'", "ITEM", "IN", "REC"]),
+            b"X00000000009\n"
+        );
+        assert_eq!(
+            display_operands(machine, &["'X'", "ACCT-ID", "(", "10:2", ")"]),
+            b"X42\n"
+        );
+        assert_eq!(
+            display_operands(machine, &["'X'", "TABLE-ITEM", "(", "2", ")"]),
+            b"X00000000002\n"
+        );
+    }
+
+    #[test]
+    fn display_keeps_special_operands_and_output_phrases_after_literals() {
+        let machine = &mut display_fixture();
+        assert_eq!(
+            display_operands(machine, &["'X'", "LENGTH", "OF", "ACCT-ID"]),
+            b"X11\n"
+        );
+        assert_eq!(
+            display_operands(
+                machine,
+                &["'X'", "FUNCTION", "UPPER-CASE", "(", "'ab'", ")"]
+            ),
+            b"XAB\n"
+        );
+        assert_eq!(
+            display_operands(machine, &["'X'", "SPACE", "ZERO", "ALL", "'x'"]),
+            b"X 0x\n"
+        );
+        assert_eq!(
+            display_operands(
+                machine,
+                &[
+                    "'X'",
+                    "ACCT-ID",
+                    "UPON",
+                    "SYSOUT",
+                    "WITH",
+                    "NO",
+                    "ADVANCING"
+                ]
+            ),
+            b"X00000000042"
+        );
+        let address = display_operands(machine, &["'X'", "ADDRESS", "OF", "ACCT-ID"]);
+        assert_eq!(address.len(), 10);
+        assert_eq!(address[0], b'X');
+        assert_eq!(address[9], b'\n');
     }
     #[test]
     fn hello_executes_in_bounded_quanta() {
