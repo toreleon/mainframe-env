@@ -127,6 +127,51 @@ when patch epic [#42](https://github.com/toreleon/mainframe-env/issues/42)
 entered implementation, and pull request #43 closed them after its complete
 hosted gate passed.
 
+## Plan-track issues
+
+The goal-aligned plan work of 2026-09-24 to 2026-09-26 runs beside the version ladder: it corrects
+behaviour that released versions already claim and adds independent evidence,
+rather than delivering a new version's surface. Its issues therefore sit
+outside the version epics. None carries a milestone yet; the column below
+names the version line or epic whose behaviour each issue corrects, so a
+milestone can be chosen when the work is scheduled. Priority is the Project's
+`Priority` field.
+
+| Issue | Priority | Finding | Roadmap relation | Open pull request |
+|---|---|---|---|---|
+| [#237](https://github.com/toreleon/mainframe-env/issues/237) | P1 | SORT honours SORT FIELDS keys and INCLUDE/OMIT, or fails closed | 0.8 JES2 and utilities (#14) | [#248](https://github.com/toreleon/mainframe-env/pull/248) |
+| [#246](https://github.com/toreleon/mainframe-env/issues/246) | P1 | Utility handlers declare their accepted operands and fail closed | 0.8 JES2 and utilities (#14) | [#250](https://github.com/toreleon/mainframe-env/pull/250) |
+| [#249](https://github.com/toreleon/mainframe-env/issues/249) | P1 | Empty SORTOUT generation makes the next COBOL step abend U0999 | 0.6 datasets (#12) | [#256](https://github.com/toreleon/mainframe-env/pull/256) |
+| [#252](https://github.com/toreleon/mainframe-env/issues/252) | P1 | An abended COBOL step loses its DISPLAY output | 0.8 JES2 (#14) | [#257](https://github.com/toreleon/mainframe-env/pull/257) |
+| [#253](https://github.com/toreleon/mainframe-env/issues/253) | P1 | Four checks already failing on main 7765d48b | Repository health | [#258](https://github.com/toreleon/mainframe-env/pull/258) |
+| [#244](https://github.com/toreleon/mainframe-env/issues/244) | P2 | README status matches the facts | Documentation | [#247](https://github.com/toreleon/mainframe-env/pull/247) |
+| [#245](https://github.com/toreleon/mainframe-env/issues/245) | P1 | Per-assertion oracle provenance (ADR-0024) | 0.8 evidence; prerequisite for 0.17 (#23) | [#255](https://github.com/toreleon/mainframe-env/pull/255) |
+| [#251](https://github.com/toreleon/mainframe-env/issues/251) | P0 | MOVE of a quoted numeric literal to PIC 9 must zero-fill | 0.4 COBOL execution (#10) | [#248](https://github.com/toreleon/mainframe-env/pull/248) |
+| [#254](https://github.com/toreleon/mainframe-env/issues/254) | P0 | WRITE record-name without FROM writes the record area | 0.4 COBOL execution (#10) | [#248](https://github.com/toreleon/mainframe-env/pull/248) |
+| [#260](https://github.com/toreleon/mainframe-env/issues/260) | P1 | ADR-0025 licence and provenance policy (Proposed; needs counsel) | Gates licensed evidence for 0.10–0.15, 0.17 (#23) and 1.0 (#24) | [#263](https://github.com/toreleon/mainframe-env/pull/263) |
+| [#261](https://github.com/toreleon/mainframe-env/issues/261) | P1 | Reproducible run bundle for CardDemo READACCT (ADR-0026) | modernize-ai artifact boundary; no version epic | [#282](https://github.com/toreleon/mainframe-env/pull/282) |
+| [#262](https://github.com/toreleon/mainframe-env/issues/262) | P2 | Independent expected outputs for CardDemo base-batch | 0.8 evidence; toward 0.17 (#23) | [#269](https://github.com/toreleon/mainframe-env/pull/269), [#288](https://github.com/toreleon/mainframe-env/pull/288) |
+| [#259](https://github.com/toreleon/mainframe-env/issues/259) | P2 | Semantic differential campaign against GnuCOBOL | 0.4 COBOL execution (#10); development checking only | [#293](https://github.com/toreleon/mainframe-env/pull/293) |
+| [#229](https://github.com/toreleon/mainframe-env/issues/229) | P1 | Numeric-edited MOVE keeps insertion commas inside suppression | 0.4 COBOL execution (#10) | [#272](https://github.com/toreleon/mainframe-env/pull/272) |
+| [#231](https://github.com/toreleon/mainframe-env/issues/231) | P1 | CR/DB sign suffix rendering | 0.4 COBOL execution (#10) | [#272](https://github.com/toreleon/mainframe-env/pull/272) |
+| [#230](https://github.com/toreleon/mainframe-env/issues/230) | P1 | Floating currency `$` in numeric-edited pictures | 0.4 COBOL execution (#10) | [#283](https://github.com/toreleon/mainframe-env/pull/283) |
+| [#287](https://github.com/toreleon/mainframe-env/issues/287) | P1 | Zero value in an all-Z picture prints `.00` instead of spaces | 0.4 COBOL execution (#10) | [#290](https://github.com/toreleon/mainframe-env/pull/290) |
+| [#264](https://github.com/toreleon/mainframe-env/issues/264) | P1 | Scaled binary items with VALUE act as zero; TRUNC(STD) | 0.4 COBOL execution (#10) | [#281](https://github.com/toreleon/mainframe-env/pull/281) |
+| [#265](https://github.com/toreleon/mainframe-env/issues/265) | P2 | DIVIDE … ROUNDED and REMAINDER | 0.4 COBOL execution (#10) | [#285](https://github.com/toreleon/mainframe-env/pull/285) |
+| [#286](https://github.com/toreleon/mainframe-env/issues/286) | P1 | Numeric overflow abends instead of truncating (DISPLAY, COMP-3) | 0.4 COBOL execution (#10) | [#291](https://github.com/toreleon/mainframe-env/pull/291) |
+| [#277](https://github.com/toreleon/mainframe-env/issues/277) | P1 | DISPLAY drops a literal that starts with a data name | 0.4 COBOL execution (#10) | [#280](https://github.com/toreleon/mainframe-env/pull/280) |
+| [#270](https://github.com/toreleon/mainframe-env/issues/270) | P1 | WRITE to RECORD VARYING … DEPENDING ON writes the full record | 0.4 COBOL execution (#10) | [#275](https://github.com/toreleon/mainframe-env/pull/275) |
+| [#266](https://github.com/toreleon/mainframe-env/issues/266) | P1 | EXEC PARM is not passed to the COBOL main program | 0.8 JES2 (#14) | [#278](https://github.com/toreleon/mainframe-env/pull/278) |
+| [#267](https://github.com/toreleon/mainframe-env/issues/267) | P1 | DCB=(*.ddname) referback is ignored | 0.7 JCL (#13) | [#274](https://github.com/toreleon/mainframe-env/pull/274) |
+| [#268](https://github.com/toreleon/mainframe-env/issues/268) | P2 | Tooling tests fail on main | Repository health | [#284](https://github.com/toreleon/mainframe-env/pull/284) |
+| [#271](https://github.com/toreleon/mainframe-env/issues/271) | P2 | Confirm `/` and `0` insertion inside zero suppression against IBM | 0.4 COBOL execution (#10); needs an IBM source | — |
+| [#273](https://github.com/toreleon/mainframe-env/issues/273) | P1 | New datasets without DCB default silently to Variable/32760 | 0.6 datasets (#12) and 0.8 JES2 (#14); may need an ADR | — |
+
+Pull requests stack where fixes touch the same code. Base order, from main:
+#258 → #293; #248 → #250; #248 → #255 → #269 → #288; #255 → #282;
+#272 → #283 → #290; #281 → #285 and #291. #288 merges every fix branch and is the integration
+view. Issues #271 and #273 have no pull request.
+
 ## Operating rules
 
 1. Keep one epic issue and one milestone per product version.
@@ -171,3 +216,20 @@ of fact, not proposals.
   The licensed differential is a hard gate for
   [#23](https://github.com/toreleon/mainframe-env/issues/23) (0.17.0) and must
   clear before 1.0.0.
+- The version table names `0.8.2` and `0.8.3` milestones, but neither exists
+  on GitHub; `VERSION` on main is `0.8.3` and the newest tag is
+  `mainframe-env-v0.8.2`. Milestone `0.8.0` is still open with no open issues
+  although its version is published and its epic
+  [#14](https://github.com/toreleon/mainframe-env/issues/14) is closed.
+- The plan-track pull requests (#247, #248, #250, #255–#258, #263, #269,
+  #272, #274, #275, #278, #280–#285, #288, #290, #291 and #293) carry no type
+  label and no milestone, contrary to rule 5, and their issues carry no
+  milestone.
+- Independent checking in #262 and #259 found that the recorded 0.8 CardDemo
+  base-batch receipt had captured product output that GnuCOBOL disagrees with
+  ([#229](https://github.com/toreleon/mainframe-env/issues/229),
+  [#266](https://github.com/toreleon/mainframe-env/issues/266),
+  [#267](https://github.com/toreleon/mainframe-env/issues/267),
+  [#287](https://github.com/toreleon/mainframe-env/issues/287)). The corrected
+  receipt is in pull request #288 and is not merged. GnuCOBOL is a development
+  reference, not IBM authority, and earns no licensed credit.
