@@ -520,8 +520,8 @@ mod tests {
         let v2 = crate::json(&root.join(V2_PATH)).unwrap();
         let summary = validate_carddemo_provenance(&v2, &v1).unwrap();
         assert_eq!(summary.total, 90);
-        assert_eq!(summary.self_recorded, 87);
-        assert_eq!(summary.conformance, 3);
+        assert_eq!(summary.self_recorded, 86);
+        assert_eq!(summary.conformance, 4);
         let source_for = |path| {
             v2["expected_value_provenance"]
                 .as_array()
@@ -538,7 +538,7 @@ mod tests {
         );
         assert_eq!(
             source_for("/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00"),
-            "self-recorded"
+            "independent-reference"
         );
     }
 }

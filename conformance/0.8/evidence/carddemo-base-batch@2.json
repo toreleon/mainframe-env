@@ -8,7 +8,7 @@
     "DATASET:AWS.M2.CARDDEMO.STATEMNT.HTML: #266: HTML statement record 916 now prints interest TRAN-ID 2022071800000037 from the PARM date.",
     "DATASET:AWS.M2.CARDDEMO.STATEMNT.PS: #266: text statement record 174 now prints interest TRAN-ID 2022071800000037 from the PARM date.",
     "DATASET:AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00: #266: 50 interest TRAN-IDs gain 20220718; matching the 312 records by bytes after the ID shows all payloads unchanged.",
-    "DATASET:AWS.M2.CARDDEMO.TRANREPT.G0001V00: #266/#229/#230: report has dated interest IDs and corrected amount commas/signs; GnuCOBOL matches 518/519 records. Record 72 zero amount .00 still differs, so this leaf stays self-recorded.",
+    "DATASET:AWS.M2.CARDDEMO.TRANREPT.G0001V00: #287: report record 72 zero amount changed from CP037 4b f0 f0 (.00) to 40 40 40 (spaces) at bytes 110-112; the other 518 records are unchanged. The independent GnuCOBOL report now matches all 519 records.",
     "DATASET:AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00: #266/#267: selected records include dated interest IDs; DCB=(*.SORTIN) now gives FB/350. JCL-derived reference digest matches.",
     "DATASET:AWS.M2.CARDDEMO.TRXFL.SEQ: #266: the 350-byte cross-reference records include dated interest TRAN-IDs after the 16-byte card key; record 44 contains 2022071800000037.",
     "DATASET:AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX: #266: the alternate index contains the 312 transaction records with the 50 corrected interest IDs; records share the KSDS payload.",
@@ -18,9 +18,9 @@
     "DATASET:AWS.M2.CARDDEMO.SYSTRAN.G0001V00: #266: all 50 generated interest records now start with a 20220718 TRAN-ID; the first is 2022071800000001.",
     "DATASET:AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS: #266: the transaction KSDS has 50 corrected interest IDs; the first source record is 2022071800000001.",
     "SPOOL:TRANREPT: #266/#277: STEP10R SYSPRINT shows dated interest TRAN-IDs and the literal labels TRAN-AMT and WS-PAGE-TOTAL.",
-    "journey_shape_sha256: #266/#267/#229/#230/#277: journey shape hashes the refreshed dataset and TRANREPT spool digests above; all fixed counts are unchanged."
+    "journey_shape_sha256: #287: recomputed from the TRANREPT dataset digest after report record 72 bytes 110-112 changed from CP037 4b f0 f0 (.00) to 40 40 40 (spaces); all other counts, dataset digests, and spool digests are unchanged."
   ],
-  "evidence_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+  "evidence_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
   "receipt": {
     "schema_version": "mainframe-env.carddemo-base-batch-receipt@1",
     "status": "pass",
@@ -71,7 +71,7 @@
       "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS": "ffac4bd1dc8f3503e9aa42ad11e5b81c35fe863f2937759b2b7aaf643f6c45fb",
       "AWS.M2.CARDDEMO.TRANCATG.PS": "69101981f70d9d11ab80015eba27817424613b0e806e00d28a369ea4a69b2052",
       "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS": "0351ebae75a4ddd4fb923d186a12f37af1222efc5b46c0f5e572cfb5c446c7b1",
-      "AWS.M2.CARDDEMO.TRANREPT.G0001V00": "428d34445de482646cdeff9438e7727caaeea3cf162b9565fa44c631acb00971",
+      "AWS.M2.CARDDEMO.TRANREPT.G0001V00": "9cf4e88ced43311304825bbb0aebd36fd48c9cf3c773638087c012b17895bc54",
       "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0001V00": "d38678af10080154b14d42be6d80a0ec4fac9509b3357e15962d0602b6b79208",
       "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00": "cfece72872a702e7bce009fbb8cd4c445a5bdbce9221a06bd41fba97e224a773",
       "AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00": "cfece72872a702e7bce009fbb8cd4c445a5bdbce9221a06bd41fba97e224a773",
@@ -117,7 +117,7 @@
       "TRANTYPE": "03ebeb9f7b0abe1d24cd392ac3b0d7943b3d6d16823fccbc192ec527e88759d2",
       "XREFFILE": "e9ec102ea373bbc5816628b21dc069b6a520c33ce6831308df461f003d769845"
     },
-    "journey_shape_sha256": "873b087be2acf4a4106f7485b9f40612bdaac760ce57965c929fdc95776a0b25"
+    "journey_shape_sha256": "77bf7c02b34eb73c7c20dcda5341bb78cf5b3dd78eceacf211d9668624921baa"
   },
   "expected_value_provenance": [
     {
@@ -382,22 +382,22 @@
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.HTML",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.HTML"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.PS",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.PS"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.SYSTRAN.G0001V00",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.SYSTRAN.G0001V00"
     },
     {
@@ -444,10 +444,10 @@
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00",
-      "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00"
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:a3885c5b0920084a898a8b0b423449dd4353ccd4a5020ae6d22e9ec4de73632e",
+      "source_locator": "/results/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0001V00",
@@ -459,15 +459,15 @@
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00"
     },
     {
@@ -480,22 +480,22 @@
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS"
     },
     {
@@ -515,15 +515,15 @@
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.SEQ",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.SEQ"
     },
     {
       "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS"
     },
     {
@@ -725,8 +725,8 @@
     {
       "assertion_path": "/spool_sha256/TRANREPT",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/spool_sha256/TRANREPT"
     },
     {
@@ -746,8 +746,8 @@
     {
       "assertion_path": "/journey_shape_sha256",
       "source": "self-recorded",
-      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
-      "source_digest": "sha256:3b0c07e717f3fd964e98dbb52477f60aafe188f4b6143ae94be192c9a91f99ab",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
       "source_locator": "/receipt/journey_shape_sha256"
     }
   ]
