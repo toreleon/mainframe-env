@@ -5381,10 +5381,11 @@ impl ReferenceMachine {
             .checked_add(u32::from(rounded))
             .ok_or(MachineProblem::SizeError)?;
         let mut quotient = decimal_divide(self.arithmetic_mode, dividend, divisor, quotient_scale)?;
+        let truncated_quotient = decimal_rescale(quotient, target_reference.layout.scale)?;
         quotient = if rounded {
             decimal_rescale_rounded(quotient, target_reference.layout.scale)?
         } else {
-            decimal_rescale(quotient, target_reference.layout.scale)?
+            truncated_quotient
         };
         let mut assignments = vec![(target, quotient, rounded)];
         if let Some(remainder) = remainder {
@@ -5395,7 +5396,7 @@ impl ReferenceMachine {
             let value = decimal_subtract(
                 self.arithmetic_mode,
                 dividend,
-                decimal_multiply(self.arithmetic_mode, divisor, quotient)?,
+                decimal_multiply(self.arithmetic_mode, divisor, truncated_quotient)?,
             )?;
             assignments.push((vec![target], value, false));
         }
@@ -12537,6 +12538,136 @@ mod tests {
         ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_ir::{Effect, IrLimits, ModuleBuilder};
+
+    fn divide_rounding_machine() -> ReferenceMachine {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        for name in ["R", "SRC", "Q", "REM"] {
+            let base = machine.bases.len();
+            machine.bases.push(vec![b'0'; 9]);
+            machine.views.insert(
+                name.into(),
+                StorageView {
+                    base,
+                    offset: 0,
+                    length: 9,
+                },
+            );
+            machine.layouts.insert(
+                name.into(),
+                LayoutMetadata {
+                    name: name.into(),
+                    simple_name: name.into(),
+                    category: LayoutCategory::NumericDisplay,
+                    picture: "S9(7)V99".into(),
+                    digits: 9,
+                    scale: 2,
+                    native_binary: false,
+                    signed: true,
+                    sign_separate: false,
+                    justified_right: false,
+                    blank_when_zero: false,
+                    linkage: false,
+                    offset: 0,
+                    length: 9,
+                    element_length: 9,
+                    occurs: 1,
+                    occurs_min: 1,
+                    unbounded: false,
+                    depending_on: None,
+                    indexes: Vec::new(),
+                    keys: Vec::new(),
+                    dynamic: false,
+                    dynamic_limit: 0,
+                    parent: None,
+                    alias_of: None,
+                    occurs_clause: false,
+                    condition_values: Vec::new(),
+                    object_class: None,
+                },
+            );
+        }
+        machine
+    }
+
+    #[test]
+    fn divide_rounded_forms_preserve_guard_digit_and_truncated_remainder() {
+        for (case, dividend, divisor, expected, expected_remainder) in [
+            ("positive tie", 9585, 2, 4793, 1),
+            ("negative tie", -9585, 2, -4793, -1),
+            ("negative divisor tie", 9585, -2, -4793, 1),
+            ("positive non-tie", 9584, 3, 3195, 2),
+            ("negative non-tie", -9584, 3, -3195, -2),
+        ] {
+            for form in [
+                "into",
+                "into giving",
+                "by giving",
+                "into giving remainder",
+                "by giving remainder",
+                "compute",
+            ] {
+                let mut machine = divide_rounding_machine();
+                let source = Decimal {
+                    coefficient: dividend,
+                    scale: 2,
+                };
+                machine.write_decimal("R", source).unwrap();
+                machine.write_decimal("SRC", source).unwrap();
+                let divisor = divisor.to_string();
+                let tokens: Vec<String> = match form {
+                    "into" => vec![divisor.as_str(), "INTO", "R", "ROUNDED"],
+                    "into giving" => {
+                        vec![divisor.as_str(), "INTO", "SRC", "GIVING", "Q", "ROUNDED"]
+                    }
+                    "by giving" => vec!["SRC", "BY", divisor.as_str(), "GIVING", "Q", "ROUNDED"],
+                    "into giving remainder" => vec![
+                        divisor.as_str(),
+                        "INTO",
+                        "SRC",
+                        "GIVING",
+                        "Q",
+                        "ROUNDED",
+                        "REMAINDER",
+                        "REM",
+                    ],
+                    "by giving remainder" => vec![
+                        "SRC",
+                        "BY",
+                        divisor.as_str(),
+                        "GIVING",
+                        "Q",
+                        "ROUNDED",
+                        "REMAINDER",
+                        "REM",
+                    ],
+                    "compute" => vec!["Q", "ROUNDED", "=", "SRC", "/", divisor.as_str()],
+                    _ => unreachable!(),
+                }
+                .into_iter()
+                .map(str::to_string)
+                .collect();
+                if form == "compute" {
+                    machine.arithmetic("compute", &tokens, false).unwrap();
+                } else {
+                    machine.divide_statement(&tokens, false).unwrap();
+                }
+                let target = if form == "into" { "R" } else { "Q" };
+                assert_eq!(
+                    machine.decimal(target).unwrap().coefficient,
+                    expected,
+                    "{case}: {form} quotient"
+                );
+                if form.contains("remainder") {
+                    assert_eq!(
+                        machine.decimal("REM").unwrap().coefficient,
+                        expected_remainder,
+                        "{case}: {form} remainder"
+                    );
+                }
+            }
+        }
+    }
     pub(super) fn invocation() -> Invocation {
         let l = InvocationLimits::default();
         Invocation::new(
