@@ -148,6 +148,7 @@ struct ResolvedReference {
 struct FileMetadata {
     assignment: String,
     record_name: Option<String>,
+    record_names: Vec<String>,
     organization: String,
     access_mode: String,
     record_key: Option<String>,
@@ -313,6 +314,8 @@ enum PendingKind {
     },
     DatasetRead {
         target: Option<String>,
+        into: Option<String>,
+        depending_on: Option<String>,
         status: Option<String>,
         ccsid: Option<u16>,
         declarative: Option<String>,
@@ -1671,7 +1674,9 @@ impl ReferenceMachine {
             }
             (
                 PendingKind::DatasetRead {
-                    target: Some(target),
+                    target,
+                    into,
+                    depending_on,
                     status,
                     ccsid,
                     ..
@@ -1686,7 +1691,17 @@ impl ReferenceMachine {
                     "00".into()
                 };
                 if let Some(record) = records.first() {
-                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                    let decoded = decode_dataset_record(ccsid, record)?;
+                    if let Some(target) = target {
+                        self.finish_dataset_read(
+                            &target,
+                            into.as_deref(),
+                            depending_on.as_deref(),
+                            &decoded,
+                        )?;
+                    } else if let Some(into) = into {
+                        self.write(&into, &decoded)?;
+                    }
                 }
                 if let Some(status) = status {
                     self.write(&status, if records.is_empty() { b"10" } else { b"00" })?;
@@ -1695,6 +1710,8 @@ impl ReferenceMachine {
             (
                 PendingKind::DatasetRead {
                     target,
+                    into,
+                    depending_on,
                     status,
                     ccsid,
                     ..
@@ -1708,8 +1725,18 @@ impl ReferenceMachine {
                 } else {
                     "10".into()
                 };
-                if let Some((target, record)) = target.zip(record.as_ref()) {
-                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                if let Some(record) = record.as_ref() {
+                    let decoded = decode_dataset_record(ccsid, record)?;
+                    if let Some(target) = target {
+                        self.finish_dataset_read(
+                            &target,
+                            into.as_deref(),
+                            depending_on.as_deref(),
+                            &decoded,
+                        )?;
+                    } else if let Some(into) = into {
+                        self.write(&into, &decoded)?;
+                    }
                 }
                 if let Some(status) = status {
                     self.write(&status, if record.is_some() { b"00" } else { b"10" })?;
@@ -3957,7 +3984,10 @@ impl ReferenceMachine {
         let file = self.files.get(&logical_name).cloned().or_else(|| {
             self.files
                 .values()
-                .find(|file| file.record_name.as_deref() == Some(logical_name.as_str()))
+                .find(|file| {
+                    file.record_name.as_deref() == Some(logical_name.as_str())
+                        || file.record_names.iter().any(|name| name == &logical_name)
+                })
                 .cloned()
         });
         let start_key = (name == "start")
@@ -4098,12 +4128,9 @@ impl ReferenceMachine {
                 None,
             ),
             "write" => {
-                let record = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.first())
-                    .map(|value| self.resolve(value))
-                    .transpose()?
-                    .unwrap_or_default();
+                let record_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+                let from = position(args, "FROM").and_then(|index| args.get(index + 1));
+                let record = self.dataset_output_record(file.as_ref(), record_name, from)?;
                 validate_record_length(file.as_ref(), record.len())?;
                 let records = vec![encode_dataset_record(ccsid, &record)?];
                 (
@@ -4128,12 +4155,9 @@ impl ReferenceMachine {
                 )
             }
             "rewrite" => {
-                let record = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.first())
-                    .map(|value| self.resolve(value))
-                    .transpose()?
-                    .unwrap_or_default();
+                let record_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+                let from = position(args, "FROM").and_then(|index| args.get(index + 1));
+                let record = self.dataset_output_record(file.as_ref(), record_name, from)?;
                 validate_record_length(file.as_ref(), record.len())?;
                 (
                     DatasetRequest::RewriteRecord {
@@ -4238,6 +4262,9 @@ impl ReferenceMachine {
             _ => (DatasetRequest::Attributes { dataset }, None),
         };
         let target = (name == "read")
+            .then(|| file.as_ref().and_then(|file| file.record_name.clone()))
+            .flatten();
+        let into = (name == "read")
             .then(|| position(args, "INTO").and_then(|index| args.get(index + 1).cloned()))
             .flatten();
         let declarative = self
@@ -4258,6 +4285,10 @@ impl ReferenceMachine {
         let pending = if name == "read" {
             PendingKind::DatasetRead {
                 target,
+                into,
+                depending_on: file
+                    .as_ref()
+                    .and_then(|file| file_record_depending(&file.description)),
                 status,
                 ccsid,
                 declarative,
@@ -4279,6 +4310,64 @@ impl ReferenceMachine {
             }
         };
         self.effect(HostRequest::Dataset(request), pending)
+    }
+
+    fn dataset_output_record(
+        &mut self,
+        file: Option<&FileMetadata>,
+        record_name: &str,
+        from: Option<&String>,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        let mut record = if let Some(from) = from {
+            let source = self.resolve(from)?;
+            if file.is_some() {
+                self.write(record_name, &source)?;
+                self.resolve(record_name)?
+            } else {
+                source
+            }
+        } else {
+            self.resolve(record_name)?
+        };
+        if let Some(file) = file
+            && let Some(depending_on) = file_record_depending(&file.description)
+        {
+            let value = self.decimal(&depending_on)?;
+            if value.scale != 0 || value.coefficient < 0 {
+                return Err(MachineProblem::SizeError);
+            }
+            let length =
+                usize::try_from(value.coefficient).map_err(|_| MachineProblem::SizeError)?;
+            validate_record_length(Some(file), length)?;
+            if length > record.len() {
+                return Err(MachineProblem::SizeError);
+            }
+            record.truncate(length);
+        }
+        Ok(record)
+    }
+
+    fn finish_dataset_read(
+        &mut self,
+        target: &str,
+        into: Option<&str>,
+        depending_on: Option<&str>,
+        record: &[u8],
+    ) -> Result<(), MachineProblem> {
+        self.write(target, record)?;
+        if let Some(depending_on) = depending_on {
+            self.write_decimal(
+                depending_on,
+                Decimal {
+                    coefficient: record.len() as i128,
+                    scale: 0,
+                },
+            )?;
+        }
+        if let Some(into) = into {
+            self.write(into, record)?;
+        }
+        Ok(())
     }
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
@@ -9378,6 +9467,12 @@ fn file_metadata(
         let metadata = FileMetadata {
             assignment: text_attribute(operation, "assignment")?.to_ascii_uppercase(),
             record_name: optional("record_name")?,
+            record_names: optional_text_attribute(operation, "record_names")
+                .unwrap_or("")
+                .split('\u{1f}')
+                .filter(|name| !name.is_empty())
+                .map(str::to_ascii_uppercase)
+                .collect(),
             organization: text_attribute(operation, "organization")?.to_ascii_uppercase(),
             access_mode: text_attribute(operation, "access_mode")?.to_ascii_uppercase(),
             record_key: optional("record_key")?,
@@ -9471,6 +9566,27 @@ fn file_record_bounds(description: &str) -> (Option<usize>, Option<usize>) {
         return (from, to);
     }
     (None, None)
+}
+
+fn file_record_depending(description: &str) -> Option<String> {
+    let words = file_contract_words(description);
+    let record = words.iter().position(|word| *word == "RECORD")?;
+    // "IS" is optional: RECORD [IS] VARYING [IN] [SIZE] ... DEPENDING [ON] data-name.
+    let varying = if words.get(record + 1) == Some(&"IS") {
+        record + 2
+    } else {
+        record + 1
+    };
+    if words.get(varying) != Some(&"VARYING") {
+        return None;
+    }
+    let depending = words.iter().position(|word| *word == "DEPENDING")?;
+    let name = if words.get(depending + 1) == Some(&"ON") {
+        depending + 2
+    } else {
+        depending + 1
+    };
+    words.get(name).map(|name| name.to_string())
 }
 
 fn file_ccsid(description: &str) -> Option<u16> {
@@ -12686,6 +12802,7 @@ mod tests {
             FileMetadata {
                 assignment: "TESTFILE".into(),
                 record_name: Some("REC".into()),
+                record_names: vec!["REC".into()],
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -12711,6 +12828,9 @@ mod tests {
             ),
             (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
         ] {
+            // WRITE ... FROM moves into the record area first (#270), so reset it per case.
+            machine.write_raw("REC", b"REC01").unwrap();
+            let from = args.contains(&"FROM");
             let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
             let step = machine.dataset_effect("write", &args).unwrap();
             let Step::Effect(effect) = step else {
@@ -12730,6 +12850,9 @@ mod tests {
                 })
                 .unwrap();
             assert_eq!(machine.resolve("FILE-STATUS").unwrap(), b"00");
+            if from {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
         }
     }
     #[test]
@@ -13279,6 +13402,247 @@ mod tests {
                 scale: 1
             }
         );
+    }
+    #[test]
+    fn varying_record_depending_accepts_optional_is_and_on() {
+        for description in [
+            "FD VBRC-FILE RECORDING MODE IS V RECORD IS VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-RECD-LEN",
+            "FD VBRC-FILE RECORD VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-RECD-LEN",
+            "FD VBRC-FILE RECORD IS VARYING FROM 10 TO 80 DEPENDING WS-RECD-LEN",
+        ] {
+            assert_eq!(
+                file_record_depending(description).as_deref(),
+                Some("WS-RECD-LEN"),
+                "{description}"
+            );
+        }
+        assert_eq!(
+            file_record_depending("FD F RECORD CONTAINS 80 CHARACTERS"),
+            None
+        );
+        assert_eq!(
+            file_record_depending("FD F RECORD IS VARYING IN SIZE FROM 10 TO 80"),
+            None
+        );
+    }
+
+    fn varying_file_machine() -> ReferenceMachine {
+        let mut m =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        m.files.insert("VBFILE".into(), FileMetadata {
+            assignment: "VBPS".into(), record_name: Some("VBR-REC".into()),
+            record_names: vec!["VBR-REC".into()],
+            organization: "SEQUENTIAL".into(), access_mode: "SEQUENTIAL".into(),
+            record_key: None, alternate_record_keys: Vec::new(), relative_key: None,
+            file_status: None, sort_merge: false,
+            description: "FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS DEPENDING ON WS-RECD-LEN".into(),
+            record_min: Some(10), record_max: Some(80), ccsid: None, linage: None,
+        });
+        let base = m.bases.len();
+        m.bases.push(vec![b'A'; 80]);
+        m.views.insert(
+            "VBR-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 80,
+            },
+        );
+        let base = m.bases.len();
+        m.bases.push(b"0012".to_vec());
+        m.views.insert(
+            "WS-RECD-LEN".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 4,
+            },
+        );
+        m.layouts.insert(
+            "WS-RECD-LEN".into(),
+            LayoutMetadata {
+                name: "WS-RECD-LEN".into(),
+                simple_name: "WS-RECD-LEN".into(),
+                category: LayoutCategory::NumericDisplay,
+                picture: "9(4)".into(),
+                digits: 4,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
+                justified_right: false,
+                blank_when_zero: false,
+                linkage: false,
+                offset: 0,
+                length: 4,
+                element_length: 4,
+                occurs: 1,
+                occurs_min: 1,
+                unbounded: false,
+                depending_on: None,
+                indexes: Vec::new(),
+                keys: Vec::new(),
+                dynamic: false,
+                dynamic_limit: 0,
+                parent: None,
+                alias_of: None,
+                occurs_clause: false,
+                condition_values: Vec::new(),
+                object_class: None,
+            },
+        );
+        m
+    }
+
+    #[test]
+    fn varying_write_uses_depending_length_and_read_restores_it() {
+        let mut m = varying_file_machine();
+        for (length, fill) in [(12, b'A'), (39, b'B')] {
+            m.write("WS-RECD-LEN", format!("{length:04}").as_bytes())
+                .unwrap();
+            m.write("VBR-REC", &[fill; 80]).unwrap();
+            let Step::Effect(effect) = m.dataset_effect("write", &["VBR-REC".into()]).unwrap()
+            else {
+                panic!("expected effect")
+            };
+            let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request
+            else {
+                panic!("expected append")
+            };
+            assert_eq!(records[0], vec![fill; length]);
+            m.pending = None;
+        }
+        m.write("WS-RECD-LEN", b"0080").unwrap();
+        let Step::Effect(effect) = m.dataset_effect("read", &["VBFILE".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        m.resume_host(EffectResult {
+            sequence: effect.sequence,
+            outcome: Ok(HostResult::Dataset(
+                mainframe_env_host_api::DatasetResult::Records {
+                    records: vec![vec![b'A'; 12]],
+                    identities: vec![b"1".to_vec()],
+                    version: 1,
+                },
+            )),
+        })
+        .unwrap();
+        assert_eq!(m.read("WS-RECD-LEN").unwrap(), b"0012");
+        assert_eq!(&m.read("VBR-REC").unwrap()[..12], &[b'A'; 12]);
+        let base = m.bases.len();
+        m.bases.push(vec![b' '; 80]);
+        m.views.insert(
+            "INTO-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 80,
+            },
+        );
+        let Step::Effect(effect) = m
+            .dataset_effect("read", &["VBFILE".into(), "INTO".into(), "INTO-REC".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        m.resume_host(EffectResult {
+            sequence: effect.sequence,
+            outcome: Ok(HostResult::Dataset(
+                mainframe_env_host_api::DatasetResult::Records {
+                    records: vec![vec![b'B'; 39]],
+                    identities: vec![b"2".to_vec()],
+                    version: 2,
+                },
+            )),
+        })
+        .unwrap();
+        assert_eq!(m.read("WS-RECD-LEN").unwrap(), b"0039");
+        assert_eq!(&m.read("INTO-REC").unwrap()[..39], &[b'B'; 39]);
+    }
+
+    #[test]
+    fn varying_write_from_uses_fd_length_and_rejects_out_of_bounds() {
+        let mut m = varying_file_machine();
+        m.implicit
+            .insert("SOURCE".into(), CobolValue::Bytes(vec![b'C'; 80]));
+        let Step::Effect(effect) = m
+            .dataset_effect("write", &["VBR-REC".into(), "FROM".into(), "SOURCE".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request else {
+            panic!("expected append")
+        };
+        assert_eq!(records[0], vec![b'C'; 12]);
+        m.pending = None;
+        m.implicit
+            .insert("SOURCE".into(), CobolValue::Bytes(b"SHORT!".to_vec()));
+        let Step::Effect(effect) = m
+            .dataset_effect("write", &["VBR-REC".into(), "FROM".into(), "SOURCE".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request else {
+            panic!("expected append")
+        };
+        assert_eq!(records[0], b"SHORT!      ");
+        m.pending = None;
+        for length in [9, 81] {
+            m.write("WS-RECD-LEN", format!("{length:04}").as_bytes())
+                .unwrap();
+            assert!(matches!(
+                m.dataset_effect("write", &["VBR-REC".into()]),
+                Err(MachineProblem::SizeError)
+            ));
+        }
+    }
+
+    #[test]
+    fn varying_without_depending_uses_named_fd_record_size() {
+        let mut m = varying_file_machine();
+        let file = m.files.get_mut("VBFILE").unwrap();
+        file.record_name = Some("SHORT-REC".into());
+        file.record_names = vec!["SHORT-REC".into(), "LONG-REC".into()];
+        file.description = "FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS".into();
+        let base = m.bases.len();
+        m.bases.push(vec![b'Z'; 39]);
+        m.views.insert(
+            "LONG-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 39,
+            },
+        );
+        let Step::Effect(effect) = m.dataset_effect("write", &["LONG-REC".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append {
+            dataset, records, ..
+        }) = effect.request
+        else {
+            panic!("expected append")
+        };
+        assert_eq!(dataset.as_str(), "VBPS");
+        assert_eq!(records[0], vec![b'Z'; 39]);
+    }
+
+    #[test]
+    fn varying_rewrite_uses_depending_length() {
+        let mut m = varying_file_machine();
+        m.files.get_mut("VBFILE").unwrap().record_key = Some("KEY".into());
+        m.implicit
+            .insert("KEY".into(), CobolValue::Bytes(b"K".to_vec()));
+        m.write("WS-RECD-LEN", b"0039").unwrap();
+        let Step::Effect(effect) = m.dataset_effect("rewrite", &["VBR-REC".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::RewriteRecord { record, .. }) = effect.request
+        else {
+            panic!("expected rewrite")
+        };
+        assert_eq!(record, vec![b'A'; 39]);
     }
 }
 
