@@ -7055,6 +7055,11 @@ impl ReferenceMachine {
         Err(MachineProblem::UnsupportedForm)
     }
 
+    fn eval_function_argument(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
+        self.eval_value(tokens)
+            .or_else(|_| self.eval_expression(tokens).map(CobolValue::Decimal))
+    }
+
     fn eval_function(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
         let name = tokens.get(1).ok_or(MachineProblem::InvalidOperation)?;
         let clock = || -> Result<Vec<u8>, MachineProblem> {
@@ -7118,7 +7123,7 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::InvalidOperation)
         };
         let decimal = |index: usize| -> Result<Decimal, MachineProblem> {
-            value_decimal(self.eval_value(argument(index)?)?)
+            value_decimal(self.eval_function_argument(argument(index)?)?)
         };
         let integer = |index: usize| -> Result<i128, MachineProblem> {
             let value = decimal(index)?;
@@ -7127,7 +7132,7 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::DataException)
         };
         let bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
-            value_bytes(self.eval_value(argument(index)?)?)
+            value_bytes(self.eval_function_argument(argument(index)?)?)
         };
         let raw_bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
             let argument = argument(index)?;
@@ -9781,13 +9786,32 @@ fn split_function_arguments<'a>(
     if arguments.len() > 1 {
         return Ok(arguments);
     }
+    let mut depth = 0usize;
+    let mut arithmetic = false;
+    for token in tokens {
+        match token.as_str() {
+            "(" => depth += 1,
+            ")" => depth = depth.saturating_sub(1),
+            "+" | "-" | "*" | "/" if depth == 0 => arithmetic = true,
+            _ => {}
+        }
+    }
+    if arithmetic && machine.eval_expression(tokens).is_ok() {
+        return Ok(arguments);
+    }
     let mut inferred = Vec::new();
     let mut at = 0usize;
     while at < tokens.len() {
         let end = (at + 1..=tokens.len())
             .rev()
-            .find(|end| machine.eval_value(&tokens[at..*end]).is_ok())
-            .ok_or(MachineProblem::InvalidOperation)?;
+            .find(|end| machine.eval_function_argument(&tokens[at..*end]).is_ok());
+        let Some(end) = end else {
+            return if arithmetic && inferred.is_empty() {
+                Ok(arguments)
+            } else {
+                Err(MachineProblem::InvalidOperation)
+            };
+        };
         inferred.push(&tokens[at..end]);
         at = end;
     }
@@ -10073,7 +10097,7 @@ fn extrema(
 ) -> Result<CobolValue, MachineProblem> {
     let values = arguments
         .iter()
-        .map(|argument| machine.eval_value(argument))
+        .map(|argument| machine.eval_function_argument(argument))
         .collect::<Result<Vec<_>, _>>()?;
     values
         .into_iter()
@@ -12573,6 +12597,46 @@ mod tests {
         match drive {
             MachineDrive::Completed(done) => assert_eq!(done.output.bytes(), b"HELLO\n"),
             other => panic!("{other:?}"),
+        }
+    }
+    #[test]
+    fn integer_evaluates_parenthesized_arithmetic_argument() {
+        let machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        let tokens = [
+            "FUNCTION", "INTEGER", "(", "(", "10", "*", "2", ")", "+", "1", ")",
+        ]
+        .map(str::to_string);
+        assert!(matches!(
+            machine.eval_value(&tokens),
+            Ok(CobolValue::Decimal(Decimal {
+                coefficient: 21,
+                scale: 0
+            }))
+        ));
+    }
+    #[test]
+    fn list_intrinsics_evaluate_arithmetic_arguments() {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        machine.implicit.insert("A".into(), integer_value(7));
+        machine.implicit.insert("B".into(), integer_value(-3));
+        for (tokens, expected) in [
+            ("FUNCTION MIN ( A , ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( ( A - 10 ) , B * 2 , 1 )", 1),
+            ("FUNCTION SUM ( A , B * 4 , 2 )", -3),
+        ] {
+            let tokens = tokens
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert!(
+                matches!(
+                    machine.eval_value(&tokens),
+                    Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 })) if coefficient == expected
+                ),
+                "{tokens:?}"
+            );
         }
     }
     #[test]
