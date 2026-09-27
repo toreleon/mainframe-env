@@ -10656,6 +10656,322 @@ mod tests {
     }
 
     #[test]
+    fn peer_basic_confirmation_consumes_send_confirm_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let target = service(store.clone());
+        target
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&target);
+        let token = target
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            )
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                vec![],
+                0,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let missing = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "missing-7",
+            )
+            .unwrap();
+        assert_eq!(missing.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .stage_basic_send_confirm(&owner, ConversationContext::Local, 7)
+            .unwrap();
+        record.state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let zero_sync = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "zero-sync-7",
+            )
+            .unwrap();
+        assert_eq!(zero_sync.outputs["RETCODE"], [3, 20, 0, 0, 0, 0]);
+        assert_eq!(zero_sync.outputs["STATE"], 84_i32.to_be_bytes());
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().sync_level = Some(1);
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let wrong_id = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                8,
+                GdsIssueFlow::Confirmation,
+                "wrong-id-8",
+            )
+            .unwrap();
+        assert_eq!(wrong_id.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().state = ConversationState::Send;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let wrong_state = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "wrong-state-7",
+            )
+            .unwrap();
+        assert_eq!(wrong_state.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        assert_eq!(wrong_state.outputs["STATE"], 91_i32.to_be_bytes());
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let foreign = registered_counter_run(&target, "foreign-basic-response");
+        assert_eq!(
+            target.accept_conversation_peer_basic_response(
+                &foreign.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "foreign-7",
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        let reply = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "confirm-7",
+            )
+            .unwrap();
+        assert_eq!(reply.outputs["RETCODE"], [0; 6]);
+        assert_eq!(reply.outputs["STATE"], 89_i32.to_be_bytes());
+        assert_eq!(
+            reply.outputs["CONVDATA"],
+            [
+                0, 0, 0, 0xff, 0, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+        let committed = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            committed.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+        assert_eq!(
+            target.accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "confirm-7",
+            ),
+            Ok(reply)
+        );
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        let no_pending = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Error,
+                "second-response-7",
+            )
+            .unwrap();
+        assert_eq!(no_pending.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .stage_basic_send_confirm(&owner, ConversationContext::Local, 8)
+            .unwrap();
+        record.state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let error = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                8,
+                GdsIssueFlow::Error,
+                "error-8",
+            )
+            .unwrap();
+        assert_eq!(error.outputs["RETCODE"], [0; 6]);
+        assert_eq!(error.outputs["STATE"], 89_i32.to_be_bytes());
+        let mut expected = [0; 24];
+        expected[3] = 0xff;
+        expected[6] = 0xff;
+        expected[7..11].copy_from_slice(&[0x08, 0x89, 0, 0]);
+        assert_eq!(error.outputs["CONVDATA"], expected);
+    }
+
+    #[test]
+    fn peer_basic_error_replays_after_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-basic-response-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("basic-response-restart", BTreeMap::new());
+        let token;
+        let committed;
+        let reply;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let session = SessionId::new("basic-response-first", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            token = target
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                )
+                .unwrap();
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let current = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = current.clone();
+            let record = next.conversation_mut(token).unwrap();
+            record
+                .connect(
+                    &owner,
+                    ConversationContext::Local,
+                    true,
+                    b"PROC".to_vec(),
+                    vec![],
+                    1,
+                )
+                .unwrap();
+            record
+                .stage_basic_send_confirm(&owner, ConversationContext::Local, 11)
+                .unwrap();
+            record.state = ConversationState::ConfReceive;
+            assert!(current.persist(&mut next, store.as_ref()).unwrap());
+            reply = target
+                .accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    11,
+                    GdsIssueFlow::Error,
+                    "error-11",
+                )
+                .unwrap();
+            assert_eq!(reply.outputs["RETCODE"], [0; 6]);
+            assert_eq!(reply.outputs["STATE"], 89_i32.to_be_bytes());
+            let mut expected = [0; 24];
+            expected[3] = 0xff;
+            expected[6] = 0xff;
+            expected[7..11].copy_from_slice(&[0x08, 0x89, 0, 0]);
+            assert_eq!(reply.outputs["CONVDATA"], expected);
+            committed = ConversationLedger::load(store.as_ref()).unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            let session = SessionId::new("basic-response-reopen", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    11,
+                    GdsIssueFlow::Error,
+                    "error-11",
+                ),
+                Ok(reply)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn peer_basic_response_rejects_mapped_and_non_appc_conversations() {
+        for kind in [ConversationKind::AppcMapped, ConversationKind::Mro] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let (invocation, _) = registered(&target);
+            let token = target
+                .install_conversation_principal_for_run(&invocation.run_unit_id, "SYS1", kind)
+                .unwrap();
+            let before = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    1,
+                    GdsIssueFlow::Error,
+                    "wrong-kind",
+                ),
+                Err(HostProblem::Unsupported)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+        }
+    }
+
+    #[test]
     fn peer_issue_abend_reopens_from_sqlite_with_exact_receipt() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-peer-issue-{}-{:?}",
