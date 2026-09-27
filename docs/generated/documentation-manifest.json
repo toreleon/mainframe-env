@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 210,
+    "markdown_documents": 211,
     "navigation_groups": 5,
     "normative_documents": 53,
     "xtask_commands": 197
@@ -1188,9 +1188,17 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/PROFILE-TRACK.md",
+      "relative_links": 7,
+      "sha256": "sha256:e9d12f3cb3d563df62b94e38ad0ad94f8e41b0c9fc7c3fc87ca79e73eac1c78c",
+      "title": "Workload-profile track",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/README.md",
-      "relative_links": 45,
-      "sha256": "sha256:92988c21b60bbfe41e273145c97b0b7f9bc594830e8187ab38e488cffa7cf7ac",
+      "relative_links": 46,
+      "sha256": "sha256:044e8c8d7fd13f74b26590f00f06c3e5f5287fc0caa19429c57866eec8dcc71f",
       "title": "IBM coverage release plans",
       "xtask_commands": 0
     },
