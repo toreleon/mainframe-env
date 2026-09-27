@@ -8,6 +8,7 @@ mod docs;
 mod evidence_seal;
 mod jcl_catalog;
 mod jcl_conformance;
+mod profile_intake;
 mod racf_catalog;
 mod release_attestation;
 mod release_licenses;
@@ -91,6 +92,18 @@ struct CheckArgs {
 }
 
 #[derive(Debug, Args)]
+struct ProfileIntakeArgs {
+    #[arg(long)]
+    manifest: PathBuf,
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long)]
+    json: PathBuf,
+    #[arg(long)]
+    markdown: PathBuf,
+}
+
+#[derive(Debug, Args)]
 struct ReleaseArgs {
     #[arg(long)]
     target: String,
@@ -167,6 +180,7 @@ enum EvidenceCommand {
 
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
+    ProfileIntake(ProfileIntakeArgs),
     Versions(CheckArgs),
     Changelog(CheckArgs),
     Docs(CheckArgs),
@@ -286,6 +300,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         };
     }
     match command {
+        XtaskCommand::ProfileIntake(args) => {
+            ("profile-intake", false, profile_intake::run(root, &args))
+        }
         XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
         XtaskCommand::Changelog(args) => checked!(
             "changelog",

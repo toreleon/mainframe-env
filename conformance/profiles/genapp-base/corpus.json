@@ -1,0 +1,17 @@
+{
+  "schema_version": "mainframe-env.profile-corpus@1",
+  "origin": "https://github.com/cicsdev/cics-genapp.git",
+  "commit": "f6f3f4b2580d31b7d8dcc31ce3e3676f4cceaaaa",
+  "license_id": "EPL-2.0",
+  "license_file": "LICENSE",
+  "layout": [
+    {"glob": "base/src/*.cbl", "kind": "cobol"},
+    {"glob": "base/src/*.cpy", "kind": "copybook"},
+    {"glob": "base/src/*.bms", "kind": "bms"},
+    {"glob": "base/cntl/*.jcl", "kind": "jcl"},
+    {"glob": "*.md", "kind": "ignore"},
+    {"glob": "*.txt", "kind": "ignore"},
+    {"glob": "*.jpg", "kind": "ignore"},
+    {"glob": "*.rexx", "kind": "ignore"}
+  ]
+}

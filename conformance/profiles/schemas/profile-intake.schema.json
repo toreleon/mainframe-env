@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Deterministic external profile intake report",
+  "type": "object",
+  "required": ["schema_version", "notice", "corpus", "members", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "mainframe-env.profile-intake@1"},
+    "notice": {"type": "string", "minLength": 1},
+    "corpus": {
+      "type": "object", "required": ["origin", "commit", "license_id", "license_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "origin": {"type": "string"}, "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "license_id": {"type": "string"}, "license_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "members": {"type": "array", "items": {"$ref": "#/$defs/member"}},
+    "summary": {
+      "type": "object", "required": ["by_kind", "top_gaps", "failing_members"], "additionalProperties": false,
+      "properties": {
+        "by_kind": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}},
+        "top_gaps": {"type": "array", "items": {"type": "object", "required": ["name", "family", "member_count"], "additionalProperties": false, "properties": {"name": {"type": "string"}, "family": {"type": "string"}, "member_count": {"type": "integer", "minimum": 1}}}},
+        "failing_members": {"type": "array", "items": {"type": "object", "required": ["path", "first_diagnostic"], "additionalProperties": false, "properties": {"path": {"type": "string"}, "first_diagnostic": {"$ref": "#/$defs/diagnostic"}}}}
+      }
+    }
+  },
+  "$defs": {
+    "span": {"type": ["object", "null"], "required": ["start", "end"], "additionalProperties": false, "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 0}}},
+    "diagnostic": {"type": "object", "required": ["code", "message", "span"], "additionalProperties": false, "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "span": {"$ref": "#/$defs/span"}}},
+    "construct": {"type": "object", "required": ["name", "family", "row_id", "registry", "baseline", "product_support", "coverage_ledger_status", "reason", "span"], "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"}, "family": {"type": "string"}, "row_id": {"type": ["string", "null"]},
+        "registry": {"enum": ["matched", "unregistered"]}, "baseline": {"type": ["string", "null"]},
+        "product_support": {"enum": ["available", "deferred", "unknown"]},
+        "coverage_ledger_status": {"enum": ["uncredited", "not-applicable"]},
+        "reason": {"type": ["string", "null"]}, "span": {"$ref": "#/$defs/span"}
+      }
+    },
+    "member": {"type": "object", "required": ["path", "kind", "analysis", "status", "stages", "diagnostics", "constructs"], "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string"}, "kind": {"enum": ["cobol", "copybook", "jcl", "bms", "ignore", "unclassified"]},
+        "analysis": {"enum": ["available", "not-applicable", "not-available"]},
+        "status": {"enum": ["complete", "unsupported", "failed", "skipped", "unclassified"]},
+        "stages": {"type": "object", "additionalProperties": {"enum": ["complete", "failed"]}},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}},
+        "constructs": {"type": "array", "items": {"$ref": "#/$defs/construct"}}
+      }
+    }
+  }
+}
