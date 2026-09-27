@@ -16,7 +16,7 @@
         "type": "object", "required": ["glob", "kind"], "additionalProperties": false,
         "properties": {
           "glob": {"type": "string", "minLength": 1},
-          "kind": {"enum": ["cobol", "copybook", "jcl", "bms", "ignore"]}
+          "kind": {"enum": ["cobol", "copybook", "jcl", "bms", "ignore", "other"]}
         }
       }
     }

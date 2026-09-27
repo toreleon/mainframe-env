@@ -17,29 +17,30 @@
     },
     "members": {"type": "array", "items": {"$ref": "#/$defs/member"}},
     "summary": {
-      "type": "object", "required": ["by_kind", "top_gaps", "failing_members"], "additionalProperties": false,
+      "type": "object", "required": ["by_kind", "top_gaps", "environment", "failing_members"], "additionalProperties": false,
       "properties": {
         "by_kind": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}},
         "top_gaps": {"type": "array", "items": {"type": "object", "required": ["name", "family", "member_count"], "additionalProperties": false, "properties": {"name": {"type": "string"}, "family": {"type": "string"}, "member_count": {"type": "integer", "minimum": 1}}}},
+        "environment": {"type": "array", "items": {"type": "object", "required": ["cause", "code", "member_count"], "additionalProperties": false, "properties": {"cause": {"enum": ["environment-placeholder", "external-procedure"]}, "code": {"type": "string"}, "member_count": {"type": "integer", "minimum": 1}}}},
         "failing_members": {"type": "array", "items": {"type": "object", "required": ["path", "first_diagnostic"], "additionalProperties": false, "properties": {"path": {"type": "string"}, "first_diagnostic": {"$ref": "#/$defs/diagnostic"}}}}
       }
     }
   },
   "$defs": {
     "span": {"type": ["object", "null"], "required": ["start", "end"], "additionalProperties": false, "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 0}}},
-    "diagnostic": {"type": "object", "required": ["code", "message", "span"], "additionalProperties": false, "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "span": {"$ref": "#/$defs/span"}}},
+    "diagnostic": {"type": "object", "required": ["code", "message", "span", "cause"], "additionalProperties": false, "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "span": {"$ref": "#/$defs/span"}, "cause": {"type": ["string", "null"]}}},
     "construct": {"type": "object", "required": ["name", "family", "row_id", "registry", "baseline", "product_support", "coverage_ledger_status", "reason", "span"], "additionalProperties": false,
       "properties": {
         "name": {"type": "string"}, "family": {"type": "string"}, "row_id": {"type": ["string", "null"]},
-        "registry": {"enum": ["matched", "unregistered"]}, "baseline": {"type": ["string", "null"]},
-        "product_support": {"enum": ["available", "deferred", "unknown"]},
+        "registry": {"enum": ["matched", "unregistered", "no-catalog-unit"]}, "baseline": {"type": ["string", "null"]},
+        "product_support": {"enum": ["available", "deferred", "unknown", "implemented", "cicsfilecontrol", "networkftp", "reportrexx", "db2tso", "imscontroller"]},
         "coverage_ledger_status": {"enum": ["uncredited", "not-applicable"]},
         "reason": {"type": ["string", "null"]}, "span": {"$ref": "#/$defs/span"}
       }
     },
     "member": {"type": "object", "required": ["path", "kind", "analysis", "status", "stages", "diagnostics", "constructs"], "additionalProperties": false,
       "properties": {
-        "path": {"type": "string"}, "kind": {"enum": ["cobol", "copybook", "jcl", "bms", "ignore", "unclassified"]},
+        "path": {"type": "string"}, "kind": {"enum": ["cobol", "copybook", "jcl", "bms", "ignore", "other", "unclassified"]},
         "analysis": {"enum": ["available", "not-applicable", "not-available"]},
         "status": {"enum": ["complete", "unsupported", "failed", "skipped", "unclassified"]},
         "stages": {"type": "object", "additionalProperties": {"enum": ["complete", "failed"]}},

@@ -3,7 +3,7 @@
 use mainframe_env_application::parse_bms;
 use mainframe_env_batch::{
     AmsStatement, JclBundle, JclConversionLimits, JclSyntaxLimits, analyze_jcl_syntax, convert_jcl,
-    parse_idcams_control, parse_jcl_statements,
+    parse_idcams_control, parse_jcl_statements, utility_disposition,
 };
 use mainframe_env_compiler::{
     CobolCompiler, CobolCompilerLimits, PROCEDURE_STATEMENTS, procedure_statement_descriptor,
@@ -95,6 +95,7 @@ pub struct IntakeDiagnostic {
     pub code: String,
     pub message: String,
     pub span: Option<Span>,
+    pub cause: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -120,7 +121,15 @@ pub struct Construct {
 pub struct Summary {
     pub by_kind: BTreeMap<String, BTreeMap<String, usize>>,
     pub top_gaps: Vec<Gap>,
+    pub environment: Vec<EnvironmentGap>,
     pub failing_members: Vec<Failure>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct EnvironmentGap {
+    pub cause: String,
+    pub code: String,
+    pub member_count: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -307,6 +316,7 @@ fn diagnostic(d: &Diagnostic) -> IntakeDiagnostic {
             start: s.bytes.start,
             end: s.bytes.end,
         }),
+        cause: None,
     }
 }
 
@@ -343,7 +353,8 @@ pub fn run(
             rule.glob.is_empty()
                 || rule.glob.starts_with('/')
                 || rule.glob.contains("..")
-                || !["cobol", "copybook", "jcl", "bms", "ignore"].contains(&rule.kind.as_str())
+                || !["cobol", "copybook", "jcl", "bms", "ignore", "other"]
+                    .contains(&rule.kind.as_str())
         })
     {
         return Err(IntakeError::Manifest("invalid pin or layout".into()));
@@ -396,7 +407,9 @@ pub fn run(
             "cobol" => analyze_cobol(&path, bytes, &copies, corpus, &catalog),
             "jcl" => analyze_jcl(&path, bytes, &catalog),
             "bms" => analyze_bms(&path, &bytes),
-            "copybook" | "ignore" => simple_member(&path, kind, "not-applicable", "skipped"),
+            "copybook" | "ignore" | "other" => {
+                simple_member(&path, kind, "not-applicable", "skipped")
+            }
             _ => simple_member(&path, kind, "not-applicable", "unclassified"),
         };
         members.push(member);
@@ -472,14 +485,14 @@ fn analyze_cobol(
             SourceLibrary::new(format!("copybooks{i}"), paths, limits).ok()
         })
         .collect();
-    let Ok(bundle) = SourceBundle::with_libraries(
-        &primary_path,
-        files,
-        libraries,
-        BTreeMap::new(),
-        Vec::new(),
-        limits,
-    ) else {
+    let options = if fixed_source_area(&bytes).contains("EXEC SQL") {
+        BTreeMap::from([("cobol.sql-precompile".into(), "true".into())])
+    } else {
+        BTreeMap::new()
+    };
+    let Ok(bundle) =
+        SourceBundle::with_libraries(&primary_path, files, libraries, options, Vec::new(), limits)
+    else {
         member
             .diagnostics
             .push(local_error("MEINTAKE001", "invalid copybook closure"));
@@ -564,7 +577,7 @@ fn analyze_cobol(
     }
     // The compiler may stop before HIR construction. Preserve embedded commands as
     // source observations while retaining its real stage failure and diagnostics.
-    let upper = String::from_utf8_lossy(&bytes).to_ascii_uppercase();
+    let upper = fixed_source_area(&bytes);
     for (family, prefix) in [("cics", "EXEC CICS"), ("db2", "EXEC SQL")] {
         let mut offset = 0;
         while let Some(start) = upper[offset..].find(prefix).map(|i| i + offset) {
@@ -573,46 +586,7 @@ fn analyze_cobol(
                 break;
             };
             let content = tail[..end_rel].trim();
-            if family == "db2" {
-                member.constructs.push(construct(
-                    "EXEC SQL",
-                    "cobol",
-                    None,
-                    "unknown",
-                    Some("no-cobol-procedure-row"),
-                    Some(Span {
-                        start,
-                        end: start + prefix.len() + end_rel + "END-EXEC".len(),
-                    }),
-                ));
-            }
-            let name = if family == "db2" {
-                content
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("UNKNOWN")
-                    .to_string()
-            } else {
-                let normalized = normalize(content);
-                catalog
-                    .0
-                    .keys()
-                    .filter(|(f, label)| {
-                        f == family
-                            && (normalized == *label
-                                || normalized.starts_with(&format!("{label} "))
-                                || normalized.starts_with(&format!("{label}(")))
-                    })
-                    .map(|(_, label)| label.clone())
-                    .max_by_key(String::len)
-                    .unwrap_or_else(|| {
-                        content
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or("UNKNOWN")
-                            .into()
-                    })
-            };
+            let name = catalog_statement_name(catalog, family, content);
             member.constructs.push(catalog.construct(
                 family,
                 &name,
@@ -629,6 +603,50 @@ fn analyze_cobol(
     member
 }
 
+fn fixed_source_area(bytes: &[u8]) -> String {
+    let mut visible = bytes.to_vec();
+    for line in visible.split_inclusive_mut(|byte| *byte == b'\n') {
+        let comment = matches!(line.get(6), Some(b'*' | b'/'));
+        for (column, byte) in line.iter_mut().enumerate() {
+            if *byte != b'\n' && (comment || !(7..72).contains(&column)) {
+                *byte = b' ';
+            }
+        }
+    }
+    String::from_utf8_lossy(&visible).to_ascii_uppercase()
+}
+
+fn catalog_statement_name(catalog: &Catalog, family: &str, content: &str) -> String {
+    let normalized = normalize(content);
+    catalog
+        .0
+        .keys()
+        .filter(|(row_family, label)| {
+            if row_family != family {
+                return false;
+            }
+            normalized == *label
+                || normalized.starts_with(&format!("{label} "))
+                || normalized.starts_with(&format!("{label}("))
+                || (family == "db2"
+                    && label == "DECLARE CURSOR"
+                    && normalized.starts_with("DECLARE ")
+                    && normalized.split_whitespace().any(|word| word == "CURSOR"))
+                || (family == "db2"
+                    && label == "SET ASSIGNMENT-STATEMENT"
+                    && normalized.starts_with("SET :"))
+        })
+        .map(|(_, label)| label.clone())
+        .max_by_key(String::len)
+        .unwrap_or_else(|| {
+            content
+                .split_whitespace()
+                .next()
+                .unwrap_or("UNKNOWN")
+                .into()
+        })
+}
+
 fn analyze_jcl(path: &str, bytes: Vec<u8>, catalog: &Catalog) -> Member {
     let mut member = simple_member(path, "jcl", "available", "failed");
     let Ok(text) = String::from_utf8(bytes) else {
@@ -638,7 +656,7 @@ fn analyze_jcl(path: &str, bytes: Vec<u8>, catalog: &Catalog) -> Member {
         return member;
     };
     let bundle = JclBundle {
-        primary: text,
+        primary: text.clone(),
         ..JclBundle::default()
     };
     let Ok(syntax) = analyze_jcl_syntax(&bundle, JclSyntaxLimits::default()) else {
@@ -700,14 +718,28 @@ fn analyze_jcl(path: &str, bytes: Vec<u8>, catalog: &Catalog) -> Member {
                 })
         {
             idcams = pgm == "IDCAMS";
-            member.constructs.push(construct(
-                pgm,
-                "program",
-                None,
-                "unknown",
-                Some("no-program-catalog"),
-                None,
-            ));
+            if let Some(disposition) = utility_disposition(pgm) {
+                let mut registered = construct(
+                    pgm,
+                    "program",
+                    None,
+                    &format!("{disposition:?}").to_ascii_lowercase(),
+                    None,
+                    None,
+                );
+                registered.registry = "matched".into();
+                registered.reason = None;
+                member.constructs.push(registered);
+            } else {
+                member.constructs.push(construct(
+                    pgm,
+                    "program",
+                    None,
+                    "unknown",
+                    Some("no-program-registry-entry"),
+                    None,
+                ));
+            }
         }
         if idcams && statement.name() == Some("SYSIN") && !statement.inline_data().is_empty() {
             match parse_idcams_control(statement.inline_data()) {
@@ -770,7 +802,11 @@ fn analyze_jcl(path: &str, bytes: Vec<u8>, catalog: &Catalog) -> Member {
             );
             member
                 .diagnostics
-                .extend(conversion.diagnostics().iter().map(diagnostic));
+                .extend(conversion.diagnostics().iter().map(|d| {
+                    let mut result = diagnostic(d);
+                    result.cause = jcl_environment_cause(&result, &text).map(str::to_string);
+                    result
+                }));
             member.status = if conversion.is_valid() && member.diagnostics.is_empty() {
                 "complete"
             } else if conversion.is_valid() {
@@ -802,31 +838,31 @@ fn analyze_bms(path: &str, bytes: &[u8]) -> Member {
         Ok(map) => {
             member.stages.insert("parse".into(), "complete".into());
             member.status = "complete".into();
-            member.constructs.push(construct(
+            member.constructs.push(no_catalog_unit(construct(
                 "DFHMSD",
                 "bms",
                 None,
                 "unknown",
                 Some("no-bms-catalog"),
                 None,
-            ));
-            member.constructs.push(construct(
+            )));
+            member.constructs.push(no_catalog_unit(construct(
                 "DFHMDI",
                 "bms",
                 None,
                 "unknown",
                 Some("no-bms-catalog"),
                 None,
-            ));
+            )));
             for _ in &map.fields {
-                member.constructs.push(construct(
+                member.constructs.push(no_catalog_unit(construct(
                     "DFHMDF",
                     "bms",
                     None,
                     "unknown",
                     Some("no-bms-catalog"),
                     None,
-                ));
+                )));
             }
         }
         Err(e) => {
@@ -839,17 +875,40 @@ fn analyze_bms(path: &str, bytes: &[u8]) -> Member {
     member
 }
 
+fn no_catalog_unit(mut item: Construct) -> Construct {
+    item.registry = "no-catalog-unit".into();
+    item.reason = Some("no-bms-catalog".into());
+    item
+}
+
+fn jcl_environment_cause(diagnostic: &IntakeDiagnostic, text: &str) -> Option<&'static str> {
+    if diagnostic.code == "MEJCL0734" {
+        return Some("external-procedure");
+    }
+    if !["MEJCL0745", "MEJCL0755", "MEJCL0760"].contains(&diagnostic.code.as_str()) {
+        return None;
+    }
+    let span = diagnostic.span.as_ref()?;
+    let source = text.get(span.start..span.end)?;
+    let open = source.find('<')?;
+    source[open + 1..]
+        .contains('>')
+        .then_some("environment-placeholder")
+}
+
 fn local_error(code: &str, message: &str) -> IntakeDiagnostic {
     IntakeDiagnostic {
         code: code.into(),
         message: message.into(),
         span: None,
+        cause: None,
     }
 }
 
 fn summarize(members: &[Member]) -> Summary {
     let mut by_kind: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
     let mut gaps: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+    let mut environment: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
     let mut failing_members = Vec::new();
     for member in members {
         *by_kind
@@ -864,6 +923,14 @@ fn summarize(members: &[Member]) -> Summary {
                 path: member.path.clone(),
                 first_diagnostic: first.clone(),
             });
+        }
+        for diagnostic in &member.diagnostics {
+            if let Some(cause) = &diagnostic.cause {
+                environment
+                    .entry((cause.clone(), diagnostic.code.clone()))
+                    .or_default()
+                    .insert(member.path.clone());
+            }
         }
         for item in &member.constructs {
             if item.registry == "unregistered" || item.product_support == "deferred" {
@@ -890,6 +957,14 @@ fn summarize(members: &[Member]) -> Summary {
     Summary {
         by_kind,
         top_gaps,
+        environment: environment
+            .into_iter()
+            .map(|((cause, code), paths)| EnvironmentGap {
+                cause,
+                code,
+                member_count: paths.len(),
+            })
+            .collect(),
         failing_members,
     }
 }
@@ -911,6 +986,13 @@ impl Report {
             out.push_str(&format!(
                 "- {} {}: {} members\n",
                 gap.family, gap.name, gap.member_count
+            ));
+        }
+        out.push_str("\n## Environment\n\n");
+        for entry in &self.summary.environment {
+            out.push_str(&format!(
+                "- {} {}: {} members\n",
+                entry.cause, entry.code, entry.member_count
             ));
         }
         out.push_str("\n## Failing members\n\n");
