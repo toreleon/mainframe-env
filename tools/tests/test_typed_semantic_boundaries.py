@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -11,6 +12,36 @@ SPEC.loader.exec_module(typed_boundaries)
 
 
 class TypedSemanticBoundaryTests(unittest.TestCase):
+    def test_cics_descriptor_registry_accepts_split_entries_and_rejects_missing_literal(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            descriptor = root / "crates/foundation/mainframe-env-ir/src/cics_descriptor"
+            entries = descriptor / "executable_entries"
+            entries.mkdir(parents=True)
+            (descriptor / "executable_entries.rs").write_text(
+                "pub const CICS_EXECUTABLE_DESCRIPTORS: () = ();\n"
+            )
+            base = entries / "base_entries.rs"
+            base.write_text(
+                'namespace: "cics.file"\n'
+                "operation: CicsPlanOperation::Read\n"
+                "operation: CicsPlanOperation::Rewrite\n"
+            )
+            (entries / "recovery_entries.rs").write_text(
+                'namespace: "cics.recovery"\n'
+                "operation: CicsPlanOperation::Syncpoint\n"
+            )
+            typed_boundaries.check_cics_descriptor_entries(root)
+            base.write_text(
+                base.read_text().replace('namespace: "cics.file"', 'namespace: "missing.file"')
+                + '#[cfg(test)]\nnamespace: "cics.file"\n'
+            )
+            with self.assertRaisesRegex(
+                typed_boundaries.BoundaryError,
+                'typed CICS descriptor registry omits namespace: "cics.file"',
+            ):
+                typed_boundaries.check_cics_descriptor_entries(root)
+
     def test_typed_cics_region_uses_current_legacy_helper_boundary(self):
         source = typed_boundaries.read(
             ROOT,

@@ -39,6 +39,23 @@ def reject(source: str, patterns: list[str], scope: str) -> None:
         require(pattern not in source, f"{scope} contains forbidden runtime grammar path {pattern}")
 
 
+def check_cics_descriptor_entries(root: Path) -> None:
+    entries_dir = root / "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries"
+    cics_descriptor_entries = "\n".join(
+        production(read(root, path.relative_to(root).as_posix()))
+        for path in [entries_dir.with_suffix(".rs"), *sorted(entries_dir.glob("*.rs"))]
+    )
+    for required in [
+        "pub const CICS_EXECUTABLE_DESCRIPTORS",
+        'namespace: "cics.file"',
+        'namespace: "cics.recovery"',
+        "operation: CicsPlanOperation::Read",
+        "operation: CicsPlanOperation::Rewrite",
+        "operation: CicsPlanOperation::Syncpoint",
+    ]:
+        require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
+
+
 def check(root: Path) -> None:
     compiler_manifest = read(root, "crates/kernel/mainframe-env-compiler/Cargo.toml")
     compiler_dependencies = tomllib.loads(compiler_manifest).get("dependencies", {})
@@ -102,9 +119,6 @@ def check(root: Path) -> None:
     cics_descriptor_root = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
     )
-    cics_descriptor_entries = production(
-        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries.rs")
-    )
     cics_descriptor_effects = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/effects.rs")
     )
@@ -123,15 +137,7 @@ def check(root: Path) -> None:
             required in cics_descriptor_effects,
             f"typed CICS descriptor effects omit {required}",
         )
-    for required in [
-        "pub const CICS_EXECUTABLE_DESCRIPTORS",
-        'namespace: "cics.file"',
-        'namespace: "cics.recovery"',
-        "operation: CicsPlanOperation::Read",
-        "operation: CicsPlanOperation::Rewrite",
-        "operation: CicsPlanOperation::Syncpoint",
-    ]:
-        require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
+    check_cics_descriptor_entries(root)
 
     lower = production(read(root, "crates/kernel/mainframe-env-compiler/src/lower.rs"))
     for required in [
