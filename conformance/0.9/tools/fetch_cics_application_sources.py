@@ -181,6 +181,8 @@ B_GDS_RESPONSE_TOPICS = (
         "role": "execution-context-candidate",
         "applies_to_rows": [
             "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
             "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
             "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
         ],
@@ -195,6 +197,8 @@ B_GDS_RESPONSE_TOPICS = (
             "role": "execution-context-candidate",
             "applies_to_rows": [
                 "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
                 "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
                 "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
             ],

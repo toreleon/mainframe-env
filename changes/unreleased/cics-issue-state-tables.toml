@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "fixed"
-summary = "Pin APPC mapped state tables and correct ISSUE ABEND, SIGNAL, and PREPARE transitions (#325)."
+summary = "Pin APPC mapped state tables and correct ISSUE ABEND, SIGNAL, PREPARE, CONFIRMATION, and ERROR transitions (#325)."

@@ -9856,15 +9856,28 @@ mod tests {
                 BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
                 1,
             );
+            let result = source
+                .invoke(
+                    &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+                .unwrap();
+            assert_eq!(result.disposition, CicsDisposition::Complete);
             assert_eq!(
-                source
-                    .invoke(
-                        &effect(&source_invocation.run_unit_id, command.clone(), 1),
-                        command,
-                    )
+                (result.condition.as_str(), result.response, result.response2),
+                ("NORMAL", 0, 0)
+            );
+            assert_eq!(
+                ConversationLedger::load(source_store.as_ref())
                     .unwrap()
-                    .disposition,
-                CicsDisposition::Complete
+                    .conversation(source_token)
+                    .unwrap()
+                    .state,
+                if flow == GdsIssueFlow::Confirmation {
+                    ConversationState::Receive
+                } else {
+                    ConversationState::Send
+                }
             );
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
             let exchange = partner.exchange(target_token).unwrap();

@@ -486,6 +486,8 @@
       "role": "execution-context-candidate",
       "applies_to_rows": [
         "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
       ],
@@ -496,6 +498,8 @@
       "role": "execution-context-candidate",
       "applies_to_rows": [
         "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
       ],
@@ -506,6 +510,8 @@
       "role": "execution-context-candidate",
       "applies_to_rows": [
         "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
       ],
@@ -516,6 +522,8 @@
       "role": "execution-context-candidate",
       "applies_to_rows": [
         "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
       ],
@@ -590,5 +598,5 @@
   "supplemental_topics": [],
   "source_resolutions": [],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, supplemental topics, and source resolutions",
-  "corpus_sha256": "sha256:6e356a0e29e212f8b65f095e5c33383426ed224a91c94eb6bbf1b2a92b9f2013"
+  "corpus_sha256": "sha256:f13d98bf54f490c05ebd26478a731919f7d664d71382187fd527c8a2c33882be"
 }

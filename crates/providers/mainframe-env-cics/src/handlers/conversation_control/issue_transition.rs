@@ -251,24 +251,16 @@ impl ConversationRecord {
         }
         let next_state = match pending.flow {
             GdsIssueFlow::Abend => ConversationState::Free,
-            GdsIssueFlow::Confirmation if self.kind == ConversationKind::AppcBasic => {
-                match self.state {
-                    ConversationState::ConfReceive => ConversationState::Receive,
-                    ConversationState::ConfSend => ConversationState::Send,
-                    ConversationState::ConfFree => ConversationState::Free,
-                    _ => return Err(ConversationProblem::WrongState),
-                }
-            }
-            GdsIssueFlow::Confirmation => ConversationState::Receive,
-            // The peer-response contract has no CDBFREE indicator. Only its normal
-            // outcome is reachable; a future indicated deallocate needs its own input.
-            GdsIssueFlow::Error if self.kind == ConversationKind::AppcBasic => {
-                ConversationState::Send
-            }
-            GdsIssueFlow::Error if self.state == ConversationState::ConfReceive => {
-                ConversationState::Receive
-            }
-            GdsIssueFlow::Error | GdsIssueFlow::Signal => self.state,
+            GdsIssueFlow::Confirmation => match self.state {
+                ConversationState::ConfReceive => ConversationState::Receive,
+                ConversationState::ConfSend => ConversationState::Send,
+                ConversationState::ConfFree => ConversationState::Free,
+                _ => return Err(ConversationProblem::WrongState),
+            },
+            // The peer-response contract has no EIBFREE/CDBFREE indicator. Only the
+            // normal outcome is reachable; indicated deallocation needs its own input.
+            GdsIssueFlow::Error => ConversationState::Send,
+            GdsIssueFlow::Signal => self.state,
             GdsIssueFlow::Prepare => match self.state {
                 ConversationState::Send => ConversationState::SyncSend,
                 ConversationState::PendReceive => ConversationState::SyncReceive,
@@ -307,14 +299,13 @@ fn issue_state_valid(record: &ConversationRecord, flow: GdsIssueFlow) -> bool {
                     | ConversationState::SyncFree
             )
         ),
-        GdsIssueFlow::Confirmation if record.kind == ConversationKind::AppcBasic => matches!(
+        GdsIssueFlow::Confirmation => matches!(
             record.state,
             ConversationState::ConfReceive
                 | ConversationState::ConfSend
                 | ConversationState::ConfFree
         ),
-        GdsIssueFlow::Confirmation => record.state == ConversationState::ConfReceive,
-        GdsIssueFlow::Error if record.kind == ConversationKind::AppcBasic => matches!(
+        GdsIssueFlow::Error => matches!(
             (record.sync_level, record.state),
             (
                 Some(0..=2),
@@ -332,10 +323,6 @@ fn issue_state_valid(record: &ConversationRecord, flow: GdsIssueFlow) -> bool {
                     | ConversationState::SyncSend
                     | ConversationState::SyncFree
             )
-        ),
-        GdsIssueFlow::Error => matches!(
-            record.state,
-            ConversationState::ConfReceive | ConversationState::Send | ConversationState::Receive
         ),
         GdsIssueFlow::Prepare => {
             record.sync_level == Some(2)
@@ -400,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn issue_abend_signal_and_prepare_follow_basic_and_mapped_state_tables() {
+    fn issue_controls_follow_basic_and_mapped_state_tables() {
         use ConversationState::*;
         const STATES: [ConversationState; 13] = [
             Allocated,
@@ -425,6 +412,8 @@ mod tests {
                         GdsIssueFlow::Abend,
                         GdsIssueFlow::Signal,
                         GdsIssueFlow::Prepare,
+                        GdsIssueFlow::Confirmation,
+                        GdsIssueFlow::Error,
                     ] {
                         let expected = match flow {
                             GdsIssueFlow::Abend
@@ -447,6 +436,21 @@ mod tests {
                                 PendFree => Some(SyncFree),
                                 _ => None,
                             },
+                            GdsIssueFlow::Confirmation if level >= 1 => match state {
+                                ConfReceive => Some(Receive),
+                                ConfSend => Some(Send),
+                                ConfFree => Some(Free),
+                                _ => None,
+                            },
+                            GdsIssueFlow::Error
+                                if [Send, PendReceive, Receive].contains(&state)
+                                    || level >= 1
+                                        && [ConfReceive, ConfSend, ConfFree].contains(&state)
+                                    || level == 2
+                                        && [SyncReceive, SyncSend, SyncFree].contains(&state) =>
+                            {
+                                Some(Send)
+                            }
                             _ => None,
                         };
                         let mut record = connected(kind, level);

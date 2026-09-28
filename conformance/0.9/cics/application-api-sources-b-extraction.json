@@ -14,7 +14,7 @@
     },
     "corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "sha256": "sha256:6e356a0e29e212f8b65f095e5c33383426ed224a91c94eb6bbf1b2a92b9f2013"
+      "sha256": "sha256:f13d98bf54f490c05ebd26478a731919f7d664d71382187fd527c8a2c33882be"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
@@ -470,6 +470,8 @@
         "kind": "specific-rows",
         "official_rows": [
           "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
         ]
@@ -499,6 +501,8 @@
         "kind": "specific-rows",
         "official_rows": [
           "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
         ]
@@ -523,6 +527,8 @@
         "kind": "specific-rows",
         "official_rows": [
           "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
         ]
@@ -547,6 +553,8 @@
         "kind": "specific-rows",
         "official_rows": [
           "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
           "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
         ]
@@ -567,5 +575,5 @@
   "conflict_expectations": [],
   "source_resolutions": [],
   "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
-  "extraction_sha256": "sha256:af001f3b50dd4a88bd39deb4f716e166f2552e073a42111bb773cfb099bf7307"
+  "extraction_sha256": "sha256:1e75d4efe5f6989125fdcc20cd49cbc8c3f128eeb0ab1276983b2c7a48a7606a"
 }

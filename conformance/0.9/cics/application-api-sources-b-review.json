@@ -700,20 +700,20 @@
       "count": 0
     },
     "verified": {
-      "candidate_ids_sha256": "sha256:a1b286d77857d1b087eb333c1e596d3ea1fe22ca30f91e8a8b3bbe64ff20360c",
-      "count": 4579
+      "candidate_ids_sha256": "sha256:fc63fc3fd97756bc35c3c04cf415b9e97f2958fc7caab03d11f272368dba2b4d",
+      "count": 4589
     }
   },
   "counts": {
     "blocking_findings": 0,
     "candidate_kinds": {
       "source-condition": 1089,
-      "source-context": 2014,
+      "source-context": 2024,
       "source-operand-direction": 1164,
       "source-option": 694,
       "source-syntax": 111
     },
-    "candidates": 5072,
+    "candidates": 5082,
     "issues": 264,
     "rows": 88,
     "topics": 185,
@@ -722,11 +722,11 @@
   "coverage_credit": 0,
   "differential_credit": 0,
   "execution_authority": false,
-  "independent_verification_sha256": "sha256:5d45b8b27adfacc89eaeaff4c67ac2c76736be6f72ed1a999f320dac06992144",
+  "independent_verification_sha256": "sha256:e3008ed9b485845dd5da3a323dfc9d1e498eea23abbbd3e8108592ba237f6591",
   "inputs": {
-    "candidate_projection_sha256": "sha256:123b4a6edc4a571bf7de9d10b9efd412f5414c79742d7f0f579faf711b746494",
-    "extraction_plan_sha256": "sha256:03bbb0a8bc86dabf9b82386383e99ae7bdccc96db033bfcbb68ec506df57d0eb",
-    "source_corpus_sha256": "sha256:62df1213dae76862c7544536c0c3f1a4ac74ab3828891e1d23b1223132533adc",
+    "candidate_projection_sha256": "sha256:d0eacfc8360c7ea5e27f275d385735008a03a682a1ef249e5cb0d58d1d3e76e1",
+    "extraction_plan_sha256": "sha256:0585318ce458d867d125c09918c002c78299c05a09093aa25af880152a602002",
+    "source_corpus_sha256": "sha256:6647d2684b74e7b90916541b6a4b34926581d6de4ee7d40ebee627d80b4515b3",
     "source_map_sha256": "sha256:331036fa6eec143d12b0f1931a58043e2f74ee89eb74a073a879cbf5921d2dd9",
     "topic_manifest_sha256": "sha256:43ae443de4bbd29578ccfd482f52d40d1d1f6b28f746ba0e3450ba0de4b40bb9"
   },
@@ -770,7 +770,7 @@
       "path": "conformance/0.9/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:ba293294fc446b9e73ca554f27d37306ad04caebb542e201fce4b9ae0935968a",
+  "review_sha256": "sha256:6435c8c2912bd4e003f6e6b2e6253bb440e160ddb3d7e6e3b2d3e87f8825c495",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,
