@@ -1877,7 +1877,30 @@ mod tests {
         );
         let basic_v2 = encode_cics_effect_plan(&basic_signal, limits).unwrap();
         assert_eq!(&basic_v2[6..8], &257u16.to_be_bytes());
-        assert_eq!(decode_cics_effect_plan(&basic_v2, limits), Ok(basic_signal));
+        assert_eq!(
+            decode_cics_effect_plan(&basic_v2, limits),
+            Ok(basic_signal.clone())
+        );
+
+        for operation in [
+            CicsPlanOperation::GdsIssueConfirmation,
+            CicsPlanOperation::GdsIssueError,
+        ] {
+            let mut response = basic_signal.clone();
+            response.operation = operation;
+            response.outputs.pop();
+            assert_eq!(
+                encode_cics_effect_plan(&response, limits),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+            response.outputs.push(CicsOutputBinding {
+                name: CicsOutputName::IssueRetCode,
+                target: slot(2, "RESULT.RETCODE"),
+            });
+            let encoded = encode_cics_effect_plan(&response, limits).unwrap();
+            assert_eq!(&encoded[6..8], &operation_tag(operation).to_be_bytes());
+            assert_eq!(decode_cics_effect_plan(&encoded, limits), Ok(response));
+        }
 
         let mut mapped_state = CicsEffectPlan {
             operation: CicsPlanOperation::IssueSignal,

@@ -970,10 +970,7 @@ impl CicsOperation {
 
     #[must_use]
     pub const fn supported(self) -> bool {
-        !matches!(
-            self,
-            Self::GdsIssueConfirmation | Self::GdsIssueError | Self::IssueCopy
-        )
+        !matches!(self, Self::IssueCopy)
     }
 }
 
@@ -1060,7 +1057,7 @@ mod issue_tests {
     use super::CicsOperation;
 
     #[test]
-    fn exact_issue_heads_are_distinct_with_17_executable_rows() {
+    fn exact_issue_heads_are_distinct_with_19_executable_rows() {
         let heads = [
             ("ISSUE ABEND", CicsOperation::IssueAbend),
             ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
@@ -1103,6 +1100,8 @@ mod issue_tests {
                         | CicsOperation::IssuePrepare
                         | CicsOperation::IssueSignal
                         | CicsOperation::GdsIssueAbend
+                        | CicsOperation::GdsIssueConfirmation
+                        | CicsOperation::GdsIssueError
                         | CicsOperation::GdsIssuePrepare
                         | CicsOperation::GdsIssueSignal
                         | CicsOperation::IssueEndoutput
