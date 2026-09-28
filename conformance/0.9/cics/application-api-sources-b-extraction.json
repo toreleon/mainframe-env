@@ -14,12 +14,12 @@
     },
     "corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "sha256": "sha256:04450a7862d6268587bd56228167607fd18ae894bada3cea5e730ad93ade3647"
+      "sha256": "sha256:f4174bdf7ba0519c0fd373a52815a4175724f09b117b0c316d2f8e279c1aa883"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "file_sha256": "sha256:d57a8eaa5b555996066a237ba9ed449ce4af44e455cc67c87856366ccd2b7104",
-      "topic_manifest_sha256": "sha256:2fc9834578c64fd3b9431ef232ee9b74932c2a8937a6df490e95efb5bab96369"
+      "file_sha256": "sha256:1ee42daba576e3ea55f966ff9c094a8386d7a2777e580a36fb1acdbc4a7712c9",
+      "topic_manifest_sha256": "sha256:b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f"
     },
     "cache_scope": "cics-application-api-sources-b"
   },
@@ -48,9 +48,9 @@
     "mapping_edges": 113,
     "mapped_command_topics": 109,
     "linked_context_topics": 63,
-    "manual_topics": 6,
-    "manifest_topics": 178,
-    "browser_verified_topics": 178,
+    "manual_topics": 9,
+    "manifest_topics": 181,
+    "browser_verified_topics": 181,
     "dimensions_per_row": 5,
     "syntax_section_topics": 106,
     "syntax_diagrams": 108,
@@ -380,10 +380,79 @@
         }
       ],
       "association": "row-specific-context"
+    },
+    {
+      "id": "appc-basic-state-transitions-sl0",
+      "source_role": "execution-context-candidate",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+      "applies_to": {
+        "kind": "specific-rows",
+        "official_rows": [
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        ]
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "appcbasic_sl0__title__3",
+          "cardinality": 1
+        }
+      ],
+      "association": "row-specific-context"
+    },
+    {
+      "id": "appc-basic-state-transitions-sl1",
+      "source_role": "execution-context-candidate",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+      "applies_to": {
+        "kind": "specific-rows",
+        "official_rows": [
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        ]
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "appcbasic_sl1__title__3",
+          "cardinality": 1
+        }
+      ],
+      "association": "row-specific-context"
+    },
+    {
+      "id": "appc-basic-state-transitions-sl2",
+      "source_role": "execution-context-candidate",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+      "applies_to": {
+        "kind": "specific-rows",
+        "official_rows": [
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        ]
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "appcbasic_sl2__title__5",
+          "cardinality": 1
+        }
+      ],
+      "association": "row-specific-context"
     }
   ],
   "conflict_expectations": [],
   "source_resolutions": [],
   "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
-  "extraction_sha256": "sha256:2f4c89ecedc91298a1f00ec49638e0f9544918403dfa979e9eb13f9b35baafd0"
+  "extraction_sha256": "sha256:b79846bb107b67d184241b9219c857d6441bdbed3ed8f0aa0f9931bfb7b6a4b5"
 }

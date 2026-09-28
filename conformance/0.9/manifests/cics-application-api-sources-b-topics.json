@@ -12,8 +12,8 @@
   "target_version": "0.9.0",
   "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
-  "topic_count": 178,
-  "topic_manifest_digest": "2fc9834578c64fd3b9431ef232ee9b74932c2a8937a6df490e95efb5bab96369",
+  "topic_count": 181,
+  "topic_manifest_digest": "b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -165,6 +165,24 @@
       "last_modified": "2026-08-26",
       "sha256": "e9ecebaa845860a50e04ca4b5d593c32967894d2a91b5abf1f1448cc7fc3d3a2",
       "topic_path": "SSJL4D_6.x/applications/developing/cloud/invoke_application.html"
+    },
+    {
+      "bytes": 61556,
+      "last_modified": "2026-01-16",
+      "sha256": "84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html"
+    },
+    {
+      "bytes": 84435,
+      "last_modified": "2026-08-26",
+      "sha256": "09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html"
+    },
+    {
+      "bytes": 97557,
+      "last_modified": "2026-01-16",
+      "sha256": "bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html"
     },
     {
       "bytes": 23176,
@@ -1085,5 +1103,5 @@
       "topic_path": "SSJL4D_6.x/upgrading/process/upgrade_apps.html"
     }
   ],
-  "total_bytes": 4215768
+  "total_bytes": 4459316
 }

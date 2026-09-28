@@ -10690,7 +10690,7 @@ mod tests {
                 true,
                 b"PROC".to_vec(),
                 vec![],
-                0,
+                1,
             )
             .unwrap();
         assert!(current.persist(&mut next, store.as_ref()).unwrap());
@@ -10710,6 +10710,7 @@ mod tests {
         record
             .stage_basic_send_confirm(&owner, ConversationContext::Local, 7)
             .unwrap();
+        record.sync_level = Some(0);
         record.state = ConversationState::ConfReceive;
         assert!(current.persist(&mut next, store.as_ref()).unwrap());
         let zero_sync = target
@@ -10814,6 +10815,7 @@ mod tests {
         let current = ConversationLedger::load(store.as_ref()).unwrap();
         let mut next = current.clone();
         let record = next.conversation_mut(token).unwrap();
+        record.state = ConversationState::Send;
         record
             .stage_basic_send_confirm(&owner, ConversationContext::Local, 8)
             .unwrap();

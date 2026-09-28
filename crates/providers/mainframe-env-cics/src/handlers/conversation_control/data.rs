@@ -259,9 +259,12 @@ impl ConversationRecord {
         if self.kind != ConversationKind::AppcBasic {
             return Err(ConversationProblem::WrongKind);
         }
+        if !matches!(self.sync_level, Some(1 | 2)) {
+            return Err(ConversationProblem::WrongState);
+        }
         if !matches!(
             self.state,
-            ConversationState::ConfReceive | ConversationState::Send | ConversationState::Receive
+            ConversationState::Send | ConversationState::PendReceive | ConversationState::PendFree
         ) || self.pending_issue.is_some()
             || self.data.pending_basic_confirm.is_some()
             || send_id == 0
@@ -980,6 +983,58 @@ mod tests {
                     ConversationProblem::WrongState
                 ))
             );
+        }
+    }
+
+    #[test]
+    fn basic_send_confirm_requires_sync_one_or_two_and_sender_state() {
+        for sync_level in [0, 1, 2] {
+            for state in [
+                ConversationState::Send,
+                ConversationState::PendReceive,
+                ConversationState::PendFree,
+                ConversationState::Receive,
+                ConversationState::ConfReceive,
+            ] {
+                let owner = owner();
+                let mut record = ConversationRecord::allocate(
+                    *b"B002",
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                    owner.clone(),
+                    false,
+                )
+                .unwrap();
+                record
+                    .connect(
+                        &owner,
+                        ConversationContext::Local,
+                        true,
+                        b"PROC".to_vec(),
+                        vec![],
+                        sync_level,
+                    )
+                    .unwrap();
+                record.state = state;
+                let before = record.clone();
+                let allowed = sync_level != 0
+                    && matches!(
+                        state,
+                        ConversationState::Send
+                            | ConversationState::PendReceive
+                            | ConversationState::PendFree
+                    );
+                assert_eq!(
+                    record
+                        .stage_basic_send_confirm(&owner, ConversationContext::Local, 1)
+                        .is_ok(),
+                    allowed,
+                    "sync_level={sync_level} state={state:?}"
+                );
+                if !allowed {
+                    assert_eq!(record, before);
+                }
+            }
         }
     }
 

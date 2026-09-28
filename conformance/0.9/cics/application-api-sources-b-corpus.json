@@ -13,17 +13,17 @@
   },
   "topic_manifest": {
     "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-    "file_sha256": "sha256:d57a8eaa5b555996066a237ba9ed449ce4af44e455cc67c87856366ccd2b7104",
-    "topic_manifest_sha256": "sha256:2fc9834578c64fd3b9431ef232ee9b74932c2a8937a6df490e95efb5bab96369",
-    "topic_count": 178,
-    "total_bytes": 4215768
+    "file_sha256": "sha256:1ee42daba576e3ea55f966ff9c094a8386d7a2777e580a36fb1acdbc4a7712c9",
+    "topic_manifest_sha256": "sha256:b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f",
+    "topic_count": 181,
+    "total_bytes": 4459316
   },
   "counts": {
     "mapping_rows": 88,
     "mapped_command_topics": 109,
     "linked_context_topics": 63,
-    "manual_topics": 6,
-    "html_topics": 178,
+    "manual_topics": 9,
+    "html_topics": 181,
     "mapping_source_gaps": 0,
     "source_gaps_unresolved": 0,
     "supplemental_topics": 0
@@ -498,6 +498,33 @@
         "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
       ],
       "reason": "appc-basic-state-transitions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+      ],
+      "reason": "appc-basic-state-transitions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+      ],
+      "reason": "appc-basic-state-transitions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+      ],
+      "reason": "appc-basic-state-transitions"
     }
   ],
   "excluded_navigation": [
@@ -511,5 +538,5 @@
   "supplemental_topics": [],
   "source_resolutions": [],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, supplemental topics, and source resolutions",
-  "corpus_sha256": "sha256:04450a7862d6268587bd56228167607fd18ae894bada3cea5e730ad93ade3647"
+  "corpus_sha256": "sha256:f4174bdf7ba0519c0fd373a52815a4175724f09b117b0c316d2f8e279c1aa883"
 }

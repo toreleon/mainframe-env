@@ -788,6 +788,9 @@ MANUAL_SOURCE_ROLES = {
     "global-response-codes": "response-code-context",
     "gds-send-response-contract": "manual-context",
     "appc-basic-state-transitions": "manual-context",
+    "appc-basic-state-transitions-sl0": "manual-context",
+    "appc-basic-state-transitions-sl1": "manual-context",
+    "appc-basic-state-transitions-sl2": "manual-context",
 }
 SUPPLEMENT_SOURCE_ROLES = {
     "cross-product-explicit-compatibility": "cross-product-compatibility",

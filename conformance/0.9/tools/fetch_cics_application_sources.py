@@ -194,6 +194,21 @@ B_GDS_RESPONSE_TOPICS = (
         ],
         "reason": "appc-basic-state-transitions",
     },
+    *(
+        {
+            "topic_path": (
+                "SSJL4D_6.x/applications/developing/connections/"
+                f"appcbasic_sl{level}.html"
+            ),
+            "role": "execution-context-candidate",
+            "applies_to_rows": [
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+            ],
+            "reason": "appc-basic-state-transitions",
+        }
+        for level in (0, 1, 2)
+    ),
 )
 
 ROW_ASSOCIATION = "ibm-cics-ts-6x-2026-08-31:api-commands:0193"

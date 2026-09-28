@@ -138,6 +138,9 @@ CONTEXT_SELECTORS = frozenset(
         "global-response-codes",
         "gds-send-response-contract",
         "appc-basic-state-transitions",
+        "appc-basic-state-transitions-sl0",
+        "appc-basic-state-transitions-sl1",
+        "appc-basic-state-transitions-sl2",
     }
 )
 
@@ -2699,7 +2702,7 @@ def candidate_category(
             if "applicability" in value:
                 return "mismatch", "unexpected-context-applicability"
             return "verified", "global-context-binding"
-        if selector in {"gds-send-response-contract", "appc-basic-state-transitions"}:
+        if selector == "gds-send-response-contract" or selector.startswith("appc-basic-state-transitions"):
             contract = next(
                 (
                     item for item in snapshot.plan.get("manual_context_selectors", [])

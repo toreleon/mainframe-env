@@ -799,10 +799,10 @@
     "source_projected_commands": 263,
     "source_reviewed_commands": 263,
     "source_ambiguous_commands": 202,
-    "source_verified_candidates": 16315,
+    "source_verified_candidates": 16321,
     "source_ambiguous_candidates": 1763,
-    "source_fact_groups": 10194,
-    "source_candidate_references": 15649,
+    "source_fact_groups": 10200,
+    "source_candidate_references": 15655,
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
@@ -821,11 +821,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-a-candidates.json",
-          "file_sha256": "sha256:be72a49fd43821168c36a15f51da6f575e43b99e9832b7336a99930e378c1e15"
+          "file_sha256": "sha256:20f6a788b8165c151fa1a9664f548b2daf2de6123baefda2e6b09b4410c6a6c5"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-a-review.json",
-          "file_sha256": "sha256:54f9c2cf8a44a91216b9829a3af839a09abca7d46fefc0ae0ae0fc1320f276d6",
+          "file_sha256": "sha256:8c40450b29f600290876b56e9ef5a0b4f4623901cba854575014b372da49d312",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -146425,11 +146425,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-b-candidates.json",
-          "file_sha256": "sha256:9575e15fa9aeb604a9172b59306e6eaeca3ca0e365200587dd053702af876eed"
+          "file_sha256": "sha256:a0187024481a48620d9fe08ce72b3504c3e6f9f86a33c4f3a1e41aa40999baaf"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-b-review.json",
-          "file_sha256": "sha256:f81b117e93ebf049daa369b9ac60a1b2b6c92766feadf4e67c7aa827d14fffc8",
+          "file_sha256": "sha256:1ca12f4509c6f5ca1e565b33f8a4d3ccc68d01d7780a4ba1247046af070947f2",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -181338,6 +181338,36 @@
                 {
                   "value": {
                     "type": "context",
+                    "selector_id": "appc-basic-state-transitions-sl0",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0113-execution-context-de0ba5a4d03a"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "appc-basic-state-transitions-sl1",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0113-execution-context-9b12ab753f60"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "appc-basic-state-transitions-sl2",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0113-execution-context-fcb02679ce8c"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
                     "selector_id": "gds-send-response-contract",
                     "association": "row-specific-context"
                   },
@@ -181751,6 +181781,9 @@
               "context_predicates": [],
               "source_selectors": [
                 "appc-basic-state-transitions",
+                "appc-basic-state-transitions-sl0",
+                "appc-basic-state-transitions-sl1",
+                "appc-basic-state-transitions-sl2",
                 "dpl-server-restrictions",
                 "gds-send-response-contract",
                 "global-command-format",
@@ -181831,7 +181864,7 @@
               "handler_sha256": "sha256:0483760b5e60009b0aa22b730fd0ac39d8709f8f632134c553dee493430c2168"
             }
           },
-          "row_contract_sha256": "sha256:04f9f61b7e1c20328f5da96f2254dfd07799feaf523e08ba481496c83a9f4b75"
+          "row_contract_sha256": "sha256:e6e590baba7cf8a0604c570da6c2aa98aa99a5f9ddbb1d3de3553d1f434f1710"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0114",
@@ -190267,6 +190300,36 @@
                 {
                   "value": {
                     "type": "context",
+                    "selector_id": "appc-basic-state-transitions-sl0",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0123-execution-context-641e1775c4ec"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "appc-basic-state-transitions-sl1",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0123-execution-context-231358d1af8d"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "appc-basic-state-transitions-sl2",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0123-execution-context-786795961560"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
                     "selector_id": "gds-send-response-contract",
                     "association": "row-specific-context"
                   },
@@ -190680,6 +190743,9 @@
               "context_predicates": [],
               "source_selectors": [
                 "appc-basic-state-transitions",
+                "appc-basic-state-transitions-sl0",
+                "appc-basic-state-transitions-sl1",
+                "appc-basic-state-transitions-sl2",
                 "dpl-server-restrictions",
                 "gds-send-response-contract",
                 "global-command-format",
@@ -190760,7 +190826,7 @@
               "handler_sha256": "sha256:573fa3dc7997fa5ae6837e3df1149e24424ee675045c83d0f119c5f2762aa605"
             }
           },
-          "row_contract_sha256": "sha256:1904d4d1ebeac9640a06e93797617f76f5599f34b7934b146440ce6982b37c48"
+          "row_contract_sha256": "sha256:57d921aa648217ffb4ada809115f6894d7185ce2cdf07089b72c9c4704e2b7e8"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0124",
@@ -274419,11 +274485,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-c-candidates.json",
-          "file_sha256": "sha256:ad092944e363917bb469ec4fbc2688dc4701f9117cbc4d8751f2e0b339c96241"
+          "file_sha256": "sha256:c5c9994ca05279fdc8dfab923a1a0af0391b4f9952e597fa10c42a2dd8ac05c3"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-c-review.json",
-          "file_sha256": "sha256:710b15187958151b94c479b8d34c07a8911898831a37a86be78e57c0793bcfbd",
+          "file_sha256": "sha256:d44fbe63d9291f7383a123181c117ab77b439893cf853089b576ce131ecf2386",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -447454,5 +447520,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:c780fada5000360a50b5c7d58a8fdbdabfe0d49adccc1eab6a575c5acb7bca66"
+  "contract_sha256": "sha256:d67ed4ae4f12a59919a6c08c06709affa358509b9e431d00cb294d398f437a74"
 }
