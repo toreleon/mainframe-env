@@ -175,6 +175,27 @@ COMMON_APPLICABILITY_TOPICS = (
     },
 )
 
+B_GDS_RESPONSE_TOPICS = (
+    {
+        "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+        "role": "execution-context-candidate",
+        "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        ],
+        "reason": "gds-send-response-contract",
+    },
+    {
+        "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+        "role": "execution-context-candidate",
+        "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        ],
+        "reason": "appc-basic-state-transitions",
+    },
+)
+
 ROW_ASSOCIATION = "ibm-cics-ts-6x-2026-08-31:api-commands:0193"
 ROW_TRACE = "ibm-cics-ts-6x-2026-08-31:api-commands:0220"
 ASSOCIATION_TOPIC = (
@@ -324,7 +345,7 @@ class LaterCorpusConfig:
 LATER_BATCHES = {
     "b": LaterCorpusConfig(
         source_batches.source_batch("b"),
-        tuple(dict(topic) for topic in COMMON_APPLICABILITY_TOPICS),
+        tuple(dict(topic) for topic in (*COMMON_APPLICABILITY_TOPICS, *B_GDS_RESPONSE_TOPICS)),
     ),
     "c": LaterCorpusConfig(
         source_batches.source_batch("c"),

@@ -34,7 +34,7 @@
     "name": "cics-dita-source-projector",
     "version": "cics-dita-source-projector@1",
     "implementation_path": "conformance/0.9/tools/extract_cics_application_sources.py",
-    "implementation_sha256": "sha256:943c199462f5ee7d754338deb945df2a06c650f5e76c9e7cafb10da81047d6b1",
+    "implementation_sha256": "sha256:b03ec8706cd65a4163fd16ea2dcb8a0ef65a44108d869c62d4607ed575e6f2ff",
     "fragment_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-fragment@1, one NUL byte (0x00), then UTF-8 order-preserving whitespace-normalized visible text of the selected DOM subtree"
   },
   "condition_name_authority": {
@@ -228865,5 +228865,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:91ca55b8d3cc0c8789b4550700d2a3e35ae830434778cfd28041f5b1f884fb98"
+  "projection_sha256": "sha256:7d1576d861f83b99e39c4d21d6fc673d80260f9a28e633325b94b1ec634593d8"
 }

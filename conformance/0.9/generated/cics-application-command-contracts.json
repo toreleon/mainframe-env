@@ -799,10 +799,10 @@
     "source_projected_commands": 263,
     "source_reviewed_commands": 263,
     "source_ambiguous_commands": 202,
-    "source_verified_candidates": 16307,
+    "source_verified_candidates": 16315,
     "source_ambiguous_candidates": 1763,
-    "source_fact_groups": 10190,
-    "source_candidate_references": 15641,
+    "source_fact_groups": 10194,
+    "source_candidate_references": 15649,
     "closed_contract_commands": 263,
     "bounded_contract_commands": 262,
     "registry_shape_commands": 263,
@@ -821,11 +821,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-a-candidates.json",
-          "file_sha256": "sha256:9defd690586b691db9a633b512f13e7197764fdf1a55be9212e849ba19d042f2"
+          "file_sha256": "sha256:be72a49fd43821168c36a15f51da6f575e43b99e9832b7336a99930e378c1e15"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-a-review.json",
-          "file_sha256": "sha256:d9d7bf1f16fc9c7004b2f9f10a52b0264a9674b81bac1159df7057c5820a2869",
+          "file_sha256": "sha256:54f9c2cf8a44a91216b9829a3af839a09abca7d46fefc0ae0ae0fc1320f276d6",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -146425,11 +146425,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-b-candidates.json",
-          "file_sha256": "sha256:e8ae011c3aa8b09661bfc21dc65ff6fd2515c8323f4d12bf162fb947da4aca6e"
+          "file_sha256": "sha256:9575e15fa9aeb604a9172b59306e6eaeca3ca0e365200587dd053702af876eed"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-b-review.json",
-          "file_sha256": "sha256:0ea21b54479feb03622ceb8cb6f98e572ef4c15fb75c09e71b89ba0494ede61d",
+          "file_sha256": "sha256:f81b117e93ebf049daa369b9ac60a1b2b6c92766feadf4e67c7aa827d14fffc8",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -181323,6 +181323,28 @@
                   "candidate_ids": [
                     "cics-b-0113-execution-context-155e5bd932fd"
                   ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "appc-basic-state-transitions",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0113-execution-context-5eba3732ca68",
+                    "cics-b-0113-execution-context-ddeda124d68a"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "gds-send-response-contract",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0113-execution-context-09e6502a2f40",
+                    "cics-b-0113-execution-context-43a92072fc42"
+                  ]
                 }
               ],
               "issue_ids": []
@@ -181728,7 +181750,9 @@
               "threadsafe_condition": null,
               "context_predicates": [],
               "source_selectors": [
+                "appc-basic-state-transitions",
                 "dpl-server-restrictions",
+                "gds-send-response-contract",
                 "global-command-format",
                 "mapped-inline-execution-context",
                 "mapped-language-applicability",
@@ -181807,7 +181831,7 @@
               "handler_sha256": "sha256:0483760b5e60009b0aa22b730fd0ac39d8709f8f632134c553dee493430c2168"
             }
           },
-          "row_contract_sha256": "sha256:486046c4e832772c1984cf11d2d73b078bd9c8182d0df06851b6ecac2337c9f5"
+          "row_contract_sha256": "sha256:04f9f61b7e1c20328f5da96f2254dfd07799feaf523e08ba481496c83a9f4b75"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0114",
@@ -190228,6 +190252,28 @@
                   "candidate_ids": [
                     "cics-b-0123-execution-context-c9f9827cc58e"
                   ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "appc-basic-state-transitions",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0123-execution-context-3e9ce60ac683",
+                    "cics-b-0123-execution-context-473de52e75bf"
+                  ]
+                },
+                {
+                  "value": {
+                    "type": "context",
+                    "selector_id": "gds-send-response-contract",
+                    "association": "row-specific-context"
+                  },
+                  "candidate_ids": [
+                    "cics-b-0123-execution-context-5a1604547dc3",
+                    "cics-b-0123-execution-context-d5be4c3d8333"
+                  ]
                 }
               ],
               "issue_ids": []
@@ -190633,7 +190679,9 @@
               "threadsafe_condition": null,
               "context_predicates": [],
               "source_selectors": [
+                "appc-basic-state-transitions",
                 "dpl-server-restrictions",
+                "gds-send-response-contract",
                 "global-command-format",
                 "mapped-inline-execution-context",
                 "mapped-language-applicability",
@@ -190712,7 +190760,7 @@
               "handler_sha256": "sha256:573fa3dc7997fa5ae6837e3df1149e24424ee675045c83d0f119c5f2762aa605"
             }
           },
-          "row_contract_sha256": "sha256:b10a131dcf6290bc70f088c2f3f079ffb12e2743e7796c1a2c6fc596816d5c60"
+          "row_contract_sha256": "sha256:1904d4d1ebeac9640a06e93797617f76f5599f34b7934b146440ce6982b37c48"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0124",
@@ -274371,11 +274419,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-c-candidates.json",
-          "file_sha256": "sha256:cad6a1c2f7911e6482fb4f6487bf41394350fa66100243fb85d40a55c36be823"
+          "file_sha256": "sha256:ad092944e363917bb469ec4fbc2688dc4701f9117cbc4d8751f2e0b339c96241"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-c-review.json",
-          "file_sha256": "sha256:40ca81ca8144496d8caedfee3400c329c6d5bd4c1575dd597dfac87cb2c2fb88",
+          "file_sha256": "sha256:710b15187958151b94c479b8d34c07a8911898831a37a86be78e57c0793bcfbd",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -447406,5 +447454,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:ffb3fce8466254c7910fa95d35e014e1a045bd25b6de408b1d86bc706f35e0ac"
+  "contract_sha256": "sha256:c780fada5000360a50b5c7d58a8fdbdabfe0d49adccc1eab6a575c5acb7bca66"
 }

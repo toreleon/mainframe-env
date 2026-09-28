@@ -786,6 +786,8 @@ MANUAL_SOURCE_ROLES = {
     "traceid-monitor-compatibility": "compatibility-context",
     "traceid-dfhcmp-compatibility": "compatibility-context",
     "global-response-codes": "response-code-context",
+    "gds-send-response-contract": "manual-context",
+    "appc-basic-state-transitions": "manual-context",
 }
 SUPPLEMENT_SOURCE_ROLES = {
     "cross-product-explicit-compatibility": "cross-product-compatibility",

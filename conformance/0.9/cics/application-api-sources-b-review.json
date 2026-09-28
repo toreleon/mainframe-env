@@ -700,35 +700,35 @@
       "count": 0
     },
     "verified": {
-      "candidate_ids_sha256": "sha256:5d4d76397b9924c9211f9b0cee51b023338d5f033775e8ab619ed921ab8c7f68",
-      "count": 4535
+      "candidate_ids_sha256": "sha256:f0779c35c84d70148594d2d0f7018ba1d95f5daac2e8a32a4aec382406925210",
+      "count": 4543
     }
   },
   "counts": {
     "blocking_findings": 0,
     "candidate_kinds": {
       "source-condition": 1089,
-      "source-context": 1970,
+      "source-context": 1978,
       "source-operand-direction": 1164,
       "source-option": 694,
       "source-syntax": 111
     },
-    "candidates": 5028,
+    "candidates": 5036,
     "issues": 264,
     "rows": 88,
-    "topics": 176,
-    "unique_evidence_fragments": 2717
+    "topics": 178,
+    "unique_evidence_fragments": 2721
   },
   "coverage_credit": 0,
   "differential_credit": 0,
   "execution_authority": false,
-  "independent_verification_sha256": "sha256:98ac1aa0de845e75011625728f132858f216bea14ba739ceb79444474282387d",
+  "independent_verification_sha256": "sha256:84e06baae54ab01a67c21cd9174845d833f6ecb3727e6c8b33fe192a9450c083",
   "inputs": {
-    "candidate_projection_sha256": "sha256:e8ae011c3aa8b09661bfc21dc65ff6fd2515c8323f4d12bf162fb947da4aca6e",
-    "extraction_plan_sha256": "sha256:970916e0538c3b503bd8c475aa22c8b748963f5be68bada7fcbdc0d9697b2384",
-    "source_corpus_sha256": "sha256:61bd5aff47c9628237531e1a4ff78cd0d08cb6ae3c21fb00f12cd952f35b5c09",
+    "candidate_projection_sha256": "sha256:9575e15fa9aeb604a9172b59306e6eaeca3ca0e365200587dd053702af876eed",
+    "extraction_plan_sha256": "sha256:9b6f60222753527bb9522e23e865afbf403678aba27068ea6f98eccb7019c796",
+    "source_corpus_sha256": "sha256:e468b0af52725607bfbc91194b5b0f2257ba4a6127d381062d4eb5387ba5a014",
     "source_map_sha256": "sha256:331036fa6eec143d12b0f1931a58043e2f74ee89eb74a073a879cbf5921d2dd9",
-    "topic_manifest_sha256": "sha256:06d0e4229080df35e1810d33525caf3a753f819ff8950cfc943b59a5cab096b5"
+    "topic_manifest_sha256": "sha256:d57a8eaa5b555996066a237ba9ed449ce4af44e455cc67c87856366ccd2b7104"
   },
   "issue_dispositions": {
     "mismatch": {
@@ -761,7 +761,7 @@
       "version": "cics-source-auto-review-checker@2"
     },
     "independent_verifier": {
-      "file_sha256": "sha256:f53a236f751a4a5ca218ae1f9bc56fbfe2e8232734cd386a604eec3d34117aa7",
+      "file_sha256": "sha256:91c57bc10aff0ab08252062a3759b824576fe6951640bae24bb0ad8125bd45a4",
       "path": "conformance/0.9/tools/verify_cics_application_sources.py",
       "version": "cics-source-independent-verifier@1"
     },
@@ -770,7 +770,7 @@
       "path": "conformance/0.9/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:431ab80e4214ce80d972f1c614dff0daed967742f10a65aa0a139498cd3845ff",
+  "review_sha256": "sha256:c76dcf235736dc319501bdc68156f2c21ee05a9ab275ea39672e5243841f3d28",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,

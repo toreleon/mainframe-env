@@ -401,7 +401,7 @@
             "global-command-format", "global-command-argument-values", "dpl-server-restrictions",
             "threadsafe-command-list", "gap-exec-interface-classification", "gap-eibfn-identity",
             "traceid-monitor-compatibility", "traceid-dfhcmp-compatibility",
-            "global-response-codes"
+            "global-response-codes", "gds-send-response-contract", "appc-basic-state-transitions"
           ]
         },
         "source_role": {
@@ -424,7 +424,7 @@
             "official-row-to-command-table-row-and-notes",
             "official-row-to-api-table-row-by-label-and-eibfn",
             "compatibility-context-only-no-command-alias",
-            "condition-name-to-response-code"
+            "condition-name-to-response-code", "row-specific-context"
           ]
         }
       }

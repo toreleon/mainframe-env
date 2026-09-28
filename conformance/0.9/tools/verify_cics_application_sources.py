@@ -136,6 +136,8 @@ CONTEXT_SELECTORS = frozenset(
         "traceid-dfhcmp-compatibility",
         "source-resolution-context",
         "global-response-codes",
+        "gds-send-response-contract",
+        "appc-basic-state-transitions",
     }
 )
 
@@ -2697,6 +2699,40 @@ def candidate_category(
             if "applicability" in value:
                 return "mismatch", "unexpected-context-applicability"
             return "verified", "global-context-binding"
+        if selector in {"gds-send-response-contract", "appc-basic-state-transitions"}:
+            contract = next(
+                (
+                    item for item in snapshot.plan.get("manual_context_selectors", [])
+                    if item.get("id") == selector
+                ),
+                None,
+            )
+            evidence = candidate["evidence"]
+            topic = snapshot.topics[str(evidence["topic_path"])]
+            node = resolve_path(topic.document, str(evidence["structural_path"]))
+            fragments = (contract or {}).get("fragment_selectors", [])
+            selected = any(
+                node.tag == fragment["tag"]
+                and (
+                    node.attrs.get("id") == fragment.get("id")
+                    if "id" in fragment else any(
+                        child.tag == "h2"
+                        and child.attrs.get("id") == fragment.get("heading_id")
+                        for child in node.children
+                    )
+                )
+                for fragment in fragments
+            )
+            if (
+                contract is None
+                or row["official_row"] not in contract["applies_to"]["official_rows"]
+                or evidence["topic_path"] != contract["topic_path"]
+                or value.get("association") != "row-specific-context"
+                or "applicability" in value
+                or not selected
+            ):
+                return "mismatch", "row-specific-context-escaped-boundary"
+            return "verified", "independent-row-specific-context"
         if selector == "mapped-inline-execution-context":
             direct = {
                 source["topic_path"] for source in row.get("topics", []) if isinstance(source, dict)

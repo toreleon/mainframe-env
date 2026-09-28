@@ -12,8 +12,8 @@
   "target_version": "0.9.0",
   "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
-  "topic_count": 176,
-  "topic_manifest_digest": "28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498",
+  "topic_count": 178,
+  "topic_manifest_digest": "2fc9834578c64fd3b9431ef232ee9b74932c2a8937a6df490e95efb5bab96369",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -173,6 +173,12 @@
       "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp622.html"
     },
     {
+      "bytes": 13924,
+      "last_modified": "2026-01-16",
+      "sha256": "268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html"
+    },
+    {
       "bytes": 12594,
       "last_modified": "2026-08-26",
       "sha256": "696848138be7136cbc4857381281c0cb608e64c4537b72c2c7c81e14bd97cf0b",
@@ -315,6 +321,12 @@
       "last_modified": "2026-08-26",
       "sha256": "61912afe7606b5dee8b43447b5f1b1b90055c7287249ab05d0f45ad850c039a9",
       "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsreceive.html"
+    },
+    {
+      "bytes": 27231,
+      "last_modified": "2026-08-26",
+      "sha256": "51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html"
     },
     {
       "bytes": 43370,
@@ -1073,5 +1085,5 @@
       "topic_path": "SSJL4D_6.x/upgrading/process/upgrade_apps.html"
     }
   ],
-  "total_bytes": 4174613
+  "total_bytes": 4215768
 }

@@ -16,25 +16,25 @@
     },
     "source_corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "file_sha256": "sha256:61bd5aff47c9628237531e1a4ff78cd0d08cb6ae3c21fb00f12cd952f35b5c09",
-      "logical_sha256": "sha256:3dace7b92117fb9136c4c816282dfc663aa92ada2aa5ec8f5ad26d30aba3d5ed"
+      "file_sha256": "sha256:e468b0af52725607bfbc91194b5b0f2257ba4a6127d381062d4eb5387ba5a014",
+      "logical_sha256": "sha256:04450a7862d6268587bd56228167607fd18ae894bada3cea5e730ad93ade3647"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "file_sha256": "sha256:06d0e4229080df35e1810d33525caf3a753f819ff8950cfc943b59a5cab096b5",
-      "logical_sha256": "sha256:28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498"
+      "file_sha256": "sha256:d57a8eaa5b555996066a237ba9ed449ce4af44e455cc67c87856366ccd2b7104",
+      "logical_sha256": "sha256:2fc9834578c64fd3b9431ef232ee9b74932c2a8937a6df490e95efb5bab96369"
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-b-extraction.json",
-      "file_sha256": "sha256:970916e0538c3b503bd8c475aa22c8b748963f5be68bada7fcbdc0d9697b2384",
-      "logical_sha256": "sha256:69ed87f044c4bee973b72d7a8ee042b63b0e338a141482926de3f8c3e808816f"
+      "file_sha256": "sha256:9b6f60222753527bb9522e23e865afbf403678aba27068ea6f98eccb7019c796",
+      "logical_sha256": "sha256:2f4c89ecedc91298a1f00ec49638e0f9544918403dfa979e9eb13f9b35baafd0"
     }
   },
   "extractor": {
     "name": "cics-dita-source-projector",
     "version": "cics-dita-source-projector@1",
     "implementation_path": "conformance/0.9/tools/extract_cics_application_sources.py",
-    "implementation_sha256": "sha256:943c199462f5ee7d754338deb945df2a06c650f5e76c9e7cafb10da81047d6b1",
+    "implementation_sha256": "sha256:b03ec8706cd65a4163fd16ea2dcb8a0ef65a44108d869c62d4607ed575e6f2ff",
     "fragment_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-fragment@1, one NUL byte (0x00), then UTF-8 order-preserving whitespace-normalized visible text of the selected DOM subtree"
   },
   "condition_name_authority": {
@@ -659,7 +659,7 @@
   "counts": {
     "rows": 88,
     "dimension_records": 440,
-    "candidates": 5028,
+    "candidates": 5036,
     "blocking_issues": 264,
     "projected_dimensions": 409,
     "declared_absent_dimensions": 31,
@@ -37656,6 +37656,11 @@
           "source_role": "one-hop-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+          "topic_sha256": "268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
           "topic_sha256": "d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425",
           "source_role": "common-command-format"
@@ -37669,6 +37674,11 @@
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissueconfirmation.html",
           "topic_sha256": "19ca5eef4cf4e6ba54c16d0020cd27b8d86a859f25fc3fbbbaee88fd73093789",
           "source_role": "primary-command"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+          "topic_sha256": "51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+          "source_role": "manual-context"
         },
         {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html",
@@ -38356,6 +38366,27 @@
           "state": "projected",
           "candidates": [
             {
+              "candidate_id": "cics-b-0113-execution-context-09e6502a2f40",
+              "kind": "source-context",
+              "key": "gds-send-response-contract",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "gds-send-response-contract",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+                "topic_sha256": "sha256:51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp42m__description",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:7a38ef419c3884d2396736c05fe115626672a0e2f32f46345d86d344e65f7ae6"
+              }
+            },
+            {
               "candidate_id": "cics-b-0113-execution-context-0e5dd1d56e52",
               "kind": "source-context",
               "key": "mapped-language-applicability",
@@ -38491,6 +38522,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0113-execution-context-43a92072fc42",
+              "kind": "source-context",
+              "key": "gds-send-response-contract",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "gds-send-response-contract",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+                "topic_sha256": "sha256:51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp42m__options",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]",
+                "fragment_sha256": "sha256:878414ee5f790f27ff76afb76b07c0c2d5b1873bf6cc9182503fac5efc9406ff"
+              }
+            },
+            {
               "candidate_id": "cics-b-0113-execution-context-47e99a7482a0",
               "kind": "source-context",
               "key": "threadsafe-command-list",
@@ -38533,6 +38585,27 @@
                 "tag": "a",
                 "structural_path": "div[1]/article[1]/div[2]/section[3]/dl[1]/dd[1]/a[1]",
                 "fragment_sha256": "sha256:da4d0598439eb0355cd50c287cb8ad6d2b5f6e351404f92724dc1cc83c0652d3"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0113-execution-context-5eba3732ca68",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:880abea7e446f2458e1e0f9ec72c728b7b8737b47874b6cd34ca2f9747b1b551"
               }
             },
             {
@@ -38641,6 +38714,27 @@
                 "tag": "a",
                 "structural_path": "div[1]/article[1]/div[2]/section[2]/p[2]/a[3]",
                 "fragment_sha256": "sha256:7e601b4e8178975ebce9bfececf8d2ce8d60b8de916eee98aa5033adf4ca2873"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0113-execution-context-ddeda124d68a",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__5",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]/div[2]/div[1]/table#dfhp625__dfhp65d",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
               }
             },
             {
@@ -46761,6 +46855,11 @@
           "source_role": "one-hop-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+          "topic_sha256": "268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
           "topic_sha256": "d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425",
           "source_role": "common-command-format"
@@ -46774,6 +46873,11 @@
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissueerror.html",
           "topic_sha256": "366916438f4e2ede56f4e8e2763d89f77249c9e51e00c043ff6441999d1653e5",
           "source_role": "primary-command"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+          "topic_sha256": "51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+          "source_role": "manual-context"
         },
         {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html",
@@ -47488,6 +47592,48 @@
               }
             },
             {
+              "candidate_id": "cics-b-0123-execution-context-3e9ce60ac683",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:880abea7e446f2458e1e0f9ec72c728b7b8737b47874b6cd34ca2f9747b1b551"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0123-execution-context-473de52e75bf",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__5",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]/div[2]/div[1]/table#dfhp625__dfhp65d",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
+            },
+            {
               "candidate_id": "cics-b-0123-execution-context-49a88f85c2b4",
               "kind": "source-context",
               "key": "one-hop-source-8840491a9ffe7fc3",
@@ -47506,6 +47652,27 @@
                 "tag": "a",
                 "structural_path": "div[1]/article[1]/div[2]/section[3]/dl[1]/dd[1]/a[1]",
                 "fragment_sha256": "sha256:da4d0598439eb0355cd50c287cb8ad6d2b5f6e351404f92724dc1cc83c0652d3"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0123-execution-context-5a1604547dc3",
+              "kind": "source-context",
+              "key": "gds-send-response-contract",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "gds-send-response-contract",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+                "topic_sha256": "sha256:51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp42m__description",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:7a38ef419c3884d2396736c05fe115626672a0e2f32f46345d86d344e65f7ae6"
               }
             },
             {
@@ -47704,6 +47871,27 @@
                 "tag": "p",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/p[1]",
                 "fragment_sha256": "sha256:338ed5a5d86ac9f6b8dc17ec2c419e3c80824208457c793e3ba90e0b93456606"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0123-execution-context-d5be4c3d8333",
+              "kind": "source-context",
+              "key": "gds-send-response-contract",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "gds-send-response-contract",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+                "topic_sha256": "sha256:51dfe085834dc31692727a47f853d30baeeb31c0e4b2a9af0143c518851ad5c9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp42m__options",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]",
+                "fragment_sha256": "sha256:878414ee5f790f27ff76afb76b07c0c2d5b1873bf6cc9182503fac5efc9406ff"
               }
             },
             {
@@ -158119,5 +158307,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:df39bcf3937c694e1c3a517dc2b32839b191015a53d942584c4af02305885f9c"
+  "projection_sha256": "sha256:ef038114e35f86aedb12c3beab02d57559ab73a3a73075ec15185126edb3bb72"
 }

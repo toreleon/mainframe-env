@@ -37,6 +37,29 @@ class CicsApplicationSourceBatchTests(unittest.TestCase):
             [batch.row_count for batch in module.BATCHES.values()], [88, 88, 87]
         )
 
+    def test_gds_response_context_is_bounded_to_two_batch_b_rows(self) -> None:
+        projection = json.loads(
+            (ROOT / module.BATCHES["b"].projection_path).read_text(encoding="utf-8")
+        )
+        expected = {
+            "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+            "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+        }
+        for row in projection["rows"]:
+            context = next(
+                dimension for dimension in row["dimensions"]
+                if dimension["name"] == "execution-context"
+            )
+            paths = {
+                candidate["evidence"]["topic_path"]
+                for candidate in context["candidates"]
+            } & expected
+            self.assertEqual(
+                paths,
+                expected if row["official_row"].endswith((":0113", ":0123")) else set(),
+                row["official_row"],
+            )
+
     def test_paths_and_work_packages_are_derived_from_batch_identity(self) -> None:
         for name, batch in module.BATCHES.items():
             with self.subTest(batch=name):

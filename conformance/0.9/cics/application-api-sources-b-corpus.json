@@ -13,17 +13,17 @@
   },
   "topic_manifest": {
     "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-    "file_sha256": "sha256:06d0e4229080df35e1810d33525caf3a753f819ff8950cfc943b59a5cab096b5",
-    "topic_manifest_sha256": "sha256:28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498",
-    "topic_count": 176,
-    "total_bytes": 4174613
+    "file_sha256": "sha256:d57a8eaa5b555996066a237ba9ed449ce4af44e455cc67c87856366ccd2b7104",
+    "topic_manifest_sha256": "sha256:2fc9834578c64fd3b9431ef232ee9b74932c2a8937a6df490e95efb5bab96369",
+    "topic_count": 178,
+    "total_bytes": 4215768
   },
   "counts": {
     "mapping_rows": 88,
     "mapped_command_topics": 109,
     "linked_context_topics": 63,
-    "manual_topics": 4,
-    "html_topics": 176,
+    "manual_topics": 6,
+    "html_topics": 178,
     "mapping_source_gaps": 0,
     "source_gaps_unresolved": 0,
     "supplemental_topics": 0
@@ -480,6 +480,24 @@
       "role": "execution-context-candidate",
       "applies_to": "all-batch-rows",
       "reason": "threadsafe-command-list"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+      ],
+      "reason": "gds-send-response-contract"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+      ],
+      "reason": "appc-basic-state-transitions"
     }
   ],
   "excluded_navigation": [
@@ -493,5 +511,5 @@
   "supplemental_topics": [],
   "source_resolutions": [],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, supplemental topics, and source resolutions",
-  "corpus_sha256": "sha256:3dace7b92117fb9136c4c816282dfc663aa92ada2aa5ec8f5ad26d30aba3d5ed"
+  "corpus_sha256": "sha256:04450a7862d6268587bd56228167607fd18ae894bada3cea5e730ad93ade3647"
 }

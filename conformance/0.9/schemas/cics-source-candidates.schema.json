@@ -1143,6 +1143,8 @@
             "traceid-monitor-compatibility",
             "traceid-dfhcmp-compatibility",
             "global-response-codes",
+            "gds-send-response-contract",
+            "appc-basic-state-transitions",
             "source-resolution-context"
           ]
         },
@@ -1159,6 +1161,7 @@
             "official-row-to-api-table-row-by-label-and-eibfn",
             "compatibility-context-only-no-command-alias",
             "condition-name-to-response-code",
+            "row-specific-context",
             "exact-topic-root-no-link-expansion",
             "mapped-inline-execution-context",
             "mapped-context-predicate",
@@ -1295,6 +1298,8 @@
             "traceid-monitor-compatibility",
             "traceid-dfhcmp-compatibility",
             "global-response-codes",
+            "gds-send-response-contract",
+            "appc-basic-state-transitions",
             "source-resolution-context"
           ]
         },
