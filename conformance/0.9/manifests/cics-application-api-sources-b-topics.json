@@ -12,8 +12,8 @@
   "target_version": "0.9.0",
   "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
-  "topic_count": 181,
-  "topic_manifest_digest": "b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f",
+  "topic_count": 185,
+  "topic_manifest_digest": "0aad3b30b2606da8639600f45530f1c773b726ad06b2ad62c2d6e2a2f4a7811a",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -183,6 +183,30 @@
       "last_modified": "2026-01-16",
       "sha256": "bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
       "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html"
+    },
+    {
+      "bytes": 66179,
+      "last_modified": "2026-01-16",
+      "sha256": "432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html"
+    },
+    {
+      "bytes": 84039,
+      "last_modified": "2026-01-16",
+      "sha256": "a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html"
+    },
+    {
+      "bytes": 106556,
+      "last_modified": "2026-01-16",
+      "sha256": "4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html"
+    },
+    {
+      "bytes": 14405,
+      "last_modified": "2026-08-26",
+      "sha256": "9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html"
     },
     {
       "bytes": 23176,
@@ -1103,5 +1127,5 @@
       "topic_path": "SSJL4D_6.x/upgrading/process/upgrade_apps.html"
     }
   ],
-  "total_bytes": 4459316
+  "total_bytes": 4730495
 }

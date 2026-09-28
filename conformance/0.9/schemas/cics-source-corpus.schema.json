@@ -168,7 +168,7 @@
       "properties": {
         "topic_path": {"$ref": "#/$defs/targetTopicPath"},
         "role": {"enum": ["execution-context-candidate", "operand-contract-candidate", "condition-contract-candidate", "compatibility-context-candidate", "target-command-source", "gap-classification-candidate", "gap-identity-candidate"]},
-        "reason": {"enum": ["argument-value-direction-rules", "exec-command-format-local-task", "dpl-command-restrictions", "threadsafe-command-list", "response-code-table", "legacy-monitoring-successor", "legacy-monitoring-module-context", "target-command-outside-summary-tree", "exec-interface-identity-and-availability", "pinned-eibfn-command-table", "gds-send-response-contract", "appc-basic-state-transitions"]},
+        "reason": {"enum": ["argument-value-direction-rules", "exec-command-format-local-task", "dpl-command-restrictions", "threadsafe-command-list", "response-code-table", "legacy-monitoring-successor", "legacy-monitoring-module-context", "target-command-outside-summary-tree", "exec-interface-identity-and-availability", "pinned-eibfn-command-table", "gds-send-response-contract", "appc-basic-state-transitions", "appc-mapped-state-transitions"]},
         "applies_to": {"enum": ["all-sources-a-rows", "all-batch-rows"]},
         "applies_to_rows": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/officialRow"}}
       },

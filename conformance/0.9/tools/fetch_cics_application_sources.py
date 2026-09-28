@@ -177,6 +177,32 @@ COMMON_APPLICABILITY_TOPICS = (
 
 B_GDS_RESPONSE_TOPICS = (
     {
+        "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+        "role": "execution-context-candidate",
+        "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+        ],
+        "reason": "appc-mapped-state-transitions",
+    },
+    *(
+        {
+            "topic_path": (
+                "SSJL4D_6.x/applications/developing/connections/"
+                f"appcmapped_sl{level}.html"
+            ),
+            "role": "execution-context-candidate",
+            "applies_to_rows": [
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+            ],
+            "reason": "appc-mapped-state-transitions",
+        }
+        for level in (0, 1, 2)
+    ),
+    {
         "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
         "role": "execution-context-candidate",
         "applies_to_rows": [
@@ -189,8 +215,11 @@ B_GDS_RESPONSE_TOPICS = (
         "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
         "role": "execution-context-candidate",
         "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
             "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
             "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
         ],
         "reason": "appc-basic-state-transitions",
     },
@@ -202,8 +231,11 @@ B_GDS_RESPONSE_TOPICS = (
             ),
             "role": "execution-context-candidate",
             "applies_to_rows": [
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
                 "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
                 "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
             ],
             "reason": "appc-basic-state-transitions",
         }

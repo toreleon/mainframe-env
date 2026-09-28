@@ -13,17 +13,17 @@
   },
   "topic_manifest": {
     "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-    "file_sha256": "sha256:1ee42daba576e3ea55f966ff9c094a8386d7a2777e580a36fb1acdbc4a7712c9",
-    "topic_manifest_sha256": "sha256:b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f",
-    "topic_count": 181,
-    "total_bytes": 4459316
+    "file_sha256": "sha256:43ae443de4bbd29578ccfd482f52d40d1d1f6b28f746ba0e3450ba0de4b40bb9",
+    "topic_manifest_sha256": "sha256:0aad3b30b2606da8639600f45530f1c773b726ad06b2ad62c2d6e2a2f4a7811a",
+    "topic_count": 185,
+    "total_bytes": 4730495
   },
   "counts": {
     "mapping_rows": 88,
     "mapped_command_topics": 109,
     "linked_context_topics": 63,
-    "manual_topics": 9,
-    "html_topics": 181,
+    "manual_topics": 13,
+    "html_topics": 185,
     "mapping_source_gaps": 0,
     "source_gaps_unresolved": 0,
     "supplemental_topics": 0
@@ -482,6 +482,46 @@
       "reason": "threadsafe-command-list"
     },
     {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
+      ],
+      "reason": "appc-mapped-state-transitions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
+      ],
+      "reason": "appc-mapped-state-transitions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
+      ],
+      "reason": "appc-mapped-state-transitions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+      "role": "execution-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
+      ],
+      "reason": "appc-mapped-state-transitions"
+    },
+    {
       "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
       "role": "execution-context-candidate",
       "applies_to_rows": [
@@ -494,8 +534,11 @@
       "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
       "role": "execution-context-candidate",
       "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0135"
       ],
       "reason": "appc-basic-state-transitions"
     },
@@ -503,8 +546,11 @@
       "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
       "role": "execution-context-candidate",
       "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0135"
       ],
       "reason": "appc-basic-state-transitions"
     },
@@ -512,8 +558,11 @@
       "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
       "role": "execution-context-candidate",
       "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0135"
       ],
       "reason": "appc-basic-state-transitions"
     },
@@ -521,8 +570,11 @@
       "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
       "role": "execution-context-candidate",
       "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
         "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0135"
       ],
       "reason": "appc-basic-state-transitions"
     }
@@ -538,5 +590,5 @@
   "supplemental_topics": [],
   "source_resolutions": [],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, supplemental topics, and source resolutions",
-  "corpus_sha256": "sha256:f4174bdf7ba0519c0fd373a52815a4175724f09b117b0c316d2f8e279c1aa883"
+  "corpus_sha256": "sha256:6e356a0e29e212f8b65f095e5c33383426ed224a91c94eb6bbf1b2a92b9f2013"
 }

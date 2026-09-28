@@ -269,7 +269,12 @@ impl ConversationRecord {
                 ConversationState::Receive
             }
             GdsIssueFlow::Error | GdsIssueFlow::Signal => self.state,
-            GdsIssueFlow::Prepare => ConversationState::SyncReceive,
+            GdsIssueFlow::Prepare => match self.state {
+                ConversationState::Send => ConversationState::SyncSend,
+                ConversationState::PendReceive => ConversationState::SyncReceive,
+                ConversationState::PendFree => ConversationState::SyncFree,
+                _ => return Err(ConversationProblem::WrongState),
+            },
         };
         let release = pending.flow == GdsIssueFlow::Abend || next_state == ConversationState::Free;
         self.next_sequence()?;
@@ -282,7 +287,26 @@ impl ConversationRecord {
 
 fn issue_state_valid(record: &ConversationRecord, flow: GdsIssueFlow) -> bool {
     match flow {
-        GdsIssueFlow::Abend => true,
+        GdsIssueFlow::Abend => matches!(
+            (record.sync_level, record.state),
+            (
+                Some(0..=2),
+                ConversationState::Send
+                    | ConversationState::PendReceive
+                    | ConversationState::PendFree
+                    | ConversationState::Receive
+            ) | (
+                Some(1..=2),
+                ConversationState::ConfReceive
+                    | ConversationState::ConfSend
+                    | ConversationState::ConfFree
+            ) | (
+                Some(2),
+                ConversationState::SyncReceive
+                    | ConversationState::SyncSend
+                    | ConversationState::SyncFree
+            )
+        ),
         GdsIssueFlow::Confirmation if record.kind == ConversationKind::AppcBasic => matches!(
             record.state,
             ConversationState::ConfReceive
@@ -313,8 +337,34 @@ fn issue_state_valid(record: &ConversationRecord, flow: GdsIssueFlow) -> bool {
             record.state,
             ConversationState::ConfReceive | ConversationState::Send | ConversationState::Receive
         ),
-        GdsIssueFlow::Prepare => record.state == ConversationState::Send,
-        GdsIssueFlow::Signal => record.state == ConversationState::Receive,
+        GdsIssueFlow::Prepare => {
+            record.sync_level == Some(2)
+                && matches!(
+                    record.state,
+                    ConversationState::Send
+                        | ConversationState::PendReceive
+                        | ConversationState::PendFree
+                )
+        }
+        GdsIssueFlow::Signal => matches!(
+            (record.sync_level, record.state),
+            (
+                Some(0..=2),
+                ConversationState::Send
+                    | ConversationState::PendReceive
+                    | ConversationState::Receive
+            ) | (
+                Some(1..=2),
+                ConversationState::ConfReceive
+                    | ConversationState::ConfSend
+                    | ConversationState::ConfFree
+            ) | (
+                Some(2),
+                ConversationState::SyncReceive
+                    | ConversationState::SyncSend
+                    | ConversationState::SyncFree
+            )
+        ),
     }
 }
 
@@ -347,6 +397,103 @@ mod tests {
             )
             .unwrap();
         record
+    }
+
+    #[test]
+    fn issue_abend_signal_and_prepare_follow_basic_and_mapped_state_tables() {
+        use ConversationState::*;
+        const STATES: [ConversationState; 13] = [
+            Allocated,
+            Send,
+            PendReceive,
+            PendFree,
+            Receive,
+            ConfReceive,
+            ConfSend,
+            ConfFree,
+            SyncReceive,
+            SyncSend,
+            SyncFree,
+            Free,
+            Rollback,
+        ];
+        for kind in [ConversationKind::AppcBasic, ConversationKind::AppcMapped] {
+            for level in 0..=2 {
+                for (index, state) in STATES.into_iter().enumerate() {
+                    let number = index + 1;
+                    for flow in [
+                        GdsIssueFlow::Abend,
+                        GdsIssueFlow::Signal,
+                        GdsIssueFlow::Prepare,
+                    ] {
+                        let expected = match flow {
+                            GdsIssueFlow::Abend
+                                if (2..=5).contains(&number)
+                                    || level >= 1 && (6..=8).contains(&number)
+                                    || level == 2 && (9..=11).contains(&number) =>
+                            {
+                                Some(Free)
+                            }
+                            GdsIssueFlow::Signal
+                                if [2, 3, 5].contains(&number)
+                                    || level >= 1 && (6..=8).contains(&number)
+                                    || level == 2 && (9..=11).contains(&number) =>
+                            {
+                                Some(state)
+                            }
+                            GdsIssueFlow::Prepare if level == 2 => match state {
+                                Send => Some(SyncSend),
+                                PendReceive => Some(SyncReceive),
+                                PendFree => Some(SyncFree),
+                                _ => None,
+                            },
+                            _ => None,
+                        };
+                        let mut record = connected(kind, level);
+                        record.state = state;
+                        let before = record.clone();
+                        let result = record.stage_issue(
+                            &owner(),
+                            ConversationContext::Local,
+                            kind == ConversationKind::AppcBasic,
+                            flow,
+                            "table-cell",
+                        );
+                        if let Some(next) = expected {
+                            let id = result.unwrap_or_else(|error| panic!(
+                                "{kind:?} level={level} state={state:?} flow={flow:?}: {error:?}"
+                            ));
+                            assert_eq!(record.state, state);
+                            record
+                                .mark_issue_attempted(
+                                    &owner(),
+                                    ConversationContext::Local,
+                                    "table-cell",
+                                    id,
+                                )
+                                .unwrap();
+                            assert_eq!(
+                                record.confirm_issue(
+                                    &owner(),
+                                    ConversationContext::Local,
+                                    "table-cell",
+                                    id,
+                                ),
+                                Ok(next),
+                                "{kind:?} level={level} state={state:?} flow={flow:?}"
+                            );
+                            assert_eq!(record.released, next == Free);
+                        } else {
+                            assert!(
+                                result.is_err(),
+                                "{kind:?} level={level} state={state:?} flow={flow:?}"
+                            );
+                            assert_eq!(record, before);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -641,7 +788,9 @@ mod tests {
                 false,
                 GdsIssueFlow::Abend
             ),
-            Ok(())
+            Err(IssueValidationProblem::Protocol(
+                ConversationProblem::WrongState
+            ))
         );
         assert_eq!(
             allocated.check_issue(
@@ -748,7 +897,7 @@ mod tests {
             (
                 GdsIssueFlow::Prepare,
                 ConversationState::Send,
-                ConversationState::SyncReceive,
+                ConversationState::SyncSend,
                 2,
             ),
             (
@@ -797,15 +946,8 @@ mod tests {
                 Ok(record)
             );
         }
-        let mut allocated = ConversationRecord::allocate(
-            [0, 0, 0, 2],
-            "S001",
-            ConversationKind::AppcMapped,
-            owner(),
-            false,
-        )
-        .unwrap();
-        let id = allocated
+        let mut sending = connected(ConversationKind::AppcMapped, 0);
+        let id = sending
             .stage_issue(
                 &owner(),
                 ConversationContext::Local,
@@ -814,17 +956,17 @@ mod tests {
                 "abend-1",
             )
             .unwrap();
-        allocated
+        sending
             .mark_issue_attempted(&owner(), ConversationContext::Local, "abend-1", id)
             .unwrap();
         assert_eq!(
-            allocated.confirm_issue(&owner(), ConversationContext::Local, "abend-1", id),
+            sending.confirm_issue(&owner(), ConversationContext::Local, "abend-1", id),
             Ok(ConversationState::Free)
         );
-        assert!(allocated.released);
+        assert!(sending.released);
         assert_eq!(
-            ConversationRecord::decode(&allocated.encode().unwrap()),
-            Ok(allocated)
+            ConversationRecord::decode(&sending.encode().unwrap()),
+            Ok(sending)
         );
     }
 
@@ -919,12 +1061,12 @@ mod tests {
                     "prepare-1",
                     id
                 ),
-                Ok(ConversationState::SyncReceive)
+                Ok(ConversationState::SyncSend)
             );
             assert!(current.persist(&mut next, &store).unwrap());
             let reopened = ConversationLedger::load(&store).unwrap();
             let record = reopened.conversation(token).unwrap();
-            assert_eq!(record.state, ConversationState::SyncReceive);
+            assert_eq!(record.state, ConversationState::SyncSend);
             assert!(record.pending_issue.is_none());
         }
         std::fs::remove_dir_all(root).unwrap();
@@ -1099,7 +1241,7 @@ mod tests {
                 "prepare-pg",
                 id
             ),
-            Ok(ConversationState::SyncReceive)
+            Ok(ConversationState::SyncSend)
         );
         assert!(current.persist(&mut confirmed, &reopened).unwrap());
         let final_state = ConversationLedger::load(&reopened).unwrap();
@@ -1112,7 +1254,7 @@ mod tests {
         );
         assert_eq!(
             final_state.conversation(token).unwrap().state,
-            ConversationState::SyncReceive
+            ConversationState::SyncSend
         );
     }
 }

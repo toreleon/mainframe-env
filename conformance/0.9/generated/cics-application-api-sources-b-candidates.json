@@ -16,25 +16,25 @@
     },
     "source_corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "file_sha256": "sha256:d7eaf4daac830ea09f90017d4448a1d4b5e815357aff1b2c540d5966310c6cd0",
-      "logical_sha256": "sha256:f4174bdf7ba0519c0fd373a52815a4175724f09b117b0c316d2f8e279c1aa883"
+      "file_sha256": "sha256:62df1213dae76862c7544536c0c3f1a4ac74ab3828891e1d23b1223132533adc",
+      "logical_sha256": "sha256:6e356a0e29e212f8b65f095e5c33383426ed224a91c94eb6bbf1b2a92b9f2013"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "file_sha256": "sha256:1ee42daba576e3ea55f966ff9c094a8386d7a2777e580a36fb1acdbc4a7712c9",
-      "logical_sha256": "sha256:b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f"
+      "file_sha256": "sha256:43ae443de4bbd29578ccfd482f52d40d1d1f6b28f746ba0e3450ba0de4b40bb9",
+      "logical_sha256": "sha256:0aad3b30b2606da8639600f45530f1c773b726ad06b2ad62c2d6e2a2f4a7811a"
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-b-extraction.json",
-      "file_sha256": "sha256:d2d9b6d098765357ca666c9585aa8f44842ec2124651e772567bf5bfc5f7bf91",
-      "logical_sha256": "sha256:b79846bb107b67d184241b9219c857d6441bdbed3ed8f0aa0f9931bfb7b6a4b5"
+      "file_sha256": "sha256:03bbb0a8bc86dabf9b82386383e99ae7bdccc96db033bfcbb68ec506df57d0eb",
+      "logical_sha256": "sha256:af001f3b50dd4a88bd39deb4f716e166f2552e073a42111bb773cfb099bf7307"
     }
   },
   "extractor": {
     "name": "cics-dita-source-projector",
     "version": "cics-dita-source-projector@1",
     "implementation_path": "conformance/0.9/tools/extract_cics_application_sources.py",
-    "implementation_sha256": "sha256:c04d1731b2fb38131657e8cabba266077d62c5449ab4331a6e00d4952c5a1145",
+    "implementation_sha256": "sha256:840837bb1fd80f11ba98633e42fa4270ed85d48df5b24c9bf2cf9772cb98a176",
     "fragment_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-fragment@1, one NUL byte (0x00), then UTF-8 order-preserving whitespace-normalized visible text of the selected DOM subtree"
   },
   "condition_name_authority": {
@@ -659,7 +659,7 @@
   "counts": {
     "rows": 88,
     "dimension_records": 440,
-    "candidates": 5042,
+    "candidates": 5072,
     "blocking_issues": 264,
     "projected_dimensions": 409,
     "declared_absent_dimensions": 31,
@@ -31595,6 +31595,26 @@
           "source_role": "manual-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+          "topic_sha256": "432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+          "topic_sha256": "a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+          "topic_sha256": "4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+          "topic_sha256": "9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
           "topic_sha256": "d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425",
           "source_role": "common-command-format"
@@ -32266,6 +32286,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0108-execution-context-3a17c72c36d3",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl0",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl0",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+                "topic_sha256": "sha256:432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl0__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:b082bd7af11e99e8b86a7069d9f379e07d3c45532496182908109fe630350a7b"
+              }
+            },
+            {
               "candidate_id": "cics-b-0108-execution-context-4ab04055e68b",
               "kind": "source-context",
               "key": "dpl-server-restrictions",
@@ -32399,6 +32440,48 @@
               }
             },
             {
+              "candidate_id": "cics-b-0108-execution-context-b2809458a9f5",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl2",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+                "topic_sha256": "sha256:4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl2__title__5",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[4]",
+                "fragment_sha256": "sha256:6066283f73c94975d7281f38fcf7a16d8561227e0c9790e4e5eab74f7dd49ec9"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0108-execution-context-b284070fc957",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl1",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl1",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+                "topic_sha256": "sha256:a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl1__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:b082bd7af11e99e8b86a7069d9f379e07d3c45532496182908109fe630350a7b"
+              }
+            },
+            {
               "candidate_id": "cics-b-0108-execution-context-b63992a58839",
               "kind": "source-context",
               "key": "global-command-format",
@@ -32417,6 +32500,27 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section[3]",
                 "fragment_sha256": "sha256:cfd4da45e04ad3cee65dc01af59bc81d2c50385c12e406142df098d9f560c61a"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0108-execution-context-cf87956909dc",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+                "topic_sha256": "sha256:9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp616__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:1f8aaa905b931ac9d4bf144c4ab607bc95560b11d8acaea45e1a81a2014731f1"
               }
             },
             {
@@ -32439,6 +32543,27 @@
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/div[1]/ul[1]",
                 "fragment_sha256": "sha256:ecf1e1d0f2cd81d8cf69117b331aeaa9c1e1dab410a085ee9c236d07bb8ba03e"
               }
+            },
+            {
+              "candidate_id": "cics-b-0108-execution-context-f83843fd13b1",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+                "topic_sha256": "sha256:9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp616__test__title__1",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section#dfhp616__test/div[1]/div[1]/div[1]/table#dfhp616__dfhp65f",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
             }
           ],
           "issues": []
@@ -32458,9 +32583,29 @@
           "source_role": "manual-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+          "topic_sha256": "84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+          "topic_sha256": "09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+          "topic_sha256": "bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp622.html",
           "topic_sha256": "370c20bbc905dffb1162f207caa9aec981749529ab8f6c1eb1d89dcf69d97a23",
           "source_role": "one-hop-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+          "topic_sha256": "268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+          "source_role": "manual-context"
         },
         {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
@@ -33253,6 +33398,48 @@
               }
             },
             {
+              "candidate_id": "cics-b-0109-execution-context-37676628c028",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:880abea7e446f2458e1e0f9ec72c728b7b8737b47874b6cd34ca2f9747b1b551"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0109-execution-context-45b577755c24",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl1",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl1",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+                "topic_sha256": "sha256:09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl1__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:fc6c035cef2ff4b0bc8a7778a0776debb26b2830cb9b55609bc134c2429a42ac"
+              }
+            },
+            {
               "candidate_id": "cics-b-0109-execution-context-4b53c317ffce",
               "kind": "source-context",
               "key": "global-command-format",
@@ -33322,6 +33509,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0109-execution-context-7d6c1281e8aa",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__5",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]/div[2]/div[1]/table#dfhp625__dfhp65d",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
+            },
+            {
               "candidate_id": "cics-b-0109-execution-context-7fa10824c0b4",
               "kind": "source-context",
               "key": "one-hop-target-299a933a1206e70b",
@@ -33385,6 +33593,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0109-execution-context-96037d5c70ef",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl0",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl0",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+                "topic_sha256": "sha256:84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl0__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:d42e67f2af8bc81cd5d6707bce064100bae7505f53c663d43cd5da99d93af660"
+              }
+            },
+            {
               "candidate_id": "cics-b-0109-execution-context-9f7f6d1bfd81",
               "kind": "source-context",
               "key": "one-hop-source-3063615423dd0065",
@@ -33403,6 +33632,27 @@
                 "tag": "a",
                 "structural_path": "div[1]/article[1]/div[2]/section[3]/dl[1]/dd[1]/a[1]",
                 "fragment_sha256": "sha256:da4d0598439eb0355cd50c287cb8ad6d2b5f6e351404f92724dc1cc83c0652d3"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0109-execution-context-aec75ee917e9",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl2",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+                "topic_sha256": "sha256:bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl2__title__5",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[4]",
+                "fragment_sha256": "sha256:cf454adc0c18b4a0e634730710ddac8870ca46bd5759deb70401b0676e9b6d5a"
               }
             },
             {
@@ -51344,6 +51594,26 @@
           "source_role": "manual-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+          "topic_sha256": "432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+          "topic_sha256": "a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+          "topic_sha256": "4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+          "topic_sha256": "9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
           "topic_sha256": "d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425",
           "source_role": "common-command-format"
@@ -51955,6 +52225,48 @@
           "state": "projected",
           "candidates": [
             {
+              "candidate_id": "cics-b-0127-execution-context-2e354461971d",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+                "topic_sha256": "sha256:9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp616__test__title__1",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section#dfhp616__test/div[1]/div[1]/div[1]/table#dfhp616__dfhp65f",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0127-execution-context-34a9022de68e",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl1",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl1",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+                "topic_sha256": "sha256:a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl1__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:b082bd7af11e99e8b86a7069d9f379e07d3c45532496182908109fe630350a7b"
+              }
+            },
+            {
               "candidate_id": "cics-b-0127-execution-context-35df14ced099",
               "kind": "source-context",
               "key": "global-command-format",
@@ -51973,6 +52285,27 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section#dfhp4kt__dfhp4_cicscmdrestrictions",
                 "fragment_sha256": "sha256:55c468c0fa94d558a789faf1ebd2a462bd1524a6ff1b65a67ab9bbbf667e57f3"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0127-execution-context-3ca9265173f2",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl2",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+                "topic_sha256": "sha256:4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl2__title__5",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[4]",
+                "fragment_sha256": "sha256:6066283f73c94975d7281f38fcf7a16d8561227e0c9790e4e5eab74f7dd49ec9"
               }
             },
             {
@@ -52082,6 +52415,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0127-execution-context-85a26568bfb4",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl0",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl0",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+                "topic_sha256": "sha256:432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl0__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:b082bd7af11e99e8b86a7069d9f379e07d3c45532496182908109fe630350a7b"
+              }
+            },
+            {
               "candidate_id": "cics-b-0127-execution-context-9ecf7c4a2519",
               "kind": "source-context",
               "key": "mapped-inline-execution-context",
@@ -52121,6 +52475,27 @@
                 "tag": "table",
                 "structural_path": "div[1]/article[1]/div[2]/section[2]/div[1]/div[1]/table#dfhp3002-gen237__dfhp3ci",
                 "fragment_sha256": "sha256:e64071f2fa2d4f5ff832ea48b8b799189ab8fce66e92d825f27c4dedb814e342"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0127-execution-context-ac63540b8b95",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+                "topic_sha256": "sha256:9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp616__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:1f8aaa905b931ac9d4bf144c4ab607bc95560b11d8acaea45e1a81a2014731f1"
               }
             },
             {
@@ -52207,9 +52582,29 @@
           "source_role": "manual-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+          "topic_sha256": "84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+          "topic_sha256": "09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+          "topic_sha256": "bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp622.html",
           "topic_sha256": "370c20bbc905dffb1162f207caa9aec981749529ab8f6c1eb1d89dcf69d97a23",
           "source_role": "one-hop-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+          "topic_sha256": "268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+          "source_role": "manual-context"
         },
         {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
@@ -52978,6 +53373,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0128-execution-context-4c8415411fe0",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:880abea7e446f2458e1e0f9ec72c728b7b8737b47874b6cd34ca2f9747b1b551"
+              }
+            },
+            {
               "candidate_id": "cics-b-0128-execution-context-655a34b16c10",
               "kind": "source-context",
               "key": "dpl-server-restrictions",
@@ -52999,6 +53415,48 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section[2]",
                 "fragment_sha256": "sha256:d82c24cbe63f7eed5608214f3b045ed6d6da1229a44fe7192ba3d40dca8a50c5"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0128-execution-context-65f0588aac16",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__5",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]/div[2]/div[1]/table#dfhp625__dfhp65d",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0128-execution-context-702408a6ad76",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl2",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+                "topic_sha256": "sha256:bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl2__title__5",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[4]",
+                "fragment_sha256": "sha256:cf454adc0c18b4a0e634730710ddac8870ca46bd5759deb70401b0676e9b6d5a"
               }
             },
             {
@@ -53092,6 +53550,48 @@
                 "tag": "p",
                 "structural_path": "div[1]/article[1]/div[2]/p[1]",
                 "fragment_sha256": "sha256:b803107f615c11d39d53936a7a1db7e95e6bc2f7383c489b0a1493209403bf28"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0128-execution-context-a654276897fc",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl0",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl0",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+                "topic_sha256": "sha256:84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl0__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:d42e67f2af8bc81cd5d6707bce064100bae7505f53c663d43cd5da99d93af660"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0128-execution-context-aca2c7d015e7",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl1",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl1",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+                "topic_sha256": "sha256:09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl1__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:fc6c035cef2ff4b0bc8a7778a0776debb26b2830cb9b55609bc134c2429a42ac"
               }
             },
             {
@@ -59931,9 +60431,29 @@
           "source_role": "manual-context"
         },
         {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+          "topic_sha256": "84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+          "topic_sha256": "09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+          "topic_sha256": "bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+          "source_role": "manual-context"
+        },
+        {
           "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp622.html",
           "topic_sha256": "370c20bbc905dffb1162f207caa9aec981749529ab8f6c1eb1d89dcf69d97a23",
           "source_role": "one-hop-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+          "topic_sha256": "268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+          "source_role": "manual-context"
         },
         {
           "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
@@ -60726,6 +61246,48 @@
               }
             },
             {
+              "candidate_id": "cics-b-0135-execution-context-3f6b2c45befa",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl0",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl0",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl0.html",
+                "topic_sha256": "sha256:84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl0__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:d42e67f2af8bc81cd5d6707bce064100bae7505f53c663d43cd5da99d93af660"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0135-execution-context-48d9c82443f5",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__5",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section[3]/div[2]/div[1]/table#dfhp625__dfhp65d",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
+            },
+            {
               "candidate_id": "cics-b-0135-execution-context-6b5e966d21a6",
               "kind": "source-context",
               "key": "threadsafe-command-list",
@@ -60879,6 +61441,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0135-execution-context-dfd5b72a9366",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+                "topic_sha256": "sha256:268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp625__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:880abea7e446f2458e1e0f9ec72c728b7b8737b47874b6cd34ca2f9747b1b551"
+              }
+            },
+            {
               "candidate_id": "cics-b-0135-execution-context-e30cc87b513e",
               "kind": "source-context",
               "key": "dpl-server-restrictions",
@@ -60924,6 +61507,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0135-execution-context-f294d3f321da",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl1",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl1",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl1.html",
+                "topic_sha256": "sha256:09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl1__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:fc6c035cef2ff4b0bc8a7778a0776debb26b2830cb9b55609bc134c2429a42ac"
+              }
+            },
+            {
               "candidate_id": "cics-b-0135-execution-context-f5846d19cc50",
               "kind": "source-context",
               "key": "global-command-format",
@@ -60943,6 +61547,27 @@
                 "structural_path": "div[1]/article[1]/div[2]/section#dfhp4kt__dfhp4_cicscmdrestrictions",
                 "fragment_sha256": "sha256:55c468c0fa94d558a789faf1ebd2a462bd1524a6ff1b65a67ab9bbbf667e57f3"
               }
+            },
+            {
+              "candidate_id": "cics-b-0135-execution-context-feaaab13ff43",
+              "kind": "source-context",
+              "key": "appc-basic-state-transitions-sl2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-basic-state-transitions-sl2",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcbasic_sl2.html",
+                "topic_sha256": "sha256:bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcbasic_sl2__title__5",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[4]",
+                "fragment_sha256": "sha256:cf454adc0c18b4a0e634730710ddac8870ca46bd5759deb70401b0676e9b6d5a"
+              }
             }
           ],
           "issues": []
@@ -60959,6 +61584,26 @@
         {
           "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00237.html",
           "topic_sha256": "15437f723e698bf2e69bc0e5688daabf69e0b66aaf1369ee119bd6630892ef7e",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+          "topic_sha256": "432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+          "topic_sha256": "a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+          "topic_sha256": "4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+          "source_role": "manual-context"
+        },
+        {
+          "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+          "topic_sha256": "9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
           "source_role": "manual-context"
         },
         {
@@ -61911,6 +62556,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0136-execution-context-221d65455495",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+                "topic_sha256": "sha256:9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp616__test__title__1",
+                "tag": "table",
+                "structural_path": "div[1]/article[1]/div[2]/section#dfhp616__test/div[1]/div[1]/div[1]/table#dfhp616__dfhp65f",
+                "fragment_sha256": "sha256:f1b6f2696843736f0abdb00da5479d043c9194bf8016ff8a141ec431488aac18"
+              }
+            },
+            {
               "candidate_id": "cics-b-0136-execution-context-22beb19fd3e0",
               "kind": "source-context",
               "key": "mapped-inline-execution-context",
@@ -61989,6 +62655,27 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]",
                 "fragment_sha256": "sha256:13bfe630c88c50bb540421ac1610157cd9f138a5b89f31737f510c6d993b168d"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0136-execution-context-5056a5456d72",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl2",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl2.html",
+                "topic_sha256": "sha256:4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl2__title__5",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[4]",
+                "fragment_sha256": "sha256:6066283f73c94975d7281f38fcf7a16d8561227e0c9790e4e5eab74f7dd49ec9"
               }
             },
             {
@@ -62097,6 +62784,27 @@
               }
             },
             {
+              "candidate_id": "cics-b-0136-execution-context-b7edc7c70b66",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+                "topic_sha256": "sha256:9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "dfhp616__title__2",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[1]",
+                "fragment_sha256": "sha256:1f8aaa905b931ac9d4bf144c4ab607bc95560b11d8acaea45e1a81a2014731f1"
+              }
+            },
+            {
               "candidate_id": "cics-b-0136-execution-context-b83ab265156a",
               "kind": "source-context",
               "key": "global-command-format",
@@ -62164,6 +62872,48 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]",
                 "fragment_sha256": "sha256:905a1f1bfbcc49961d91bd71f878e7bd8285910294397ab9f57e510188aa53a1"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0136-execution-context-e5ec65de5a11",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl1",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl1",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl1.html",
+                "topic_sha256": "sha256:a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl1__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:b082bd7af11e99e8b86a7069d9f379e07d3c45532496182908109fe630350a7b"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0136-execution-context-f5ae903e6821",
+              "kind": "source-context",
+              "key": "appc-mapped-state-transitions-sl0",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "appc-mapped-state-transitions-sl0",
+                "association": "row-specific-context"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/applications/developing/connections/appcmapped_sl0.html",
+                "topic_sha256": "sha256:432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8",
+                "source_role": "manual-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "appcmapped_sl0__title__3",
+                "tag": "section",
+                "structural_path": "div[1]/article[1]/div[2]/section[2]",
+                "fragment_sha256": "sha256:b082bd7af11e99e8b86a7069d9f379e07d3c45532496182908109fe630350a7b"
               }
             }
           ],
@@ -158463,5 +159213,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:7269fb6331b035a6f09030ce9bd3c4ce6f9f57b98434ef6c35e502072d489f8d"
+  "projection_sha256": "sha256:6feaa7dd05dd37ed26a0ce8a4afbfc044007c26e80d990c3d7247b94fef0d09a"
 }

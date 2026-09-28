@@ -791,6 +791,10 @@ MANUAL_SOURCE_ROLES = {
     "appc-basic-state-transitions-sl0": "manual-context",
     "appc-basic-state-transitions-sl1": "manual-context",
     "appc-basic-state-transitions-sl2": "manual-context",
+    "appc-mapped-state-transitions": "manual-context",
+    "appc-mapped-state-transitions-sl0": "manual-context",
+    "appc-mapped-state-transitions-sl1": "manual-context",
+    "appc-mapped-state-transitions-sl2": "manual-context",
 }
 SUPPLEMENT_SOURCE_ROLES = {
     "cross-product-explicit-compatibility": "cross-product-compatibility",

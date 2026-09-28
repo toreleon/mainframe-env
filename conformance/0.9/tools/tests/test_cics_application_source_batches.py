@@ -37,14 +37,24 @@ class CicsApplicationSourceBatchTests(unittest.TestCase):
             [batch.row_count for batch in module.BATCHES.values()], [88, 88, 87]
         )
 
-    def test_gds_response_context_is_bounded_to_two_batch_b_rows(self) -> None:
+    def test_appc_state_context_is_bounded_to_its_batch_b_rows(self) -> None:
         projection = json.loads(
             (ROOT / module.BATCHES["b"].projection_path).read_text(encoding="utf-8")
         )
-        expected = {
+        basic = {
             "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
             "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
         }
+        mapped = {
+            "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+            *(f"SSJL4D_6.x/applications/developing/connections/appcmapped_sl{level}.html"
+              for level in range(3)),
+        }
+        basic_tables = {
+            f"SSJL4D_6.x/applications/developing/connections/appcbasic_sl{level}.html"
+            for level in range(3)
+        }
+        all_paths = basic | basic_tables | mapped
         for row in projection["rows"]:
             context = next(
                 dimension for dimension in row["dimensions"]
@@ -53,10 +63,18 @@ class CicsApplicationSourceBatchTests(unittest.TestCase):
             paths = {
                 candidate["evidence"]["topic_path"]
                 for candidate in context["candidates"]
-            } & expected
+            } & all_paths
+            ordinal = row["official_row"].rsplit(":", 1)[-1]
+            expected = set()
+            if ordinal in {"0109", "0113", "0123", "0128", "0135"}:
+                expected = basic_tables | {next(path for path in basic if path.endswith("dfhp625.html"))}
+            if ordinal in {"0113", "0123"}:
+                expected |= {next(path for path in basic if path.endswith("dfhp4_gdssend.html"))}
+            if ordinal in {"0108", "0127", "0136"}:
+                expected = mapped
             self.assertEqual(
                 paths,
-                expected if row["official_row"].endswith((":0113", ":0123")) else set(),
+                expected,
                 row["official_row"],
             )
 

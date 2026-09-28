@@ -402,7 +402,9 @@
             "threadsafe-command-list", "gap-exec-interface-classification", "gap-eibfn-identity",
             "traceid-monitor-compatibility", "traceid-dfhcmp-compatibility",
             "global-response-codes", "gds-send-response-contract", "appc-basic-state-transitions",
-            "appc-basic-state-transitions-sl0", "appc-basic-state-transitions-sl1", "appc-basic-state-transitions-sl2"
+            "appc-basic-state-transitions-sl0", "appc-basic-state-transitions-sl1", "appc-basic-state-transitions-sl2",
+            "appc-mapped-state-transitions", "appc-mapped-state-transitions-sl0",
+            "appc-mapped-state-transitions-sl1", "appc-mapped-state-transitions-sl2"
           ]
         },
         "source_role": {

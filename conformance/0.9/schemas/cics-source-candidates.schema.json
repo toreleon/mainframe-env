@@ -1148,6 +1148,10 @@
             "appc-basic-state-transitions-sl0",
             "appc-basic-state-transitions-sl1",
             "appc-basic-state-transitions-sl2",
+            "appc-mapped-state-transitions",
+            "appc-mapped-state-transitions-sl0",
+            "appc-mapped-state-transitions-sl1",
+            "appc-mapped-state-transitions-sl2",
             "source-resolution-context"
           ]
         },
@@ -1306,6 +1310,10 @@
             "appc-basic-state-transitions-sl0",
             "appc-basic-state-transitions-sl1",
             "appc-basic-state-transitions-sl2",
+            "appc-mapped-state-transitions",
+            "appc-mapped-state-transitions-sl0",
+            "appc-mapped-state-transitions-sl1",
+            "appc-mapped-state-transitions-sl2",
             "source-resolution-context"
           ]
         },

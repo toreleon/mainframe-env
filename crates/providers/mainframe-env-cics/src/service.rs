@@ -6309,6 +6309,34 @@ mod tests {
         (invocation, session)
     }
 
+    fn connect_issue_source(
+        store: &dyn ProviderStateStore,
+        invocation: &Invocation,
+        token: [u8; 4],
+        kind: ConversationKind,
+        sync_level: u8,
+    ) {
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                kind == ConversationKind::AppcBasic,
+                b"PROC".to_vec(),
+                vec![],
+                sync_level,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store).unwrap());
+    }
+
     fn registered_counter_run(service: &CicsService, name: &str) -> Invocation {
         let invocation = invocation_for(name, BTreeMap::new());
         let session = SessionId::new(format!("{name}-session"), 64).unwrap();
@@ -9053,6 +9081,13 @@ mod tests {
                 ConversationKind::AppcMapped,
             )
             .unwrap();
+        connect_issue_source(
+            store.as_ref(),
+            &invocation,
+            token,
+            ConversationKind::AppcMapped,
+            0,
+        );
         let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueAbend,
@@ -9087,7 +9122,7 @@ mod tests {
         assert!(pending.request.as_ref().unwrap().state_output);
         assert_eq!(
             first.conversation(token).unwrap().state,
-            ConversationState::Allocated
+            ConversationState::Send
         );
         assert_eq!(
             stage(&mut run, &command).unwrap().disposition,
@@ -9232,6 +9267,13 @@ mod tests {
                 ConversationKind::AppcMapped,
             )
             .unwrap();
+        connect_issue_source(
+            store.as_ref(),
+            &invocation,
+            token,
+            ConversationKind::AppcMapped,
+            0,
+        );
         let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueAbend,
@@ -9275,7 +9317,7 @@ mod tests {
         let attempted = ConversationLedger::load(store.as_ref()).unwrap();
         assert_eq!(
             attempted.conversation(token).unwrap().state,
-            ConversationState::Allocated
+            ConversationState::Send
         );
         assert!(
             attempted
@@ -9879,6 +9921,13 @@ mod tests {
                     ConversationKind::AppcMapped,
                 )
                 .unwrap();
+            connect_issue_source(
+                store.as_ref(),
+                &invocation,
+                token,
+                ConversationKind::AppcMapped,
+                0,
+            );
             run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
             let command = request(
                 CicsOperation::IssueAbend,
@@ -10011,8 +10060,8 @@ mod tests {
         for (operation, sync_level, source_state, result_state) in [
             (
                 CicsOperation::GdsIssueAbend,
-                None,
-                ConversationState::Allocated,
+                Some(0),
+                ConversationState::Send,
                 ConversationState::Free,
             ),
             (
@@ -10031,7 +10080,7 @@ mod tests {
                 CicsOperation::GdsIssuePrepare,
                 Some(2),
                 ConversationState::Send,
-                ConversationState::SyncReceive,
+                ConversationState::SyncSend,
             ),
             (
                 CicsOperation::GdsIssueSignal,
@@ -10202,7 +10251,7 @@ mod tests {
                 ConversationKind::AppcBasic,
                 CicsOperation::GdsIssueSignal,
                 Some(0),
-                ConversationState::Send,
+                ConversationState::PendFree,
                 false,
                 [3, 8, 0, 0, 0, 0],
             ),
@@ -10527,6 +10576,13 @@ mod tests {
                     ConversationKind::AppcBasic,
                 )
                 .unwrap();
+            connect_issue_source(
+                store.as_ref(),
+                &invocation,
+                token,
+                ConversationKind::AppcBasic,
+                0,
+            );
             run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
             service
                 .install_conversation_transport(Arc::new(Carrier {
@@ -10709,6 +10765,15 @@ mod tests {
                     kind,
                 )
                 .unwrap();
+            if flow == GdsIssueFlow::Abend {
+                connect_issue_source(
+                    source_store.as_ref(),
+                    &source_invocation,
+                    source_token,
+                    kind,
+                    0,
+                );
+            }
             if flow == GdsIssueFlow::Prepare {
                 for (store, invocation, token, receiving) in [
                     (&source_store, &source_invocation, source_token, false),

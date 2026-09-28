@@ -20,9 +20,9 @@
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-application-api-sources-b-2026-09-10",
       "manifest": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "manifest_sha256": "sha256:1ee42daba576e3ea55f966ff9c094a8386d7a2777e580a36fb1acdbc4a7712c9",
-      "topic_count": 181,
-      "topic_manifest_sha256": "sha256:b89c4c5ed41020653deff87bfcc0c27462fe940a6c2defa3650c857d9dda920f",
+      "manifest_sha256": "sha256:43ae443de4bbd29578ccfd482f52d40d1d1f6b28f746ba0e3450ba0de4b40bb9",
+      "topic_count": 185,
+      "topic_manifest_sha256": "sha256:0aad3b30b2606da8639600f45530f1c773b726ad06b2ad62c2d6e2a2f4a7811a",
       "semantic_authority": false,
       "coverage_credit": 0
     },
