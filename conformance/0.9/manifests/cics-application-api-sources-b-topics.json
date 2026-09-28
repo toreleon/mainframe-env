@@ -13,7 +13,7 @@
   "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
   "topic_count": 176,
-  "topic_manifest_digest": "f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc",
+  "topic_manifest_digest": "28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -983,9 +983,9 @@
       "topic_path": "SSJL4D_6.x/reference-system-management/resources/macros/mct/emp.html"
     },
     {
-      "bytes": 200065,
+      "bytes": 251733,
       "last_modified": "2026-08-26",
-      "sha256": "03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
+      "sha256": "21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
       "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html"
     },
     {
@@ -1055,9 +1055,9 @@
       "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfht2k7.html"
     },
     {
-      "bytes": 61712,
+      "bytes": 61709,
       "last_modified": "2026-06-29",
-      "sha256": "b07229031a6b7b9d622586842457c3c71f06fc9fe087a5dfd3a334f621e2e5a5",
+      "sha256": "4f3daa22b3c1667c0ecbb76d5c033cdb630d2b08fe222f9eece0f46dff3084ef",
       "topic_path": "SSJL4D_6.x/troubleshooting/java/troubleshooting_web_ref.html"
     },
     {
@@ -1073,5 +1073,5 @@
       "topic_path": "SSJL4D_6.x/upgrading/process/upgrade_apps.html"
     }
   ],
-  "total_bytes": 4122948
+  "total_bytes": 4174613
 }
