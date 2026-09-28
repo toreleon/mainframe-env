@@ -16,18 +16,18 @@
     },
     "source_corpus": {
       "path": "conformance/0.9/cics/application-api-sources-c-corpus.json",
-      "file_sha256": "sha256:96b6068b33cedd23d3d246203bfbaff7c20df7aa550c5d7123106059d350fb35",
-      "logical_sha256": "sha256:3e5e7975f27fad959ccbd6413766aa4d8143e6b4fb94b912b99b236b836d48ae"
+      "file_sha256": "sha256:d7da2e82241de042f027e47c93679ced532a71f7254af0a06803ad65f39acd30",
+      "logical_sha256": "sha256:c112f0b28743478d2b0ea8ea167cd8a76f05a60e6ef11230a1168a907a0847bf"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-c-topics.json",
-      "file_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc",
-      "logical_sha256": "sha256:717396f5e8cd0e9fbc21c91c569afce84e6f7f632dfbec574d3fd62bf5a85871"
+      "file_sha256": "sha256:54957233e41377648dfff0f9a334866eb63e0cfbef1d25d329d52ec2c984228f",
+      "logical_sha256": "sha256:01fb00ebd639d937017cb3f6565cdf38df3c25bb0ebe4393030e66db260d8bc2"
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-c-extraction.json",
-      "file_sha256": "sha256:100866ba86291a61141e1d6ea8c7d58d5011157a249e7fb0e8bd0c5934d89327",
-      "logical_sha256": "sha256:47d8e19781b0ad510c0a95b7983b7df05a9e77b020c40392e286b586a720d275"
+      "file_sha256": "sha256:1e09820660e56b54c818822a848dc3fe9289ed11e62a58e601cb57046f663442",
+      "logical_sha256": "sha256:9aaa9a52006cbf99c39a29cc6363243ffe531e81cecff60d61880a1d0ac56f97"
     }
   },
   "extractor": {
@@ -90554,7 +90554,7 @@
         },
         {
           "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
-          "topic_sha256": "03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
+          "topic_sha256": "21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
           "source_role": "one-hop-context"
         },
         {
@@ -95900,6 +95900,27 @@
               }
             },
             {
+              "candidate_id": "cics-c-0205-execution-context-e8b113f9ea76",
+              "kind": "source-context",
+              "key": "one-hop-target-8611b9b3bb1eb9e2",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
+                "topic_sha256": "sha256:21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:a6a8e38d5a45061fde298323b9a6ad73c3d9f3c4532d1ac79017a2c7b8cd7a13"
+              }
+            },
+            {
               "candidate_id": "cics-c-0205-execution-context-f0f7469b38e2",
               "kind": "source-context",
               "key": "global-command-format",
@@ -95967,27 +95988,6 @@
                 "tag": "a",
                 "structural_path": "div[1]/article[1]/div[2]/section[5]/dl[1]/dd[6]/p[2]/a[1]",
                 "fragment_sha256": "sha256:fb2ef2fee1ff72fcf6510343b6ae5990a33f7b82490314bf8daea358446a28bc"
-              }
-            },
-            {
-              "candidate_id": "cics-c-0205-execution-context-f57354a13fb6",
-              "kind": "source-context",
-              "key": "one-hop-target-8611b9b3bb1eb9e2",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
-                "topic_sha256": "sha256:03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:b3ddd677564b3cdee6bea2c8f4829f1b29cc60c433048d06de0b956b69bfa747"
               }
             }
           ],
@@ -159916,12 +159916,12 @@
         },
         {
           "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
-          "topic_sha256": "c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b",
+          "topic_sha256": "3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319",
           "source_role": "one-hop-context"
         },
         {
           "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html",
-          "topic_sha256": "38ff92b29e9bff1add9a2add4bef33f1f7ccc6a29076b42b48f3e5b3733bf740",
+          "topic_sha256": "bb908fcb9f23db0145218bbd535b15094f4148d22a7c0016912bcc90e8df13ca",
           "source_role": "one-hop-context"
         },
         {
@@ -163488,27 +163488,6 @@
               }
             },
             {
-              "candidate_id": "cics-c-0246-execution-context-02b117f8ad63",
-              "kind": "source-context",
-              "key": "one-hop-target-bc955693816ebe1f",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html",
-                "topic_sha256": "sha256:38ff92b29e9bff1add9a2add4bef33f1f7ccc6a29076b42b48f3e5b3733bf740",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:0b8858c17000fc5dde194f43695d9d91baf6f5154b06451995c45aa66e1a4053"
-              }
-            },
-            {
               "candidate_id": "cics-c-0246-execution-context-05035df2ebcd",
               "kind": "source-context",
               "key": "global-command-format",
@@ -163590,6 +163569,27 @@
                 "tag": "p",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/p[1]",
                 "fragment_sha256": "sha256:3f7dc2811a47ffa5bf6d1791c0ec18f30d5e7133de6c2dbdce55cc8e65e616f6"
+              }
+            },
+            {
+              "candidate_id": "cics-c-0246-execution-context-361c7e593d8d",
+              "kind": "source-context",
+              "key": "one-hop-target-5244927740e1fc79",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
+                "topic_sha256": "sha256:3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:b7fbc1570a968bf3a849046c4941f5ecf37b2cdf303d0605a147ca319083a264"
               }
             },
             {
@@ -163770,27 +163770,6 @@
               }
             },
             {
-              "candidate_id": "cics-c-0246-execution-context-77c2595f1343",
-              "kind": "source-context",
-              "key": "one-hop-target-5244927740e1fc79",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
-                "topic_sha256": "sha256:c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:b7fbc1570a968bf3a849046c4941f5ecf37b2cdf303d0605a147ca319083a264"
-              }
-            },
-            {
               "candidate_id": "cics-c-0246-execution-context-78d1d4bde35d",
               "kind": "source-context",
               "key": "mapped-context-predicate",
@@ -163963,6 +163942,27 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]",
                 "fragment_sha256": "sha256:13bfe630c88c50bb540421ac1610157cd9f138a5b89f31737f510c6d993b168d"
+              }
+            },
+            {
+              "candidate_id": "cics-c-0246-execution-context-cdb5b4610bf1",
+              "kind": "source-context",
+              "key": "one-hop-target-bc955693816ebe1f",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html",
+                "topic_sha256": "sha256:bb908fcb9f23db0145218bbd535b15094f4148d22a7c0016912bcc90e8df13ca",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:0b8858c17000fc5dde194f43695d9d91baf6f5154b06451995c45aa66e1a4053"
               }
             },
             {
@@ -164210,7 +164210,7 @@
         },
         {
           "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
-          "topic_sha256": "c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b",
+          "topic_sha256": "3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319",
           "source_role": "one-hop-context"
         },
         {
@@ -167167,6 +167167,27 @@
               }
             },
             {
+              "candidate_id": "cics-c-0247-execution-context-43e459eb42f4",
+              "kind": "source-context",
+              "key": "one-hop-target-42fd7acce730d19d",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
+                "topic_sha256": "sha256:3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:b7fbc1570a968bf3a849046c4941f5ecf37b2cdf303d0605a147ca319083a264"
+              }
+            },
+            {
               "candidate_id": "cics-c-0247-execution-context-4f6035fb9ed2",
               "kind": "source-context",
               "key": "global-command-format",
@@ -167272,27 +167293,6 @@
               }
             },
             {
-              "candidate_id": "cics-c-0247-execution-context-5c745b1aad42",
-              "kind": "source-context",
-              "key": "one-hop-target-42fd7acce730d19d",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
-                "topic_sha256": "sha256:c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:b7fbc1570a968bf3a849046c4941f5ecf37b2cdf303d0605a147ca319083a264"
-              }
-            },
-            {
               "candidate_id": "cics-c-0247-execution-context-8d89e4e3a745",
               "kind": "source-context",
               "key": "dpl-server-restrictions",
@@ -167327,6 +167327,27 @@
               }
             },
             {
+              "candidate_id": "cics-c-0247-execution-context-9bc5bd37fa93",
+              "kind": "source-context",
+              "key": "one-hop-target-bbc1dbecb1107799",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
+                "topic_sha256": "sha256:3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:b7fbc1570a968bf3a849046c4941f5ecf37b2cdf303d0605a147ca319083a264"
+              }
+            },
+            {
               "candidate_id": "cics-c-0247-execution-context-9cf5740f165b",
               "kind": "source-context",
               "key": "mapped-inline-execution-context",
@@ -167345,27 +167366,6 @@
                 "tag": "p",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/p[1]",
                 "fragment_sha256": "sha256:cccc7784d18b278c88ef2c6adad6385e0919486cc5fe1943d148359e161d5dd3"
-              }
-            },
-            {
-              "candidate_id": "cics-c-0247-execution-context-a43ff8d4f7ba",
-              "kind": "source-context",
-              "key": "one-hop-target-bbc1dbecb1107799",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html",
-                "topic_sha256": "sha256:c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:b7fbc1570a968bf3a849046c4941f5ecf37b2cdf303d0605a147ca319083a264"
               }
             },
             {
@@ -187095,7 +187095,7 @@
         },
         {
           "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html",
-          "topic_sha256": "38ff92b29e9bff1add9a2add4bef33f1f7ccc6a29076b42b48f3e5b3733bf740",
+          "topic_sha256": "bb908fcb9f23db0145218bbd535b15094f4148d22a7c0016912bcc90e8df13ca",
           "source_role": "one-hop-context"
         },
         {
@@ -189546,6 +189546,27 @@
               }
             },
             {
+              "candidate_id": "cics-c-0251-execution-context-273f56fac416",
+              "kind": "source-context",
+              "key": "one-hop-target-3fd058809c265705",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html",
+                "topic_sha256": "sha256:bb908fcb9f23db0145218bbd535b15094f4148d22a7c0016912bcc90e8df13ca",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:0b8858c17000fc5dde194f43695d9d91baf6f5154b06451995c45aa66e1a4053"
+              }
+            },
+            {
               "candidate_id": "cics-c-0251-execution-context-2e63a1f1195b",
               "kind": "source-context",
               "key": "mapped-inline-execution-context",
@@ -189781,27 +189802,6 @@
                 "tag": "p",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/p[2]",
                 "fragment_sha256": "sha256:d73303dce02d90093df2df971537373675138fbd682f0bc38845f5b0dd4957d6"
-              }
-            },
-            {
-              "candidate_id": "cics-c-0251-execution-context-9fee31721e9e",
-              "kind": "source-context",
-              "key": "one-hop-target-3fd058809c265705",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html",
-                "topic_sha256": "sha256:38ff92b29e9bff1add9a2add4bef33f1f7ccc6a29076b42b48f3e5b3733bf740",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:0b8858c17000fc5dde194f43695d9d91baf6f5154b06451995c45aa66e1a4053"
               }
             },
             {
@@ -228865,5 +228865,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:3291395ca8f97f3728137e7b07abb6b21c5d17e0c667702677df45b6dff9c854"
+  "projection_sha256": "sha256:91ca55b8d3cc0c8789b4550700d2a3e35ae830434778cfd28041f5b1f884fb98"
 }

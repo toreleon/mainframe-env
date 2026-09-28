@@ -897,7 +897,46 @@ def load_supplements(
         b"mainframe-env.cics-source-supplement-identity@1\0"
         + "".join(sorted(identity_lines)).encode("utf-8")
     )
-    if capture.get("identity_sha256") != identity:
+    repin = receipt.get("repin")
+    if repin is not None:
+        if not isinstance(repin, dict) or repin.get("historical_receipt_path") != (
+            "conformance/0.9/cics/application-api-sources-a-supplements-2026-09-10.json"
+        ):
+            raise VerificationError("supplement repin history path differs")
+        historical_path = root / repin["historical_receipt_path"]
+        historical = read_object(historical_path)
+        if (
+            repin.get("historical_receipt_sha256") != file_sha256(historical_path)
+            or historical.get("capture") != capture
+            or not isinstance(historical.get("topics"), list)
+        ):
+            raise VerificationError("supplement historical capture differs")
+        old_lines = sorted(
+            f"{row['topic_path']} {row['bytes']} {row['sha256']}\n"
+            for row in historical["topics"]
+        )
+        old_identity = "sha256:" + sha256_bytes(
+            b"mainframe-env.cics-source-supplement-identity@1\0"
+            + "".join(old_lines).encode("utf-8")
+        )
+        changed = [
+            (old, new)
+            for old, new in zip(historical["topics"], raw_topics)
+            if old != new
+        ]
+        if (
+            capture.get("identity_sha256") != old_identity
+            or len(changed) != 1
+            or changed[0][0].get("topic_path") != repin.get("topic_path")
+            or changed[0][1].get("topic_path") != repin.get("topic_path")
+            or changed[0][1].get("sha256") != repin.get("topic_sha256")
+            or changed[0][1].get("bytes") != repin.get("topic_bytes")
+            or repin.get("issue") != 173
+            or repin.get("verified_on") != "2026-09-28"
+            or repin.get("verification_method") != "user-chrome-browser-control"
+        ):
+            raise VerificationError("supplement repin identity differs")
+    elif capture.get("identity_sha256") != identity:
         raise VerificationError("supplement capture identity digest differs")
     return topics, entries
 
