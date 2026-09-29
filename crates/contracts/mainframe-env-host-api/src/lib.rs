@@ -15,6 +15,7 @@ mod clock;
 mod dataset;
 mod enterprise;
 mod mq_catalog;
+mod mq_context;
 mod names;
 mod registry;
 mod request;
@@ -46,6 +47,10 @@ pub use mq_catalog::{
     MQ_MQI_CALL_COUNT, MQ_MQI_CALL_IDENTITY_SET_SHA256, MQ_MQI_SOURCE_ROW_COUNT,
     MqMqiCallIdentityDescriptor, mq_mqi_call_identities, mq_mqi_call_identity,
     mq_mqi_call_identity_by_label,
+};
+pub use mq_context::{
+    MQCC_FAILED, MQRC_ENVIRONMENT_ERROR, MqContextDisposition, MqHostEnvironment, MqSyncpointCall,
+    MqSyncpointOwner, mq_syncpoint_context_disposition,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
