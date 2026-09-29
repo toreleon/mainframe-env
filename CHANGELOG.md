@@ -2494,9 +2494,10 @@ All notable changes to mainframe-env are documented here.
 - Typed terminal plans forward `CURSOR` and `FREEKB`, but the terminal provider
   does not yet model cursor placement or keyboard-lock state (#210).
 - These `0.8.3` development changes are not part of the published 0.8.2 tag. The
-  [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records the
-  release-truth, durability, security, CI, and documentation blockers that must
-  be resolved before 0.9.0 implementation and publication.
+  [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records historical
+  blockers. The [0.9 status record](docs/delivery/coverage-versions/status/0.9.0.md)
+  records the accepted 2026-09-09 implementation entry gate; release and licensed
+  certification remain separate work.
 
 ## [0.8.2] - 2026-09-06
 

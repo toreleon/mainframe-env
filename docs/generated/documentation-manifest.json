@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 211,
+    "markdown_documents": 213,
     "navigation_groups": 5,
-    "normative_documents": 53,
+    "normative_documents": 54,
     "xtask_commands": 198
   },
   "documents": [
@@ -17,8 +17,8 @@
     {
       "normative": false,
       "path": "CHANGELOG.md",
-      "relative_links": 1,
-      "sha256": "sha256:5a6d69bad26b1fb4baef34c2c54c41f154bd0830b9fd3f52ea7aeb18b0f225c9",
+      "relative_links": 2,
+      "sha256": "sha256:f1816e14354c1ef24a369639d8012eb90a25c8de4897d1374f54550808d0e7de",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -33,8 +33,8 @@
     {
       "normative": false,
       "path": "README.md",
-      "relative_links": 21,
-      "sha256": "sha256:de9b8f1741ef04426a311cc172ed84bdbc04175f32f4f737cd4caa1188573f68",
+      "relative_links": 22,
+      "sha256": "sha256:74e372cb62d5a144d24d4fa40aae75d563df14fa64034d4b661883aa2bd6ddaf",
       "title": "mainframe-env",
       "xtask_commands": 4
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 88,
-      "sha256": "sha256:0944b3a8e5c072a1f5b2a587b4aef982a96531a9cef54d3f9364f4f23d4be332",
+      "relative_links": 89,
+      "sha256": "sha256:ce9df8a080e8a3110f5fd15f829a27412806bd4139e3c9ee6dadc6ebceaaffb0",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -903,10 +903,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.8 evidence contract v2",
+      "normative": true,
+      "owner": "conformance and xtask maintainers",
+      "path": "docs/decisions/0024-per-assertion-oracle-provenance.md",
+      "relative_links": 0,
+      "scope": "CardDemo 0.8 base-batch expected values and conformance credit",
+      "sha256": "sha256:01eed855b18a74e80125390d0b68f4504b7f850e8e102e576d0334f2bdb6807f",
+      "status": "Proposed for the first increment of issue #245",
+      "title": "ADR-0024: Per-assertion oracle provenance for CardDemo base batch",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 23,
-      "sha256": "sha256:41093e342b8888396afeefd30c796f60a85dca2c91b32b26ec817f5a1394d850",
+      "relative_links": 24,
+      "sha256": "sha256:eaa1cb3a27b0a4c77cb15f245535c6aad312a4fd19c14be75572e9212a62bc2f",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1188,9 +1200,17 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/PROFILE-TRACK.md",
+      "relative_links": 7,
+      "sha256": "sha256:e9d12f3cb3d563df62b94e38ad0ad94f8e41b0c9fc7c3fc87ca79e73eac1c78c",
+      "title": "Workload-profile track",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/README.md",
-      "relative_links": 45,
-      "sha256": "sha256:92988c21b60bbfe41e273145c97b0b7f9bc594830e8187ab38e488cffa7cf7ac",
+      "relative_links": 46,
+      "sha256": "sha256:044e8c8d7fd13f74b26590f00f06c3e5f5287fc0caa19429c57866eec8dcc71f",
       "title": "IBM coverage release plans",
       "xtask_commands": 0
     },
@@ -1653,8 +1673,8 @@
     {
       "normative": false,
       "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md",
-      "relative_links": 31,
-      "sha256": "sha256:f1c07ce882b71239b7603520e42bf4b7779bbd442699617c88c00828e7a35f9a",
+      "relative_links": 32,
+      "sha256": "sha256:79da452100f6f938d1ae35cbe4a29fd4adbf6702db210018143712beca3aa526",
       "title": "Pre-0.9.0 deep review",
       "xtask_commands": 5
     },
@@ -2108,6 +2128,10 @@
           "path": "docs/decisions/0023-bts-lifecycle-authority.md"
         },
         {
+          "label": "ADR-0024: Per-assertion oracle provenance",
+          "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2271,7 +2295,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:2d41f7a509a682f1b26eb6f09e5dd7d692265b7538b099848828dec3df388b44",
+  "registry_sha256": "sha256:6dd315895961865b933dee7a5ec8e9b7939693aa7f2ea68e17872dae21ded071",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

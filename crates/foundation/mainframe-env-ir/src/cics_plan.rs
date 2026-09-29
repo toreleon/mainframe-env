@@ -362,6 +362,22 @@ fn validate_plan(
             operand.name,
             CicsOperandName::Length
                 | CicsOperandName::KeyLength
+                | CicsOperandName::DataLength
+                | CicsOperandName::Flength
+                | CicsOperandName::DumpLength
+                | CicsOperandName::DumpFlength
+                | CicsOperandName::SignalFromLength
+                | CicsOperandName::OperatorTextLength
+                | CicsOperandName::OperatorMaxLength
+                | CicsOperandName::JournalFlength
+                | CicsOperandName::WebUrlLength
+                | CicsOperandName::WebHostLength
+                | CicsOperandName::SpoolFlength
+                | CicsOperandName::WebFromLength
+                | CicsOperandName::WebPathLength
+                | CicsOperandName::WebQueryStringLength
+                | CicsOperandName::WebNameLength
+                | CicsOperandName::WebValueLength
                 | CicsOperandName::ListLength
                 | CicsOperandName::MaximumLength
                 | CicsOperandName::WebReceiveMaxLength

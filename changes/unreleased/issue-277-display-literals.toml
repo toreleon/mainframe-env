@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "DISPLAY preserves leading and interleaved literals when concatenating operands, and quoted literals never resolve as data references (#277)."

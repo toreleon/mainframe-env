@@ -175,7 +175,10 @@ pub(super) fn invalid_write_shape(
                 (operand.name, &operand.value),
                 (CicsOperandName::SpoolToken, CicsOperandValue::Storage(_))
                     | (CicsOperandName::SpoolFrom, CicsOperandValue::Storage(_))
-                    | (CicsOperandName::SpoolFlength, CicsOperandValue::Storage(_))
+                    | (
+                        CicsOperandName::SpoolFlength,
+                        CicsOperandValue::Storage(_) | CicsOperandValue::LengthOf(_)
+                    )
             )
         })
         || plan.options.iter().any(|option| {
