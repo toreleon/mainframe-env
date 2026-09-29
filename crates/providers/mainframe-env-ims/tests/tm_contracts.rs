@@ -76,6 +76,16 @@ fn generic_tm_definitions_messages_and_statuses_are_bounded() {
     assert_eq!(TmPcbStatus::NO_MORE_MESSAGES.as_str(), "QC");
     assert_eq!(TmPcbStatus::INVALID_CALL.as_str(), "AD");
     assert_eq!(TmPcbStatus::QUEUE_FULL.as_str(), "QF");
+    for code in [b"  ", b"QC", b"AD", b"QF"] {
+        assert!(
+            mainframe_env_host_api::resolve_ims_status(
+                code,
+                mainframe_env_host_api::ImsStatusContext::Message,
+                mainframe_env_host_api::ImsPcbKind::Io,
+            )
+            .is_ok()
+        );
+    }
 }
 
 #[test]
