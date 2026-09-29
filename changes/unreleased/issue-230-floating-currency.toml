@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Floating currency ($$$,$$9.99) reserves one insertion position and counts the other $ symbols as digits; floating $, + and - take the position left of the first significant digit, replacing an insertion comma there (#230)."
