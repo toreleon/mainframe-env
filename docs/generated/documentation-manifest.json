@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 211,
+    "markdown_documents": 212,
     "navigation_groups": 5,
     "normative_documents": 54,
     "xtask_commands": 197
@@ -1322,7 +1322,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:a67163c0817dffe8d7543677f1e0c463c2948a5aee87f6062b8b3a223dc9f4c2",
+      "sha256": "sha256:f16179220a7d858bf78ec37c324e4045a80b9f0c4ecd423d2f8fdc061bc4faa1",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },
