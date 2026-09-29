@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CardDemo TRANREPT independent reference",
+  "type": "object",
+  "required": ["schema_version", "scope", "input", "date_parameters", "program", "tool", "derivation", "results"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.carddemo-tranrept-reference@1"},
+    "scope": {"type": "string", "minLength": 1},
+    "input": {
+      "type": "object",
+      "required": ["path", "sha256", "raw_record_sha256", "framed_dataset_sha256", "dataset", "record_count", "lrecl"],
+      "properties": {
+        "path": {"const": "conformance/0.8/oracles/carddemo-tranrept-input@1.bin"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "raw_record_sha256": {"$ref": "#/$defs/digest"},
+        "framed_dataset_sha256": {"$ref": "#/$defs/digest"},
+        "dataset": {"const": "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00"},
+        "record_count": {"type": "integer", "minimum": 1},
+        "lrecl": {"const": 350}
+      },
+      "additionalProperties": false
+    },
+    "date_parameters": {
+      "type": "object",
+      "required": ["start", "end", "jcl_sha256"],
+      "properties": {
+        "start": {"const": "2022-01-01"},
+        "end": {"const": "2022-07-06"},
+        "jcl_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "program": {
+      "type": "object",
+      "required": ["corpus_commit", "files"],
+      "properties": {
+        "corpus_commit": {"const": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e"},
+        "files": {
+          "type": "object",
+          "required": ["app/cbl/CBTRN03C.cbl", "app/cpy/CVTRA05Y.cpy", "app/cpy/CVACT03Y.cpy", "app/cpy/CVTRA03Y.cpy", "app/cpy/CVTRA04Y.cpy", "app/cpy/CVTRA07Y.cpy"],
+          "properties": {
+            "app/cbl/CBTRN03C.cbl": {"$ref": "#/$defs/digest"},
+            "app/cpy/CVTRA05Y.cpy": {"$ref": "#/$defs/digest"},
+            "app/cpy/CVACT03Y.cpy": {"$ref": "#/$defs/digest"},
+            "app/cpy/CVTRA03Y.cpy": {"$ref": "#/$defs/digest"},
+            "app/cpy/CVTRA04Y.cpy": {"$ref": "#/$defs/digest"},
+            "app/cpy/CVTRA07Y.cpy": {"$ref": "#/$defs/digest"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "required": ["version", "sha256", "indexed_backend", "native_ebcdic", "flags"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "indexed_backend": {"const": "BDB"},
+        "native_ebcdic": {"const": false},
+        "flags": {"type": "array", "items": {"type": "string"}, "minItems": 2}
+      },
+      "additionalProperties": false
+    },
+    "derivation": {
+      "type": "object",
+      "required": ["script_path", "script_sha256", "sort_path", "sort_sha256", "canonicaliser_path", "canonicaliser_sha256", "sort_policy", "sort_origin", "dataset_metadata"],
+      "properties": {
+        "script_path": {"const": "conformance/tools/carddemo_tranrept_reference.py"},
+        "script_sha256": {"$ref": "#/$defs/digest"},
+        "sort_path": {"const": "conformance/0.8/oracles/carddemo-tranrept-sort@1.cbl"},
+        "sort_sha256": {"$ref": "#/$defs/digest"},
+        "canonicaliser_path": {"const": "conformance/tools/carddemo_tranrept_reference.py"},
+        "canonicaliser_sha256": {"$ref": "#/$defs/digest"},
+        "sort_policy": {"type": "string", "minLength": 1},
+        "sort_origin": {"type": "string", "minLength": 1},
+        "dataset_metadata": {
+          "type": "object",
+          "required": ["input", "selected", "report"],
+          "properties": {"input": {"$ref": "#/$defs/metadata"}, "selected": {"$ref": "#/$defs/metadata"}, "report": {"$ref": "#/$defs/metadata"}},
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "results": {
+      "type": "object",
+      "required": ["tranrept_selected_records", "tranrept_report_records", "dataset_sha256"],
+      "properties": {
+        "tranrept_selected_records": {"type": "integer", "minimum": 0},
+        "tranrept_report_records": {"type": "integer", "minimum": 0},
+        "dataset_sha256": {
+          "type": "object",
+          "required": ["AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00", "AWS.M2.CARDDEMO.TRANREPT.G0001V00"],
+          "properties": {
+            "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00": {"$ref": "#/$defs/digest"},
+            "AWS.M2.CARDDEMO.TRANREPT.G0001V00": {"$ref": "#/$defs/digest"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "metadata": {
+      "type": "object",
+      "required": ["organization", "recfm", "lrecl", "ccsid", "version"],
+      "properties": {
+        "organization": {"const": "Sequential"},
+        "recfm": {"enum": ["FixedBlocked", "Variable"]},
+        "lrecl": {"type": "integer", "minimum": 1},
+        "ccsid": {"const": 37},
+        "version": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

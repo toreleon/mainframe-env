@@ -70,7 +70,7 @@ class CicsApplicationSourceBatchTests(unittest.TestCase):
                 expected = basic_tables | {next(path for path in basic if path.endswith("dfhp625.html"))}
             if ordinal in {"0113", "0123"}:
                 expected |= {next(path for path in basic if path.endswith("dfhp4_gdssend.html"))}
-            if ordinal in {"0108", "0127", "0136"}:
+            if ordinal in {"0108", "0112", "0122", "0127", "0136"}:
                 expected = mapped
             self.assertEqual(
                 paths,

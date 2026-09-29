@@ -4714,6 +4714,208 @@ mod tests {
     }
 
     #[test]
+    fn cics_writeq_ts_length_of_group_resolves() {
+        // IBM CICS TS 6.x WRITEQ TS: dfhp4_writeqts.html, LENGTH(data-value)
+        // is the halfword binary length of the data written. Enterprise COBOL
+        // 6.5 rllanlen.html: LENGTH OF gives a data item's byte length.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. P5. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-QAREA. 05 Q1 PIC X(4). 05 Q2 PIC X(6). PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('GENAQ') FROM(WS-QAREA) LENGTH(LENGTH OF WS-QAREA) END-EXEC. EXEC CICS RETURN END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITEQ TS LENGTH OF group: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::WriteTemporaryStorage =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .expect("typed WRITEQ TS");
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(&operand.value, HirCicsValue::LengthOf(reference) if reference.qualified_name == "WS-QAREA" && reference.length == 10)
+        }));
+    }
+
+    #[test]
+    fn cics_input_length_operands_resolve_length_of_group() {
+        let cases = [
+            (
+                "WRITEQ TS QUEUE('TEMPQ') FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "WRITEQ TD QUEUE('OUTQ') FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "LINK PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "LINK PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(10) DATALENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::DataLength,
+            ),
+            (
+                "XCTL PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "RETURN TRANSID('NEXT') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "START TRANSID('NEXT') FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "SEND TEXT FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "SEND MAP('MENU') FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "RECEIVE MAP('MENU') FROM(AREA-X) INTO(AREA-Y) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "GETMAIN SET(PTR-X) FLENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Flength,
+            ),
+            (
+                "GETMAIN SET(PTR-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "WRITE FILE('ACCTDAT') FROM(AREA-X) RIDFLD(KEY-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "REWRITE FILE('ACCTDAT') FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X)",
+                HirCicsOperandName::KeyLength,
+            ),
+            (
+                "READ FILE('ACCTDAT') INTO(AREA-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X)",
+                HirCicsOperandName::KeyLength,
+            ),
+            (
+                "STARTBR DATASET('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X)",
+                HirCicsOperandName::KeyLength,
+            ),
+            (
+                "RESETBR DATASET('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X)",
+                HirCicsOperandName::KeyLength,
+            ),
+            (
+                "READNEXT DATASET('ACCTDAT') INTO(AREA-X) LENGTH(LENGTH OF AREA-X) RIDFLD(KEY-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "READPREV DATASET('ACCTDAT') INTO(AREA-X) LENGTH(LENGTH OF AREA-X) RIDFLD(KEY-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "DUMP TRANSACTION DUMPCODE('TEST') FROM(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::DumpLength,
+            ),
+            (
+                "DUMP TRANSACTION DUMPCODE('TEST') FROM(AREA-X) FLENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::DumpFlength,
+            ),
+            (
+                "SIGNAL EVENT('GO') FROM(AREA-X) FROMLENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::SignalFromLength,
+            ),
+            (
+                "BIF DEEDIT FIELD(AREA-Y) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "BIF DIGEST RECORD(AREA-X) RECORDLEN(LENGTH OF AREA-X) HEX RESULT(HASH-X)",
+                HirCicsOperandName::RecordLength,
+            ),
+            (
+                "DOCUMENT CREATE DOCTOKEN(TOKEN-X) TEXT(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "DOCUMENT INSERT DOCTOKEN(TOKEN-X) TEXT(AREA-X) LENGTH(LENGTH OF AREA-X) BOOKMARK('MARK')",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "DOCUMENT SET DOCTOKEN(TOKEN-X) SYMBOL('Title') VALUE(AREA-X) LENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::Length,
+            ),
+            (
+                "WRITE OPERATOR TEXT(AREA-X) TEXTLENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::OperatorTextLength,
+            ),
+            (
+                "WRITE JOURNALNAME('ACCOUNTS') JTYPEID('UR') FROM(AREA-X) FLENGTH(LENGTH OF AREA-X)",
+                HirCicsOperandName::JournalFlength,
+            ),
+            (
+                "WEB OPEN HOST(AREA-X) HOSTLENGTH(LENGTH OF AREA-X) SCHEME(HTTP) SESSTOKEN(SESSION-X)",
+                HirCicsOperandName::WebHostLength,
+            ),
+            (
+                "WEB PARSE URL(AREA-X) URLLENGTH(LENGTH OF AREA-X) HOST(AREA-Y) HOSTLENGTH(LEN-X)",
+                HirCicsOperandName::WebUrlLength,
+            ),
+            (
+                "SPOOLWRITE TOKEN(SESSION-X) FROM(AREA-X) FLENGTH(LENGTH OF AREA-X) NOHANDLE",
+                HirCicsOperandName::SpoolFlength,
+            ),
+            (
+                "WEB SEND FROM(AREA-X) FROMLENGTH(LENGTH OF AREA-X) STATUSCODE(STATUS-X) ACTION(EVENTUAL)",
+                HirCicsOperandName::WebFromLength,
+            ),
+            (
+                "WEB WRITE HTTPHEADER(AREA-X) NAMELENGTH(LENGTH OF AREA-X) VALUE(AREA-Y) VALUELENGTH(10)",
+                HirCicsOperandName::WebNameLength,
+            ),
+            (
+                "WEB WRITE HTTPHEADER(AREA-X) NAMELENGTH(10) VALUE(AREA-Y) VALUELENGTH(LENGTH OF AREA-Y)",
+                HirCicsOperandName::WebValueLength,
+            ),
+        ];
+        for (body, name) in cases {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LENCLASS. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X. 05 A PIC X(4). 05 B PIC X(6). 01 AREA-Y PIC X(10). 01 KEY-X PIC X(3). 01 TOKEN-X PIC X(16). 01 SESSION-X PIC X(8). 01 LEN-X PIC S9(9) COMP. 01 STATUS-X PIC S9(4) COMP. 01 HASH-X PIC X(40). 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS {body} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{body}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{body}: no typed CICS command"));
+            assert!(
+                command.operands.iter().any(|operand| {
+                    operand.name == name && matches!(&operand.value, HirCicsValue::LengthOf(_))
+                }),
+                "{body}: {:?}",
+                command.operands
+            );
+        }
+    }
+
+    #[test]
     fn cics_getmain_resolves_bounded_flength_and_length_storage() {
         let analysis = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(9) COMP VALUE 4. 01 INIT-X PIC X VALUE 'Z'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) INITIMG(INIT-X) NOSUSPEND RESP(RESP-X) END-EXEC. STOP RUN.",

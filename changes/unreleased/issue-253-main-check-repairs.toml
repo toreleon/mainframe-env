@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Repair conformance oracle fixtures, CICS scheduling test access, IR lint checks, and the CardDemo batch receipt on main."

@@ -219,7 +219,9 @@ pub(super) fn invalid_signal_shape(
         CicsOperandName::SignalFrom => !matches!(operand.value, CicsOperandValue::Storage(_)),
         CicsOperandName::SignalFromLength => !matches!(
             operand.value,
-            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+            CicsOperandValue::Integer(_)
+                | CicsOperandValue::Storage(_)
+                | CicsOperandValue::LengthOf(_)
         ),
         _ => true,
     })
