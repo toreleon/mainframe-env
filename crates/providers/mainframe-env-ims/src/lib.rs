@@ -30,6 +30,8 @@ pub use service::{
 };
 
 pub use tm::{
-    TmAlternatePcbDefinition, TmCall, TmConversationAction, TmDefinitionSet, TmDestination,
-    TmExecutionContext, TmInputMessage, TmLimits, TmPcb, TmPcbStatus, TmTransactionDefinition,
+    TmAlternatePcbDefinition, TmCall, TmCallResult, TmCancelReceipt, TmConversationAction,
+    TmConversationView, TmDefinitionSet, TmDestination, TmEnqueueReceipt, TmExecutionContext,
+    TmInputMessage, TmInstallReceipt, TmLimits, TmMessageState, TmOutboundMessage, TmPcb,
+    TmPcbStatus, TmPcbView, TmScheduleReceipt, TmService, TmTransactionDefinition,
 };
