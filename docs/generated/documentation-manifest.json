@@ -258,7 +258,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
       "relative_links": 1,
-      "sha256": "sha256:a78be9c5d20af29dc461169793561af83e8db90098d63b9a29504b3150a812a7",
+      "sha256": "sha256:d4bcb87041534e5f2a7a91fa6a548fe253cbcb9d5791122d637a60544ddacb5e",
       "title": "mainframe-env-db2",
       "xtask_commands": 2
     },
@@ -1258,7 +1258,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.12.0.md",
       "relative_links": 1,
-      "sha256": "sha256:2faff715b1600c699e1de1bf4fbbe0b43d218c1dbd46dc188dd565504a54f493",
+      "sha256": "sha256:4c4c501b450a015e3aad9db5d5bbe5162a1c717512b75e84f77c15fa3fb2469d",
       "title": "mainframe-env 0.12.0 implementation status",
       "xtask_commands": 0
     },

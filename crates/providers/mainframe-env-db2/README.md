@@ -57,3 +57,10 @@ parser accepts a variable alone or with an indicator, with optional
 `INDICATOR` before the indicator variable, and rejects misplaced parts.
 Host structures and host-language binding remain pending. Parsing has no
 execution route.
+
+The proposed common dynamic-SQL parser owns static-host PREPARE, EXECUTE, and
+EXECUTE IMMEDIATE structure, including SQLDA naming modes, attribute indicators,
+USING lists, and descriptors. It rejects PL/I string expressions, SQL PL
+variables and array elements, multi-row source buffers, and forbidden source
+indicators. This partial family support grants no whole-row recognition credit
+and has no execution route.
