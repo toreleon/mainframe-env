@@ -2964,7 +2964,7 @@ impl ProductServer {
             .cloned()
             .map(|capability| (capability, "1".to_string()))
             .collect();
-        let bindings = BTreeMap::from([(
+        let mut bindings = BTreeMap::from([(
             "jes.work-id".into(),
             BoundedPayload::new(
                 "mainframe-env.jes-work@1",
@@ -2973,6 +2973,7 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::InfrastructureFailure)?,
         )]);
+        bindings.extend(self.cobol_date_bindings(limits)?);
         let identity = format!("{}-{}", payload.job_id, work.lease_epoch);
         let mut invocation = Invocation::new(
             RequestId::new(format!("jes-request-{identity}"), limits)
@@ -4858,6 +4859,28 @@ impl ProductServer {
         Ok(current)
     }
 
+    fn cobol_date_bindings(
+        &self,
+        limits: InvocationLimits,
+    ) -> Result<BTreeMap<String, BoundedPayload>, HostProblem> {
+        self.config
+            .cobol_current_date
+            .as_ref()
+            .map(|date| {
+                Ok(BTreeMap::from([(
+                    "cobol.current-date".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cobol.datetime@1",
+                        date.as_bytes().to_vec(),
+                        limits,
+                    )
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )]))
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+    }
+
     pub(crate) fn invocation(
         &self,
         principal: &str,
@@ -4910,7 +4933,7 @@ impl ProductServer {
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             1,
             ResourceLimits::default(),
-            BTreeMap::new(),
+            self.cobol_date_bindings(limits)?,
             limits,
         )
         .and_then(|invocation| invocation.with_provider_generations(generations, limits))
@@ -7735,6 +7758,34 @@ mod tests {
             }
         }
         output
+    }
+
+    #[tokio::test]
+    async fn configured_batch_current_date_reaches_cobol_and_default_stays_epoch() {
+        let definition = BatchProgramDefinition::current(
+            "CLOCKJOB",
+            &published_fixture("CLOCKJOB", "DISPLAY FUNCTION CURRENT-DATE."),
+        );
+        for (date, expected) in [
+            (Some("2022070600000000+0000"), "2022070600000000+0000"),
+            (None, "1970010100000000+0000"),
+        ] {
+            let mut settings = config();
+            settings.cobol_current_date = date.map(str::to_owned);
+            let server = ProductServer::memory(settings).unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .install_batch_programs(vec![definition.clone()])
+                .unwrap();
+            let output = execute_installed_batch_job(&server, "CLOCKRUN", "CLOCKJOB").await;
+            assert!(
+                output
+                    .windows(expected.len())
+                    .any(|part| part == expected.as_bytes()),
+                "expected {expected} in {}",
+                String::from_utf8_lossy(&output)
+            );
+        }
     }
 
     #[tokio::test]
@@ -19443,6 +19494,19 @@ mod tests {
         };
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.TERMINAL.PAGE", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.TERMINAL.PAGE",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
             InvocationLimits::default(),
@@ -24067,6 +24131,126 @@ mod tests {
         assert_eq!(job["status"], "ACTIVE");
         let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
         assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
+    }
+
+    #[tokio::test]
+    async fn abended_installed_cobol_retains_display_spool() {
+        let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. ABDSPOOL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nDISPLAY 'BEFORE ABEND'.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n";
+        let published = published_source_fixture("ABDSPOOL", source);
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_batch_programs(vec![BatchProgramDefinition::current(
+                "ABDSPOOL", &published,
+            )])
+            .unwrap();
+        let app = server.router();
+        let response = call(
+            &app,
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            "//ABDSPOOL JOB CLASS=A\n//FAIL EXEC PGM=ABDSPOOL\n",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
+        let id = job["jobid"].as_str().unwrap();
+        let completed = wait_for_terminal_job(&server, id).await;
+        assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
+        assert_eq!(
+            completed.steps[0].state,
+            mainframe_env_batch::StepState::Abended
+        );
+        assert_eq!(
+            completed.steps[0].termination,
+            Some(mainframe_env_batch::StepTermination::Abend {
+                code: "U0999".into(),
+                system: true,
+            })
+        );
+        let files = call(
+            &app,
+            Method::GET,
+            &format!("/zosmf/restjobs/jobs/ABDSPOOL/{id}/files"),
+            "",
+        )
+        .await;
+        assert_eq!(files.status(), StatusCode::OK);
+        let files: Value =
+            serde_json::from_slice(&to_bytes(files.into_body(), 65_536).await.unwrap()).unwrap();
+        let sysprint = files
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|file| file["ddname"] == "FAIL:SYSPRINT")
+            .expect("abended step SYSOUT file");
+        let records = call(
+            &app,
+            Method::GET,
+            &format!(
+                "/zosmf/restjobs/jobs/ABDSPOOL/{id}/files/{}/records",
+                sysprint["id"].as_u64().unwrap()
+            ),
+            "",
+        )
+        .await;
+        assert_eq!(records.status(), StatusCode::OK);
+        let records_body = to_bytes(records.into_body(), 65_536).await.unwrap();
+        assert_eq!(&records_body[..], b"BEFORE ABEND");
+    }
+
+    #[tokio::test]
+    async fn abended_compile_and_go_cobol_retains_display_spool() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let app = server.router();
+        let response = call(
+            &app,
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            "//CGABEND JOB CLASS=A\n//FAIL EXEC PGM=COBOL\n//SYSIN DD *\nIDENTIFICATION DIVISION.\nPROGRAM-ID. CGABEND.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nDISPLAY 'BEFORE ABEND'.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n/*\n",
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
+        let id = job["jobid"].as_str().unwrap();
+        let completed = wait_for_terminal_job(&server, id).await;
+        let files = call(
+            &app,
+            Method::GET,
+            &format!("/zosmf/restjobs/jobs/CGABEND/{id}/files"),
+            "",
+        )
+        .await;
+        assert_eq!(files.status(), StatusCode::OK);
+        let files: Value =
+            serde_json::from_slice(&to_bytes(files.into_body(), 65_536).await.unwrap()).unwrap();
+        let sysprint = files
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|file| file["ddname"] == "FAIL:SYSPRINT")
+            .expect("abended step SYSOUT file");
+        let records = call(
+            &app,
+            Method::GET,
+            &format!(
+                "/zosmf/restjobs/jobs/CGABEND/{id}/files/{}/records",
+                sysprint["id"].as_u64().unwrap()
+            ),
+            "",
+        )
+        .await;
+        assert_eq!(records.status(), StatusCode::OK);
+        let records_body = to_bytes(records.into_body(), 65_536).await.unwrap();
+        assert_eq!(&records_body[..], b"BEFORE ABEND");
+        assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
+        assert_eq!(
+            completed.steps[0].state,
+            mainframe_env_batch::StepState::Abended
+        );
     }
 
     #[test]

@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod carddemo_base_batch_provenance;
 mod carddemo_v09_host;
 mod changelog;
 mod docs;
@@ -6573,25 +6574,9 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
     )?;
 
     let versioned_path = root.join("conformance/0.8/evidence/carddemo-base-batch.json");
-    let expected = if versioned_path.is_file() {
-        let versioned = json(&versioned_path)?;
-        require(
-            versioned["schema_version"]
-                == Value::String("mainframe-env.carddemo-base-batch-version-evidence@1".into())
-                && versioned["target_version"] == Value::String("0.8.0".into())
-                && versioned["supersedes"]
-                    == Value::String("conformance/0.1.1/evidence/issues/CD-023.json".into())
-                && versioned["historical_receipt_rewritten"] == Value::Bool(false),
-            "0.8 CardDemo base-batch evidence header is invalid",
-        )?;
-        let expected = versioned["receipt"]
-            .as_object()
-            .ok_or("0.8 CardDemo base-batch receipt is malformed")?;
-        let expected_digest = canonical_evidence_digest(expected)?;
-        require(
-            versioned["evidence_digest"].as_str() == Some(expected_digest.as_str()),
-            "0.8 CardDemo base-batch evidence digest differs",
-        )?;
+    let (expected, credit) =
+        carddemo_base_batch_provenance::read_carddemo_evidence(root, historical_receipt)?;
+    if versioned_path.is_file() {
         for field in [
             "schema_version",
             "status",
@@ -6610,10 +6595,7 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
                 &format!("0.8 CardDemo compatibility projection changed {field}"),
             )?;
         }
-        Value::Object(expected.clone())
-    } else {
-        Value::Object(historical_receipt.clone())
-    };
+    }
     require(
         expected == receipt_value,
         "CardDemo base-batch receipt is stale",
@@ -6623,6 +6605,7 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
             || evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
         "CD-023 evidence digest differs",
     )?;
+    credit.print();
     Ok(())
 }
 
@@ -7396,6 +7379,122 @@ fn validate_public_version_truth(
     state_label: &str,
 ) -> TaskResult {
     let readme = read(&root.join("README.md"))?;
+    let status = readme
+        .split_once("## Project status")
+        .and_then(|(_, rest)| rest.split("\n## ").next())
+        .ok_or("README Project status section is missing")?;
+    let row = |name: &str| -> TaskResult<&str> {
+        status
+            .lines()
+            .find_map(|line| line.strip_prefix(&format!("| {name} | ")))
+            .and_then(|value| value.strip_suffix(" |"))
+            .ok_or_else(|| format!("README Project status: {name} row is missing"))
+    };
+    let local_version = product_version(root)?;
+    let cargo: toml::Value = read(&root.join("Cargo.toml"))?
+        .parse()
+        .map_err(|error| format!("Cargo.toml: {error}"))?;
+    let cargo_version = cargo["workspace"]["package"]["version"]
+        .as_str()
+        .ok_or("workspace.package.version is missing")?;
+    require(
+        local_version == current
+            && cargo_version == current
+            && row("Current workspace version")? == format!("`{current}` ({state_label})"),
+        "README Project status: workspace version disagrees with VERSION or Cargo.toml",
+    )?;
+    let tags = command_text(root, "git", &["tag", "--list", "mainframe-env-v*"])?;
+    let highest = tags
+        .lines()
+        .filter_map(|tag| {
+            let version = tag.strip_prefix("mainframe-env-v")?;
+            stable_zero_version(version)
+                .ok()
+                .map(|parts| (parts, version))
+        })
+        .max_by_key(|(parts, _)| *parts)
+        .map(|(_, version)| version)
+        .ok_or("README Project status: no local stable release tag")?;
+    require(
+        highest == released,
+        "README Project status: latest release disagrees with highest local stable tag",
+    )?;
+    let source_record = root.join(format!("release/{released}/source-distribution.json"));
+    let release_kind = if source_record.exists() {
+        let record: Value = serde_json::from_str(&read(&source_record)?)
+            .map_err(|error| format!("{}: {error}", source_record.display()))?;
+        require(
+            record["version"].as_str() == Some(released)
+                && record["tag"].as_str() == Some(format!("mainframe-env-v{released}").as_str())
+                && record["published_assets"]["kind"].as_str()
+                    == Some("locked-cargo-vendor-source-bundle")
+                && record["published_assets"]["native_binaries"].as_bool() == Some(false),
+            "README Project status: source release record is inconsistent",
+        )?;
+        "source bundle only"
+    } else {
+        let manifest = root.join(format!(
+            "release/{released}/targets/x86_64-unknown-linux-gnu/manifest.json"
+        ));
+        let record: Value = serde_json::from_str(&read(&manifest)?)
+            .map_err(|error| format!("{}: {error}", manifest.display()))?;
+        require(
+            record["version"].as_str() == Some(released)
+                && record["tag"].as_str() == Some(format!("mainframe-env-v{released}").as_str()),
+            "README Project status: binary release record is inconsistent",
+        )?;
+        "native binaries"
+    };
+    require(
+        row("Latest published release")?
+            == format!(
+                "[{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), {release_kind}"
+            ),
+        "README Project status: latest release or release kind disagrees with local record",
+    )?;
+    require(
+        row("Development baseline")?.contains(&format!("`{current}`"))
+            && row("Development baseline")?.contains(&format!("{released} tag")),
+        "README Project status: development baseline disagrees with local versions",
+    )?;
+    let dossier = read(&root.join("docs/delivery/coverage-versions/0.9.0.md"))?;
+    require(
+        row("Next planned minor")?.contains(
+            "[0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md)",
+        ) && dossier.contains("Status: **Proposed**"),
+        "README Project status: next planned minor disagrees with 0.9 dossier",
+    )?;
+    require(
+        row("Production readiness")? == "Not claimed"
+            && row("Licensed differential status")?
+                == "Required campaigns remain pending where the release notes say so"
+            && dossier.contains("licensed campaigns remain pending"),
+        "README Project status: readiness or licensed status is unsupported",
+    )?;
+    let acceptance_path = "docs/delivery/coverage-versions/status/0.9.0.md";
+    let acceptance = read(&root.join(acceptance_path))?;
+    if acceptance.contains("Last integrated acceptance review: 2026-09-09")
+        && acceptance.contains("RUN_MODE=full, SUCCESS, 2026-09-09")
+    {
+        require(
+            status.contains("original no-go")
+                && status.contains("2026-09-09")
+                && status.contains("entry gate accepted")
+                && status.contains(acceptance_path)
+                && !status.contains("current pre-0.9 assessment is a **no-go"),
+            "README Project status: pre-0.9 entry decision disagrees with accepted status record (docs/delivery/coverage-versions/status/0.9.0.md)",
+        )?;
+        let review = read(&root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"))?;
+        require(
+            review.contains("Disposition at review")
+                && review.contains(
+                    "Status: **Complete review; broad 0.9.0 implementation was blocked at review**",
+                )
+                && review.contains("2026-09-09")
+                && review.contains("../delivery/coverage-versions/status/0.9.0.md"),
+            "pre-0.9 review: finding index must identify review-time disposition after accepted entry gate",
+        )?;
+    }
     require(
         readme.contains(&format!("| Latest published release | [{released}]"))
             && readme.contains(&format!(
@@ -8664,6 +8763,14 @@ fn check_schemas(root: &Path) -> TaskResult {
             "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json",
         ),
         (
+            "conformance/0.8/evidence/carddemo-base-batch@2.json",
+            "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json",
+        ),
+        (
+            "conformance/0.8/oracles/carddemo-tranrept-reference@1.json",
+            "conformance/0.8/schemas/carddemo-tranrept-reference.schema.json",
+        ),
+        (
             "conformance/0.8/inventory/jes-dd-surface.json",
             "conformance/0.8/schemas/jes-dd-surface.schema.json",
         ),
@@ -8715,6 +8822,18 @@ fn check_schemas(root: &Path) -> TaskResult {
         validate_schema_instance(&jes_evidence_schema, &evidence, &path)?;
         let rows = array(&evidence, "rows", &path)?;
         unique_rows(rows, "id", &path)?;
+        if work_package == "JES-805" {
+            require(
+                rows.iter().any(|row| {
+                    row["id"] == Value::String("registered-control-declarations".into())
+                        && row["result"] == Value::String("pass".into())
+                        && row["evidence"].as_str().is_some_and(|evidence| {
+                            evidence.contains("every_registered_handler_rejects_undeclared_control")
+                        })
+                }),
+                "JES-805 requires the registered control declaration gate",
+            )?;
+        }
         let pending = rows
             .iter()
             .filter(|row| row["result"] == Value::String("pending".into()))
@@ -15915,13 +16034,37 @@ mod tests {
 
     fn write_public_version_fixtures(root: &Path, current: &str, released: &str) {
         fs::create_dir_all(root.join("docs/delivery/coverage-versions")).unwrap();
+        fs::create_dir_all(root.join("docs/delivery/coverage-versions/status")).unwrap();
+        fs::create_dir_all(root.join("docs/reviews")).unwrap();
+        fs::create_dir_all(root.join(format!("release/{released}"))).unwrap();
+        fs::write(root.join("VERSION"), format!("{current}\n")).unwrap();
+        fs::write(
+            root.join("Cargo.toml"),
+            format!("[workspace.package]\nversion = \"{current}\"\n"),
+        )
+        .unwrap();
+        fs::write(
+            root.join(format!("release/{released}/source-distribution.json")),
+            format!("{{\"version\":\"{released}\",\"tag\":\"mainframe-env-v{released}\",\"published_assets\":{{\"kind\":\"locked-cargo-vendor-source-bundle\",\"native_binaries\":false}}}}"),
+        ).unwrap();
         fs::write(
             root.join("README.md"),
             format!(
-                "| Latest published release | [{released}](release) |\n| Current workspace version | `{current}` (development) |\n"
+                "## Project status\n\n| Item | Status |\n|---|---|\n| Latest published release | [{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), source bundle only |\n| Current workspace version | `{current}` (development) |\n| Development baseline | `{current}` after the {released} tag |\n| Next planned minor | [0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md) |\n| Production readiness | Not claimed |\n| Licensed differential status | Required campaigns remain pending where the release notes say so |\n\nThe original no-go was resolved on 2026-09-09; the entry gate accepted (docs/delivery/coverage-versions/status/0.9.0.md).\n"
             ),
         )
         .unwrap();
+        fs::write(
+            root.join("docs/delivery/coverage-versions/0.9.0.md"),
+            "Status: **Proposed**\nlicensed campaigns remain pending\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs/delivery/coverage-versions/status/0.9.0.md"),
+            "Last integrated acceptance review: 2026-09-09\nRUN_MODE=full, SUCCESS, 2026-09-09\n",
+        )
+        .unwrap();
+        fs::write(root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"), "Status: **Complete review; broad 0.9.0 implementation was blocked at review**\n\n| Disposition at review |\n\n2026-09-09: [fix mapping](../delivery/coverage-versions/status/0.9.0.md).\n").unwrap();
         fs::write(
             root.join("docs/delivery/coverage-versions/README.md"),
             format!(
@@ -15978,6 +16121,76 @@ mod tests {
         );
         assert!(validate_unreleased_identity(&root, "0.8.3", "0.8.2", false).is_err());
         validate_unreleased_identity(&root, "0.8.3", "0.8.2", true).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn public_status_truth_rejects_stale_claims() {
+        let root = temporary_git_repository("public-status-truth");
+        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
+        commit_all(&root, "fixture");
+        assert!(
+            Command::new("git")
+                .args(["tag", "mainframe-env-v0.8.2"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let check = || validate_public_version_truth(&root, "0.8.3", "0.8.2", "development");
+        check().unwrap();
+
+        let readme_path = root.join("README.md");
+        let good_readme = read(&readme_path).unwrap();
+        fs::write(
+            &readme_path,
+            good_readme.replace("`0.8.3` (development)", "`0.8.2` (development)"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("workspace version"));
+        fs::write(&readme_path, &good_readme).unwrap();
+
+        assert!(
+            Command::new("git")
+                .args(["tag", "mainframe-env-v0.8.4"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(check().unwrap_err().contains("highest local stable tag"));
+        assert!(
+            Command::new("git")
+                .args(["tag", "-d", "mainframe-env-v0.8.4"])
+                .current_dir(&root)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+
+        fs::write(
+            &readme_path,
+            good_readme.replace("source bundle only", "native binaries"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("release kind"));
+        fs::write(
+            &readme_path,
+            good_readme.replace("entry gate accepted", "entry gate pending"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("entry decision"));
+        fs::write(&readme_path, &good_readme).unwrap();
+
+        let review_path = root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md");
+        let review = read(&review_path).unwrap();
+        fs::write(
+            &review_path,
+            review.replace("Disposition at review", "Disposition"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("review-time disposition"));
         fs::remove_dir_all(root).unwrap();
     }
 

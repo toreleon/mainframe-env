@@ -115,7 +115,9 @@ pub(super) fn invalid_dump_transaction_shape(
             }
             CicsOperandName::DumpLength | CicsOperandName::DumpFlength => !matches!(
                 operand.value,
-                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
             ),
             _ => true,
         })
@@ -151,7 +153,9 @@ pub(super) fn invalid_dump_shape(
             CicsOperandName::DumpFrom => !matches!(operand.value, CicsOperandValue::Storage(_)),
             CicsOperandName::DumpLength | CicsOperandName::DumpFlength => !matches!(
                 operand.value,
-                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
             ),
             _ => true,
         })

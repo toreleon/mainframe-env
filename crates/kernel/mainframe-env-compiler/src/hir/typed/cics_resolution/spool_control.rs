@@ -145,15 +145,17 @@ pub(super) fn operands(
             },
         ];
         if let Some(length) = clauses.get("FLENGTH") {
-            let length = complete_data_reference(length, semantic)?;
-            if length.category != DataCategory::Binary || length.length != 4 {
+            let length = super::cics_integer_value(length, semantic)?;
+            if !matches!(&length, HirCicsValue::Data(reference) if reference.category == DataCategory::Binary && reference.length == 4)
+                && !matches!(&length, HirCicsValue::LengthOf(_))
+            {
                 return Err(ResolutionFailure::Invalid(
                     "CICS SPOOLWRITE FLENGTH requires fullword binary storage".into(),
                 ));
             }
             operands.push(HirCicsNamedOperand {
                 name: HirCicsOperandName::SpoolFlength,
-                value: HirCicsValue::Data(length),
+                value: length,
             });
         }
         return Ok(operands);

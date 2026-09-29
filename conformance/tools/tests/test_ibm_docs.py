@@ -1,6 +1,7 @@
 """Offline IBM cache tests using only synthetic publication bodies."""
 
 from contextlib import redirect_stderr, redirect_stdout
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
@@ -9,6 +10,7 @@ from pathlib import Path
 import sys
 import tarfile
 import tempfile
+from threading import Barrier
 import unittest
 from unittest.mock import patch
 
@@ -172,17 +174,25 @@ class CacheTests(unittest.TestCase):
             )
 
     def test_concurrent_identical_publish_is_idempotent(self):
-        counts = ibm_docs.Counter()
         target = ibm_docs.pin_target(self.pin)
+        barrier = Barrier(2)
+        original_link = os.link
 
-        def racing(destination, source):
-            del source
-            destination.write_bytes(self.body)
-            raise FileExistsError("racing writer won")
+        def racing(source, destination, *args, **kwargs):
+            barrier.wait(timeout=5)
+            return original_link(source, destination, *args, **kwargs)
 
-        with patch.object(Path, "hardlink_to", autospec=True, side_effect=racing):
+        def publish():
+            counts = ibm_docs.Counter()
             ibm_docs.publish(self.cache, target, self.body, counts)
-        self.assertEqual(counts["already_present"], 1)
+            return counts
+
+        with patch.object(os, "link", side_effect=racing), ThreadPoolExecutor(
+            max_workers=2
+        ) as workers:
+            results = list(workers.map(lambda _: publish(), range(2)))
+        self.assertEqual(sum(counts["imported"] for counts in results), 1)
+        self.assertEqual(sum(counts["already_present"] for counts in results), 1)
         self.assertEqual(ibm_docs.cached_body(self.cache, self.pin), self.body)
 
     def test_existing_oversized_target_is_rejected_without_reading_it(self):

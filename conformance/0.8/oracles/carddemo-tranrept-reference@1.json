@@ -1,0 +1,82 @@
+{
+  "schema_version": "mainframe-env.carddemo-tranrept-reference@1",
+  "scope": "validates the SORT/INCLUDE and CBTRN03C report stage for the pinned input; the input itself is produced by this implementation's upstream jobs and is not independently validated",
+  "input": {
+    "path": "conformance/0.8/oracles/carddemo-tranrept-input@1.bin",
+    "sha256": "d851cfa95497805da9e8d15d5a077d6680f8d9608890130c16127be441202dcf",
+    "raw_record_sha256": "d851cfa95497805da9e8d15d5a077d6680f8d9608890130c16127be441202dcf",
+    "framed_dataset_sha256": "c2dd2f3ae08c314a35ec66305b260af3ea90b9289e05d4ef88c0d601d879e148",
+    "dataset": "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
+    "record_count": 312,
+    "lrecl": 350
+  },
+  "date_parameters": {
+    "start": "2022-01-01",
+    "end": "2022-07-06",
+    "jcl_sha256": "7d8fc0777e6b9fb1c62aee6b4b10a67d127057c84b92203c7152f230b3db9571"
+  },
+  "program": {
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "files": {
+      "app/cbl/CBTRN03C.cbl": "8691e625502b7efcfd7ba4ae61797132e7b68f3fd5fedcdcc7dd6488f6871eef",
+      "app/cpy/CVTRA05Y.cpy": "d7bde0e78ff608497087b9909c889ed39e347269f964bda767b92b547fbb5fec",
+      "app/cpy/CVACT03Y.cpy": "ffc6079e09b28739e154bf6c1e1c36d408209faa91f6cf7008078dc596a1c370",
+      "app/cpy/CVTRA03Y.cpy": "fb15dbc4a6924cbddce0704932f9e61c067ac10004cd00839dff0ed7c7bb0667",
+      "app/cpy/CVTRA04Y.cpy": "89803bc13a06347e1f3d8a599a5383b87235b203dce9f18a486bc233186479f8",
+      "app/cpy/CVTRA07Y.cpy": "72ba597b1a40e1e6cf908e15da9e6a818a0ab899ef1d27d15edeb074963102fa"
+    }
+  },
+  "tool": {
+    "version": "cobc (GnuCOBOL) 3.2.0",
+    "sha256": "021a024d464959696a8adb6a9a9f27aa3f58ac49030eb741af536c5ced036175",
+    "indexed_backend": "BDB",
+    "native_ebcdic": false,
+    "flags": [
+      "-x",
+      "-std=ibm",
+      "-I",
+      "app/cpy"
+    ]
+  },
+  "derivation": {
+    "script_path": "conformance/tools/carddemo_tranrept_reference.py",
+    "script_sha256": "403a36923c3c28d725d2cc77e8644cc4bd195f5f3e615e81ab15faaa142f17d8",
+    "sort_path": "conformance/0.8/oracles/carddemo-tranrept-sort@1.cbl",
+    "sort_sha256": "e90b5a377ce24c89e11a5d301b9f508241e6fc03b1c4b04534d59e0ba664bf82",
+    "canonicaliser_path": "conformance/tools/carddemo_tranrept_reference.py",
+    "canonicaliser_sha256": "403a36923c3c28d725d2cc77e8644cc4bd195f5f3e615e81ab15faaa142f17d8",
+    "sort_policy": "ascending 16-byte card key; equal keys retain input order",
+    "sort_origin": "written translation of TRANREPT.jcl DFSORT card",
+    "dataset_metadata": {
+      "input": {
+        "organization": "Sequential",
+        "recfm": "FixedBlocked",
+        "lrecl": 350,
+        "ccsid": 37,
+        "version": 3
+      },
+      "selected": {
+        "organization": "Sequential",
+        "recfm": "Variable",
+        "lrecl": 32760,
+        "ccsid": 37,
+        "version": 3
+      },
+      "report": {
+        "organization": "Sequential",
+        "recfm": "FixedBlocked",
+        "lrecl": 133,
+        "ccsid": 37,
+        "version": 522
+      }
+    }
+  },
+  "results": {
+    "tranrept_selected_records": 312,
+    "tranrept_report_records": 519,
+    "dataset_sha256": {
+      "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00": "f935cb974c0cbfdd9c64e6b3a65d0da58ddbe55d776ac73ec84f4dfad71fa842",
+      "AWS.M2.CARDDEMO.TRANREPT.G0001V00": "07fe1bbf92874ba0a13be851398ed8b3f8a501fa9f72afeceeca2d945ee751d7"
+    }
+  }
+}
