@@ -38,9 +38,12 @@ pub use retention::{
 };
 pub use service::{Db2Limits, Db2ReplayClock, Db2Service, db2_providers};
 pub use statement::{
-    Db2CommitStatement, Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement,
-    Db2ExecuteUsing, Db2PrepareDescriptor, Db2PrepareStatement, Db2RollbackStatement,
-    Db2RollbackTarget, Db2SavepointStatement, Db2Statement, Db2StatementKind,
+    Db2CommitStatement, Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget,
+    Db2CursorReturnability, Db2CursorRowsetPositioning, Db2CursorSensitivity,
+    Db2DeclareCursorPreparedStatement, Db2DescriptorNameMode, Db2ExecuteImmediateStatement,
+    Db2ExecuteStatement, Db2ExecuteUsing, Db2PrepareDescriptor, Db2PrepareStatement,
+    Db2RollbackStatement, Db2RollbackTarget, Db2SavepointStatement, Db2SensitiveCursorKind,
+    Db2Statement, Db2StatementKind, parse_db2_cursor_statement, parse_db2_declare_cursor_prepared,
     parse_db2_dynamic_statement, parse_db2_transaction_statement,
 };
 pub use syntax::{
