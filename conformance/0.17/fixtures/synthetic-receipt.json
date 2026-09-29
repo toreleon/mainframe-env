@@ -24,7 +24,7 @@
     "catalogs": [
       {"id": "ibm-cics-ts-6x-2026-08-31", "digest": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"}
     ],
-    "conformance_spec_digest": "sha256:039a321b1319aaea8e7905f6e50e6fa88c995a9f08a15bd1fcd78fd8a9f4bfa6",
+    "conformance_spec_digest": "sha256:082744eadcb2536894602beb72781cd40836101fb3ae2a99bcd2646082bfbfe9",
     "fixture_digest": "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b",
     "oracle_adapter_digest": "sha256:7bde0441642fff59ab28af46e815c7c1ba4f65e47ca1066aad7536a910b9873d",
     "normalization_policy_digest": "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9",
@@ -33,7 +33,7 @@
   },
   "compatibility": {
     "legacy_schema_version": "mainframe-env.cics-oracle-capture@1",
-    "legacy_receipt_digest": "sha256:565ade7a4a8336d8af6e38f2cdd14d96960de8eae3d3b2b2ee4d8f8addb92cb0",
+    "legacy_receipt_digest": "sha256:53c2e0138788dd97f4aa360caac433b38a06a439131035e39e9f9754df7eb253",
     "read_rule": "exact-v1-plus-cer1701-envelope",
     "subsystem_validator_status": "synthetic-fixture-pass"
   },
@@ -41,7 +41,7 @@
     "status": "pass",
     "expected_cases": 12,
     "observed_cases": 12,
-    "raw_capture_digest": "sha256:565ade7a4a8336d8af6e38f2cdd14d96960de8eae3d3b2b2ee4d8f8addb92cb0",
+    "raw_capture_digest": "sha256:53c2e0138788dd97f4aa360caac433b38a06a439131035e39e9f9754df7eb253",
     "normalized_capture_digest": "sha256:03305af9e0f7b2c36604c553fc0136fceace72d8ed657c3dcbe4f4064b818a9b",
     "started_at": "2026-09-22T00:00:00Z",
     "finished_at": "2026-09-22T00:00:01Z"
