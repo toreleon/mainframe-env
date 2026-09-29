@@ -98,7 +98,7 @@
       "subsystem": "IBM MQ MQI",
       "environment_status": "pending",
       "differential_status": "pending",
-      "required_baselines": [{"baseline_id": "ibm-mq-9.4-mqi-2026-08-31", "topic_manifest_sha256": "sha256:c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3", "catalog_sha256": "sha256:62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7"}],
+      "required_baselines": [{"baseline_id": "ibm-mq-9.4-mqi-2026-08-31", "topic_manifest_sha256": "sha256:f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d", "catalog_sha256": "sha256:62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7"}],
       "required_products": ["IBM MQ 9.4 for z/OS"],
       "required_capabilities": ["mq.connect", "mq.mqi", "mq.syncpoint", "mq.restart", "mq.queue-readback"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
@@ -126,7 +126,7 @@
         {"baseline_id": "ibm-cics-ts-6x-2026-08-31", "topic_manifest_sha256": "sha256:8fad1a7085e08a7d9726d25c3a9c98681e20f677616f518214c4c4f3cac7d716", "catalog_sha256": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"},
         {"baseline_id": "ibm-db2-for-zos-13-2026-08-13", "topic_manifest_sha256": "sha256:6fd51d84b9d5c365d2017f1037f4edefb8d9af71de9277556cd50cf3e2f13757", "catalog_sha256": "sha256:97f897a11fc5e74ca1b8c394e67a06be571498c82fcf762f11c4f92730699d75"},
         {"baseline_id": "ibm-ims-15.6-dli-2026-08-31", "topic_manifest_sha256": "sha256:7748d88614c92c7261c9ae430027ef8954a48f3edf921ac2283b88cfb9a6f07d", "catalog_sha256": "sha256:b488f67b4c5b4d71a93e97a8a1605b8eac21fcf73c802c264a7bff5dfa3ce319"},
-        {"baseline_id": "ibm-mq-9.4-mqi-2026-08-31", "topic_manifest_sha256": "sha256:c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3", "catalog_sha256": "sha256:62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7"}
+        {"baseline_id": "ibm-mq-9.4-mqi-2026-08-31", "topic_manifest_sha256": "sha256:f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d", "catalog_sha256": "sha256:62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7"}
       ],
       "required_products": ["IBM z/OS 3.2", "IBM CICS Transaction Server", "IBM Db2 for z/OS", "IBM IMS", "IBM MQ for z/OS"],
       "required_capabilities": ["transaction.syncpoint", "transaction.prepare-if-applicable", "transaction.commit", "transaction.rollback", "transaction.in-doubt", "transaction.recovery"],
