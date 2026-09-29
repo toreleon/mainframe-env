@@ -274,7 +274,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-mq/README.md",
       "relative_links": 2,
-      "sha256": "sha256:7d06461dd053646e717e3b3bf5fed193d7761ae8af8d46e5d4bdd0d888cc1cb6",
+      "sha256": "sha256:f8bfea1aac5dd4c436c4738a73a423518531527d9787cf5b942b5a03d8f64124",
       "title": "mainframe-env-mq",
       "xtask_commands": 0
     },
@@ -493,7 +493,7 @@
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
       "relative_links": 0,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:0c18ba91cfdff0284e7ff3151b872abd88ff44ccd8ae3619b40c2f58d870e62b",
+      "sha256": "sha256:1bcce5bc7d85b3db0863959ac3ceb7594fc0deab07767c80ffecc17060ce15db",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -1262,7 +1262,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.15.0.md",
       "relative_links": 0,
-      "sha256": "sha256:4ab1b60e9dcf8079fca93e6b49f1f2d82483da59194303d064713149cd018c82",
+      "sha256": "sha256:fc99708b467b84b130ce752622e580d35a66213f7ad31e58f38e1a20fde64900",
       "title": "mainframe-env 0.15.0 implementation status",
       "xtask_commands": 0
     },

@@ -16,3 +16,8 @@ The IBM MQ 9.4 MQI denominator and provider authority boundary are defined in
 the [MQ programming-surface architecture](../../../docs/architecture/MQ-PROGRAMMING-SURFACE.md).
 The generated 26-call host registry preserves all 27 source-list positions but
 does not advertise execution or grant coverage.
+
+Direct MQ commit/backout calls with a valid CICS execution-context binding
+return MQCC 2 / MQRC 2012 without changing UOW state. Internal CICS SYNCPOINT
+dispatch carries nested and outer effect-origin attestations, which MQ replay
+validation binds to the exact run, sequence, and effect identities.

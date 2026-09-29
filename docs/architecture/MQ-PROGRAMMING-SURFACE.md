@@ -48,6 +48,20 @@ syncpoint owner. A forbidden context returns the exact MQ completion/reason
 condition without mutating queue-manager state. `MQCMIT` must never be exposed
 as a generic cross-subsystem commit.
 
+The provider recognizes the typed `mainframe-env.cics.execution-context@1`
+invocation binding. A direct `MQCMIT` or `MQBACK` in CICS returns MQCC 2 / MQRC
+2012 before authorization, replay, or queue state access. The existing CICS
+SYNCPOINT dispatch carries nested and outer effect-origin bindings; MQ replay
+validation binds them to the exact run, sequence, idempotency key, and outer
+effect before persistence. Partial or malformed provenance fails closed.
+
+`MqSyncpointCall`, `MqHostEnvironment`, and `MqSyncpointOwner` define the shared
+direct-call applicability matrix for `MQBACK`, `MQBEGIN`, and `MQCMIT`. Batch,
+IMS batch DL/I, and other queue-manager-owned bindings admit these calls. CICS
+and non-batch IMS reject application commit/backout; MQ client bindings also
+reject `MQBEGIN`. An external coordinator rejects all three direct calls with
+MQCC 2 / MQRC 2012. IMS and MQ client provider enforcement remain pending.
+
 ## Coverage boundary
 
 Catalog and generated-registry checks prove only:
