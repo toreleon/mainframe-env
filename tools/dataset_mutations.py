@@ -85,12 +85,13 @@ CICS_MUTATIONS = (
     Mutation(
         'cics-omit-rewrite',
         'Report a successful product REWRITE without invoking the dataset transition',
-        'let result = service\n        .nested(run, HostRequest::Dataset(host_request))',
-        'let result = if operation == CicsOperation::Rewrite {\n'
+        '    } else {\n        service.nested(run, HostRequest::Dataset(host_request))\n'
+        '    }\n    .map_err(|problem| normalize_file_not_found(operation, problem))?;',
+        '    } else if operation == CicsOperation::Rewrite {\n'
         '        Ok(HostResult::Dataset(DatasetResult::Mutated { version: 1 }))\n'
         '    } else {\n'
         '        service.nested(run, HostRequest::Dataset(host_request))\n'
-        '    }',
+        '    }\n    .map_err(|problem| normalize_file_not_found(operation, problem))?;',
         CICS_FILE_SOURCE,
     ),
     Mutation(
@@ -103,7 +104,7 @@ CICS_MUTATIONS = (
     Mutation(
         'cics-bypass-read-update',
         'Allow a plain READ identity to establish REWRITE context',
-        'if request.arguments.contains_key("OPTION.UPDATE")\n                && let Some(identity) = identities.first()',
+        'if update_requested && let Some(identity) = identities.first()',
         'if let Some(identity) = identities.first()',
         CICS_FILE_SOURCE,
     ),

@@ -44,7 +44,7 @@ struct Condition {
     groups: Vec<Vec<Comparison>>,
     omit: bool,
 }
-#[derive(Eq, PartialEq)]
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
 enum Value {
     Ch(Vec<u8>),
     Zd(i128),
@@ -372,11 +372,8 @@ pub(super) fn execute(
 ) -> Result<Vec<Vec<u8>>, HostProblem> {
     let control = match text(input, "SYSIN") {
         Ok(s) => s,
-        Err(HostProblem::NotFound) => {
-            let mut r = records;
-            r.sort();
-            return Ok(r);
-        }
+        // DFSORT requires an ordering control statement in this model.
+        Err(HostProblem::NotFound) => return unsupported(),
         Err(e) => return Err(e),
     };
     let symbols = symbols(input)?;
@@ -417,6 +414,9 @@ pub(super) fn execute(
             return unsupported();
         }
     }
+    if sort_keys.is_none() {
+        return unsupported();
+    }
     let mut records = records
         .into_iter()
         .filter_map(|r| match &filter {
@@ -444,7 +444,8 @@ pub(super) fn execute(
             keys.iter()
                 .enumerate()
                 .find_map(|(i, k)| {
-                    let order = compare(&a.1[i], &b.1[i], ccsid).expect("matching key formats");
+                    // Both values were decoded with the same key field above.
+                    let order = a.1[i].cmp(&b.1[i]);
                     (order != Ordering::Equal).then_some(if k.descending {
                         order.reverse()
                     } else {
@@ -454,8 +455,6 @@ pub(super) fn execute(
                 .unwrap_or(Ordering::Equal)
         });
         records = decorated.into_iter().map(|(r, _)| r).collect();
-    } else {
-        records.sort();
     }
     if let Some(tokens) = outrec {
         let fields = symbols
