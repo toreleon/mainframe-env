@@ -28,6 +28,10 @@ the post-review candidate that day. The tracked
 that decision and its fix mapping. The accepted gate authorizes implementation;
 it does not establish 0.9 release readiness or licensed certification.
 
+The [0.12.0 implementation status](docs/delivery/coverage-versions/status/0.12.0.md)
+tracks recovered Db2 parser slices. They do not grant whole-row catalog,
+execution, conformance, differential, or licensed credit.
+
 ## Quick start
 
 The repository pins Rust 1.98.0. Install the toolchain declared in
