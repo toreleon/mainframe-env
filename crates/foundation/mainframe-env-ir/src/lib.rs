@@ -54,9 +54,9 @@ pub use cics_plan::{
 };
 pub use cobol_config::{
     COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
-    COBOL_RUNTIME_CONFIG_MAJOR, COBOL_RUNTIME_CONFIG_NAME, COBOL_RUNTIME_CONFIG_NAMESPACE,
-    CobolAddressMode, CobolArithmeticMode, CobolDisplaySign, CobolRuntimeConfig,
-    CobolRuntimeConfigProblem, cobol_runtime_config,
+    COBOL_ENTRY_FORMALS_V1, COBOL_RUNTIME_CONFIG_MAJOR, COBOL_RUNTIME_CONFIG_NAME,
+    COBOL_RUNTIME_CONFIG_NAMESPACE, CobolAddressMode, CobolArithmeticMode, CobolDisplaySign,
+    CobolRuntimeConfig, CobolRuntimeConfigProblem, cobol_entry_formals, cobol_runtime_config,
 };
 pub use cobol_layout::{
     COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES, COBOL_MAX_TABLE_KEYS,
