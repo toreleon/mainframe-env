@@ -20,6 +20,17 @@ normalized official rows, and the exact pinned call-list topic. The generated
 topic paths and SHA-256 pins in the immutable MQ topic manifest. The registry
 is identity-only: it neither selects a handler nor advertises execution.
 
+`conformance/0.15/mq/structure-status-catalog.json` adds the ordered,
+source-bound signatures for the same 26 calls. The generated host API exposes
+169 parameter descriptors with structure and version symbols, options,
+selectors, completion and reason families, and handle roles. All 26 pinned
+call topics have matching retained HTML, including the re-pinned MQINQ topic
+`SSFKSJ_9.4.0/refdev/q101840_.html` (SHA-256
+`03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b`).
+The MQBUFMH spelling anomaly is recorded in the catalog, while `MQHMSG` is
+the sole published handle identity. The registry supplies identity data only;
+option legality and executable handlers remain pending.
+
 ## Authority boundary
 
 `mainframe-env-mq` is the one owned semantic authority for queue managers,

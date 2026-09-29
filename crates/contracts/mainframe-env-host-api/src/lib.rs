@@ -16,6 +16,7 @@ mod dataset;
 mod enterprise;
 mod mq_catalog;
 mod mq_context;
+mod mq_contract;
 mod names;
 mod registry;
 mod request;
@@ -51,6 +52,13 @@ pub use mq_catalog::{
 pub use mq_context::{
     MQCC_FAILED, MQRC_ENVIRONMENT_ERROR, MqContextDisposition, MqHostEnvironment, MqSyncpointCall,
     MqSyncpointOwner, mq_syncpoint_context_disposition,
+};
+pub use mq_contract::{
+    MQ_MQI_CONTRACT_CATALOG_SHA256, MQ_MQI_CONTRACT_COUNT, MQ_MQI_CONTRACT_SET_SHA256,
+    MQ_MQI_PARAMETER_COUNT, MQ_MQI_PENDING_SIGNATURE_COUNT, MQ_MQI_VERIFIED_SIGNATURE_COUNT,
+    MqMqiContractDescriptor, MqMqiHandleAction, MqMqiHandleRole, MqMqiParameterDescriptor,
+    MqMqiParameterDirection, MqMqiParameterRole, MqMqiSignatureStatus, MqMqiSourceSpellingAnomaly,
+    MqMqiSourceStatus, mq_mqi_contract, mq_mqi_contract_by_label, mq_mqi_contracts,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
