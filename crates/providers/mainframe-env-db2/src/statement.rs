@@ -2,6 +2,7 @@
 
 mod cursor;
 mod dynamic;
+mod query;
 
 pub use cursor::{
     Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget, Db2CursorReturnability,
@@ -12,6 +13,12 @@ pub use cursor::{
 pub use dynamic::{
     Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement, Db2ExecuteUsing,
     Db2PrepareDescriptor, Db2PrepareStatement, parse_db2_dynamic_statement,
+};
+
+pub use query::{
+    Db2FetchClause, Db2FetchPosition, Db2NamedTableSource, Db2OffsetClause, Db2OrderByItem,
+    Db2OrderDirection, Db2OrderKey, Db2QueryExpression, Db2SelectCore, Db2SelectItem,
+    Db2SelectQuantifier, parse_db2_select_core,
 };
 
 use crate::{
