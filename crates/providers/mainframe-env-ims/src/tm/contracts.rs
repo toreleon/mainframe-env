@@ -310,7 +310,7 @@ impl<'de> Deserialize<'de> for TmPcbStatus {
             [b' ', b' '] => Ok(Self::SUCCESS),
             [b'Q', b'C'] => Ok(Self::NO_MORE_MESSAGES),
             [b'A', b'D'] => Ok(Self::INVALID_CALL),
-            [b'Q', b'F'] => Ok(Self::QUEUE_FULL),
+            [b'Q', b'F'] => Ok(Self::INVALID_SEGMENT_LENGTH),
             _ => Err(serde::de::Error::custom("unsupported IMS TM PCB status")),
         }
     }
@@ -320,7 +320,10 @@ impl TmPcbStatus {
     pub const SUCCESS: Self = Self(*b"  ");
     pub const NO_MORE_MESSAGES: Self = Self(*b"QC");
     pub const INVALID_CALL: Self = Self(*b"AD");
-    pub const QUEUE_FULL: Self = Self(*b"QF");
+    /// QF: the message segment is shorter than the minimum length (IMS 15.6
+    /// message-call status table and the QF explanation topic), not a queue-full
+    /// condition.
+    pub const INVALID_SEGMENT_LENGTH: Self = Self(*b"QF");
 
     #[must_use]
     pub const fn as_str(self) -> &'static str {
