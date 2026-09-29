@@ -179,6 +179,7 @@ enum XtaskCommand {
     Schemas(CheckArgs),
     Inventory(CheckArgs),
     MqMqiRegistry(CheckArgs),
+    MqLicensedContract(CheckArgs),
     Evidence(EvidenceArgs),
     Coverage(CheckArgs),
     ApplicationPackages(CheckArgs),
@@ -326,6 +327,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::Inventory(args) => checked!("inventory", args, check_inventory(root)),
         XtaskCommand::MqMqiRegistry(args) => {
             checked!("mq-mqi-registry", args, check_mq_mqi_registry(root))
+        }
+        XtaskCommand::MqLicensedContract(args) => {
+            checked!(
+                "mq-licensed-contract",
+                args,
+                check_mq_licensed_contract(root)
+            )
         }
         XtaskCommand::Evidence(args) => match (args.check, args.command) {
             (check, None) => ("evidence", check, check_evidence(root)),
@@ -7827,6 +7835,45 @@ fn check_mq_mqi_registry(root: &Path) -> TaskResult {
         status.success(),
         "MQ MQI call-registry freshness guard failed",
     )
+}
+
+fn check_mq_licensed_contract(root: &Path) -> TaskResult {
+    let adapter = root.join("conformance/0.15/oracles/mq-licensed-differential.json");
+    let adapter_schema =
+        root.join("conformance/0.15/schemas/mq-licensed-differential-adapter.schema.json");
+    validate_schema_instance(&json(&adapter_schema)?, &json(&adapter)?, &adapter)?;
+
+    let fixtures = root.join("conformance/0.15/fixtures/mq-licensed-differential-cases.json");
+    let fixture_schema =
+        root.join("conformance/0.15/schemas/mq-licensed-differential-fixtures.schema.json");
+    validate_schema_instance(&json(&fixture_schema)?, &json(&fixtures)?, &fixtures)?;
+
+    let receipt_schema =
+        root.join("conformance/0.15/schemas/mq-licensed-differential-receipt.schema.json");
+    compile_draft_2020_12_schema(&json(&receipt_schema)?, &receipt_schema)?;
+
+    for (label, tool, arguments) in [
+        (
+            "MQ licensed fixture freshness guard",
+            "conformance/0.15/tools/generate_mq_licensed_fixtures.py",
+            ["--check"].as_slice(),
+        ),
+        (
+            "MQ licensed receipt verifier",
+            "conformance/0.15/tools/verify_mq_licensed_differential.py",
+            ["--check"].as_slice(),
+        ),
+    ] {
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(root.join(tool))
+            .args(arguments)
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("{label}: {error}"))?;
+        require(status.success(), &format!("{label} failed"))?;
+    }
+    Ok(())
 }
 
 /// Static dependency/ownership/route checks; no release build or runtime campaign.

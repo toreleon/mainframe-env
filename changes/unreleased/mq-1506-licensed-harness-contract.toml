@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recovered the IBM MQ 9.4 licensed differential fixture, adapter, and external receipt contract for all 26 MQI calls. No licensed execution or differential credit."
