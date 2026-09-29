@@ -27,10 +27,10 @@ hashes, or test counts into Project fields.
 | 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | — | Planned; open |
 | 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | — | Planned; open |
 | 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | — | Planned; open |
-| 0.12.0 | `0.12.0` | [#18](https://github.com/toreleon/mainframe-env/issues/18) | — | Planned; open |
+| 0.12.0 | `0.12.0` | [#18](https://github.com/toreleon/mainframe-env/issues/18) | — | Planned; open; recovered foundation in review ([export-recovery track](#export-recovery-track)) |
 | 0.13.0 | `0.13.0` | [#19](https://github.com/toreleon/mainframe-env/issues/19) | — | Planned; open |
-| 0.14.0 | `0.14.0` | [#20](https://github.com/toreleon/mainframe-env/issues/20) | — | Planned; open |
-| 0.15.0 | `0.15.0` | [#21](https://github.com/toreleon/mainframe-env/issues/21) | — | Planned; open |
+| 0.14.0 | `0.14.0` | [#20](https://github.com/toreleon/mainframe-env/issues/20) | — | Planned; open; recovered foundation in review ([export-recovery track](#export-recovery-track)) |
+| 0.15.0 | `0.15.0` | [#21](https://github.com/toreleon/mainframe-env/issues/21) | — | Planned; open; recovered foundation in review ([export-recovery track](#export-recovery-track)) |
 | 0.16.0 | `0.16.0` | [#22](https://github.com/toreleon/mainframe-env/issues/22) | — | Planned; open |
 | 0.17.0 | `0.17.0` | [#23](https://github.com/toreleon/mainframe-env/issues/23) | — | Planned; open |
 | 1.0.0 | `1.0.0` | [#24](https://github.com/toreleon/mainframe-env/issues/24) | — | Planned; open |
@@ -180,6 +180,38 @@ Remaining stacks, from main: #281 → #285 and #281 → #291. Every other open
 plan-track pull request now targets main. Issues #271 and #273 have no pull
 request.
 
+## Export-recovery track
+
+The 2026-09-22 Mac Codex lanes for 0.12.0, 0.14.0 and 0.15.0 were committed
+locally but never pushed. On 2026-09-29 their exported sessions were replayed
+onto `main`, one reviewed slice per pull request. Each chain below merges in
+order from `main`. The foundations are syntax, contract and in-memory runtime
+work. They do not complete any version: every plan stays **Proposed**, and no
+slice earns execution, conformance, differential or licensed credit.
+
+| Version | Tracking | Pull requests, in merge order | Waiting on |
+|---|---|---|---|
+| 0.12.0 Db2 (#18) | [#344](https://github.com/toreleon/mainframe-env/issues/344) | [#345](https://github.com/toreleon/mainframe-env/pull/345) catalog → [#351](https://github.com/toreleon/mainframe-env/pull/351) lexer → [#355](https://github.com/toreleon/mainframe-env/pull/355) AST → [#356](https://github.com/toreleon/mainframe-env/pull/356) transaction → [#357](https://github.com/toreleon/mainframe-env/pull/357) host references → [#358](https://github.com/toreleon/mainframe-env/pull/358) dynamic SQL → [#363](https://github.com/toreleon/mainframe-env/pull/363) expressions → [#365](https://github.com/toreleon/mainframe-env/pull/365) cursor → [#368](https://github.com/toreleon/mainframe-env/pull/368) SELECT → [#372](https://github.com/toreleon/mainframe-env/pull/372) CREATE TABLE → [#374](https://github.com/toreleon/mainframe-env/pull/374) type compatibility | [#350](https://github.com/toreleon/mainframe-env/issues/350) re-pin [#354](https://github.com/toreleon/mainframe-env/pull/354), after [#340](https://github.com/toreleon/mainframe-env/pull/340). Then the catalog is regenerated and float, decfloat and Boolean constants can be un-fenced. |
+| 0.14.0 IMS (#20) | [#347](https://github.com/toreleon/mainframe-env/issues/347) | [#349](https://github.com/toreleon/mainframe-env/pull/349) call catalog → [#352](https://github.com/toreleon/mainframe-env/pull/352) SSA → [#359](https://github.com/toreleon/mainframe-env/pull/359) sources → [#362](https://github.com/toreleon/mainframe-env/pull/362) TM contracts → [#364](https://github.com/toreleon/mainframe-env/pull/364) PCB status → [#367](https://github.com/toreleon/mainframe-env/pull/367) metadata → [#371](https://github.com/toreleon/mainframe-env/pull/371) database engine → [#373](https://github.com/toreleon/mainframe-env/pull/373) TM runtime | Review only. Package publication, host routing and TM/database integration were never finished in the lost lane. |
+| 0.15.0 MQ (#21) | [#21](https://github.com/toreleon/mainframe-env/issues/21) | [#340](https://github.com/toreleon/mainframe-env/pull/340) call registry and [#337](https://github.com/toreleon/mainframe-env/issues/337) re-pin → [#341](https://github.com/toreleon/mainframe-env/pull/341) syncpoint context → [#343](https://github.com/toreleon/mainframe-env/pull/343) MQI structures → [#348](https://github.com/toreleon/mainframe-env/pull/348) licensed harness (0/26 credit); and [#341](https://github.com/toreleon/mainframe-env/pull/341) → [#346](https://github.com/toreleon/mainframe-env/pull/346) object lifecycle | Review only |
+
+Defects found while recovering and reviewing, each with a fail-first
+regression test:
+
+| Issue | Finding | Roadmap relation | Pull request |
+|---|---|---|---|
+| [#335](https://github.com/toreleon/mainframe-env/issues/335), [#336](https://github.com/toreleon/mainframe-env/issues/336) | Module ceilings exceeded on `main`; string dispatch in `program.rs` | Repository health | [#339](https://github.com/toreleon/mainframe-env/pull/339) |
+| [#337](https://github.com/toreleon/mainframe-env/issues/337) | MQINQ topic republished; pinned bytes unavailable | 0.15 MQ (#21) | [#340](https://github.com/toreleon/mainframe-env/pull/340) |
+| [#342](https://github.com/toreleon/mainframe-env/issues/342) | MQ object names folded to upper case and trimmed | 0.15 MQ (#21) | [#346](https://github.com/toreleon/mainframe-env/pull/346) |
+| [#350](https://github.com/toreleon/mainframe-env/issues/350) | 25 Db2 13 SQL-reference topics republished | 0.12 Db2 (#18) | [#354](https://github.com/toreleon/mainframe-env/pull/354) |
+| [#360](https://github.com/toreleon/mainframe-env/issues/360) | Documentation manifest stale on `main` | Repository health | [#361](https://github.com/toreleon/mainframe-env/pull/361) |
+| [#366](https://github.com/toreleon/mainframe-env/issues/366) | Floating `$` pictures fail IR verification (regression from #283) | 0.4 COBOL execution (#10) | [#370](https://github.com/toreleon/mainframe-env/pull/370) |
+| [#369](https://github.com/toreleon/mainframe-env/issues/369) | Floating strings with embedded `B`, `0` or `/` edit wrongly | 0.4 COBOL execution (#10) | [#376](https://github.com/toreleon/mainframe-env/pull/376), on [#370](https://github.com/toreleon/mainframe-env/pull/370) |
+| [#375](https://github.com/toreleon/mainframe-env/issues/375) | ON SIZE ERROR never raised for numeric-edited receivers; floating `+`/`-` capacity one too high | 0.4 COBOL execution (#10) | [#377](https://github.com/toreleon/mainframe-env/pull/377), on [#376](https://github.com/toreleon/mainframe-env/pull/376) |
+
+The v0.9 rows 0027, 0093 and 0114 stay unready. Their source blockers are
+recorded on [#297](https://github.com/toreleon/mainframe-env/issues/297).
+
 ## Operating rules
 
 1. Keep one epic issue and one milestone per product version.
@@ -237,6 +269,11 @@ of fact, not proposals.
   the pull requests listed for them have merged (#269, #248 and #272), because
   those pull requests did not use a closing keyword for them. Whether each is
   resolved is an owner decision; this page does not close them.
+- The export-recovery pull requests (#339–#377 in the track above) also carry
+  no type label or milestone, contrary to rule 5. Most target another
+  recovery branch rather than `main`. GitHub applies a closing keyword only
+  when its pull request merges into `main`, so each stacked pull request must
+  be retargeted to `main` before it merges, or its issue closed by hand.
 - Independent checking in #262 and #259 found that the recorded 0.8 CardDemo
   base-batch receipt had captured product output that GnuCOBOL disagrees with
   ([#229](https://github.com/toreleon/mainframe-env/issues/229),

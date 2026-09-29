@@ -1185,8 +1185,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
-      "relative_links": 126,
-      "sha256": "sha256:14c4cd0293a7f3936f7dafe7b0bbb7f300a0ffd3d40136c231ee941b5c87f59c",
+      "relative_links": 181,
+      "sha256": "sha256:b3eafb16fc9349625c715efcbddf19522a0b5858aad912d82ea3520b3d146c72",
       "title": "GitHub Project synchronization",
       "xtask_commands": 0
     },
