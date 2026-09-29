@@ -37,3 +37,10 @@ The proposed 0.12 lexer is a separate owned, bounded token stream for later
 parser slices. It exposes token kinds, byte and line/column spans, diagnostics,
 and a peekable cursor; it does not route SQL to execution. Float and decfloat
 constant forms fail with a source-pending diagnostic under issue #350.
+
+The proposed 0.12 AST primitives own normalized and delimited identifiers,
+qualified names, host and indicator references, built-in and distinct type
+syntax, literals, operators, and an append-only expression arena. Constructors
+bound names, type arguments, literals, lists, nodes, references, and depth.
+Expressions retain D2 source spans. Name resolution, type compatibility, and
+statement parsing remain pending.
