@@ -8,6 +8,8 @@ Machine roadmap:
 [`ibm-official-coverage-roadmap.json`](../../../conformance/roadmap/ibm-official-coverage-roadmap.json)
 Operational tracker:
 [GitHub Project synchronization](GITHUB-PROJECT.md)
+Profile track:
+[Workload-profile track](PROFILE-TRACK.md), beside these versions
 
 These documents prepare the implementation and certification work for each
 minor version. They do not authorize a tag, publication, deployment, remote

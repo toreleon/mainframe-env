@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Numeric-edited CR and DB suffixes are blank for positive values and shown for negative values."
