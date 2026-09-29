@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Zero in an all-Z or all-floating numeric-edited picture now blanks the entire item; all-asterisk pictures retain asterisks around the decimal point (#287)."

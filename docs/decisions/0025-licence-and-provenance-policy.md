@@ -11,7 +11,7 @@ Issue [#260](https://github.com/toreleon/mainframe-env/issues/260) identifies
 licensed differential evidence as a release dependency, including CER-1701 and
 the 0.10–0.17 campaigns. A reproducible harness does not itself establish that
 an environment may be used for this project or that its output may be published.
-[ADR-0024 (PR #255)](https://github.com/toreleon/mainframe-env/pull/255)
+[ADR-0024](0024-per-assertion-oracle-provenance.md)
 defines per-assertion oracle source classes and credit rules; this decision
 governs the acquisition and handling of `licensed-ibm` and
 `customer-captured` material and the provenance of IBM-derived inputs.
