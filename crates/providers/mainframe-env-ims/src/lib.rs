@@ -4,6 +4,7 @@
 
 mod retention;
 mod service;
+mod tm;
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -16,4 +17,9 @@ pub use service::{
     ImsApplicationDefinition, ImsDatabaseDefinition, ImsInstallReceipt, ImsLimits, ImsLoadImage,
     ImsLoadRoot, ImsPcbDefinition, ImsPsbDefinition, ImsReplayClock, ImsSegmentDefinition,
     ImsService, ims_providers,
+};
+
+pub use tm::{
+    TmAlternatePcbDefinition, TmCall, TmConversationAction, TmDefinitionSet, TmDestination,
+    TmExecutionContext, TmInputMessage, TmLimits, TmPcb, TmPcbStatus, TmTransactionDefinition,
 };

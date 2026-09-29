@@ -5,7 +5,8 @@ Ownership: IMS provider maintainers.
 This crate owns the bounded deterministic IMS application authority currently
 required by the product: HIDAM-style root/child data, secondary indexes,
 PSB/PCB selection, DLI navigation and mutation, checkpointing, load/unload,
-durable commit/rollback, replay, and host-provider registration.
+durable commit/rollback, replay, and host-provider registration. It also owns
+bounded TM transaction, message, I/O/alternate-PCB, and conversational contracts.
 
 ## Invariants
 
@@ -29,7 +30,9 @@ state.
 
 `ImsService` installs validated application definitions and exposes typed host
 providers through `ims_providers`. Public definition and limit types describe
-the bounded installation and execution contract.
+the bounded installation and execution contract. `TmDefinitionSet`,
+`TmInputMessage`, and `TmCall` define the TM contract without a TM scheduler or
+durable TM runtime in this slice.
 
 ## Non-goals
 
