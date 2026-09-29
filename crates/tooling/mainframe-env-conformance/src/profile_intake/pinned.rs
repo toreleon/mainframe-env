@@ -17,29 +17,12 @@ impl<'a> PinnedFiles<'a> {
         }
         let output = git_bytes(root, &["ls-tree", "-r", "-z", "--full-tree", commit])?;
         let mut blobs = BTreeMap::new();
-        for entry in output.split(|byte| *byte == 0).filter(|entry| !entry.is_empty()) {
-            let entry = std::str::from_utf8(entry)
-                .map_err(|_| IntakeError::Pin("non-UTF-8 tracked path".into()))?;
-            let (header, path) = entry
-                .split_once('\t')
-                .ok_or_else(|| IntakeError::Pin("invalid Git tree entry".into()))?;
-            let fields = header.split_ascii_whitespace().collect::<Vec<_>>();
-            if fields.len() != 3
-                || !matches!(fields[0], "100644" | "100755")
-                || fields[1] != "blob"
-            {
-                return Err(IntakeError::Pin(format!(
-                    "non-regular tracked entry is unsupported: {path}"
-                )));
-            }
-            let oid = fields[2];
-            if oid.len() != 40
-                || !oid.bytes().all(|byte| byte.is_ascii_hexdigit())
-                || path.is_empty()
-                || path.starts_with('/')
-                || path.split('/').any(|part| matches!(part, "" | "." | ".."))
-                || blobs.insert(path.to_string(), oid.to_string()).is_some()
-            {
+        for entry in output
+            .split(|byte| *byte == 0)
+            .filter(|entry| !entry.is_empty())
+        {
+            let (path, oid) = parse_tree_entry(entry)?;
+            if blobs.insert(path, oid).is_some() {
                 return Err(IntakeError::Pin("invalid pinned file identity".into()));
             }
         }
@@ -59,6 +42,30 @@ impl<'a> PinnedFiles<'a> {
         // replacement objects, or later working-tree/index edits can change it.
         git_bytes(self.root, &["cat-file", "blob", oid])
     }
+}
+
+fn parse_tree_entry(entry: &[u8]) -> Result<(String, String), IntakeError> {
+    let entry = std::str::from_utf8(entry)
+        .map_err(|_| IntakeError::Pin("non-UTF-8 tracked path".into()))?;
+    let (header, path) = entry
+        .split_once('\t')
+        .ok_or_else(|| IntakeError::Pin("invalid Git tree entry".into()))?;
+    let fields = header.split_ascii_whitespace().collect::<Vec<_>>();
+    if fields.len() != 3 || !matches!(fields[0], "100644" | "100755") || fields[1] != "blob" {
+        return Err(IntakeError::Pin(format!(
+            "non-regular tracked entry is unsupported: {path}"
+        )));
+    }
+    let oid = fields[2];
+    if oid.len() != 40
+        || !oid.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || path.is_empty()
+        || path.starts_with('/')
+        || path.split('/').any(|part| matches!(part, "" | "." | ".."))
+    {
+        return Err(IntakeError::Pin("invalid pinned file identity".into()));
+    }
+    Ok((path.to_string(), oid.to_string()))
 }
 
 fn git_bytes(root: &Path, args: &[&str]) -> Result<Vec<u8>, IntakeError> {
@@ -134,15 +141,19 @@ mod tests {
         let fixture = Fixture::new();
         let original = b"  source\n\0\xff\n";
         fs::write(fixture.0.join("source.cbl"), original).unwrap();
+        fs::write(fixture.0.join("copy.cpy"), b"copybook\n").unwrap();
         fs::write(fixture.0.join("LICENSE"), b"licence\n").unwrap();
         let commit = fixture.commit();
         let pinned = PinnedFiles::open(&fixture.0, &commit).unwrap();
         fs::write(fixture.0.join("source.cbl"), b"changed").unwrap();
+        fs::write(fixture.0.join("copy.cpy"), b"changed").unwrap();
+        fs::write(fixture.0.join("LICENSE"), b"changed").unwrap();
         fs::write(fixture.0.join("new.cpy"), b"not pinned").unwrap();
         fixture.git(&["add", "-A"]);
         assert_eq!(pinned.read("source.cbl").unwrap(), original);
+        assert_eq!(pinned.read("copy.cpy").unwrap(), b"copybook\n");
         assert_eq!(pinned.read("LICENSE").unwrap(), b"licence\n");
-        assert_eq!(pinned.paths(), vec!["LICENSE", "source.cbl"]);
+        assert_eq!(pinned.paths(), vec!["LICENSE", "copy.cpy", "source.cbl"]);
         assert!(pinned.read("new.cpy").is_err());
         assert!(pinned.read("../outside").is_err());
     }
@@ -168,6 +179,40 @@ mod tests {
     }
 
     #[test]
+    fn pinned_files_reject_gitlinks() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("source.cbl"), b"source\n").unwrap();
+        let referenced_commit = fixture.commit();
+        fixture.git(&[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{referenced_commit},submodule"),
+        ]);
+        fixture.git(&["commit", "-qm", "gitlink"]);
+        let commit = fixture.git(&["rev-parse", "HEAD"]);
+        assert!(matches!(
+            PinnedFiles::open(&fixture.0, &commit),
+            Err(IntakeError::Pin(message)) if message.contains("non-regular tracked entry")
+        ));
+    }
+
+    #[test]
+    fn pinned_files_reject_malformed_tree_entries() {
+        let oid = "a".repeat(40);
+        for entry in [
+            b"garbage".to_vec(),
+            format!("100644 blob {oid}\t../escape").into_bytes(),
+            b"100644 blob invalid\tsource.cbl".to_vec(),
+            format!("120000 blob {oid}\tsource.cbl").into_bytes(),
+            format!("160000 commit {oid}\tsubmodule").into_bytes(),
+            [b"100644 blob ".as_slice(), &[0xff], b"\tsource.cbl"].concat(),
+        ] {
+            assert!(parse_tree_entry(&entry).is_err(), "{entry:?}");
+        }
+    }
+
+    #[test]
     fn pinned_files_ignore_local_blob_replacements() {
         let fixture = Fixture::new();
         fs::write(fixture.0.join("source.cbl"), b"original\n").unwrap();
@@ -175,8 +220,7 @@ mod tests {
         let original = fixture.git(&["rev-parse", &format!("{commit}:source.cbl")]);
         fs::write(fixture.0.join("source.cbl"), b"replacement\n").unwrap();
         let replacement_commit = fixture.commit();
-        let replacement =
-            fixture.git(&["rev-parse", &format!("{replacement_commit}:source.cbl")]);
+        let replacement = fixture.git(&["rev-parse", &format!("{replacement_commit}:source.cbl")]);
         fixture.git(&["replace", &original, &replacement]);
         let pinned = PinnedFiles::open(&fixture.0, &commit).unwrap();
         assert_eq!(pinned.read("source.cbl").unwrap(), b"original\n");
