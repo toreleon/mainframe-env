@@ -1,5 +1,6 @@
 //! Executable COBOL layout-dialect validation.
 
+use crate::cobol_floating_insertion::cobol_floating_insertion_prefix;
 use crate::{Attribute, Operation, OperationId};
 
 mod category;
@@ -727,13 +728,13 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
         .iter()
         .flat_map(|(symbol, count)| std::iter::repeat_n(*symbol, *count as usize))
         .collect();
-    let floating_currency_prefix = cobol_floating_currency_prefix(&symbols);
+    let floating_prefix = cobol_floating_insertion_prefix(&symbols);
     let mut currency_symbols_seen = 0u64;
     let mut position = 0usize;
     let mut shape = NumericPictureShape::default();
     let mut fractional = false;
     for (symbol, count) in runs {
-        let in_floating_prefix = position < floating_currency_prefix;
+        let in_floating_prefix = floating_prefix.is_some_and(|(_, end)| position < end);
         position += count as usize;
         match symbol {
             b'9' => add_picture_digits(&mut shape, count, fractional)?,
@@ -762,7 +763,7 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
                     .storage
                     .checked_add(count)
                     .ok_or("numeric PICTURE extent overflows")?;
-                if count > 1 {
+                if count > 1 || (in_floating_prefix && floating_prefix.unwrap().0 == symbol) {
                     shape.digits = shape
                         .digits
                         .checked_add(count)
@@ -823,20 +824,9 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
 /// Expanded prefix in which repeated currency symbols use floating insertion.
 #[must_use]
 pub fn cobol_floating_currency_prefix(symbols: &[u8]) -> usize {
-    let prefix = symbols
-        .iter()
-        .take_while(|&&symbol| matches!(symbol, b'$' | b','))
-        .count();
-    if symbols[..prefix]
-        .iter()
-        .filter(|&&symbol| symbol == b'$')
-        .count()
-        >= 2
-    {
-        prefix
-    } else {
-        0
-    }
+    cobol_floating_insertion_prefix(symbols)
+        .filter(|(symbol, _)| *symbol == b'$')
+        .map_or(0, |(_, end)| end)
 }
 
 fn add_picture_digits(
@@ -1182,7 +1172,7 @@ fn is_known_layout(category: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::numeric_picture_shape;
+    use super::{cobol_floating_insertion_prefix, numeric_picture_shape};
 
     #[test]
     fn floating_insertion_picture_matches_compiler_metadata() {
@@ -1199,6 +1189,44 @@ mod tests {
             assert_eq!(
                 (shape.storage, shape.digits, shape.scale, shape.signed),
                 (storage, digits, scale, signed),
+                "{picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn embedded_simple_insertions_extend_floating_picture_shape() {
+        for (picture, storage, digits, scale, signed) in [
+            ("$$B$$9.9", 8, 5, 1, false),
+            ("$$0$$9", 6, 4, 0, false),
+            ("$$/$$9", 6, 4, 0, false),
+            ("++B++9", 6, 5, 0, true),
+            ("--,--9.99", 9, 7, 2, true),
+            ("$$$B99", 6, 4, 0, false),
+            ("+++.+++", 7, 6, 3, true),
+        ] {
+            let shape = numeric_picture_shape(picture).unwrap();
+            assert_eq!(
+                (shape.storage, shape.digits, shape.scale, shape.signed),
+                (storage, digits, scale, signed),
+                "{picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn floating_extent_includes_trailing_simple_insertions_but_not_trailing_period() {
+        for (picture, expected) in [
+            ("$$$B99", Some((b'$', 4))),
+            ("$$$099", Some((b'$', 4))),
+            ("$$$/99", Some((b'$', 4))),
+            ("$$.99", Some((b'$', 2))),
+            ("+++.+++", Some((b'+', 7))),
+            ("$B9", None),
+        ] {
+            assert_eq!(
+                cobol_floating_insertion_prefix(picture.as_bytes()),
+                expected,
                 "{picture}"
             );
         }

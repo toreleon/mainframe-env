@@ -7,6 +7,7 @@ mod cics_administrative;
 mod cics_descriptor;
 mod cics_plan;
 mod cobol_config;
+mod cobol_floating_insertion;
 mod cobol_layout;
 mod cobol_reserved_words;
 mod codec;
@@ -58,6 +59,7 @@ pub use cobol_config::{
     CobolAddressMode, CobolArithmeticMode, CobolDisplaySign, CobolRuntimeConfig,
     CobolRuntimeConfigProblem, cobol_runtime_config,
 };
+pub use cobol_floating_insertion::cobol_floating_insertion_prefix;
 pub use cobol_layout::{
     COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES, COBOL_MAX_TABLE_KEYS,
     COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES,
