@@ -188,14 +188,44 @@ impl Db2QualifiedName {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Db2HostIdentifier {
+    value: String,
+}
+
+impl Db2HostIdentifier {
+    pub fn new(value: impl Into<String>, limits: Db2AstLimits) -> Result<Self, Db2AstError> {
+        limits.validate()?;
+        let value = value.into();
+        if value.is_empty() || value.as_bytes().contains(&0) {
+            return Err(Db2AstError::new(
+                Db2AstErrorCode::InvalidIdentifier,
+                "Db2 host identifier is empty or contains NUL",
+            ));
+        }
+        if value.len() > limits.max_identifier_bytes {
+            return Err(Db2AstError::new(
+                Db2AstErrorCode::IdentifierTooLong,
+                "Db2 host identifier exceeds the configured UTF-8 byte limit",
+            ));
+        }
+        Ok(Self { value })
+    }
+
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Db2HostReference {
-    variable: Db2Identifier,
-    indicator: Option<Db2Identifier>,
+    variable: Db2HostIdentifier,
+    indicator: Option<Db2HostIdentifier>,
 }
 
 impl Db2HostReference {
     #[must_use]
-    pub const fn new(variable: Db2Identifier, indicator: Option<Db2Identifier>) -> Self {
+    pub const fn new(variable: Db2HostIdentifier, indicator: Option<Db2HostIdentifier>) -> Self {
         Self {
             variable,
             indicator,
@@ -203,12 +233,12 @@ impl Db2HostReference {
     }
 
     #[must_use]
-    pub const fn variable(&self) -> &Db2Identifier {
+    pub const fn variable(&self) -> &Db2HostIdentifier {
         &self.variable
     }
 
     #[must_use]
-    pub const fn indicator(&self) -> Option<&Db2Identifier> {
+    pub const fn indicator(&self) -> Option<&Db2HostIdentifier> {
         self.indicator.as_ref()
     }
 }
@@ -582,6 +612,30 @@ mod tests {
                 .unwrap_err()
                 .code,
             Db2AstErrorCode::InvalidDataType
+        );
+    }
+
+    #[test]
+    fn host_identifiers_preserve_host_language_spelling_and_limits() {
+        let limits = Db2AstLimits::default();
+        let variable = Db2HostIdentifier::new("Cobol-Field", limits).unwrap();
+        let indicator = Db2HostIdentifier::new("Cobol-Ind", limits).unwrap();
+        let reference = Db2HostReference::new(variable, Some(indicator));
+        assert_eq!(reference.variable().value(), "Cobol-Field");
+        assert_eq!(reference.indicator().unwrap().value(), "Cobol-Ind");
+        assert_eq!(
+            Db2HostIdentifier::new("", limits).unwrap_err().code,
+            Db2AstErrorCode::InvalidIdentifier
+        );
+        assert_eq!(
+            Db2HostIdentifier::new("x\0y", limits).unwrap_err().code,
+            Db2AstErrorCode::InvalidIdentifier
+        );
+        assert_eq!(
+            Db2HostIdentifier::new("x".repeat(129), limits)
+                .unwrap_err()
+                .code,
+            Db2AstErrorCode::IdentifierTooLong
         );
     }
 
