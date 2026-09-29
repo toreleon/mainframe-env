@@ -266,7 +266,9 @@ fn invalid_data_length(plan: &CicsEffectPlan) -> bool {
             .any(|operand| operand.name == CicsOperandName::Length)
         || !matches!(
             value,
-            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+            CicsOperandValue::Integer(_)
+                | CicsOperandValue::Storage(_)
+                | CicsOperandValue::LengthOf(_)
         )
 }
 

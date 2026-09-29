@@ -131,7 +131,9 @@ pub(super) fn invalid_write_journal_shape(
             }
             CicsOperandName::JournalFlength => !matches!(
                 operand.value,
-                CicsOperandValue::Integer(0..) | CicsOperandValue::Storage(_)
+                CicsOperandValue::Integer(0..)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
             ),
             CicsOperandName::JournalPfxLeng => !matches!(
                 operand.value,
