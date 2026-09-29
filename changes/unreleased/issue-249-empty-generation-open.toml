@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "OPEN INPUT and I-O now accept existing empty sequential generations; the first READ reports end of file."
