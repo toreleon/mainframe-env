@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 211,
+    "markdown_documents": 212,
     "navigation_groups": 5,
     "normative_documents": 54,
     "xtask_commands": 197
@@ -1658,7 +1658,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:1779bbdc68a10b01f70db5d9ea94a0d9255c5ab4521f635cf8f5a852b42cc0a4",
+      "sha256": "sha256:315b0e775a8b3318fc9ebd37451ab1018b3c910370b087095758a8c5f26d9b79",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
