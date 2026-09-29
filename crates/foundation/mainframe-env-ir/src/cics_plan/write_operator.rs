@@ -50,6 +50,9 @@ pub(super) fn invalid_shape(
             ) && !matches!(
                 operand.value,
                 CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
-            )
+            ) && !(matches!(
+                operand.name,
+                CicsOperandName::OperatorTextLength | CicsOperandName::OperatorMaxLength
+            ) && matches!(operand.value, CicsOperandValue::LengthOf(_)))
         })
 }

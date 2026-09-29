@@ -8,7 +8,7 @@ mod security_entries;
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 234] = [
+pub static CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 234] = [
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[0],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[1],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[2],

@@ -8,7 +8,8 @@ use crate::controller::{
 use crate::dd_hydration::{is_program_library_dd, retains_flattened_dataset_bytes};
 use crate::program::{
     ProgramRegistration, RegisteredProgramHandler, TsoProgramExecution,
-    resolve_program_registration, tso_program_execution,
+    resolve_program_registration, tso_program_execution, validate_program_controls,
+    validate_tso_action_controls,
 };
 use crate::{
     BatchControllerGeneration, BatchControllerInstallReceipt, BatchControllerPlan,
@@ -1553,6 +1554,7 @@ impl BatchService {
             self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
             let allocation_plans = plan_dd_allocations(&step.dds)?;
             let mut allocations = Vec::new();
+            let mut program_abend_code = None;
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
                 allocations = self.allocate_dds(
                     invocation,
@@ -1597,6 +1599,9 @@ impl BatchService {
                     .filter(|registration| registration.program == step.program)
                     .cloned()
                     .ok_or(HostProblem::InfrastructureFailure)?;
+                if registration.handler != RegisteredProgramHandler::ProgramService {
+                    validate_program_controls(&registration.program, &input)?;
+                }
                 let dataset_resolutions = job.dataset_resolutions.clone();
                 let idcams_return_code = if registration.handler
                     == RegisteredProgramHandler::Utility(crate::UtilityHandler::Idcams)
@@ -1651,6 +1656,42 @@ impl BatchService {
                 )?;
                 Ok(output)
             })();
+            let step_result = step_result.and_then(|output| {
+                if let Some(crate::ProgramTermination::Abend {
+                    code,
+                    condition_name,
+                }) = &output.termination
+                {
+                    let mut problem = HostProblem::Condition {
+                        name: format!("ABEND:{code}"),
+                        response: -1,
+                        response2: 0,
+                    };
+                    if abend_code(&problem).is_none() {
+                        return Err(HostProblem::Malformed);
+                    }
+                    if let Some(name) = condition_name {
+                        problem = HostProblem::Condition {
+                            name: name.clone(),
+                            response: -1,
+                            response2: 0,
+                        };
+                    }
+                    self.append_spool_records(
+                        invocation,
+                        job,
+                        Some(&step.name),
+                        step.dds
+                            .iter()
+                            .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+                        "SYSPRINT",
+                        output.records,
+                    )?;
+                    program_abend_code = Some(code.clone());
+                    return Err(problem);
+                }
+                Ok(output)
+            });
             let output = match step_result {
                 Ok(output) => output,
                 Err(problem) => {
@@ -1674,7 +1715,8 @@ impl BatchService {
                         )?;
                     }
                     let terminal_problem = problem;
-                    if let Some(code) = abend_code(&terminal_problem) {
+                    if let Some(code) = program_abend_code.or_else(|| abend_code(&terminal_problem))
+                    {
                         first_abend.get_or_insert_with(|| code.clone());
                         job.abend_code = Some(code.clone());
                         self.mark_step(
@@ -2189,7 +2231,8 @@ impl BatchService {
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
-        let controls = parse_sdsf_file_controls(&input_dd_text(input, "ISFIN")?)?;
+        let controls = parse_sdsf_file_controls(&input_dd_text(input, "ISFIN")?)
+            .map_err(|_| HostProblem::Unsupported)?;
         let arguments = controls
             .iter()
             .map(|control| {
@@ -2256,6 +2299,7 @@ impl BatchService {
                     vec![format!("{} COMMANDS COMPLETED", controls.len()).into_bytes()],
                 ),
             ]),
+            termination: None,
         })
     }
 
@@ -2268,9 +2312,11 @@ impl BatchService {
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
         let control = input_dd_text(input, "SYSTSIN")?;
-        if control.to_ascii_uppercase().contains("FREE PLAN")
-            || control.to_ascii_uppercase().contains("FREE PACKAGE")
-        {
+        let normalized = control.trim().to_ascii_uppercase();
+        if normalized.starts_with("FREE PLAN(") || normalized.starts_with("FREE PACKAGE(") {
+            if !normalized.ends_with(')') || normalized.contains('\n') {
+                return Err(HostProblem::Unsupported);
+            }
             let result = self.db2_call(
                 invocation,
                 job,
@@ -2284,6 +2330,7 @@ impl BatchService {
                 return_code: i32::from(result.sqlcode != 0) * 8,
                 records: vec![format!("IKJEFT01 SQLCODE={}", result.sqlcode).into_bytes()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             });
         }
         let program = tso_run_program(&control)?;
@@ -2304,6 +2351,7 @@ impl BatchService {
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
+        validate_tso_action_controls(&program, &control)?;
         let statement = input_dd_text(input, "SYSIN")?;
         let operation = match tso_program_execution(&program).ok_or(HostProblem::Unsupported)? {
             TsoProgramExecution::ExecuteScript => Db2Operation::ExecuteScript,
@@ -2363,6 +2411,7 @@ impl BatchService {
                 .into_bytes(),
             ],
             dd_outputs,
+            termination: None,
         })
     }
 
@@ -2530,6 +2579,7 @@ impl BatchService {
                         format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
                     ],
                     dd_outputs: BTreeMap::new(),
+                    termination: None,
                 })
             }
             BatchControllerPlan::ImsUnload {
@@ -2583,6 +2633,7 @@ impl BatchService {
                         format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
                     ],
                     dd_outputs,
+                    termination: None,
                 })
             }
             BatchControllerPlan::ImsPurge {
@@ -2727,6 +2778,7 @@ impl BatchService {
                     )
                     .into_bytes()],
                     dd_outputs: BTreeMap::new(),
+                    termination: None,
                 })
             }
         }
@@ -4227,6 +4279,18 @@ impl BatchService {
                 if let Some(relative) = dd.generation {
                     let resolution_key = dataset_resolution_key(dd, raw_name);
                     if !job.dataset_resolutions.contains_key(&resolution_key) {
+                        let attributes =
+                            if relative == 1 && disposition.status == DdStatusDisposition::New {
+                                Some(self.effective_dd_attributes(
+                                    invocation,
+                                    job,
+                                    step,
+                                    plan.ordinal,
+                                    effect_sequence,
+                                )?)
+                            } else {
+                                None
+                            };
                         let sequence = next_effect_sequence(invocation, effect_sequence)?;
                         let key = effect_key(job, step, sequence)?;
                         let base_name = DatasetName::new(raw_name.to_ascii_uppercase(), 128)
@@ -4236,7 +4300,8 @@ impl BatchService {
                                 (
                                     DatasetRequest::CreateGeneration {
                                         base: base_name,
-                                        attributes: dataset_attributes_for_dd(dd)?,
+                                        attributes: attributes
+                                            .ok_or(HostProblem::InfrastructureFailure)?,
                                         records: Vec::new(),
                                         mutation: Mutation {
                                             sequence,
@@ -4400,10 +4465,16 @@ impl BatchService {
                         && dd.member.is_none()
                         && !existing);
                 if create {
+                    let attributes = self.effective_dd_attributes(
+                        invocation,
+                        job,
+                        step,
+                        allocation.ordinal,
+                        effect_sequence,
+                    )?;
                     let sequence = next_effect_sequence(invocation, effect_sequence)?;
                     let key = effect_key(job, step, sequence)?;
-                    let mut definition =
-                        DatasetDefinition::compatibility(dataset_attributes_for_dd(dd)?);
+                    let mut definition = DatasetDefinition::compatibility(attributes);
                     definition.lifecycle.state = DatasetLifecycleState::Allocated;
                     let result = self.invoke_host(
                         invocation,
@@ -4478,6 +4549,129 @@ impl BatchService {
         else {
             return Err(HostProblem::ProviderFailure);
         };
+        Ok(attributes)
+    }
+
+    fn effective_dd_attributes(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step: &StepPlan,
+        dd_index: usize,
+        effect_sequence: &mut u64,
+    ) -> Result<DatasetAttributes, HostProblem> {
+        let step_index = job
+            .plan
+            .steps
+            .iter()
+            .position(|candidate| candidate.name == step.name)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        self.resolve_dcb_attributes(
+            invocation,
+            job,
+            step_index,
+            dd_index,
+            false,
+            0,
+            effect_sequence,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_dcb_attributes(
+        &self,
+        invocation: &Invocation,
+        job: &Job,
+        step_index: usize,
+        dd_index: usize,
+        source: bool,
+        depth: usize,
+        effect_sequence: &mut u64,
+    ) -> Result<DatasetAttributes, HostProblem> {
+        if depth > 64 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let step = job
+            .plan
+            .steps
+            .get(step_index)
+            .ok_or(HostProblem::Malformed)?;
+        let dd = step.dds.get(dd_index).ok_or(HostProblem::Malformed)?;
+        let base = if let Some(reference) = dcb_reference(dd) {
+            if let Some(suffix) = reference.strip_prefix("*.") {
+                let (target_step, target_dd) = suffix
+                    .rsplit_once('.')
+                    .map_or((step.name.as_str(), suffix), |(step, dd)| (step, dd));
+                let target_step_index = job
+                    .plan
+                    .steps
+                    .iter()
+                    .position(|candidate| candidate.name == target_step)
+                    .ok_or(HostProblem::Malformed)?;
+                if target_step_index > step_index {
+                    return Err(HostProblem::Malformed);
+                }
+                let target_dd_index = job.plan.steps[target_step_index]
+                    .dds
+                    .iter()
+                    .position(|candidate| candidate.name == target_dd)
+                    .ok_or(HostProblem::Malformed)?;
+                if target_step_index == step_index && target_dd_index >= dd_index {
+                    return Err(HostProblem::Malformed);
+                }
+                Some(self.resolve_dcb_attributes(
+                    invocation,
+                    job,
+                    target_step_index,
+                    target_dd_index,
+                    true,
+                    depth + 1,
+                    effect_sequence,
+                )?)
+            } else {
+                let dataset =
+                    DatasetName::new(reference, 128).map_err(|_| HostProblem::Malformed)?;
+                self.authorize(
+                    invocation,
+                    "DATASET",
+                    dataset.as_str(),
+                    AccessIntent::Read,
+                    next_effect_sequence(invocation, effect_sequence)?,
+                )?;
+                Some(self.dataset_attributes(invocation, &dataset, effect_sequence)?)
+            }
+        } else if source {
+            let raw = dd.dataset.as_ref().ok_or(HostProblem::Malformed)?;
+            let name = resolved_dataset(job, dd, raw, &job.dataset_resolutions);
+            let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
+            match self.dataset_attributes(invocation, &dataset, effect_sequence) {
+                Ok(attributes) => Some(attributes),
+                Err(HostProblem::NotFound)
+                    if dd.disposition.first() == Some(&crate::Disposition::New)
+                        && (dd.organization.is_some()
+                            || dd.record_format.is_some()
+                            || dd.logical_record_length.is_some()) =>
+                {
+                    None
+                }
+                Err(problem) => return Err(problem),
+            }
+        } else {
+            None
+        };
+        let mut attributes = base.unwrap_or(dataset_attributes_for_dd(dd)?);
+        if let Some(organization) = dd.organization.as_deref() {
+            attributes.organization = dd_organization(organization)?;
+        }
+        if let Some(record_format) = dd.record_format.as_deref() {
+            attributes.record_format = dd_record_format(record_format)?;
+        }
+        if let Some(length) = dd.logical_record_length {
+            attributes.logical_record_length = length;
+        }
+        if let Some(ccsid) = dd.ccsid {
+            attributes.ccsid = Some(ccsid);
+        }
         Ok(attributes)
     }
 
@@ -5827,20 +6021,19 @@ impl BatchService {
     }
 }
 
+fn dcb_reference(dd: &crate::DdPlan) -> Option<&str> {
+    let value = dd
+        .parameters
+        .iter()
+        .find(|parameter| parameter.identity().keyword() == "DCB")?
+        .normalized_value();
+    let first = value.trim_matches(['(', ')']).split(',').next()?.trim();
+    (!first.is_empty() && !first.contains('=')).then_some(first)
+}
+
 fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, HostProblem> {
-    let organization = match dd.organization.as_deref().unwrap_or("PS") {
-        "PS" => DatasetOrganization::Sequential,
-        "PO" => DatasetOrganization::Partitioned,
-        _ => return Err(HostProblem::Unsupported),
-    };
-    let record_format = match dd.record_format.as_deref().unwrap_or("V") {
-        "F" => RecordFormat::Fixed,
-        "FB" => RecordFormat::FixedBlocked,
-        "V" => RecordFormat::Variable,
-        "VB" => RecordFormat::VariableBlocked,
-        "U" => RecordFormat::Undefined,
-        _ => return Err(HostProblem::Unsupported),
-    };
+    let organization = dd_organization(dd.organization.as_deref().unwrap_or("PS"))?;
+    let record_format = dd_record_format(dd.record_format.as_deref().unwrap_or("V"))?;
     let logical_record_length = dd.logical_record_length.unwrap_or({
         if matches!(
             record_format,
@@ -5857,7 +6050,26 @@ fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, Ho
         logical_record_length,
         key_offset: None,
         key_length: None,
-        ccsid: Some(37),
+        ccsid: dd.ccsid.or(Some(37)),
+    })
+}
+
+fn dd_organization(value: &str) -> Result<DatasetOrganization, HostProblem> {
+    Ok(match value {
+        "PS" => DatasetOrganization::Sequential,
+        "PO" => DatasetOrganization::Partitioned,
+        _ => return Err(HostProblem::Unsupported),
+    })
+}
+
+fn dd_record_format(value: &str) -> Result<RecordFormat, HostProblem> {
+    Ok(match value {
+        "F" => RecordFormat::Fixed,
+        "FB" => RecordFormat::FixedBlocked,
+        "V" => RecordFormat::Variable,
+        "VB" => RecordFormat::VariableBlocked,
+        "U" => RecordFormat::Undefined,
+        _ => return Err(HostProblem::Unsupported),
     })
 }
 
@@ -5971,12 +6183,11 @@ fn input_dd_text(input: &ProgramInput, name: &str) -> Result<String, HostProblem
 
 fn tso_run_program(control: &str) -> Result<String, HostProblem> {
     let upper = control.to_ascii_uppercase();
-    let start = upper.find("RUN PROGRAM(").ok_or(HostProblem::Unsupported)? + "RUN PROGRAM(".len();
-    let end = upper[start..]
-        .find(')')
-        .map(|offset| start + offset)
-        .ok_or(HostProblem::Malformed)?;
-    let program = upper[start..end].trim();
+    let normalized = upper.trim();
+    let program = normalized
+        .strip_prefix("RUN PROGRAM(")
+        .and_then(|tail| tail.strip_suffix(')'))
+        .ok_or(HostProblem::Unsupported)?;
     if program.is_empty()
         || program.len() > 128
         || !program.bytes().all(|byte| byte.is_ascii_alphanumeric())
@@ -5992,6 +6203,9 @@ fn ims_controller_selector(parameter: &str) -> Result<BatchControllerSelector, H
         .trim()
         .trim_matches(|character| matches!(character, '\'' | '"' | '(' | ')'));
     let fields = normalized.split(',').map(str::trim).collect::<Vec<_>>();
+    if fields.len() < 2 || fields.len() > 3 {
+        return Err(HostProblem::Unsupported);
+    }
     let mode = fields.first().copied().ok_or(HostProblem::Malformed)?;
     let program = fields.get(1).copied().ok_or(HostProblem::Malformed)?;
     let qualifier = fields.get(2).copied().filter(|value| !value.is_empty());
@@ -8315,6 +8529,188 @@ mod tests {
         }
     }
 
+    fn assert_dcb_referback_allocates(
+        jcl: &str,
+        expected_format: RecordFormat,
+        expected_length: u32,
+    ) {
+        assert_dcb_referback_allocates_bundle(
+            JclBundle {
+                primary: jcl.into(),
+                ..Default::default()
+            },
+            expected_format,
+            expected_length,
+        );
+    }
+
+    fn assert_dcb_referback_allocates_bundle(
+        bundle: JclBundle,
+        expected_format: RecordFormat,
+        expected_length: u32,
+    ) {
+        let (service, dataset) = service_with_real_datasets();
+        let source = DatasetName::new("USER.REFER.IN", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: source,
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::FixedBlocked,
+                    logical_record_length: 350,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: dataset_test_mutation(600),
+            })
+            .unwrap();
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &bundle,
+                &IdempotencyKey::new("dcb-referback", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        let output = DatasetName::new("USER.REFER.OUT", 128).unwrap();
+        let DatasetResult::Attributes { attributes, .. } = dataset
+            .invoke(DatasetRequest::Attributes { dataset: output })
+            .unwrap()
+        else {
+            panic!("expected output attributes");
+        };
+        assert_eq!(attributes.record_format, expected_format);
+        assert_eq!(attributes.logical_record_length, expected_length);
+    }
+
+    #[test]
+    fn dcb_referback_copies_existing_sortin_effective_attributes() {
+        for dcb in ["(*.SORTIN)", "*.SORTIN", "(*.SORTIN,BLKSIZE=0)"] {
+            let disposition = if dcb.contains("BLKSIZE") {
+                "(NEW,KEEP)"
+            } else {
+                "(NEW,CATLG)"
+            };
+            assert_dcb_referback_allocates(
+                &format!(
+                    "//REFJOB JOB CLASS=A\n//SORT EXEC PGM=IEFBR14\n//SORTIN DD DSN=USER.REFER.IN,DISP=SHR\n//SORTOUT DD DSN=USER.REFER.OUT,DISP={disposition},DCB={dcb}\n"
+                ),
+                RecordFormat::FixedBlocked,
+                350,
+            );
+        }
+    }
+
+    #[test]
+    fn dcb_referback_explicit_subparameters_override_source() {
+        assert_dcb_referback_allocates(
+            "//REFJOB JOB CLASS=A\n//SORT EXEC PGM=IEFBR14\n//SORTIN DD DSN=USER.REFER.IN,DISP=SHR\n//SORTOUT DD DSN=USER.REFER.OUT,DISP=(NEW,CATLG),DCB=(*.SORTIN,LRECL=80)\n",
+            RecordFormat::FixedBlocked,
+            80,
+        );
+    }
+
+    #[test]
+    fn dcb_step_qualified_referback_copies_prior_dd() {
+        assert_dcb_referback_allocates(
+            "//REFJOB JOB CLASS=A\n//PREP EXEC PGM=IEFBR14\n//SORTIN DD DSN=USER.REFER.IN,DISP=SHR\n//SORT EXEC PGM=IEFBR14\n//SORTOUT DD DSN=USER.REFER.OUT,DISP=(NEW,CATLG),DCB=*.PREP.SORTIN\n",
+            RecordFormat::FixedBlocked,
+            350,
+        );
+    }
+
+    #[test]
+    fn dcb_proc_step_qualified_referback_copies_prior_dd() {
+        assert_dcb_referback_allocates_bundle(
+            JclBundle {
+                primary: "//REFJOB JOB CLASS=A\n//CALL EXEC PROC=INPROC\n//SORT EXEC PGM=IEFBR14\n//SORTOUT DD DSN=USER.REFER.OUT,DISP=(NEW,CATLG),DCB=*.CALL.PS.SORTIN\n"
+                    .into(),
+                cataloged_procedures: BTreeMap::from([(
+                    "INPROC".into(),
+                    "//INPROC PROC\n//PS EXEC PGM=IEFBR14\n//SORTIN DD DSN=USER.REFER.IN,DISP=SHR\n// PEND\n"
+                        .into(),
+                )]),
+                ..Default::default()
+            },
+            RecordFormat::FixedBlocked,
+            350,
+        );
+    }
+
+    #[test]
+    fn dcb_referback_copies_explicit_source_dcb() {
+        assert_dcb_referback_allocates(
+            "//REFJOB JOB CLASS=A\n//SORT EXEC PGM=IEFBR14\n//SORTIN DD DSN=USER.REFER.TEMP,DISP=(NEW,KEEP),DCB=(RECFM=FB,LRECL=350)\n//SORTOUT DD DSN=USER.REFER.OUT,DISP=(NEW,CATLG),DCB=*.SORTIN\n",
+            RecordFormat::FixedBlocked,
+            350,
+        );
+    }
+
+    #[test]
+    fn dcb_referback_from_catalogued_positive_generation_copies_fb_350() {
+        let (service, dataset) = service_with_real_datasets();
+        for (sequence, base) in [(610, "USER.BKUP"), (611, "USER.DALY")] {
+            dataset
+                .invoke(DatasetRequest::DefineGenerationGroup {
+                    base: DatasetName::new(base, 128).unwrap(),
+                    limit: 3,
+                    scratch: true,
+                    empty: false,
+                    mutation: dataset_test_mutation(sequence),
+                })
+                .unwrap();
+        }
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//REFJOB JOB CLASS=A\n//PREP EXEC PGM=IEFBR14\n//BKUP DD DSN=USER.BKUP(+1),DISP=(NEW,CATLG),DCB=(RECFM=FB,LRECL=350)\n//SORT EXEC PGM=IEFBR14\n//SORTIN DD DSN=USER.BKUP(+1),DISP=SHR\n//SORTOUT DD DSN=USER.DALY(+1),DISP=(NEW,CATLG),DCB=(*.SORTIN)\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("dcb-gdg-referback", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service
+                .run_next(&invocation, false)
+                .unwrap()
+                .unwrap()
+                .return_code,
+            Some(0)
+        );
+        let DatasetResult::Attributes { attributes, .. } = dataset
+            .invoke(DatasetRequest::Attributes {
+                dataset: DatasetName::new("USER.DALY.G0001V00", 128).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("expected generation attributes");
+        };
+        assert_eq!(attributes.record_format, RecordFormat::FixedBlocked);
+        assert_eq!(attributes.logical_record_length, 350);
+    }
+
+    #[test]
+    fn dcb_dataset_name_copies_catalogued_attributes() {
+        assert_dcb_referback_allocates(
+            "//REFJOB JOB CLASS=A\n//SORT EXEC PGM=IEFBR14\n//SORTOUT DD DSN=USER.REFER.OUT,DISP=(NEW,CATLG),DCB=USER.REFER.IN\n",
+            RecordFormat::FixedBlocked,
+            350,
+        );
+    }
+
     #[test]
     fn submit_replay_hold_release_run_spool_and_purge() {
         let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
@@ -8936,6 +9332,41 @@ mod tests {
     }
 
     #[test]
+    fn undeclared_utility_control_fails_step_with_unsupported_category() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BADCTL JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nDATA\n/*\n//SYSUT2 DD DUMMY\n//SYSIN DD *\n COPY\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("undeclared-utility-control", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        let failed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(failed.state, JobState::Failed);
+        assert_eq!(failed.steps[0].state, StepState::Failed);
+        assert_eq!(
+            failed.steps[0].termination,
+            Some(StepTermination::Failed {
+                category: "unsupported".into()
+            })
+        );
+        assert!(
+            service
+                .spool(&invocation, &submitted.id, "JESMSGLG", 0, 20)
+                .unwrap()
+                .0
+                .iter()
+                .any(|record| String::from_utf8_lossy(record).contains("Unsupported"))
+        );
+    }
+
+    #[test]
     fn sdsf_applies_carddemo_cics_file_controls_as_one_typed_effect() {
         let controls = Arc::new(Mutex::new(Vec::new()));
         let limits = InvocationLimits::default();
@@ -9267,7 +9698,7 @@ mod tests {
                 &invocation,
                 &JclBundle {
                     primary: "//HYDRATE JOB CLASS=A\n\
-//COPY EXEC PGM=IEBGENER\n\
+//COPY EXEC PGM=IEFBR14\n\
 //SYSUT1 DD DSN=IBMUSER.INPUT,DISP=SHR\n\
 //SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n\
 //PLAIN DD DSN=IBMUSER.PLAIN,DISP=SHR\n\
@@ -11024,6 +11455,7 @@ mod tests {
                 return_code: 4,
                 records: vec![b"COBOL OUTPUT".to_vec()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             })
         }
     }
