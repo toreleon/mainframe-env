@@ -723,9 +723,18 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
         return Err("numeric layout PICTURE is missing");
     }
     let runs = picture_runs(picture)?;
+    let symbols: Vec<u8> = runs
+        .iter()
+        .flat_map(|(symbol, count)| std::iter::repeat_n(*symbol, *count as usize))
+        .collect();
+    let floating_currency_prefix = cobol_floating_currency_prefix(&symbols);
+    let mut currency_symbols_seen = 0u64;
+    let mut position = 0usize;
     let mut shape = NumericPictureShape::default();
     let mut fractional = false;
     for (symbol, count) in runs {
+        let in_floating_prefix = position < floating_currency_prefix;
+        position += count as usize;
         match symbol {
             b'9' => add_picture_digits(&mut shape, count, fractional)?,
             b'Z' | b'*' => {
@@ -774,7 +783,28 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
                     .checked_add(count)
                     .ok_or("numeric PICTURE extent overflows")?;
             }
-            b',' | b'$' | b'/' | b'B' | b'0' | b'C' | b'R' | b'D' | b'E' => {
+            b'$' => {
+                shape.edited = true;
+                shape.storage = shape
+                    .storage
+                    .checked_add(count)
+                    .ok_or("numeric PICTURE extent overflows")?;
+                if in_floating_prefix {
+                    let digit_slots = count - u64::from(currency_symbols_seen == 0);
+                    shape.digits = shape
+                        .digits
+                        .checked_add(digit_slots)
+                        .ok_or("numeric PICTURE digit count overflows")?;
+                    if fractional {
+                        shape.scale = shape
+                            .scale
+                            .checked_add(digit_slots)
+                            .ok_or("numeric PICTURE scale overflows")?;
+                    }
+                    currency_symbols_seen += count;
+                }
+            }
+            b',' | b'/' | b'B' | b'0' | b'C' | b'R' | b'D' | b'E' => {
                 shape.edited = true;
                 shape.storage = shape
                     .storage
@@ -788,6 +818,25 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
         return Err("numeric layout PICTURE has no data positions");
     }
     Ok(shape)
+}
+
+/// Expanded prefix in which repeated currency symbols use floating insertion.
+#[must_use]
+pub fn cobol_floating_currency_prefix(symbols: &[u8]) -> usize {
+    let prefix = symbols
+        .iter()
+        .take_while(|&&symbol| matches!(symbol, b'$' | b','))
+        .count();
+    if symbols[..prefix]
+        .iter()
+        .filter(|&&symbol| symbol == b'$')
+        .count()
+        >= 2
+    {
+        prefix
+    } else {
+        0
+    }
 }
 
 fn add_picture_digits(
@@ -1129,4 +1178,29 @@ fn is_known_layout(category: &str) -> bool {
             | "utf8"
             | "utf8_group"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::numeric_picture_shape;
+
+    #[test]
+    fn floating_insertion_picture_matches_compiler_metadata() {
+        for (picture, storage, digits, scale, signed) in [
+            ("$$$,$$9.99", 10, 7, 2, false),
+            ("$$$.99", 6, 4, 2, false),
+            ("$$V99", 4, 3, 2, false),
+            ("$$$$", 4, 3, 0, false),
+            ("$9", 2, 1, 0, false),
+            ("+++,++9.99", 10, 8, 2, true),
+            ("----9", 5, 5, 0, true),
+        ] {
+            let shape = numeric_picture_shape(picture).unwrap();
+            assert_eq!(
+                (shape.storage, shape.digits, shape.scale, shape.signed),
+                (storage, digits, scale, signed),
+                "{picture}"
+            );
+        }
+    }
 }

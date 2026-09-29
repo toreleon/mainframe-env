@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fix IR verification of floating-currency PICTURE digit positions so issue #230 programs compile and display correctly (issue #366)."
