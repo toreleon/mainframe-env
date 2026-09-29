@@ -14,6 +14,28 @@
       "topic_manifest_sha256": "sha256:a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-database-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-database-contracts-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+      "manifest_sha256": "sha256:64ac7eac823b2aacdbdfc7772bc12462fe0915168f45830da2797010550af6d0",
+      "topic_count": 20,
+      "topic_manifest_sha256": "sha256:3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-tm-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-tm-contracts-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-tm-contracts-topics.json",
+      "manifest_sha256": "sha256:b8bc9ec7f5edf9d20a979d295db84306946de06bcdec756d06d85787af874a5f",
+      "topic_count": 10,
+      "topic_manifest_sha256": "sha256:dac590371f5b7be6747c7280598ae9db075ea0f7c59473a2fcd8b9c9d8c0cd36",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

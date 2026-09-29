@@ -532,6 +532,8 @@ class CacheTests(unittest.TestCase):
         self.assertIn("cics-task-enqueue", scopes)
         self.assertIn("cobol-numeric-move-pilot", scopes)
         self.assertIn("ims-programming-contracts", scopes)
+        self.assertIn("ims-database-contracts", scopes)
+        self.assertIn("ims-tm-contracts", scopes)
         self.assertTrue(pins)
         self.assertTrue(tocs)
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
