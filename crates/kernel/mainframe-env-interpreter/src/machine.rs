@@ -13018,6 +13018,7 @@ mod tests {
             FileMetadata {
                 assignment: "USER.EMPTY.G0001V00".into(),
                 record_name: None,
+                record_names: Vec::new(),
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -13142,6 +13143,7 @@ mod tests {
             FileMetadata {
                 assignment: "TESTFILE".into(),
                 record_name: Some("REC".into()),
+                record_names: vec!["REC".into()],
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -13167,6 +13169,7 @@ mod tests {
             ),
             (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
         ] {
+            machine.write_raw("REC", b"REC01").unwrap();
             let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
             let step = machine.dataset_effect("write", &args).unwrap();
             let Step::Effect(effect) = step else {
@@ -13177,6 +13180,9 @@ mod tests {
                 panic!("WRITE did not append a sequential record");
             };
             assert_eq!(records, &vec![expected.to_vec()]);
+            if args.iter().any(|arg| arg == "FROM") {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
             machine
                 .resume_host(EffectResult {
                     sequence: effect.sequence,
