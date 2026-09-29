@@ -1573,6 +1573,21 @@ mod tests {
             .collect::<BTreeSet<_>>();
         assert!(labels.contains("1000-INITIALIZE") && labels.contains("1000-EXIT"));
     }
+
+    #[test]
+    fn go_to_paragraph_named_end_program_resolves_transfer() {
+        // Enterprise COBOL 6.5 reserved words: SS6SG3_6.5/lr/ref/rlres.html,
+        // sha256:fe1d8f5fdda5c0e2c605e4591ab35207595b56b274dc1b9111f1d2cb6e47291f;
+        // END-PROGRAM is absent from the reserved-word list.
+        let parsed = parse_procedure(
+            "IF A NOT = '02'\n DISPLAY 'NE'\n GO TO END-PROGRAM\nEND-IF.\nDISPLAY 'MID'.\nEND-PROGRAM.\nDISPLAY 'END'.\nSTOP RUN.",
+            32,
+        )
+        .unwrap();
+        assert!(parsed.edges.iter().any(|edge| {
+            edge.kind == ControlEdgeKind::Transfer && parsed.nodes[edge.to].text == "END-PROGRAM"
+        }));
+    }
     #[test]
     fn compute_accepts_a_well_formed_intrinsic_function_expression() {
         let parsed = parse_procedure(

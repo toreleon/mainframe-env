@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Numeric-edited MOVE suppresses insertion commas with leading and floating zero or asterisk suppression."

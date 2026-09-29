@@ -1,7 +1,9 @@
 //! Position and replace dataset browse cursors without changing their identity.
 
-use super::{BrowseIdentity, DatasetLimits, State, browse_identities, condition};
-use mainframe_env_host_api::{DatasetName, DatasetResult, HostProblem, KeyRelation};
+use super::{BrowseIdentity, DatasetLimits, State, browse_identities, condition, entry};
+use mainframe_env_host_api::{
+    DatasetName, DatasetOrganization, DatasetResult, HostProblem, KeyRelation,
+};
 
 pub(super) fn position(
     state: &State,
@@ -23,6 +25,15 @@ pub(super) fn position(
         }
     };
     if index >= identities.len() {
+        // Sequential OPEN INPUT/I-O uses an unkeyed GTEQ browse. An existing
+        // empty file still needs a cursor so its first READ can report EOF.
+        if identities.is_empty()
+            && key.is_empty()
+            && relation == KeyRelation::GreaterOrEqual
+            && entry(state, dataset)?.attributes.organization == DatasetOrganization::Sequential
+        {
+            return Ok((identities, index));
+        }
         state.require_eof_browse(dataset, key, relation, !identities.is_empty())?;
     }
     Ok((identities, index))
