@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Added a pinned GnuCOBOL TRANREPT stage reference and bound CardDemo independent-reference credit to checked-in manifest bytes and leaf values."

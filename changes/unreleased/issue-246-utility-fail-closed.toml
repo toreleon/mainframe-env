@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed #246: registered batch utilities declare control sources and reject unsupported statements and operands; SORT requires explicit ordering controls."

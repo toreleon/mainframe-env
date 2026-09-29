@@ -2465,6 +2465,16 @@ struct PictureDetails {
 
 fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
     let bytes = expanded_picture_symbols(pic)?;
+    let floating_currency_prefix = bytes
+        .iter()
+        .take_while(|&&byte| matches!(byte, b'$' | b','))
+        .count();
+    let floating_currency = bytes[..floating_currency_prefix]
+        .iter()
+        .filter(|&&byte| byte == b'$')
+        .count()
+        >= 2;
+    let mut currency_symbols_seen = 0usize;
     let mut storage = 0usize;
     let mut digits = 0usize;
     let mut numeric = false;
@@ -2558,7 +2568,22 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
                 fractional = true;
                 storage += repeat;
             }
-            b',' | b'$' | b'/' | b'B' | b'0' => {
+            b'$' => {
+                alphabetic = false;
+                edited = true;
+                if floating_currency && index < floating_currency_prefix {
+                    if currency_symbols_seen > 0 {
+                        numeric = true;
+                        digits += 1;
+                        if fractional {
+                            scale += 1;
+                        }
+                    }
+                    currency_symbols_seen += 1;
+                }
+                storage += repeat;
+            }
+            b',' | b'/' | b'B' | b'0' => {
                 alphabetic = false;
                 edited = true;
                 storage += repeat;
@@ -2835,6 +2860,24 @@ pub(crate) enum SemanticProblem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floating_currency_picture_reserves_one_insertion_position() {
+        for (picture, digits, scale) in [
+            ("$$$,$$9.99", 7, 2),
+            ("$$,$$$,$$9.99", 9, 2),
+            ("$$$.99", 4, 2),
+            ("$ZZ,ZZ9.99", 7, 2),
+        ] {
+            let details = picture_details(picture).unwrap();
+            assert_eq!(
+                (details.digits, details.scale),
+                (digits, scale),
+                "{picture}"
+            );
+            assert_eq!(details.storage, picture.len(), "{picture}");
+        }
+    }
 
     fn program(declarations: &str) -> String {
         format!(
