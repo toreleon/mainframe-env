@@ -42,5 +42,11 @@ The proposed 0.12 AST primitives own normalized and delimited identifiers,
 qualified names, host and indicator references, built-in and distinct type
 syntax, literals, operators, and an append-only expression arena. Constructors
 bound names, type arguments, literals, lists, nodes, references, and depth.
-Expressions retain D2 source spans. Name resolution, type compatibility, and
-statement parsing remain pending.
+Expressions retain D2 source spans. Name resolution and type compatibility
+remain pending.
+
+The proposed 0.12 transaction parser owns typed COMMIT, ROLLBACK, and SAVEPOINT
+syntax, including optional WORK, named or unnamed rollback targets, UNIQUE,
+and both retain clauses. It rejects unsupported families, duplicate or
+malformed clauses, invalid savepoint names, and extra statements with bounded
+located diagnostics. Parsing does not route SQL to execution.

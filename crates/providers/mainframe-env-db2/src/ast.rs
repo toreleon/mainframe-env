@@ -35,7 +35,7 @@ impl Default for Db2AstLimits {
 }
 
 impl Db2AstLimits {
-    fn validate(self) -> Result<(), Db2AstError> {
+    pub(crate) fn validate(self) -> Result<(), Db2AstError> {
         if self.max_identifier_bytes == 0
             || self.max_identifier_bytes > MAX_IDENTIFIER_BYTES_CEILING
             || self.max_name_parts == 0
