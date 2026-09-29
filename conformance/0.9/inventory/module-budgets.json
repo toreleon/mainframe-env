@@ -36,13 +36,13 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/cobol.rs",
-      "max_production_lines": 1452,
+      "max_production_lines": 1280,
       "responsibility": "Server-side COBOL execution and runtime service helpers remain co-located while provider routing and selected-link adapters live in focused modules.",
       "split_boundary": "Continue separating runtime service binding, installed-program lookup, and program execution adapters."
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6302,
+      "max_production_lines": 6204,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -72,13 +72,13 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",
-      "max_production_lines": 3319,
+      "max_production_lines": 3316,
       "responsibility": "COBOL statement-family grammar recognition and operand extraction are implemented as one lowering grammar table.",
       "split_boundary": "Split grammar recognizers by control, data, I/O, communication, and exception statement families."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
-      "max_production_lines": 1773,
+      "max_production_lines": 1733,
       "responsibility": "HIR declarations, builder state, and source-to-HIR integration remain combined at the compiler stage boundary.",
       "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
     },
@@ -90,7 +90,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/semantic.rs",
-      "max_production_lines": 2819,
+      "max_production_lines": 2780,
       "responsibility": "Semantic analysis owns the cross-family model, name resolution, validation passes, and diagnostic assembly.",
       "split_boundary": "Separate model construction, symbol resolution, cross-reference validation, and diagnostics behind the semantic facade."
     },
@@ -108,7 +108,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 12943,
+      "max_production_lines": 12879,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -198,7 +198,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 13824,
+      "max_production_lines": 13650,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
