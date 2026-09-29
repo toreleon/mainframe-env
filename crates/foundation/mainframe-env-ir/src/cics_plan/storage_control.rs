@@ -24,7 +24,9 @@ pub(super) fn invalid_getmain_shape(
         || plan.operands.iter().any(|operand| match operand.name {
             CicsOperandName::Flength | CicsOperandName::Length => !matches!(
                 operand.value,
-                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                CicsOperandValue::Integer(_)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
             ),
             CicsOperandName::InitImage => !matches!(operand.value, CicsOperandValue::Storage(_)),
             _ => true,

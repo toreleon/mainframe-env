@@ -1,6 +1,6 @@
 # Pre-0.9.0 deep review
 
-Status: **Complete review; broad 0.9.0 implementation is blocked**
+Status: **Complete review; broad 0.9.0 implementation was blocked at review**
 
 - Review date: 2026-09-08
 - Reviewed commit: `1bd294c170cae35c470f0d183635f758f80e2c98`
@@ -10,6 +10,12 @@ Status: **Complete review; broad 0.9.0 implementation is blocked**
   through [#128](https://github.com/toreleon/mainframe-env/issues/128), under
   roadmap epic [#15](https://github.com/toreleon/mainframe-env/issues/15)
 - Decision owner: repository owner
+
+2026-09-09 update: R-01–R-15 were closed through PR #131, and the integrated
+entry gate accepted the post-review candidate. See the
+[0.9 status record and fix mapping](../delivery/coverage-versions/status/0.9.0.md).
+The original dispositions below describe the 2026-09-08 review; acceptance
+permits implementation, not release or licensed certification.
 
 ## Executive decision
 
@@ -58,7 +64,7 @@ not as proof that current `main` still behaves the same way.
 
 ## Finding index
 
-| ID | Priority | Area | Disposition |
+| ID | Priority | Area | Disposition at review |
 |---|---|---|---|
 | [R-01](https://github.com/toreleon/mainframe-env/issues/101) | P1 | Effect journaling | Open; entry blocker |
 | [R-02](https://github.com/toreleon/mainframe-env/issues/102) | P1 | Security audit | Open; entry blocker |
@@ -442,8 +448,9 @@ populate Unreleased on every user-visible merge; make the version gate validate
 the public README, coverage index, project mapping, and tag distance; choose a
 new development version before producing distributable artifacts.
 
-Documentation truth and navigation were corrected during this review, but the
-versioning automation and development version still require implementation.
+At review time, documentation truth and navigation were corrected, but the
+versioning automation and development version still required implementation.
+The 2026-09-09 update above links their subsequent fix mapping.
 
 ## P2 findings — required by the affected work package
 

@@ -8,6 +8,15 @@ pub(super) fn cics_integer_value(
     tokens: &[String],
     semantic: &SemanticModel,
 ) -> Resolution<HirCicsValue> {
+    if tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+        && tokens
+            .get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+    {
+        return complete_data_reference(&tokens[2..], semantic).map(HirCicsValue::LengthOf);
+    }
     if let [value] = tokens
         && let Some(literal) = numeric_literal(value)
         && literal.scale == 0

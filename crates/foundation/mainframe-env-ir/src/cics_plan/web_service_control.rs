@@ -167,17 +167,15 @@ pub(super) fn invalid_shape(
     if matches!(
         plan.operation,
         P::WsaContextBuild | P::WsaContextGet | P::WsaEprCreate
-    ) {
-        if inputs.contains(&N::FromCcsid) && inputs.contains(&N::FromCodepage)
-            || inputs.contains(&N::IntoCcsid) && inputs.contains(&N::IntoCodepage)
-            || plan.operation == P::WsaContextBuild
-                && inputs.contains(&N::EprFrom) != inputs.contains(&N::EprLength)
-            || inputs.contains(&N::RelatesType) && !inputs.contains(&N::RelatesUri)
-            || inputs.contains(&N::RefParms) != inputs.contains(&N::RefParmsLen)
-            || inputs.contains(&N::Metadata) != inputs.contains(&N::MetadataLen)
-        {
-            return true;
-        }
+    ) && (inputs.contains(&N::FromCcsid) && inputs.contains(&N::FromCodepage)
+        || inputs.contains(&N::IntoCcsid) && inputs.contains(&N::IntoCodepage)
+        || plan.operation == P::WsaContextBuild
+            && inputs.contains(&N::EprFrom) != inputs.contains(&N::EprLength)
+        || inputs.contains(&N::RelatesType) && !inputs.contains(&N::RelatesUri)
+        || inputs.contains(&N::RefParms) != inputs.contains(&N::RefParmsLen)
+        || inputs.contains(&N::Metadata) != inputs.contains(&N::MetadataLen))
+    {
+        return true;
     }
     if matches!(plan.operation, P::WsaContextGet | P::WsaEprCreate) {
         let into = outputs.contains(&O::WebEprInto);

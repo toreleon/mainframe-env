@@ -879,10 +879,7 @@ impl<'a> GrammarParser<'a> {
     fn is_label(&self) -> bool {
         if self.classify_at(self.position).is_some()
             || self.tokens[self.position].kind != TokenKind::Word
-            || self.tokens[self.position]
-                .text
-                .to_ascii_uppercase()
-                .starts_with("END-")
+            || self.at_any_terminator()
             || self.tokens[self.position].is("ELSE")
             || self.tokens[self.position].is("WHEN")
         {
