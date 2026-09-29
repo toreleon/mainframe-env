@@ -18,6 +18,8 @@ bounded TM transaction, message, I/O/alternate-PCB, and conversational contracts
 - Unknown outcomes, conditions, cancellation, and provider failures remain
   distinct.
 - Application names and conformance row IDs never select production behavior.
+- Versioned DBD/PSB metadata validation closes names, hierarchy, fields, indexes,
+  relationships, PCB options, and sensitivity paths before producing a digest.
 
 ## Allowed dependencies
 
@@ -32,7 +34,10 @@ state.
 providers through `ims_providers`. Public definition and limit types describe
 the bounded installation and execution contract. `TmDefinitionSet`,
 `TmInputMessage`, and `TmCall` define the TM contract without a TM scheduler or
-durable TM runtime in this slice.
+durable TM runtime in this slice. `ImsMetadataCatalog` and
+`validate_ims_metadata` expose the additive `mainframe-env.ims-metadata@1`
+contract, described by the Draft 2020-12
+[`metadata schema`](../../../conformance/0.14/schemas/ims-metadata.schema.json).
 
 ## Non-goals
 

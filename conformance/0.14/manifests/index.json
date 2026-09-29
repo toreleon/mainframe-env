@@ -36,6 +36,17 @@
       "topic_manifest_sha256": "sha256:dac590371f5b7be6747c7280598ae9db075ea0f7c59473a2fcd8b9c9d8c0cd36",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-metadata-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-metadata-contracts-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-metadata-contracts-topics.json",
+      "manifest_sha256": "sha256:ade81a59c1cf695b02cc23a41f5d786e79c4a0a11072d848102081099d07aa4e",
+      "topic_count": 10,
+      "topic_manifest_sha256": "sha256:847166149ae438081effe2f09e7a492b9417217d285d48944bafc3b17cb671d2",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
