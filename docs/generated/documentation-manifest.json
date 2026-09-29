@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 211,
+    "markdown_documents": 214,
     "navigation_groups": 5,
-    "normative_documents": 54,
+    "normative_documents": 55,
     "xtask_commands": 197
   },
   "documents": [
@@ -273,8 +273,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-mq/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:ebae6caf992399ae8a25d34aabe655f4d3b306132ab810abe37b040e880e63a8",
+      "relative_links": 2,
+      "sha256": "sha256:7d06461dd053646e717e3b3bf5fed193d7761ae8af8d46e5d4bdd0d888cc1cb6",
       "title": "mainframe-env-mq",
       "xtask_commands": 0
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 89,
-      "sha256": "sha256:ce9df8a080e8a3110f5fd15f829a27412806bd4139e3c9ee6dadc6ebceaaffb0",
+      "relative_links": 90,
+      "sha256": "sha256:e20c286e40199591fd1c95a6ffd7080c5ade2cecca2b1f426621ec9a52a1505a",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -485,6 +485,18 @@
       "status": "Normative from mainframe-env 0.8.0",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
+      "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
+      "relative_links": 0,
+      "scope": "MQI denominator, source provenance, host context and semantic authority",
+      "sha256": "sha256:0c18ba91cfdff0284e7ff3151b872abd88ff44ccd8ae3619b40c2f58d870e62b",
+      "status": "Normative identity boundary; semantics are implemented incrementally",
+      "title": "IBM MQ programming-surface ownership",
+      "xtask_commands": 0
     },
     {
       "applies_from": "mainframe-env 0.1.0",
@@ -1049,8 +1061,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.15.0.md",
-      "relative_links": 2,
-      "sha256": "sha256:6ef74c56bd3964d10c45ba6f3271cddd06311a1332a01a9551cd083d2df274a6",
+      "relative_links": 3,
+      "sha256": "sha256:9da09a8d7b9444fe232b5b6e7f7c72746831eeb165d0b7d709c3a49cb4b469f3",
       "title": "mainframe-env 0.15.0 — Complete IBM MQ 9.4 programming surface",
       "xtask_commands": 0
     },
@@ -1245,6 +1257,14 @@
       "sha256": "sha256:66ce9a2923671daceac81cee4e54e369799cdaf446fe46b8ebca3bf7c13b8c1a",
       "title": "mainframe-env 0.11.0 implementation status",
       "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.15.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:4ab1b60e9dcf8079fca93e6b49f1f2d82483da59194303d064713149cd018c82",
+      "title": "mainframe-env 0.15.0 implementation status",
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -1658,7 +1678,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:1779bbdc68a10b01f70db5d9ea94a0d9255c5ab4521f635cf8f5a852b42cc0a4",
+      "sha256": "sha256:4768c79847684e321d0a47c19c0b1abf9f6547aa4b96375a295d7d34fd796341",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -1965,6 +1985,10 @@
         {
           "label": "JES execution",
           "path": "docs/architecture/JES-EXECUTION.md"
+        },
+        {
+          "label": "IBM MQ programming surface",
+          "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
         },
         {
           "label": "Application packages",
@@ -2287,7 +2311,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:6dd315895961865b933dee7a5ec8e9b7939693aa7f2ea68e17872dae21ded071",
+  "registry_sha256": "sha256:6e8028ac98b0c3cf11e8cdbaaf8c5466e63e93983321926920cf6df424df4bae",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

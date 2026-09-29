@@ -1,0 +1,63 @@
+# IBM MQ programming-surface ownership
+
+Status: **Normative identity boundary; semantics are implemented incrementally**
+
+Owner: `mainframe-env-host-api` contracts and `mainframe-env-mq` provider
+
+Scope: MQI denominator, source provenance, host context and semantic authority
+
+Applies from: mainframe-env 0.15.0
+
+## Denominator and provenance
+
+The immutable 0.2 official catalog defines 26 unique IBM MQ 9.4 MQI calls.
+The pinned source call list displays 27 rows because it lists `MQMHBUF` twice.
+That duplicate is retained as source provenance and never increments coverage.
+
+`conformance/0.15/mq/source-call-list.json` records the 27 positions, their
+normalized official rows, and the exact pinned call-list topic. The generated
+`MqMqiCallIdentityDescriptor` registry joins those positions to the per-call
+topic paths and SHA-256 pins in the immutable MQ topic manifest. The registry
+is identity-only: it neither selects a handler nor advertises execution.
+
+## Authority boundary
+
+`mainframe-env-mq` is the one owned semantic authority for queue managers,
+objects, handles, messages, callbacks, properties, delivery and recovery.
+Stable host contracts live in `mainframe-env-host-api`; application packages
+provide topology; shared store, principal/SAF, canonical effect and UOW
+contracts retain their existing ownership.
+
+A native IBM MQ client can appear only behind an explicit licensed adapter and
+profile. It is not an owned-simulator fallback, does not add simulator coverage,
+and cannot act as both product and expectation in a differential test. A
+commodity broker can be only a replaceable physical adapter after a reviewed
+semantic-gap and failure matrix; its acknowledgements or transaction model do
+not establish MQI compatibility.
+
+## Host-owned syncpoint rule
+
+The pinned `MQCMIT` and `MQBACK` topics restrict those calls on z/OS to batch,
+including IMS batch DL/I. CICS applications use CICS syncpoint commands;
+non-batch IMS applications use IMS coordination calls. `MQBEGIN` distinguishes
+queue-manager-coordinated local and global units from externally coordinated
+units and is invalid in an MQ client environment.
+
+The typed call contract must therefore carry the execution context and
+syncpoint owner. A forbidden context returns the exact MQ completion/reason
+condition without mutating queue-manager state. `MQCMIT` must never be exposed
+as a generic cross-subsystem commit.
+
+## Coverage boundary
+
+Catalog and generated-registry checks prove only:
+
+- the 26-call normalized denominator;
+- the exact 27-row source provenance;
+- official row, label, topic-path and topic-digest joins; and
+- deterministic generated identity bytes.
+
+Behavioral credit requires independently bound Conformance IR obligations and
+verdicts for each applicable recognized, validated, executed, conditioned,
+recovered and differential gate. Missing licensed or source evidence remains
+pending; it is never inferred from registry presence or broad workload success.

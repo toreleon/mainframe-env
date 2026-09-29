@@ -178,6 +178,7 @@ enum XtaskCommand {
     Profiles(CheckArgs),
     Schemas(CheckArgs),
     Inventory(CheckArgs),
+    MqMqiRegistry(CheckArgs),
     Evidence(EvidenceArgs),
     Coverage(CheckArgs),
     ApplicationPackages(CheckArgs),
@@ -323,6 +324,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::Profiles(args) => checked!("profiles", args, check_profiles(root)),
         XtaskCommand::Schemas(args) => checked!("schemas", args, check_schemas(root)),
         XtaskCommand::Inventory(args) => checked!("inventory", args, check_inventory(root)),
+        XtaskCommand::MqMqiRegistry(args) => {
+            checked!("mq-mqi-registry", args, check_mq_mqi_registry(root))
+        }
         XtaskCommand::Evidence(args) => match (args.check, args.command) {
             (check, None) => ("evidence", check, check_evidence(root)),
             (false, Some(EvidenceCommand::Seal(args))) => (
@@ -7791,6 +7795,32 @@ fn check_architecture(root: &Path) -> TaskResult {
     check_runtime_unit_gates(root)
 }
 
+fn check_mq_mqi_registry(root: &Path) -> TaskResult {
+    let generator = root.join("tools/generate_mq_mqi_registry.py");
+    require(
+        generator.is_file(),
+        "MQ MQI call-registry generator is missing",
+    )?;
+    let source_list = root.join("conformance/0.15/mq/source-call-list.json");
+    let source_list_schema = root.join("conformance/0.15/schemas/mq-source-call-list.schema.json");
+    validate_schema_instance(
+        &json(&source_list_schema)?,
+        &json(&source_list)?,
+        &source_list,
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&generator)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("MQ MQI call-registry freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "MQ MQI call-registry freshness guard failed",
+    )
+}
+
 /// Static dependency/ownership/route checks; no release build or runtime campaign.
 fn check_architecture_fast(root: &Path) -> TaskResult {
     let mut manifests = Vec::new();
@@ -7950,6 +7980,7 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "durable retention lifecycle architecture guard failed",
     )?;
+    check_mq_mqi_registry(root)?;
     let cics_descriptors = root.join("tools/generate_cics_descriptors.py");
     require(
         cics_descriptors.is_file(),

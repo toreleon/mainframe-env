@@ -14,6 +14,7 @@ mod cics_catalog;
 mod clock;
 mod dataset;
 mod enterprise;
+mod mq_catalog;
 mod names;
 mod registry;
 mod request;
@@ -41,6 +42,11 @@ pub use dataset::{
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 pub use enterprise::{EnterpriseAuthorizer, EnterpriseResource, EnterpriseResourceClass};
+pub use mq_catalog::{
+    MQ_MQI_CALL_COUNT, MQ_MQI_CALL_IDENTITY_SET_SHA256, MQ_MQI_SOURCE_ROW_COUNT,
+    MqMqiCallIdentityDescriptor, mq_mqi_call_identities, mq_mqi_call_identity,
+    mq_mqi_call_identity_by_label,
+};
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
     ResourceName, RuntimeServiceName, SessionId,
