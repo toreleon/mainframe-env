@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Aligned public project status with the accepted pre-0.9 implementation entry gate."

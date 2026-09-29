@@ -33,6 +33,7 @@
         "schema_version",
         "status",
         "corpus_commit",
+        "business_date",
         "journeys_passed",
         "initialization_jobs",
         "operational_jobs",
@@ -41,6 +42,8 @@
         "warm_restart_controls",
         "rollback_controls",
         "cancellation_controls",
+        "tranrept_selected_records",
+        "tranrept_report_records",
         "dataset_sha256",
         "spool_sha256",
         "journey_shape_sha256"
@@ -49,6 +52,7 @@
         "schema_version": {"const": "mainframe-env.carddemo-base-batch-receipt@1"},
         "status": {"const": "pass"},
         "corpus_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "business_date": {"const": "2022-07-06"},
         "journeys_passed": {"type": "integer", "minimum": 1},
         "initialization_jobs": {"type": "integer", "minimum": 1},
         "operational_jobs": {"type": "integer", "minimum": 1},
@@ -57,6 +61,8 @@
         "warm_restart_controls": {"type": "integer", "minimum": 1},
         "rollback_controls": {"type": "integer", "minimum": 1},
         "cancellation_controls": {"type": "integer", "minimum": 1},
+        "tranrept_selected_records": {"type": "integer", "minimum": 1},
+        "tranrept_report_records": {"type": "integer", "minimum": 1},
         "dataset_sha256": {"$ref": "#/$defs/digestMap"},
         "spool_sha256": {"$ref": "#/$defs/digestMap"},
         "journey_shape_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
