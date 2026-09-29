@@ -13,7 +13,7 @@
     {"program": "IEBEDIT", "handler": "iebedit", "family": "edit", "effect": "bounded job/position and optional step selection written to SYSUT2"},
     {"program": "IEBUPDTE", "handler": "iebupdte", "family": "update", "effect": "one ADD/REPL member body written exactly to SYSUT2 member"},
     {"program": "IDCAMS", "handler": "idcams", "family": "catalog", "effect": "typed dataset/catalog requests for every accepted command"},
-    {"program": "SORT", "handler": "sort", "family": "sort", "effect": "bounded record sort and OUTREC projection written to SORTOUT"}
+    {"program": "SORT", "handler": "sort", "family": "sort", "effect": "SORT FIELDS CH/ZD keys, INCLUDE/OMIT filtering, and OUTREC projection written to SORTOUT; equal keys retain input order (documented model choice); unsupported controls fail closed"}
   ],
   "special_handlers": [
     {"program": "SDSF", "handler": "sdsf"},
@@ -28,7 +28,8 @@
     "unknown utility control",
     "missing required DD",
     "invalid output bound",
-    "unsupported multi-member IEBUPDTE operation"
+    "unsupported multi-member IEBUPDTE operation",
+    "unsupported SORT control, symbol, field format, or comparison"
   ],
   "non_claims": [
     "complete IBM utility option parity outside the pinned controls",

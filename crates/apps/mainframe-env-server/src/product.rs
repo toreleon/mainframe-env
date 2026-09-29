@@ -2964,7 +2964,7 @@ impl ProductServer {
             .cloned()
             .map(|capability| (capability, "1".to_string()))
             .collect();
-        let bindings = BTreeMap::from([(
+        let mut bindings = BTreeMap::from([(
             "jes.work-id".into(),
             BoundedPayload::new(
                 "mainframe-env.jes-work@1",
@@ -2973,6 +2973,7 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::InfrastructureFailure)?,
         )]);
+        bindings.extend(self.cobol_date_bindings(limits)?);
         let identity = format!("{}-{}", payload.job_id, work.lease_epoch);
         let mut invocation = Invocation::new(
             RequestId::new(format!("jes-request-{identity}"), limits)
@@ -4858,6 +4859,28 @@ impl ProductServer {
         Ok(current)
     }
 
+    fn cobol_date_bindings(
+        &self,
+        limits: InvocationLimits,
+    ) -> Result<BTreeMap<String, BoundedPayload>, HostProblem> {
+        self.config
+            .cobol_current_date
+            .as_ref()
+            .map(|date| {
+                Ok(BTreeMap::from([(
+                    "cobol.current-date".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cobol.datetime@1",
+                        date.as_bytes().to_vec(),
+                        limits,
+                    )
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )]))
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+    }
+
     pub(crate) fn invocation(
         &self,
         principal: &str,
@@ -4910,7 +4933,7 @@ impl ProductServer {
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             1,
             ResourceLimits::default(),
-            BTreeMap::new(),
+            self.cobol_date_bindings(limits)?,
             limits,
         )
         .and_then(|invocation| invocation.with_provider_generations(generations, limits))
@@ -7734,6 +7757,34 @@ mod tests {
             }
         }
         output
+    }
+
+    #[tokio::test]
+    async fn configured_batch_current_date_reaches_cobol_and_default_stays_epoch() {
+        let definition = BatchProgramDefinition::current(
+            "CLOCKJOB",
+            &published_fixture("CLOCKJOB", "DISPLAY FUNCTION CURRENT-DATE."),
+        );
+        for (date, expected) in [
+            (Some("2022070600000000+0000"), "2022070600000000+0000"),
+            (None, "1970010100000000+0000"),
+        ] {
+            let mut settings = config();
+            settings.cobol_current_date = date.map(str::to_owned);
+            let server = ProductServer::memory(settings).unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .install_batch_programs(vec![definition.clone()])
+                .unwrap();
+            let output = execute_installed_batch_job(&server, "CLOCKRUN", "CLOCKJOB").await;
+            assert!(
+                output
+                    .windows(expected.len())
+                    .any(|part| part == expected.as_bytes()),
+                "expected {expected} in {}",
+                String::from_utf8_lossy(&output)
+            );
+        }
     }
 
     #[tokio::test]
