@@ -35,6 +35,7 @@ mod amode64_access;
 mod completion;
 mod condition_literals;
 mod corresponding;
+mod decimal_capacity;
 mod decimal_commit;
 mod eib;
 #[cfg(test)]
@@ -45,6 +46,7 @@ mod snapshot_codec;
 mod typed_cics;
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};
+use decimal_capacity::decimal_exceeds_picture;
 
 const NAMESPACE: &str = "mainframe.core.cobol";
 pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
@@ -5234,10 +5236,10 @@ impl ReferenceMachine {
             return self.add_or_subtract(name, args, preserve_failed_receiver);
         }
         if name == "multiply" {
-            return self.multiply_statement(args).map(|()| false);
+            return self.multiply_statement(args, preserve_failed_receiver);
         }
         if name == "divide" {
-            return self.divide_statement(args).map(|()| false);
+            return self.divide_statement(args, preserve_failed_receiver);
         }
         let rounded = args.iter().any(|argument| argument == "ROUNDED");
         let (target, value) = match name {
@@ -5349,7 +5351,7 @@ impl ReferenceMachine {
             .map(|()| false)
     }
 
-    fn multiply_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn multiply_statement(&mut self, args: &[String], keep: bool) -> Result<bool, MachineProblem> {
         let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
         let giving = position(args, "GIVING");
         let left = value_decimal(self.eval_value(&args[..by])?)?;
@@ -5371,14 +5373,14 @@ impl ReferenceMachine {
         if target.is_empty() {
             return Err(MachineProblem::InvalidOperation);
         }
-        self.commit_decimal_assignments(vec![(
-            target,
-            decimal_multiply(self.arithmetic_mode, left, right)?,
-            args.iter().any(|token| token == "ROUNDED"),
-        )])
+        let value = decimal_multiply(self.arithmetic_mode, left, right)?;
+        self.commit_arithmetic(
+            vec![(target, value, args.iter().any(|t| t == "ROUNDED"))],
+            keep,
+        )
     }
 
-    fn divide_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn divide_statement(&mut self, args: &[String], keep: bool) -> Result<bool, MachineProblem> {
         let giving = position(args, "GIVING");
         let remainder = position(args, "REMAINDER");
         let rounded = args.iter().any(|token| token == "ROUNDED");
@@ -5440,7 +5442,7 @@ impl ReferenceMachine {
             )?;
             assignments.push((vec![target], value, false));
         }
-        self.commit_decimal_assignments(assignments)
+        self.commit_arithmetic(assignments, keep)
     }
 
     fn add_or_subtract(
@@ -10839,10 +10841,7 @@ fn decode_binary_integer(bytes: &[u8]) -> Result<i128, MachineProblem> {
 
 fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
     let digits = value.coefficient.unsigned_abs().to_string();
-    if layout.digits > 0
-        && digits.len() > layout.digits
-        && layout.category != LayoutCategory::NumericEdited
-    {
+    if layout.category != LayoutCategory::NumericEdited && decimal_exceeds_picture(layout, value) {
         return Err(MachineProblem::SizeError);
     }
     match layout.category {

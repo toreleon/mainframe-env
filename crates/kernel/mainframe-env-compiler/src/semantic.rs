@@ -5,7 +5,7 @@ mod structure;
 
 use layout_relations::{resolve_rename_range, validate_layout_relationships};
 use layout_utils::{
-    data_description_clause_boundary, hex_nibble, index_names, occurs_range,
+    data_description_clause_boundary, floating_sign_digit, hex_nibble, index_names, occurs_range,
     validate_occurs_phrase_order, values_clause,
 };
 
@@ -2528,10 +2528,7 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
                 alphabetic = false;
                 edited = true;
                 signed = true;
-                if floating_prefix.is_some_and(|(symbol, end)| symbol == byte && index < end)
-                    || bytes.get(index.wrapping_sub(1)) == Some(&byte)
-                    || bytes.get(index + 1) == Some(&byte)
-                {
+                if floating_sign_digit(&bytes, index, floating_prefix) {
                     digits += 1;
                     if fractional {
                         scale += 1;
@@ -2861,8 +2858,9 @@ mod tests {
         for (picture, digits, scale, signed) in [
             ("$$V99", 3, 2, false),
             ("$$$$", 3, 0, false),
-            ("+++,++9.99", 8, 2, true),
-            ("----9", 5, 0, true),
+            // COBOL 6.5 rlddeief reserves the leftmost floating sign.
+            ("+++,++9.99", 7, 2, true),
+            ("----9", 4, 0, true),
         ] {
             let details = picture_details(picture).unwrap();
             assert_eq!(
@@ -2879,10 +2877,11 @@ mod tests {
             ("$$B$$9.9", 8, 5, 1, false),
             ("$$0$$9", 6, 4, 0, false),
             ("$$/$$9", 6, 4, 0, false),
-            ("++B++9", 6, 5, 0, true),
-            ("--,--9.99", 9, 7, 2, true),
+            // COBOL 6.5 rlddeief: the second-leftmost floating sign is the first digit.
+            ("++B++9", 6, 4, 0, true),
+            ("--,--9.99", 9, 6, 2, true),
             ("$$$B99", 6, 4, 0, false),
-            ("+++.+++", 7, 6, 3, true),
+            ("+++.+++", 7, 5, 3, true),
         ] {
             let details = picture_details(picture).unwrap();
             assert_eq!(
@@ -3095,7 +3094,7 @@ mod tests {
             DataCategory::NumericEdited
         );
         assert_eq!(model.layout("D").unwrap().length, 10);
-        assert_eq!(model.layout("E").unwrap().digits, 5);
+        assert_eq!(model.layout("E").unwrap().digits, 4);
     }
 
     #[test]
