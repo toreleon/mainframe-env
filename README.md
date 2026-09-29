@@ -20,10 +20,13 @@ presented as licensed IBM equivalence.
 | Production readiness | Not claimed |
 | Licensed differential status | Required campaigns remain pending where the release notes say so |
 
-The current pre-0.9 assessment is a **no-go for broad implementation** until
-the P1 hardening items in the
-[pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) are closed. A clean
-test run is necessary but does not override those findings.
+The [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) recorded the
+original no-go for broad implementation. Its R-01–R-15 P1 items (#101–#115)
+were closed through PR #131 on 2026-09-09, and the integrated entry gate accepted
+the post-review candidate that day. The tracked
+[0.9 status record](docs/delivery/coverage-versions/status/0.9.0.md) documents
+that decision and its fix mapping. The accepted gate authorizes implementation;
+it does not establish 0.9 release readiness or licensed certification.
 
 ## Quick start
 
