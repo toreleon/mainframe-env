@@ -252,6 +252,7 @@ pub(super) fn operands(
                 HirCicsValue::Data(reference) => {
                     require_halfword("WRITEQ TS", "LENGTH", reference)?
                 }
+                HirCicsValue::LengthOf(_) => {}
                 _ => {
                     return Err(ResolutionFailure::Invalid(
                         "CICS WRITEQ TS LENGTH requires a halfword value".into(),

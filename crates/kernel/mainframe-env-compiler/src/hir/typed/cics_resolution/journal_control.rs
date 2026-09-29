@@ -240,6 +240,7 @@ fn write_operands(
                 if reference.usage == CobolUsage::Binary
                     && reference.length == 4
                     && reference.scale == 0 => {}
+            HirCicsValue::LengthOf(_) => {}
             _ => {
                 return Err(ResolutionFailure::Invalid(
                     "CICS journal WRITE FLENGTH requires nonnegative fullword binary value".into(),

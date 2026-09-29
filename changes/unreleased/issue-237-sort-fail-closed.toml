@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed #237: batch SORT applies supported CH/ZD keys, CardDemo hyphenated symbols, and INCLUDE/OMIT conditions, preserves input order for equal keys as a model choice, and fails closed on unsupported controls. Pinned the CardDemo base-batch journey business date to 2022-07-06."

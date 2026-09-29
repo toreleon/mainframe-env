@@ -787,6 +787,8 @@ mod tests {
             .map(|observation| (observation.scenario_id.clone(), observation.clone()))
             .collect::<BTreeMap<_, _>>();
         let expected = crate::CicsOracleExpectation {
+            family_id: None,
+            family_manifest_digest: None,
             candidate_digest: &capture.candidate_digest,
             spec_digest: &capture.spec_digest,
             fixture_digest: &capture.fixture_digest,
@@ -794,6 +796,7 @@ mod tests {
             environment_manifest_digest: &capture.environment_manifest_digest,
             comparison_policy: &capture.comparison_policy,
             required_scenarios: &required,
+            required_order: None,
             expected_observations: &observations,
         };
         let legacy = crate::import_cics_oracle_capture(LEGACY_CAPTURE, &expected, None).unwrap();
