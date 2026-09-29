@@ -21,6 +21,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+mod pinned;
+use pinned::PinnedFiles;
+
 const NOTICE: &str =
     "A row match records recognition only; it is not an execution or conformance claim.";
 
@@ -269,7 +272,11 @@ fn git(corpus: &Path, args: &[&str]) -> Result<String, IntakeError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().into())
 }
 
-fn verify_pin(manifest: &CorpusManifest, corpus: &Path) -> Result<CorpusPin, IntakeError> {
+fn verify_pin(
+    manifest: &CorpusManifest,
+    corpus: &Path,
+    files: &PinnedFiles<'_>,
+) -> Result<CorpusPin, IntakeError> {
     if git(corpus, &["rev-parse", "HEAD"])? != manifest.commit {
         return Err(IntakeError::Pin("commit mismatch".into()));
     }
@@ -279,8 +286,7 @@ fn verify_pin(manifest: &CorpusManifest, corpus: &Path) -> Result<CorpusPin, Int
     if !git(corpus, &["status", "--porcelain", "--untracked-files=all"])?.is_empty() {
         return Err(IntakeError::Pin("dirty tree".into()));
     }
-    let license = fs::read(corpus.join(&manifest.license_file))
-        .map_err(|e| IntakeError::Pin(e.to_string()))?;
+    let license = files.read(&manifest.license_file)?;
     Ok(CorpusPin {
         origin: manifest.origin.clone(),
         commit: manifest.commit.clone(),
@@ -359,23 +365,10 @@ pub fn run(
     {
         return Err(IntakeError::Manifest("invalid pin or layout".into()));
     }
-    let pin = verify_pin(&manifest, corpus)?;
+    let files = PinnedFiles::open(corpus, &manifest.commit)?;
+    let pin = verify_pin(&manifest, corpus, &files)?;
     let catalog = Catalog::load(repository_root)?;
-    let output = Command::new("git")
-        .args(["ls-files", "-z"])
-        .current_dir(corpus)
-        .output()
-        .map_err(|e| IntakeError::Pin(e.to_string()))?;
-    if !output.status.success() {
-        return Err(IntakeError::Pin("cannot list tracked files".into()));
-    }
-    let mut paths = output
-        .stdout
-        .split(|b| *b == 0)
-        .filter(|p| !p.is_empty())
-        .map(|p| String::from_utf8(p.to_vec()).map_err(|e| IntakeError::Pin(e.to_string())))
-        .collect::<Result<Vec<_>, _>>()?;
-    paths.sort();
+    let paths = files.paths();
     let mut kinds = BTreeMap::new();
     for path in &paths {
         let matching = manifest
@@ -402,9 +395,9 @@ pub fn run(
     let mut members = Vec::new();
     for path in paths {
         let kind = &kinds[&path];
-        let bytes = fs::read(corpus.join(&path)).map_err(|e| IntakeError::Io(e.to_string()))?;
+        let bytes = files.read(&path)?;
         let member = match kind.as_str() {
-            "cobol" => analyze_cobol(&path, bytes, &copies, corpus, &catalog),
+            "cobol" => analyze_cobol(&path, bytes, &copies, &files, &catalog),
             "jcl" => analyze_jcl(&path, bytes, &catalog),
             "bms" => analyze_bms(&path, &bytes),
             "copybook" | "ignore" | "other" => {
@@ -428,7 +421,7 @@ fn analyze_cobol(
     path: &str,
     bytes: Vec<u8>,
     copies: &[String],
-    corpus: &Path,
+    corpus: &PinnedFiles<'_>,
     catalog: &Catalog,
 ) -> Member {
     let mut member = simple_member(path, "cobol", "available", "failed");
@@ -457,8 +450,11 @@ fn analyze_cobol(
     let mut files = vec![primary];
     let mut by_dir: BTreeMap<String, Vec<LogicalPath>> = BTreeMap::new();
     for copy in copies {
-        let Ok(copy_bytes) = fs::read(corpus.join(copy)) else {
-            continue;
+        let Ok(copy_bytes) = corpus.read(copy) else {
+            member
+                .diagnostics
+                .push(local_error("MEINTAKE001", "cannot read pinned copybook"));
+            return member;
         };
         let Ok(file) = make_file(copy, copy_bytes) else {
             continue;
