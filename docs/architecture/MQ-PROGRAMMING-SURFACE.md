@@ -62,6 +62,22 @@ and non-batch IMS reject application commit/backout; MQ client bindings also
 reject `MQBEGIN`. An external coordinator rejects all three direct calls with
 MQCC 2 / MQRC 2012. IMS and MQ client provider enforcement remain pending.
 
+## Object lifecycle kernel
+
+`mainframe-env-mq::object` owns bounded, case-sensitive object names and typed
+definitions for queue managers, local, alias, remote, and model queues, topics,
+subscriptions, and processes. Its catalog resolves aliases and remote routes
+deterministically with cycle and depth rejection. Model instances have explicit
+owner and close rules. A strict versioned snapshot codec rejects noncanonical
+names, corrupt rows, and unsupported schema versions before restoration.
+
+The existing queue service uses the same name rule for definitions, lookups,
+request queue selectors, and trigger programs. It removes permitted trailing
+blanks or a null ending significant data, preserves case, and rejects leading
+or embedded blanks before durable mutation. The object catalog has no host
+MQI handler integration yet; `Inquire` is an object capability identity, not
+MQINQ execution.
+
 ## Coverage boundary
 
 Catalog and generated-registry checks prove only:

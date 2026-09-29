@@ -6,7 +6,31 @@ mod definition;
 pub use definition::*;
 
 use crate::service::MqQueueDefinition;
+use mainframe_env_host_api::HostProblem;
 use std::collections::{BTreeMap, BTreeSet};
+
+/// Service-facing MQ name rule (#342): significant bytes keep their case;
+/// only trailing blanks, or a null ending significant data, are dropped.
+pub(crate) fn canonical_name(value: &str) -> Result<String, HostProblem> {
+    MqObjectName::new(value)
+        .map(|name| name.as_str().to_owned())
+        .map_err(|_| HostProblem::Malformed)
+}
+
+pub(crate) fn is_canonical_name(value: &str) -> bool {
+    canonical_name(value).as_deref() == Ok(value)
+}
+
+pub(crate) fn canonical_definition(
+    definition: MqQueueDefinition,
+) -> Result<MqQueueDefinition, HostProblem> {
+    Ok(MqQueueDefinition {
+        name: canonical_name(&definition.name)?,
+        trigger_program: (definition.trigger_program.as_deref())
+            .map(canonical_name)
+            .transpose()?,
+    })
+}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum ObjectNamespace {
