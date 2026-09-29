@@ -1,0 +1,171 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-programming-contracts-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 programming contracts for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 25,
+  "total_bytes": 569244,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "a7f6da97c28fb8d27666288b05fa4f1a54c5dabbb5fce1576bb465876c6c578f",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "sha256": "ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "bytes": 16046,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssas.htm",
+      "sha256": "7a0fb0faa50c4308924576ebbe6bfcca0dd78e217f33c59e78480b9c6dd8ae20",
+      "bytes": 13974,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_formattingssa.htm",
+      "sha256": "6d8409b99f914fd6f602666a7120756433726fc7315d3f320c6fa380857dedbe",
+      "bytes": 1963,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssacodingrules.htm",
+      "sha256": "cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5",
+      "bytes": 9488,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssacodingformats.htm",
+      "sha256": "dd8afe24c819750ec361d8359529ad328c4ef280235553da7bdd918be28504d9",
+      "bytes": 15844,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssaguidelines.htm",
+      "sha256": "317fb0a7984af4fce98e0e0d6ea2572439d5fed4bd3f14c79b3af519265a68cf",
+      "bytes": 5716,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssas_cmdcodes.htm",
+      "sha256": "d95a2d5c1dc735e2abf4b4bba206c704ee0d5104c47ff63afa848705f06084de",
+      "bytes": 13938,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingcmdcodesandopts.htm",
+      "sha256": "eec570be49de991fe17b672c5e81dc4a83733d66267d3e0b561502e8820854ec",
+      "bytes": 12101,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_imsdbdbpcbmask.htm",
+      "sha256": "699a551e0c2804db26725d0997be3b1f9fdc91379a69f490c8e509d76fcc61b3",
+      "bytes": 24105,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_pcbmaskgsamdb.htm",
+      "sha256": "033ee82b96d160db01409f168a44f9076429bd090e70a49d83585f774755dcd3",
+      "bytes": 23050,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingiopcb.htm",
+      "sha256": "d85982dd9c913de3bd6e387717c5e830e24c795b4dad51347f251a898ff18ced",
+      "bytes": 39836,
+      "last_modified": "2026-08-28"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingalternatepcb.htm",
+      "sha256": "5cc97ec11a47a33ab39ba7dd3c4cec3b5acbc1b98cdc8a8e2e02cf741c1e35a2",
+      "bytes": 10262,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodes.htm",
+      "sha256": "f08cede75251608041fccf611390bc61f301b3f48b70709801dbda1ff2c0fcb7",
+      "bytes": 2414,
+      "last_modified": "2026-01-19"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables.htm",
+      "sha256": "412e6436d3bbffc13a7c87e6c1d51cd9921732578d5c7a24ec6e15f846604452",
+      "bytes": 2526,
+      "last_modified": "2026-01-19"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodesxpl.htm",
+      "sha256": "43b201ffb660a608928da49c90da5c2330de5d4880cbe19b54f259187cc423be",
+      "bytes": 27006,
+      "last_modified": "2026-01-19"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
+      "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
+      "bytes": 75709,
+      "last_modified": "2026-01-19"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_systemservicecalls.htm",
+      "sha256": "6ca2da6ccfaee04998c9d11306725b7a9d5523270f304aefa08e019fe93ad81c",
+      "bytes": 44578,
+      "last_modified": "2026-01-19"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_messagecalls.htm",
+      "sha256": "c18deaa4db069bc24064071bb2ca50be736dde1ea8a324ca452d546df58d2955",
+      "bytes": 51023,
+      "last_modified": "2026-01-19"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+      "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+      "bytes": 31807,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
+      "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
+      "bytes": 37053,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
+      "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
+      "bytes": 26643,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_currentpos.htm",
+      "sha256": "07aafcddb9b30591eef1da5ad50bfe8bc3c1e9b9e9e51b56b27d39bf6adf5673",
+      "bytes": 2859,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_processingoptions.htm",
+      "sha256": "bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4",
+      "bytes": 9755,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_dlicallfunctions.htm",
+      "sha256": "cc1b7fb49795e5bf1b928fdd4e4ec211cd4e807a2e4c1ff737e029f282817866",
+      "bytes": 36739,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_cmdcodref.htm",
+      "sha256": "cb1d0cc0cf765f13836b888efaea5538bcbcbbd0453028388b07f69736946093",
+      "bytes": 34809,
+      "last_modified": "2026-02-09"
+    }
+  ]
+}

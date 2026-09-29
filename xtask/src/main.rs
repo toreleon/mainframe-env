@@ -7,6 +7,7 @@ mod carddemo_v09_host;
 mod changelog;
 mod docs;
 mod evidence_seal;
+mod ims_catalog;
 mod jcl_catalog;
 mod jcl_conformance;
 mod racf_catalog;
@@ -213,6 +214,7 @@ enum XtaskCommand {
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
+    ImsCatalog(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
     WorkPackageSeal(WorkPackageSealArgs),
@@ -501,6 +503,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             }
         ),
         XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
+        XtaskCommand::ImsCatalog(args) => checked!(
+            "ims-catalog",
+            args,
+            if args.check {
+                ims_catalog::check(root)
+            } else {
+                ims_catalog::generate(root)
+            }
+        ),
         XtaskCommand::RacfCatalog(args) => (
             "racf-catalog",
             args.check,
@@ -666,6 +677,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    ims_catalog::check(root)?;
     racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;

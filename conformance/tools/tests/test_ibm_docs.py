@@ -524,13 +524,14 @@ class CacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "conflicting immutable baseline"):
                 ibm_docs.load_pins(index, registry)
 
-    def test_shipped_zero_credit_pins_include_registered_0_9_scopes(self):
+    def test_shipped_zero_credit_pins_include_all_registered_later_scopes(self):
         pins, tocs = ibm_docs.load_pins()
         scopes = {scope.scope_id for pin in [*pins, *tocs] for scope in pin.scopes}
         self.assertIn("cics-file-uow-pilot", scopes)
         self.assertIn("cics-handle-aid", scopes)
         self.assertIn("cics-task-enqueue", scopes)
         self.assertIn("cobol-numeric-move-pilot", scopes)
+        self.assertIn("ims-programming-contracts", scopes)
         self.assertTrue(pins)
         self.assertTrue(tocs)
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
