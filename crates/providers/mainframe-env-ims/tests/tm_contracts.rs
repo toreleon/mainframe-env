@@ -75,7 +75,7 @@ fn generic_tm_definitions_messages_and_statuses_are_bounded() {
     assert_eq!(TmPcbStatus::SUCCESS.as_str(), "  ");
     assert_eq!(TmPcbStatus::NO_MORE_MESSAGES.as_str(), "QC");
     assert_eq!(TmPcbStatus::INVALID_CALL.as_str(), "AD");
-    assert_eq!(TmPcbStatus::QUEUE_FULL.as_str(), "QF");
+    assert_eq!(TmPcbStatus::INVALID_SEGMENT_LENGTH.as_str(), "QF");
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn unknown_pcb_status_is_rejected_instead_of_becoming_invalid_call() {
         TmPcbStatus::SUCCESS,
         TmPcbStatus::NO_MORE_MESSAGES,
         TmPcbStatus::INVALID_CALL,
-        TmPcbStatus::QUEUE_FULL,
+        TmPcbStatus::INVALID_SEGMENT_LENGTH,
     ] {
         let encoded = serde_json::to_string(&status).unwrap();
         assert_eq!(
