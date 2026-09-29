@@ -33,6 +33,7 @@ const DIGEST_DEFINITION: &str = "sha256 over the concatenation, sorted by topic_
 pub(super) fn check(root: &Path) -> TaskResult {
     let index_path = root.join(INDEX_PATH);
     let index = json(&index_path)?;
+    let manifest_schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))?;
     let mut pinned = BTreeSet::new();
     for baseline in array(&index, "baselines", &index_path)? {
         let id = text(baseline, "id", &index_path)?;
@@ -49,6 +50,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
         )?;
         let manifest_path = manifest_path(root, relative, id)?;
         let manifest = json(&manifest_path)?;
+        validate_schema_instance(&manifest_schema, &manifest, &manifest_path)?;
         let digest = recompute(&manifest, &manifest_path)?;
         require(
             text(&manifest, "topic_manifest_digest", &manifest_path)? == digest,
@@ -388,6 +390,20 @@ mod tests {
     #[test]
     fn every_committed_manifest_reproduces_the_digest_its_receipt_pins() {
         check(&repository_root().expect("repository root")).expect("topic manifests");
+    }
+
+    #[test]
+    fn repins_use_the_same_schema_as_a_single_repin() {
+        let root = repository_root().expect("repository root");
+        let schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))
+            .expect("manifest schema");
+        let mut manifest =
+            json(&root.join("conformance/0.2/manifests/mq-topics.json")).expect("MQ manifest");
+        let repin = manifest.as_object_mut().unwrap().remove("repin").unwrap();
+        manifest["repins"] = json!([repin]);
+        validate_schema_instance(&schema, &manifest, Path::new("in-memory")).expect("valid repins");
+        manifest["repins"][0]["superseded_sha256"] = json!("bad");
+        assert!(validate_schema_instance(&schema, &manifest, Path::new("in-memory")).is_err());
     }
 
     /// Every locator in `conformance/0.3/cobol/language.json` -- the 173 official
