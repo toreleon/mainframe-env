@@ -39,6 +39,14 @@ durable TM runtime in this slice. `ImsMetadataCatalog` and
 contract, described by the Draft 2020-12
 [`metadata schema`](../../../conformance/0.14/schemas/ims-metadata.schema.json).
 
+The `database` module exports the recovered in-memory engine foundation. It
+validates bounded hierarchy, field and index definitions, and owns deterministic
+GU/GN/GNP-style selection, caller-owned position and holds, insert, replace,
+physical subtree delete, append-only GSAM, and secondary-index maintenance.
+It is isolated from `ims_providers`; it does not emit PCB statuses or persist
+its image. Metadata publication, host routing, authorization and UOW integration
+remain separate contracts.
+
 ## Non-goals
 
 - Complete IMS 15.6 compatibility, which belongs to the 0.14 program.

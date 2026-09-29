@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod database;
 mod metadata;
 mod retention;
 mod service;
