@@ -13291,6 +13291,7 @@ mod tests {
             FileMetadata {
                 assignment: "USER.EMPTY.G0001V00".into(),
                 record_name: None,
+                record_names: Vec::new(),
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -13454,6 +13455,9 @@ mod tests {
                 panic!("WRITE did not append a sequential record");
             };
             assert_eq!(records, &vec![expected.to_vec()]);
+            if args.iter().any(|arg| arg == "FROM") {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
             machine
                 .resume_host(EffectResult {
                     sequence: effect.sequence,
