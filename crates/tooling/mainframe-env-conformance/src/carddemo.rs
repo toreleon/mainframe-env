@@ -9198,6 +9198,83 @@ async fn exercise_base_batch_routes(
             )?;
         }
     }
+    if let Ok(directory) = env::var("CARDDEMO_TRANREPT_EXTRACT_DIR") {
+        let directory = Path::new(&directory);
+        if !directory.is_absolute() {
+            return Err(CorpusProblem::new(
+                "carddemo.base_batch.extract_path",
+                "CARDDEMO_TRANREPT_EXTRACT_DIR must be absolute",
+            ));
+        }
+        fs::create_dir_all(directory).map_err(|error| {
+            CorpusProblem::new("carddemo.base_batch.extract", error.to_string())
+        })?;
+        for (dataset, filename) in [
+            (
+                "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
+                "tranrept-input.bin",
+            ),
+            (
+                "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00",
+                "tranrept-selected.bin",
+            ),
+            ("AWS.M2.CARDDEMO.TRANREPT.G0001V00", "tranrept-report.bin"),
+        ] {
+            let records = utility_records(&server, dataset, None)?;
+            let bytes = records.concat();
+            fs::write(directory.join(filename), bytes).map_err(|error| {
+                CorpusProblem::new("carddemo.base_batch.extract", error.to_string())
+            })?;
+            let name = DatasetName::new(dataset, 128).map_err(|_| {
+                CorpusProblem::new("carddemo.base_batch.extract", "dataset name is invalid")
+            })?;
+            let DatasetResult::Attributes {
+                attributes,
+                version,
+            } = server
+                .dataset_service()
+                .invoke(DatasetRequest::Attributes {
+                    dataset: name.clone(),
+                })
+                .map_err(terminal_problem)?
+            else {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.extract",
+                    "attributes unavailable",
+                ));
+            };
+            let DatasetResult::Records {
+                version: read_version,
+                identities,
+                ..
+            } = server
+                .dataset_service()
+                .invoke(DatasetRequest::Read {
+                    dataset: name,
+                    member: None,
+                    key: None,
+                    max_records: 4_096,
+                    control: Default::default(),
+                })
+                .map_err(terminal_problem)?
+            else {
+                return Err(CorpusProblem::new(
+                    "carddemo.base_batch.extract",
+                    "records unavailable",
+                ));
+            };
+            fs::write(
+                directory.join(format!("{filename}.meta")),
+                format!(
+                    "attributes={:?}\nversion={version}\nread_version={read_version}\nidentities={} first={:?}\n",
+                    attributes,
+                    identities.len(),
+                    identities.first()
+                ),
+            )
+            .map_err(|error| CorpusProblem::new("carddemo.base_batch.extract", error.to_string()))?;
+        }
+    }
     let tranrept_selected_records =
         utility_records(&server, "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00", None)?.len();
     let tranrept_report_records =

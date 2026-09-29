@@ -15106,6 +15106,87 @@ mod tests {
     }
 
     #[test]
+    fn open_input_empty_generation_then_read_eof() {
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let empty = DatasetName::new("USER.EMPTY.G0001V00", 44).unwrap();
+        let missing = DatasetName::new("USER.MISSING.G0001V00", 44).unwrap();
+        let populated = DatasetName::new("USER.FULL.G0001V00", 44).unwrap();
+        let indexed = DatasetName::new("USER.INDEXED", 44).unwrap();
+        for (name, organization, sequence) in [
+            (&empty, DatasetOrganization::Sequential, 1),
+            (&populated, DatasetOrganization::Sequential, 2),
+            (&indexed, DatasetOrganization::KeySequenced, 3),
+        ] {
+            service
+                .invoke(DatasetRequest::Create {
+                    dataset: name.clone(),
+                    attributes: attrs(organization),
+                    mutation: mutation(sequence),
+                })
+                .unwrap();
+        }
+        service
+            .invoke(DatasetRequest::Append {
+                dataset: populated.clone(),
+                member: None,
+                records: vec![b"DATA".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(4),
+            })
+            .unwrap();
+
+        let start = |dataset| {
+            service.invoke(DatasetRequest::StartBrowse {
+                dataset,
+                key: Vec::new(),
+                relation: KeyRelation::GreaterOrEqual,
+            })
+        };
+        assert_eq!(start(missing), Err(HostProblem::NotFound));
+        assert!(matches!(
+            start(indexed),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+        let cursor = match start(empty.clone()).unwrap() {
+            DatasetResult::Browse { cursor, .. } => cursor,
+            other => panic!("OPEN INPUT result: {other:?}"),
+        };
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: empty.clone(),
+                cursor: cursor.clone(),
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: None, .. })
+        ));
+        assert!(
+            service
+                .invoke(DatasetRequest::Close {
+                    dataset: empty,
+                    cursor: Some(cursor),
+                    control: Default::default(),
+                })
+                .is_ok()
+        );
+        let cursor = match start(populated.clone()).unwrap() {
+            DatasetResult::Browse { cursor, .. } => cursor,
+            other => panic!("OPEN INPUT result: {other:?}"),
+        };
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: populated,
+                cursor,
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"DATA"
+        ));
+    }
+
+    #[test]
     fn relational_start_positions_exactly_and_missing_equal_is_conditioned() {
         use mainframe_env_host_api::KeyRelation;
 

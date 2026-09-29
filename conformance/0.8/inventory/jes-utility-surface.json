@@ -25,7 +25,8 @@
   "fallback": "unknown ordinary programs use typed ProgramService invocation",
   "fail_closed": [
     "registration substitution",
-    "unknown utility control",
+    "unknown utility control or operand (runtime handler declarations)",
+    "SORT requires SYSIN with SORT FIELDS; absent or filter-only SYSIN fails unsupported",
     "missing required DD",
     "invalid output bound",
     "unsupported multi-member IEBUPDTE operation",
