@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 211,
+    "markdown_documents": 212,
     "navigation_groups": 5,
     "normative_documents": 54,
     "xtask_commands": 197
@@ -1185,8 +1185,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
-      "relative_links": 122,
-      "sha256": "sha256:93d7ba55cb2b1fdf054e6a1f96d0387688a08ec0951006fc15099ec329199e2d",
+      "relative_links": 126,
+      "sha256": "sha256:14c4cd0293a7f3936f7dafe7b0bbb7f300a0ffd3d40136c231ee941b5c87f59c",
       "title": "GitHub Project synchronization",
       "xtask_commands": 0
     },
