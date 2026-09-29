@@ -3,7 +3,7 @@
     "markdown_documents": 213,
     "navigation_groups": 5,
     "normative_documents": 54,
-    "xtask_commands": 199
+    "xtask_commands": 200
   },
   "documents": [
     {
@@ -162,7 +162,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
       "relative_links": 0,
-      "sha256": "sha256:f8eac8afc1fb03909d081687c907f71089f6bb6107bd3aee9361f14b766cbc3d",
+      "sha256": "sha256:46f8e0d423bc29e1fc6fc551e6110128e4088c3657b4e7753c00be80a87d106c",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -1250,9 +1250,9 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.14.0.md",
       "relative_links": 0,
-      "sha256": "sha256:c01c477580f34693c17ae6f60d5adb9d34451a5086c73cfcf9099b36728a4761",
+      "sha256": "sha256:a7d42a04adfe6e94bd11e0bc712907157615842be1d1105011b03ee59def4ea7",
       "title": "mainframe-env 0.14.0 implementation status",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
