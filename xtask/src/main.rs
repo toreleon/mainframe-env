@@ -8831,6 +8831,18 @@ fn check_schemas(root: &Path) -> TaskResult {
         validate_schema_instance(&jes_evidence_schema, &evidence, &path)?;
         let rows = array(&evidence, "rows", &path)?;
         unique_rows(rows, "id", &path)?;
+        if work_package == "JES-805" {
+            require(
+                rows.iter().any(|row| {
+                    row["id"] == Value::String("registered-control-declarations".into())
+                        && row["result"] == Value::String("pass".into())
+                        && row["evidence"].as_str().is_some_and(|evidence| {
+                            evidence.contains("every_registered_handler_rejects_undeclared_control")
+                        })
+                }),
+                "JES-805 requires the registered control declaration gate",
+            )?;
+        }
         let pending = rows
             .iter()
             .filter(|row| row["result"] == Value::String("pending".into()))

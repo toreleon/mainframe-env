@@ -6,7 +6,7 @@ use mainframe_env_host_api::{
     HostResult, ProgramRequest,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 #[path = "generated/common_programs.rs"]
@@ -139,6 +139,9 @@ fn common_program(program: &str) -> Option<&'static CommonProgramEntry> {
 pub fn resolve_program_registration(program: &str) -> Result<ProgramRegistration, HostProblem> {
     let program = program.to_ascii_uppercase();
     let entry = common_program(&program);
+    if entry.is_some() && control_declaration(&program).is_none() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
     let handler = if let Some(builtin) = entry.and_then(|entry| entry.builtin) {
         RegisteredProgramHandler::Utility(builtin.utility_handler())
     } else {
@@ -166,6 +169,215 @@ pub(crate) fn tso_program_execution(program: &str) -> Option<TsoProgramExecution
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(program))
         .map(|(_, execution)| *execution)
+}
+
+// These declarations are consulted before execution; a source absent from the list is
+// never interpreted as control input by this handler. Data DDs are not control sources.
+#[derive(Clone, Copy)]
+enum ControlGrammar {
+    ReadsNone,
+    Cards(&'static [(&'static str, &'static [&'static str])]),
+    UpdateCards,
+    Sort,
+    Idcams, // crate::ams::validate_idcams_control owns its command grammar.
+    Sdsf,   // service::parse_sdsf_file_controls owns its ISFIN grammar.
+    Tso,
+    Ims,
+    Unavailable,
+}
+
+struct ControlDeclaration {
+    sources: &'static [&'static str],
+    grammar: ControlGrammar,
+}
+
+fn control_declaration(program: &str) -> Option<ControlDeclaration> {
+    let (sources, grammar) = match program {
+        "IEFBR14" => (&[][..], ControlGrammar::ReadsNone),
+        "IEBGENER" | "IEBCOMPR" => (&["SYSIN"][..], ControlGrammar::ReadsNone),
+        "IEBCOPY" => (
+            &["SYSIN"][..],
+            ControlGrammar::Cards(&[("COPY", &["INDD", "OUTDD"])]),
+        ),
+        "IEBDG" => (
+            &["SYSIN"][..],
+            ControlGrammar::Cards(&[
+                ("DSD", &["OUTPUT"]),
+                ("FD", &["NAME", "LENGTH", "VALUE"]),
+                ("CREATE", &["QUANTITY", "RECORDS", "LENGTH", "VALUE"]),
+                ("END", &[]),
+            ]),
+        ),
+        "IEBEDIT" => (
+            &["SYSIN"][..],
+            ControlGrammar::Cards(&[("EDIT", &["START", "STOP", "END", "STEPNAME"])]),
+        ),
+        "IEBUPDTE" => (&["SYSIN"][..], ControlGrammar::UpdateCards),
+        "SORT" => (&["SYSIN", "SYMNAMES"][..], ControlGrammar::Sort),
+        "IDCAMS" => (&["SYSIN", "PARM"][..], ControlGrammar::Idcams),
+        "SDSF" => (&["ISFIN"][..], ControlGrammar::Sdsf),
+        "IKJEFT01" => (&["SYSTSIN", "SYSIN"][..], ControlGrammar::Tso),
+        "DFSRRC00" => (&["PARM"][..], ControlGrammar::Ims),
+        "DSNTEP4" | "DSNTIAD" | "DSNTIAUL" => (&["SYSTSIN", "SYSIN"][..], ControlGrammar::Tso),
+        "FTP" | "IKJEFT1B" => (&[][..], ControlGrammar::Unavailable),
+        _ => return None,
+    };
+    Some(ControlDeclaration { sources, grammar })
+}
+
+pub(crate) fn validate_program_controls(
+    program: &str,
+    input: &ProgramInput,
+) -> Result<(), HostProblem> {
+    let declaration = control_declaration(program).ok_or(HostProblem::Unsupported)?;
+    if matches!(declaration.grammar, ControlGrammar::ReadsNone) && program == "IEFBR14" {
+        return Ok(());
+    }
+    if matches!(declaration.grammar, ControlGrammar::Unavailable) {
+        return Err(HostProblem::Unsupported);
+    }
+    if input
+        .parameter
+        .as_ref()
+        .is_some_and(|value| !value.trim().is_empty())
+        && !declaration.sources.contains(&"PARM")
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    if program == "IDCAMS"
+        && input
+            .parameter
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+        && control_source_has_data(input, "SYSIN")
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    for name in ["SYSIN", "SYSTSIN", "ISFIN", "SYMNAMES"] {
+        if !declaration.sources.contains(&name) && control_source_has_data(input, name) {
+            return Err(HostProblem::Unsupported);
+        }
+    }
+    match declaration.grammar {
+        ControlGrammar::ReadsNone => {
+            if control_source_has_data(input, "SYSIN") {
+                Err(HostProblem::Unsupported)
+            } else {
+                Ok(())
+            }
+        }
+        ControlGrammar::Cards(cards) => {
+            if let Some(control) = optional_dd_text(input, "SYSIN")? {
+                validate_utility_cards(&control, cards)?;
+            }
+            Ok(())
+        }
+        ControlGrammar::UpdateCards => validate_update_cards(input),
+        ControlGrammar::Ims => {
+            let fields = input
+                .parameter
+                .as_deref()
+                .unwrap_or_default()
+                .split(',')
+                .count();
+            if fields > 3 {
+                Err(HostProblem::Unsupported)
+            } else {
+                Ok(())
+            }
+        }
+        ControlGrammar::Sort
+        | ControlGrammar::Idcams
+        | ControlGrammar::Sdsf
+        | ControlGrammar::Tso => Ok(()),
+        ControlGrammar::Unavailable => Err(HostProblem::Unsupported),
+    }
+}
+
+fn control_source_has_data(input: &ProgramInput, name: &str) -> bool {
+    let has_nonblank_record = |records: &[Vec<u8>]| {
+        records
+            .iter()
+            .any(|record| record.iter().any(|byte| !byte.is_ascii_whitespace()))
+    };
+    input
+        .dd_records
+        .get(name)
+        .is_some_and(|records| has_nonblank_record(records))
+        || input.dds.iter().any(|dd| {
+            dd.name.eq_ignore_ascii_case(name)
+                && has_nonblank_record(&inline_records(&dd.inline_data))
+        })
+}
+
+fn validate_utility_cards(control: &str, cards: &[(&str, &[&str])]) -> Result<(), HostProblem> {
+    let mut seen = BTreeSet::new();
+    for line in control.lines().filter(|line| !line.trim().is_empty()) {
+        let mut words = line.trim().splitn(2, char::is_whitespace);
+        let statement = words.next().unwrap_or_default();
+        if !seen.insert(statement) {
+            return Err(HostProblem::Unsupported);
+        }
+        let operands = cards
+            .iter()
+            .find(|(name, _)| *name == statement)
+            .ok_or(HostProblem::Unsupported)?
+            .1;
+        for field in split_control_fields(words.next().unwrap_or_default())
+            .map_err(|_| HostProblem::Unsupported)?
+        {
+            for token in field.split_ascii_whitespace() {
+                let (name, value) = token.split_once('=').ok_or(HostProblem::Unsupported)?;
+                if !operands.contains(&name) || value.is_empty() {
+                    return Err(HostProblem::Unsupported);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_update_cards(input: &ProgramInput) -> Result<(), HostProblem> {
+    let mut in_body = false;
+    let mut ended = false;
+    for record in dd_records(input, "SYSIN")? {
+        let text = std::str::from_utf8(&record).map_err(|_| HostProblem::Unsupported)?;
+        let line = text.trim().to_ascii_uppercase();
+        if ended {
+            return Err(HostProblem::Unsupported);
+        }
+        if let Some(card) = line.strip_prefix("./ ") {
+            if card == "ENDUP" {
+                ended = true;
+            } else if let Some((verb, rest)) = card.split_once(' ') {
+                if !matches!(verb, "ADD" | "REPL") {
+                    return Err(HostProblem::Unsupported);
+                }
+                validate_utility_cards(&format!("HEADER {rest}"), &[("HEADER", &["NAME"])])?;
+                in_body = true;
+            } else {
+                return Err(HostProblem::Unsupported);
+            }
+        } else if !in_body && !line.is_empty() {
+            return Err(HostProblem::Unsupported);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_tso_action_controls(
+    program: &str,
+    control: &str,
+) -> Result<(), HostProblem> {
+    if tso_program_execution(program).is_none() {
+        return Err(HostProblem::Unsupported);
+    }
+    let control = control.trim().to_ascii_uppercase();
+    if control == format!("RUN PROGRAM({program})") {
+        Ok(())
+    } else {
+        Err(HostProblem::Unsupported)
+    }
 }
 
 #[must_use]
@@ -340,6 +552,7 @@ impl Program for Builtin {
         invocation: &Invocation,
         input: &ProgramInput,
     ) -> Result<ProgramOutput, HostProblem> {
+        validate_program_controls(self.0.name, input)?;
         match self.0.builtin.ok_or(HostProblem::InfrastructureFailure)? {
             BuiltinProgram::Iefbr14 => output(0, vec![self.0.name.as_bytes().to_vec()]),
             BuiltinProgram::Iebgener => {
@@ -656,7 +869,12 @@ fn iebcopy(input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
 
 fn iebdg(input: &ProgramInput, max_output_bytes: u64) -> Result<ProgramOutput, HostProblem> {
     let control = dd_text(input, "SYSIN")?;
-    if !control.contains("DSD") || !control.contains("CREATE") {
+    let has_statement = |name| {
+        control
+            .lines()
+            .any(|line| line.split_ascii_whitespace().next() == Some(name))
+    };
+    if !has_statement("DSD") || !has_statement("CREATE") {
         return Err(HostProblem::Unsupported);
     }
     let output_dd = control_parameter(&control, "OUTPUT").unwrap_or_else(|| "SYSUT2".into());
@@ -1055,6 +1273,138 @@ mod tests {
     }
 
     #[test]
+    fn every_registered_handler_rejects_undeclared_control() {
+        for entry in COMMON_PROGRAMS {
+            assert!(control_declaration(entry.name).is_some(), "{}", entry.name);
+            let mut input = input("SYSIN", b" UNKNOWN CONTROL=YES\n");
+            input.parameter = Some("UNKNOWN,CONTROL=YES".into());
+            if entry.builtin.is_some() {
+                if entry.name == "IEFBR14" {
+                    // IEFBR14 reads no controls, including a supplied SYSIN.
+                    assert!(Builtin(entry).execute(&invocation(), &input).is_ok());
+                    continue;
+                }
+                assert_eq!(
+                    Builtin(entry).execute(&invocation(), &input),
+                    Err(HostProblem::Unsupported),
+                    "{}",
+                    entry.name
+                );
+            } else {
+                assert_eq!(
+                    validate_program_controls(entry.name, &input),
+                    Err(HostProblem::Unsupported),
+                    "{}",
+                    entry.name
+                );
+            }
+        }
+        for (program, _) in TSO_PROGRAMS {
+            assert!(control_declaration(program).is_some(), "{program}");
+            assert_eq!(
+                validate_tso_action_controls(program, "RUN PROGRAM(OTHER)\n"),
+                Err(HostProblem::Unsupported)
+            );
+        }
+    }
+
+    #[test]
+    fn utility_operands_and_sort_ordering_fail_closed() {
+        for (program, source, control) in [
+            ("IEBGENER", "SYSIN", " COPY\n"),
+            ("IEBCOMPR", "SYSIN", " COMPARE\n"),
+            (
+                "IEBCOPY",
+                "SYSIN",
+                " COPY INDD=SYSUT1,OUTDD=SYSUT2,BOGUS=1\n",
+            ),
+            (
+                "IEBDG",
+                "SYSIN",
+                " DSD OUTPUT=(SYSUT2),BOGUS=1\n CREATE QUANTITY=1\n",
+            ),
+            ("IEBEDIT", "SYSIN", " EDIT START=1,BOGUS=1\n"),
+            ("IEBUPDTE", "SYSIN", "./ ADD NAME=M,BOGUS=1\n./ ENDUP\n"),
+            ("SORT", "SYSIN", " INCLUDE COND=(1,1,CH,EQ,C'A')\n"),
+            ("SORT", "SYSIN", "* comment only\n"),
+            ("IEBCOPY", "SYSIN", " COPY\n COPY\n"),
+            ("IEBDG", "SYSIN", " CREATE QUANTITY=1,VALUE=DSD\n"),
+        ] {
+            let mut case = input(source, control.as_bytes());
+            add_dd(&mut case, "SYSUT1", b"A\n");
+            add_dd(&mut case, "SYSUT2", b"");
+            add_dd(&mut case, "SORTIN", b"A\n");
+            add_dd(&mut case, "SORTOUT", b"");
+            case.dds
+                .iter_mut()
+                .find(|dd| dd.name == "SYSUT2")
+                .unwrap()
+                .member = Some("M".into());
+            assert_eq!(
+                Builtin(common_program(program).unwrap()).execute(&invocation(), &case),
+                Err(HostProblem::Unsupported),
+                "{program}: {control}"
+            );
+        }
+        let mut no_sysin = input("SORTIN", b"B\nA\n");
+        add_dd(&mut no_sysin, "SORTOUT", b"");
+        assert_eq!(
+            Builtin(common_program("SORT").unwrap()).execute(&invocation(), &no_sysin),
+            Err(HostProblem::Unsupported)
+        );
+    }
+
+    #[test]
+    fn carddemo_control_forms_match_declarations() {
+        // Pinned app/jcl and app/proc forms: DUMMY IEBGENER SYSIN, IDCAMS
+        // SYSIN, SDSF ISFIN, and the five SORT SYSIN layouts.
+        assert!(validate_program_controls("IEFBR14", &input("SYSIN", b"ignored\n")).is_ok());
+        assert!(validate_program_controls("IEBGENER", &input("SYSIN", b"")).is_ok());
+        assert!(validate_program_controls("IEBGENER", &input("SYSIN", b"\n")).is_ok());
+        for control in [
+            " DELETE AWS.M2.CARDDEMO.TRXFL.SEQ\n",
+            " DEFINE CLUSTER (NAME(AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS))\n",
+            " REPRO INFILE(IN) OUTFILE(OUT)\n",
+            " BLDINDEX INDATASET(IN) OUTDATASET(OUT)\n",
+            " IF LASTCC=12 THEN SET MAXCC=0\n",
+        ] {
+            assert!(
+                validate_program_controls("IDCAMS", &input("SYSIN", control.as_bytes())).is_ok()
+            );
+        }
+        for control in [
+            "/F CICSAWSA,'CEMT SET FIL(ACCTDAT ) CLO'\n",
+            "/F CICSAWSA,'CEMT SET FIL(ACCTDAT ) OPE'\n",
+        ] {
+            assert!(validate_program_controls("SDSF", &input("ISFIN", control.as_bytes())).is_ok());
+        }
+        for (control, symbols) in [
+            (" SORT FIELDS=(TRAN-ID,A)\n", "TRAN-ID,1,16,CH\n"),
+            (
+                " SORT FIELDS=(TRAN-CARD-NUM,A)\n INCLUDE COND=(TRAN-PROC-DT,GE,PARM-START-DATE,AND,\n TRAN-PROC-DT,LE,PARM-END-DATE)\n",
+                "TRAN-CARD-NUM,263,16,ZD\nTRAN-PROC-DT,305,10,CH\nPARM-START-DATE,C'2022-01-01'\nPARM-END-DATE,C'2022-07-06'\n",
+            ),
+            (
+                " SORT FIELDS=(TRANCAT-ACCT-ID,A,TRANCAT-TYPE-CD,A,TRANCAT-CD,A)\n OUTREC FIELDS=(TRANCAT-ACCT-ID,X,\n TRANCAT-TYPE-CD,X,\n TRANCAT-CD,X,\n TRAN-CAT-BAL,EDIT=(TTTTTTTTT.TT),9X)\n",
+                "TRANCAT-ACCT-ID,1,11,ZD\nTRANCAT-TYPE-CD,12,2,CH\nTRANCAT-CD,14,4,ZD\nTRAN-CAT-BAL,18,11,ZD\n",
+            ),
+            (
+                " SORT FIELDS=(263,16,CH,A,1,16,CH,A)\n OUTREC FIELDS=(1:263,16,17:1,262,279:279,50)\n",
+                "",
+            ),
+        ] {
+            let mut case = input("SORTIN", b"");
+            add_dd(&mut case, "SYSIN", control.as_bytes());
+            add_dd(&mut case, "SYMNAMES", symbols.as_bytes());
+            assert!(validate_program_controls("SORT", &case).is_ok());
+            assert!(
+                sort_control::execute(&case, Vec::new()).is_ok(),
+                "{control}"
+            );
+        }
+    }
+
+    #[test]
     fn generate_and_sort_transform_exact_records() {
         assert_eq!(
             Builtin(common_program("IEBGENER").unwrap())
@@ -1066,6 +1416,7 @@ mod tests {
         let mut sort_input = input("SORTIN", b"B\nA\n");
         let mut sort_output = input("SORTOUT", b"");
         sort_input.dds.append(&mut sort_output.dds);
+        add_dd(&mut sort_input, "SYSIN", b" SORT FIELDS=(1,1,CH,A)\n");
         assert_eq!(
             Builtin(common_program("SORT").unwrap())
                 .execute(&invocation(), &sort_input)
