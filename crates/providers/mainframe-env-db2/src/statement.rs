@@ -1,5 +1,6 @@
 //! Owned transaction-statement syntax; parsing has no execution side effects.
 
+mod create_table;
 mod cursor;
 mod dynamic;
 mod query;
@@ -8,6 +9,12 @@ pub use cursor::{
     Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget, Db2CursorReturnability,
     Db2CursorRowsetPositioning, Db2CursorSensitivity, Db2DeclareCursorPreparedStatement,
     Db2SensitiveCursorKind, parse_db2_cursor_statement, parse_db2_declare_cursor_prepared,
+};
+
+pub use create_table::{
+    Db2ColumnDefault, Db2CreateTableColumn, Db2CreateTableConstraint, Db2CreateTableStatement,
+    Db2DefaultSpelling, Db2ForeignKeyConstraint, Db2OnDeleteAction, Db2TableConstraintKind,
+    parse_db2_create_table_statement,
 };
 
 pub use dynamic::{

@@ -78,3 +78,11 @@ It reuses the owned expression parser and rejects joins, aliases, set operators,
 subqueries, SELECT INTO, and outer SELECT clauses with located diagnostics.
 Fullselect and inline cursor integration remain pending. This syntax has no
 execution route or whole-row recognition credit.
+
+The proposed common CREATE TABLE parser owns one named-table definition with
+bounded columns, built-in or distinct type syntax, NOT NULL, constant or NULL
+defaults, and table PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints with the
+recorded ON DELETE actions. It rejects unsupported column and physical-table
+clauses, including CHECK, before binding or execution. The public syntax is
+disconnected from the SQL execution route and earns no whole-row recognition
+or conformance credit.

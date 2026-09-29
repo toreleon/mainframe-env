@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover bounded common Db2 CREATE TABLE syntax and its public parser surface without execution or whole-row recognition credit (#344)."
