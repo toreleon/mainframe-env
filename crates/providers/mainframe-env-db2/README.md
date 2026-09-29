@@ -32,3 +32,8 @@ package/plan, and distributed portfolio assigned to later versions. Verify with
 `cargo test -p mainframe-env-db2 --locked`, `cargo xtask db2-catalog --check`,
 `cargo xtask db2-statement-catalog --check`, and the pinned CardDemo Db2 and
 authorization gates.
+
+The proposed 0.12 lexer is a separate owned, bounded token stream for later
+parser slices. It exposes token kinds, byte and line/column spans, diagnostics,
+and a peekable cursor; it does not route SQL to execution. Float and decfloat
+constant forms fail with a source-pending diagnostic under issue #350.
