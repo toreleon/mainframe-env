@@ -1,15 +1,46 @@
 #[test]
 fn compiled_online_source_resolved_bts_browse_recovers_after_sqlite_restart() {
-    compiled_bts_browse_recovers_after_restart(None);
+    compiled_bts_browse_recovers_after_restart(None, None);
+}
+
+#[test]
+fn compiled_getnext_eventtype_writes_cvda_and_advances_once_after_sqlite_restart() {
+    compiled_bts_browse_recovers_after_restart(None, Some(("EVENTTYPE", 1004)));
+}
+
+#[test]
+fn compiled_getnext_firestatus_writes_cvda_and_advances_once_after_sqlite_restart() {
+    compiled_bts_browse_recovers_after_restart(None, Some(("FIRESTATUS", 1000)));
 }
 
 #[test]
 #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
 fn postgres_compiled_bts_browse_cursor_recovers_after_restart() {
-    compiled_bts_browse_recovers_after_restart(Some(required_postgres_route_url()));
+    compiled_bts_browse_recovers_after_restart(Some(required_postgres_route_url()), None);
 }
 
-fn compiled_bts_browse_recovers_after_restart(postgres_url: Option<String>) {
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+fn postgres_compiled_getnext_eventtype_writes_cvda_and_advances_once_after_restart() {
+    compiled_bts_browse_recovers_after_restart(
+        Some(required_postgres_route_url()),
+        Some(("EVENTTYPE", 1004)),
+    );
+}
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+fn postgres_compiled_getnext_firestatus_writes_cvda_and_advances_once_after_restart() {
+    compiled_bts_browse_recovers_after_restart(
+        Some(required_postgres_route_url()),
+        Some(("FIRESTATUS", 1000)),
+    );
+}
+
+fn compiled_bts_browse_recovers_after_restart(
+    postgres_url: Option<String>,
+    getnext_metadata: Option<(&str, i32)>,
+) {
     use mainframe_env_cics::bts_lifecycle::{BtsProcessTypeDefinition, BtsTransactionDefinition};
     use mainframe_env_cics::bts_browse::{BrowseEffect, BrowseEventMetadata, BrowseItem, BrowseKind, BrowseOutcome, BrowseOwner, BrowseScope, BtsBrowseStore};
 
@@ -128,6 +159,8 @@ fn compiled_bts_browse_recovers_after_restart(postgres_url: Option<String>) {
         "01 ITEM-X PIC X(16). 01 DATA-X PIC X(4) VALUE 'DATA'. ",
         "01 LEN-X PIC S9(9) COMP. 01 RESP-X PIC S9(9) COMP. ",
         "01 CVDA-X PIC S9(9) COMP. 01 ABS-X PIC S9(15) COMP-3. ",
+        "01 GET-CVDA PIC S9(9) COMP. 01 GET-RESP PIC S9(9) COMP. ",
+        "01 NEXT-EVENT PIC X(16). 01 NEXT-RESP PIC S9(9) COMP. ",
         "PROCEDURE DIVISION. ",
         "EXEC CICS STARTBROWSE PROCESS PROCESSTYPE('TYPE') BROWSETOKEN(TOKEN-X) END-EXEC. ",
         "EXEC CICS GETNEXT PROCESS(PROCESS-X) BROWSETOKEN(TOKEN-X) ACTIVITYID(ROOT-X) END-EXEC. ",
@@ -157,7 +190,20 @@ fn compiled_bts_browse_recovers_after_restart(postgres_url: Option<String>) {
         "EXEC CICS INQUIRE CONTAINER('MISSING') PROCESS('ORDER') PROCESSTYPE('TYPE') DATALENGTH(LEN-X) RESP(RESP-X) END-EXEC. ",
         "STOP RUN."
     );
-    let artifact = published_source_fixture("BTSBR", source);
+    let source = if let Some((field, _)) = getnext_metadata {
+        source
+            .replace(
+                "EXEC CICS GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) TIMER(ITEM-X) END-EXEC. ",
+                &format!(
+                    "EXEC CICS GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) {field}(GET-CVDA) RESP(GET-RESP) END-EXEC. \
+                     EXEC CICS GETNEXT EVENT(NEXT-EVENT) BROWSETOKEN(TOKEN-X) RESP(NEXT-RESP) END-EXEC. "
+                ),
+            )
+            .replace("STOP RUN.", "EXEC CICS SUSPEND END-EXEC. STOP RUN.")
+    } else {
+        source.to_owned()
+    };
+    let artifact = published_source_fixture("BTSBR", &source);
     let artifact_ref = ArtifactRef::new(
         format!("sha256:{:x}", Sha256::digest(artifact.payload())),
         InvocationLimits::default(),
@@ -242,6 +288,24 @@ fn compiled_bts_browse_recovers_after_restart(postgres_url: Option<String>) {
     second
         .run_online_exchange(&session, &principal, "BTSBR", tick)
         .unwrap();
+    if let Some((_, expected_cvda)) = getnext_metadata {
+        let continuation = second.online_machine_continuation(&session).unwrap().unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored.restore_checkpoint(&continuation.checkpoint).unwrap();
+        assert_eq!(restored.variable("EVENT-X").unwrap().bytes(), b"BELL            ");
+        assert_eq!(restored.variable("GET-CVDA").unwrap().bytes(), &expected_cvda.to_be_bytes());
+        assert_eq!(restored.variable("GET-RESP").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("NEXT-EVENT").unwrap().bytes(), b"READY           ");
+        assert_eq!(restored.variable("NEXT-RESP").unwrap().bytes(), &[0; 4]);
+        second
+            .run_online_exchange(&session, &principal, "BTSBR", tick)
+            .unwrap();
+    }
     let cursor = second_store
         .get_provider_state("cics-bts-browse-v1", invocation.run_unit_id.as_str())
         .unwrap()
