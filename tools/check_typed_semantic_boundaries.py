@@ -164,8 +164,17 @@ def check_cics_descriptor_entries(root: Path) -> None:
         production(read(root, path.relative_to(root).as_posix()))
         for path in [entries_dir.with_suffix(".rs"), *sorted(entries_dir.glob("*.rs"))]
     )
+    require(
+        re.search(
+            r"^pub (?:const|static) CICS_EXECUTABLE_DESCRIPTORS: "
+            r"\[CicsExecutableDescriptor; [0-9]+\] = \[",
+            cics_descriptor_entries,
+            re.MULTILINE,
+        )
+        is not None,
+        "typed CICS descriptor registry omits the pub const or pub static array",
+    )
     for required in [
-        "pub const CICS_EXECUTABLE_DESCRIPTORS",
         'namespace: "cics.file"',
         'namespace: "cics.recovery"',
         "operation: CicsPlanOperation::Read",
