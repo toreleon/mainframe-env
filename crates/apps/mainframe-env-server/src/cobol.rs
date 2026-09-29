@@ -1,5 +1,5 @@
 use mainframe_env_batch::{
-    Program, ProgramInput, ProgramOutput, ProgramRouter, SystemServiceProgram,
+    Program, ProgramInput, ProgramOutput, ProgramRouter, ProgramTermination, SystemServiceProgram,
     system_service_program,
 };
 use mainframe_env_cics::cics_abi_library;
@@ -569,16 +569,27 @@ impl CobolProgram {
                     .map(<[u8]>::to_vec)
                     .collect(),
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             }),
             ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
                 return_code: condition.response,
                 records: vec![condition.name.into_bytes()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             }),
-            ExecutionOutcome::Abend(abend) => Err(HostProblem::Condition {
-                name: format!("ABEND:{}", abend.code),
-                response: -1,
-                response2: 0,
+            ExecutionOutcome::Abend(abend) => Ok(ProgramOutput {
+                return_code: -1,
+                records: machine
+                    .output()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|record| !record.is_empty())
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+                dd_outputs: BTreeMap::new(),
+                termination: Some(ProgramTermination::Abend {
+                    code: abend.code,
+                    condition_name: None,
+                }),
             }),
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
@@ -738,17 +749,28 @@ impl Program for CobolProgram {
                         .map(<[u8]>::to_vec)
                         .collect(),
                     dd_outputs: BTreeMap::new(),
+                    termination: None,
                 })
             }
             ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
                 return_code: condition.response,
                 records: vec![condition.name.into_bytes()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             }),
-            ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
-                name: "ABEND".into(),
-                response: -1,
-                response2: 0,
+            ExecutionOutcome::Abend(abend) => Ok(ProgramOutput {
+                return_code: -1,
+                records: machine
+                    .output()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|record| !record.is_empty())
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+                dd_outputs: BTreeMap::new(),
+                termination: Some(ProgramTermination::Abend {
+                    code: abend.code,
+                    condition_name: Some("ABEND".into()),
+                }),
             }),
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),

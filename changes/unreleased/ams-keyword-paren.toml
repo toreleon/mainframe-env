@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Accept IDCAMS DEFINE CLUSTER( without a space before the parameter list (#313)."
