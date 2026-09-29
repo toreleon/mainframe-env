@@ -1554,6 +1554,7 @@ impl BatchService {
             self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
             let allocation_plans = plan_dd_allocations(&step.dds)?;
             let mut allocations = Vec::new();
+            let mut program_abend_code = None;
             let step_result = (|| -> Result<crate::ProgramOutput, HostProblem> {
                 allocations = self.allocate_dds(
                     invocation,
@@ -1655,6 +1656,42 @@ impl BatchService {
                 )?;
                 Ok(output)
             })();
+            let step_result = step_result.and_then(|output| {
+                if let Some(crate::ProgramTermination::Abend {
+                    code,
+                    condition_name,
+                }) = &output.termination
+                {
+                    let mut problem = HostProblem::Condition {
+                        name: format!("ABEND:{code}"),
+                        response: -1,
+                        response2: 0,
+                    };
+                    if abend_code(&problem).is_none() {
+                        return Err(HostProblem::Malformed);
+                    }
+                    if let Some(name) = condition_name {
+                        problem = HostProblem::Condition {
+                            name: name.clone(),
+                            response: -1,
+                            response2: 0,
+                        };
+                    }
+                    self.append_spool_records(
+                        invocation,
+                        job,
+                        Some(&step.name),
+                        step.dds
+                            .iter()
+                            .find(|dd| dd.name.eq_ignore_ascii_case("SYSPRINT")),
+                        "SYSPRINT",
+                        output.records,
+                    )?;
+                    program_abend_code = Some(code.clone());
+                    return Err(problem);
+                }
+                Ok(output)
+            });
             let output = match step_result {
                 Ok(output) => output,
                 Err(problem) => {
@@ -1678,7 +1715,8 @@ impl BatchService {
                         )?;
                     }
                     let terminal_problem = problem;
-                    if let Some(code) = abend_code(&terminal_problem) {
+                    if let Some(code) = program_abend_code.or_else(|| abend_code(&terminal_problem))
+                    {
                         first_abend.get_or_insert_with(|| code.clone());
                         job.abend_code = Some(code.clone());
                         self.mark_step(
@@ -2261,6 +2299,7 @@ impl BatchService {
                     vec![format!("{} COMMANDS COMPLETED", controls.len()).into_bytes()],
                 ),
             ]),
+            termination: None,
         })
     }
 
@@ -2291,6 +2330,7 @@ impl BatchService {
                 return_code: i32::from(result.sqlcode != 0) * 8,
                 records: vec![format!("IKJEFT01 SQLCODE={}", result.sqlcode).into_bytes()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             });
         }
         let program = tso_run_program(&control)?;
@@ -2371,6 +2411,7 @@ impl BatchService {
                 .into_bytes(),
             ],
             dd_outputs,
+            termination: None,
         })
     }
 
@@ -2538,6 +2579,7 @@ impl BatchService {
                         format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
                     ],
                     dd_outputs: BTreeMap::new(),
+                    termination: None,
                 })
             }
             BatchControllerPlan::ImsUnload {
@@ -2591,6 +2633,7 @@ impl BatchService {
                         format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
                     ],
                     dd_outputs,
+                    termination: None,
                 })
             }
             BatchControllerPlan::ImsPurge {
@@ -2735,6 +2778,7 @@ impl BatchService {
                     )
                     .into_bytes()],
                     dd_outputs: BTreeMap::new(),
+                    termination: None,
                 })
             }
         }
@@ -11035,6 +11079,7 @@ mod tests {
                 return_code: 4,
                 records: vec![b"COBOL OUTPUT".to_vec()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             })
         }
     }

@@ -41,11 +41,23 @@ pub struct ProgramInput {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ProgramTermination {
+    Abend {
+        code: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        condition_name: Option<String>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProgramOutput {
     pub return_code: i32,
     pub records: Vec<Vec<u8>>,
     #[serde(default)]
     pub dd_outputs: BTreeMap<String, Vec<Vec<u8>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub termination: Option<ProgramTermination>,
 }
 
 pub trait Program: Send + Sync {
@@ -1018,6 +1030,7 @@ fn iebupdte(input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
         return_code: 0,
         records: vec![format!("IEBUPDTE MEMBER={member} RECORDS={count}").into_bytes()],
         dd_outputs: BTreeMap::from([("SYSUT2".into(), records)]),
+        termination: None,
     })
 }
 
@@ -1086,6 +1099,7 @@ fn output(return_code: i32, records: Vec<Vec<u8>>) -> Result<ProgramOutput, Host
         return_code,
         records,
         dd_outputs: BTreeMap::new(),
+        termination: None,
     })
 }
 
@@ -1099,6 +1113,7 @@ fn output_to(
         return_code,
         records: vec![format!("{dd} RECORDS={count}").into_bytes()],
         dd_outputs: BTreeMap::from([(dd.into(), records)]),
+        termination: None,
     })
 }
 
