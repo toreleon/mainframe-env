@@ -337,7 +337,10 @@ mod tests {
 
     #[test]
     fn bts_event_metadata_accepts_numeric_provider_payloads() {
-        for operation in [CicsOperation::BtsGetNextEvent, CicsOperation::BtsInquireEvent] {
+        for operation in [
+            CicsOperation::BtsGetNextEvent,
+            CicsOperation::BtsInquireEvent,
+        ] {
             for (name, coefficient) in [
                 ("EVENTTYPE", 226i128),
                 ("EVENTTYPE", 1002),
@@ -364,7 +367,10 @@ mod tests {
 
     #[test]
     fn bts_event_metadata_rejects_wrong_schema_and_malformed_numbers() {
-        for operation in [CicsOperation::BtsGetNextEvent, CicsOperation::BtsInquireEvent] {
+        for operation in [
+            CicsOperation::BtsGetNextEvent,
+            CicsOperation::BtsInquireEvent,
+        ] {
             for name in ["EVENTTYPE", "FIRESTATUS"] {
                 for (schema, bytes) in [
                     ("mainframe-env.cics.cvda@1", b"INPUT".as_slice()),
