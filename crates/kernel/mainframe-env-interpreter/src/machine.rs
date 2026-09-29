@@ -446,6 +446,7 @@ pub struct ReferenceMachine {
     entry_initials: BTreeMap<StorageId, Vec<u8>>,
     implicit: BTreeMap<String, CobolValue>,
     layouts: BTreeMap<String, LayoutMetadata>,
+    entry_formals: Vec<String>,
     simple_layouts: BTreeMap<String, Vec<String>>,
     files: BTreeMap<String, FileMetadata>,
     declaratives: BTreeMap<String, String>,
@@ -692,6 +693,8 @@ impl ReferenceMachine {
             .transpose()?
             .unwrap_or_default();
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
+        let entry_formals = mainframe_env_ir::cobol_entry_formals(&module)
+            .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))?;
         let dynamic_lengths = layouts
             .values()
             .filter(|layout| layout.dynamic)
@@ -708,15 +711,33 @@ impl ReferenceMachine {
         if let Some(call) = invocation.bindings.get("cobol.call.arguments") {
             let batch_main = call.schema() == "mainframe-env.cobol.batch-main@1";
             let values = decode_call_arguments(call)?;
-            let mut linkage = layouts
-                .values()
-                .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
-                .collect::<Vec<_>>();
-            linkage.sort_by_key(|layout| layout.offset);
-            if linkage.len() < values.len() && !(batch_main && linkage.is_empty()) {
+            let formals: &[String] = match entry_formals.as_ref() {
+                Some(formals) => formals,
+                None if batch_main
+                    && !layouts
+                        .values()
+                        .any(|layout| layout.linkage && layout.parent.is_none()) =>
+                {
+                    &[]
+                }
+                None => {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "missing entry_formals_v1".into(),
+                    ));
+                }
+            };
+            if formals.len() < values.len() && !(batch_main && formals.is_empty()) {
                 return Err(MachineProblem::InvalidOperation);
             }
-            for (layout, value) in linkage.into_iter().zip(values) {
+            for (formal, value) in formals.iter().zip(values) {
+                let layout = layouts
+                    .get(&normalize(&formal))
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                if !layout.linkage || layout.parent.is_some() || layout.length == 0 {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "invalid entry formal layout".into(),
+                    ));
+                }
                 let storage = module
                     .storage()
                     .iter()
@@ -772,6 +793,7 @@ impl ReferenceMachine {
             entry_initials,
             implicit: std::mem::take(&mut implicit),
             layouts,
+            entry_formals: entry_formals.unwrap_or_default(),
             simple_layouts,
             files,
             declaratives,
@@ -1555,15 +1577,9 @@ impl ReferenceMachine {
     }
 
     pub fn linkage_values(&self) -> Result<Vec<Vec<u8>>, MachineProblem> {
-        let mut linkage = self
-            .layouts
-            .values()
-            .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
-            .collect::<Vec<_>>();
-        linkage.sort_by_key(|layout| layout.offset);
-        linkage
-            .into_iter()
-            .map(|layout| self.read(&layout.name))
+        self.entry_formals
+            .iter()
+            .map(|name| self.read(name))
             .collect()
     }
 
@@ -12706,6 +12722,70 @@ mod tests {
         )
         .unwrap();
         mainframe_env_ir::encode_binary(&b.finish().unwrap(), CodecLimits::default()).unwrap()
+    }
+
+    #[test]
+    fn entry_argument_metadata_rejects_legacy_and_preserves_no_using_batch_entry() {
+        let mut legacy = invocation();
+        legacy.bindings.insert(
+            "cobol.call.arguments".into(),
+            encode_call_values(&["ARG".into()], &[b"X".to_vec()]).unwrap(),
+        );
+        assert!(matches!(
+            ReferenceMachine::from_binary(&binary(), legacy, CodecLimits::default()),
+            Err(MachineProblem::InvalidArtifact(detail)) if detail == "missing entry_formals_v1"
+        ));
+
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "config", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("arithmetic_mode".into(), Attribute::Text("extended".into())),
+                    ("entry_formals_v1".into(), Attribute::Text(String::new())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let encoded =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut batch = invocation();
+        let payload = encode_call_values(&["PARM".into()], &[b"2022071800".to_vec()]).unwrap();
+        batch.bindings.insert(
+            "cobol.call.arguments".into(),
+            BoundedPayload::new(
+                "mainframe-env.cobol.batch-main@1",
+                payload.bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert!(
+            ReferenceMachine::from_binary(&binary(), batch.clone(), CodecLimits::default()).is_ok()
+        );
+        let machine =
+            ReferenceMachine::from_binary(&encoded, batch, CodecLimits::default()).unwrap();
+        assert!(machine.linkage_values().unwrap().is_empty());
     }
     fn display_fixture() -> ReferenceMachine {
         let mut machine =

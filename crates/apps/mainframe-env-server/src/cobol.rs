@@ -1343,6 +1343,62 @@ mod tests {
     }
 
     #[test]
+    fn batch_main_parm_skips_unused_preceding_linkage() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PARMORD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DISPLAY-LENGTH PIC 9(4).\nLINKAGE SECTION.\n01 UNUSED-AREA PIC X(12).\n01 PARM-AREA.\n  05 PARM-LENGTH PIC S9(4) COMP.\n  05 PARM-DATE PIC X(10).\nPROCEDURE DIVISION USING PARM-AREA.\nMOVE PARM-LENGTH TO DISPLAY-LENGTH.\nDISPLAY DISPLAY-LENGTH.\nDISPLAY PARM-DATE.\nDISPLAY UNUSED-AREA.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=PARMORD,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(
+            output.records,
+            vec![b"0010".to_vec(), b"2022071800".to_vec(), vec![0; 12]]
+        );
+    }
+
+    #[test]
+    fn batch_main_with_linkage_but_no_using_ignores_parm() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. NOUSING.\nDATA DIVISION.\nLINKAGE SECTION.\n01 UNUSED-AREA PIC X(12).\nPROCEDURE DIVISION.\nDISPLAY UNUSED-AREA.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=NOUSING,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let mut input = ProgramInput {
+            parameter: Some("2022071800".into()),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records, vec![vec![0; 12]]);
+        input.parameter = None;
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records, vec![vec![0; 12]]);
+    }
+
+    #[test]
     fn batch_main_parm_text_concatenates_with_native_storage() {
         // CardDemo CBACT01C builds TRAN-ID with STRING PARM-DATE, WS-TRANID-SUFFIX (#266):
         // the PARM text must be in the runtime's native storage encoding, not raw CP037.
