@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed #254: WRITE without FROM now writes the record-name contents, including fixed-length report records."

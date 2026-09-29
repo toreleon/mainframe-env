@@ -243,6 +243,95 @@ pub(super) fn invalid_shape(
         })
 }
 
+pub(super) fn option_allowed(operation: CicsPlanOperation, option: CicsPlanOption) -> bool {
+    if option == CicsPlanOption::NoHandle {
+        return true;
+    }
+    matches!(
+        (operation, option),
+        (
+            CicsPlanOperation::ReceiveConversation,
+            CicsPlanOption::ConversationDataNotruncate
+        ) | (
+            CicsPlanOperation::GdsReceiveConversation,
+            CicsPlanOption::ConversationDataBuffer | CicsPlanOption::ConversationDataLlid
+        ) | (
+            CicsPlanOperation::SendConversation,
+            CicsPlanOption::ConversationDataInvite
+                | CicsPlanOption::ConversationDataLast
+                | CicsPlanOption::ConversationDataConfirm
+                | CicsPlanOption::ConversationDataWait
+                | CicsPlanOption::ConversationDataFmh
+                | CicsPlanOption::ConversationDataDefresp
+        ) | (
+            CicsPlanOperation::AllocateConversation | CicsPlanOperation::GdsAllocateConversation,
+            CicsPlanOption::ConversationNoQueue
+        ) | (
+            CicsPlanOperation::Converse,
+            CicsPlanOption::ConversationNotruncate
+                | CicsPlanOption::ConversationDefresp
+                | CicsPlanOption::ConversationFmh
+        )
+    )
+}
+
+pub(super) const fn output_allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
+    if matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2) {
+        return true;
+    }
+    matches!(
+        (operation, output),
+        (
+            CicsPlanOperation::ReceiveConversation
+                | CicsPlanOperation::GdsReceiveConversation
+                | CicsPlanOperation::SendConversation
+                | CicsPlanOperation::GdsWaitConversation
+                | CicsPlanOperation::WaitConvid,
+            CicsOutputName::ConversationDataState
+        ) | (
+            CicsPlanOperation::ReceiveConversation,
+            CicsOutputName::ConversationDataInto
+                | CicsOutputName::ConversationDataSet
+                | CicsOutputName::ConversationDataLength
+                | CicsOutputName::ConversationDataFullLength
+        ) | (
+            CicsPlanOperation::GdsReceiveConversation,
+            CicsOutputName::ConversationDataInto
+                | CicsOutputName::ConversationDataSet
+                | CicsOutputName::ConversationDataFullLength
+        ) | (
+            CicsPlanOperation::GdsReceiveConversation | CicsPlanOperation::GdsWaitConversation,
+            CicsOutputName::ConversationDataRetcode | CicsOutputName::ConversationDataConvData
+        ) | (
+            CicsPlanOperation::AllocateConversation
+                | CicsPlanOperation::GdsAllocateConversation
+                | CicsPlanOperation::ConnectProcess
+                | CicsPlanOperation::GdsConnectProcess
+                | CicsPlanOperation::Converse
+                | CicsPlanOperation::FreeConversation
+                | CicsPlanOperation::GdsFreeConversation,
+            CicsOutputName::ConversationState
+        ) | (
+            CicsPlanOperation::GdsAllocateConversation,
+            CicsOutputName::ConversationConvid | CicsOutputName::ConversationRetcode
+        ) | (
+            CicsPlanOperation::GdsAssignConversation,
+            CicsOutputName::ConversationPrinConvid
+                | CicsOutputName::ConversationPrinSysid
+                | CicsOutputName::ConversationRetcode
+        ) | (
+            CicsPlanOperation::GdsConnectProcess | CicsPlanOperation::GdsFreeConversation,
+            CicsOutputName::ConversationRetcode | CicsOutputName::ConversationConvData
+        ) | (
+            CicsPlanOperation::Converse,
+            CicsOutputName::ConversationInto
+                | CicsOutputName::ConversationSet
+                | CicsOutputName::ConversationToLength
+                | CicsOutputName::ConversationToFullLength
+        )
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -554,93 +643,4 @@ mod tests {
             Err(CicsPlanCodecProblem::Malformed)
         );
     }
-}
-
-pub(super) fn option_allowed(operation: CicsPlanOperation, option: CicsPlanOption) -> bool {
-    if option == CicsPlanOption::NoHandle {
-        return true;
-    }
-    matches!(
-        (operation, option),
-        (
-            CicsPlanOperation::ReceiveConversation,
-            CicsPlanOption::ConversationDataNotruncate
-        ) | (
-            CicsPlanOperation::GdsReceiveConversation,
-            CicsPlanOption::ConversationDataBuffer | CicsPlanOption::ConversationDataLlid
-        ) | (
-            CicsPlanOperation::SendConversation,
-            CicsPlanOption::ConversationDataInvite
-                | CicsPlanOption::ConversationDataLast
-                | CicsPlanOption::ConversationDataConfirm
-                | CicsPlanOption::ConversationDataWait
-                | CicsPlanOption::ConversationDataFmh
-                | CicsPlanOption::ConversationDataDefresp
-        ) | (
-            CicsPlanOperation::AllocateConversation | CicsPlanOperation::GdsAllocateConversation,
-            CicsPlanOption::ConversationNoQueue
-        ) | (
-            CicsPlanOperation::Converse,
-            CicsPlanOption::ConversationNotruncate
-                | CicsPlanOption::ConversationDefresp
-                | CicsPlanOption::ConversationFmh
-        )
-    )
-}
-
-pub(super) const fn output_allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
-    if matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2) {
-        return true;
-    }
-    matches!(
-        (operation, output),
-        (
-            CicsPlanOperation::ReceiveConversation
-                | CicsPlanOperation::GdsReceiveConversation
-                | CicsPlanOperation::SendConversation
-                | CicsPlanOperation::GdsWaitConversation
-                | CicsPlanOperation::WaitConvid,
-            CicsOutputName::ConversationDataState
-        ) | (
-            CicsPlanOperation::ReceiveConversation,
-            CicsOutputName::ConversationDataInto
-                | CicsOutputName::ConversationDataSet
-                | CicsOutputName::ConversationDataLength
-                | CicsOutputName::ConversationDataFullLength
-        ) | (
-            CicsPlanOperation::GdsReceiveConversation,
-            CicsOutputName::ConversationDataInto
-                | CicsOutputName::ConversationDataSet
-                | CicsOutputName::ConversationDataFullLength
-        ) | (
-            CicsPlanOperation::GdsReceiveConversation | CicsPlanOperation::GdsWaitConversation,
-            CicsOutputName::ConversationDataRetcode | CicsOutputName::ConversationDataConvData
-        ) | (
-            CicsPlanOperation::AllocateConversation
-                | CicsPlanOperation::GdsAllocateConversation
-                | CicsPlanOperation::ConnectProcess
-                | CicsPlanOperation::GdsConnectProcess
-                | CicsPlanOperation::Converse
-                | CicsPlanOperation::FreeConversation
-                | CicsPlanOperation::GdsFreeConversation,
-            CicsOutputName::ConversationState
-        ) | (
-            CicsPlanOperation::GdsAllocateConversation,
-            CicsOutputName::ConversationConvid | CicsOutputName::ConversationRetcode
-        ) | (
-            CicsPlanOperation::GdsAssignConversation,
-            CicsOutputName::ConversationPrinConvid
-                | CicsOutputName::ConversationPrinSysid
-                | CicsOutputName::ConversationRetcode
-        ) | (
-            CicsPlanOperation::GdsConnectProcess | CicsPlanOperation::GdsFreeConversation,
-            CicsOutputName::ConversationRetcode | CicsOutputName::ConversationConvData
-        ) | (
-            CicsPlanOperation::Converse,
-            CicsOutputName::ConversationInto
-                | CicsOutputName::ConversationSet
-                | CicsOutputName::ConversationToLength
-                | CicsOutputName::ConversationToFullLength
-        )
-    )
 }

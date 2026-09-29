@@ -241,8 +241,9 @@ fn condition_code(value: &str) -> Result<u8, HostProblem> {
 
 fn command_entry(statement: &str) -> Option<&'static AmsGrammarEntry> {
     let tokens = statement
-        .split_whitespace()
+        .split(|ch: char| ch.is_whitespace() || ch == '(')
         .map(|token| token.trim_matches(['(', ')', ',']))
+        .filter(|token| !token.is_empty())
         .collect::<Vec<_>>();
     generated::AMS_GRAMMAR
         .iter()
@@ -455,6 +456,35 @@ mod tests {
         assert_eq!(operand(statement, &["TRACKS"]).as_deref(), Some("2 1"));
         assert_eq!(operand(statement, &["NAME"]).as_deref(), Some("USER.A"));
         assert_eq!(operand(statement, &["NEWNAME"]).as_deref(), Some("USER.B"));
+    }
+
+    #[test]
+    fn define_cluster_accepts_parenthesis_without_preceding_space() {
+        // z/OS 3.2 DFSMS AMS, "Positional and keyword parameters",
+        // SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/da6i2002.htm:
+        // blanks, commas, or comments around list parentheses are optional.
+        let compact = b"DEFINE CLUSTER(NAME(A.B) INDEXED KEYS(8 0) RECORDSIZE(80 80)) DATA(NAME(A.B.D)) INDEX(NAME(A.B.I))";
+        let spaced = b"DEFINE CLUSTER (NAME(A.B) INDEXED KEYS(8 0) RECORDSIZE(80 80)) DATA(NAME(A.B.D)) INDEX(NAME(A.B.I))";
+        let compact_result = parse_idcams_control(compact);
+        let spaced_result = parse_idcams_control(spaced);
+
+        let compact = compact_result.unwrap();
+        let spaced = spaced_result.unwrap();
+        let (AmsStatement::Command(compact), AmsStatement::Command(spaced)) =
+            (&compact[0], &spaced[0])
+        else {
+            panic!("expected DEFINE CLUSTER commands");
+        };
+        assert_eq!(compact.id(), spaced.id());
+        assert_eq!(compact.label(), spaced.label());
+        assert_eq!(compact.capability(), spaced.capability());
+        for keyword in ["NAME", "KEYS", "RECORDSIZE", "DATA", "INDEX"] {
+            assert_eq!(
+                operand(compact.source(), &[keyword]),
+                operand(spaced.source(), &[keyword])
+            );
+        }
+        assert_eq!(operand(compact.source(), &["KEYS"]).as_deref(), Some("8 0"));
     }
 
     #[test]
