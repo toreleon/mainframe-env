@@ -101,6 +101,8 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Versioning and releases](delivery/VERSIONING-AND-RELEASES.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)
 - [IBM coverage release plans](delivery/coverage-versions/README.md)
+- [Db2 0.12 reuse spike](delivery/coverage-versions/0.12.0-reuse-spike.md)
+- [Db2 0.12 proposed status](delivery/coverage-versions/status/0.12.0.md)
 - [Parallel implementation plan](delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md)
 - [Implementation prompt index](prompts/coverage-versions/README.md)
 

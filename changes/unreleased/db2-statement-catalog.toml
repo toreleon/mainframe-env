@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover the proposed Db2 0.12 reuse study and generated 174-row statement identity catalog with pinned topic hashes."
