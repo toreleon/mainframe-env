@@ -42,8 +42,7 @@ The proposed 0.12 AST primitives own normalized and delimited identifiers,
 qualified names, host and indicator references, built-in and distinct type
 syntax, literals, operators, and an append-only expression arena. Constructors
 bound names, type arguments, literals, lists, nodes, references, and depth.
-Expressions retain D2 source spans. Name resolution and type compatibility
-remain pending.
+Expressions retain D2 source spans. Name resolution remains pending.
 
 The proposed 0.12 transaction parser owns typed COMMIT, ROLLBACK, and SAVEPOINT
 syntax, including optional WORK, named or unnamed rollback targets, UNIQUE,
@@ -86,3 +85,12 @@ recorded ON DELETE actions. It rejects unsupported column and physical-table
 clauses, including CHECK, before binding or execution. The public syntax is
 disconnected from the SQL execution route and earns no whole-row recognition
 or conformance credit.
+
+The proposed common type boundary resolves the owned AST's built-in type syntax
+to bounded numeric, character, graphic, binary, and datetime shapes. It exposes
+directional assignment and symmetric comparison classifications, preserving
+nullability and timestamp time-zone distinctions. Distinct types, LOBs, ROWID,
+XML, explicit CCSID/collation, and context-sensitive datetime strings remain
+explicitly rejected or deferred. This pure boundary performs no conversion or
+execution. Float and decfloat *type shapes* use the pinned data-type topic;
+float, decfloat, and Boolean *constants* remain fenced on #350.
