@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 219,
+    "markdown_documents": 221,
     "navigation_groups": 5,
     "normative_documents": 57,
-    "xtask_commands": 207
+    "xtask_commands": 208
   },
   "documents": [
     {
@@ -258,9 +258,9 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
       "relative_links": 1,
-      "sha256": "sha256:98c63fd71740d6e31d4acb1999e03e4ea5aea2e5ccb282ba1007ca789f548185",
+      "sha256": "sha256:fcf93c3d379c5038e9b22049f47ccc211645294259e9fe9b6bf3a30f0f5a6ae0",
       "title": "mainframe-env-db2",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 93,
-      "sha256": "sha256:927509fc2611ac1556a9f64fb9330f324b736a47a6eab9f6392d8a85447ef6b9",
+      "relative_links": 95,
+      "sha256": "sha256:84656413b6d4fc01b4c90722eafc7246d82341ed3bb456303158d5509d20c3f1",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1060,6 +1060,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/0.12.0-reuse-spike.md",
+      "relative_links": 0,
+      "sha256": "sha256:cba7865f928e50999b6617ed44dfbb31c7e86607179e84fc6731c0cdd1abcc6f",
+      "title": "Db2 0.12 parser and executor reuse spike",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/0.12.0.md",
       "relative_links": 3,
       "sha256": "sha256:792bcb4030f06a8c29f42438f8d81e54cd0c625294d275a6b5919527a47a2864",
@@ -1281,6 +1289,14 @@
       "sha256": "sha256:66ce9a2923671daceac81cee4e54e369799cdaf446fe46b8ebca3bf7c13b8c1a",
       "title": "mainframe-env 0.11.0 implementation status",
       "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.12.0.md",
+      "relative_links": 1,
+      "sha256": "sha256:b460ec952833e3fca5a5c998c0a67ed1731c7eef9acba614848159cc795996f4",
+      "title": "mainframe-env 0.12.0 implementation status",
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -2242,6 +2258,14 @@
           "path": "docs/delivery/coverage-versions/README.md"
         },
         {
+          "label": "Db2 0.12 reuse spike",
+          "path": "docs/delivery/coverage-versions/0.12.0-reuse-spike.md"
+        },
+        {
+          "label": "Db2 0.12 proposed status",
+          "path": "docs/delivery/coverage-versions/status/0.12.0.md"
+        },
+        {
           "label": "Parallel implementation plan",
           "path": "docs/delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md"
         },
@@ -2371,7 +2395,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:35c79f79a943283f0f5ee5778546b9b4b21619ff7df15146b9443613ac838379",
+  "registry_sha256": "sha256:1bc898d0d807e0b4d782e834f7e290811797f0db4623f2b6d05cca3a7dc9cad1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

@@ -141,6 +141,8 @@
         {"label": "Versioning and releases", "path": "docs/delivery/VERSIONING-AND-RELEASES.md"},
         {"label": "z/OSMF compatibility API", "path": "docs/delivery/ZOSMF-API.md"},
         {"label": "IBM coverage release plans", "path": "docs/delivery/coverage-versions/README.md"},
+        {"label": "Db2 0.12 reuse spike", "path": "docs/delivery/coverage-versions/0.12.0-reuse-spike.md"},
+        {"label": "Db2 0.12 proposed status", "path": "docs/delivery/coverage-versions/status/0.12.0.md"},
         {"label": "Parallel implementation plan", "path": "docs/delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md"},
         {"label": "Implementation prompt index", "path": "docs/prompts/coverage-versions/README.md"}
       ],
