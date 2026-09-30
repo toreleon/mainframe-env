@@ -7,6 +7,7 @@ mod cics_administrative;
 mod cics_descriptor;
 mod cics_plan;
 mod cobol_config;
+mod cobol_floating_insertion;
 mod cobol_layout;
 mod cobol_reserved_words;
 mod codec;
@@ -55,16 +56,17 @@ pub use cics_plan::{
 };
 pub use cobol_config::{
     COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
-    COBOL_RUNTIME_CONFIG_MAJOR, COBOL_RUNTIME_CONFIG_NAME, COBOL_RUNTIME_CONFIG_NAMESPACE,
-    CobolAddressMode, CobolArithmeticMode, CobolDisplaySign, CobolRuntimeConfig,
-    CobolRuntimeConfigProblem, cobol_runtime_config,
+    COBOL_ENTRY_FORMALS_V1, COBOL_RUNTIME_CONFIG_MAJOR, COBOL_RUNTIME_CONFIG_NAME,
+    COBOL_RUNTIME_CONFIG_NAMESPACE, CobolAddressMode, CobolArithmeticMode, CobolDisplaySign,
+    CobolRuntimeConfig, CobolRuntimeConfigProblem, cobol_entry_formals, cobol_runtime_config,
 };
+pub use cobol_floating_insertion::cobol_floating_insertion_prefix;
 pub use cobol_layout::{
     COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES, COBOL_MAX_TABLE_KEYS,
-    COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES, cobol_index_name_is_valid,
-    cobol_layout_reference_matches, cobol_source_word_is_undefinable,
-    cobol_table_key_category_is_eligible, validate_cobol_condition_values,
-    validate_cobol_level78_value,
+    COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES,
+    cobol_floating_currency_prefix, cobol_index_name_is_valid, cobol_layout_reference_matches,
+    cobol_source_word_is_undefinable, cobol_table_key_category_is_eligible,
+    validate_cobol_condition_values, validate_cobol_level78_value,
 };
 pub use codec::{CodecLimits, IrCodecProblem, decode_binary, encode_binary, parse_text, to_text};
 pub use decimal_plan::{

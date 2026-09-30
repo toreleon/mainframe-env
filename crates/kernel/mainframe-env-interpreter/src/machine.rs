@@ -22,7 +22,8 @@ use mainframe_env_host_api::{
     RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector, TerminalRequest,
 };
 use mainframe_env_ir::{
-    Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
+    Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId,
+    cobol_floating_insertion_prefix, decode_binary,
 };
 use sha2::{Digest as _, Sha256};
 use std::cell::Cell;
@@ -34,14 +35,18 @@ mod amode64_access;
 mod completion;
 mod condition_literals;
 mod corresponding;
+mod decimal_capacity;
 mod decimal_commit;
 mod eib;
+#[cfg(test)]
+mod floating_insertion_tests;
 mod layout_admission;
 mod layout_resolution;
 mod snapshot_codec;
 mod typed_cics;
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};
+use decimal_capacity::decimal_exceeds_picture;
 
 const NAMESPACE: &str = "mainframe.core.cobol";
 pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
@@ -114,6 +119,7 @@ struct LayoutMetadata {
     picture: String,
     digits: usize,
     scale: u32,
+    native_binary: bool,
     signed: bool,
     sign_separate: bool,
     justified_right: bool,
@@ -148,6 +154,7 @@ struct ResolvedReference {
 struct FileMetadata {
     assignment: String,
     record_name: Option<String>,
+    record_names: Vec<String>,
     organization: String,
     access_mode: String,
     record_key: Option<String>,
@@ -313,6 +320,8 @@ enum PendingKind {
     },
     DatasetRead {
         target: Option<String>,
+        into: Option<String>,
+        depending_on: Option<String>,
         status: Option<String>,
         ccsid: Option<u16>,
         declarative: Option<String>,
@@ -446,6 +455,7 @@ pub struct ReferenceMachine {
     entry_initials: BTreeMap<StorageId, Vec<u8>>,
     implicit: BTreeMap<String, CobolValue>,
     layouts: BTreeMap<String, LayoutMetadata>,
+    entry_formals: Vec<String>,
     simple_layouts: BTreeMap<String, Vec<String>>,
     files: BTreeMap<String, FileMetadata>,
     declaratives: BTreeMap<String, String>,
@@ -692,6 +702,8 @@ impl ReferenceMachine {
             .transpose()?
             .unwrap_or_default();
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
+        let entry_formals = mainframe_env_ir::cobol_entry_formals(&module)
+            .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))?;
         let dynamic_lengths = layouts
             .values()
             .filter(|layout| layout.dynamic)
@@ -706,16 +718,35 @@ impl ReferenceMachine {
                 }));
         }
         if let Some(call) = invocation.bindings.get("cobol.call.arguments") {
+            let batch_main = call.schema() == "mainframe-env.cobol.batch-main@1";
             let values = decode_call_arguments(call)?;
-            let mut linkage = layouts
-                .values()
-                .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
-                .collect::<Vec<_>>();
-            linkage.sort_by_key(|layout| layout.offset);
-            if linkage.len() < values.len() {
+            let formals: &[String] = match entry_formals.as_ref() {
+                Some(formals) => formals,
+                None if batch_main
+                    && !layouts
+                        .values()
+                        .any(|layout| layout.linkage && layout.parent.is_none()) =>
+                {
+                    &[]
+                }
+                None => {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "missing entry_formals_v1".into(),
+                    ));
+                }
+            };
+            if formals.len() < values.len() && !(batch_main && formals.is_empty()) {
                 return Err(MachineProblem::InvalidOperation);
             }
-            for (layout, value) in linkage.into_iter().zip(values) {
+            for (formal, value) in formals.iter().zip(values) {
+                let layout = layouts
+                    .get(&normalize(&formal))
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                if !layout.linkage || layout.parent.is_some() || layout.length == 0 {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "invalid entry formal layout".into(),
+                    ));
+                }
                 let storage = module
                     .storage()
                     .iter()
@@ -771,6 +802,7 @@ impl ReferenceMachine {
             entry_initials,
             implicit: std::mem::take(&mut implicit),
             layouts,
+            entry_formals: entry_formals.unwrap_or_default(),
             simple_layouts,
             files,
             declaratives,
@@ -1554,15 +1586,9 @@ impl ReferenceMachine {
     }
 
     pub fn linkage_values(&self) -> Result<Vec<Vec<u8>>, MachineProblem> {
-        let mut linkage = self
-            .layouts
-            .values()
-            .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
-            .collect::<Vec<_>>();
-        linkage.sort_by_key(|layout| layout.offset);
-        linkage
-            .into_iter()
-            .map(|layout| self.read(&layout.name))
+        self.entry_formals
+            .iter()
+            .map(|name| self.read(name))
             .collect()
     }
 
@@ -1670,7 +1696,9 @@ impl ReferenceMachine {
             }
             (
                 PendingKind::DatasetRead {
-                    target: Some(target),
+                    target,
+                    into,
+                    depending_on,
                     status,
                     ccsid,
                     ..
@@ -1685,7 +1713,17 @@ impl ReferenceMachine {
                     "00".into()
                 };
                 if let Some(record) = records.first() {
-                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                    let decoded = decode_dataset_record(ccsid, record)?;
+                    if let Some(target) = target {
+                        self.finish_dataset_read(
+                            &target,
+                            into.as_deref(),
+                            depending_on.as_deref(),
+                            &decoded,
+                        )?;
+                    } else if let Some(into) = into {
+                        self.write(&into, &decoded)?;
+                    }
                 }
                 if let Some(status) = status {
                     self.write(&status, if records.is_empty() { b"10" } else { b"00" })?;
@@ -1694,6 +1732,8 @@ impl ReferenceMachine {
             (
                 PendingKind::DatasetRead {
                     target,
+                    into,
+                    depending_on,
                     status,
                     ccsid,
                     ..
@@ -1707,8 +1747,18 @@ impl ReferenceMachine {
                 } else {
                     "10".into()
                 };
-                if let Some((target, record)) = target.zip(record.as_ref()) {
-                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                if let Some(record) = record.as_ref() {
+                    let decoded = decode_dataset_record(ccsid, record)?;
+                    if let Some(target) = target {
+                        self.finish_dataset_read(
+                            &target,
+                            into.as_deref(),
+                            depending_on.as_deref(),
+                            &decoded,
+                        )?;
+                    } else if let Some(into) = into {
+                        self.write(&into, &decoded)?;
+                    }
                 }
                 if let Some(status) = status {
                     self.write(&status, if record.is_some() { b"00" } else { b"10" })?;
@@ -3967,7 +4017,10 @@ impl ReferenceMachine {
         let file = self.files.get(&logical_name).cloned().or_else(|| {
             self.files
                 .values()
-                .find(|file| file.record_name.as_deref() == Some(logical_name.as_str()))
+                .find(|file| {
+                    file.record_name.as_deref() == Some(logical_name.as_str())
+                        || file.record_names.iter().any(|name| name == &logical_name)
+                })
                 .cloned()
         });
         let start_key = (name == "start")
@@ -4108,12 +4161,9 @@ impl ReferenceMachine {
                 None,
             ),
             "write" => {
-                let record = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.first())
-                    .map(|value| self.resolve(value))
-                    .transpose()?
-                    .unwrap_or_default();
+                let record_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+                let from = position(args, "FROM").and_then(|index| args.get(index + 1));
+                let record = self.dataset_output_record(file.as_ref(), record_name, from)?;
                 validate_record_length(file.as_ref(), record.len())?;
                 let records = vec![encode_dataset_record(ccsid, &record)?];
                 (
@@ -4138,12 +4188,9 @@ impl ReferenceMachine {
                 )
             }
             "rewrite" => {
-                let record = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.first())
-                    .map(|value| self.resolve(value))
-                    .transpose()?
-                    .unwrap_or_default();
+                let record_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+                let from = position(args, "FROM").and_then(|index| args.get(index + 1));
+                let record = self.dataset_output_record(file.as_ref(), record_name, from)?;
                 validate_record_length(file.as_ref(), record.len())?;
                 (
                     DatasetRequest::RewriteRecord {
@@ -4248,6 +4295,9 @@ impl ReferenceMachine {
             _ => (DatasetRequest::Attributes { dataset }, None),
         };
         let target = (name == "read")
+            .then(|| file.as_ref().and_then(|file| file.record_name.clone()))
+            .flatten();
+        let into = (name == "read")
             .then(|| position(args, "INTO").and_then(|index| args.get(index + 1).cloned()))
             .flatten();
         let declarative = self
@@ -4268,6 +4318,10 @@ impl ReferenceMachine {
         let pending = if name == "read" {
             PendingKind::DatasetRead {
                 target,
+                into,
+                depending_on: file
+                    .as_ref()
+                    .and_then(|file| file_record_depending(&file.description)),
                 status,
                 ccsid,
                 declarative,
@@ -4289,6 +4343,64 @@ impl ReferenceMachine {
             }
         };
         self.effect(HostRequest::Dataset(request), pending)
+    }
+
+    fn dataset_output_record(
+        &mut self,
+        file: Option<&FileMetadata>,
+        record_name: &str,
+        from: Option<&String>,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        let mut record = if let Some(from) = from {
+            let source = self.resolve(from)?;
+            if file.is_some() {
+                self.write(record_name, &source)?;
+                self.resolve(record_name)?
+            } else {
+                source
+            }
+        } else {
+            self.resolve(record_name)?
+        };
+        if let Some(file) = file
+            && let Some(depending_on) = file_record_depending(&file.description)
+        {
+            let value = self.decimal(&depending_on)?;
+            if value.scale != 0 || value.coefficient < 0 {
+                return Err(MachineProblem::SizeError);
+            }
+            let length =
+                usize::try_from(value.coefficient).map_err(|_| MachineProblem::SizeError)?;
+            validate_record_length(Some(file), length)?;
+            if length > record.len() {
+                return Err(MachineProblem::SizeError);
+            }
+            record.truncate(length);
+        }
+        Ok(record)
+    }
+
+    fn finish_dataset_read(
+        &mut self,
+        target: &str,
+        into: Option<&str>,
+        depending_on: Option<&str>,
+        record: &[u8],
+    ) -> Result<(), MachineProblem> {
+        self.write(target, record)?;
+        if let Some(depending_on) = depending_on {
+            self.write_decimal(
+                depending_on,
+                Decimal {
+                    coefficient: record.len() as i128,
+                    scale: 0,
+                },
+            )?;
+        }
+        if let Some(into) = into {
+            self.write(into, record)?;
+        }
+        Ok(())
     }
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
@@ -4757,7 +4869,18 @@ impl ReferenceMachine {
                 let target = self.reference(std::slice::from_ref(&target.name))?;
                 let bytes = if is_numeric(source.layout.category) {
                     let value = decode_decimal(&source.layout, &self.read_reference(&source)?)?;
-                    encode_decimal(&target.layout, decimal_rescale(value, target.layout.scale)?)?
+                    let value = decimal_rescale(value, target.layout.scale)?;
+                    let value = if matches!(
+                        target.layout.category,
+                        LayoutCategory::NumericDisplay | LayoutCategory::PackedDecimal
+                    ) || target.layout.category == LayoutCategory::Binary
+                        && !target.layout.native_binary
+                    {
+                        truncate_to_picture(&target.layout, value)?
+                    } else {
+                        value
+                    };
+                    encode_decimal(&target.layout, value)?
                 } else {
                     FixedValue::fit(
                         &self.read_reference(&source)?,
@@ -5231,10 +5354,10 @@ impl ReferenceMachine {
             return self.add_or_subtract(name, args, preserve_failed_receiver);
         }
         if name == "multiply" {
-            return self.multiply_statement(args).map(|()| false);
+            return self.multiply_statement(args, preserve_failed_receiver);
         }
         if name == "divide" {
-            return self.divide_statement(args).map(|()| false);
+            return self.divide_statement(args, preserve_failed_receiver);
         }
         let rounded = args.iter().any(|argument| argument == "ROUNDED");
         let (target, value) = match name {
@@ -5342,11 +5465,17 @@ impl ReferenceMachine {
             }
             _ => return Err(MachineProblem::InvalidOperation),
         };
-        self.write_decimal_mode(&target, value, rounded)
-            .map(|()| false)
+        self.commit_decimal_assignments_receiver_local(
+            vec![(vec![target], value, rounded)],
+            preserve_failed_receiver,
+        )
     }
 
-    fn multiply_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn multiply_statement(
+        &mut self,
+        args: &[String],
+        preserve_failed_receiver: bool,
+    ) -> Result<bool, MachineProblem> {
         let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
         let giving = position(args, "GIVING");
         let left = value_decimal(self.eval_value(&args[..by])?)?;
@@ -5368,14 +5497,21 @@ impl ReferenceMachine {
         if target.is_empty() {
             return Err(MachineProblem::InvalidOperation);
         }
-        self.commit_decimal_assignments(vec![(
-            target,
-            decimal_multiply(self.arithmetic_mode, left, right)?,
-            args.iter().any(|token| token == "ROUNDED"),
-        )])
+        self.commit_decimal_assignments_receiver_local(
+            vec![(
+                target,
+                decimal_multiply(self.arithmetic_mode, left, right)?,
+                args.iter().any(|token| token == "ROUNDED"),
+            )],
+            preserve_failed_receiver,
+        )
     }
 
-    fn divide_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn divide_statement(
+        &mut self,
+        args: &[String],
+        preserve_failed_receiver: bool,
+    ) -> Result<bool, MachineProblem> {
         let giving = position(args, "GIVING");
         let remainder = position(args, "REMAINDER");
         let rounded = args.iter().any(|token| token == "ROUNDED");
@@ -5413,16 +5549,17 @@ impl ReferenceMachine {
             return Err(MachineProblem::InvalidOperation);
         }
         let target_reference = self.reference(&target)?;
-        let mut quotient = decimal_divide(
-            self.arithmetic_mode,
-            dividend,
-            divisor,
-            target_reference.layout.scale,
-        )?;
+        let quotient_scale = target_reference
+            .layout
+            .scale
+            .checked_add(u32::from(rounded))
+            .ok_or(MachineProblem::SizeError)?;
+        let mut quotient = decimal_divide(self.arithmetic_mode, dividend, divisor, quotient_scale)?;
+        let truncated_quotient = decimal_rescale(quotient, target_reference.layout.scale)?;
         quotient = if rounded {
             decimal_rescale_rounded(quotient, target_reference.layout.scale)?
         } else {
-            decimal_rescale(quotient, target_reference.layout.scale)?
+            truncated_quotient
         };
         let mut assignments = vec![(target, quotient, rounded)];
         if let Some(remainder) = remainder {
@@ -5433,11 +5570,11 @@ impl ReferenceMachine {
             let value = decimal_subtract(
                 self.arithmetic_mode,
                 dividend,
-                decimal_multiply(self.arithmetic_mode, divisor, quotient)?,
+                decimal_multiply(self.arithmetic_mode, divisor, truncated_quotient)?,
             )?;
             assignments.push((vec![target], value, false));
         }
-        self.commit_decimal_assignments(assignments)
+        self.commit_decimal_assignments_receiver_local(assignments, preserve_failed_receiver)
     }
 
     fn add_or_subtract(
@@ -7107,6 +7244,11 @@ impl ReferenceMachine {
         Err(MachineProblem::UnsupportedForm)
     }
 
+    fn eval_function_argument(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
+        self.eval_value(tokens)
+            .or_else(|_| self.eval_expression(tokens).map(CobolValue::Decimal))
+    }
+
     fn eval_function(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
         let name = tokens.get(1).ok_or(MachineProblem::InvalidOperation)?;
         let clock = || -> Result<Vec<u8>, MachineProblem> {
@@ -7170,7 +7312,7 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::InvalidOperation)
         };
         let decimal = |index: usize| -> Result<Decimal, MachineProblem> {
-            value_decimal(self.eval_value(argument(index)?)?)
+            value_decimal(self.eval_function_argument(argument(index)?)?)
         };
         let integer = |index: usize| -> Result<i128, MachineProblem> {
             let value = decimal(index)?;
@@ -7179,7 +7321,7 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::DataException)
         };
         let bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
-            value_bytes(self.eval_value(argument(index)?)?)
+            value_bytes(self.eval_function_argument(argument(index)?)?)
         };
         let raw_bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
             let argument = argument(index)?;
@@ -7879,17 +8021,25 @@ impl ReferenceMachine {
                 if reference.length == reference.layout.length
                     && is_numeric(reference.layout.category) =>
             {
-                encode_decimal(
-                    &reference.layout,
-                    if matches!(
-                        reference.layout.category,
-                        LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                    ) {
-                        *value
-                    } else {
-                        decimal_rescale(*value, reference.layout.scale)?
-                    },
-                )?
+                let scaled = if matches!(
+                    reference.layout.category,
+                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                ) {
+                    *value
+                } else {
+                    decimal_rescale(*value, reference.layout.scale)?
+                };
+                let scaled = if matches!(
+                    reference.layout.category,
+                    LayoutCategory::NumericDisplay | LayoutCategory::PackedDecimal
+                ) || reference.layout.category == LayoutCategory::Binary
+                    && !reference.layout.native_binary
+                {
+                    truncate_to_picture(&reference.layout, scaled)?
+                } else {
+                    scaled
+                };
+                encode_decimal(&reference.layout, scaled)?
             }
             CobolValue::Decimal(value) => {
                 FixedValue::fit(decimal_string(*value).as_bytes(), reference.length, false)
@@ -9303,6 +9453,9 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
             digits: usize_attribute(operation, "digits")?,
             scale: u32::try_from(usize_attribute(operation, "scale")?)
                 .map_err(|_| MachineProblem::InvalidOperation)?,
+            native_binary: optional_integer_attribute(operation, "native_binary")
+                .unwrap_or_default()
+                != 0,
             signed: integer_attribute(operation, "signed")? != 0,
             sign_separate: integer_attribute(operation, "sign_separate")? != 0,
             justified_right: optional_integer_attribute(operation, "justified_right")
@@ -9393,6 +9546,12 @@ fn file_metadata(
         let metadata = FileMetadata {
             assignment: text_attribute(operation, "assignment")?.to_ascii_uppercase(),
             record_name: optional("record_name")?,
+            record_names: optional_text_attribute(operation, "record_names")
+                .unwrap_or("")
+                .split('\u{1f}')
+                .filter(|name| !name.is_empty())
+                .map(str::to_ascii_uppercase)
+                .collect(),
             organization: text_attribute(operation, "organization")?.to_ascii_uppercase(),
             access_mode: text_attribute(operation, "access_mode")?.to_ascii_uppercase(),
             record_key: optional("record_key")?,
@@ -9486,6 +9645,27 @@ fn file_record_bounds(description: &str) -> (Option<usize>, Option<usize>) {
         return (from, to);
     }
     (None, None)
+}
+
+fn file_record_depending(description: &str) -> Option<String> {
+    let words = file_contract_words(description);
+    let record = words.iter().position(|word| *word == "RECORD")?;
+    // "IS" is optional: RECORD [IS] VARYING [IN] [SIZE] ... DEPENDING [ON] data-name.
+    let varying = if words.get(record + 1) == Some(&"IS") {
+        record + 2
+    } else {
+        record + 1
+    };
+    if words.get(varying) != Some(&"VARYING") {
+        return None;
+    }
+    let depending = words.iter().position(|word| *word == "DEPENDING")?;
+    let name = if words.get(depending + 1) == Some(&"ON") {
+        depending + 2
+    } else {
+        depending + 1
+    };
+    words.get(name).map(|name| name.to_string())
 }
 
 fn file_ccsid(description: &str) -> Option<u16> {
@@ -9844,13 +10024,32 @@ fn split_function_arguments<'a>(
     if arguments.len() > 1 {
         return Ok(arguments);
     }
+    let mut depth = 0usize;
+    let mut arithmetic = false;
+    for token in tokens {
+        match token.as_str() {
+            "(" => depth += 1,
+            ")" => depth = depth.saturating_sub(1),
+            "+" | "-" | "*" | "/" if depth == 0 => arithmetic = true,
+            _ => {}
+        }
+    }
+    if arithmetic && machine.eval_expression(tokens).is_ok() {
+        return Ok(arguments);
+    }
     let mut inferred = Vec::new();
     let mut at = 0usize;
     while at < tokens.len() {
         let end = (at + 1..=tokens.len())
             .rev()
-            .find(|end| machine.eval_value(&tokens[at..*end]).is_ok())
-            .ok_or(MachineProblem::InvalidOperation)?;
+            .find(|end| machine.eval_function_argument(&tokens[at..*end]).is_ok());
+        let Some(end) = end else {
+            return if arithmetic && inferred.is_empty() {
+                Ok(arguments)
+            } else {
+                Err(MachineProblem::InvalidOperation)
+            };
+        };
         inferred.push(&tokens[at..end]);
         at = end;
     }
@@ -10136,7 +10335,7 @@ fn extrema(
 ) -> Result<CobolValue, MachineProblem> {
     let values = arguments
         .iter()
-        .map(|argument| machine.eval_value(argument))
+        .map(|argument| machine.eval_function_argument(argument))
         .collect::<Result<Vec<_>, _>>()?;
     values
         .into_iter()
@@ -10708,6 +10907,9 @@ fn decode_decimal(layout: &LayoutMetadata, bytes: &[u8]) -> Result<Decimal, Mach
     let coefficient = match layout.category {
         LayoutCategory::NumericDisplay => decode_display(bytes, layout.sign_separate)?,
         LayoutCategory::PackedDecimal => decode_packed(bytes)?,
+        LayoutCategory::Binary if layout.native_binary && !layout.signed => bytes
+            .iter()
+            .fold(0i128, |value, byte| (value << 8) | i128::from(*byte)),
         LayoutCategory::Binary => decode_binary_integer(bytes)?,
         LayoutCategory::NumericEdited => {
             decimal_text(&String::from_utf8_lossy(bytes))
@@ -10834,11 +11036,22 @@ fn decode_binary_integer(bytes: &[u8]) -> Result<i128, MachineProblem> {
     Ok(i128::from_be_bytes(value))
 }
 
+fn truncate_to_picture(layout: &LayoutMetadata, value: Decimal) -> Result<Decimal, MachineProblem> {
+    let digits = u32::try_from(layout.digits).map_err(|_| MachineProblem::SizeError)?;
+    Ok(Decimal {
+        coefficient: value.coefficient % ten_power(digits)?,
+        scale: value.scale,
+    })
+}
+
 fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
     let digits = value.coefficient.unsigned_abs().to_string();
+    // The product has no TRUNC option: ordinary binary uses TRUNC(STD), while
+    // COMP-5 uses its full native storage range.
     if layout.digits > 0
         && digits.len() > layout.digits
         && layout.category != LayoutCategory::NumericEdited
+        && !(layout.category == LayoutCategory::Binary && layout.native_binary)
     {
         return Err(MachineProblem::SizeError);
     }
@@ -10883,7 +11096,14 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
         LayoutCategory::Binary => {
             let bytes = value.coefficient.to_be_bytes();
             let output = bytes[bytes.len() - layout.length..].to_vec();
-            if decode_binary_integer(&output)? != value.coefficient {
+            let stored = if layout.native_binary && !layout.signed {
+                output
+                    .iter()
+                    .fold(0i128, |value, byte| (value << 8) | i128::from(*byte))
+            } else {
+                decode_binary_integer(&output)?
+            };
+            if stored != value.coefficient {
                 return Err(MachineProblem::SizeError);
             }
             Ok(output)
@@ -10935,14 +11155,8 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         .windows(2)
         .find(|pair| pair[0] == pair[1] && matches!(pair[0], b'+' | b'-'))
         .map(|pair| pair[0]);
-    let floating_currency = (picture
-        .iter()
-        .take_while(|&&byte| matches!(byte, b'$' | b','))
-        .filter(|&&byte| byte == b'$')
-        .count()
-        >= 2)
-        .then_some(b'$');
-    let floating_symbol = floating_sign.or(floating_currency);
+    let floating_prefix = cobol_floating_insertion_prefix(&picture);
+    let floating_symbol = floating_prefix.map(|(symbol, _)| symbol).or(floating_sign);
     if value.coefficient == 0
         && !picture.contains(&b'9')
         && (picture.contains(&b'Z') || picture.contains(&b'*') || floating_symbol.is_some())
@@ -10964,10 +11178,9 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         }
         return Ok(output);
     }
-    let leading_floating_slots = floating_symbol.map_or(0, |symbol| {
-        picture
+    let leading_floating_slots = floating_prefix.map_or(0, |(symbol, end)| {
+        picture[..end]
             .iter()
-            .take_while(|&&byte| byte == symbol || byte == b',')
             .filter(|&&byte| byte == symbol)
             .count()
     });
@@ -11039,10 +11252,8 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
                 if (byte != b'$'
                     && (picture.get(picture_index.wrapping_sub(1)) == Some(&byte)
                         || picture.get(picture_index + 1) == Some(&byte)))
-                    || (floating_symbol == Some(byte)
-                        && picture[..picture_index]
-                            .iter()
-                            .all(|&prefix| prefix == byte || prefix == b',')) =>
+                    || floating_prefix
+                        .is_some_and(|(symbol, end)| symbol == byte && picture_index < end) =>
             {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
                 if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
@@ -11090,20 +11301,22 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             b'+' => Some(b'+'),
             _ => None,
         };
-        // The floating symbol takes the position immediately left of the first
-        // significant digit, even when that position holds an insertion comma;
-        // with no significant digit inside the floating string it takes the
-        // string's last position.
-        let region = picture
-            .iter()
-            .take_while(|&&byte| byte == symbol || byte == b',')
-            .count();
+        // The floating symbol precedes the first significant digit or decimal
+        // point, whichever is farther left; with neither it uses the last slot.
+        let region = floating_prefix
+            .filter(|(floating, _)| *floating == symbol)
+            .map_or(0, |(_, end)| end);
         if let Some(insertion) = insertion
             && region > 0
         {
-            let slot = output[..region.min(output.len())]
+            let first_digit = output[..region.min(output.len())]
                 .iter()
-                .position(u8::is_ascii_digit)
+                .position(u8::is_ascii_digit);
+            let decimal = picture[..region].iter().position(|&byte| byte == b'.');
+            let slot = first_digit
+                .into_iter()
+                .chain(decimal)
+                .min()
                 .map_or(region - 1, |first| first.saturating_sub(1));
             output[slot] = insertion;
         }
@@ -12444,7 +12657,10 @@ fn encode_call_values(
 }
 
 fn decode_call_arguments(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, MachineProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
+    if !matches!(
+        payload.schema(),
+        "mainframe-env.cobol.call@1" | "mainframe-env.cobol.batch-main@1"
+    ) {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let mut input = SnapshotInput::new(payload.bytes());
@@ -12632,6 +12848,136 @@ mod tests {
         ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_ir::{Effect, IrLimits, ModuleBuilder};
+
+    fn divide_rounding_machine() -> ReferenceMachine {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        for name in ["R", "SRC", "Q", "REM"] {
+            let base = machine.bases.len();
+            machine.bases.push(vec![b'0'; 9]);
+            machine.views.insert(
+                name.into(),
+                StorageView {
+                    base,
+                    offset: 0,
+                    length: 9,
+                },
+            );
+            machine.layouts.insert(
+                name.into(),
+                LayoutMetadata {
+                    name: name.into(),
+                    simple_name: name.into(),
+                    category: LayoutCategory::NumericDisplay,
+                    picture: "S9(7)V99".into(),
+                    digits: 9,
+                    scale: 2,
+                    native_binary: false,
+                    signed: true,
+                    sign_separate: false,
+                    justified_right: false,
+                    blank_when_zero: false,
+                    linkage: false,
+                    offset: 0,
+                    length: 9,
+                    element_length: 9,
+                    occurs: 1,
+                    occurs_min: 1,
+                    unbounded: false,
+                    depending_on: None,
+                    indexes: Vec::new(),
+                    keys: Vec::new(),
+                    dynamic: false,
+                    dynamic_limit: 0,
+                    parent: None,
+                    alias_of: None,
+                    occurs_clause: false,
+                    condition_values: Vec::new(),
+                    object_class: None,
+                },
+            );
+        }
+        machine
+    }
+
+    #[test]
+    fn divide_rounded_forms_preserve_guard_digit_and_truncated_remainder() {
+        for (case, dividend, divisor, expected, expected_remainder) in [
+            ("positive tie", 9585, 2, 4793, 1),
+            ("negative tie", -9585, 2, -4793, -1),
+            ("negative divisor tie", 9585, -2, -4793, 1),
+            ("positive non-tie", 9584, 3, 3195, 2),
+            ("negative non-tie", -9584, 3, -3195, -2),
+        ] {
+            for form in [
+                "into",
+                "into giving",
+                "by giving",
+                "into giving remainder",
+                "by giving remainder",
+                "compute",
+            ] {
+                let mut machine = divide_rounding_machine();
+                let source = Decimal {
+                    coefficient: dividend,
+                    scale: 2,
+                };
+                machine.write_decimal("R", source).unwrap();
+                machine.write_decimal("SRC", source).unwrap();
+                let divisor = divisor.to_string();
+                let tokens: Vec<String> = match form {
+                    "into" => vec![divisor.as_str(), "INTO", "R", "ROUNDED"],
+                    "into giving" => {
+                        vec![divisor.as_str(), "INTO", "SRC", "GIVING", "Q", "ROUNDED"]
+                    }
+                    "by giving" => vec!["SRC", "BY", divisor.as_str(), "GIVING", "Q", "ROUNDED"],
+                    "into giving remainder" => vec![
+                        divisor.as_str(),
+                        "INTO",
+                        "SRC",
+                        "GIVING",
+                        "Q",
+                        "ROUNDED",
+                        "REMAINDER",
+                        "REM",
+                    ],
+                    "by giving remainder" => vec![
+                        "SRC",
+                        "BY",
+                        divisor.as_str(),
+                        "GIVING",
+                        "Q",
+                        "ROUNDED",
+                        "REMAINDER",
+                        "REM",
+                    ],
+                    "compute" => vec!["Q", "ROUNDED", "=", "SRC", "/", divisor.as_str()],
+                    _ => unreachable!(),
+                }
+                .into_iter()
+                .map(str::to_string)
+                .collect();
+                if form == "compute" {
+                    machine.arithmetic("compute", &tokens, false).unwrap();
+                } else {
+                    machine.divide_statement(&tokens, false).unwrap();
+                }
+                let target = if form == "into" { "R" } else { "Q" };
+                assert_eq!(
+                    machine.decimal(target).unwrap().coefficient,
+                    expected,
+                    "{case}: {form} quotient"
+                );
+                if form.contains("remainder") {
+                    assert_eq!(
+                        machine.decimal("REM").unwrap().coefficient,
+                        expected_remainder,
+                        "{case}: {form} remainder"
+                    );
+                }
+            }
+        }
+    }
     pub(super) fn invocation() -> Invocation {
         let l = InvocationLimits::default();
         Invocation::new(
@@ -12703,6 +13049,70 @@ mod tests {
         .unwrap();
         mainframe_env_ir::encode_binary(&b.finish().unwrap(), CodecLimits::default()).unwrap()
     }
+
+    #[test]
+    fn entry_argument_metadata_rejects_legacy_and_preserves_no_using_batch_entry() {
+        let mut legacy = invocation();
+        legacy.bindings.insert(
+            "cobol.call.arguments".into(),
+            encode_call_values(&["ARG".into()], &[b"X".to_vec()]).unwrap(),
+        );
+        assert!(matches!(
+            ReferenceMachine::from_binary(&binary(), legacy, CodecLimits::default()),
+            Err(MachineProblem::InvalidArtifact(detail)) if detail == "missing entry_formals_v1"
+        ));
+
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "config", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("arithmetic_mode".into(), Attribute::Text("extended".into())),
+                    ("entry_formals_v1".into(), Attribute::Text(String::new())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let encoded =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut batch = invocation();
+        let payload = encode_call_values(&["PARM".into()], &[b"2022071800".to_vec()]).unwrap();
+        batch.bindings.insert(
+            "cobol.call.arguments".into(),
+            BoundedPayload::new(
+                "mainframe-env.cobol.batch-main@1",
+                payload.bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert!(
+            ReferenceMachine::from_binary(&binary(), batch.clone(), CodecLimits::default()).is_ok()
+        );
+        let machine =
+            ReferenceMachine::from_binary(&encoded, batch, CodecLimits::default()).unwrap();
+        assert!(machine.linkage_values().unwrap().is_empty());
+    }
     fn display_fixture() -> ReferenceMachine {
         let mut machine =
             ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
@@ -12715,6 +13125,7 @@ mod tests {
                 picture: "9(11)".into(),
                 digits: 11,
                 scale: 0,
+                native_binary: false,
                 signed: false,
                 sign_separate: false,
                 justified_right: false,
@@ -12902,6 +13313,7 @@ mod tests {
             FileMetadata {
                 assignment: "USER.EMPTY.G0001V00".into(),
                 record_name: None,
+                record_names: Vec::new(),
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -12997,6 +13409,46 @@ mod tests {
         }
     }
     #[test]
+    fn integer_evaluates_parenthesized_arithmetic_argument() {
+        let machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        let tokens = [
+            "FUNCTION", "INTEGER", "(", "(", "10", "*", "2", ")", "+", "1", ")",
+        ]
+        .map(str::to_string);
+        assert!(matches!(
+            machine.eval_value(&tokens),
+            Ok(CobolValue::Decimal(Decimal {
+                coefficient: 21,
+                scale: 0
+            }))
+        ));
+    }
+    #[test]
+    fn list_intrinsics_evaluate_arithmetic_arguments() {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        machine.implicit.insert("A".into(), integer_value(7));
+        machine.implicit.insert("B".into(), integer_value(-3));
+        for (tokens, expected) in [
+            ("FUNCTION MIN ( A , ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( ( A - 10 ) , B * 2 , 1 )", 1),
+            ("FUNCTION SUM ( A , B * 4 , 2 )", -3),
+        ] {
+            let tokens = tokens
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert!(
+                matches!(
+                    machine.eval_value(&tokens),
+                    Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 })) if coefficient == expected
+                ),
+                "{tokens:?}"
+            );
+        }
+    }
+    #[test]
     fn write_without_from_uses_record_name_and_preserves_fixed_length() {
         let mut builder = ModuleBuilder::new(IrLimits::default());
         for (name, length) in [("REC", 5), ("WS-ITEM", 5), ("FILE-STATUS", 2)] {
@@ -13026,6 +13478,7 @@ mod tests {
             FileMetadata {
                 assignment: "TESTFILE".into(),
                 record_name: Some("REC".into()),
+                record_names: vec!["REC".into()],
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -13051,6 +13504,9 @@ mod tests {
             ),
             (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
         ] {
+            // WRITE ... FROM moves into the record area first (#270), so reset it per case.
+            machine.write_raw("REC", b"REC01").unwrap();
+            let from = args.contains(&"FROM");
             let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
             let step = machine.dataset_effect("write", &args).unwrap();
             let Step::Effect(effect) = step else {
@@ -13061,6 +13517,9 @@ mod tests {
                 panic!("WRITE did not append a sequential record");
             };
             assert_eq!(records, &vec![expected.to_vec()]);
+            if args.iter().any(|arg| arg == "FROM") {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
             machine
                 .resume_host(EffectResult {
                     sequence: effect.sequence,
@@ -13070,6 +13529,9 @@ mod tests {
                 })
                 .unwrap();
             assert_eq!(machine.resolve("FILE-STATUS").unwrap(), b"00");
+            if from {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
         }
     }
     #[test]
@@ -13083,6 +13545,7 @@ mod tests {
             picture: String::new(),
             digits: length,
             scale,
+            native_binary: false,
             signed,
             sign_separate: false,
             justified_right: false,
@@ -13402,6 +13865,7 @@ mod tests {
             picture: "9(9).99-".into(),
             digits: 11,
             scale: 2,
+            native_binary: false,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13676,7 +14140,7 @@ mod tests {
         }
     }
 
-    fn edited_test_layout(
+    pub(super) fn edited_test_layout(
         picture: &str,
         digits: usize,
         scale: u32,
@@ -13689,6 +14153,7 @@ mod tests {
             picture: picture.into(),
             digits,
             scale,
+            native_binary: false,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13722,6 +14187,7 @@ mod tests {
             picture: "----9".into(),
             digits: 5,
             scale: 0,
+            native_binary: false,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13793,6 +14259,250 @@ mod tests {
             }
         );
     }
+    #[test]
+    fn varying_record_depending_accepts_optional_is_and_on() {
+        for description in [
+            "FD VBRC-FILE RECORDING MODE IS V RECORD IS VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-RECD-LEN",
+            "FD VBRC-FILE RECORD VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-RECD-LEN",
+            "FD VBRC-FILE RECORD IS VARYING FROM 10 TO 80 DEPENDING WS-RECD-LEN",
+        ] {
+            assert_eq!(
+                file_record_depending(description).as_deref(),
+                Some("WS-RECD-LEN"),
+                "{description}"
+            );
+        }
+        assert_eq!(
+            file_record_depending("FD F RECORD CONTAINS 80 CHARACTERS"),
+            None
+        );
+        assert_eq!(
+            file_record_depending("FD F RECORD IS VARYING IN SIZE FROM 10 TO 80"),
+            None
+        );
+    }
+
+    fn varying_file_machine() -> ReferenceMachine {
+        let mut m =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        m.files.insert("VBFILE".into(), FileMetadata {
+            assignment: "VBPS".into(), record_name: Some("VBR-REC".into()),
+            record_names: vec!["VBR-REC".into()],
+            organization: "SEQUENTIAL".into(), access_mode: "SEQUENTIAL".into(),
+            record_key: None, alternate_record_keys: Vec::new(), relative_key: None,
+            file_status: None, sort_merge: false,
+            description: "FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS DEPENDING ON WS-RECD-LEN".into(),
+            record_min: Some(10), record_max: Some(80), ccsid: None, linage: None,
+        });
+        let base = m.bases.len();
+        m.bases.push(vec![b'A'; 80]);
+        m.views.insert(
+            "VBR-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 80,
+            },
+        );
+        let base = m.bases.len();
+        m.bases.push(b"0012".to_vec());
+        m.views.insert(
+            "WS-RECD-LEN".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 4,
+            },
+        );
+        m.layouts.insert(
+            "WS-RECD-LEN".into(),
+            LayoutMetadata {
+                name: "WS-RECD-LEN".into(),
+                simple_name: "WS-RECD-LEN".into(),
+                category: LayoutCategory::NumericDisplay,
+                picture: "9(4)".into(),
+                digits: 4,
+                scale: 0,
+                native_binary: false,
+                signed: false,
+                sign_separate: false,
+                justified_right: false,
+                blank_when_zero: false,
+                linkage: false,
+                offset: 0,
+                length: 4,
+                element_length: 4,
+                occurs: 1,
+                occurs_min: 1,
+                unbounded: false,
+                depending_on: None,
+                indexes: Vec::new(),
+                keys: Vec::new(),
+                dynamic: false,
+                dynamic_limit: 0,
+                parent: None,
+                alias_of: None,
+                occurs_clause: false,
+                condition_values: Vec::new(),
+                object_class: None,
+            },
+        );
+        m
+    }
+
+    #[test]
+    fn varying_write_uses_depending_length_and_read_restores_it() {
+        let mut m = varying_file_machine();
+        for (length, fill) in [(12, b'A'), (39, b'B')] {
+            m.write("WS-RECD-LEN", format!("{length:04}").as_bytes())
+                .unwrap();
+            m.write("VBR-REC", &[fill; 80]).unwrap();
+            let Step::Effect(effect) = m.dataset_effect("write", &["VBR-REC".into()]).unwrap()
+            else {
+                panic!("expected effect")
+            };
+            let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request
+            else {
+                panic!("expected append")
+            };
+            assert_eq!(records[0], vec![fill; length]);
+            m.pending = None;
+        }
+        m.write("WS-RECD-LEN", b"0080").unwrap();
+        let Step::Effect(effect) = m.dataset_effect("read", &["VBFILE".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        m.resume_host(EffectResult {
+            sequence: effect.sequence,
+            outcome: Ok(HostResult::Dataset(
+                mainframe_env_host_api::DatasetResult::Records {
+                    records: vec![vec![b'A'; 12]],
+                    identities: vec![b"1".to_vec()],
+                    version: 1,
+                },
+            )),
+        })
+        .unwrap();
+        assert_eq!(m.read("WS-RECD-LEN").unwrap(), b"0012");
+        assert_eq!(&m.read("VBR-REC").unwrap()[..12], &[b'A'; 12]);
+        let base = m.bases.len();
+        m.bases.push(vec![b' '; 80]);
+        m.views.insert(
+            "INTO-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 80,
+            },
+        );
+        let Step::Effect(effect) = m
+            .dataset_effect("read", &["VBFILE".into(), "INTO".into(), "INTO-REC".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        m.resume_host(EffectResult {
+            sequence: effect.sequence,
+            outcome: Ok(HostResult::Dataset(
+                mainframe_env_host_api::DatasetResult::Records {
+                    records: vec![vec![b'B'; 39]],
+                    identities: vec![b"2".to_vec()],
+                    version: 2,
+                },
+            )),
+        })
+        .unwrap();
+        assert_eq!(m.read("WS-RECD-LEN").unwrap(), b"0039");
+        assert_eq!(&m.read("INTO-REC").unwrap()[..39], &[b'B'; 39]);
+    }
+
+    #[test]
+    fn varying_write_from_uses_fd_length_and_rejects_out_of_bounds() {
+        let mut m = varying_file_machine();
+        m.implicit
+            .insert("SOURCE".into(), CobolValue::Bytes(vec![b'C'; 80]));
+        let Step::Effect(effect) = m
+            .dataset_effect("write", &["VBR-REC".into(), "FROM".into(), "SOURCE".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request else {
+            panic!("expected append")
+        };
+        assert_eq!(records[0], vec![b'C'; 12]);
+        m.pending = None;
+        m.implicit
+            .insert("SOURCE".into(), CobolValue::Bytes(b"SHORT!".to_vec()));
+        let Step::Effect(effect) = m
+            .dataset_effect("write", &["VBR-REC".into(), "FROM".into(), "SOURCE".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request else {
+            panic!("expected append")
+        };
+        assert_eq!(records[0], b"SHORT!      ");
+        m.pending = None;
+        for length in [9, 81] {
+            m.write("WS-RECD-LEN", format!("{length:04}").as_bytes())
+                .unwrap();
+            assert!(matches!(
+                m.dataset_effect("write", &["VBR-REC".into()]),
+                Err(MachineProblem::SizeError)
+            ));
+        }
+    }
+
+    #[test]
+    fn varying_without_depending_uses_named_fd_record_size() {
+        let mut m = varying_file_machine();
+        let file = m.files.get_mut("VBFILE").unwrap();
+        file.record_name = Some("SHORT-REC".into());
+        file.record_names = vec!["SHORT-REC".into(), "LONG-REC".into()];
+        file.description = "FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS".into();
+        let base = m.bases.len();
+        m.bases.push(vec![b'Z'; 39]);
+        m.views.insert(
+            "LONG-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 39,
+            },
+        );
+        let Step::Effect(effect) = m.dataset_effect("write", &["LONG-REC".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append {
+            dataset, records, ..
+        }) = effect.request
+        else {
+            panic!("expected append")
+        };
+        assert_eq!(dataset.as_str(), "VBPS");
+        assert_eq!(records[0], vec![b'Z'; 39]);
+    }
+
+    #[test]
+    fn varying_rewrite_uses_depending_length() {
+        let mut m = varying_file_machine();
+        m.files.get_mut("VBFILE").unwrap().record_key = Some("KEY".into());
+        m.implicit
+            .insert("KEY".into(), CobolValue::Bytes(b"K".to_vec()));
+        m.write("WS-RECD-LEN", b"0039").unwrap();
+        let Step::Effect(effect) = m.dataset_effect("rewrite", &["VBR-REC".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::RewriteRecord { record, .. }) = effect.request
+        else {
+            panic!("expected rewrite")
+        };
+        assert_eq!(record, vec![b'A'; 39]);
+    }
 }
 
 mod instance;
+#[cfg(test)]
+mod size_truncation_tests;

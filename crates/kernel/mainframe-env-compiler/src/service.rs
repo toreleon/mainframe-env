@@ -644,6 +644,34 @@ mod tests {
         let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
         assert_eq!(plan.policy, DecimalExecutionPolicy::decimal18_v1());
     }
+
+    #[test]
+    fn procedure_using_order_survives_lowering_and_binary_roundtrip() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ORDER. DATA DIVISION. LINKAGE SECTION. 01 UNUSED-AREA PIC X. 01 ARG-TWO PIC X. 01 ARG-ONE PIC X. PROCEDURE DIVISION USING ARG-ONE ARG-TWO. MOVE 'A' TO ARG-ONE. MOVE 'B' TO ARG-TWO. GOBACK.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("expected executable: {result:?}");
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        assert_eq!(
+            mainframe_env_ir::cobol_entry_formals(&module).unwrap(),
+            Some(vec!["ARG-ONE".into(), "ARG-TWO".into()])
+        );
+        let no_using = source.replace("USING ARG-ONE ARG-TWO", "");
+        let result = CobolCompiler::default()
+            .compile(request(&no_using, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("expected executable: {result:?}");
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        assert_eq!(
+            mainframe_env_ir::cobol_entry_formals(&module).unwrap(),
+            Some(vec![])
+        );
+    }
     #[test]
     fn display_sign_is_embedded_in_manifest_and_executable_payload() {
         let source = format!("PROCESS DISPSIGN(SEP)\n{HELLO}");
