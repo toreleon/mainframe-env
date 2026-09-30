@@ -68,5 +68,13 @@ and has no execution route.
 The proposed prepared DECLARE CURSOR parser owns scrollability and sensitivity,
 holdability, returnability, and rowset positioning. It preserves omitted
 keywords as typed defaults, rejects duplicate or misplaced clauses with
-locations, and fences inline queries until the SELECT slice. It has no cursor
+locations, and fences inline queries until full select-statement syntax is
+available. It has no cursor
+execution route or whole-row recognition credit.
+
+The proposed SELECT core parser owns a bounded subselect with select items,
+named table sources, WHERE, GROUP BY, HAVING, ORDER BY, OFFSET, and FETCH.
+It reuses the owned expression parser and rejects joins, aliases, set operators,
+subqueries, SELECT INTO, and outer SELECT clauses with located diagnostics.
+Fullselect and inline cursor integration remain pending. This syntax has no
 execution route or whole-row recognition credit.

@@ -41,10 +41,13 @@ pub use statement::{
     Db2CommitStatement, Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget,
     Db2CursorReturnability, Db2CursorRowsetPositioning, Db2CursorSensitivity,
     Db2DeclareCursorPreparedStatement, Db2DescriptorNameMode, Db2ExecuteImmediateStatement,
-    Db2ExecuteStatement, Db2ExecuteUsing, Db2PrepareDescriptor, Db2PrepareStatement,
-    Db2RollbackStatement, Db2RollbackTarget, Db2SavepointStatement, Db2SensitiveCursorKind,
-    Db2Statement, Db2StatementKind, parse_db2_cursor_statement, parse_db2_declare_cursor_prepared,
-    parse_db2_dynamic_statement, parse_db2_transaction_statement,
+    Db2ExecuteStatement, Db2ExecuteUsing, Db2FetchClause, Db2FetchPosition, Db2NamedTableSource,
+    Db2OffsetClause, Db2OrderByItem, Db2OrderDirection, Db2OrderKey, Db2PrepareDescriptor,
+    Db2PrepareStatement, Db2QueryExpression, Db2RollbackStatement, Db2RollbackTarget,
+    Db2SavepointStatement, Db2SelectCore, Db2SelectItem, Db2SelectQuantifier,
+    Db2SensitiveCursorKind, Db2Statement, Db2StatementKind, parse_db2_cursor_statement,
+    parse_db2_declare_cursor_prepared, parse_db2_dynamic_statement, parse_db2_select_core,
+    parse_db2_transaction_statement,
 };
 pub use syntax::{
     Db2LexedStatement, Db2SourceLocation, Db2SourceSpan, Db2StringKind, Db2Symbol,
