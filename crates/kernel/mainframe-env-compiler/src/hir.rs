@@ -334,6 +334,8 @@ pub struct ControlEdge {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CobolHir {
     pub program_id: String,
+    /// Qualified LINKAGE roots in PROCEDURE DIVISION USING order.
+    pub entry_formals: Vec<String>,
     /// Installed-call lifecycle contract; not inferred from diagnostic text.
     pub program_lifecycle: String,
     pub layouts: Vec<CobolLayout>,
@@ -389,6 +391,7 @@ impl CobolHir {
         let module = build_module(&statements, &semantic.layouts, mode.as_str(), limits)?;
         Ok(Self {
             program_id: semantic.program_id.clone(),
+            entry_formals: entry_formals(syntax.semantic_text(), semantic)?,
             program_lifecycle: installed_lifecycle(syntax.semantic_text(), semantic).into(),
             layouts: semantic.layouts.clone(),
             files: semantic.files.clone(),
@@ -599,6 +602,41 @@ fn procedure_text(source: &str) -> Option<(usize, &str)> {
     let rest = &source[start..];
     let dot = rest.find('.')?;
     Some((start + dot + 1, &rest[dot + 1..]))
+}
+
+fn entry_formals(source: &str, semantic: &SemanticModel) -> Result<Vec<String>, HirProblem> {
+    let upper = source_text::blank(source).to_ascii_uppercase();
+    let start = upper
+        .find("PROCEDURE DIVISION")
+        .ok_or(HirProblem::MissingProcedure)?;
+    let header = upper[start + "PROCEDURE DIVISION".len()..]
+        .split('.')
+        .next()
+        .ok_or(HirProblem::MissingProcedure)?;
+    let words = header
+        .split(|ch: char| ch.is_whitespace() || ch == ',')
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>();
+    let Some(using) = words.iter().position(|word| *word == "USING") else {
+        return Ok(Vec::new());
+    };
+    let mut formals = Vec::new();
+    let mut index = using + 1;
+    while index < words.len() && !matches!(words[index], "RETURNING" | "GIVING") {
+        if words[index] == "BY" {
+            index += 2;
+            continue;
+        }
+        let layout = semantic
+            .resolve(words[index])
+            .map_err(|_| HirProblem::InvalidLayout)?;
+        if layout.section != crate::StorageSection::Linkage || layout.parent.is_some() {
+            return Err(HirProblem::InvalidLayout);
+        }
+        formals.push(layout.qualified_name.clone());
+        index += 1;
+    }
+    Ok(formals)
 }
 
 fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {

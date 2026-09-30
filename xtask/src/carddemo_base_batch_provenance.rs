@@ -199,12 +199,15 @@ pub(super) fn validate_carddemo_provenance(v2: &Value, v1: &Value) -> TaskResult
             .ok_or_else(|| format!("missing source for {path}"))?;
         match source {
             "self-recorded" => {
+                let historical = entry["source_id"] == format!("{V1_PATH}#{v1_digest}")
+                    && entry["source_digest"] == v1_digest
+                    && v1.pointer(&format!("/receipt{path}")) == receipt.pointer(path);
+                let refreshed = entry["source_id"] == format!("{V2_PATH}#{digest}")
+                    && entry["source_digest"] == digest;
                 require(
-                    entry["source_id"] == format!("{V1_PATH}#{v1_digest}")
-                        && entry["source_digest"] == v1_digest
-                        && entry["source_locator"] == format!("/receipt{path}")
-                        && v1.pointer(&format!("/receipt{path}")) == receipt.pointer(path),
-                    &format!("self-recorded source does not match v1 for {path}"),
+                    entry["source_locator"] == format!("/receipt{path}")
+                        && (historical || refreshed),
+                    &format!("self-recorded source does not match v1 or v2 for {path}"),
                 )?;
                 summary.self_recorded += 1;
             }
@@ -378,6 +381,29 @@ mod tests {
     }
 
     #[test]
+    fn carddemo_provenance_refreshed_self_recorded_is_regression_only() {
+        let (v1, mut v2) = fixture();
+        v2["receipt"]["journey_shape_sha256"] = json!("d".repeat(64));
+        let digest = crate::canonical_evidence_digest(v2["receipt"].as_object().unwrap()).unwrap();
+        v2["evidence_digest"] = json!(digest);
+        let position = v2["expected_value_provenance"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|entry| entry["assertion_path"] == "/journey_shape_sha256")
+            .unwrap();
+        v2["expected_value_provenance"][position]["source_id"] =
+            json!(format!("{V2_PATH}#{digest}"));
+        v2["expected_value_provenance"][position]["source_digest"] = json!(digest);
+        let summary = validate_carddemo_provenance(&v2, &v1).unwrap();
+        assert_eq!(summary.self_recorded, 15);
+        assert_eq!(summary.conformance, 0);
+        v2["expected_value_provenance"][position]["source_digest"] =
+            json!(format!("sha256:{}", "0".repeat(64)));
+        assert!(validate_carddemo_provenance(&v2, &v1).is_err());
+    }
+
+    #[test]
     fn carddemo_provenance_missing_digest_is_precise_failure() {
         let (v1, mut v2) = fixture();
         v2["expected_value_provenance"]
@@ -494,7 +520,25 @@ mod tests {
         let v2 = crate::json(&root.join(V2_PATH)).unwrap();
         let summary = validate_carddemo_provenance(&v2, &v1).unwrap();
         assert_eq!(summary.total, 90);
-        assert_eq!(summary.self_recorded, 88);
-        assert_eq!(summary.conformance, 2);
+        assert_eq!(summary.self_recorded, 86);
+        assert_eq!(summary.conformance, 4);
+        let source_for = |path| {
+            v2["expected_value_provenance"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|entry| entry["assertion_path"] == path)
+                .unwrap()["source"]
+                .as_str()
+                .unwrap()
+        };
+        assert_eq!(
+            source_for("/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00"),
+            "independent-reference"
+        );
+        assert_eq!(
+            source_for("/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00"),
+            "independent-reference"
+        );
     }
 }
