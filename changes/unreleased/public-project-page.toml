@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a public GitHub Pages project overview with architecture, development status, and getting started guidance while retaining private source access."

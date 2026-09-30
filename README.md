@@ -1,5 +1,7 @@
 # mainframe-env
 
+[Public project page](https://toreleon.github.io/mainframe-env/)
+
 `mainframe-env` is a greenfield Rust implementation of a bounded mainframe
 application environment. It combines a deterministic COBOL compiler and
 execution kernel with owned CICS, JCL/JES, dataset, RACF/SAF, z/OSMF, Db2, IMS,
