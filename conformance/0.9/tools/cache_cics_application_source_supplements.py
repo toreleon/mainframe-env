@@ -29,6 +29,9 @@ import ibm_docs  # noqa: E402
 RECEIPT_PATH = Path(
     "conformance/0.9/cics/application-api-sources-a-supplements.json"
 )
+HISTORICAL_RECEIPT_PATH = Path(
+    "conformance/0.9/cics/application-api-sources-a-supplements-2026-09-10.json"
+)
 SCHEMA_PATH = Path("conformance/0.9/schemas/cics-source-supplements.schema.json")
 CHECKER_PATH = Path(
     "conformance/0.9/tools/cache_cics_application_source_supplements.py"
@@ -241,8 +244,8 @@ EXPECTED_TOPICS = [
         "product_key": "SSGMCP_5.5.0",
         "heading": "TRANSACTION attributes",
         "last_modified": "2025-01-07",
-        "bytes": 200069,
-        "sha256": "90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd",
+        "bytes": 205306,
+        "sha256": "c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514",
         "source_role": "target-product-version-compatibility",
         "target_authority_boundary": "target-product-older-version-context",
         "target_product_authority": False,
@@ -415,6 +418,7 @@ def validate_receipt(receipt: dict[str, Any], root: Path = ROOT) -> dict[str, An
             "coverage_credit",
             "differential_credit",
             "capture",
+            "repin",
             "receipt_contract",
             "topics",
             "source_resolutions",
@@ -502,9 +506,52 @@ def validate_receipt(receipt: dict[str, Any], root: Path = ROOT) -> dict[str, An
         _validate_topic(topic, expected, index)
     paths = [topic["topic_path"] for topic in topics]
     _require(len(paths) == len(set(paths)), "duplicate supplement topic")
+    historical_path = root / HISTORICAL_RECEIPT_PATH
+    historical = read_json(historical_path)
+    repin = _exact_keys(
+        top["repin"],
+        {
+            "issue",
+            "verified_on",
+            "verification_method",
+            "historical_receipt_path",
+            "historical_receipt_sha256",
+            "topic_path",
+            "topic_sha256",
+            "topic_bytes",
+        },
+        "repin",
+    )
+    _require(repin["issue"] == 173, "repin.issue differs")
+    _require(repin["verified_on"] == "2026-09-28", "repin.verified_on differs")
     _require(
-        capture["identity_sha256"] == identity_digest(topics),
-        "capture identity digest is stale",
+        repin["verification_method"] == "user-chrome-browser-control",
+        "repin.verification_method differs",
+    )
+    _require(
+        repin["historical_receipt_path"] == HISTORICAL_RECEIPT_PATH.as_posix()
+        and repin["historical_receipt_sha256"] == file_sha256(historical_path),
+        "repin historical receipt binding differs",
+    )
+    _require(
+        historical.get("capture") == capture
+        and historical.get("capture", {}).get("identity_sha256")
+        == identity_digest(historical["topics"]),
+        "historical capture identity differs",
+    )
+    changed = [
+        (old, new)
+        for old, new in zip(historical["topics"], topics)
+        if old != new
+    ]
+    _require(len(changed) == 1, "repin must change exactly one supplement")
+    old, new = changed[0]
+    _require(
+        old["topic_path"] == new["topic_path"] == repin["topic_path"]
+        and new["sha256"] == repin["topic_sha256"]
+        and new["bytes"] == repin["topic_bytes"]
+        and old["last_modified"] == new["last_modified"],
+        "repin topic identity or publication date differs",
     )
     _require(
         isinstance(top["supplements_sha256"], str)

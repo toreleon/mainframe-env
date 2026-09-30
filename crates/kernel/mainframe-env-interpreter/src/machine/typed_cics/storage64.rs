@@ -5,6 +5,7 @@ use crate::storage64::{Storage64Key, Storage64Problem};
 pub(crate) enum Storage64Intent {
     Getmain(Option<[u8; 8]>),
     Freemain([u8; 8]),
+    GetContainer(Option<(u64, usize)>),
 }
 
 pub(super) fn pending_intent(
@@ -13,6 +14,18 @@ pub(super) fn pending_intent(
     arguments: &BTreeMap<String, BoundedPayload>,
 ) -> Result<Option<Storage64Intent>, MachineProblem> {
     match operation {
+        CicsOperation::GetContainer64 => {
+            let target = arguments.get("INTO").and_then(|value| {
+                if value.schema() != "mainframe-env.cics.pointer64@1" {
+                    return None;
+                }
+                let address = u64::from_be_bytes(value.bytes().try_into().ok()?);
+                let capacity = arguments.get("INTO.MAXLENGTH")?.bytes();
+                let capacity = std::str::from_utf8(capacity).ok()?.parse().ok()?;
+                Some((address, capacity))
+            });
+            Ok(Some(Storage64Intent::GetContainer(target)))
+        }
         CicsOperation::Getmain64 => {
             let length = arguments
                 .get("FLENGTH")
@@ -85,6 +98,33 @@ pub(super) fn validate_response(
     response: &CicsResponse,
 ) -> Result<(), MachineProblem> {
     match (operation, intent) {
+        (CicsOperation::GetContainer64, Some(Storage64Intent::GetContainer(target))) => {
+            if let Some(value) = response.outputs.get("INTO") {
+                if target.is_none()
+                    || value.schema() != "mainframe-env.cics.payload@1"
+                    || value.bytes().len() > target.unwrap().1
+                    || response.disposition != CicsDisposition::Complete
+                    || !matches!(response.condition.as_str(), "NORMAL" | "LENGERR")
+                {
+                    return Err(MachineProblem::UnexpectedHostResult);
+                }
+            } else if response.condition == "NORMAL"
+                && response.response == 0
+                && (target.is_some()
+                    || response.outputs.get("FLENGTH").is_none_or(|length| {
+                        length.schema() != "mainframe-env.cics.decimal@1"
+                            || std::str::from_utf8(length.bytes())
+                                .ok()
+                                .and_then(|text| text.parse::<u32>().ok())
+                                .is_none()
+                    }))
+            {
+                return Err(MachineProblem::UnexpectedHostResult);
+            }
+            Ok(())
+        }
+        (CicsOperation::PutContainer64, None) => Ok(()),
+        (CicsOperation::GetContainer64, _) => Err(MachineProblem::UnexpectedHostResult),
         (CicsOperation::Getmain64, Some(Storage64Intent::Getmain(expected))) => {
             validate_getmain_response(expected, response)
         }

@@ -1,0 +1,35 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://schemas.modernize.ai/execution-manifest/1.0.0",
+  "title":"ExecutionManifest 1.0.0","type":"object","additionalProperties":false,
+  "required":["manifestVersion","logicalExecutionId","scenarioId","runtimeContract","technologyPack","behaviorPacket","replayManifest","stateSnapshot","codecProfile","migrationSpec","comparatorRegistry","sensitivityPolicy","runner","deterministicSources","jobParameters","initialState","limits","authority","faultSchedule","expectedOutputTypes"],
+  "properties": {
+    "manifestVersion":{"const":"1.0.0"},
+    "logicalExecutionId":{"type":"string","pattern":"^execution_sha256_[0-9a-f]{64}$"},
+    "scenarioId":{"type":"string","pattern":"^[a-z0-9][a-z0-9.-]{0,79}$"},
+    "runtimeContract":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+    "technologyPack":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+    "behaviorPacket":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+    "replayManifest":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+    "stateSnapshot":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+    "codecProfile":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/digestRef"},
+    "migrationSpec":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+    "comparatorRegistry":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/digestRef"},
+    "sensitivityPolicy":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/digestRef"},
+    "runner": {"type":"object","additionalProperties":false,"required":["role","implementation","build","executable","runtime","shim"],"properties":{
+      "role":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/runnerRole"},
+      "implementation":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/digestRef"},
+      "build":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"},
+      "executable":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/digestRef"},
+      "runtime":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/digestRef"},
+      "shim":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/artifactRef"}
+    }},
+    "deterministicSources":{"type":"object","additionalProperties":false,"required":["clock","timezone","locale","randomSeed"],"properties":{"clock":{"type":"string","format":"date-time"},"timezone":{"const":"UTC"},"locale":{"const":"en-US"},"randomSeed":{"type":"integer","minimum":0,"maximum":9007199254740991}}},
+    "jobParameters":{"type":"object","additionalProperties":false,"required":["accountLimit","lookupKey","expectedTermination"],"properties":{"accountLimit":{"type":"integer","minimum":1,"maximum":10000},"lookupKey":{"type":"string","pattern":"^[0-9]{11}$"},"expectedTermination":{"enum":["success","non-zero","abend","failure"]}}},
+    "initialState":{"type":"object","additionalProperties":false,"required":["namespaceDigest","materializationDigest","cleanRequired"],"properties":{"namespaceDigest":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/sha256"},"materializationDigest":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/sha256"},"cleanRequired":{"const":true}}},
+    "limits":{"type":"object","additionalProperties":false,"required":["deadlineMillis","maxStdoutBytes","maxStderrBytes","maxResultBytes","maxStateBytes","maxProcesses"],"properties":{"deadlineMillis":{"type":"integer","minimum":100,"maximum":120000},"maxStdoutBytes":{"type":"integer","minimum":1,"maximum":10485760},"maxStderrBytes":{"type":"integer","minimum":1,"maximum":10485760},"maxResultBytes":{"type":"integer","minimum":1,"maximum":10485760},"maxStateBytes":{"type":"integer","minimum":1,"maximum":104857600},"maxProcesses":{"type":"integer","minimum":1,"maximum":32}}},
+    "authority":{"type":"object","additionalProperties":false,"required":["required","allowedLocal"],"properties":{"required":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/p5Authority"},"allowedLocal":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/p5Authority"}}},
+    "faultSchedule":{"anyOf":[{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/faultSchedule"},{"type":"null"}]},
+    "expectedOutputTypes":{"type":"array","minItems":2,"uniqueItems":true,"items":{"enum":["Observation","RunnerResultManifest","RestartReport"]}}
+  }
+}

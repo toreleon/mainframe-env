@@ -644,6 +644,34 @@ mod tests {
         let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
         assert_eq!(plan.policy, DecimalExecutionPolicy::decimal18_v1());
     }
+
+    #[test]
+    fn procedure_using_order_survives_lowering_and_binary_roundtrip() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ORDER. DATA DIVISION. LINKAGE SECTION. 01 UNUSED-AREA PIC X. 01 ARG-TWO PIC X. 01 ARG-ONE PIC X. PROCEDURE DIVISION USING ARG-ONE ARG-TWO. MOVE 'A' TO ARG-ONE. MOVE 'B' TO ARG-TWO. GOBACK.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("expected executable: {result:?}");
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        assert_eq!(
+            mainframe_env_ir::cobol_entry_formals(&module).unwrap(),
+            Some(vec!["ARG-ONE".into(), "ARG-TWO".into()])
+        );
+        let no_using = source.replace("USING ARG-ONE ARG-TWO", "");
+        let result = CobolCompiler::default()
+            .compile(request(&no_using, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("expected executable: {result:?}");
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        assert_eq!(
+            mainframe_env_ir::cobol_entry_formals(&module).unwrap(),
+            Some(vec![])
+        );
+    }
     #[test]
     fn display_sign_is_embedded_in_manifest_and_executable_payload() {
         let source = format!("PROCESS DISPSIGN(SEP)\n{HELLO}");
@@ -1846,6 +1874,49 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::BtsEndBrowseContainer => {
+                    crate::HirCicsOperation::BtsEndBrowseContainer
+                }
+                CicsPlanOperation::BtsGetNextContainer => {
+                    crate::HirCicsOperation::BtsGetNextContainer
+                }
+                CicsPlanOperation::BtsInquireContainer => {
+                    crate::HirCicsOperation::BtsInquireContainer
+                }
+                CicsPlanOperation::BtsStartBrowseContainer => {
+                    crate::HirCicsOperation::BtsStartBrowseContainer
+                }
+                CicsPlanOperation::BtsEndBrowseEvent => crate::HirCicsOperation::BtsEndBrowseEvent,
+                CicsPlanOperation::BtsGetNextEvent => crate::HirCicsOperation::BtsGetNextEvent,
+                CicsPlanOperation::BtsInquireEvent => crate::HirCicsOperation::BtsInquireEvent,
+                CicsPlanOperation::BtsStartBrowseEvent => {
+                    crate::HirCicsOperation::BtsStartBrowseEvent
+                }
+                CicsPlanOperation::BtsEndBrowseTimer => crate::HirCicsOperation::BtsEndBrowseTimer,
+                CicsPlanOperation::BtsInquireTimer => crate::HirCicsOperation::BtsInquireTimer,
+                CicsPlanOperation::BtsStartBrowseTimer => {
+                    crate::HirCicsOperation::BtsStartBrowseTimer
+                }
+                CicsPlanOperation::BtsStartBrowseActivity => {
+                    crate::HirCicsOperation::BtsStartBrowseActivity
+                }
+                CicsPlanOperation::BtsGetNextActivity => {
+                    crate::HirCicsOperation::BtsGetNextActivity
+                }
+                CicsPlanOperation::BtsEndBrowseActivity => {
+                    crate::HirCicsOperation::BtsEndBrowseActivity
+                }
+                CicsPlanOperation::BtsInquireActivity => {
+                    crate::HirCicsOperation::BtsInquireActivity
+                }
+                CicsPlanOperation::BtsStartBrowseProcess => {
+                    crate::HirCicsOperation::BtsStartBrowseProcess
+                }
+                CicsPlanOperation::BtsGetNextProcess => crate::HirCicsOperation::BtsGetNextProcess,
+                CicsPlanOperation::BtsEndBrowseProcess => {
+                    crate::HirCicsOperation::BtsEndBrowseProcess
+                }
+                CicsPlanOperation::BtsInquireProcess => crate::HirCicsOperation::BtsInquireProcess,
                 CicsPlanOperation::AcquireActivityId => crate::HirCicsOperation::AcquireActivityId,
                 CicsPlanOperation::AcquireProcess => crate::HirCicsOperation::AcquireProcess,
                 CicsPlanOperation::CancelAcqActivity => crate::HirCicsOperation::CancelAcqActivity,
@@ -1866,6 +1937,18 @@ mod tests {
                 CicsPlanOperation::RunAcqProcess => crate::HirCicsOperation::RunAcqProcess,
                 CicsPlanOperation::RunActivity => crate::HirCicsOperation::RunActivity,
                 CicsPlanOperation::RunTransId => crate::HirCicsOperation::RunTransId,
+                CicsPlanOperation::DeleteChannel => crate::HirCicsOperation::DeleteChannel,
+                CicsPlanOperation::DeleteContainer => crate::HirCicsOperation::DeleteContainer,
+                CicsPlanOperation::GetContainer => crate::HirCicsOperation::GetContainer,
+                CicsPlanOperation::GetContainer64 => {
+                    panic!("GET64 CONTAINER must not originate from COBOL source")
+                }
+                CicsPlanOperation::MoveContainer => crate::HirCicsOperation::MoveContainer,
+                CicsPlanOperation::PutContainer => crate::HirCicsOperation::PutContainer,
+                CicsPlanOperation::PutContainer64 => {
+                    panic!("PUT64 CONTAINER must not originate from COBOL source")
+                }
+                CicsPlanOperation::QueryChannel => crate::HirCicsOperation::QueryChannel,
                 CicsPlanOperation::SuspendAcqActivity => {
                     crate::HirCicsOperation::SuspendAcqActivity
                 }

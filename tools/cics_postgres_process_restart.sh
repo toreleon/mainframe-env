@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Run the bounded CIC-906 BTS subprocess selector against one disposable PostgreSQL 18.6 cluster.
+# Run selected CICS restart routes against one disposable PostgreSQL 18.6 cluster.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$root"
-if command -v brew >/dev/null 2>&1; then
+if [[ -n "${MAINFRAME_ENV_PG_BIN:-}" ]]; then
+  pg_bin="$MAINFRAME_ENV_PG_BIN"
+elif command -v brew >/dev/null 2>&1; then
   pg_bin="$(brew --prefix postgresql@18)/bin"
 else
   pg_bin="$(dirname "$(command -v pg_config)")"
@@ -13,7 +15,7 @@ fi
   echo 'PostgreSQL 18.6 is required' >&2
   exit 1
 }
-for tool in initdb pg_ctl createdb pg_config; do
+for tool in initdb pg_ctl createdb dropdb pg_config; do
   [[ -x "$pg_bin/$tool" ]] || { echo "missing $pg_bin/$tool" >&2; exit 1; }
 done
 
@@ -39,7 +41,8 @@ trap 'exit 143' TERM
 
 port="$(python3 -B -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
 echo "CIC-906 task-owned PostgreSQL 18.6 cluster: data=$data socket=$socket port=$port"
-"$pg_bin/initdb" -D "$data" -U cic906 --auth-local=trust --auth-host=trust \
+"$pg_bin/initdb" -D "$data" -L "$("$pg_bin/pg_config" --sharedir)" \
+  -U cic906 --auth-local=trust --auth-host=trust \
   --encoding=UTF8 --no-locale --no-instructions >/dev/null
 "$pg_bin/pg_ctl" -D "$data" -l "$scratch/postgres.log" \
   -o "-F -k $socket -p $port -h 127.0.0.1" start -w -t 30 >/dev/null
@@ -51,3 +54,12 @@ cargo test --locked -p mainframe-env-cics --lib \
 cargo test --locked -p mainframe-env-cics --lib \
   service::tests::bts_selected_link_reconciles_outer_receipt_after_postgres_reopen \
   -- --ignored --exact
+for selector in \
+  postgres_compiled_channel_container_route_recovers_after_restart \
+  postgres_compiled_bts_container_route_recovers_after_restart \
+  postgres_compiled_bts_browse_cursor_recovers_after_restart; do
+  "$pg_bin/dropdb" -h 127.0.0.1 -p "$port" -U cic906 cic906_bts_restart
+  "$pg_bin/createdb" -h 127.0.0.1 -p "$port" -U cic906 cic906_bts_restart
+  cargo test --locked -p mainframe-env-server --lib "product::tests::$selector" \
+    -- --ignored --exact --test-threads=1
+done
