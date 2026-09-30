@@ -5,7 +5,8 @@ Ownership: IMS provider maintainers.
 This crate owns the bounded deterministic IMS application authority currently
 required by the product: HIDAM-style root/child data, secondary indexes,
 PSB/PCB selection, DLI navigation and mutation, checkpointing, load/unload,
-durable commit/rollback, replay, and host-provider registration.
+durable commit/rollback, replay, and host-provider registration. It also owns
+bounded TM transaction, message, I/O/alternate-PCB, and conversational contracts.
 
 ## Invariants
 
@@ -17,6 +18,8 @@ durable commit/rollback, replay, and host-provider registration.
 - Unknown outcomes, conditions, cancellation, and provider failures remain
   distinct.
 - Application names and conformance row IDs never select production behavior.
+- Versioned DBD/PSB metadata validation closes names, hierarchy, fields, indexes,
+  relationships, PCB options, and sensitivity paths before producing a digest.
 
 ## Allowed dependencies
 
@@ -29,7 +32,31 @@ state.
 
 `ImsService` installs validated application definitions and exposes typed host
 providers through `ims_providers`. Public definition and limit types describe
-the bounded installation and execution contract.
+the bounded installation and execution contract. `TmDefinitionSet`,
+`TmInputMessage`, and `TmCall` define the TM contract. `TmService` persists
+bounded catalog, message, session, conversation, outbound, and replay rows
+through `ProviderStateStore`. It uses `WorkStore` for scheduling, cancellation,
+the durable logical clock, and fenced leases. The existing
+`EnterpriseAuthorizer` checks PSB, transaction, and destination access before
+protected transitions. `ImsMetadataCatalog` and
+`validate_ims_metadata` expose the additive `mainframe-env.ims-metadata@1`
+contract, described by the Draft 2020-12
+[`metadata schema`](../../../conformance/0.14/schemas/ims-metadata.schema.json).
+
+The `database` module exports the recovered in-memory engine foundation. It
+validates bounded hierarchy, field and index definitions, and owns deterministic
+GU/GN/GNP-style selection, caller-owned position and holds, insert, replace,
+physical subtree delete, append-only GSAM, and secondary-index maintenance.
+It is isolated from `ims_providers`; it does not emit PCB statuses or persist
+its image. Metadata publication, host routing, authorization and UOW integration
+remain separate contracts.
+
+TM admission records a provider-row intent before adding work. An exact retry
+or `repair_schedules` repairs that bounded cross-interface gap without executing
+the application. Current-step nonexpress output is published at commit and
+discarded at rollback; express PURG output remains available. SQLite reopen
+preserves the recorded TM cursor, output, and conversation state. This is a
+provider foundation, not an application execution route or licensed IMS claim.
 
 ## Non-goals
 

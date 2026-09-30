@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recovered the MQ-1502 typed object lifecycle kernel with deterministic resolution, model instances, and strict restart snapshots; no MQI execution or licensed credit."

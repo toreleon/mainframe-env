@@ -5,6 +5,13 @@ use super::{CicsPlanOption, HirCicsOption};
 pub(super) const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
         HirCicsOption::BtsSynchronous => CicsPlanOption::BtsSynchronous,
+        HirCicsOption::ContainerAppend => CicsPlanOption::ContainerAppend,
+        HirCicsOption::ContainerNoData => CicsPlanOption::ContainerNoData,
+        HirCicsOption::ContainerProcess => CicsPlanOption::ContainerProcess,
+        HirCicsOption::ContainerAcqProcess => CicsPlanOption::ContainerAcqProcess,
+        HirCicsOption::ContainerAcqActivity => CicsPlanOption::ContainerAcqActivity,
+        HirCicsOption::ContainerFromProcess => CicsPlanOption::ContainerFromProcess,
+        HirCicsOption::ContainerToProcess => CicsPlanOption::ContainerToProcess,
         HirCicsOption::BtsAsynchronous => CicsPlanOption::BtsAsynchronous,
         HirCicsOption::BtsNoSuspend => CicsPlanOption::BtsNoSuspend,
         HirCicsOption::BtsAcqActivity => CicsPlanOption::BtsAcqActivity,

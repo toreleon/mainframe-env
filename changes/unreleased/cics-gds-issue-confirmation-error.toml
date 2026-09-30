@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Register typed APPC basic GDS ISSUE CONFIRMATION and ERROR with durable carrier and peer replay (#294)."
