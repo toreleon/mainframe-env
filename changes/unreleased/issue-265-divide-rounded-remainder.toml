@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Calculate DIVIDE REMAINDER from the truncated quotient when the result is ROUNDED."

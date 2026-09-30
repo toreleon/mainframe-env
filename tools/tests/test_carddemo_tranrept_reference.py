@@ -15,6 +15,25 @@ SPEC.loader.exec_module(reference)
 
 
 class FramingTest(unittest.TestCase):
+    def test_sortout_metadata_resolves_sortin_referback(self):
+        jcl = """//PRC001.FILEOUT DD DISP=NEW,
+//        DCB=(LRECL=350,RECFM=FB,BLKSIZE=0)
+//SORTIN DD DISP=SHR,
+//         DSN=AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)
+//SORTOUT DD DISP=NEW,
+//         DCB=(*.SORTIN)
+//TRANREPT DD DISP=NEW,
+//         DCB=(LRECL=133,RECFM=FB,BLKSIZE=0)
+"""
+        source, selected, report = reference.tranrept_dataset_metadata(jcl)
+        self.assertEqual(source, {"organization": "Sequential", "recfm": "FixedBlocked",
+                                  "lrecl": 350, "ccsid": 37})
+        self.assertEqual(selected, source)
+        self.assertIsNot(selected, source)
+        self.assertEqual(report["lrecl"], 133)
+        with self.assertRaisesRegex(ValueError, "refer back"):
+            reference.tranrept_dataset_metadata(jcl.replace("*.SORTIN", "*.OTHER"))
+
     def test_two_one_byte_records_with_sequential_metadata(self):
         self.assertEqual(
             reference.framed_dataset([b"A", b"B"], 1, 2),

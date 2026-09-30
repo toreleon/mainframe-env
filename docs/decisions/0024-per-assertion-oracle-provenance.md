@@ -19,11 +19,11 @@ The v2 evidence contract gives every correctness leaf an
 `source`, `source_id`, `source_digest`, and `source_locator`. The four source
 classes are `self-recorded`, `independent-reference`, `customer-captured`, and
 `licensed-ibm`. The validator checks exact coverage, duplicate and unknown
-paths, source classes, and the self-recorded binding to the unchanged v1
-receipt. A missing attribution has zero conformance credit. The validator
-derives credit from validated provenance; evidence cannot edit a `credit`
-field. The current v2 artifact cites v1 for all 90 assertions, so it remains
-a passing regression with zero conformance credit.
+paths, source classes, and self-recorded bindings to the historical v1 or
+refreshed v2 receipt. A missing attribution has zero conformance credit. The
+validator derives credit from validated provenance; evidence cannot edit a
+`credit` field. Self-recorded leaves remain regression evidence with zero
+conformance credit. Refreshes leave the historical v1 receipt unchanged.
 
 A `licensed-ibm` label alone grants no licensed equivalence. That still
 requires CER-1701 protected attestation and the relevant subsystem validators
