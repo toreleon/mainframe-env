@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/cobol-differential-receipt.schema.json",
+  "title": "Bounded COBOL semantic differential campaign receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reference",
+    "licensed_credit",
+    "cobc_path",
+    "cobc_version",
+    "cobc_sha256",
+    "compiler_flags",
+    "seed_start",
+    "seed_end",
+    "seeds_run",
+    "rejected_reference",
+    "rejected_product",
+    "anchors",
+    "anchor_programs",
+    "generated_reached",
+    "divergences"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.cobol-differential-receipt@2"
+    },
+    "reference": {
+      "const": "GnuCOBOL"
+    },
+    "licensed_credit": {
+      "const": 0
+    },
+    "cobc_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cobc_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cobc_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "compiler_flags": {
+      "const": [
+        "-x",
+        "-std=ibm",
+        "-free",
+        "-fbinary-truncate"
+      ]
+    },
+    "seed_start": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seed_end": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seeds_run": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300
+    },
+    "rejected_reference": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rejected_product": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "anchors": {
+      "$ref": "#/$defs/reach"
+    },
+    "anchor_programs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "generated_reached": {
+      "$ref": "#/$defs/reach"
+    },
+    "divergences": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/divergence"
+      }
+    }
+  },
+  "$defs": {
+    "reach": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stdout_records",
+        "return_code",
+        "abend_code",
+        "abend_reason"
+      ],
+      "properties": {
+        "stdout_records": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "return_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "abend_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "abend_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "divergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "seed",
+        "class",
+        "signature",
+        "count",
+        "classification",
+        "reason",
+        "minimized_program",
+        "product",
+        "reference"
+      ],
+      "properties": {
+        "origin": {
+          "enum": [
+            "anchor",
+            "generated"
+          ]
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "class": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "classification": {
+          "enum": [
+            "known-defect",
+            "allowed-difference",
+            "product-defect-candidate",
+            "generator-bug"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minimized_program": {
+          "type": "string",
+          "minLength": 1
+        },
+        "product": {
+          "$ref": "#/$defs/observation"
+        },
+        "reference": {
+          "$ref": "#/$defs/observation"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
