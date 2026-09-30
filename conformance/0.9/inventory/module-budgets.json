@@ -138,7 +138,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-mq/src/service.rs",
-      "max_production_lines": 1335,
+      "max_production_lines": 1331,
       "responsibility": "MQ queue semantics, unit-of-work transitions, durable object rows, replay identity, and retention-clock finalization share one service authority; host-context validation and canonical message identity are extracted.",
       "split_boundary": "Continue extracting replay envelopes and clock finalization from queue operations and durable object-row persistence behind the existing MQ service."
     },
