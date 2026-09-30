@@ -734,6 +734,24 @@ fn validate_named_jecl_operands(value: &str, allowed: &[&str]) -> bool {
 }
 
 fn normalize_parameter(identity: crate::JclParameterIdentity, raw: &str) -> Result<String, String> {
+    if matches!(
+        identity,
+        crate::JclParameterIdentity::Exec(ExecParameterId::Parm)
+    ) {
+        if raw.chars().any(char::is_control) {
+            return Err("PARM contains controls".into());
+        }
+        let raw = raw.trim();
+        let value = if raw.starts_with('\'') && raw.ends_with('\'') && raw.len() >= 2 {
+            raw[1..raw.len() - 1].replace("''", "'")
+        } else {
+            raw.to_string()
+        };
+        if value.chars().count() > 100 || value.chars().any(char::is_control) {
+            return Err("PARM exceeds 100 characters or contains controls".into());
+        }
+        return Ok(value);
+    }
     let value = strip_quotes(raw.trim());
     if value.len() > 65_536 || value.chars().any(char::is_control) {
         return Err(format!(
@@ -1797,6 +1815,16 @@ mod tests {
         OUTPUT_PARAMETERS,
     };
 
+    #[test]
+    fn exec_parm_limits_decoded_text_to_one_hundred_characters() {
+        let identity = crate::JclParameterIdentity::Exec(ExecParameterId::Parm);
+        assert_eq!(
+            normalize_parameter(identity, &format!("'{}'", "A".repeat(100))),
+            Ok("A".repeat(100))
+        );
+        assert!(normalize_parameter(identity, &format!("'{}'", "A".repeat(101))).is_err());
+    }
+
     fn convert(source: &str) -> JclConversion {
         convert_jcl(
             &JclBundle {
@@ -1894,7 +1922,11 @@ mod tests {
                 "valid sample failed for {}: {valid}",
                 identity.generated().row_id()
             );
-            let invalid = invalid_sample(identity.validation());
+            let invalid = if matches!(identity, JclParameterIdentity::Exec(ExecParameterId::Parm)) {
+                "\n"
+            } else {
+                invalid_sample(identity.validation())
+            };
             assert!(
                 normalize_parameter(identity, invalid).is_err(),
                 "invalid sample passed for {}: {invalid}",

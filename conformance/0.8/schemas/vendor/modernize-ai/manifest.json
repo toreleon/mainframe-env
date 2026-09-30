@@ -1,0 +1,10 @@
+{
+  "source_commit": "1ebd5a975f1c92a9032c7d041e7bbc89327e25b9",
+  "files": [
+    {"source_path": "schemas/execution-manifests/execution-manifest-1.0.0.schema.json", "sha256": "6dadc283c3646cf9cfbd62ae733780c29b49fbb80c3d27db328daa19e96f3532"},
+    {"source_path": "schemas/artifacts/observation-3.0.0.schema.json", "sha256": "e09bc775d4b99432d2a53a307b802783b2a10361f4396d1b2eaecca4b9c30309"},
+    {"source_path": "schemas/artifacts/runner-result-manifest-1.0.0.schema.json", "sha256": "c8622a77d598c0f892cd6ff0f4dbf4839e42899df98f46bd6ba9fbd23271953b"},
+    {"source_path": "schemas/artifacts/p5-common-1.0.0.schema.json", "sha256": "d8eafa6002afb54a2557fa42691ca843026da8c416ef66aa205d365c39e93ead"},
+    {"source_path": "schemas/artifacts/p4-common-1.0.0.schema.json", "sha256": "6894769dfc500c474248b126b5807f5b6993ad84afec68ca61b07a31ae215623"}
+  ]
+}
