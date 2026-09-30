@@ -730,6 +730,7 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
         .collect();
     let floating_prefix = cobol_floating_insertion_prefix(&symbols);
     let mut currency_symbols_seen = 0u64;
+    let mut floating_signs_seen = 0u64;
     let mut position = 0usize;
     let mut shape = NumericPictureShape::default();
     let mut fractional = false;
@@ -763,7 +764,20 @@ fn numeric_picture_shape(picture: &str) -> Result<NumericPictureShape, &'static 
                     .storage
                     .checked_add(count)
                     .ok_or("numeric PICTURE extent overflows")?;
-                if count > 1 || (in_floating_prefix && floating_prefix.unwrap().0 == symbol) {
+                if in_floating_prefix && floating_prefix.unwrap().0 == symbol {
+                    let digit_slots = count - u64::from(floating_signs_seen == 0);
+                    shape.digits = shape
+                        .digits
+                        .checked_add(digit_slots)
+                        .ok_or("numeric PICTURE digit count overflows")?;
+                    if fractional {
+                        shape.scale = shape
+                            .scale
+                            .checked_add(digit_slots)
+                            .ok_or("numeric PICTURE scale overflows")?;
+                    }
+                    floating_signs_seen += count;
+                } else if count > 1 {
                     shape.digits = shape
                         .digits
                         .checked_add(count)
@@ -1182,8 +1196,9 @@ mod tests {
             ("$$V99", 4, 3, 2, false),
             ("$$$$", 4, 3, 0, false),
             ("$9", 2, 1, 0, false),
-            ("+++,++9.99", 10, 8, 2, true),
-            ("----9", 5, 5, 0, true),
+            // COBOL 6.5 rlddeief reserves the leftmost floating sign.
+            ("+++,++9.99", 10, 7, 2, true),
+            ("----9", 5, 4, 0, true),
         ] {
             let shape = numeric_picture_shape(picture).unwrap();
             assert_eq!(
@@ -1200,10 +1215,11 @@ mod tests {
             ("$$B$$9.9", 8, 5, 1, false),
             ("$$0$$9", 6, 4, 0, false),
             ("$$/$$9", 6, 4, 0, false),
-            ("++B++9", 6, 5, 0, true),
-            ("--,--9.99", 9, 7, 2, true),
+            // COBOL 6.5 rlddeief: the second-leftmost floating sign is the first digit.
+            ("++B++9", 6, 4, 0, true),
+            ("--,--9.99", 9, 6, 2, true),
             ("$$$B99", 6, 4, 0, false),
-            ("+++.+++", 7, 6, 3, true),
+            ("+++.+++", 7, 5, 3, true),
         ] {
             let shape = numeric_picture_shape(picture).unwrap();
             assert_eq!(
@@ -1211,6 +1227,22 @@ mod tests {
                 (storage, digits, scale, signed),
                 "{picture}"
             );
+        }
+    }
+
+    #[test]
+    fn edited_arithmetic_receivers_have_picture_digit_capacity() {
+        for (picture, digits, scale) in [
+            ("ZZZ9", 4, 0),
+            ("Z,ZZ9", 4, 0),
+            ("$$$9", 3, 0),
+            ("++++9", 4, 0),
+            ("----9", 4, 0),
+            ("ZZ9.99", 5, 2),
+            ("$$B$$9.9", 5, 1),
+        ] {
+            let shape = numeric_picture_shape(picture).unwrap();
+            assert_eq!((shape.digits, shape.scale), (digits, scale), "{picture}");
         }
     }
 

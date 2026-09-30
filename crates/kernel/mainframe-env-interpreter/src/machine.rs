@@ -35,6 +35,7 @@ mod amode64_access;
 mod completion;
 mod condition_literals;
 mod corresponding;
+mod decimal_capacity;
 mod decimal_commit;
 mod eib;
 #[cfg(test)]
@@ -45,6 +46,7 @@ mod snapshot_codec;
 mod typed_cics;
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};
+use decimal_capacity::decimal_exceeds_picture;
 
 const NAMESPACE: &str = "mainframe.core.cobol";
 pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
