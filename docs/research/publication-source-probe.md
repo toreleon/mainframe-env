@@ -142,11 +142,11 @@ second half will be surprised by the next red run.
 | dataset-vsam-ams | SC23-6846-70, z/OS 3.2 DFSMS Access Method Services | 516<!--f:pins.topics.dataset_vsam_ams--> | 3,448,164<!--f:pins.bytes.dataset_vsam_ams--> | matches |
 | racf-saf | SA23-2292-70, z/OS 3.2 RACF Command Language Reference | 109<!--f:pins.topics.racf_saf--> | 4,011,649<!--f:pins.bytes.racf_saf--> | matches |
 | zosmf | SC27-8430-70, z/OSMF Programming Guide | 395<!--f:pins.topics.zosmf--> | 9,761,388<!--f:pins.bytes.zosmf--> | matches |
-| db2 | Db2 13 for z/OS SQL Reference | 832<!--f:pins.topics.db2--> | 29,147,264<!--f:pins.bytes.db2--> | matches on re-read; intermittently reported `differs` (see below) |
+| db2 | Db2 13 for z/OS SQL Reference | 832<!--f:pins.topics.db2--> | 29,147,520<!--f:pins.bytes.db2--> | matches on re-read; intermittently reported `differs` (see below) |
 | ims | Comparing EXEC DLI commands and DL/I calls, IMS 15.6 | 1<!--f:pins.topics.ims--> | 16,046<!--f:pins.bytes.ims--> | matches |
-| mq | IBM MQ 9.4 MQI call descriptions | 27<!--f:pins.topics.mq--> | 837,828<!--f:pins.bytes.mq--> | matches |
+| mq | IBM MQ 9.4 MQI call descriptions | 27<!--f:pins.topics.mq--> | 837,829<!--f:pins.bytes.mq--> | matches |
 
-4,488<!--f:pins.topics_total--> topics and 61,667,626<!--f:pins.bytes_total-->
+4,488<!--f:pins.topics_total--> topics and 61,667,883<!--f:pins.bytes_total-->
 bytes; both totals are the sum of the nine manifests
 in `conformance/0.2/manifests/` and can be recomputed from the tree without
 asking IBM anything. All nine tables of contents hash to their recorded
@@ -834,14 +834,14 @@ were argued from.
 
 - **"nothing validates parameters" (AMS) is false.**
   `ams_operand_allowed` at
-  `crates/apps/mainframe-env-batch/src/service.rs:6225<!--f:ams.allowlist_line-->`
+  `crates/apps/mainframe-env-batch/src/service.rs:6202<!--f:ams.allowlist_line-->`
   is a per-command allowlist of **126<!--f:ams.allowlist_names--> distinct
   operand names**, 84<!--f:ams.allowlist_base_names--> of them the
   base set shared by `ALLOCATE`, `DEFINE CLUSTER`, `DEFINE NONVSAM`, `DEFINE
   ALTERNATEINDEX` and `ALTER` and the rest declared per command.
-  `unimplemented_ams_operand` at `:6103<!--f:ams.unimplemented_line-->` scans
+  `unimplemented_ams_operand` at `:6080<!--f:ams.unimplemented_line-->` scans
   every top-level term and its caller at
-  `:2996<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
+  `:3050<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
   capability `ams-operand` before any
   effect runs. The ruling — that `grammar.json` stays a recognition inventory and
   should not grow a parameter field — is *strengthened* by this, not weakened:

@@ -61,6 +61,22 @@ class CicsApplicationSourceSupplementTests(unittest.TestCase):
             self.assertEqual(pin.key, topic["cache_key"])
             self.assertEqual(pin.scopes, ())
 
+    def test_repin_keeps_original_capture_bound_to_historical_topics(self) -> None:
+        historical = module.read_json(module.ROOT / module.HISTORICAL_RECEIPT_PATH)
+        self.assertEqual(
+            self.receipt["capture"]["identity_sha256"],
+            module.identity_digest(historical["topics"]),
+        )
+        self.assertNotEqual(
+            self.receipt["capture"]["identity_sha256"],
+            module.identity_digest(self.receipt["topics"]),
+        )
+        receipt = self.mutated_receipt()
+        receipt["repin"]["historical_receipt_sha256"] = "sha256:" + "0" * 64
+        self.refresh(receipt)
+        with self.assertRaisesRegex(module.SupplementError, "historical receipt binding"):
+            module.validate_receipt(receipt)
+
     def test_toc_or_target_authority_spoof_is_rejected(self) -> None:
         receipt = self.mutated_receipt()
         receipt["toc_claimed"] = True

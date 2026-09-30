@@ -487,13 +487,15 @@ pub use container_scope::{BtsAcquiredProcessContainerScope, BtsProcessContainerA
 pub use context::BtsActivityContext;
 pub(super) use dispatch::invoke;
 pub(in crate::service) use participant::settle_recorded_uow;
+#[cfg(test)]
+pub(in crate::service::handlers) use removal::BtsRemoval;
 pub use run::{BTS_RUN_WORK_GENERATION, BtsRunRecord, BtsRunState};
 pub use store::BtsLifecycleStore;
 pub use transid::{
     BTS_TRANSID_WORK_GENERATION, BtsTransidContainer, BtsTransidRecord, BtsTransidState,
 };
 
-fn put_process(
+pub(in crate::service::handlers) fn put_process(
     key: &str,
     process: &BtsProcess,
     expected_version: Option<u64>,
@@ -577,7 +579,7 @@ fn activity_id(process_key: &str, incarnation: &str, sequence: u64) -> String {
     result
 }
 
-fn validate_activity_id(value: &str) -> Result<(), HostProblem> {
+pub(super) fn validate_activity_id(value: &str) -> Result<(), HostProblem> {
     if value.len() != 52 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(HostProblem::Malformed);
     }
@@ -596,7 +598,7 @@ fn validate_identifier(value: &str, max: usize) -> Result<(), HostProblem> {
     Ok(())
 }
 
-fn validate_name(value: &str, max: usize, blanks: bool) -> Result<(), HostProblem> {
+pub(super) fn validate_name(value: &str, max: usize, blanks: bool) -> Result<(), HostProblem> {
     if value.is_empty()
         || value.chars().count() > max
         || value.trim_ascii().is_empty()

@@ -28,6 +28,8 @@ mod retrieve;
 mod runtime_validation;
 mod slot_access;
 use runtime_validation::validate_machine_slot;
+mod container_route;
+pub(super) mod container_set;
 mod spool_control;
 mod storage64;
 mod task_wait;
@@ -41,7 +43,7 @@ use names::SlotUse;
 use registry::operation_schema;
 use registry::{expected_effects, expected_operation};
 pub(super) use registry::{operation_identities, validate_module_operations};
-pub(super) use response::{drive_response, write_response_state, write_runtime_output};
+pub(super) use response::{finish, write_response_state, write_runtime_output};
 use runtime_validation::validate_runtime_plan;
 use slot_access::{plan_slots, read_integer_slot, read_slot};
 pub(super) use storage64::Storage64Intent;
@@ -286,6 +288,9 @@ pub(super) fn execute(
             {
                 storage64::freemain_argument(machine, slot, operand.name)?
             }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::ContainerFrom64 => {
+                ("mainframe-env.cics.pointer64@1", read_slot(machine, slot)?)
+            }
             CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
@@ -417,6 +422,11 @@ pub(super) fn execute(
                         | CicsOperandName::WebReceiveStatusLength
                         | CicsOperandName::WebPortNumber
                         | CicsOperandName::BtsTimeout
+                        | CicsOperandName::ContainerLength
+                        | CicsOperandName::ContainerCcsid
+                        | CicsOperandName::ContainerByteOffset
+                        | CicsOperandName::ContainerIntoCcsid
+                        | CicsOperandName::BtsBrowse(mainframe_env_ir::BtsBrowseInput::BrowseToken)
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (
@@ -463,6 +473,10 @@ pub(super) fn execute(
             names::operand_for(plan.operation, operand.name).into(),
             payload(schema, bytes)?,
         );
+    }
+
+    if plan.operation == CicsPlanOperation::PutContainer64 {
+        container_route::prepare_from(machine, &mut arguments)?;
     }
 
     if plan.operation == CicsPlanOperation::DumpTransaction
@@ -524,7 +538,10 @@ pub(super) fn execute(
             tcpip::add_output_arguments(machine, &mut arguments, key, identity, &output.target)?;
         }
         match output.name {
-            CicsOutputName::ConversationDataInto => {
+            CicsOutputName::ContainerInto64 => {
+                container_route::prepare_into(machine, &output.target, &mut arguments)?;
+            }
+            CicsOutputName::ContainerInto | CicsOutputName::ConversationDataInto => {
                 let CicsTarget::Resolved(slot) = &target else {
                     return Err(MachineProblem::UnexpectedHostResult);
                 };
@@ -540,7 +557,9 @@ pub(super) fn execute(
                 );
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::ConversationDataSet => {
+            CicsOutputName::ContainerSet
+            | CicsOutputName::ConversationDataSet
+            | CicsOutputName::BtsBrowse(mainframe_env_ir::BtsBrowseOutput::Set) => {
                 arguments.extend(retrieve::allocation_arguments(
                     machine,
                     &target,
@@ -637,13 +656,17 @@ pub(super) fn execute(
             | CicsOutputName::ConversationToFullLength => {
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::BtsActivityId
+            CicsOutputName::BtsBrowse(_)
+            | CicsOutputName::BtsActivityId
             | CicsOutputName::BtsCompStatus
             | CicsOutputName::BtsMode
             | CicsOutputName::BtsSuspStatus
             | CicsOutputName::BtsAbCode
             | CicsOutputName::BtsAbProgram
             | CicsOutputName::BtsChildToken
+            | CicsOutputName::ContainerLength
+            | CicsOutputName::ContainerCcsid
+            | CicsOutputName::ContainerCount
             | CicsOutputName::Abstime
             | CicsOutputName::SecurityRead
             | CicsOutputName::SecurityUpdate
@@ -931,6 +954,12 @@ pub(super) fn execute(
     }
     let argument_summary = argument_summary(&arguments);
     let storage64_intent = storage64::pending_intent(machine, host_operation, &arguments)?;
+    let container_identity = container_set::prepare(
+        machine,
+        host_operation,
+        &arguments,
+        outputs.contains_key("SET"),
+    );
     machine.effect(
         HostRequest::Cics(CicsRequest {
             operation: host_operation,
@@ -942,6 +971,7 @@ pub(super) fn execute(
             operation: host_operation,
             storage64_intent,
             argument_summary,
+            container: container_identity,
             into,
             outputs,
             response,
@@ -1168,6 +1198,221 @@ mod tests {
         encode_cics_effect_plan,
     };
 
+    #[test]
+    fn channel_container_64_bit_pointer_and_length_are_checked_before_copy() {
+        use crate::storage64::{Storage64Attributes, Storage64Key, Storage64Location};
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PTR-X", 8);
+        machine.invocation.bindings.insert(
+            "cics.amode64.caller".into(),
+            payload(
+                "mainframe-env.cics.amode64-caller@1",
+                b"non-le-amode64".to_vec(),
+            )
+            .unwrap(),
+        );
+        machine.invocation.bindings.insert(
+            "cics.amode64.taskdatakey".into(),
+            payload("mainframe-env.cics.taskdatakey@1", b"USER".to_vec()).unwrap(),
+        );
+        let owner = machine.invocation.run_unit_id.as_str().to_owned();
+        let address = machine
+            .storage64
+            .allocate(
+                &owner,
+                8,
+                Storage64Attributes {
+                    location: Storage64Location::AboveBar,
+                    key: Storage64Key::User,
+                    shared: false,
+                    executable: false,
+                },
+            )
+            .unwrap();
+        machine.write_storage64(address, 0, b"ABCDEFGH").unwrap();
+        machine.write("PTR-X", &address.to_be_bytes()).unwrap();
+        let mut from = BTreeMap::from([
+            (
+                "FROM".into(),
+                payload(
+                    "mainframe-env.cics.pointer64@1",
+                    address.to_be_bytes().to_vec(),
+                )
+                .unwrap(),
+            ),
+            (
+                "FLENGTH".into(),
+                payload("mainframe-env.cics.decimal@1", b"4".to_vec()).unwrap(),
+            ),
+        ]);
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(
+            from["FROM"].schema(),
+            "mainframe-env.cics.storage64-value@1"
+        );
+        assert_eq!(from["FROM"].bytes(), b"ABCD");
+        from.insert(
+            "FROM".into(),
+            payload(
+                "mainframe-env.cics.pointer64@1",
+                address.to_be_bytes().to_vec(),
+            )
+            .unwrap(),
+        );
+        from.insert(
+            "FLENGTH".into(),
+            payload("mainframe-env.cics.decimal@1", b"9".to_vec()).unwrap(),
+        );
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(from["FROM"].schema(), "mainframe-env.cics.length-error64@1");
+        from.insert(
+            "FROM".into(),
+            payload(
+                "mainframe-env.cics.pointer64@1",
+                address.to_be_bytes().to_vec(),
+            )
+            .unwrap(),
+        );
+        from.insert(
+            "FLENGTH".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                b"18446744073709551616".to_vec(),
+            )
+            .unwrap(),
+        );
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(from["FROM"].schema(), "mainframe-env.cics.length-error64@1");
+        let mut into = BTreeMap::new();
+        container_route::prepare_into(&machine, &slot, &mut into).unwrap();
+        assert_eq!(into["INTO.MAXLENGTH"].bytes(), b"8");
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: String::new(),
+            sysid: String::new(),
+            transaction: String::new(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", Vec::new()).unwrap(),
+            outputs: BTreeMap::from([(
+                "INTO".into(),
+                payload("mainframe-env.cics.payload@1", b"WXYZ".to_vec()).unwrap(),
+            )]),
+            unit_of_work: None,
+        };
+        response::write_response_state(
+            &mut machine,
+            CicsOperation::GetContainer64,
+            Some(Storage64Intent::GetContainer(Some((address, 8)))),
+            None,
+            None,
+            None,
+            &BTreeMap::new(),
+            &response,
+        )
+        .unwrap();
+        assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
+        let mut nodata = response.clone();
+        nodata.outputs.clear();
+        nodata.outputs.insert(
+            "FLENGTH".into(),
+            payload("mainframe-env.cics.decimal@1", b"4".to_vec()).unwrap(),
+        );
+        response::write_response_state(
+            &mut machine,
+            CicsOperation::GetContainer64,
+            Some(Storage64Intent::GetContainer(None)),
+            None,
+            None,
+            None,
+            &BTreeMap::new(),
+            &nodata,
+        )
+        .unwrap();
+        assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
+        let mut oversized = response;
+        oversized.outputs.insert(
+            "INTO".into(),
+            payload("mainframe-env.cics.payload@1", b"123456789".to_vec()).unwrap(),
+        );
+        assert!(
+            response::write_response_state(
+                &mut machine,
+                CicsOperation::GetContainer64,
+                Some(Storage64Intent::GetContainer(Some((address, 8)))),
+                None,
+                None,
+                None,
+                &BTreeMap::new(),
+                &oversized,
+            )
+            .is_err()
+        );
+        assert_eq!(machine.read_storage64(address, 0, 8).unwrap(), b"WXYZEFGH");
+    }
+
+    #[test]
+    fn get64_put64_cics_key_access_fails_with_user_taskdatakey() {
+        use crate::storage64::{Storage64Attributes, Storage64Key, Storage64Location};
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PTR-X", 8);
+        machine.invocation.bindings.insert(
+            "cics.amode64.caller".into(),
+            payload(
+                "mainframe-env.cics.amode64-caller@1",
+                b"non-le-amode64".to_vec(),
+            )
+            .unwrap(),
+        );
+        machine.invocation.bindings.insert(
+            "cics.amode64.taskdatakey".into(),
+            payload("mainframe-env.cics.taskdatakey@1", b"USER".to_vec()).unwrap(),
+        );
+        let address = machine
+            .storage64
+            .allocate(
+                machine.invocation.run_unit_id.as_str(),
+                8,
+                Storage64Attributes {
+                    location: Storage64Location::AboveBar,
+                    key: Storage64Key::Cics,
+                    shared: false,
+                    executable: false,
+                },
+            )
+            .unwrap();
+        machine.write("PTR-X", &address.to_be_bytes()).unwrap();
+        let before = machine.storage64.get(address).unwrap().bytes.clone();
+        let mut from = BTreeMap::from([
+            (
+                "FROM".into(),
+                payload(
+                    "mainframe-env.cics.pointer64@1",
+                    address.to_be_bytes().to_vec(),
+                )
+                .unwrap(),
+            ),
+            (
+                "FLENGTH".into(),
+                payload("mainframe-env.cics.decimal@1", b"4".to_vec()).unwrap(),
+            ),
+        ]);
+        container_route::prepare_from(&machine, &mut from).unwrap();
+        assert_eq!(
+            from["FROM"].schema(),
+            "mainframe-env.cics.invalid-pointer64@1"
+        );
+        let mut into = BTreeMap::new();
+        container_route::prepare_into(&machine, &slot, &mut into).unwrap();
+        assert_eq!(
+            into["INTO"].schema(),
+            "mainframe-env.cics.invalid-pointer64@1"
+        );
+        assert_eq!(machine.storage64.get(address).unwrap().bytes, before);
+    }
+
     fn syncpoint_plan() -> CicsEffectPlan {
         CicsEffectPlan {
             operation: CicsPlanOperation::Syncpoint,
@@ -1205,7 +1450,7 @@ mod tests {
         }
     }
 
-    fn machine_with_alphanumeric_slot(
+    pub(super) fn machine_with_alphanumeric_slot(
         name: &str,
         length: usize,
     ) -> (ReferenceMachine, CicsStorageSlot) {

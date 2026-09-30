@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/ims-ssa-rules@1",
+  "title": "Reviewed IMS SSA grammar rules",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "source_scope",
+    "source_topics",
+    "rule_groups",
+    "segment_name_bytes",
+    "field_name_bytes",
+    "relational_operator_bytes",
+    "command_codes",
+    "relational_operators",
+    "boolean_connectors"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.ims-ssa-rules@1"},
+    "target_version": {"const": "0.14.0"},
+    "source_scope": {"const": "ims-programming-contracts"},
+    "source_topics": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["topic_path", "sha256"],
+        "properties": {
+          "topic_path": {"type": "string", "minLength": 16, "maxLength": 512},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "rule_groups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["names", "command_codes", "relational_operators", "boolean_connectors", "concatenated_key"],
+      "properties": {
+        "names": {"$ref": "#/$defs/topic"},
+        "command_codes": {"$ref": "#/$defs/topic"},
+        "relational_operators": {"$ref": "#/$defs/topic"},
+        "boolean_connectors": {"$ref": "#/$defs/topic"},
+        "concatenated_key": {"$ref": "#/$defs/topic"}
+      }
+    },
+    "segment_name_bytes": {"const": 8},
+    "field_name_bytes": {"const": 8},
+    "relational_operator_bytes": {"const": 2},
+    "command_codes": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "behavior", "subset_pointer", "dedb_only"],
+        "properties": {
+          "code": {"type": "string", "pattern": "^[A-Z]$"},
+          "behavior": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", "maxLength": 64},
+          "subset_pointer": {"type": "boolean"},
+          "dedb_only": {"type": "boolean"}
+        }
+      }
+    },
+    "relational_operators": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["relation", "encodings"],
+        "properties": {
+          "relation": {"enum": ["equal", "greater-than", "less-than", "greater-or-equal", "less-or-equal", "not-equal"]},
+          "encodings": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[0-9a-f]{4}$"}
+          }
+        }
+      }
+    },
+    "boolean_connectors": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["connector", "encoding"],
+        "properties": {
+          "connector": {"enum": ["dependent-and", "logical-or", "independent-and"]},
+          "encoding": {"type": "string", "pattern": "^[0-9a-f]{2}$"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topic_path", "sha256"],
+      "properties": {
+        "topic_path": {"type": "string", "minLength": 16, "maxLength": 512},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

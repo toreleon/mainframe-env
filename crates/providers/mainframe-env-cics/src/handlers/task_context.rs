@@ -55,6 +55,7 @@ pub(in crate::service) fn allocate_terminal_input(
 #[derive(Clone)]
 pub(in crate::service) struct CurrentProgramFrame {
     pub(in crate::service) current: Option<String>,
+    pub(in crate::service) channel: Option<String>,
     pub(in crate::service) parent_execution_id: Option<ExecutionId>,
     pub(in crate::service) initial_entry: bool,
 }
@@ -66,6 +67,16 @@ pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<Str
         .strip_prefix("program:")
         .filter(|program| !program.is_empty())
         .map(str::to_ascii_uppercase)
+}
+
+pub(in crate::service) fn current_channel(invocation: &Invocation) -> Option<String> {
+    invocation
+        .bindings
+        .get("cics.channel")
+        .filter(|value| value.schema() == "mainframe-env.cics.channel@1")
+        .and_then(|value| std::str::from_utf8(value.bytes()).ok())
+        .filter(|name| super::bts_container::valid_task_channel_name(name))
+        .map(str::to_owned)
 }
 
 pub(in crate::service) fn synchronize_current_program(
@@ -81,7 +92,13 @@ pub(in crate::service) fn synchronize_current_program(
     }
     run.current_program.parent_execution_id = invocation.parent_execution_id.clone();
     run.current_program.initial_entry = initial_entry;
-    if let Some(program) = current_program(invocation) {
+    let next_program = current_program(invocation);
+    if next_program != run.current_program.current
+        || invocation.bindings.contains_key("cics.channel")
+    {
+        run.current_program.channel = current_channel(invocation);
+    }
+    if let Some(program) = next_program {
         run.current_program.current = Some(program);
     }
     Ok(true)

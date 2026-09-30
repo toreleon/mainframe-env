@@ -14,12 +14,12 @@
     },
     "corpus": {
       "path": "conformance/0.9/cics/application-api-sources-c-corpus.json",
-      "sha256": "sha256:3e5e7975f27fad959ccbd6413766aa4d8143e6b4fb94b912b99b236b836d48ae"
+      "sha256": "sha256:c112f0b28743478d2b0ea8ea167cd8a76f05a60e6ef11230a1168a907a0847bf"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-c-topics.json",
-      "file_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc",
-      "topic_manifest_sha256": "sha256:717396f5e8cd0e9fbc21c91c569afce84e6f7f632dfbec574d3fd62bf5a85871"
+      "file_sha256": "sha256:54957233e41377648dfff0f9a334866eb63e0cfbef1d25d329d52ec2c984228f",
+      "topic_manifest_sha256": "sha256:01fb00ebd639d937017cb3f6565cdf38df3c25bb0ebe4393030e66db260d8bc2"
     },
     "cache_scope": "cics-application-api-sources-c"
   },
@@ -448,5 +448,5 @@
     }
   ],
   "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
-  "extraction_sha256": "sha256:47d8e19781b0ad510c0a95b7983b7df05a9e77b020c40392e286b586a720d275"
+  "extraction_sha256": "sha256:9aaa9a52006cbf99c39a29cc6363243ffe531e81cecff60d61880a1d0ac56f97"
 }

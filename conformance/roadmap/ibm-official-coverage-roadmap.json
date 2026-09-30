@@ -237,7 +237,7 @@
         "toc_sha256": "b083904697db57a7e746e79491f73c22c7e58c267dd83ea6e4ce39eb401071fb",
         "manifest": "conformance/0.2/manifests/db2-topics.json",
         "topic_count": 832,
-        "sha256": "6fd51d84b9d5c365d2017f1037f4edefb8d9af71de9277556cd50cf3e2f13757"
+        "sha256": "83f04d82753771425aab203c7913dd9fea1c768766cf315df421100015e72463"
       },
       "units": [
         {"name": "sql-statements", "total": 158, "current_internal_operations": 14, "current_statement_equivalent_estimate": 12, "comparable": false},
@@ -285,7 +285,7 @@
         "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
         "manifest": "conformance/0.2/manifests/mq-topics.json",
         "topic_count": 27,
-        "sha256": "c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3"
+        "sha256": "f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d"
       },
       "units": [
         {"name": "mqi-calls-unique", "total": 26, "documentation_rows": 27, "current_recognized": 7, "current_executed": 7}

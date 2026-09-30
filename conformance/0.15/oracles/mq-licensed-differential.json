@@ -1,0 +1,178 @@
+{
+  "schema_version": "mainframe-env.mq-licensed-differential-adapter@1",
+  "target_version": "0.15.0",
+  "work_package": "MQ-1506.licensed-harness-contract",
+  "denominator": {
+    "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
+    "unit": "mqi-calls-unique",
+    "unique_call_count": 26,
+    "source_row_count": 27,
+    "official_catalog": {
+      "path": "conformance/0.2/catalogs/mq.json",
+      "sha256": "sha256:62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7"
+    },
+    "source_manifest": {
+      "path": "conformance/0.2/manifests/mq-topics.json",
+      "sha256": "sha256:f5d2fbc4d05cfc8b461b94e72048fffe34d04bafffbd1e711ca2fb8175d65562",
+      "topic_manifest_sha256": "sha256:f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d",
+      "toc_sha256": "sha256:5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+      "documentation_product": "SSFKSJ_9.4.0"
+    },
+    "source_call_list": {
+      "path": "conformance/0.15/mq/source-call-list.json",
+      "sha256": "sha256:2918ffcbf4bc784f6f9cc88427026e8f6d6e3f3e30041e182ac032f95eda6a1e",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101650_.html",
+      "topic_sha256": "sha256:24025a9f40dfc613b8243fef16f902a94794a9fbe517730ae1b6c489a338009f"
+    },
+    "reviewed_source_topics": [
+      {
+        "call": "MQCONNX",
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101770_.html",
+        "sha256": "sha256:41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633",
+        "review_method": "ibm_docs.py-read",
+        "coverage_credit": 0
+      },
+      {
+        "call": "MQSTAT",
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101920_.html",
+        "sha256": "sha256:4f19dab47ed3e325ec894cc74a8d88db265a7c27f8ff2a7c507f94cf4bedd1d9",
+        "review_method": "ibm_docs.py-read",
+        "coverage_credit": 0
+      },
+      {
+        "call": "MQINQ",
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html",
+        "sha256": "sha256:03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b",
+        "review_method": "retained-html-sha256",
+        "coverage_credit": 0
+      }
+    ],
+    "unavailable_source_topics": []
+  },
+  "licensed_oracle": {
+    "product_name": "IBM MQ",
+    "major_minor": "9.4",
+    "documentation_product": "SSFKSJ_9.4.0",
+    "service_identity_policy": "externally-pinned-exact-vrmf-command-level-build-installation",
+    "execution_role": "oracle-only",
+    "native_product_fallback_allowed": false
+  },
+  "receipt_configuration": {
+    "receipt_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_ORACLE_RECEIPT",
+    "receipt_sha256_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_ORACLE_RECEIPT_SHA256",
+    "service_identity_sha256_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_SERVICE_IDENTITY_SHA256",
+    "environment_manifest_sha256_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_ENVIRONMENT_SHA256",
+    "authorization_grant_sha256_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_AUTHORIZATION_SHA256",
+    "fixture_bundle_sha256_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_FIXTURE_BUNDLE_SHA256",
+    "product_runner_sha256_environment_variable": "MAINFRAME_ENV_MQ_PRODUCT_RUNNER_SHA256",
+    "oracle_runner_sha256_environment_variable": "MAINFRAME_ENV_MQ_LICENSED_RUNNER_SHA256",
+    "external_regular_file_required": true,
+    "symlink_allowed": false,
+    "maximum_receipt_bytes": 2097152
+  },
+  "candidate_identity": {
+    "source": "clean-git-head-and-tree",
+    "required_fields": ["commit_sha", "tree_sha", "tracked_worktree_clean"]
+  },
+  "spec_identity": {
+    "algorithm": "sha256",
+    "domain": "mainframe-env.mq-licensed-spec@1",
+    "paths": [
+      "conformance/0.15/mq/source-call-list.json",
+      "conformance/0.15/mq/structure-status-catalog.json",
+      "conformance/0.15/fixtures/mq-licensed-differential-cases.json",
+      "conformance/0.15/oracles/mq-licensed-differential.json",
+      "conformance/0.15/schemas/mq-licensed-differential-adapter.schema.json",
+      "conformance/0.15/schemas/mq-licensed-differential-fixtures.schema.json",
+      "conformance/0.15/schemas/mq-licensed-differential-receipt.schema.json"
+    ]
+  },
+  "runner_identity": {
+    "contract_verifier": "conformance/0.15/tools/verify_mq_licensed_differential.py",
+    "protocol": "mainframe-env.mq-licensed-runner@1",
+    "product_and_oracle_runners_must_differ": true
+  },
+  "fixtures": {
+    "path": "conformance/0.15/fixtures/mq-licensed-differential-cases.json",
+    "schema": "mainframe-env.mq-licensed-differential-fixtures@1",
+    "case_count": 26,
+    "cases_per_call": 1,
+    "external_bundle_digest_required": true,
+    "product_generated_expectations_allowed": false
+  },
+  "required_capabilities": [
+    "licensed.ibm-mq-9.4",
+    "independent.product-oracle-execution",
+    "normalized.digest-only-capture",
+    "secrets.excluded",
+    "raw-output.excluded",
+    "mqi.call.MQBACK",
+    "mqi.call.MQBEGIN",
+    "mqi.call.MQBUFMH",
+    "mqi.call.MQCB",
+    "mqi.call.MQCB_FUNCTION",
+    "mqi.call.MQCLOSE",
+    "mqi.call.MQCMIT",
+    "mqi.call.MQCONN",
+    "mqi.call.MQCONNX",
+    "mqi.call.MQCRTMH",
+    "mqi.call.MQCTL",
+    "mqi.call.MQDISC",
+    "mqi.call.MQDLTMH",
+    "mqi.call.MQDLTMP",
+    "mqi.call.MQGET",
+    "mqi.call.MQINQ",
+    "mqi.call.MQINQMP",
+    "mqi.call.MQMHBUF",
+    "mqi.call.MQOPEN",
+    "mqi.call.MQPUT",
+    "mqi.call.MQPUT1",
+    "mqi.call.MQSET",
+    "mqi.call.MQSETMP",
+    "mqi.call.MQSTAT",
+    "mqi.call.MQSUB",
+    "mqi.call.MQSUBRQ"
+  ],
+  "normalization": {
+    "policy": "mq-normalized-observation@1",
+    "comparison": "exact-canonical-object-equality",
+    "fields": [
+      "completion_code",
+      "reason_code",
+      "handle_state",
+      "mutation_state",
+      "state_digest",
+      "effect_digest",
+      "output_digest",
+      "output_length",
+      "output_encoding",
+      "status_digest"
+    ],
+    "raw_output_retained": false,
+    "maximum_output_length": 16777216
+  },
+  "required_harness_mutants": [
+    "omitted-transition",
+    "generic-success",
+    "authorization-bypass",
+    "forbidden-mutation",
+    "byte-encoding-error"
+  ],
+  "secret_and_raw_output_policy": {
+    "credentials_in_receipt": false,
+    "secret_values_in_receipt": false,
+    "raw_message_or_property_bytes_in_receipt": false,
+    "raw_product_or_oracle_output_in_receipt": false,
+    "normalized_digests_only": true
+  },
+  "credit_policy": {
+    "external_receipt_required_for_pass": true,
+    "absent_receipt_differential_credit": 0,
+    "invalid_or_partial_receipt_differential_credit": 0,
+    "complete_receipt_call_credit": 26,
+    "historical_local_model_synthetic_credit": 0,
+    "native_ibm_product_fallback_credit": 0
+  },
+  "licensed_campaign_status": "not-run",
+  "differential_gate": "pending"
+}

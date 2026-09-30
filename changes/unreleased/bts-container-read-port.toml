@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a private, owner-scoped BTS and task-channel container read port for future command routes."
