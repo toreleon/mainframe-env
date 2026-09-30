@@ -7854,6 +7854,14 @@ fn check_mq_mqi_registry(root: &Path) -> TaskResult {
         &json(&source_list)?,
         &source_list,
     )?;
+    let contract_catalog = root.join("conformance/0.15/mq/structure-status-catalog.json");
+    let contract_schema =
+        root.join("conformance/0.15/schemas/mq-structure-status-catalog.schema.json");
+    validate_schema_instance(
+        &json(&contract_schema)?,
+        &json(&contract_catalog)?,
+        &contract_catalog,
+    )?;
     let status = Command::new("python3")
         .arg("-B")
         .arg(&generator)
