@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Pin APPC basic state tables and correct internal GDS ISSUE response transitions (#294)."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "BTS activity, event, and timer inquiries return source-bounded state outputs and exact CVDA values."

@@ -20,6 +20,7 @@
     "coverage_credit",
     "differential_credit",
     "capture",
+    "repin",
     "receipt_contract",
     "topics",
     "source_resolutions",
@@ -141,6 +142,21 @@
             "$ref": "#/$defs/equivalenceControl"
           }
         }
+      }
+    },
+    "repin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "verified_on", "verification_method", "historical_receipt_path", "historical_receipt_sha256", "topic_path", "topic_sha256", "topic_bytes"],
+      "properties": {
+        "issue": {"const": 173},
+        "verified_on": {"const": "2026-09-28"},
+        "verification_method": {"const": "user-chrome-browser-control"},
+        "historical_receipt_path": {"const": "conformance/0.9/cics/application-api-sources-a-supplements-2026-09-10.json"},
+        "historical_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "topic_path": {"const": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html"},
+        "topic_sha256": {"$ref": "#/$defs/bareSha256"},
+        "topic_bytes": {"type": "integer", "minimum": 1, "maximum": 2097152}
       }
     },
     "receipt_contract": {

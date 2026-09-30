@@ -5,6 +5,258 @@
   "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
   "coverage_credit": 0,
   "product": "SSEPEK_13.0.0",
+  "repins": [
+    {
+      "issue": 350,
+      "superseded_bytes": 17918,
+      "superseded_last_modified": "2026-09-02",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "9bbe7aeaa74f37a2a55977368714d0f8d3fd33465e65d3e416795218236f0fa7",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_constantsintro.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 31654,
+      "superseded_last_modified": "2026-01-07",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "46d816220949258524a137969294e02fe4f6256b3893152ac371b07d31f72043",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_resignalstatement4nativesqlpl.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 34648,
+      "superseded_last_modified": "2026-01-07",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "03bac94d3cccb493e0b245ea16d869a2f2c3223ae40b95e43f685547550217d1",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_signalstatement4nativesqlpl.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 209218,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "d53347dba77a01184c4c7a741610247b1cac3684986b13d05074728a746dc68f",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterindex.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 578684,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "6e4890d56667f80c7b2c76f06a2733779f7a86185f9fd169bcfa44053abfdb3b",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterproceduresqlnative.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 1193947,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "cc53c3d677f36f48c6365ebc6a3ab5a5b13b6eebd93f0ed1b4d1cf5b0e77c060",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertable.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 239618,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "9e88247827db126421376c232f8d9a63dd6c4886a098da75fd0de506ece61bed",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertablespace.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 314039,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "01988b0cbf267c66a41641e842a678e18b0bbfafd9a5b1c0bf4d8aa41a2e4652",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertriggeradvanced.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 8837,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "3ba39e7cc9d007fa2f555b2d800d5df1b5108bd5e2ed861a803be952fc7a3276",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_begindeclaresection.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 377408,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "4ec6ee8d1bc2a720f2f541f139d7e0639009de4148994b96e2cd504b73ad262f",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionexternalscalar.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 127039,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "77a61e9d6995998a0d4893e759f6492cd4f8a657f359f1cbfed42938c7b7d4fc",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createlobtablespace.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 11869,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "6b18a2a55f53972dc946a778eb6f92cc61058b516c310cdfa0ea86d8a739b07f",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createprocedure.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 360320,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "771ca57f637c4ecfbbccd1b2cac37e695e991afb0bd9f0266f90f2c163ae7c96",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createprocedureexternal.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 239794,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "0261a79e3f1cc9126ddda5b66fb984eeef2ac273c50c9c8691735a1fe3bd8419",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createproceduresqlexternal.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 548107,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "d950c22a978090caef7fd71ad8e293b51fd86965bf1c5f7f2e001ec0df1c4f79",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createproceduresqlnative.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 307910,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "e43f4bcf229707d2422581934406374b5561a69f4c1b6ea9444838e0637b2594",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtablespace.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 330521,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "7010af27792c6e94905f237630d68d037a102dc996b86243ce42673437ad0214",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtriggeradvanced.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 238145,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "1789b1fb9e6544e45ab6e7f0c68be4707e2f09781d47f09c5f4292e43a33a853",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declareglobaltemptable.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 225829,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "91e8e834429dda88d32f1c9d3d1f50744c8f6cd5f8be1dbf50ea9304c7158245",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_delete.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 211364,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "bbfc930074a104827b0b7b3a9a3b184f61be74313edb2c8902897cfa7da5ba9d",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_fetch.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 44706,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "dfaec626dc902c524729f150d74832788dacc676b803a2f516213b32f3b16c8b",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_open.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 23578,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "42104ea578d83230d7e6ee2175d131b418fb5a385150d696a5ee24caa3b49db8",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentdecfloatroundingmode.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 34418,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "a060fb3d2a1fd5ed8cf6fdcc7c99d888ac6005fc238bc47952577a6b410a78a7",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_signal.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 252756,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "efa364a3766948bbb7722393adeb57f2f4288a623b2cc4766f7dba4c5701a12a",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_update.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    },
+    {
+      "issue": 350,
+      "superseded_bytes": 42278,
+      "superseded_last_modified": "2026-09-03",
+      "superseded_manifest_file_sha256": "cd5f9d23775f04078676e3d9779c79ca7ac146240b65727641537076721ae41e",
+      "superseded_sha256": "b1874b4def9bc1ecf827055576ba82312aa610bc0562e3f403493768b6fed751",
+      "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_valuesinto.html",
+      "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+      "verified_on": "2026-09-29"
+    }
+  ],
   "retained_in_repository": false,
   "schema_version": "mainframe-env.topic-manifest@1",
   "snapshot_date": "2026-08-13",
@@ -13,7 +265,7 @@
   "toc_sha256": "b083904697db57a7e746e79491f73c22c7e58c267dd83ea6e4ce39eb401071fb",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSEPEK_13.0.0?lang=en",
   "topic_count": 832,
-  "topic_manifest_digest": "6fd51d84b9d5c365d2017f1037f4edefb8d9af71de9277556cd50cf3e2f13757",
+  "topic_manifest_digest": "83f04d82753771425aab203c7913dd9fea1c768766cf315df421100015e72463",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -1823,9 +2075,9 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_compoundstatement4nativesqlpl.html"
     },
     {
-      "bytes": 17918,
-      "last_modified": "2026-09-02",
-      "sha256": "9bbe7aeaa74f37a2a55977368714d0f8d3fd33465e65d3e416795218236f0fa7",
+      "bytes": 17915,
+      "last_modified": "2026-09-08",
+      "sha256": "bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_constantsintro.html"
     },
     {
@@ -2783,9 +3035,9 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_resignalstatement4externalsqlpl.html"
     },
     {
-      "bytes": 31654,
-      "last_modified": "2026-01-07",
-      "sha256": "46d816220949258524a137969294e02fe4f6256b3893152ac371b07d31f72043",
+      "bytes": 31653,
+      "last_modified": "2026-09-08",
+      "sha256": "59515374af95cd69384ea95a0cc3368b87654fac7d713fa9061528b23465ae29",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_resignalstatement4nativesqlpl.html"
     },
     {
@@ -2915,9 +3167,9 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_signalstatement4externalsqlpl.html"
     },
     {
-      "bytes": 34648,
-      "last_modified": "2026-01-07",
-      "sha256": "03bac94d3cccb493e0b245ea16d869a2f2c3223ae40b95e43f685547550217d1",
+      "bytes": 34647,
+      "last_modified": "2026-09-08",
+      "sha256": "1fafd242450da7f16df9d8dd435ca7adbb2d23d64d98b603b78514461d271dcf",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_signalstatement4nativesqlpl.html"
     },
     {
@@ -3371,9 +3623,9 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterfunctionsqltable.html"
     },
     {
-      "bytes": 209218,
-      "last_modified": "2026-09-03",
-      "sha256": "d53347dba77a01184c4c7a741610247b1cac3684986b13d05074728a746dc68f",
+      "bytes": 209475,
+      "last_modified": "2026-09-08",
+      "sha256": "bba0090b232f5e474949fbcce45967cf2c0d74cb33b906f6d7b9b3918cb67115",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterindex.html"
     },
     {
@@ -3402,8 +3654,8 @@
     },
     {
       "bytes": 578684,
-      "last_modified": "2026-09-03",
-      "sha256": "6e4890d56667f80c7b2c76f06a2733779f7a86185f9fd169bcfa44053abfdb3b",
+      "last_modified": "2026-09-08",
+      "sha256": "fe141e9ff7356a078aaefd3d1ed01f8d4bbfe8f06749f3360654d26ca8a166fd",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterproceduresqlnative.html"
     },
     {
@@ -3420,14 +3672,14 @@
     },
     {
       "bytes": 1193947,
-      "last_modified": "2026-09-03",
-      "sha256": "cc53c3d677f36f48c6365ebc6a3ab5a5b13b6eebd93f0ed1b4d1cf5b0e77c060",
+      "last_modified": "2026-09-08",
+      "sha256": "3cff926910254ee857084a2e407d02dcacf21407fa301128be9b55a859344409",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertable.html"
     },
     {
-      "bytes": 239618,
-      "last_modified": "2026-09-03",
-      "sha256": "9e88247827db126421376c232f8d9a63dd6c4886a098da75fd0de506ece61bed",
+      "bytes": 239625,
+      "last_modified": "2026-09-08",
+      "sha256": "309e4ef18ec18b549ebcf3e5d22e4c67346170f18868b95245bcc5038d9935b5",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertablespace.html"
     },
     {
@@ -3438,8 +3690,8 @@
     },
     {
       "bytes": 314039,
-      "last_modified": "2026-09-03",
-      "sha256": "01988b0cbf267c66a41641e842a678e18b0bbfafd9a5b1c0bf4d8aa41a2e4652",
+      "last_modified": "2026-09-08",
+      "sha256": "4b59de18763389fc32a5a274ce2b72845c07926ecaa502c5fb87c7cbf8db6472",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertriggeradvanced.html"
     },
     {
@@ -3462,8 +3714,8 @@
     },
     {
       "bytes": 8837,
-      "last_modified": "2026-09-03",
-      "sha256": "3ba39e7cc9d007fa2f555b2d800d5df1b5108bd5e2ed861a803be952fc7a3276",
+      "last_modified": "2026-09-08",
+      "sha256": "07b6648109ef5defbe76f3eb052d71724dd4e0cfd9381cd604151057b4c1f353",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_begindeclaresection.html"
     },
     {
@@ -3552,8 +3804,8 @@
     },
     {
       "bytes": 377408,
-      "last_modified": "2026-09-03",
-      "sha256": "4ec6ee8d1bc2a720f2f541f139d7e0639009de4148994b96e2cd504b73ad262f",
+      "last_modified": "2026-09-08",
+      "sha256": "ef28b011362ffc7573385dab32ce92e78f6691ce2288dd0fc753d9a67b34d5ae",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionexternalscalar.html"
     },
     {
@@ -3594,8 +3846,8 @@
     },
     {
       "bytes": 127039,
-      "last_modified": "2026-09-03",
-      "sha256": "77a61e9d6995998a0d4893e759f6492cd4f8a657f359f1cbfed42938c7b7d4fc",
+      "last_modified": "2026-09-08",
+      "sha256": "0b956245d2a3c0bd5ce3bd22739a3881139f1ba5aeeef91d91bfdc475ccd3fb0",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createlobtablespace.html"
     },
     {
@@ -3612,26 +3864,26 @@
     },
     {
       "bytes": 11869,
-      "last_modified": "2026-09-03",
-      "sha256": "6b18a2a55f53972dc946a778eb6f92cc61058b516c310cdfa0ea86d8a739b07f",
+      "last_modified": "2026-09-08",
+      "sha256": "e4c8034ee68cc4458c1610a62d88d36a65f8b0be941b7f4432cc2907ceb5343f",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createprocedure.html"
     },
     {
       "bytes": 360320,
-      "last_modified": "2026-09-03",
-      "sha256": "771ca57f637c4ecfbbccd1b2cac37e695e991afb0bd9f0266f90f2c163ae7c96",
+      "last_modified": "2026-09-08",
+      "sha256": "887be01fd9184c1fe4e6bece9c11eea30defa9ebc79c9fba5de79596edd2a806",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createprocedureexternal.html"
     },
     {
       "bytes": 239794,
-      "last_modified": "2026-09-03",
-      "sha256": "0261a79e3f1cc9126ddda5b66fb984eeef2ac273c50c9c8691735a1fe3bd8419",
+      "last_modified": "2026-09-08",
+      "sha256": "5e456dd3b30b658a225a06ff5cfd99d08c07371199f29aaf6642f8eef1223f0c",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createproceduresqlexternal.html"
     },
     {
       "bytes": 548107,
-      "last_modified": "2026-09-03",
-      "sha256": "d950c22a978090caef7fd71ad8e293b51fd86965bf1c5f7f2e001ec0df1c4f79",
+      "last_modified": "2026-09-08",
+      "sha256": "85c39785f4ee734867a0208f0229e780db10932ca732ca5ec2f398b4ebd71350",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createproceduresqlnative.html"
     },
     {
@@ -3660,8 +3912,8 @@
     },
     {
       "bytes": 307910,
-      "last_modified": "2026-09-03",
-      "sha256": "e43f4bcf229707d2422581934406374b5561a69f4c1b6ea9444838e0637b2594",
+      "last_modified": "2026-09-08",
+      "sha256": "d0cc88b3e36e1e480d7d936153b9d94c129b7ec5f8581ea992e27430efbe998b",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtablespace.html"
     },
     {
@@ -3672,8 +3924,8 @@
     },
     {
       "bytes": 330521,
-      "last_modified": "2026-09-03",
-      "sha256": "7010af27792c6e94905f237630d68d037a102dc996b86243ce42673437ad0214",
+      "last_modified": "2026-09-08",
+      "sha256": "eb3b1f54cc8849757f75a7796f90590f34fa7abaf8dead4549ee97f1aec66cee",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtriggeradvanced.html"
     },
     {
@@ -3720,8 +3972,8 @@
     },
     {
       "bytes": 238145,
-      "last_modified": "2026-09-03",
-      "sha256": "1789b1fb9e6544e45ab6e7f0c68be4707e2f09781d47f09c5f4292e43a33a853",
+      "last_modified": "2026-09-08",
+      "sha256": "025cc8558ffd3bbf544b95f4b3ca262cc74775ba9fc100d835c12026ca198d94",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declareglobaltemptable.html"
     },
     {
@@ -3744,8 +3996,8 @@
     },
     {
       "bytes": 225829,
-      "last_modified": "2026-09-03",
-      "sha256": "91e8e834429dda88d32f1c9d3d1f50744c8f6cd5f8be1dbf50ea9304c7158245",
+      "last_modified": "2026-09-08",
+      "sha256": "0e8760f121bb0e982541d6442ed565adbd291678dfbab44d6d2fe2dc4d176317",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_delete.html"
     },
     {
@@ -3822,8 +4074,8 @@
     },
     {
       "bytes": 211364,
-      "last_modified": "2026-09-03",
-      "sha256": "bbfc930074a104827b0b7b3a9a3b184f61be74313edb2c8902897cfa7da5ba9d",
+      "last_modified": "2026-09-08",
+      "sha256": "b8109d9f6389937ae432fa9ff1abd49df237598fa81216032b752c31b413e57d",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_fetch.html"
     },
     {
@@ -4008,8 +4260,8 @@
     },
     {
       "bytes": 44706,
-      "last_modified": "2026-09-03",
-      "sha256": "dfaec626dc902c524729f150d74832788dacc676b803a2f516213b32f3b16c8b",
+      "last_modified": "2026-09-08",
+      "sha256": "b0b06e74f611c2840d7cb81d8c64a151ea7dbb02404aa911c367defd5cc8eeee",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_open.html"
     },
     {
@@ -4247,9 +4499,9 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentdebugmode.html"
     },
     {
-      "bytes": 23578,
-      "last_modified": "2026-09-03",
-      "sha256": "42104ea578d83230d7e6ee2175d131b418fb5a385150d696a5ee24caa3b49db8",
+      "bytes": 23576,
+      "last_modified": "2026-09-08",
+      "sha256": "3b830c497131cb0cec378ec0be1c6cdab5eb1bf5afe492f20616cd544290ec9a",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentdecfloatroundingmode.html"
     },
     {
@@ -4379,9 +4631,9 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setsessiontimezone.html"
     },
     {
-      "bytes": 34418,
-      "last_modified": "2026-09-03",
-      "sha256": "a060fb3d2a1fd5ed8cf6fdcc7c99d888ac6005fc238bc47952577a6b410a78a7",
+      "bytes": 34417,
+      "last_modified": "2026-09-08",
+      "sha256": "729ccf9d1703c095d7c2da6337bb09abd2ba92c65db98b7cbc9dab7e6590d869",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_signal.html"
     },
     {
@@ -4440,8 +4692,8 @@
     },
     {
       "bytes": 252756,
-      "last_modified": "2026-09-03",
-      "sha256": "efa364a3766948bbb7722393adeb57f2f4288a623b2cc4766f7dba4c5701a12a",
+      "last_modified": "2026-09-08",
+      "sha256": "0ddb9b81001292f17d7b2fe9d20db41274bb921a85ca11a8fab3ec2c0931c4ab",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_update.html"
     },
     {
@@ -4458,8 +4710,8 @@
     },
     {
       "bytes": 42278,
-      "last_modified": "2026-09-03",
-      "sha256": "b1874b4def9bc1ecf827055576ba82312aa610bc0562e3f403493768b6fed751",
+      "last_modified": "2026-09-08",
+      "sha256": "3a037287b43914aa8b87e4266b25c9b9ab8d21ba65ecb56e7a0c9a87330a432d",
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_valuesinto.html"
     },
     {
@@ -5009,5 +5261,5 @@
       "topic_path": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_xsrtablesintro.html"
     }
   ],
-  "total_bytes": 29147264
+  "total_bytes": 29147520
 }

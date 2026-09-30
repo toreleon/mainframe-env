@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recovered MQ-1501 CICS syncpoint-owner enforcement and the typed MQBACK/MQBEGIN/MQCMIT context contract; direct CICS commit/backout fails before UOW mutation, while attested CICS SYNCPOINT dispatch remains supported. No conformance or licensed credit."

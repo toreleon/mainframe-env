@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/mq-licensed-differential-adapter@1",
+  "title": "IBM MQ 9.4 licensed-differential adapter policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "work_package",
+    "denominator",
+    "licensed_oracle",
+    "receipt_configuration",
+    "candidate_identity",
+    "spec_identity",
+    "runner_identity",
+    "fixtures",
+    "required_capabilities",
+    "normalization",
+    "required_harness_mutants",
+    "secret_and_raw_output_policy",
+    "credit_policy",
+    "licensed_campaign_status",
+    "differential_gate"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.mq-licensed-differential-adapter@1"},
+    "target_version": {"const": "0.15.0"},
+    "work_package": {"const": "MQ-1506.licensed-harness-contract"},
+    "denominator": {"$ref": "#/$defs/denominator"},
+    "licensed_oracle": {"$ref": "#/$defs/licensedOracle"},
+    "receipt_configuration": {"$ref": "#/$defs/receiptConfiguration"},
+    "candidate_identity": {"$ref": "#/$defs/candidateIdentity"},
+    "spec_identity": {"$ref": "#/$defs/specIdentity"},
+    "runner_identity": {"$ref": "#/$defs/runnerIdentity"},
+    "fixtures": {"$ref": "#/$defs/fixtures"},
+    "required_capabilities": {
+      "type": "array",
+      "minItems": 31,
+      "maxItems": 31,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "normalization": {"$ref": "#/$defs/normalization"},
+    "required_harness_mutants": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "omitted-transition",
+          "generic-success",
+          "authorization-bypass",
+          "forbidden-mutation",
+          "byte-encoding-error"
+        ]
+      }
+    },
+    "secret_and_raw_output_policy": {"$ref": "#/$defs/secretPolicy"},
+    "credit_policy": {"$ref": "#/$defs/creditPolicy"},
+    "licensed_campaign_status": {"const": "not-run"},
+    "differential_gate": {"const": "pending"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9_.@+/-]+$"
+    },
+    "pathDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_id",
+        "unit",
+        "unique_call_count",
+        "source_row_count",
+        "official_catalog",
+        "source_manifest",
+        "source_call_list",
+        "reviewed_source_topics",
+        "unavailable_source_topics"
+      ],
+      "properties": {
+        "baseline_id": {"const": "ibm-mq-9.4-mqi-2026-08-31"},
+        "unit": {"const": "mqi-calls-unique"},
+        "unique_call_count": {"const": 26},
+        "source_row_count": {"const": 27},
+        "official_catalog": {"$ref": "#/$defs/pathDigest"},
+        "source_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "topic_manifest_sha256",
+            "toc_sha256",
+            "documentation_product"
+          ],
+          "properties": {
+            "path": {"const": "conformance/0.2/manifests/mq-topics.json"},
+            "sha256": {"$ref": "#/$defs/digest"},
+            "topic_manifest_sha256": {"$ref": "#/$defs/digest"},
+            "toc_sha256": {"$ref": "#/$defs/digest"},
+            "documentation_product": {"const": "SSFKSJ_9.4.0"}
+          }
+        },
+        "source_call_list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "topic_path", "topic_sha256"],
+          "properties": {
+            "path": {"const": "conformance/0.15/mq/source-call-list.json"},
+            "sha256": {"$ref": "#/$defs/digest"},
+            "topic_path": {"const": "SSFKSJ_9.4.0/refdev/q101650_.html"},
+            "topic_sha256": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "reviewed_source_topics": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "allOf": [
+                {"$ref": "#/$defs/reviewedSourceTopic"},
+                {
+                  "properties": {
+                    "call": {"const": "MQCONNX"},
+                    "topic_path": {"const": "SSFKSJ_9.4.0/refdev/q101770_.html"},
+                    "sha256": {
+                      "const": "sha256:41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {"$ref": "#/$defs/reviewedSourceTopic"},
+                {
+                  "properties": {
+                    "call": {"const": "MQSTAT"},
+                    "topic_path": {"const": "SSFKSJ_9.4.0/refdev/q101920_.html"},
+                    "sha256": {
+                      "const": "sha256:4f19dab47ed3e325ec894cc74a8d88db265a7c27f8ff2a7c507f94cf4bedd1d9"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {"$ref": "#/$defs/reviewedSourceTopic"},
+                {
+                  "properties": {
+                    "call": {"const": "MQINQ"},
+                    "topic_path": {"const": "SSFKSJ_9.4.0/refdev/q101840_.html"},
+                    "sha256": {"const": "sha256:03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b"},
+                    "review_method": {"const": "retained-html-sha256"}
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        },
+        "unavailable_source_topics": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    },
+    "reviewedSourceTopic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call", "topic_path", "sha256", "review_method", "coverage_credit"],
+      "properties": {
+        "call": {"enum": ["MQCONNX", "MQSTAT", "MQINQ"]},
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"
+        },
+        "sha256": {"$ref": "#/$defs/digest"},
+        "review_method": {"enum": ["ibm_docs.py-read", "retained-html-sha256"]},
+        "coverage_credit": {"const": 0}
+      }
+    },
+    "licensedOracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_name",
+        "major_minor",
+        "documentation_product",
+        "service_identity_policy",
+        "execution_role",
+        "native_product_fallback_allowed"
+      ],
+      "properties": {
+        "product_name": {"const": "IBM MQ"},
+        "major_minor": {"const": "9.4"},
+        "documentation_product": {"const": "SSFKSJ_9.4.0"},
+        "service_identity_policy": {
+          "const": "externally-pinned-exact-vrmf-command-level-build-installation"
+        },
+        "execution_role": {"const": "oracle-only"},
+        "native_product_fallback_allowed": {"const": false}
+      }
+    },
+    "receiptConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_environment_variable",
+        "receipt_sha256_environment_variable",
+        "service_identity_sha256_environment_variable",
+        "environment_manifest_sha256_environment_variable",
+        "authorization_grant_sha256_environment_variable",
+        "fixture_bundle_sha256_environment_variable",
+        "product_runner_sha256_environment_variable",
+        "oracle_runner_sha256_environment_variable",
+        "external_regular_file_required",
+        "symlink_allowed",
+        "maximum_receipt_bytes"
+      ],
+      "properties": {
+        "receipt_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_ORACLE_RECEIPT"},
+        "receipt_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_ORACLE_RECEIPT_SHA256"},
+        "service_identity_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_SERVICE_IDENTITY_SHA256"},
+        "environment_manifest_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_ENVIRONMENT_SHA256"},
+        "authorization_grant_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_AUTHORIZATION_SHA256"},
+        "fixture_bundle_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_FIXTURE_BUNDLE_SHA256"},
+        "product_runner_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_PRODUCT_RUNNER_SHA256"},
+        "oracle_runner_sha256_environment_variable": {"const": "MAINFRAME_ENV_MQ_LICENSED_RUNNER_SHA256"},
+        "external_regular_file_required": {"const": true},
+        "symlink_allowed": {"const": false},
+        "maximum_receipt_bytes": {"const": 2097152}
+      }
+    },
+    "candidateIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "required_fields"],
+      "properties": {
+        "source": {"const": "clean-git-head-and-tree"},
+        "required_fields": {
+          "const": ["commit_sha", "tree_sha", "tracked_worktree_clean"]
+        }
+      }
+    },
+    "specIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "domain", "paths"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "domain": {"const": "mainframe-env.mq-licensed-spec@1"},
+        "paths": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        }
+      }
+    },
+    "runnerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_verifier",
+        "protocol",
+        "product_and_oracle_runners_must_differ"
+      ],
+      "properties": {
+        "contract_verifier": {
+          "const": "conformance/0.15/tools/verify_mq_licensed_differential.py"
+        },
+        "protocol": {"const": "mainframe-env.mq-licensed-runner@1"},
+        "product_and_oracle_runners_must_differ": {"const": true}
+      }
+    },
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "schema",
+        "case_count",
+        "cases_per_call",
+        "external_bundle_digest_required",
+        "product_generated_expectations_allowed"
+      ],
+      "properties": {
+        "path": {"const": "conformance/0.15/fixtures/mq-licensed-differential-cases.json"},
+        "schema": {"const": "mainframe-env.mq-licensed-differential-fixtures@1"},
+        "case_count": {"const": 26},
+        "cases_per_call": {"const": 1},
+        "external_bundle_digest_required": {"const": true},
+        "product_generated_expectations_allowed": {"const": false}
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "comparison",
+        "fields",
+        "raw_output_retained",
+        "maximum_output_length"
+      ],
+      "properties": {
+        "policy": {"const": "mq-normalized-observation@1"},
+        "comparison": {"const": "exact-canonical-object-equality"},
+        "fields": {
+          "const": [
+            "completion_code",
+            "reason_code",
+            "handle_state",
+            "mutation_state",
+            "state_digest",
+            "effect_digest",
+            "output_digest",
+            "output_length",
+            "output_encoding",
+            "status_digest"
+          ]
+        },
+        "raw_output_retained": {"const": false},
+        "maximum_output_length": {"const": 16777216}
+      }
+    },
+    "secretPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credentials_in_receipt",
+        "secret_values_in_receipt",
+        "raw_message_or_property_bytes_in_receipt",
+        "raw_product_or_oracle_output_in_receipt",
+        "normalized_digests_only"
+      ],
+      "properties": {
+        "credentials_in_receipt": {"const": false},
+        "secret_values_in_receipt": {"const": false},
+        "raw_message_or_property_bytes_in_receipt": {"const": false},
+        "raw_product_or_oracle_output_in_receipt": {"const": false},
+        "normalized_digests_only": {"const": true}
+      }
+    },
+    "creditPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_receipt_required_for_pass",
+        "absent_receipt_differential_credit",
+        "invalid_or_partial_receipt_differential_credit",
+        "complete_receipt_call_credit",
+        "historical_local_model_synthetic_credit",
+        "native_ibm_product_fallback_credit"
+      ],
+      "properties": {
+        "external_receipt_required_for_pass": {"const": true},
+        "absent_receipt_differential_credit": {"const": 0},
+        "invalid_or_partial_receipt_differential_credit": {"const": 0},
+        "complete_receipt_call_credit": {"const": 26},
+        "historical_local_model_synthetic_credit": {"const": 0},
+        "native_ibm_product_fallback_credit": {"const": 0}
+      }
+    }
+  }
+}
