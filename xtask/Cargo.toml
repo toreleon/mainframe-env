@@ -19,3 +19,11 @@ sha2.workspace = true
 toml.workspace = true
 protobuf-json-mapping.workspace = true
 ring.workspace = true
+
+[dev-dependencies]
+mainframe-env-compiler.workspace = true
+mainframe-env-compiler-api.workspace = true
+mainframe-env-execution-api.workspace = true
+mainframe-env-interpreter.workspace = true
+mainframe-env-ir.workspace = true
+mainframe-env-source.workspace = true

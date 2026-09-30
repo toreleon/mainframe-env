@@ -6309,6 +6309,34 @@ mod tests {
         (invocation, session)
     }
 
+    fn connect_issue_source(
+        store: &dyn ProviderStateStore,
+        invocation: &Invocation,
+        token: [u8; 4],
+        kind: ConversationKind,
+        sync_level: u8,
+    ) {
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                kind == ConversationKind::AppcBasic,
+                b"PROC".to_vec(),
+                vec![],
+                sync_level,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store).unwrap());
+    }
+
     fn registered_counter_run(service: &CicsService, name: &str) -> Invocation {
         let invocation = invocation_for(name, BTreeMap::new());
         let session = SessionId::new(format!("{name}-session"), 64).unwrap();
@@ -8277,7 +8305,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 233);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 262);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9053,6 +9081,13 @@ mod tests {
                 ConversationKind::AppcMapped,
             )
             .unwrap();
+        connect_issue_source(
+            store.as_ref(),
+            &invocation,
+            token,
+            ConversationKind::AppcMapped,
+            0,
+        );
         let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueAbend,
@@ -9087,7 +9122,7 @@ mod tests {
         assert!(pending.request.as_ref().unwrap().state_output);
         assert_eq!(
             first.conversation(token).unwrap().state,
-            ConversationState::Allocated
+            ConversationState::Send
         );
         assert_eq!(
             stage(&mut run, &command).unwrap().disposition,
@@ -9232,6 +9267,13 @@ mod tests {
                 ConversationKind::AppcMapped,
             )
             .unwrap();
+        connect_issue_source(
+            store.as_ref(),
+            &invocation,
+            token,
+            ConversationKind::AppcMapped,
+            0,
+        );
         let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueAbend,
@@ -9275,7 +9317,7 @@ mod tests {
         let attempted = ConversationLedger::load(store.as_ref()).unwrap();
         assert_eq!(
             attempted.conversation(token).unwrap().state,
-            ConversationState::Allocated
+            ConversationState::Send
         );
         assert!(
             attempted
@@ -9814,15 +9856,28 @@ mod tests {
                 BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
                 1,
             );
+            let result = source
+                .invoke(
+                    &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+                .unwrap();
+            assert_eq!(result.disposition, CicsDisposition::Complete);
             assert_eq!(
-                source
-                    .invoke(
-                        &effect(&source_invocation.run_unit_id, command.clone(), 1),
-                        command,
-                    )
+                (result.condition.as_str(), result.response, result.response2),
+                ("NORMAL", 0, 0)
+            );
+            assert_eq!(
+                ConversationLedger::load(source_store.as_ref())
                     .unwrap()
-                    .disposition,
-                CicsDisposition::Complete
+                    .conversation(source_token)
+                    .unwrap()
+                    .state,
+                if flow == GdsIssueFlow::Confirmation {
+                    ConversationState::Receive
+                } else {
+                    ConversationState::Send
+                }
             );
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
             let exchange = partner.exchange(target_token).unwrap();
@@ -9879,6 +9934,13 @@ mod tests {
                     ConversationKind::AppcMapped,
                 )
                 .unwrap();
+            connect_issue_source(
+                store.as_ref(),
+                &invocation,
+                token,
+                ConversationKind::AppcMapped,
+                0,
+            );
             run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
             let command = request(
                 CicsOperation::IssueAbend,
@@ -9980,6 +10042,8 @@ mod tests {
 
     #[test]
     fn five_gds_issue_controls_return_exact_basic_outputs_after_carrier_confirmation() {
+        assert!(CicsOperation::GdsIssueConfirmation.supported());
+        assert!(CicsOperation::GdsIssueError.supported());
         struct Carrier;
 
         impl CicsConversationTransport for Carrier {
@@ -10009,8 +10073,8 @@ mod tests {
         for (operation, sync_level, source_state, result_state) in [
             (
                 CicsOperation::GdsIssueAbend,
-                None,
-                ConversationState::Allocated,
+                Some(0),
+                ConversationState::Send,
                 ConversationState::Free,
             ),
             (
@@ -10029,7 +10093,7 @@ mod tests {
                 CicsOperation::GdsIssuePrepare,
                 Some(2),
                 ConversationState::Send,
-                ConversationState::SyncReceive,
+                ConversationState::SyncSend,
             ),
             (
                 CicsOperation::GdsIssueSignal,
@@ -10116,6 +10180,16 @@ mod tests {
             );
             assert_eq!(first.outputs["RETCODE"].bytes(), &[0; 6], "{operation:?}");
             assert_eq!(first.outputs["CONVDATA"].bytes().len(), 24);
+            if operation == CicsOperation::GdsIssueConfirmation {
+                let mut expected = [0; 24];
+                expected[3] = 0xff;
+                assert_eq!(first.outputs["CONVDATA"].bytes(), &expected);
+                assert_eq!(first.outputs["STATE"].bytes(), b"89");
+            }
+            if operation == CicsOperation::GdsIssueError {
+                assert_eq!(first.outputs["CONVDATA"].bytes(), &[0; 24]);
+                assert_eq!(first.outputs["STATE"].bytes(), b"91");
+            }
             assert_eq!(
                 first.outputs["STATE"].bytes(),
                 result_state.cvda().to_string().as_bytes(),
@@ -10156,6 +10230,22 @@ mod tests {
             ),
             (
                 ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueConfirmation,
+                Some(1),
+                ConversationState::Receive,
+                false,
+                [3, 8, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueError,
+                Some(0),
+                ConversationState::Allocated,
+                false,
+                [3, 8, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
                 CicsOperation::GdsIssuePrepare,
                 Some(0),
                 ConversationState::Send,
@@ -10174,7 +10264,7 @@ mod tests {
                 ConversationKind::AppcBasic,
                 CicsOperation::GdsIssueSignal,
                 Some(0),
-                ConversationState::Send,
+                ConversationState::PendFree,
                 false,
                 [3, 8, 0, 0, 0, 0],
             ),
@@ -10238,18 +10328,182 @@ mod tests {
                 ]),
                 1,
             );
-            let reply = handlers::invoke_extended_control(
-                &service,
-                &mut run,
-                &command,
-                crate::generated::CicsCommandFamily::ConversationControl,
-                100,
-            )
+            let reply = if operation.supported() {
+                service.invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+            } else {
+                handlers::invoke_extended_control(
+                    &service,
+                    &mut run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+            }
             .unwrap();
             assert_eq!(reply.condition, "NORMAL");
             assert_eq!(reply.response, 0);
             assert_eq!(reply.outputs["RETCODE"].bytes(), &expected, "{operation:?}");
             assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn gds_issue_response_rows_replay_exactly_after_sqlite_reopen() {
+        use std::sync::atomic::AtomicUsize;
+
+        struct Carrier(Arc<AtomicUsize>);
+
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        for (operation, state, expected_state, expected_convdata) in [
+            (
+                CicsOperation::GdsIssueConfirmation,
+                ConversationState::ConfReceive,
+                b"89".as_slice(),
+                {
+                    let mut block = [0; 24];
+                    block[3] = 0xff;
+                    block
+                },
+            ),
+            (
+                CicsOperation::GdsIssueError,
+                ConversationState::Send,
+                b"91".as_slice(),
+                [0; 24],
+            ),
+        ] {
+            let root = std::env::temp_dir().join(format!(
+                "mainframe-env-gds-response-reopen-{}-{operation:?}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&root).unwrap();
+            let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+            let invocation = invocation_for("gds-response-reopen", BTreeMap::new());
+            let session = SessionId::new("gds-response-reopen", 64).unwrap();
+            let sent = Arc::new(AtomicUsize::new(0));
+            let command;
+            let first;
+            {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+                let service = service(store.clone());
+                service
+                    .register_conversation_system(ConversationSystemDefinition {
+                        sysid: "SYS1".into(),
+                        kind: ConversationKind::AppcMapped,
+                        capacity: 1,
+                        enabled: true,
+                    })
+                    .unwrap();
+                service.create_session(&session, 24, 80).unwrap();
+                service
+                    .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                    .unwrap();
+                let token = service
+                    .install_conversation_principal_for_run(
+                        &invocation.run_unit_id,
+                        "SYS1",
+                        ConversationKind::AppcBasic,
+                    )
+                    .unwrap();
+                let owner = ConversationOwner {
+                    execution: invocation.execution_id.as_str().into(),
+                    run_unit: invocation.run_unit_id.as_str().into(),
+                    lease_epoch: u64::from(invocation.attempt),
+                };
+                let current = ConversationLedger::load(store.as_ref()).unwrap();
+                let mut next = current.clone();
+                let record = next.conversation_mut(token).unwrap();
+                record
+                    .connect(
+                        &owner,
+                        ConversationContext::Local,
+                        true,
+                        b"PROC".to_vec(),
+                        vec![],
+                        1,
+                    )
+                    .unwrap();
+                record.state = state;
+                assert!(current.persist(&mut next, store.as_ref()).unwrap());
+                service
+                    .install_conversation_transport(Arc::new(Carrier(sent.clone())))
+                    .unwrap();
+                command = request(
+                    operation,
+                    BTreeMap::from([
+                        ("CONVID".into(), cics_literal(&token)),
+                        ("RETCODE".into(), argument(b"RETCODE-X")),
+                        ("CONVDATA".into(), argument(b"CONVDATA-X")),
+                        ("STATE".into(), argument(b"STATE-X")),
+                    ]),
+                    1,
+                );
+                first = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command.clone(),
+                    )
+                    .unwrap();
+                assert_eq!(first.outputs["RETCODE"].bytes(), &[0; 6]);
+                assert_eq!(first.outputs["CONVDATA"].bytes(), &expected_convdata);
+                assert_eq!(first.outputs["STATE"].bytes(), expected_state);
+            }
+            {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+                let service = service(store);
+                let reopened_session = SessionId::new("gds-response-reopen-second", 64).unwrap();
+                service.create_session(&reopened_session, 24, 80).unwrap();
+                service
+                    .register_run(
+                        invocation.clone(),
+                        &reopened_session,
+                        "MENU",
+                        "MEAPPL",
+                        "MESYS",
+                    )
+                    .unwrap();
+                service
+                    .install_conversation_transport(Arc::new(Carrier(sent.clone())))
+                    .unwrap();
+                assert_eq!(
+                    service.invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command,
+                    ),
+                    Ok(first)
+                );
+            }
+            assert_eq!(sent.load(Ordering::SeqCst), 1);
+            std::fs::remove_dir_all(root).unwrap();
         }
     }
 
@@ -10335,6 +10589,13 @@ mod tests {
                     ConversationKind::AppcBasic,
                 )
                 .unwrap();
+            connect_issue_source(
+                store.as_ref(),
+                &invocation,
+                token,
+                ConversationKind::AppcBasic,
+                0,
+            );
             run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
             service
                 .install_conversation_transport(Arc::new(Carrier {
@@ -10517,6 +10778,15 @@ mod tests {
                     kind,
                 )
                 .unwrap();
+            if flow == GdsIssueFlow::Abend {
+                connect_issue_source(
+                    source_store.as_ref(),
+                    &source_invocation,
+                    source_token,
+                    kind,
+                    0,
+                );
+            }
             if flow == GdsIssueFlow::Prepare {
                 for (store, invocation, token, receiving) in [
                     (&source_store, &source_invocation, source_token, false),
@@ -10652,6 +10922,324 @@ mod tests {
                 ConversationLedger::load(target_store.as_ref()).unwrap(),
                 partner
             );
+        }
+    }
+
+    #[test]
+    fn peer_basic_confirmation_consumes_send_confirm_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let target = service(store.clone());
+        target
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&target);
+        let token = target
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            )
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                vec![],
+                1,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let missing = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "missing-7",
+            )
+            .unwrap();
+        assert_eq!(missing.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .stage_basic_send_confirm(&owner, ConversationContext::Local, 7)
+            .unwrap();
+        record.sync_level = Some(0);
+        record.state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let zero_sync = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "zero-sync-7",
+            )
+            .unwrap();
+        assert_eq!(zero_sync.outputs["RETCODE"], [3, 20, 0, 0, 0, 0]);
+        assert_eq!(zero_sync.outputs["STATE"], 84_i32.to_be_bytes());
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().sync_level = Some(1);
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let wrong_id = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                8,
+                GdsIssueFlow::Confirmation,
+                "wrong-id-8",
+            )
+            .unwrap();
+        assert_eq!(wrong_id.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().state = ConversationState::Send;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let wrong_state = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "wrong-state-7",
+            )
+            .unwrap();
+        assert_eq!(wrong_state.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        assert_eq!(wrong_state.outputs["STATE"], 91_i32.to_be_bytes());
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let foreign = registered_counter_run(&target, "foreign-basic-response");
+        assert_eq!(
+            target.accept_conversation_peer_basic_response(
+                &foreign.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "foreign-7",
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        let reply = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "confirm-7",
+            )
+            .unwrap();
+        assert_eq!(reply.outputs["RETCODE"], [0; 6]);
+        assert_eq!(reply.outputs["STATE"], 89_i32.to_be_bytes());
+        assert_eq!(
+            reply.outputs["CONVDATA"],
+            [
+                0, 0, 0, 0xff, 0, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+        let committed = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            committed.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+        assert_eq!(
+            target.accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "confirm-7",
+            ),
+            Ok(reply)
+        );
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        let no_pending = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Error,
+                "second-response-7",
+            )
+            .unwrap();
+        assert_eq!(no_pending.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record.state = ConversationState::Send;
+        record
+            .stage_basic_send_confirm(&owner, ConversationContext::Local, 8)
+            .unwrap();
+        record.state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let error = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                8,
+                GdsIssueFlow::Error,
+                "error-8",
+            )
+            .unwrap();
+        assert_eq!(error.outputs["RETCODE"], [0; 6]);
+        assert_eq!(error.outputs["STATE"], 89_i32.to_be_bytes());
+        let mut expected = [0; 24];
+        expected[3] = 0xff;
+        expected[6] = 0xff;
+        expected[7..11].copy_from_slice(&[0x08, 0x89, 0, 0]);
+        assert_eq!(error.outputs["CONVDATA"], expected);
+    }
+
+    #[test]
+    fn peer_basic_error_replays_after_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-basic-response-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("basic-response-restart", BTreeMap::new());
+        let token;
+        let committed;
+        let reply;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let session = SessionId::new("basic-response-first", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            token = target
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                )
+                .unwrap();
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let current = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = current.clone();
+            let record = next.conversation_mut(token).unwrap();
+            record
+                .connect(
+                    &owner,
+                    ConversationContext::Local,
+                    true,
+                    b"PROC".to_vec(),
+                    vec![],
+                    1,
+                )
+                .unwrap();
+            record
+                .stage_basic_send_confirm(&owner, ConversationContext::Local, 11)
+                .unwrap();
+            record.state = ConversationState::ConfReceive;
+            assert!(current.persist(&mut next, store.as_ref()).unwrap());
+            reply = target
+                .accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    11,
+                    GdsIssueFlow::Error,
+                    "error-11",
+                )
+                .unwrap();
+            assert_eq!(reply.outputs["RETCODE"], [0; 6]);
+            assert_eq!(reply.outputs["STATE"], 89_i32.to_be_bytes());
+            let mut expected = [0; 24];
+            expected[3] = 0xff;
+            expected[6] = 0xff;
+            expected[7..11].copy_from_slice(&[0x08, 0x89, 0, 0]);
+            assert_eq!(reply.outputs["CONVDATA"], expected);
+            committed = ConversationLedger::load(store.as_ref()).unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            let session = SessionId::new("basic-response-reopen", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    11,
+                    GdsIssueFlow::Error,
+                    "error-11",
+                ),
+                Ok(reply)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn peer_basic_response_rejects_mapped_and_non_appc_conversations() {
+        for kind in [ConversationKind::AppcMapped, ConversationKind::Mro] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let (invocation, _) = registered(&target);
+            let token = target
+                .install_conversation_principal_for_run(&invocation.run_unit_id, "SYS1", kind)
+                .unwrap();
+            let before = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    1,
+                    GdsIssueFlow::Error,
+                    "wrong-kind",
+                ),
+                Err(HostProblem::Unsupported)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
         }
     }
 
@@ -41181,7 +41769,11 @@ mod tests {
                 &effect(&parent.run_unit_id, channel_request.clone(), 5),
                 channel_request,
             ),
-            Err(HostProblem::Unsupported)
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 2,
+            })
         );
         assert!(
             store
@@ -41194,6 +41786,38 @@ mod tests {
                 .get_provider_state("cics-bts-child-ownership-v1", parent.run_unit_id.as_str())
                 .unwrap()
                 .is_none()
+        );
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"INPUT")),
+                ("CONTAINER".into(), cics_literal(b"MESSAGE")),
+                ("FROM".into(), cics_literal(b"channel-data")),
+                ("FLENGTH".into(), cics_decimal(12)),
+            ]),
+            6,
+        );
+        cics.invoke(&effect(&parent.run_unit_id, put.clone(), 6), put)
+            .unwrap();
+        let run = request(
+            CicsOperation::RunTransId,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"BT04")),
+                ("CHANNEL".into(), argument(b"INPUT")),
+                ("CHILD".into(), argument(b"CHILD-X")),
+            ]),
+            7,
+        );
+        cics.invoke(&effect(&parent.run_unit_id, run.clone(), 7), run)
+            .unwrap();
+        let rows = store
+            .list_provider_state("cics-bts-transid-run-v1", 2)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let snapshot: serde_json::Value = serde_json::from_slice(&rows[0].payload).unwrap();
+        assert_eq!(
+            snapshot["containers"]["MESSAGE"]["bytes"],
+            "Y2hhbm5lbC1kYXRh"
         );
     }
 
@@ -52259,6 +52883,1131 @@ mod tests {
             ]),
             sequence,
         )
+    }
+
+    #[test]
+    fn channel_container_character_append_set_and_nodata() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        for (sequence, bytes, append) in [
+            (1, b"AB".as_slice(), false),
+            (2, b"CD", true),
+            (3, b"EF", true),
+        ] {
+            let mut arguments = BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"TEXT")),
+                ("FROM".into(), cics_literal(bytes)),
+            ]);
+            if sequence != 3 {
+                arguments.insert("DATATYPE".into(), cics_literal(b"CHAR"));
+                arguments.insert("FROMCCSID".into(), cics_decimal(37));
+            }
+            if append {
+                arguments.insert("OPTION.APPEND".into(), cics_option());
+            }
+            let put = request(CicsOperation::PutContainer, arguments, sequence);
+            cics.invoke(&effect(&invocation.run_unit_id, put.clone(), sequence), put)
+                .unwrap();
+        }
+        let set = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"TEXT")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(6)),
+                ("FLENGTH".into(), argument(b"LEN-X")),
+                ("CCSID".into(), argument(b"CCSID-X")),
+            ]),
+            4,
+        );
+        let fetched = cics
+            .invoke(&effect(&invocation.run_unit_id, set.clone(), 4), set)
+            .unwrap();
+        assert_eq!(fetched.outputs["SET"].bytes(), b"ABCDEF");
+        assert_eq!(fetched.outputs["FLENGTH"].bytes(), b"6");
+        assert_eq!(fetched.outputs["CCSID"].bytes(), b"37");
+        let nodata = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"TEXT")),
+                ("FLENGTH".into(), argument(b"LEN-X")),
+                ("OPTION.NODATA".into(), cics_option()),
+            ]),
+            5,
+        );
+        let length = cics
+            .invoke(&effect(&invocation.run_unit_id, nodata.clone(), 5), nodata)
+            .unwrap();
+        assert_eq!(length.outputs["FLENGTH"].bytes(), b"6");
+        assert!(!length.outputs.contains_key("INTO"));
+    }
+
+    #[test]
+    fn bit_container_get_with_conversion_options_fails_closed() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"BITDATA")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("DATATYPE".into(), cics_literal(b"BIT")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        for (sequence, key, value) in [
+            (2, "INTOCCSID", cics_decimal(37)),
+            (3, "INTOCODEPAGE", cics_literal(b"37")),
+        ] {
+            let get = request(
+                CicsOperation::GetContainer,
+                BTreeMap::from([
+                    ("CHANNEL".into(), cics_literal(b"WORK")),
+                    ("CONTAINER".into(), cics_literal(b"BITDATA")),
+                    ("INTO".into(), argument(b"TARGET")),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                    (key.into(), value),
+                ]),
+                sequence,
+            );
+            assert!(matches!(
+                cics.invoke(&effect(&invocation.run_unit_id, get.clone(), sequence), get),
+                Err(HostProblem::Unsupported)
+            ));
+        }
+    }
+
+    #[test]
+    fn channel_container_64_bit_provider_reuses_checked_channel_data() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let payload64 = |schema, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let put = request(
+            CicsOperation::PutContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "FROM".into(),
+                    payload64("mainframe-env.cics.storage64-value@1", b"ABCD"),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("FLENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "INTO".into(),
+                    payload64("mainframe-env.cics.pointer64@1", &123u64.to_be_bytes()),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("FLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCD");
+        assert_eq!(read.outputs["FLENGTH"].bytes(), b"4");
+        let negative_offset = request(
+            CicsOperation::GetContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+                (
+                    "INTO".into(),
+                    payload64("mainframe-env.cics.pointer64@1", &123u64.to_be_bytes()),
+                ),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("BYTEOFFSET".into(), cics_decimal(-1)),
+            ]),
+            4,
+        );
+        let read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, negative_offset.clone(), 4),
+                negative_offset,
+            )
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCD");
+        let invalid = request(
+            CicsOperation::PutContainer64,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                (
+                    "FROM".into(),
+                    payload64("mainframe-env.cics.length-error64@1", b""),
+                ),
+                (
+                    "ABI64".into(),
+                    cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+                ),
+            ]),
+            3,
+        );
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid
+            ),
+            Err(HostProblem::Condition {
+                response: 22,
+                response2: 1,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn channel_container_64_bit_bounded_options_and_fences() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let base = BTreeMap::from([
+            ("CHANNEL".into(), cics_literal(b"WORK")),
+            ("CONTAINER".into(), cics_literal(b"TEXT")),
+            (
+                "ABI64".into(),
+                cics_literal(b"mainframe-env.cics-amode64-nonle@1"),
+            ),
+        ]);
+        let mut put = base.clone();
+        put.insert(
+            "FROM".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.storage64-value@1",
+                b"AB".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        put.insert("DATATYPE".into(), cics_literal(b"CHAR"));
+        put.insert("FROMCCSID".into(), cics_decimal(37));
+        let command = request(CicsOperation::PutContainer64, put.clone(), 1);
+        cics.invoke(
+            &effect(&invocation.run_unit_id, command.clone(), 1),
+            command,
+        )
+        .unwrap();
+
+        let mut get = base.clone();
+        get.insert("FLENGTH".into(), argument(b"LEN-X"));
+        get.insert("OPTION.NODATA".into(), cics_option());
+        let command = request(CicsOperation::GetContainer64, get, 2);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 2),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["FLENGTH"].bytes(), b"2");
+        assert!(!result.outputs.contains_key("INTO"));
+
+        let mut invalid_nodata = base.clone();
+        invalid_nodata.insert("FLENGTH".into(), cics_decimal(2));
+        invalid_nodata.insert("OPTION.NODATA".into(), cics_option());
+        let command = request(CicsOperation::GetContainer64, invalid_nodata, 12);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 12),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let mut invalid_nodata = base.clone();
+        invalid_nodata.insert("FLENGTH".into(), argument(b"LEN-X"));
+        invalid_nodata.insert("BYTEOFFSET".into(), cics_decimal(1));
+        invalid_nodata.insert("OPTION.NODATA".into(), cics_option());
+        let command = request(CicsOperation::GetContainer64, invalid_nodata, 13);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 13),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+
+        let mut get = base.clone();
+        get.insert(
+            "INTO".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.pointer64@1",
+                123u64.to_be_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        get.insert("INTO.MAXLENGTH".into(), cics_decimal(2));
+        get.insert("CCSID".into(), argument(b"CCSID-X"));
+        get.insert("CONVERTST".into(), cics_literal(b"NOCONVERT"));
+        get.insert("INTOCCSID".into(), cics_decimal(37));
+        let command = request(CicsOperation::GetContainer64, get.clone(), 3);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 3),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"AB");
+        assert_eq!(result.outputs["CCSID"].bytes(), b"37");
+
+        let mut set = base.clone();
+        set.insert("SET".into(), argument(b"PTR-X"));
+        set.insert("FLENGTH".into(), argument(b"LEN-X"));
+        let command = request(CicsOperation::GetContainer64, set, 11);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 11),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+
+        let mut codepage = get.clone();
+        codepage.remove("INTOCCSID");
+        codepage.insert("INTOCODEPAGE".into(), cics_literal(b"37"));
+        let command = request(CicsOperation::GetContainer64, codepage, 6);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 6),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"AB");
+
+        let mut unsupported = get.clone();
+        unsupported.insert("INTOCCSID".into(), cics_decimal(500));
+        let command = request(CicsOperation::GetContainer64, unsupported, 4);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 4),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let mut unsupported = put.clone();
+        unsupported.insert("OPTION.PREPEND".into(), cics_option());
+        let command = request(CicsOperation::PutContainer64, unsupported, 5);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 5),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let mut unsupported = put;
+        unsupported.insert("FROMCODEPAGE".into(), cics_literal(b"UTF-8"));
+        let command = request(CicsOperation::PutContainer64, unsupported, 9);
+        assert!(matches!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 9),
+                command
+            ),
+            Err(HostProblem::Unsupported)
+        ));
+        let command = request(CicsOperation::GetContainer64, get, 10);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 10),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), b"AB");
+
+        let mut bit = base.clone();
+        bit.insert("CONTAINER".into(), cics_literal(b"BITS"));
+        bit.insert(
+            "FROM".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.storage64-value@1",
+                vec![0, 255],
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        bit.insert("DATATYPE".into(), cics_literal(b"BIT"));
+        let command = request(CicsOperation::PutContainer64, bit.clone(), 7);
+        cics.invoke(
+            &effect(&invocation.run_unit_id, command.clone(), 7),
+            command,
+        )
+        .unwrap();
+        let mut bit_get = base;
+        bit_get.insert("CONTAINER".into(), cics_literal(b"BITS"));
+        bit_get.insert(
+            "INTO".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.pointer64@1",
+                123u64.to_be_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        bit_get.insert("INTO.MAXLENGTH".into(), cics_decimal(2));
+        bit_get.insert("CCSID".into(), argument(b"CCSID-X"));
+        bit_get.insert("CONVERTST".into(), cics_literal(b"NOCONVERT"));
+        let command = request(CicsOperation::GetContainer64, bit_get, 8);
+        let result = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, command.clone(), 8),
+                command,
+            )
+            .unwrap();
+        assert_eq!(result.outputs["INTO"].bytes(), &[0, 255]);
+        assert_eq!(result.outputs["CCSID"].bytes(), b"0");
+    }
+
+    #[test]
+    fn bts_container_process_put_and_get_use_held_root() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let run_unit = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run_unit).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", principal, run_unit)
+                    .unwrap(),
+                run_unit,
+                execution,
+                principal,
+            )
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+    }
+
+    #[test]
+    fn bts_container_current_activity_and_named_child_move() {
+        use handlers::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsProcess, BtsReply,
+        };
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let uow = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ACTIVITY", uow).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "ACTIVITY", &root, "MAIN", "BTS1", principal, uow).unwrap(),
+                uow,
+                execution,
+                principal,
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "ACTIVITY",
+                uow,
+                execution,
+                principal,
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 7, "checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        authority
+            .define_child(
+                "TYPE",
+                "ACTIVITY",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: principal.into(),
+                },
+                uow,
+                execution,
+                principal,
+                "child",
+                [2; 32],
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ACTIVITY", &root, 1, 7)
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let move_item = request(
+            CicsOperation::MoveContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("AS".into(), cics_literal(b"NEXT")),
+                ("TOACTIVITY".into(), cics_literal(b"CHILD")),
+            ]),
+            2,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, move_item.clone(), 2),
+            move_item,
+        )
+        .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"NEXT")),
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            3,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 3), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+        let delete = request(
+            CicsOperation::DeleteContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"NEXT")),
+                ("ACTIVITY".into(), cics_literal(b"CHILD")),
+            ]),
+            4,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, delete.clone(), 4), delete)
+            .unwrap();
+    }
+
+    #[test]
+    fn bts_container_uow_rollback_discards_acquired_process_write() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let creator = registered_counter_run(&cics, "bts-container-rollback-creator");
+        let writer = registered_counter_run(&cics, "bts-container-rollback-writer");
+        let reader = registered_counter_run(&cics, "bts-container-rollback-reader");
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "ROLLBACK", creator.run_unit_id.as_str()).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "ROLLBACK",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    creator.principal.id().as_str(),
+                    creator.run_unit_id.as_str(),
+                )
+                .unwrap(),
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+            )
+            .unwrap();
+        authority
+            .finish_run_uow(
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                writer.run_unit_id.as_str(),
+                writer.execution_id.as_str(),
+                writer.principal.id().as_str(),
+                "TYPE",
+                "ROLLBACK",
+                &root,
+            )
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&writer.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        authority
+            .finish_run_uow(
+                writer.run_unit_id.as_str(),
+                writer.execution_id.as_str(),
+                writer.principal.id().as_str(),
+                false,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                reader.run_unit_id.as_str(),
+                reader.execution_id.as_str(),
+                reader.principal.id().as_str(),
+                "TYPE",
+                "ROLLBACK",
+                &root,
+            )
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&reader.run_unit_id, get.clone(), 1), get),
+            Err(HostProblem::Condition {
+                name: "CONTAINERERR".into(),
+                response: 110,
+                response2: 1
+            })
+        );
+    }
+
+    #[test]
+    fn bts_container_descendant_acqprocess_get_is_explicitly_unsupported() {
+        use handlers::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsProcess, BtsReply,
+        };
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let creator = registered_counter_run(&cics, "bts-container-descend-creator");
+        let root_owner = registered_counter_run(&cics, "bts-container-descend-root");
+        let descendant = registered_counter_run(&cics, "bts-container-descend-child");
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let root =
+            BtsLifecycleStore::root_id("TYPE", "DESCEND", creator.run_unit_id.as_str()).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "DESCEND",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    creator.principal.id().as_str(),
+                    creator.run_unit_id.as_str(),
+                )
+                .unwrap(),
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+            )
+            .unwrap();
+        authority
+            .finish_run_uow(
+                creator.run_unit_id.as_str(),
+                creator.execution_id.as_str(),
+                creator.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                "TYPE",
+                "DESCEND",
+                &root,
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "DESCEND",
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        let child = authority
+            .define_child(
+                "TYPE",
+                "DESCEND",
+                &root,
+                &BtsChildDefinition {
+                    name: "CHILD".into(),
+                    completion_event: "DONE".into(),
+                    program: "MAIN".into(),
+                    transid: "BTS1".into(),
+                    userid: root_owner.principal.id().as_str().into(),
+                },
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                "child",
+                [2; 32],
+            )
+            .unwrap();
+        authority
+            .finish_child_uow("TYPE", "DESCEND", root_owner.run_unit_id.as_str(), true)
+            .unwrap();
+        authority
+            .finish_run_uow(
+                root_owner.run_unit_id.as_str(),
+                root_owner.execution_id.as_str(),
+                root_owner.principal.id().as_str(),
+                true,
+            )
+            .unwrap();
+        authority
+            .acquire(
+                descendant.run_unit_id.as_str(),
+                descendant.execution_id.as_str(),
+                descendant.principal.id().as_str(),
+                "TYPE",
+                "DESCEND",
+                &child,
+            )
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&descendant.run_unit_id, get.clone(), 1), get),
+            Err(HostProblem::Unsupported)
+        );
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQACTIVITY".into(), cics_option()),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&descendant.run_unit_id, put.clone(), 2), put)
+            .unwrap();
+        let read = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                ("OPTION.ACQACTIVITY".into(), cics_option()),
+            ]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&descendant.run_unit_id, read.clone(), 3), read)
+                .unwrap()
+                .outputs["INTO"]
+                .bytes(),
+            b"DATA"
+        );
+    }
+
+    #[test]
+    fn bts_container_owner_saf_denial_precedes_staged_write_and_is_audited() {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let (host, seen) = deny_exact_class_authorities("BTSLIFE", None);
+        let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let (invocation, _) = registered(&cics);
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let uow = invocation.run_unit_id.as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "DENIED", uow).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "DENIED",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    invocation.principal.id().as_str(),
+                    uow,
+                )
+                .unwrap(),
+                uow,
+                invocation.execution_id.as_str(),
+                invocation.principal.id().as_str(),
+            )
+            .unwrap();
+        let before = authority.load_process("TYPE", "DENIED").unwrap().unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            authority.load_process("TYPE", "DENIED").unwrap(),
+            Some(before)
+        );
+        assert!(
+            store
+                .list_provider_state("cics-bts-container-pending-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, _, intent)| class == "BTSLIFE" && *intent == AccessIntent::Update)
+        );
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| {
+                    record.capability.as_str() == "host.security.authorize"
+                        && record.decision == AuditDecision::Deny
+                        && record.run_unit_id == invocation.run_unit_id
+                })
+        );
+    }
+
+    #[test]
+    fn channel_container_current_channel_binding_selects_omitted_channel() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let invocation = invocation_for(
+            "channel-current-run",
+            BTreeMap::from([(
+                "cics.channel".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.channel@1",
+                    b"WORK".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let session = SessionId::new("channel-current-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+        let delete_current = request(
+            CicsOperation::DeleteChannel,
+            BTreeMap::from([("CHANNEL".into(), cics_literal(b"WORK"))]),
+            3,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, delete_current.clone(), 3),
+                delete_current,
+            ),
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 4,
+            })
+        );
+
+        let (without_current, _) = registered(&cics);
+        let omitted = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("OPTION.NODATA".into(), cics_option()),
+            ]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&without_current.run_unit_id, omitted.clone(), 1),
+                omitted,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn channel_container_public_route_preserves_data_count_and_replay() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"ABCDEF")),
+                ("FLENGTH".into(), cics_decimal(6)),
+            ]),
+            1,
+        );
+        cics.invoke(
+            &effect(&invocation.run_unit_id, put.clone(), 1),
+            put.clone(),
+        )
+        .unwrap();
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        let get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("FLENGTH".into(), cics_decimal(6)),
+            ]),
+            2,
+        );
+        let read = cics
+            .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"ABCDEF");
+        assert_eq!(read.outputs["FLENGTH"].bytes(), b"6");
+        let short_get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("FLENGTH".into(), cics_decimal(3)),
+            ]),
+            23,
+        );
+        let truncated = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, short_get.clone(), 23),
+                short_get,
+            )
+            .unwrap();
+        assert_eq!(truncated.condition, "LENGERR");
+        assert_eq!(truncated.response, 22);
+        assert_eq!(truncated.outputs["INTO"].bytes(), b"ABC");
+        assert_eq!(truncated.outputs["FLENGTH"].bytes(), b"6");
+        cics.lock()
+            .unwrap()
+            .runs
+            .get_mut(&invocation.run_unit_id)
+            .unwrap()
+            .current_program
+            .channel = Some("WORK".into());
+        let current_get = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+            ]),
+            22,
+        );
+        let current_read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, current_get.clone(), 22),
+                current_get,
+            )
+            .unwrap();
+        assert_eq!(current_read.outputs["INTO"].bytes(), b"ABCDEF");
+        let query = request(
+            CicsOperation::QueryChannel,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINERCNT".into(), cics_literal(b"COUNT-X")),
+            ]),
+            3,
+        );
+        let count = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 3), query)
+            .unwrap();
+        assert_eq!(count.outputs["CONTAINERCNT"].bytes(), b"1");
+        let system_query = request(
+            CicsOperation::QueryChannel,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"DFHTRANSACTION")),
+                ("CONTAINERCNT".into(), cics_literal(b"COUNT-X")),
+            ]),
+            24,
+        );
+        let system_count = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, system_query.clone(), 24),
+                system_query,
+            )
+            .unwrap();
+        assert_eq!(system_count.outputs["CONTAINERCNT"].bytes(), b"0");
+        let system_delete = request(
+            CicsOperation::DeleteChannel,
+            BTreeMap::from([("CHANNEL".into(), cics_literal(b"DFHTRANSACTION"))]),
+            25,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, system_delete.clone(), 25),
+                system_delete,
+            ),
+            Err(HostProblem::Condition {
+                name: "CHANNELERR".into(),
+                response: 122,
+                response2: 5,
+            })
+        );
+        for (sequence, selector) in [
+            "OPTION.PROCESS",
+            "OPTION.ACQPROCESS",
+            "OPTION.ACQACTIVITY",
+            "ACTIVITY",
+            "FROMACTIVITY",
+            "TOACTIVITY",
+            "OPTION.FROMPROCESS",
+            "OPTION.TOPROCESS",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let sequence = sequence as u64 + 40;
+            let bts = request(
+                CicsOperation::DeleteContainer,
+                BTreeMap::from([
+                    ("CONTAINER".into(), cics_literal(b"ITEM")),
+                    (
+                        selector.into(),
+                        if selector.starts_with("OPTION.") {
+                            cics_option()
+                        } else {
+                            cics_literal(b"CHILD")
+                        },
+                    ),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, bts.clone(), sequence), bts),
+                if matches!(
+                    selector,
+                    "OPTION.FROMPROCESS" | "OPTION.TOPROCESS" | "FROMACTIVITY" | "TOACTIVITY"
+                ) {
+                    Err(HostProblem::Unsupported)
+                } else {
+                    Err(HostProblem::Condition {
+                        name: "INVREQ".into(),
+                        response: 16,
+                        response2: 1,
+                    })
+                },
+                "{selector}"
+            );
+        }
     }
 
     #[test]

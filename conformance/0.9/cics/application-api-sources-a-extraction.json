@@ -28,8 +28,8 @@
     },
     "supplements": {
       "path": "conformance/0.9/cics/application-api-sources-a-supplements.json",
-      "file_sha256": "sha256:a66a5e8e1879845a331642f19f5daf38ab775332100bf59d10f59eb07607dc16",
-      "supplements_sha256": "sha256:4b9db83a27918cc20824356ec98dc66ae6c75212d171fc7198ecf0b9f21f94da"
+      "file_sha256": "sha256:ca51682ac867191816dddeab9bbf2967d2065ebfa724da9d836a58fa098cd24b",
+      "supplements_sha256": "sha256:27a78b7de1bc0798771f559c60877b55229f2ea62e3d4d40fc9c456b7cb82c74"
     },
     "cache_scope": "cics-application-api-sources-a"
   },
@@ -66,10 +66,10 @@
     "syntax_diagrams": 111,
     "multiple_syntax_diagram_topics": 4,
     "options_section_topics": 108,
-    "conditions_section_topics": 97
-    ,"supplement_topics": 5
-    ,"supplement_direct_topics": 2
-    ,"supplement_context_topics": 3
+    "conditions_section_topics": 97,
+    "supplement_topics": 5,
+    "supplement_direct_topics": 2,
+    "supplement_context_topics": 3
   },
   "selector_profiles": [
     {
@@ -836,5 +836,5 @@
     }
   ],
   "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
-  "extraction_sha256": "sha256:1c7055c8e02c84b986e35ce9b5082b3b5085c54c54d253a87f1d5ae0ff7c7f56"
+  "extraction_sha256": "sha256:03907cec4cd262641155b1f011ae2bd6d9aa4e715d4e760463c866b80b1d560a"
 }

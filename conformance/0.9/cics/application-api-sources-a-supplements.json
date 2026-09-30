@@ -59,12 +59,12 @@
   "receipt_contract": {
     "schema": {
       "path": "conformance/0.9/schemas/cics-source-supplements.schema.json",
-      "file_sha256": "sha256:c7d29562ccbba4fc2d7bf02845cb956cac42fbc7e6b39a596d8386ebd576e98a"
+      "file_sha256": "sha256:c194095f5fe18b5831c44eacf07af3e8930fc2229479a734ae9e6668ee7b14b5"
     },
     "checker": {
       "path": "conformance/0.9/tools/cache_cics_application_source_supplements.py",
       "version": "cics-source-supplements-cache@1",
-      "file_sha256": "sha256:f22080fd6d97433b9db1997ba8be652ae637797b142c9dc9cc02256095684aa3"
+      "file_sha256": "sha256:ad8928058068c417bf617a333607a8b62aeeeebabebd2835b06f4528fbb561e0"
     }
   },
   "topics": [
@@ -193,9 +193,9 @@
       "product_key": "SSGMCP_5.5.0",
       "heading": "TRANSACTION attributes",
       "last_modified": "2025-01-07",
-      "bytes": 200069,
-      "sha256": "90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd",
-      "cache_key": "topic-7aba208cb295eae6ba5d2934af7f9b00f0521910bf01e95767dd622d1b1c78d5-sha256-90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd.html",
+      "bytes": 205306,
+      "sha256": "c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514",
+      "cache_key": "topic-7aba208cb295eae6ba5d2934af7f9b00f0521910bf01e95767dd622d1b1c78d5-sha256-c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514.html",
       "source_role": "target-product-version-compatibility",
       "target_authority_boundary": "target-product-older-version-context",
       "target_product_authority": false,
@@ -260,5 +260,15 @@
     }
   ],
   "supplement_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-supplements@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete receipt with supplements_sha256 omitted",
-  "supplements_sha256": "sha256:4b9db83a27918cc20824356ec98dc66ae6c75212d171fc7198ecf0b9f21f94da"
+  "supplements_sha256": "sha256:27a78b7de1bc0798771f559c60877b55229f2ea62e3d4d40fc9c456b7cb82c74",
+  "repin": {
+    "issue": 173,
+    "verified_on": "2026-09-28",
+    "verification_method": "user-chrome-browser-control",
+    "historical_receipt_path": "conformance/0.9/cics/application-api-sources-a-supplements-2026-09-10.json",
+    "historical_receipt_sha256": "sha256:a66a5e8e1879845a331642f19f5daf38ab775332100bf59d10f59eb07607dc16",
+    "topic_path": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
+    "topic_sha256": "c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514",
+    "topic_bytes": 205306
+  }
 }

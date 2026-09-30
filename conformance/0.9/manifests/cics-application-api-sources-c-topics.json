@@ -13,7 +13,7 @@
   "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
   "topic_count": 224,
-  "topic_manifest_digest": "717396f5e8cd0e9fbc21c91c569afce84e6f7f632dfbec574d3fd62bf5a85871",
+  "topic_manifest_digest": "01fb00ebd639d937017cb3f6565cdf38df3c25bb0ebe4393030e66db260d8bc2",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -287,9 +287,9 @@
       "topic_path": "SSJL4D_6.x/fundamentals/connections/dfht1m5.html"
     },
     {
-      "bytes": 4383,
+      "bytes": 4377,
       "last_modified": "2026-01-16",
-      "sha256": "c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b",
+      "sha256": "3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319",
       "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl20.html"
     },
     {
@@ -299,9 +299,9 @@
       "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl25.html"
     },
     {
-      "bytes": 3010,
+      "bytes": 3004,
       "last_modified": "2026-08-26",
-      "sha256": "38ff92b29e9bff1add9a2add4bef33f1f7ccc6a29076b42b48f3e5b3733bf740",
+      "sha256": "bb908fcb9f23db0145218bbd535b15094f4148d22a7c0016912bcc90e8df13ca",
       "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_client_encoding.html"
     },
     {
@@ -1205,9 +1205,9 @@
       "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
     },
     {
-      "bytes": 200065,
+      "bytes": 251733,
       "last_modified": "2026-08-26",
-      "sha256": "03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
+      "sha256": "21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
       "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html"
     },
     {
@@ -1361,5 +1361,5 @@
       "topic_path": "SSJL4D_6.x/upgrading/process/upgrade_java.html"
     }
   ],
-  "total_bytes": 6018940
+  "total_bytes": 6070596
 }

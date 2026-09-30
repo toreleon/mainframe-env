@@ -484,7 +484,8 @@ fn rollback_run(service: &CicsService, run: &mut Run) -> Result<(), HostProblem>
     run.current_records.clear();
     run.file_updates.current_record_values.clear();
     run.file_updates.file_tokens.clear();
-    service.clear_undo(run)
+    service.clear_undo(run)?;
+    super::bts_browse::rollback_task(service, run)
 }
 
 fn uow_response(
