@@ -6,6 +6,25 @@ pub use output::CicsOutputName;
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    BtsEndBrowseContainer,
+    BtsGetNextContainer,
+    BtsInquireContainer,
+    BtsStartBrowseContainer,
+    BtsEndBrowseEvent,
+    BtsGetNextEvent,
+    BtsInquireEvent,
+    BtsStartBrowseEvent,
+    BtsEndBrowseTimer,
+    BtsInquireTimer,
+    BtsStartBrowseTimer,
+    BtsStartBrowseActivity,
+    BtsGetNextActivity,
+    BtsEndBrowseActivity,
+    BtsInquireActivity,
+    BtsStartBrowseProcess,
+    BtsGetNextProcess,
+    BtsEndBrowseProcess,
+    BtsInquireProcess,
     /// BTS process and activity lifecycle commands, catalog rows 0002–0217.
     AcquireActivityId,
     AcquireProcess,
@@ -27,6 +46,16 @@ pub enum CicsPlanOperation {
     RunAcqProcess,
     RunActivity,
     RunTransId,
+    DeleteChannel,
+    DeleteContainer,
+    GetContainer,
+    /// Read a channel container into checked AMODE(64) storage.
+    GetContainer64,
+    MoveContainer,
+    PutContainer,
+    /// Write a channel container from checked AMODE(64) storage.
+    PutContainer64,
+    QueryChannel,
     SuspendAcqActivity,
     SuspendAcqProcess,
     SuspendActivity,
@@ -449,6 +478,7 @@ pub enum CicsPlanOperation {
 /// Named input accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOperandName {
+    BtsBrowse(super::BtsBrowseInput),
     /// Four-byte ISSUE conversation token.
     IssueConvid,
     /// Legacy SESSION alias for a mapped ISSUE conversation token.
@@ -478,6 +508,22 @@ pub enum CicsOperandName {
     BtsUserId,
     BtsFacilityToken,
     BtsChannel,
+    ContainerName,
+    ContainerAs,
+    ContainerActivity,
+    ContainerFromActivity,
+    ContainerToActivity,
+    ContainerToChannel,
+    ContainerFrom,
+    ContainerFrom64,
+    ContainerLength,
+    ContainerDatatype,
+    ContainerCcsid,
+    ContainerByteOffset,
+    ContainerIntoCcsid,
+    ContainerFromCodepage,
+    ContainerIntoCodepage,
+    ContainerConvertst,
     /// Opaque sixteen-byte child token.
     BtsChild,
     /// Name of a current activity's child.

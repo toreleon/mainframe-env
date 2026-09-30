@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover the bounded in-memory IMS database engine foundation for hierarchy navigation, held mutations, GSAM append, and secondary indexes without host or conformance credit."

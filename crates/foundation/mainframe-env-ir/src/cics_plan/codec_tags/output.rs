@@ -2,6 +2,7 @@ use super::*;
 
 pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
     match value {
+        CicsOutputName::BtsBrowse(name) => name.tag(),
         CicsOutputName::IssueState => 1528,
         CicsOutputName::IssueConvData => 1529,
         CicsOutputName::IssueRetCode => 1530,
@@ -16,6 +17,12 @@ pub(in crate::cics_plan) const fn output_tag(value: CicsOutputName) -> u16 {
         CicsOutputName::BtsChildCompStatus => 1145,
         CicsOutputName::BtsChannel => 1146,
         CicsOutputName::BtsAbcode => 1147,
+        CicsOutputName::ContainerInto => 1720,
+        CicsOutputName::ContainerInto64 => 1725,
+        CicsOutputName::ContainerSet => 1721,
+        CicsOutputName::ContainerLength => 1722,
+        CicsOutputName::ContainerCcsid => 1723,
+        CicsOutputName::ContainerCount => 1724,
         CicsOutputName::AttachProcess => 1400,
         CicsOutputName::AttachResource => 1401,
         CicsOutputName::AttachReturnProcess => 1402,
@@ -185,6 +192,9 @@ pub(in crate::cics_plan) fn output_from_tag(
     value: u16,
 ) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
+        1016..=1040 => super::super::BtsBrowseOutput::from_tag(value)
+            .map(CicsOutputName::BtsBrowse)
+            .ok_or(CicsPlanCodecProblem::Malformed),
         1528 => Ok(CicsOutputName::IssueState),
         1529 => Ok(CicsOutputName::IssueConvData),
         1530 => Ok(CicsOutputName::IssueRetCode),
@@ -199,6 +209,12 @@ pub(in crate::cics_plan) fn output_from_tag(
         1145 => Ok(CicsOutputName::BtsChildCompStatus),
         1146 => Ok(CicsOutputName::BtsChannel),
         1147 => Ok(CicsOutputName::BtsAbcode),
+        1720 => Ok(CicsOutputName::ContainerInto),
+        1725 => Ok(CicsOutputName::ContainerInto64),
+        1721 => Ok(CicsOutputName::ContainerSet),
+        1722 => Ok(CicsOutputName::ContainerLength),
+        1723 => Ok(CicsOutputName::ContainerCcsid),
+        1724 => Ok(CicsOutputName::ContainerCount),
         1400 => Ok(CicsOutputName::AttachProcess),
         1401 => Ok(CicsOutputName::AttachResource),
         1402 => Ok(CicsOutputName::AttachReturnProcess),

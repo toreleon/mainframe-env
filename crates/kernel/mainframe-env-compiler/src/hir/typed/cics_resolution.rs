@@ -16,11 +16,13 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
 mod assign_validation;
+mod bts_browse;
 mod bts_child_link;
 mod bts_lifecycle;
 mod builtin_function;
 mod candidate_validation;
 mod certificate_control;
+mod channel_container;
 mod clause_parser;
 mod command_recognition;
 use command_recognition::{is_aid_name, is_single_condition_label};
@@ -60,12 +62,10 @@ mod transform_control;
 mod value;
 mod web_control;
 mod web_service_control;
-
 use candidate_validation::{keep_best_failure, validate_candidate};
 use clause_parser::{clauses, matching_close};
 use numeric_value::{cics_cvda_value, cics_integer_value};
 use value::{cics_address_value, cics_value, complete_data_reference, output};
-
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
     clauses: Clauses,
@@ -84,14 +84,26 @@ pub(super) fn validated_command(
     Clauses,
     Vec<String>,
 )> {
-    let candidates = cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
-    if candidates.is_empty() {
+    let syntax_candidates =
+        cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
+    let selected_candidates = syntax_candidates
+        .iter()
+        .copied()
+        .filter(|candidate| bts_browse::selector_matches(candidate.descriptor, body))
+        .collect::<Vec<_>>();
+    if syntax_candidates.is_empty() {
         return Err(ResolutionFailure::Invalid(format!(
             "unknown CICS application command: {}",
             body.first().map_or("<empty>", String::as_str)
         )));
     }
-
+    // A selector can follow another option. If no selector matches in the
+    // canonical position, let the catalog validators resolve or diagnose it.
+    let candidates = if selected_candidates.is_empty() {
+        syntax_candidates
+    } else {
+        selected_candidates
+    };
     let mut valid = BTreeMap::<&'static str, ValidatedCandidate>::new();
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {
@@ -194,7 +206,6 @@ pub(super) fn validated_command(
         {
             options.push((*kind).into());
         }
-
         let validated = ValidatedCandidate {
             descriptor: candidate.descriptor,
             clauses,
@@ -326,10 +337,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let web_shape = web_service_control::shape(operation);
     let event_shape = event_control::shape(operation);
     let bts_shape = bts_child_link::shape(operation);
+    let browse_shape = bts_browse::shape(operation);
     let command_shape = transform_shape
         .as_ref()
         .or(event_shape.as_ref())
-        .or(bts_shape.as_ref());
+        .or(bts_shape.as_ref())
+        .or(browse_shape.as_ref());
     let allowed_clauses: &[&str] = match operation {
         op if conversation_control::is_operation(op) => conversation_control::allowed_clauses(op),
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
@@ -489,10 +502,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
-        operation if counter_control::is_counter(operation) => {
-            counter_control::allowed_clauses(operation)
-        }
+        op if counter_control::is_counter(op) => counter_control::allowed_clauses(op),
         operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_clauses(operation),
+        op if channel_container::is_channel_container(op) => channel_container::allowed_clauses(op),
         op if outboard::is_issue(op) => outboard::allowed_clauses(op),
         op if issue_control::is_issue(op) => issue_control::allowed_clauses(op),
         HirCicsOperation::SpoolClose
@@ -634,10 +646,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WaitJournalNum
         | HirCicsOperation::WriteJournalName
         | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
-        operation if counter_control::is_counter(operation) => {
-            counter_control::allowed_options(operation)
-        }
+        op if counter_control::is_counter(op) => counter_control::allowed_options(op),
         operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_options(operation),
+        op if channel_container::is_channel_container(op) => channel_container::allowed_options(op),
         op if outboard::is_issue(op) => outboard::allowed_options(op),
         op if issue_control::is_issue(op) => issue_control::allowed_options(op),
         HirCicsOperation::SpoolClose
@@ -700,6 +711,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     route::validate_constraints(&clauses, &raw_options, operation)?;
     bts_lifecycle::validate_constraints(operation, &clauses, &raw_options)?;
+    channel_container::validate(&clauses, &raw_options, operation)?;
     security_control::validate(&clauses, operation, semantic)?;
     conversation_control::validate(&clauses, operation)?;
     outboard::validate_constraints(&clauses, &raw_options, operation)?;
@@ -712,6 +724,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     transform_control::validate_constraints(&clauses, operation)?;
     event_control::validate_constraints(operation, &raw_options)?;
     bts_child_link::validate(&clauses, &raw_options, operation)?;
+    bts_browse::validate(&clauses, &raw_options, operation)?;
     web_service_control::validate(&clauses, operation)?;
     for required in match operation {
         op if conversation_control::is_operation(op) => &[][..],
@@ -846,6 +859,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
         operation if counter_control::is_counter(operation) => counter_control::required(operation),
         operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::required(operation),
+        op if channel_container::is_channel_container(op) => channel_container::required(op),
         HirCicsOperation::SpoolClose
         | HirCicsOperation::SpoolOpenInput
         | HirCicsOperation::SpoolOpenOutput
@@ -1000,12 +1014,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(transform_control::operands(&clauses, operation, semantic)?);
     operands.extend(event_control::operands(&clauses, operation, semantic)?);
     operands.extend(bts_child_link::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_browse::operands(&clauses, operation, semantic)?);
     operands.extend(web_service_control::operands(
         &clauses, operation, semantic,
     )?);
     operands.extend(journal_control::operands(&clauses, operation, semantic)?);
     operands.extend(counter_control::operands(&clauses, operation, semantic)?);
     operands.extend(bts_lifecycle::operands(&clauses, operation, semantic)?);
+    operands.extend(channel_container::operands(&clauses, operation, semantic)?);
     operands.extend(web_control::operands(&clauses, operation, semantic)?);
     operands.extend(conversation_control::operands(
         &clauses, operation, semantic,
@@ -1079,6 +1095,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(bts_lifecycle::outputs(&clauses, operation, semantic)?);
+    outputs.extend(channel_container::outputs(&clauses, operation, semantic)?);
     outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
     outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_control::outputs(
@@ -1087,24 +1104,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     outputs.extend(conversation_data::outputs(&clauses, operation, semantic)?);
     outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
     outputs.extend(bts_child_link::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_browse::outputs(&clauses, operation, semantic)?);
     outputs.extend(conversation_open::outputs(&clauses, operation, semantic)?);
     outputs.extend(issue_control::outputs(&clauses, operation, semantic)?);
-    if operation == HirCicsOperation::Retrieve
-        && let Some(length) = clauses.get("LENGTH")
-    {
-        let target = complete_data_reference(length, semantic)?;
-        require_writable(&target)?;
-        outputs.push(HirCicsOutputBinding {
-            name: HirCicsOutputName::Length,
-            target,
-        });
-    } else if let Some(target) = output_bindings::inout_length(&operands, operation) {
-        require_writable(target)?;
-        outputs.push(HirCicsOutputBinding {
-            name: HirCicsOutputName::Length,
-            target: target.clone(),
-        });
-    }
+    output_bindings::append_inout_length(&mut outputs, &clauses, &operands, operation, semantic)?;
     let mut options = raw_options
         .iter()
         .filter(|option| {
@@ -1120,6 +1123,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 .or_else(|| conversation_data::option(operation, option))
                 .or_else(|| bts_child_link::option(operation, option))
                 .or_else(|| bts_lifecycle::option(operation, option))
+                .or_else(|| channel_container::option(operation, option))
                 .or_else(|| counter_control::option(operation, option))
                 .or_else(|| event_control::option(operation, option))
                 .or_else(|| diagnostics::option(operation, option))

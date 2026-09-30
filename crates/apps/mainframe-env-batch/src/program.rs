@@ -265,7 +265,8 @@ pub(crate) fn validate_program_controls(
     {
         return Err(HostProblem::Unsupported);
     }
-    for name in ["SYSIN", "SYSTSIN", "ISFIN", "SYMNAMES"] {
+    const CONTROL_DD_NAMES: &[&str] = &["SYSIN", "SYSTSIN", "ISFIN", "SYMNAMES"];
+    for &name in CONTROL_DD_NAMES {
         if !declaration.sources.contains(&name) && control_source_has_data(input, name) {
             return Err(HostProblem::Unsupported);
         }

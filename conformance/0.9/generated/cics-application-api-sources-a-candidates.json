@@ -26,20 +26,20 @@
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-a-extraction.json",
-      "file_sha256": "sha256:fb48f8738059f28984315397066660ad794fc4ff74d88cf8e15720a90e65c0c4",
-      "logical_sha256": "sha256:1c7055c8e02c84b986e35ce9b5082b3b5085c54c54d253a87f1d5ae0ff7c7f56"
+      "file_sha256": "sha256:cb5adbeb1e2feaaf857aeae947441f8acb7f717fa997627d07fe288c0a4e36f7",
+      "logical_sha256": "sha256:03907cec4cd262641155b1f011ae2bd6d9aa4e715d4e760463c866b80b1d560a"
     },
     "source_supplements": {
       "path": "conformance/0.9/cics/application-api-sources-a-supplements.json",
-      "file_sha256": "sha256:a66a5e8e1879845a331642f19f5daf38ab775332100bf59d10f59eb07607dc16",
-      "logical_sha256": "sha256:4b9db83a27918cc20824356ec98dc66ae6c75212d171fc7198ecf0b9f21f94da"
+      "file_sha256": "sha256:ca51682ac867191816dddeab9bbf2967d2065ebfa724da9d836a58fa098cd24b",
+      "logical_sha256": "sha256:27a78b7de1bc0798771f559c60877b55229f2ea62e3d4d40fc9c456b7cb82c74"
     }
   },
   "extractor": {
     "name": "cics-dita-source-projector",
     "version": "cics-dita-source-projector@1",
     "implementation_path": "conformance/0.9/tools/extract_cics_application_sources.py",
-    "implementation_sha256": "sha256:943c199462f5ee7d754338deb945df2a06c650f5e76c9e7cafb10da81047d6b1",
+    "implementation_sha256": "sha256:840837bb1fd80f11ba98633e42fa4270ed85d48df5b24c9bf2cf9772cb98a176",
     "fragment_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-fragment@1, one NUL byte (0x00), then UTF-8 order-preserving whitespace-normalized visible text of the selected DOM subtree"
   },
   "condition_name_authority": {
@@ -125075,7 +125075,7 @@
       "topics": [
         {
           "topic_path": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
-          "topic_sha256": "90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd",
+          "topic_sha256": "c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514",
           "source_role": "version-compatibility-context"
         },
         {
@@ -126457,27 +126457,6 @@
               }
             },
             {
-              "candidate_id": "cics-a-0056-execution-context-1d5c00d44420",
-              "kind": "source-context",
-              "key": "source-resolution-context",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "source-resolution-context",
-                "association": "exact-topic-root-no-link-expansion"
-              },
-              "evidence": {
-                "topic_path": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
-                "topic_sha256": "sha256:90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd",
-                "source_role": "version-compatibility-context",
-                "source_product": "SSGMCP_5.5.0",
-                "target_authority_boundary": "target-product-older-version-context",
-                "section_id": "__topic__",
-                "tag": "li",
-                "structural_path": "div[1]/article[1]/div[2]/div[2]/dl[1]/dd[8]/div[1]/ul[1]/li[1]",
-                "fragment_sha256": "sha256:d982d3eeb97c138986bf9c219c355ce41f459f479ce56d91e318448afb5351ad"
-              }
-            },
-            {
               "candidate_id": "cics-a-0056-execution-context-2f23bdfb6a26",
               "kind": "source-context",
               "key": "dpl-server-restrictions",
@@ -126499,6 +126478,27 @@
                 "tag": "section",
                 "structural_path": "div[1]/article[1]/div[2]/section[2]",
                 "fragment_sha256": "sha256:d82c24cbe63f7eed5608214f3b045ed6d6da1229a44fe7192ba3d40dca8a50c5"
+              }
+            },
+            {
+              "candidate_id": "cics-a-0056-execution-context-3049914304c6",
+              "kind": "source-context",
+              "key": "source-resolution-context",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "source-resolution-context",
+                "association": "exact-topic-root-no-link-expansion"
+              },
+              "evidence": {
+                "topic_path": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
+                "topic_sha256": "sha256:c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514",
+                "source_role": "version-compatibility-context",
+                "source_product": "SSGMCP_5.5.0",
+                "target_authority_boundary": "target-product-older-version-context",
+                "section_id": "__topic__",
+                "tag": "li",
+                "structural_path": "div[1]/article[1]/div[2]/div[2]/dl[1]/dd[8]/div[1]/ul[1]/li[1]",
+                "fragment_sha256": "sha256:d982d3eeb97c138986bf9c219c355ce41f459f479ce56d91e318448afb5351ad"
               }
             },
             {
@@ -191284,5 +191284,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:74c4c60d21c8c93c888a3e0dacf083e5259b6bc90d5206ac923ab5976925ea96"
+  "projection_sha256": "sha256:1e8cec269b4c0c17a91b52498b3f1d756ede1851f31992000cb325ada95f90db"
 }

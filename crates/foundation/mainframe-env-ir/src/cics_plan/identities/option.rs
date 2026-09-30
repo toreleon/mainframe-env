@@ -23,6 +23,13 @@ pub enum CicsPlanOption {
     BtsAcqActivity,
     /// Select the process acquired by this unit of work.
     BtsAcqProcess,
+    ContainerAppend,
+    ContainerNoData,
+    ContainerProcess,
+    ContainerAcqProcess,
+    ContainerAcqActivity,
+    ContainerFromProcess,
+    ContainerToProcess,
     ConversationNoQueue,
     ConversationNotruncate,
     ConversationDefresp,

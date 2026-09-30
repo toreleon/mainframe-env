@@ -8,7 +8,7 @@ mod security_entries;
 use super::*;
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub static CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 234] = [
+pub static CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 261] = [
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[0],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[1],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[2],
@@ -243,4 +243,31 @@ pub static CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 234] = [
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[17],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[18],
     issue_entries::ISSUE_EXECUTABLE_DESCRIPTORS[19],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[29],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[30],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[31],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[32],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[33],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[34],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[35],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[36],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[37],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[38],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[39],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[40],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[41],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[42],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[43],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[0],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[1],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[2],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[3],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[4],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[5],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[44],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[45],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[46],
+    bts_entries::BTS_EXECUTABLE_DESCRIPTORS[47],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[6],
+    bts_entries::CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS[7],
 ];
