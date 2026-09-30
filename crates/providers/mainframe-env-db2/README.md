@@ -64,3 +64,9 @@ USING lists, and descriptors. It rejects PL/I string expressions, SQL PL
 variables and array elements, multi-row source buffers, and forbidden source
 indicators. This partial family support grants no whole-row recognition credit
 and has no execution route.
+
+The proposed prepared DECLARE CURSOR parser owns scrollability and sensitivity,
+holdability, returnability, and rowset positioning. It preserves omitted
+keywords as typed defaults, rejects duplicate or misplaced clauses with
+locations, and fences inline queries until the SELECT slice. It has no cursor
+execution route or whole-row recognition credit.

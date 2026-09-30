@@ -1,6 +1,13 @@
 //! Owned transaction-statement syntax; parsing has no execution side effects.
 
+mod cursor;
 mod dynamic;
+
+pub use cursor::{
+    Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget, Db2CursorReturnability,
+    Db2CursorRowsetPositioning, Db2CursorSensitivity, Db2DeclareCursorPreparedStatement,
+    Db2SensitiveCursorKind, parse_db2_cursor_statement, parse_db2_declare_cursor_prepared,
+};
 
 pub use dynamic::{
     Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement, Db2ExecuteUsing,
@@ -40,6 +47,7 @@ impl Db2Statement {
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Db2StatementKind {
+    DeclareCursorPrepared(Db2DeclareCursorPreparedStatement),
     Commit(Db2CommitStatement),
     Rollback(Db2RollbackStatement),
     Savepoint(Db2SavepointStatement),
