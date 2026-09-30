@@ -15,8 +15,8 @@ pub use abi::db2_abi_library;
 pub use ast::{
     Db2AstError, Db2AstErrorCode, Db2AstLimits, Db2BinaryOperator, Db2BuiltInDataType,
     Db2BuiltInType, Db2DataType, Db2Expression, Db2ExpressionArena, Db2ExpressionId,
-    Db2ExpressionKind, Db2HostReference, Db2Identifier, Db2Literal, Db2QualifiedName,
-    Db2UnaryOperator,
+    Db2ExpressionKind, Db2HostIdentifier, Db2HostReference, Db2Identifier, Db2Literal,
+    Db2QualifiedName, Db2UnaryOperator,
 };
 
 pub use catalog::{
@@ -42,5 +42,5 @@ pub use statement::{
 pub use syntax::{
     Db2LexedStatement, Db2SourceLocation, Db2SourceSpan, Db2StringKind, Db2Symbol,
     Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenCursor,
-    Db2TokenKind, lex_db2,
+    Db2TokenKind, lex_db2, parse_db2_host_reference,
 };

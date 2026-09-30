@@ -1,5 +1,6 @@
 //! Owned, bounded Db2 SQL tokens for later parser slices.
 
+use crate::{Db2AstLimits, Db2HostIdentifier, Db2HostReference};
 use std::fmt;
 
 const MAX_DIAGNOSTIC_BYTES: usize = 256;
@@ -250,6 +251,79 @@ pub fn lex_db2(
     Ok(Db2LexedStatement {
         tokens: lexer.tokens,
     })
+}
+
+/// Parse one non-Java host-variable reference without executing SQL.
+pub fn parse_db2_host_reference(
+    source: &str,
+    syntax_limits: Db2SyntaxLimits,
+    ast_limits: Db2AstLimits,
+) -> Result<Db2HostReference, Db2SyntaxDiagnostic> {
+    let statement = lex_db2(source, syntax_limits)?;
+    let tokens = statement.tokens();
+    let Some(first) = tokens.first() else {
+        return Err(Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::MissingToken,
+            Db2SourceLocation::START,
+            "Db2 host reference requires a host variable",
+        ));
+    };
+    let Db2TokenKind::HostVariable(variable) = &first.kind else {
+        return Err(Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::UnexpectedToken,
+            first.span.start,
+            "Db2 host reference must begin with a host variable",
+        ));
+    };
+    let host_identifier = |value: &str, location| {
+        Db2HostIdentifier::new(value, ast_limits).map_err(|_| {
+            Db2SyntaxDiagnostic::new(
+                Db2SyntaxDiagnosticCode::InvalidHostVariable,
+                location,
+                "Db2 host identifier exceeds the configured limit",
+            )
+        })
+    };
+    let variable = host_identifier(variable, first.span.start)?;
+    let mut next = 1;
+    let indicator_keyword = matches!(
+        tokens.get(next).map(|token| &token.kind),
+        Some(Db2TokenKind::Word { value, delimited: false }) if value == "INDICATOR"
+    );
+    if indicator_keyword {
+        next += 1;
+    }
+    let indicator = if let Some(token) = tokens.get(next) {
+        match &token.kind {
+            Db2TokenKind::HostVariable(name) => {
+                next += 1;
+                Some(host_identifier(name, token.span.start)?)
+            }
+            _ => {
+                return Err(Db2SyntaxDiagnostic::new(
+                    Db2SyntaxDiagnosticCode::UnexpectedToken,
+                    token.span.start,
+                    "Db2 indicator must be a colon-prefixed host variable",
+                ));
+            }
+        }
+    } else if indicator_keyword {
+        return Err(Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::MissingToken,
+            tokens.last().unwrap().span.end,
+            "Db2 INDICATOR requires a host variable",
+        ));
+    } else {
+        None
+    };
+    if let Some(extra) = tokens.get(next) {
+        return Err(Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::UnexpectedToken,
+            extra.span.start,
+            "Db2 host reference has trailing tokens",
+        ));
+    }
+    Ok(Db2HostReference::new(variable, indicator))
 }
 
 struct Lexer<'a> {
@@ -643,7 +717,7 @@ impl Lexer<'_> {
             }
         }
         self.push(
-            Db2TokenKind::HostVariable(self.source[begin..self.offset].to_ascii_uppercase()),
+            Db2TokenKind::HostVariable(self.source[begin..self.offset].to_owned()),
             start,
         )
     }
@@ -716,6 +790,47 @@ mod tests {
             lex(": BAD").unwrap_err().code,
             Db2SyntaxDiagnosticCode::InvalidHostVariable
         );
+    }
+
+    #[test]
+    fn host_reference_diagram_forms_and_spelling() {
+        let syntax = Db2SyntaxLimits::default();
+        let ast = Db2AstLimits::default();
+        for (source, indicator) in [
+            (":Mixed-Field", None),
+            (":Mixed-Field :Null-Ind", Some("Null-Ind")),
+            (":Mixed-Field INDICATOR :Null-Ind", Some("Null-Ind")),
+        ] {
+            let reference = parse_db2_host_reference(source, syntax, ast).unwrap();
+            assert_eq!(reference.variable().value(), "Mixed-Field");
+            assert_eq!(
+                reference.indicator().map(Db2HostIdentifier::value),
+                indicator
+            );
+        }
+    }
+
+    #[test]
+    fn misplaced_host_reference_parts_fail() {
+        let syntax = Db2SyntaxLimits::default();
+        let ast = Db2AstLimits::default();
+        for source in [
+            "",
+            ":",
+            ":HV INDICATOR",
+            ":HV INDICATOR IND",
+            ":HV IND :IND",
+            "INDICATOR :IND :HV",
+            ":HV :IND INDICATOR",
+            ":HV :IND :EXTRA",
+            ":HV;",
+            "HV :IND",
+        ] {
+            assert!(
+                parse_db2_host_reference(source, syntax, ast).is_err(),
+                "{source}"
+            );
+        }
     }
 
     #[test]

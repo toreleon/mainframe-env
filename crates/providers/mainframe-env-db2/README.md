@@ -50,3 +50,10 @@ syntax, including optional WORK, named or unnamed rollback targets, UNIQUE,
 and both retain clauses. It rejects unsupported families, duplicate or
 malformed clauses, invalid savepoint names, and extra statements with bounded
 located diagnostics. Parsing does not route SQL to execution.
+
+Host identifiers remain distinct from SQL identifiers. The lexer preserves
+host-language spelling, including COBOL hyphens. The bounded host-reference
+parser accepts a variable alone or with an indicator, with optional
+`INDICATOR` before the indicator variable, and rejects misplaced parts.
+Host structures and host-language binding remain pending. Parsing has no
+execution route.
