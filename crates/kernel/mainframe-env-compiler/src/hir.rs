@@ -1,7 +1,9 @@
+mod lifecycle;
 use crate::{
     CobolFileBinding, CobolLayout, LosslessSyntax, ProcedureStatementKind, SemanticModel,
     SourceSpan,
 };
+use lifecycle::*;
 use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
@@ -334,6 +336,8 @@ pub struct ControlEdge {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CobolHir {
     pub program_id: String,
+    /// Qualified LINKAGE roots in PROCEDURE DIVISION USING order.
+    pub entry_formals: Vec<String>,
     /// Installed-call lifecycle contract; not inferred from diagnostic text.
     pub program_lifecycle: String,
     pub layouts: Vec<CobolLayout>,
@@ -389,6 +393,7 @@ impl CobolHir {
         let module = build_module(&statements, &semantic.layouts, mode.as_str(), limits)?;
         Ok(Self {
             program_id: semantic.program_id.clone(),
+            entry_formals: entry_formals(syntax.semantic_text(), semantic)?,
             program_lifecycle: installed_lifecycle(syntax.semantic_text(), semantic).into(),
             layouts: semantic.layouts.clone(),
             files: semantic.files.clone(),
@@ -591,14 +596,6 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
         K::If | K::Evaluate | K::Search => vec![Effect::MemoryRead, Effect::Condition],
         _ => Vec::new(),
     }
-}
-
-fn procedure_text(source: &str) -> Option<(usize, &str)> {
-    let upper = source.to_ascii_uppercase();
-    let start = upper.find("PROCEDURE DIVISION")?;
-    let rest = &source[start..];
-    let dot = rest.find('.')?;
-    Some((start + dot + 1, &rest[dot + 1..]))
 }
 
 fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {
@@ -1726,63 +1723,6 @@ mod tests {
         assert!(recovered.statements.iter().any(|statement| {
             statement.kind == StatementKind::DuplicateLabel && !statement.kind.supported()
         }));
-    }
-}
-
-// Reuse the language lexer so a PROGRAM-ID inside a literal/comment is not a
-// nested program and INITIAL in procedure/data text is not a program attribute.
-fn installed_lifecycle(text: &str, semantic: &SemanticModel) -> &'static str {
-    use crate::syntax::CobolSyntaxKind as K;
-    let mut remaining = text;
-    let mut tokens = Vec::new();
-    while !remaining.is_empty() {
-        let (kind, length) = crate::syntax::next_token(remaining);
-        if length == 0 {
-            return "unsupported@1";
-        }
-        if !matches!(kind, K::Whitespace | K::Newline | K::Comment) {
-            tokens.push((kind, remaining[..length].to_ascii_uppercase()));
-        }
-        remaining = &remaining[length..];
-    }
-    let ids: Vec<_> = tokens
-        .iter()
-        .enumerate()
-        .filter_map(|(i, (kind, text))| (*kind == K::Word && text == "PROGRAM-ID").then_some(i))
-        .collect();
-    if ids.len() != 1
-        || semantic.layouts.iter().any(|layout| {
-            layout.external_name.is_some()
-                || layout.global
-                || layout.typedef
-                || !layout.allocated
-                    && !matches!(
-                        layout.category,
-                        crate::DataCategory::Condition | crate::DataCategory::Rename
-                    )
-        })
-    {
-        return "unsupported@1";
-    }
-    let mut at = ids[0] + 1;
-    if tokens.get(at).is_some_and(|(_, text)| text == ".") {
-        at += 1;
-    }
-    if tokens.get(at).is_none() {
-        return "unsupported@1";
-    }
-    at += 1; // program name, including a quoted name
-    let attributes: Vec<_> = tokens[at..]
-        .iter()
-        .take_while(|(_, text)| text != ".")
-        .map(|(_, text)| text.as_str())
-        .collect();
-    match attributes.as_slice() {
-        [] => "retained@1",
-        ["INITIAL"] | ["INITIAL", "PROGRAM"] | ["IS", "INITIAL"] | ["IS", "INITIAL", "PROGRAM"] => {
-            "initial@1"
-        }
-        _ => "unsupported@1",
     }
 }
 

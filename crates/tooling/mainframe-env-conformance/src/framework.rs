@@ -4,10 +4,10 @@
 
 use crate::{
     abi, carddemo, cics_licensed, cics_pilot, cobol_arithmetic_pilot, cobol_assurance,
-    cobol_clauses, cobol_conditions, cobol_data, cobol_exit, cobol_files, cobol_frontend,
-    cobol_function_boundaries, cobol_functions, cobol_intrinsics, cobol_licensed, cobol_move_pilot,
-    cobol_phrases, cobol_recovery, cobol_reference, cobol_registers, cobol_runtime,
-    cobol_statements, dataset, dataset_reference, jcl, racf, racf_oracle,
+    cobol_clauses, cobol_conditions, cobol_data, cobol_differential, cobol_exit, cobol_files,
+    cobol_frontend, cobol_function_boundaries, cobol_functions, cobol_intrinsics, cobol_licensed,
+    cobol_move_pilot, cobol_phrases, cobol_recovery, cobol_reference, cobol_registers,
+    cobol_runtime, cobol_statements, dataset, dataset_reference, jcl, racf, racf_oracle,
 };
 use mainframe_env_compiler::CobolCompiler;
 use mainframe_env_compiler_api::{
@@ -39,21 +39,21 @@ pub use carddemo::{
     CardDemoLayoutReceipt, CardDemoMqAuthorizationReceipt, CardDemoPackageReceipt,
     CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt,
     CardDemoSourceReceipt, CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt,
-    CorpusProblem, verify_carddemo_application_package_from_env,
-    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
-    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
-    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
-    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CorpusProblem, capture_carddemo_readacct_from_env,
+    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
+    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
+    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
+    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
+    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
     verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
     verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env,
+    verify_carddemo_program_routing_from_env, verify_carddemo_readacct_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
 };
 pub use cics_licensed::{
     CicsOracleCapture, CicsOracleExpectation, CicsOracleImport, CicsOracleObservation,
@@ -78,6 +78,9 @@ pub use cobol_assurance::verify_cobol_assurance_sources;
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
 pub use cobol_conditions::verify_cobol_condition_fixtures;
 pub use cobol_data::verify_cobol_data_runtime_fixtures;
+pub use cobol_differential::{
+    CobolDifferentialReceipt, observe_cobol_source, run_cobol_differential,
+};
 pub use cobol_exit::{CobolExitReceipt, verify_cobol_exit};
 pub use cobol_files::verify_cobol_file_runtime_fixtures;
 pub use cobol_frontend::{

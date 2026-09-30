@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Capture and replay a self-recorded CardDemo READACCT run bundle with offline schema projection validation (#261)."

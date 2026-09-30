@@ -251,14 +251,24 @@ impl ConversationRecord {
         }
         let next_state = match pending.flow {
             GdsIssueFlow::Abend => ConversationState::Free,
-            GdsIssueFlow::Confirmation => ConversationState::Receive,
-            GdsIssueFlow::Error if self.state == ConversationState::ConfReceive => {
-                ConversationState::Receive
-            }
-            GdsIssueFlow::Error | GdsIssueFlow::Signal => self.state,
-            GdsIssueFlow::Prepare => ConversationState::SyncReceive,
+            GdsIssueFlow::Confirmation => match self.state {
+                ConversationState::ConfReceive => ConversationState::Receive,
+                ConversationState::ConfSend => ConversationState::Send,
+                ConversationState::ConfFree => ConversationState::Free,
+                _ => return Err(ConversationProblem::WrongState),
+            },
+            // The peer-response contract has no EIBFREE/CDBFREE indicator. Only the
+            // normal outcome is reachable; indicated deallocation needs its own input.
+            GdsIssueFlow::Error => ConversationState::Send,
+            GdsIssueFlow::Signal => self.state,
+            GdsIssueFlow::Prepare => match self.state {
+                ConversationState::Send => ConversationState::SyncSend,
+                ConversationState::PendReceive => ConversationState::SyncReceive,
+                ConversationState::PendFree => ConversationState::SyncFree,
+                _ => return Err(ConversationProblem::WrongState),
+            },
         };
-        let release = pending.flow == GdsIssueFlow::Abend;
+        let release = pending.flow == GdsIssueFlow::Abend || next_state == ConversationState::Free;
         self.next_sequence()?;
         self.state = next_state;
         self.released = release;
@@ -269,14 +279,79 @@ impl ConversationRecord {
 
 fn issue_state_valid(record: &ConversationRecord, flow: GdsIssueFlow) -> bool {
     match flow {
-        GdsIssueFlow::Abend => true,
-        GdsIssueFlow::Confirmation => record.state == ConversationState::ConfReceive,
-        GdsIssueFlow::Error => matches!(
-            record.state,
-            ConversationState::ConfReceive | ConversationState::Send | ConversationState::Receive
+        GdsIssueFlow::Abend => matches!(
+            (record.sync_level, record.state),
+            (
+                Some(0..=2),
+                ConversationState::Send
+                    | ConversationState::PendReceive
+                    | ConversationState::PendFree
+                    | ConversationState::Receive
+            ) | (
+                Some(1..=2),
+                ConversationState::ConfReceive
+                    | ConversationState::ConfSend
+                    | ConversationState::ConfFree
+            ) | (
+                Some(2),
+                ConversationState::SyncReceive
+                    | ConversationState::SyncSend
+                    | ConversationState::SyncFree
+            )
         ),
-        GdsIssueFlow::Prepare => record.state == ConversationState::Send,
-        GdsIssueFlow::Signal => record.state == ConversationState::Receive,
+        GdsIssueFlow::Confirmation => matches!(
+            record.state,
+            ConversationState::ConfReceive
+                | ConversationState::ConfSend
+                | ConversationState::ConfFree
+        ),
+        GdsIssueFlow::Error => matches!(
+            (record.sync_level, record.state),
+            (
+                Some(0..=2),
+                ConversationState::Send
+                    | ConversationState::PendReceive
+                    | ConversationState::Receive
+            ) | (
+                Some(1..=2),
+                ConversationState::ConfReceive
+                    | ConversationState::ConfSend
+                    | ConversationState::ConfFree
+            ) | (
+                Some(2),
+                ConversationState::SyncReceive
+                    | ConversationState::SyncSend
+                    | ConversationState::SyncFree
+            )
+        ),
+        GdsIssueFlow::Prepare => {
+            record.sync_level == Some(2)
+                && matches!(
+                    record.state,
+                    ConversationState::Send
+                        | ConversationState::PendReceive
+                        | ConversationState::PendFree
+                )
+        }
+        GdsIssueFlow::Signal => matches!(
+            (record.sync_level, record.state),
+            (
+                Some(0..=2),
+                ConversationState::Send
+                    | ConversationState::PendReceive
+                    | ConversationState::Receive
+            ) | (
+                Some(1..=2),
+                ConversationState::ConfReceive
+                    | ConversationState::ConfSend
+                    | ConversationState::ConfFree
+            ) | (
+                Some(2),
+                ConversationState::SyncReceive
+                    | ConversationState::SyncSend
+                    | ConversationState::SyncFree
+            )
+        ),
     }
 }
 
@@ -309,6 +384,290 @@ mod tests {
             )
             .unwrap();
         record
+    }
+
+    #[test]
+    fn issue_controls_follow_basic_and_mapped_state_tables() {
+        use ConversationState::*;
+        const STATES: [ConversationState; 13] = [
+            Allocated,
+            Send,
+            PendReceive,
+            PendFree,
+            Receive,
+            ConfReceive,
+            ConfSend,
+            ConfFree,
+            SyncReceive,
+            SyncSend,
+            SyncFree,
+            Free,
+            Rollback,
+        ];
+        for kind in [ConversationKind::AppcBasic, ConversationKind::AppcMapped] {
+            for level in 0..=2 {
+                for (index, state) in STATES.into_iter().enumerate() {
+                    let number = index + 1;
+                    for flow in [
+                        GdsIssueFlow::Abend,
+                        GdsIssueFlow::Signal,
+                        GdsIssueFlow::Prepare,
+                        GdsIssueFlow::Confirmation,
+                        GdsIssueFlow::Error,
+                    ] {
+                        let expected = match flow {
+                            GdsIssueFlow::Abend
+                                if (2..=5).contains(&number)
+                                    || level >= 1 && (6..=8).contains(&number)
+                                    || level == 2 && (9..=11).contains(&number) =>
+                            {
+                                Some(Free)
+                            }
+                            GdsIssueFlow::Signal
+                                if [2, 3, 5].contains(&number)
+                                    || level >= 1 && (6..=8).contains(&number)
+                                    || level == 2 && (9..=11).contains(&number) =>
+                            {
+                                Some(state)
+                            }
+                            GdsIssueFlow::Prepare if level == 2 => match state {
+                                Send => Some(SyncSend),
+                                PendReceive => Some(SyncReceive),
+                                PendFree => Some(SyncFree),
+                                _ => None,
+                            },
+                            GdsIssueFlow::Confirmation if level >= 1 => match state {
+                                ConfReceive => Some(Receive),
+                                ConfSend => Some(Send),
+                                ConfFree => Some(Free),
+                                _ => None,
+                            },
+                            GdsIssueFlow::Error
+                                if [Send, PendReceive, Receive].contains(&state)
+                                    || level >= 1
+                                        && [ConfReceive, ConfSend, ConfFree].contains(&state)
+                                    || level == 2
+                                        && [SyncReceive, SyncSend, SyncFree].contains(&state) =>
+                            {
+                                Some(Send)
+                            }
+                            _ => None,
+                        };
+                        let mut record = connected(kind, level);
+                        record.state = state;
+                        let before = record.clone();
+                        let result = record.stage_issue(
+                            &owner(),
+                            ConversationContext::Local,
+                            kind == ConversationKind::AppcBasic,
+                            flow,
+                            "table-cell",
+                        );
+                        if let Some(next) = expected {
+                            let id = result.unwrap_or_else(|error| panic!(
+                                "{kind:?} level={level} state={state:?} flow={flow:?}: {error:?}"
+                            ));
+                            assert_eq!(record.state, state);
+                            record
+                                .mark_issue_attempted(
+                                    &owner(),
+                                    ConversationContext::Local,
+                                    "table-cell",
+                                    id,
+                                )
+                                .unwrap();
+                            assert_eq!(
+                                record.confirm_issue(
+                                    &owner(),
+                                    ConversationContext::Local,
+                                    "table-cell",
+                                    id,
+                                ),
+                                Ok(next),
+                                "{kind:?} level={level} state={state:?} flow={flow:?}"
+                            );
+                            assert_eq!(record.released, next == Free);
+                        } else {
+                            assert!(
+                                result.is_err(),
+                                "{kind:?} level={level} state={state:?} flow={flow:?}"
+                            );
+                            assert_eq!(record, before);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn basic_issue_confirmation_follows_sync_level_state_tables() {
+        for sync_level in [1, 2] {
+            for (start, end, released) in [
+                (
+                    ConversationState::ConfReceive,
+                    ConversationState::Receive,
+                    false,
+                ),
+                (ConversationState::ConfSend, ConversationState::Send, false),
+                (ConversationState::ConfFree, ConversationState::Free, true),
+            ] {
+                let mut record = connected(ConversationKind::AppcBasic, sync_level);
+                record.state = start;
+                let id = record
+                    .stage_issue(
+                        &owner(),
+                        ConversationContext::Local,
+                        true,
+                        GdsIssueFlow::Confirmation,
+                        "confirm",
+                    )
+                    .unwrap();
+                record
+                    .mark_issue_attempted(&owner(), ConversationContext::Local, "confirm", id)
+                    .unwrap();
+                assert_eq!(
+                    record.confirm_issue(&owner(), ConversationContext::Local, "confirm", id),
+                    Ok(end)
+                );
+                assert_eq!(record.released, released);
+                assert_eq!(
+                    ConversationRecord::decode(&record.encode().unwrap()),
+                    Ok(record)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn basic_issue_error_normal_outcome_is_send_for_every_valid_state() {
+        for (sync_level, states) in [
+            (
+                0,
+                &[
+                    ConversationState::Send,
+                    ConversationState::PendReceive,
+                    ConversationState::Receive,
+                ][..],
+            ),
+            (
+                1,
+                &[
+                    ConversationState::Send,
+                    ConversationState::PendReceive,
+                    ConversationState::Receive,
+                    ConversationState::ConfReceive,
+                    ConversationState::ConfSend,
+                    ConversationState::ConfFree,
+                ][..],
+            ),
+            (
+                2,
+                &[
+                    ConversationState::Send,
+                    ConversationState::PendReceive,
+                    ConversationState::Receive,
+                    ConversationState::ConfReceive,
+                    ConversationState::ConfSend,
+                    ConversationState::ConfFree,
+                    ConversationState::SyncReceive,
+                    ConversationState::SyncSend,
+                    ConversationState::SyncFree,
+                ][..],
+            ),
+        ] {
+            for &start in states {
+                let mut record = connected(ConversationKind::AppcBasic, sync_level);
+                record.state = start;
+                let id = record
+                    .stage_issue(
+                        &owner(),
+                        ConversationContext::Local,
+                        true,
+                        GdsIssueFlow::Error,
+                        "error",
+                    )
+                    .unwrap();
+                record
+                    .mark_issue_attempted(&owner(), ConversationContext::Local, "error", id)
+                    .unwrap();
+                assert_eq!(
+                    record.confirm_issue(&owner(), ConversationContext::Local, "error", id),
+                    Ok(ConversationState::Send)
+                );
+                assert!(!record.released);
+                assert_eq!(
+                    ConversationRecord::decode(&record.encode().unwrap()),
+                    Ok(record)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn basic_issue_response_rejects_states_outside_sync_level_tables() {
+        for (sync_level, flow, states) in [
+            (
+                0,
+                GdsIssueFlow::Confirmation,
+                &[
+                    ConversationState::ConfReceive,
+                    ConversationState::ConfSend,
+                    ConversationState::ConfFree,
+                ][..],
+            ),
+            (
+                1,
+                GdsIssueFlow::Confirmation,
+                &[
+                    ConversationState::Send,
+                    ConversationState::PendReceive,
+                    ConversationState::Receive,
+                ][..],
+            ),
+            (
+                2,
+                GdsIssueFlow::Confirmation,
+                &[
+                    ConversationState::Send,
+                    ConversationState::SyncReceive,
+                    ConversationState::SyncSend,
+                ][..],
+            ),
+            (
+                0,
+                GdsIssueFlow::Error,
+                &[
+                    ConversationState::PendFree,
+                    ConversationState::ConfReceive,
+                    ConversationState::SyncReceive,
+                ][..],
+            ),
+            (
+                1,
+                GdsIssueFlow::Error,
+                &[
+                    ConversationState::PendFree,
+                    ConversationState::SyncReceive,
+                    ConversationState::SyncSend,
+                    ConversationState::SyncFree,
+                ][..],
+            ),
+            (2, GdsIssueFlow::Error, &[ConversationState::PendFree][..]),
+        ] {
+            for &state in states {
+                let mut record = connected(ConversationKind::AppcBasic, sync_level);
+                record.state = state;
+                let before = record.clone();
+                assert!(
+                    record
+                        .check_issue(&owner(), ConversationContext::Local, true, flow)
+                        .is_err(),
+                    "sync_level={sync_level} state={state:?} flow={flow:?}"
+                );
+                assert_eq!(record, before);
+            }
+        }
     }
 
     #[test]
@@ -433,7 +792,9 @@ mod tests {
                 false,
                 GdsIssueFlow::Abend
             ),
-            Ok(())
+            Err(IssueValidationProblem::Protocol(
+                ConversationProblem::WrongState
+            ))
         );
         assert_eq!(
             allocated.check_issue(
@@ -540,7 +901,7 @@ mod tests {
             (
                 GdsIssueFlow::Prepare,
                 ConversationState::Send,
-                ConversationState::SyncReceive,
+                ConversationState::SyncSend,
                 2,
             ),
             (
@@ -552,7 +913,7 @@ mod tests {
             (
                 GdsIssueFlow::Error,
                 ConversationState::ConfReceive,
-                ConversationState::Receive,
+                ConversationState::Send,
                 1,
             ),
             (
@@ -589,15 +950,8 @@ mod tests {
                 Ok(record)
             );
         }
-        let mut allocated = ConversationRecord::allocate(
-            [0, 0, 0, 2],
-            "S001",
-            ConversationKind::AppcMapped,
-            owner(),
-            false,
-        )
-        .unwrap();
-        let id = allocated
+        let mut sending = connected(ConversationKind::AppcMapped, 0);
+        let id = sending
             .stage_issue(
                 &owner(),
                 ConversationContext::Local,
@@ -606,17 +960,17 @@ mod tests {
                 "abend-1",
             )
             .unwrap();
-        allocated
+        sending
             .mark_issue_attempted(&owner(), ConversationContext::Local, "abend-1", id)
             .unwrap();
         assert_eq!(
-            allocated.confirm_issue(&owner(), ConversationContext::Local, "abend-1", id),
+            sending.confirm_issue(&owner(), ConversationContext::Local, "abend-1", id),
             Ok(ConversationState::Free)
         );
-        assert!(allocated.released);
+        assert!(sending.released);
         assert_eq!(
-            ConversationRecord::decode(&allocated.encode().unwrap()),
-            Ok(allocated)
+            ConversationRecord::decode(&sending.encode().unwrap()),
+            Ok(sending)
         );
     }
 
@@ -711,12 +1065,12 @@ mod tests {
                     "prepare-1",
                     id
                 ),
-                Ok(ConversationState::SyncReceive)
+                Ok(ConversationState::SyncSend)
             );
             assert!(current.persist(&mut next, &store).unwrap());
             let reopened = ConversationLedger::load(&store).unwrap();
             let record = reopened.conversation(token).unwrap();
-            assert_eq!(record.state, ConversationState::SyncReceive);
+            assert_eq!(record.state, ConversationState::SyncSend);
             assert!(record.pending_issue.is_none());
         }
         std::fs::remove_dir_all(root).unwrap();
@@ -891,7 +1245,7 @@ mod tests {
                 "prepare-pg",
                 id
             ),
-            Ok(ConversationState::SyncReceive)
+            Ok(ConversationState::SyncSend)
         );
         assert!(current.persist(&mut confirmed, &reopened).unwrap());
         let final_state = ConversationLedger::load(&reopened).unwrap();
@@ -904,7 +1258,7 @@ mod tests {
         );
         assert_eq!(
             final_state.conversation(token).unwrap().state,
-            ConversationState::SyncReceive
+            ConversationState::SyncSend
         );
     }
 }

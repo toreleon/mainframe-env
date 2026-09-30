@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed #335: move DD allocation attribute and DCB referback helpers into a batch service submodule to restore the reviewed module ceiling."
