@@ -88,6 +88,7 @@ explicitly names that authority as superseded.
 - [ADR-0022: ISSUE PASS target handoff](decisions/0022-issue-pass-target-handoff.md)
 - [ADR-0023: BTS lifecycle authority](decisions/0023-bts-lifecycle-authority.md)
 - [ADR-0024: Per-assertion oracle provenance](decisions/0024-per-assertion-oracle-provenance.md)
+- [ADR-0026: CardDemo run bundle](decisions/0026-run-bundle.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
@@ -113,6 +114,7 @@ Version-specific status files and review reports describe candidates at a point 
 - [Capacity and recovery](runbooks/CAPACITY-AND-RECOVERY.md)
 - [Local Jenkins](runbooks/JENKINS-LOCAL.md)
 - [CardDemo operator guide](runbooks/CARDDEMO-OPERATOR.md)
+- [CardDemo READACCT run bundle](runbooks/CARDDEMO-READACCT-BUNDLE.md)
 - [CICS licensed pilot](runbooks/cics-licensed-pilot.md)
 - [Conformance family rollout](runbooks/conformance-family-rollout.md)
 
