@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover owned Db2 COMMIT, ROLLBACK, and SAVEPOINT transaction syntax with bounded located diagnostics."

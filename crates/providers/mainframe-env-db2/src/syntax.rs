@@ -81,6 +81,11 @@ pub enum Db2SyntaxDiagnosticCode {
     UnterminatedComment,
     InvalidHex,
     UnsupportedNumericConstant,
+    UnsupportedStatement,
+    UnexpectedToken,
+    MissingToken,
+    DuplicateClause,
+    InvalidStatementOperand,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -91,7 +96,11 @@ pub struct Db2SyntaxDiagnostic {
 }
 
 impl Db2SyntaxDiagnostic {
-    fn new(code: Db2SyntaxDiagnosticCode, location: Db2SourceLocation, message: &str) -> Self {
+    pub(crate) fn new(
+        code: Db2SyntaxDiagnosticCode,
+        location: Db2SourceLocation,
+        message: &str,
+    ) -> Self {
         let mut end = message.len().min(MAX_DIAGNOSTIC_BYTES);
         while !message.is_char_boundary(end) {
             end -= 1;
