@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 212,
+    "markdown_documents": 213,
     "navigation_groups": 5,
     "normative_documents": 54,
-    "xtask_commands": 197
+    "xtask_commands": 199
   },
   "documents": [
     {
@@ -234,7 +234,7 @@
       "normative": false,
       "path": "crates/kernel/mainframe-env-interpreter/README.md",
       "relative_links": 0,
-      "sha256": "sha256:c536404f7eac111792bba51b98722f81afd7eafa8454c82a965cb2511219e1e4",
+      "sha256": "sha256:96de29fcca957ea958f816e5e65ca0259e44d5cf9864a46996b20f304ababad4",
       "title": "mainframe-env-interpreter",
       "xtask_commands": 0
     },
@@ -1185,8 +1185,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
-      "relative_links": 64,
-      "sha256": "sha256:817db9bfc52c077be93dad07f7d8fe897ec1eb2b55fa8eae7dec2375cbbde58f",
+      "relative_links": 181,
+      "sha256": "sha256:b3eafb16fc9349625c715efcbddf19522a0b5858aad912d82ea3520b3d146c72",
       "title": "GitHub Project synchronization",
       "xtask_commands": 0
     },
@@ -1720,6 +1720,14 @@
     },
     {
       "normative": false,
+      "path": "docs/runbooks/COBOL-DIFFERENTIAL.md",
+      "relative_links": 0,
+      "sha256": "sha256:ccffa273c310b031cc96a96f59a5e2e15d1464f7346d2d1e08ec0e74d2e2d945",
+      "title": "COBOL semantic differential pilot",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
       "sha256": "sha256:37302bab0348eab33739ad6289d93ed0bdebc84455cdde4413ca9b0633dde479",
@@ -1914,9 +1922,9 @@
       "normative": false,
       "path": "xtask/README.md",
       "relative_links": 0,
-      "sha256": "sha256:8fc22e749f9635c2c50ace94439b4cf328d67c996a9aeea673d81ad56bf0e81c",
+      "sha256": "sha256:e3fc66d28c38005caa33900ddc8fd0f9e6bd4f6e0e7a00be97a127bc89784cc3",
       "title": "xtask",
-      "xtask_commands": 9
+      "xtask_commands": 10
     }
   ],
   "navigation": [

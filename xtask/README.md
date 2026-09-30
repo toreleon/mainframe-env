@@ -22,6 +22,14 @@ topology, and public version truth.
 integration: it consumes the fragments into the Unreleased changelog and then
 regenerates the documentation manifest.
 
+`cargo xtask profile-intake --manifest conformance/profiles/genapp-base/corpus.json
+--corpus /path/to/pinned/cics-genapp --json /path/to/report.json
+--markdown /path/to/report.md` verifies a clean external checkout and emits a
+deterministic gap report. The command exits successfully when a valid report is
+produced, even when members have recognition gaps. It rejects a changed pin or
+invalid manifest. A matched catalog row records recognition only, with product
+support and coverage-ledger status reported separately.
+
 Verify with `cargo test -p xtask`, `cargo xtask conformance`, and (when the
 pinned checkout is available) `cargo xtask carddemo-corpus --check`.
 `cargo xtask carddemo-source --check` additionally replays all pinned COBOL

@@ -149,6 +149,7 @@ struct ResolvedReference {
 struct FileMetadata {
     assignment: String,
     record_name: Option<String>,
+    record_names: Vec<String>,
     organization: String,
     access_mode: String,
     record_key: Option<String>,
@@ -314,6 +315,8 @@ enum PendingKind {
     },
     DatasetRead {
         target: Option<String>,
+        into: Option<String>,
+        depending_on: Option<String>,
         status: Option<String>,
         ccsid: Option<u16>,
         declarative: Option<String>,
@@ -447,6 +450,7 @@ pub struct ReferenceMachine {
     entry_initials: BTreeMap<StorageId, Vec<u8>>,
     implicit: BTreeMap<String, CobolValue>,
     layouts: BTreeMap<String, LayoutMetadata>,
+    entry_formals: Vec<String>,
     simple_layouts: BTreeMap<String, Vec<String>>,
     files: BTreeMap<String, FileMetadata>,
     declaratives: BTreeMap<String, String>,
@@ -693,6 +697,8 @@ impl ReferenceMachine {
             .transpose()?
             .unwrap_or_default();
         let (layouts, simple_layouts) = layout_metadata(&operations)?;
+        let entry_formals = mainframe_env_ir::cobol_entry_formals(&module)
+            .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))?;
         let dynamic_lengths = layouts
             .values()
             .filter(|layout| layout.dynamic)
@@ -707,16 +713,35 @@ impl ReferenceMachine {
                 }));
         }
         if let Some(call) = invocation.bindings.get("cobol.call.arguments") {
+            let batch_main = call.schema() == "mainframe-env.cobol.batch-main@1";
             let values = decode_call_arguments(call)?;
-            let mut linkage = layouts
-                .values()
-                .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
-                .collect::<Vec<_>>();
-            linkage.sort_by_key(|layout| layout.offset);
-            if linkage.len() < values.len() {
+            let formals: &[String] = match entry_formals.as_ref() {
+                Some(formals) => formals,
+                None if batch_main
+                    && !layouts
+                        .values()
+                        .any(|layout| layout.linkage && layout.parent.is_none()) =>
+                {
+                    &[]
+                }
+                None => {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "missing entry_formals_v1".into(),
+                    ));
+                }
+            };
+            if formals.len() < values.len() && !(batch_main && formals.is_empty()) {
                 return Err(MachineProblem::InvalidOperation);
             }
-            for (layout, value) in linkage.into_iter().zip(values) {
+            for (formal, value) in formals.iter().zip(values) {
+                let layout = layouts
+                    .get(&normalize(&formal))
+                    .ok_or(MachineProblem::UnknownStorage)?;
+                if !layout.linkage || layout.parent.is_some() || layout.length == 0 {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "invalid entry formal layout".into(),
+                    ));
+                }
                 let storage = module
                     .storage()
                     .iter()
@@ -772,6 +797,7 @@ impl ReferenceMachine {
             entry_initials,
             implicit: std::mem::take(&mut implicit),
             layouts,
+            entry_formals: entry_formals.unwrap_or_default(),
             simple_layouts,
             files,
             declaratives,
@@ -1555,15 +1581,9 @@ impl ReferenceMachine {
     }
 
     pub fn linkage_values(&self) -> Result<Vec<Vec<u8>>, MachineProblem> {
-        let mut linkage = self
-            .layouts
-            .values()
-            .filter(|layout| layout.linkage && layout.parent.is_none() && layout.length > 0)
-            .collect::<Vec<_>>();
-        linkage.sort_by_key(|layout| layout.offset);
-        linkage
-            .into_iter()
-            .map(|layout| self.read(&layout.name))
+        self.entry_formals
+            .iter()
+            .map(|name| self.read(name))
             .collect()
     }
 
@@ -1671,7 +1691,9 @@ impl ReferenceMachine {
             }
             (
                 PendingKind::DatasetRead {
-                    target: Some(target),
+                    target,
+                    into,
+                    depending_on,
                     status,
                     ccsid,
                     ..
@@ -1686,7 +1708,17 @@ impl ReferenceMachine {
                     "00".into()
                 };
                 if let Some(record) = records.first() {
-                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                    let decoded = decode_dataset_record(ccsid, record)?;
+                    if let Some(target) = target {
+                        self.finish_dataset_read(
+                            &target,
+                            into.as_deref(),
+                            depending_on.as_deref(),
+                            &decoded,
+                        )?;
+                    } else if let Some(into) = into {
+                        self.write(&into, &decoded)?;
+                    }
                 }
                 if let Some(status) = status {
                     self.write(&status, if records.is_empty() { b"10" } else { b"00" })?;
@@ -1695,6 +1727,8 @@ impl ReferenceMachine {
             (
                 PendingKind::DatasetRead {
                     target,
+                    into,
+                    depending_on,
                     status,
                     ccsid,
                     ..
@@ -1708,8 +1742,18 @@ impl ReferenceMachine {
                 } else {
                     "10".into()
                 };
-                if let Some((target, record)) = target.zip(record.as_ref()) {
-                    self.write(&target, &decode_dataset_record(ccsid, record)?)?;
+                if let Some(record) = record.as_ref() {
+                    let decoded = decode_dataset_record(ccsid, record)?;
+                    if let Some(target) = target {
+                        self.finish_dataset_read(
+                            &target,
+                            into.as_deref(),
+                            depending_on.as_deref(),
+                            &decoded,
+                        )?;
+                    } else if let Some(into) = into {
+                        self.write(&into, &decoded)?;
+                    }
                 }
                 if let Some(status) = status {
                     self.write(&status, if record.is_some() { b"00" } else { b"10" })?;
@@ -3968,7 +4012,10 @@ impl ReferenceMachine {
         let file = self.files.get(&logical_name).cloned().or_else(|| {
             self.files
                 .values()
-                .find(|file| file.record_name.as_deref() == Some(logical_name.as_str()))
+                .find(|file| {
+                    file.record_name.as_deref() == Some(logical_name.as_str())
+                        || file.record_names.iter().any(|name| name == &logical_name)
+                })
                 .cloned()
         });
         let start_key = (name == "start")
@@ -4109,12 +4156,9 @@ impl ReferenceMachine {
                 None,
             ),
             "write" => {
-                let record = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.first())
-                    .map(|value| self.resolve(value))
-                    .transpose()?
-                    .unwrap_or_default();
+                let record_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+                let from = position(args, "FROM").and_then(|index| args.get(index + 1));
+                let record = self.dataset_output_record(file.as_ref(), record_name, from)?;
                 validate_record_length(file.as_ref(), record.len())?;
                 let records = vec![encode_dataset_record(ccsid, &record)?];
                 (
@@ -4139,12 +4183,9 @@ impl ReferenceMachine {
                 )
             }
             "rewrite" => {
-                let record = position(args, "FROM")
-                    .and_then(|index| args.get(index + 1))
-                    .or_else(|| args.first())
-                    .map(|value| self.resolve(value))
-                    .transpose()?
-                    .unwrap_or_default();
+                let record_name = args.first().ok_or(MachineProblem::InvalidOperation)?;
+                let from = position(args, "FROM").and_then(|index| args.get(index + 1));
+                let record = self.dataset_output_record(file.as_ref(), record_name, from)?;
                 validate_record_length(file.as_ref(), record.len())?;
                 (
                     DatasetRequest::RewriteRecord {
@@ -4249,6 +4290,9 @@ impl ReferenceMachine {
             _ => (DatasetRequest::Attributes { dataset }, None),
         };
         let target = (name == "read")
+            .then(|| file.as_ref().and_then(|file| file.record_name.clone()))
+            .flatten();
+        let into = (name == "read")
             .then(|| position(args, "INTO").and_then(|index| args.get(index + 1).cloned()))
             .flatten();
         let declarative = self
@@ -4269,6 +4313,10 @@ impl ReferenceMachine {
         let pending = if name == "read" {
             PendingKind::DatasetRead {
                 target,
+                into,
+                depending_on: file
+                    .as_ref()
+                    .and_then(|file| file_record_depending(&file.description)),
                 status,
                 ccsid,
                 declarative,
@@ -4290,6 +4338,64 @@ impl ReferenceMachine {
             }
         };
         self.effect(HostRequest::Dataset(request), pending)
+    }
+
+    fn dataset_output_record(
+        &mut self,
+        file: Option<&FileMetadata>,
+        record_name: &str,
+        from: Option<&String>,
+    ) -> Result<Vec<u8>, MachineProblem> {
+        let mut record = if let Some(from) = from {
+            let source = self.resolve(from)?;
+            if file.is_some() {
+                self.write(record_name, &source)?;
+                self.resolve(record_name)?
+            } else {
+                source
+            }
+        } else {
+            self.resolve(record_name)?
+        };
+        if let Some(file) = file
+            && let Some(depending_on) = file_record_depending(&file.description)
+        {
+            let value = self.decimal(&depending_on)?;
+            if value.scale != 0 || value.coefficient < 0 {
+                return Err(MachineProblem::SizeError);
+            }
+            let length =
+                usize::try_from(value.coefficient).map_err(|_| MachineProblem::SizeError)?;
+            validate_record_length(Some(file), length)?;
+            if length > record.len() {
+                return Err(MachineProblem::SizeError);
+            }
+            record.truncate(length);
+        }
+        Ok(record)
+    }
+
+    fn finish_dataset_read(
+        &mut self,
+        target: &str,
+        into: Option<&str>,
+        depending_on: Option<&str>,
+        record: &[u8],
+    ) -> Result<(), MachineProblem> {
+        self.write(target, record)?;
+        if let Some(depending_on) = depending_on {
+            self.write_decimal(
+                depending_on,
+                Decimal {
+                    coefficient: record.len() as i128,
+                    scale: 0,
+                },
+            )?;
+        }
+        if let Some(into) = into {
+            self.write(into, record)?;
+        }
+        Ok(())
     }
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
@@ -7121,6 +7227,11 @@ impl ReferenceMachine {
         Err(MachineProblem::UnsupportedForm)
     }
 
+    fn eval_function_argument(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
+        self.eval_value(tokens)
+            .or_else(|_| self.eval_expression(tokens).map(CobolValue::Decimal))
+    }
+
     fn eval_function(&self, tokens: &[String]) -> Result<CobolValue, MachineProblem> {
         let name = tokens.get(1).ok_or(MachineProblem::InvalidOperation)?;
         let clock = || -> Result<Vec<u8>, MachineProblem> {
@@ -7184,7 +7295,7 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::InvalidOperation)
         };
         let decimal = |index: usize| -> Result<Decimal, MachineProblem> {
-            value_decimal(self.eval_value(argument(index)?)?)
+            value_decimal(self.eval_function_argument(argument(index)?)?)
         };
         let integer = |index: usize| -> Result<i128, MachineProblem> {
             let value = decimal(index)?;
@@ -7193,7 +7304,7 @@ impl ReferenceMachine {
                 .ok_or(MachineProblem::DataException)
         };
         let bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
-            value_bytes(self.eval_value(argument(index)?)?)
+            value_bytes(self.eval_function_argument(argument(index)?)?)
         };
         let raw_bytes = |index: usize| -> Result<Vec<u8>, MachineProblem> {
             let argument = argument(index)?;
@@ -9415,6 +9526,12 @@ fn file_metadata(
         let metadata = FileMetadata {
             assignment: text_attribute(operation, "assignment")?.to_ascii_uppercase(),
             record_name: optional("record_name")?,
+            record_names: optional_text_attribute(operation, "record_names")
+                .unwrap_or("")
+                .split('\u{1f}')
+                .filter(|name| !name.is_empty())
+                .map(str::to_ascii_uppercase)
+                .collect(),
             organization: text_attribute(operation, "organization")?.to_ascii_uppercase(),
             access_mode: text_attribute(operation, "access_mode")?.to_ascii_uppercase(),
             record_key: optional("record_key")?,
@@ -9508,6 +9625,27 @@ fn file_record_bounds(description: &str) -> (Option<usize>, Option<usize>) {
         return (from, to);
     }
     (None, None)
+}
+
+fn file_record_depending(description: &str) -> Option<String> {
+    let words = file_contract_words(description);
+    let record = words.iter().position(|word| *word == "RECORD")?;
+    // "IS" is optional: RECORD [IS] VARYING [IN] [SIZE] ... DEPENDING [ON] data-name.
+    let varying = if words.get(record + 1) == Some(&"IS") {
+        record + 2
+    } else {
+        record + 1
+    };
+    if words.get(varying) != Some(&"VARYING") {
+        return None;
+    }
+    let depending = words.iter().position(|word| *word == "DEPENDING")?;
+    let name = if words.get(depending + 1) == Some(&"ON") {
+        depending + 2
+    } else {
+        depending + 1
+    };
+    words.get(name).map(|name| name.to_string())
 }
 
 fn file_ccsid(description: &str) -> Option<u16> {
@@ -9866,13 +10004,32 @@ fn split_function_arguments<'a>(
     if arguments.len() > 1 {
         return Ok(arguments);
     }
+    let mut depth = 0usize;
+    let mut arithmetic = false;
+    for token in tokens {
+        match token.as_str() {
+            "(" => depth += 1,
+            ")" => depth = depth.saturating_sub(1),
+            "+" | "-" | "*" | "/" if depth == 0 => arithmetic = true,
+            _ => {}
+        }
+    }
+    if arithmetic && machine.eval_expression(tokens).is_ok() {
+        return Ok(arguments);
+    }
     let mut inferred = Vec::new();
     let mut at = 0usize;
     while at < tokens.len() {
         let end = (at + 1..=tokens.len())
             .rev()
-            .find(|end| machine.eval_value(&tokens[at..*end]).is_ok())
-            .ok_or(MachineProblem::InvalidOperation)?;
+            .find(|end| machine.eval_function_argument(&tokens[at..*end]).is_ok());
+        let Some(end) = end else {
+            return if arithmetic && inferred.is_empty() {
+                Ok(arguments)
+            } else {
+                Err(MachineProblem::InvalidOperation)
+            };
+        };
         inferred.push(&tokens[at..end]);
         at = end;
     }
@@ -10158,7 +10315,7 @@ fn extrema(
 ) -> Result<CobolValue, MachineProblem> {
     let values = arguments
         .iter()
-        .map(|argument| machine.eval_value(argument))
+        .map(|argument| machine.eval_function_argument(argument))
         .collect::<Result<Vec<_>, _>>()?;
     values
         .into_iter()
@@ -12487,7 +12644,10 @@ fn encode_call_values(
 }
 
 fn decode_call_arguments(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, MachineProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
+    if !matches!(
+        payload.schema(),
+        "mainframe-env.cobol.call@1" | "mainframe-env.cobol.batch-main@1"
+    ) {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let mut input = SnapshotInput::new(payload.bytes());
@@ -12746,6 +12906,70 @@ mod tests {
         .unwrap();
         mainframe_env_ir::encode_binary(&b.finish().unwrap(), CodecLimits::default()).unwrap()
     }
+
+    #[test]
+    fn entry_argument_metadata_rejects_legacy_and_preserves_no_using_batch_entry() {
+        let mut legacy = invocation();
+        legacy.bindings.insert(
+            "cobol.call.arguments".into(),
+            encode_call_values(&["ARG".into()], &[b"X".to_vec()]).unwrap(),
+        );
+        assert!(matches!(
+            ReferenceMachine::from_binary(&binary(), legacy, CodecLimits::default()),
+            Err(MachineProblem::InvalidArtifact(detail)) if detail == "missing entry_formals_v1"
+        ));
+
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "config", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("arithmetic_mode".into(), Attribute::Text("extended".into())),
+                    ("entry_formals_v1".into(), Attribute::Text(String::new())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let encoded =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut batch = invocation();
+        let payload = encode_call_values(&["PARM".into()], &[b"2022071800".to_vec()]).unwrap();
+        batch.bindings.insert(
+            "cobol.call.arguments".into(),
+            BoundedPayload::new(
+                "mainframe-env.cobol.batch-main@1",
+                payload.bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert!(
+            ReferenceMachine::from_binary(&binary(), batch.clone(), CodecLimits::default()).is_ok()
+        );
+        let machine =
+            ReferenceMachine::from_binary(&encoded, batch, CodecLimits::default()).unwrap();
+        assert!(machine.linkage_values().unwrap().is_empty());
+    }
     fn display_fixture() -> ReferenceMachine {
         let mut machine =
             ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
@@ -12946,6 +13170,7 @@ mod tests {
             FileMetadata {
                 assignment: "USER.EMPTY.G0001V00".into(),
                 record_name: None,
+                record_names: Vec::new(),
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -13041,6 +13266,46 @@ mod tests {
         }
     }
     #[test]
+    fn integer_evaluates_parenthesized_arithmetic_argument() {
+        let machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        let tokens = [
+            "FUNCTION", "INTEGER", "(", "(", "10", "*", "2", ")", "+", "1", ")",
+        ]
+        .map(str::to_string);
+        assert!(matches!(
+            machine.eval_value(&tokens),
+            Ok(CobolValue::Decimal(Decimal {
+                coefficient: 21,
+                scale: 0
+            }))
+        ));
+    }
+    #[test]
+    fn list_intrinsics_evaluate_arithmetic_arguments() {
+        let mut machine =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        machine.implicit.insert("A".into(), integer_value(7));
+        machine.implicit.insert("B".into(), integer_value(-3));
+        for (tokens, expected) in [
+            ("FUNCTION MIN ( A , ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( ( A - 10 ) , B * 2 , 1 )", 1),
+            ("FUNCTION SUM ( A , B * 4 , 2 )", -3),
+        ] {
+            let tokens = tokens
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert!(
+                matches!(
+                    machine.eval_value(&tokens),
+                    Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 })) if coefficient == expected
+                ),
+                "{tokens:?}"
+            );
+        }
+    }
+    #[test]
     fn write_without_from_uses_record_name_and_preserves_fixed_length() {
         let mut builder = ModuleBuilder::new(IrLimits::default());
         for (name, length) in [("REC", 5), ("WS-ITEM", 5), ("FILE-STATUS", 2)] {
@@ -13070,6 +13335,7 @@ mod tests {
             FileMetadata {
                 assignment: "TESTFILE".into(),
                 record_name: Some("REC".into()),
+                record_names: vec!["REC".into()],
                 organization: "SEQUENTIAL".into(),
                 access_mode: "SEQUENTIAL".into(),
                 record_key: None,
@@ -13095,6 +13361,7 @@ mod tests {
             ),
             (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
         ] {
+            machine.write_raw("REC", b"REC01").unwrap();
             let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
             let step = machine.dataset_effect("write", &args).unwrap();
             let Step::Effect(effect) = step else {
@@ -13105,6 +13372,9 @@ mod tests {
                 panic!("WRITE did not append a sequential record");
             };
             assert_eq!(records, &vec![expected.to_vec()]);
+            if args.iter().any(|arg| arg == "FROM") {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
             machine
                 .resume_host(EffectResult {
                     sequence: effect.sequence,
@@ -13840,6 +14110,247 @@ mod tests {
                 scale: 1
             }
         );
+    }
+    #[test]
+    fn varying_record_depending_accepts_optional_is_and_on() {
+        for description in [
+            "FD VBRC-FILE RECORDING MODE IS V RECORD IS VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-RECD-LEN",
+            "FD VBRC-FILE RECORD VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-RECD-LEN",
+            "FD VBRC-FILE RECORD IS VARYING FROM 10 TO 80 DEPENDING WS-RECD-LEN",
+        ] {
+            assert_eq!(
+                file_record_depending(description).as_deref(),
+                Some("WS-RECD-LEN"),
+                "{description}"
+            );
+        }
+        assert_eq!(
+            file_record_depending("FD F RECORD CONTAINS 80 CHARACTERS"),
+            None
+        );
+        assert_eq!(
+            file_record_depending("FD F RECORD IS VARYING IN SIZE FROM 10 TO 80"),
+            None
+        );
+    }
+
+    fn varying_file_machine() -> ReferenceMachine {
+        let mut m =
+            ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
+        m.files.insert("VBFILE".into(), FileMetadata {
+            assignment: "VBPS".into(), record_name: Some("VBR-REC".into()),
+            record_names: vec!["VBR-REC".into()],
+            organization: "SEQUENTIAL".into(), access_mode: "SEQUENTIAL".into(),
+            record_key: None, alternate_record_keys: Vec::new(), relative_key: None,
+            file_status: None, sort_merge: false,
+            description: "FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS DEPENDING ON WS-RECD-LEN".into(),
+            record_min: Some(10), record_max: Some(80), ccsid: None, linage: None,
+        });
+        let base = m.bases.len();
+        m.bases.push(vec![b'A'; 80]);
+        m.views.insert(
+            "VBR-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 80,
+            },
+        );
+        let base = m.bases.len();
+        m.bases.push(b"0012".to_vec());
+        m.views.insert(
+            "WS-RECD-LEN".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 4,
+            },
+        );
+        m.layouts.insert(
+            "WS-RECD-LEN".into(),
+            LayoutMetadata {
+                name: "WS-RECD-LEN".into(),
+                simple_name: "WS-RECD-LEN".into(),
+                category: LayoutCategory::NumericDisplay,
+                picture: "9(4)".into(),
+                digits: 4,
+                scale: 0,
+                signed: false,
+                sign_separate: false,
+                justified_right: false,
+                blank_when_zero: false,
+                linkage: false,
+                offset: 0,
+                length: 4,
+                element_length: 4,
+                occurs: 1,
+                occurs_min: 1,
+                unbounded: false,
+                depending_on: None,
+                indexes: Vec::new(),
+                keys: Vec::new(),
+                dynamic: false,
+                dynamic_limit: 0,
+                parent: None,
+                alias_of: None,
+                occurs_clause: false,
+                condition_values: Vec::new(),
+                object_class: None,
+            },
+        );
+        m
+    }
+
+    #[test]
+    fn varying_write_uses_depending_length_and_read_restores_it() {
+        let mut m = varying_file_machine();
+        for (length, fill) in [(12, b'A'), (39, b'B')] {
+            m.write("WS-RECD-LEN", format!("{length:04}").as_bytes())
+                .unwrap();
+            m.write("VBR-REC", &[fill; 80]).unwrap();
+            let Step::Effect(effect) = m.dataset_effect("write", &["VBR-REC".into()]).unwrap()
+            else {
+                panic!("expected effect")
+            };
+            let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request
+            else {
+                panic!("expected append")
+            };
+            assert_eq!(records[0], vec![fill; length]);
+            m.pending = None;
+        }
+        m.write("WS-RECD-LEN", b"0080").unwrap();
+        let Step::Effect(effect) = m.dataset_effect("read", &["VBFILE".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        m.resume_host(EffectResult {
+            sequence: effect.sequence,
+            outcome: Ok(HostResult::Dataset(
+                mainframe_env_host_api::DatasetResult::Records {
+                    records: vec![vec![b'A'; 12]],
+                    identities: vec![b"1".to_vec()],
+                    version: 1,
+                },
+            )),
+        })
+        .unwrap();
+        assert_eq!(m.read("WS-RECD-LEN").unwrap(), b"0012");
+        assert_eq!(&m.read("VBR-REC").unwrap()[..12], &[b'A'; 12]);
+        let base = m.bases.len();
+        m.bases.push(vec![b' '; 80]);
+        m.views.insert(
+            "INTO-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 80,
+            },
+        );
+        let Step::Effect(effect) = m
+            .dataset_effect("read", &["VBFILE".into(), "INTO".into(), "INTO-REC".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        m.resume_host(EffectResult {
+            sequence: effect.sequence,
+            outcome: Ok(HostResult::Dataset(
+                mainframe_env_host_api::DatasetResult::Records {
+                    records: vec![vec![b'B'; 39]],
+                    identities: vec![b"2".to_vec()],
+                    version: 2,
+                },
+            )),
+        })
+        .unwrap();
+        assert_eq!(m.read("WS-RECD-LEN").unwrap(), b"0039");
+        assert_eq!(&m.read("INTO-REC").unwrap()[..39], &[b'B'; 39]);
+    }
+
+    #[test]
+    fn varying_write_from_uses_fd_length_and_rejects_out_of_bounds() {
+        let mut m = varying_file_machine();
+        m.implicit
+            .insert("SOURCE".into(), CobolValue::Bytes(vec![b'C'; 80]));
+        let Step::Effect(effect) = m
+            .dataset_effect("write", &["VBR-REC".into(), "FROM".into(), "SOURCE".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request else {
+            panic!("expected append")
+        };
+        assert_eq!(records[0], vec![b'C'; 12]);
+        m.pending = None;
+        m.implicit
+            .insert("SOURCE".into(), CobolValue::Bytes(b"SHORT!".to_vec()));
+        let Step::Effect(effect) = m
+            .dataset_effect("write", &["VBR-REC".into(), "FROM".into(), "SOURCE".into()])
+            .unwrap()
+        else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append { records, .. }) = effect.request else {
+            panic!("expected append")
+        };
+        assert_eq!(records[0], b"SHORT!      ");
+        m.pending = None;
+        for length in [9, 81] {
+            m.write("WS-RECD-LEN", format!("{length:04}").as_bytes())
+                .unwrap();
+            assert!(matches!(
+                m.dataset_effect("write", &["VBR-REC".into()]),
+                Err(MachineProblem::SizeError)
+            ));
+        }
+    }
+
+    #[test]
+    fn varying_without_depending_uses_named_fd_record_size() {
+        let mut m = varying_file_machine();
+        let file = m.files.get_mut("VBFILE").unwrap();
+        file.record_name = Some("SHORT-REC".into());
+        file.record_names = vec!["SHORT-REC".into(), "LONG-REC".into()];
+        file.description = "FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS".into();
+        let base = m.bases.len();
+        m.bases.push(vec![b'Z'; 39]);
+        m.views.insert(
+            "LONG-REC".into(),
+            StorageView {
+                base,
+                offset: 0,
+                length: 39,
+            },
+        );
+        let Step::Effect(effect) = m.dataset_effect("write", &["LONG-REC".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::Append {
+            dataset, records, ..
+        }) = effect.request
+        else {
+            panic!("expected append")
+        };
+        assert_eq!(dataset.as_str(), "VBPS");
+        assert_eq!(records[0], vec![b'Z'; 39]);
+    }
+
+    #[test]
+    fn varying_rewrite_uses_depending_length() {
+        let mut m = varying_file_machine();
+        m.files.get_mut("VBFILE").unwrap().record_key = Some("KEY".into());
+        m.implicit
+            .insert("KEY".into(), CobolValue::Bytes(b"K".to_vec()));
+        m.write("WS-RECD-LEN", b"0039").unwrap();
+        let Step::Effect(effect) = m.dataset_effect("rewrite", &["VBR-REC".into()]).unwrap() else {
+            panic!("expected effect")
+        };
+        let HostRequest::Dataset(DatasetRequest::RewriteRecord { record, .. }) = effect.request
+        else {
+            panic!("expected rewrite")
+        };
+        assert_eq!(record, vec![b'A'; 39]);
     }
 }
 
