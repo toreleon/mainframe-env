@@ -3,6 +3,8 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod host_context;
+mod message;
 mod retention;
 mod service;
 

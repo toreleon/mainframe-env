@@ -14,6 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::host_context::reject_host_owned_syncpoint;
+use crate::message::canonical_message_id;
 use crate::retention::{
     MqReplayOwnerKind, mq_pending_replay_matches, prepare_mq_replay, resolve_mq_replay,
     validate_mq_recorded_result,
@@ -324,6 +326,9 @@ impl MqService {
     ) -> Result<MqResult, HostProblem> {
         if resolution_lower_bound == 0 {
             return Err(HostProblem::Malformed);
+        }
+        if let Some(rejection) = reject_host_owned_syncpoint(invocation, request)? {
+            return Ok(rejection);
         }
         let mut durable = self.lock()?;
         refresh_replay(&*self.store, self.limits, &mut durable)?;
@@ -1027,16 +1032,6 @@ fn put(
     })
 }
 
-fn canonical_message_id(run: &str, request: &MqRequest) -> Result<Vec<u8>, HostProblem> {
-    let request_digest = canonical_mq_request_digest(request)?;
-    let mut digest = Sha256::new();
-    digest.update(b"mainframe-env.mq-message-id@1\0");
-    digest.update(u64::try_from(run.len()).unwrap_or(u64::MAX).to_be_bytes());
-    digest.update(run.as_bytes());
-    digest.update(request_digest);
-    Ok(digest.finalize()[..24].to_vec())
-}
-
 fn get(state: &mut State, run: &str, request: &MqRequest) -> Result<MqResult, HostProblem> {
     let queue_name = resolve_queue(state, run, request)?;
     let queue = state
@@ -1342,8 +1337,8 @@ pub fn mq_providers(
 mod tests {
     use super::*;
     use mainframe_env_execution_api::{
-        ArtifactRef, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
-        ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+        ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Principal, PrincipalId,
+        RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::Mutation;
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
@@ -1509,6 +1504,197 @@ mod tests {
                 transaction: Some("MQ-TEST".into()),
             }),
         }
+    }
+
+    fn cics_invocation(run: &str) -> Invocation {
+        let mut invocation = invocation(run);
+        let (binding, schema) = crate::host_context::cics_execution_context_contract();
+        invocation.bindings.insert(
+            binding.into(),
+            BoundedPayload::new(schema, b"local".to_vec(), InvocationLimits::default()).unwrap(),
+        );
+        invocation
+    }
+
+    fn cics_coordinator_invocation(run: &str, key: &IdempotencyKey, outer: &str) -> Invocation {
+        let mut invocation = cics_invocation(run);
+        invocation.bindings.insert(
+            crate::retention::CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                crate::retention::CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                key.as_str().as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        invocation.bindings.insert(
+            crate::retention::CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                crate::retention::CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+                outer.as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        invocation
+    }
+
+    fn cics_coordinator_request(operation: MqOperation, run: &str, sequence: u64) -> MqRequest {
+        let mut request = request(operation, sequence);
+        request.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("cics:{run}:{sequence}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        request
+    }
+
+    #[test]
+    fn cics_direct_commit_and_backout_are_rejected_but_host_syncpoint_can_coordinate() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store, Default::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "CICS.SYNC.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let run = "cics-syncpoint-owner";
+
+        let mut first_put = request(MqOperation::PutOne, 1);
+        first_put.queue = Some("CICS.SYNC.Q".into());
+        first_put.message = b"COMMIT".to_vec();
+        first_put.options = 2;
+        service.execute(&invocation(run), &first_put).unwrap();
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(0));
+
+        let direct_commit = request(MqOperation::Commit, 2);
+        let rejected = service
+            .execute(&cics_invocation(run), &direct_commit)
+            .unwrap();
+        assert_eq!((rejected.completion_code, rejected.reason_code), (2, 2012));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(0));
+
+        let coordinated_commit = cics_coordinator_request(MqOperation::Commit, run, 3);
+        let commit_key = coordinated_commit
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .clone();
+        let committed = service
+            .execute(
+                &cics_coordinator_invocation(run, &commit_key, "outer-cics-commit"),
+                &coordinated_commit,
+            )
+            .unwrap();
+        assert_eq!((committed.completion_code, committed.reason_code), (0, 0));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(1));
+
+        let mut second_put = request(MqOperation::PutOne, 4);
+        second_put.queue = Some("CICS.SYNC.Q".into());
+        second_put.message = b"ROLLBACK".to_vec();
+        second_put.options = 2;
+        service.execute(&invocation(run), &second_put).unwrap();
+
+        let direct_backout = request(MqOperation::Rollback, 5);
+        let rejected = service
+            .execute(&cics_invocation(run), &direct_backout)
+            .unwrap();
+        assert_eq!((rejected.completion_code, rejected.reason_code), (2, 2012));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(1));
+
+        let coordinated_backout = cics_coordinator_request(MqOperation::Rollback, run, 6);
+        let backout_key = coordinated_backout
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .clone();
+        let backed_out = service
+            .execute(
+                &cics_coordinator_invocation(run, &backout_key, "outer-cics-backout"),
+                &coordinated_backout,
+            )
+            .unwrap();
+        assert_eq!((backed_out.completion_code, backed_out.reason_code), (0, 0));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(1));
+    }
+
+    #[test]
+    fn malformed_or_partial_cics_syncpoint_provenance_fails_closed() {
+        let service = MqService::open(
+            Arc::new(MemoryStore::new(Default::default())),
+            Default::default(),
+        )
+        .unwrap();
+        let request = request(MqOperation::Commit, 10);
+        let mut malformed = invocation("malformed-cics-context");
+        let (binding, schema) = crate::host_context::cics_execution_context_contract();
+        malformed.bindings.insert(
+            binding.into(),
+            BoundedPayload::new(schema, b"unknown".to_vec(), InvocationLimits::default()).unwrap(),
+        );
+        assert_eq!(
+            service.execute(&malformed, &request),
+            Err(HostProblem::Malformed)
+        );
+
+        let mut partial = cics_invocation("partial-cics-context");
+        partial.bindings.insert(
+            crate::retention::CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                crate::retention::CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                b"cics:partial-cics-context:10".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            service.execute(&partial, &request),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn cics_nested_owner_mismatch_preserves_pending_work() {
+        let service = MqService::open(
+            Arc::new(MemoryStore::new(Default::default())),
+            Default::default(),
+        )
+        .unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "CICS.OWNER.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let run = "cics-owner-mismatch";
+        let mut put = request(MqOperation::PutOne, 1);
+        put.queue = Some("CICS.OWNER.Q".into());
+        put.message = b"pending".to_vec();
+        put.options = 2;
+        service.execute(&invocation(run), &put).unwrap();
+
+        let commit = cics_coordinator_request(MqOperation::Commit, run, 2);
+        let wrong_key =
+            IdempotencyKey::new("cics:other-run:2", InvocationLimits::default()).unwrap();
+        let wrong_owner = cics_coordinator_invocation(run, &wrong_key, "outer-cics-commit");
+        assert_eq!(
+            service.execute(&wrong_owner, &commit),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(service.queue_depth("CICS.OWNER.Q"), Ok(0));
+
+        let key = commit.mutation.as_ref().unwrap().idempotency_key.clone();
+        let accepted = service
+            .execute(
+                &cics_coordinator_invocation(run, &key, "outer-cics-commit"),
+                &commit,
+            )
+            .unwrap();
+        assert_eq!((accepted.completion_code, accepted.reason_code), (0, 0));
+        assert_eq!(service.queue_depth("CICS.OWNER.Q"), Ok(1));
     }
 
     fn retain_as_legacy_replay(
