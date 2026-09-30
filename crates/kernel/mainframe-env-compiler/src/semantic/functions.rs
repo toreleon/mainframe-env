@@ -162,6 +162,11 @@ fn argument_type(
 ) -> Result<IntrinsicValueType, SemanticProblem> {
     let text = text.trim();
     let upper = text.to_ascii_uppercase();
+    if let Some(value_type) =
+        arithmetic_argument_type(text, layouts, pointer_bytes, user_functions)?
+    {
+        return Ok(value_type);
+    }
     if matches!(upper.as_str(), "LEADING" | "TRAILING") {
         return Ok(IntrinsicValueType::Keyword);
     }
@@ -212,6 +217,91 @@ fn argument_type(
             "ambiguous intrinsic argument {text}"
         ))),
     }
+}
+
+fn arithmetic_argument_type(
+    text: &str,
+    layouts: &[CobolLayout],
+    pointer_bytes: usize,
+    user_functions: &BTreeSet<String>,
+) -> Result<Option<IntrinsicValueType>, SemanticProblem> {
+    if text.starts_with('(') && matching_close(text, 0) == Some(text.len() - 1) {
+        return argument_type(
+            &text[1..text.len() - 1],
+            layouts,
+            pointer_bytes,
+            user_functions,
+        )
+        .map(Some);
+    }
+    let mut depth = 0usize;
+    let mut operator = None;
+    let mut quote = None;
+    let bytes = text.as_bytes();
+    for (index, byte) in bytes.iter().enumerate() {
+        if matches!(byte, b'\'' | b'"') {
+            if quote == Some(*byte) {
+                quote = None;
+            } else if quote.is_none() {
+                quote = Some(*byte);
+            }
+            continue;
+        }
+        if quote.is_some() {
+            continue;
+        }
+        match byte {
+            b'(' => depth += 1,
+            b')' => depth = depth.saturating_sub(1),
+            b'+' | b'*' | b'/'
+                if depth == 0
+                    && index > 0
+                    && !matches!(
+                        bytes[..index]
+                            .iter()
+                            .rev()
+                            .find(|byte| !byte.is_ascii_whitespace()),
+                        Some(b'+' | b'-' | b'*' | b'/' | b'(')
+                    ) =>
+            {
+                operator = Some(index);
+            }
+            b'-' if depth == 0
+                && index > 0
+                && bytes[index - 1].is_ascii_whitespace()
+                && bytes.get(index + 1).is_some_and(u8::is_ascii_whitespace) =>
+            {
+                operator = Some(index);
+            }
+            _ => {}
+        }
+    }
+    let Some(index) = operator else {
+        return Ok(None);
+    };
+    let left = argument_type(&text[..index], layouts, pointer_bytes, user_functions)?;
+    let right = argument_type(&text[index + 1..], layouts, pointer_bytes, user_functions)?;
+    if !matches!(
+        left,
+        IntrinsicValueType::Integer | IntrinsicValueType::Numeric
+    ) || !matches!(
+        right,
+        IntrinsicValueType::Integer | IntrinsicValueType::Numeric
+    ) {
+        return Err(SemanticProblem::InvalidIntrinsic(format!(
+            "non-numeric intrinsic argument {text}"
+        )));
+    }
+    Ok(Some(
+        if bytes[index] == b'/'
+            || left == IntrinsicValueType::Numeric
+            || right == IntrinsicValueType::Numeric
+        {
+            IntrinsicValueType::Numeric
+        } else {
+            IntrinsicValueType::Integer
+        },
+    ))
 }
 
 fn data_reference_identity(text: &str) -> Option<String> {
@@ -839,6 +929,31 @@ mod tests {
         ] {
             assert!(SemanticModel::analyze(&program(invalid), 4096, 128).is_err());
         }
+    }
+
+    #[test]
+    fn intrinsic_argument_can_start_with_parenthesized_arithmetic_expression() {
+        // Enterprise COBOL 6.5 Arguments (SS6SG3_6.5/lr/ref/rlinfsped.html,
+        // sha256:f5ff6a301dcbd04a92845942d6f35beb968fe61bbfa2ec0d283aa0ab862baac5)
+        // permits an arithmetic expression as an argument; INTEGER
+        // (rlinfint.html, sha256:1b7484178e7d852125fb5c889e9db737b1d69e8df044f62f7f2794c91252a5c3)
+        // requires a numeric argument.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. P3C. DATA DIVISION. WORKING-STORAGE SECTION. 01 LO PIC 9(4) VALUE 10. 01 R PIC 9(4). PROCEDURE DIVISION. COMPUTE R = FUNCTION INTEGER((LO * 2) + 1). DISPLAY R. STOP RUN.";
+        let model = SemanticModel::analyze(source, 4096, 128).unwrap();
+        assert_eq!(model.intrinsic_calls[0].arguments[0].text, "(LO * 2) + 1");
+
+        let nested = "IDENTIFICATION DIVISION. PROGRAM-ID. NESTED. DATA DIVISION. WORKING-STORAGE SECTION. 01 LO PIC 9(4) VALUE 10. 01 HI PIC 9(4) VALUE 30. 01 R PIC 9(4). PROCEDURE DIVISION. COMPUTE R = FUNCTION INTEGER((FUNCTION RANDOM(7) * (HI - LO)) + LO). STOP RUN.";
+        assert!(SemanticModel::analyze(nested, 4096, 128).is_ok());
+
+        let nonnumeric = source.replace("LO * 2", "'ABC' * 2");
+        assert!(SemanticModel::analyze(&nonnumeric, 4096, 128).is_err());
+    }
+
+    #[test]
+    fn intrinsic_length_accepts_subscripted_data_reference() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TABLELEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TABLE-ROOT. 05 TBL PIC X(4) OCCURS 2 TIMES. 01 R PIC 9(4). PROCEDURE DIVISION. COMPUTE R = FUNCTION LENGTH(TBL(2)). STOP RUN.";
+        let model = SemanticModel::analyze(source, 4096, 128).unwrap();
+        assert_eq!(model.intrinsic_calls[0].arguments[0].text, "TBL(2)");
     }
 
     #[test]
