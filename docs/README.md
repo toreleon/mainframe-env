@@ -88,6 +88,7 @@ explicitly names that authority as superseded.
 - [ADR-0022: ISSUE PASS target handoff](decisions/0022-issue-pass-target-handoff.md)
 - [ADR-0023: BTS lifecycle authority](decisions/0023-bts-lifecycle-authority.md)
 - [ADR-0024: Per-assertion oracle provenance](decisions/0024-per-assertion-oracle-provenance.md)
+- [ADR-0025: Licence and provenance policy for IBM oracle evidence](decisions/0025-licence-and-provenance-policy.md)
 - [ADR-0026: CardDemo run bundle](decisions/0026-run-bundle.md)
 - [Decision index and template](decisions/README.md)
 

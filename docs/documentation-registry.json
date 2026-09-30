@@ -57,6 +57,7 @@
     "docs/decisions/0022-issue-pass-target-handoff.md",
     "docs/decisions/0023-bts-lifecycle-authority.md",
     "docs/decisions/0024-per-assertion-oracle-provenance.md",
+    "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
@@ -122,6 +123,7 @@
         {"label": "ADR-0022: ISSUE PASS target handoff", "path": "docs/decisions/0022-issue-pass-target-handoff.md"},
         {"label": "ADR-0023: BTS lifecycle authority", "path": "docs/decisions/0023-bts-lifecycle-authority.md"},
         {"label": "ADR-0024: Per-assertion oracle provenance", "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"},
+        {"label": "ADR-0025: Licence and provenance policy for IBM oracle evidence", "path": "docs/decisions/0025-licence-and-provenance-policy.md"},
         {"label": "ADR-0026: CardDemo run bundle", "path": "docs/decisions/0026-run-bundle.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],

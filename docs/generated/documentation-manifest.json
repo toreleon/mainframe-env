@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 215,
+    "markdown_documents": 216,
     "navigation_groups": 5,
-    "normative_documents": 55,
+    "normative_documents": 56,
     "xtask_commands": 202
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 91,
-      "sha256": "sha256:ddf4c34451c0bd2ef462b4fc9cc1560473360d7cb14e66ccb7490c3b6b30c7e9",
+      "relative_links": 92,
+      "sha256": "sha256:bf649016c80dc858f483cddad5870756ca1fa0b06d4dc29cf15539710cc0e1d7",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -915,6 +915,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.17 licensed-evidence planning, subject to acceptance",
+      "normative": true,
+      "owner": "repository owner",
+      "path": "docs/decisions/0025-licence-and-provenance-policy.md",
+      "relative_links": 4,
+      "scope": "licensed IBM oracles, customer captures, and IBM-derived material",
+      "sha256": "sha256:07c16b23d5eb236e87df668bdac57db8e91f017e42c1a288029ed327021f64cb",
+      "status": "Proposed",
+      "title": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.8 run bundle v1",
       "normative": true,
       "owner": "conformance and xtask maintainers",
@@ -929,8 +941,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 25,
-      "sha256": "sha256:242253d217134dc32ac7b95b4b62bff1e4a21c298beef822d0232c8b1d9c33f7",
+      "relative_links": 26,
+      "sha256": "sha256:7814b7dc1e8622f600c88a43c8b3ebb3c44bdb94be49c4528b801078005e28b5",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2152,6 +2164,10 @@
           "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"
         },
         {
+          "label": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+          "path": "docs/decisions/0025-licence-and-provenance-policy.md"
+        },
+        {
           "label": "ADR-0026: CardDemo run bundle",
           "path": "docs/decisions/0026-run-bundle.md"
         },
@@ -2323,7 +2339,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:2e173d106021f8daf2f7304cb96c069b30b6c18aa764f3c9ec9ae24d0a01a869",
+  "registry_sha256": "sha256:5fea64049c1ef8ac1d9b86c01ef6cd7c28a40ca0554d12a755641bfbe37dd777",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

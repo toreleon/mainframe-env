@@ -28,6 +28,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0022](0022-issue-pass-target-handoff.md) | replayable ISSUE PASS target claim and CICS logon data handoff | Proposed |
 | [0023](0023-bts-lifecycle-authority.md) | shared versioned BTS process/activity state and UOW acquisition | Proposed |
 | [0024](0024-per-assertion-oracle-provenance.md) | per-assertion CardDemo base-batch oracle provenance and derived credit | Proposed |
+| [0025](0025-licence-and-provenance-policy.md) | licence and provenance policy for IBM oracle evidence | Proposed |
 | [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
