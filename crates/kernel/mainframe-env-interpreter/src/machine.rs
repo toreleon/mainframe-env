@@ -22,7 +22,8 @@ use mainframe_env_host_api::{
     RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector, TerminalRequest,
 };
 use mainframe_env_ir::{
-    Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
+    Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId,
+    cobol_floating_insertion_prefix, decode_binary,
 };
 use sha2::{Digest as _, Sha256};
 use std::cell::Cell;
@@ -36,6 +37,8 @@ mod condition_literals;
 mod corresponding;
 mod decimal_commit;
 mod eib;
+#[cfg(test)]
+mod floating_insertion_tests;
 mod layout_admission;
 mod layout_resolution;
 mod snapshot_codec;
@@ -11150,14 +11153,8 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         .windows(2)
         .find(|pair| pair[0] == pair[1] && matches!(pair[0], b'+' | b'-'))
         .map(|pair| pair[0]);
-    let floating_currency = (picture
-        .iter()
-        .take_while(|&&byte| matches!(byte, b'$' | b','))
-        .filter(|&&byte| byte == b'$')
-        .count()
-        >= 2)
-        .then_some(b'$');
-    let floating_symbol = floating_sign.or(floating_currency);
+    let floating_prefix = cobol_floating_insertion_prefix(&picture);
+    let floating_symbol = floating_prefix.map(|(symbol, _)| symbol).or(floating_sign);
     if value.coefficient == 0
         && !picture.contains(&b'9')
         && (picture.contains(&b'Z') || picture.contains(&b'*') || floating_symbol.is_some())
@@ -11179,10 +11176,9 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         }
         return Ok(output);
     }
-    let leading_floating_slots = floating_symbol.map_or(0, |symbol| {
-        picture
+    let leading_floating_slots = floating_prefix.map_or(0, |(symbol, end)| {
+        picture[..end]
             .iter()
-            .take_while(|&&byte| byte == symbol || byte == b',')
             .filter(|&&byte| byte == symbol)
             .count()
     });
@@ -11254,10 +11250,8 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
                 if (byte != b'$'
                     && (picture.get(picture_index.wrapping_sub(1)) == Some(&byte)
                         || picture.get(picture_index + 1) == Some(&byte)))
-                    || (floating_symbol == Some(byte)
-                        && picture[..picture_index]
-                            .iter()
-                            .all(|&prefix| prefix == byte || prefix == b',')) =>
+                    || floating_prefix
+                        .is_some_and(|(symbol, end)| symbol == byte && picture_index < end) =>
             {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
                 if suppressing && digit == b'0' && digit_index + 1 < digit_positions {
@@ -11305,20 +11299,22 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             b'+' => Some(b'+'),
             _ => None,
         };
-        // The floating symbol takes the position immediately left of the first
-        // significant digit, even when that position holds an insertion comma;
-        // with no significant digit inside the floating string it takes the
-        // string's last position.
-        let region = picture
-            .iter()
-            .take_while(|&&byte| byte == symbol || byte == b',')
-            .count();
+        // The floating symbol precedes the first significant digit or decimal
+        // point, whichever is farther left; with neither it uses the last slot.
+        let region = floating_prefix
+            .filter(|(floating, _)| *floating == symbol)
+            .map_or(0, |(_, end)| end);
         if let Some(insertion) = insertion
             && region > 0
         {
-            let slot = output[..region.min(output.len())]
+            let first_digit = output[..region.min(output.len())]
                 .iter()
-                .position(u8::is_ascii_digit)
+                .position(u8::is_ascii_digit);
+            let decimal = picture[..region].iter().position(|&byte| byte == b'.');
+            let slot = first_digit
+                .into_iter()
+                .chain(decimal)
+                .min()
                 .map_or(region - 1, |first| first.saturating_sub(1));
             output[slot] = insertion;
         }
@@ -14142,7 +14138,7 @@ mod tests {
         }
     }
 
-    fn edited_test_layout(
+    pub(super) fn edited_test_layout(
         picture: &str,
         digits: usize,
         scale: u32,

@@ -21,7 +21,7 @@ pub use structure::{
 use crate::syntax::{SourceOrigin, SourceSpan};
 use crate::{IntrinsicFunctionKind, SpecialRegisterKind};
 use mainframe_env_ir::{
-    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_floating_currency_prefix,
+    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_floating_insertion_prefix,
     cobol_index_name_is_valid, cobol_layout_reference_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -2463,10 +2463,9 @@ struct PictureDetails {
     utf8: bool,
     dbcs: bool,
 }
-
 fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
     let bytes = expanded_picture_symbols(pic)?;
-    let floating_currency_prefix = cobol_floating_currency_prefix(&bytes);
+    let floating_prefix = cobol_floating_insertion_prefix(&bytes);
     let mut currency_symbols_seen = 0usize;
     let mut storage = 0usize;
     let mut digits = 0usize;
@@ -2545,7 +2544,8 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
                 alphabetic = false;
                 edited = true;
                 signed = true;
-                if bytes.get(index.wrapping_sub(1)) == Some(&byte)
+                if floating_prefix.is_some_and(|(symbol, end)| symbol == byte && index < end)
+                    || bytes.get(index.wrapping_sub(1)) == Some(&byte)
                     || bytes.get(index + 1) == Some(&byte)
                 {
                     digits += 1;
@@ -2564,7 +2564,7 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
             b'$' => {
                 alphabetic = false;
                 edited = true;
-                if index < floating_currency_prefix {
+                if floating_prefix.is_some_and(|(symbol, end)| symbol == byte && index < end) {
                     if currency_symbols_seen > 0 {
                         numeric = true;
                         digits += 1;
@@ -3027,6 +3027,31 @@ mod tests {
             assert_eq!(
                 (details.digits, details.scale, details.signed),
                 (digits, scale, signed),
+                "{picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn embedded_simple_insertions_keep_floating_metadata_in_sync() {
+        for (picture, storage, digits, scale, signed) in [
+            ("$$B$$9.9", 8, 5, 1, false),
+            ("$$0$$9", 6, 4, 0, false),
+            ("$$/$$9", 6, 4, 0, false),
+            ("++B++9", 6, 5, 0, true),
+            ("--,--9.99", 9, 7, 2, true),
+            ("$$$B99", 6, 4, 0, false),
+            ("+++.+++", 7, 6, 3, true),
+        ] {
+            let details = picture_details(picture).unwrap();
+            assert_eq!(
+                (
+                    details.storage,
+                    details.digits,
+                    details.scale,
+                    details.signed
+                ),
+                (storage, digits, scale, signed),
                 "{picture}"
             );
         }

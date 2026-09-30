@@ -24,3 +24,25 @@ fn floating_insertion_variants_pass_ir_verification() {
         compile(&source).unwrap_or_else(|error| panic!("{picture}: {error}"));
     }
 }
+
+#[test]
+fn embedded_simple_insertions_route_through_compiler_and_interpreter() {
+    // Expected bytes from GnuCOBOL 3.2.0 with -std=ibm, an unlicensed reference.
+    for (picture, value, expected) in [
+        ("$$B$$9.9", "99999999999999999", b"$9 999.0\n".as_slice()),
+        ("$$0$$9", "12345", b"$20345\n".as_slice()),
+        ("++B++9", "12345", b"+2 345\n".as_slice()),
+    ] {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. HELLO. DATA DIVISION. WORKING-STORAGE SECTION. 01 N0 PIC 9(17) USAGE DISPLAY VALUE {value}. 01 N5 PIC {picture}. PROCEDURE DIVISION. MOVE N0 TO N5. DISPLAY N5. STOP RUN."
+        );
+        let artifact = compile(&source).unwrap_or_else(|error| panic!("{picture}: {error}"));
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.return_code, 0, "{picture}");
+                assert_eq!(done.output.bytes(), expected, "{picture}");
+            }
+            other => panic!("{picture}: {other:?}"),
+        }
+    }
+}
