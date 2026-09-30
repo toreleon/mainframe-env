@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover generated IMS PCB mask and status contracts with bounded host API lookups and shared TM status validation, without execution credit."

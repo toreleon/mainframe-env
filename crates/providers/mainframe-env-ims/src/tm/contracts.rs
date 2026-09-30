@@ -1,5 +1,5 @@
 use mainframe_env_execution_api::{ArtifactRef, IdempotencyKey, InvocationLimits, Selector};
-use mainframe_env_host_api::HostProblem;
+use mainframe_env_host_api::{HostProblem, ImsPcbKind, ImsStatusContext, resolve_ims_status};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -303,7 +303,10 @@ impl<'de> Deserialize<'de> for TmPcbStatus {
     where
         D: serde::Deserializer<'de>,
     {
-        match <[u8; 2]>::deserialize(deserializer)? {
+        let code = <[u8; 2]>::deserialize(deserializer)?;
+        resolve_ims_status(&code, ImsStatusContext::Message, ImsPcbKind::Io)
+            .map_err(|_| serde::de::Error::custom("unsupported IMS TM PCB status"))?;
+        match code {
             [b' ', b' '] => Ok(Self::SUCCESS),
             [b'Q', b'C'] => Ok(Self::NO_MORE_MESSAGES),
             [b'A', b'D'] => Ok(Self::INVALID_CALL),

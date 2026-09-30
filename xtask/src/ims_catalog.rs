@@ -9,6 +9,12 @@ const SSA_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-ssa-rules.schema.jso
 const SSA_MANIFEST_PATH: &str = "conformance/0.14/manifests/ims-programming-contracts-topics.json";
 const GENERATED_SSA_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_ssa_rules.rs";
+const PCB_STATUS_RULES_PATH: &str = "conformance/0.14/ims/pcb-status-rules.json";
+const PCB_STATUS_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-pcb-status-rules.schema.json";
+const GENERATED_PCB_PATH: &str =
+    "crates/contracts/mainframe-env-host-api/src/generated/ims_pcb_masks.rs";
+const GENERATED_STATUS_PATH: &str =
+    "crates/contracts/mainframe-env-host-api/src/generated/ims_status_codes.rs";
 const BASELINE: &str = "ibm-ims-15.6-dli-2026-08-31";
 const SOURCE_TOPIC: &str =
     "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm";
@@ -24,10 +30,52 @@ struct Family {
     command_names: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
+enum PcbWidth {
+    Fixed(usize),
+    OneOf(Vec<usize>),
+    Variable,
+}
+
+#[derive(Clone, Debug)]
+struct PcbField {
+    name: String,
+    width: PcbWidth,
+    semantic_value: String,
+    contexts: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct PcbMask {
+    kind: String,
+    source_topic: String,
+    source_sha256: String,
+    contexts: Vec<String>,
+    fields: Vec<PcbField>,
+}
+
+#[derive(Clone, Debug)]
+struct StatusRow {
+    code: String,
+    categories: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct StatusContext {
+    name: String,
+    source_topic: String,
+    source_sha256: String,
+    pcb_kinds: Vec<String>,
+    statuses: Vec<StatusRow>,
+}
+
 pub(super) fn generate(root: &Path) -> TaskResult {
+    let (generated_pcb, generated_status) = render_pcb_status(root)?;
     for (relative, generated) in [
         (GENERATED_PATH, render(root)?),
         (GENERATED_SSA_PATH, render_ssa(root)?),
+        (GENERATED_PCB_PATH, generated_pcb),
+        (GENERATED_STATUS_PATH, generated_status),
     ] {
         let path = root.join(relative);
         fs::create_dir_all(path.parent().ok_or("generated IMS path has no parent")?)
@@ -38,9 +86,12 @@ pub(super) fn generate(root: &Path) -> TaskResult {
 }
 
 pub(super) fn check(root: &Path) -> TaskResult {
+    let (generated_pcb, generated_status) = render_pcb_status(root)?;
     for (relative, expected) in [
         (GENERATED_PATH, render(root)?),
         (GENERATED_SSA_PATH, render_ssa(root)?),
+        (GENERATED_PCB_PATH, generated_pcb),
+        (GENERATED_STATUS_PATH, generated_status),
     ] {
         let path = root.join(relative);
         let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -441,6 +492,398 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
     format_generated_rust(source)
 }
 
+fn render_pcb_status(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
+    let rules_path = root.join(PCB_STATUS_RULES_PATH);
+    let rules = json(&rules_path)?;
+    let schema_path = root.join(PCB_STATUS_SCHEMA_PATH);
+    validate_schema_instance(&json(&schema_path)?, &rules, &rules_path)?;
+    require(
+        rules["schema_version"] == Value::String("mainframe-env.ims-pcb-status-rules@1".into())
+            && rules["target_version"] == Value::String("0.14.0".into())
+            && rules["source_scope"] == Value::String("ims-programming-contracts".into()),
+        "IMS PCB/status rule identity drifted",
+    )?;
+
+    let manifest_path = root.join(SSA_MANIFEST_PATH);
+    let manifest = json(&manifest_path)?;
+    let manifest_topics = array(&manifest, "topics", &manifest_path)?;
+    let source_topics = array(&rules, "source_topics", &rules_path)?;
+    let mut cited_topics = BTreeMap::new();
+    for source in source_topics {
+        let (topic, sha256) = source_pair(source, &rules_path)?;
+        require(
+            cited_topics.insert(topic.clone(), sha256.clone()).is_none()
+                && manifest_topics.iter().any(|candidate| {
+                    candidate["topic_path"].as_str() == Some(topic.as_str())
+                        && candidate["sha256"].as_str() == Some(sha256.as_str())
+                }),
+            &format!("IMS PCB/status rules cite an unpinned or duplicate topic {topic}"),
+        )?;
+    }
+    require(
+        cited_topics.len() == 7,
+        "IMS PCB/status rules must cite four mask and three status topics",
+    )?;
+
+    let expected_execution_contexts = ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"];
+    require(
+        strings(&rules, "execution_contexts", &rules_path)? == expected_execution_contexts,
+        "IMS execution-context ordering drifted",
+    )?;
+
+    let expected_masks = [
+        ("database", 9, &["db-dc", "dbctl", "db-batch"][..]),
+        (
+            "gsam",
+            10,
+            &["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"][..],
+        ),
+        (
+            "io",
+            14,
+            &["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"][..],
+        ),
+        ("alternate", 3, &["db-dc", "dcctl"][..]),
+    ];
+    let mask_values = array(&rules, "pcb_masks", &rules_path)?;
+    require(
+        mask_values.len() == expected_masks.len(),
+        "IMS PCB mask denominator drifted",
+    )?;
+    let mut masks = Vec::new();
+    for (value, (expected_kind, expected_fields, expected_contexts)) in
+        mask_values.iter().zip(expected_masks)
+    {
+        let kind = text(value, "kind", &rules_path)?.to_string();
+        let (source_topic, source_sha256) = source_pair(&value["source_topic"], &rules_path)?;
+        let contexts = strings(value, "allowed_contexts", &rules_path)?;
+        require(
+            kind == expected_kind
+                && contexts
+                    .iter()
+                    .map(String::as_str)
+                    .eq(expected_contexts.iter().copied())
+                && cited_topics.get(&source_topic) == Some(&source_sha256),
+            &format!("IMS {kind} PCB identity, source, or contexts drifted"),
+        )?;
+        let field_values = array(value, "fields", &rules_path)?;
+        require(
+            field_values.len() == expected_fields,
+            &format!("IMS {kind} PCB field count drifted"),
+        )?;
+        let mut fields = Vec::new();
+        let mut field_names = BTreeSet::new();
+        let mut status_fields = 0;
+        let mut variable_fields = 0;
+        for field in field_values {
+            let name = text(field, "field", &rules_path)?.to_string();
+            let semantic_value = text(field, "semantic_value", &rules_path)?.to_string();
+            let field_contexts = strings(field, "applicable_contexts", &rules_path)?;
+            require(
+                field_names.insert(name.clone())
+                    && field_contexts
+                        .iter()
+                        .all(|context| contexts.contains(context)),
+                &format!("IMS {kind} PCB field {name} is duplicated or has a forbidden context"),
+            )?;
+            let width = pcb_width(&field["width"], &rules_path)?;
+            if name == "status-code" {
+                status_fields += 1;
+                require(
+                    matches!(width, PcbWidth::Fixed(2)),
+                    &format!("IMS {kind} status field must be two bytes"),
+                )?;
+            }
+            if !matches!(width, PcbWidth::Fixed(_)) {
+                variable_fields += 1;
+            }
+            fields.push(PcbField {
+                name,
+                width,
+                semantic_value,
+                contexts: field_contexts,
+            });
+        }
+        require(
+            status_fields == 1
+                && variable_fields == usize::from(matches!(kind.as_str(), "database" | "gsam")),
+            &format!("IMS {kind} PCB variable/status field closure drifted"),
+        )?;
+        masks.push(PcbMask {
+            kind,
+            source_topic,
+            source_sha256,
+            contexts,
+            fields,
+        });
+    }
+
+    let categories = strings(&rules, "status_categories", &rules_path)?;
+    let expected_categories = [
+        "exceptional-valid-completed",
+        "warning-with-data-completed",
+        "warning-no-data-completed",
+        "improper-user-specification",
+        "system-io-security-error",
+        "unavailable-data",
+        "lock-timeout",
+    ];
+    require(
+        categories == expected_categories,
+        "IMS status category ordering drifted",
+    )?;
+    let expected_status_contexts = [
+        ("database", 87, &["database", "gsam"][..]),
+        ("system-service", 50, &["io"][..]),
+        ("message", 68, &["io", "alternate"][..]),
+    ];
+    let status_values = array(&rules, "status_contexts", &rules_path)?;
+    require(
+        status_values.len() == expected_status_contexts.len(),
+        "IMS status-context denominator drifted",
+    )?;
+    let mut status_contexts = Vec::new();
+    let mut distinct_codes = BTreeSet::new();
+    let mut memberships = 0_usize;
+    for (value, (expected_name, expected_count, expected_pcbs)) in
+        status_values.iter().zip(expected_status_contexts)
+    {
+        let name = text(value, "context", &rules_path)?.to_string();
+        let (source_topic, source_sha256) = source_pair(&value["source_topic"], &rules_path)?;
+        let pcb_kinds = strings(value, "pcb_kinds", &rules_path)?;
+        require(
+            name == expected_name
+                && value["status_count"].as_u64() == Some(expected_count as u64)
+                && pcb_kinds
+                    .iter()
+                    .map(String::as_str)
+                    .eq(expected_pcbs.iter().copied())
+                && cited_topics.get(&source_topic) == Some(&source_sha256),
+            &format!("IMS {name} status identity, source, count, or PCB applicability drifted"),
+        )?;
+        let mut statuses = BTreeMap::<String, Vec<String>>::new();
+        let mut seen_categories = BTreeSet::new();
+        let mut last_category = None;
+        for group in array(value, "category_groups", &rules_path)? {
+            let category = text(group, "category", &rules_path)?.to_string();
+            let position = categories
+                .iter()
+                .position(|candidate| candidate == &category)
+                .ok_or_else(|| format!("unknown IMS status category {category}"))?;
+            require(
+                seen_categories.insert(category.clone())
+                    && last_category.is_none_or(|prior| position > prior),
+                &format!("IMS {name} status category {category} is repeated or out of order"),
+            )?;
+            last_category = Some(position);
+            let mut group_codes = BTreeSet::new();
+            for code in strings(group, "codes", &rules_path)? {
+                validate_status_code(&code)?;
+                require(
+                    group_codes.insert(code.clone()),
+                    &format!("IMS {name} status category {category} repeats code {code:?}"),
+                )?;
+                statuses.entry(code).or_default().push(category.clone());
+            }
+        }
+        for code in strings(value, "uncategorized_codes", &rules_path)? {
+            validate_status_code(&code)?;
+            require(
+                statuses.insert(code.clone(), Vec::new()).is_none(),
+                &format!("IMS {name} uncategorized status {code:?} is already categorized"),
+            )?;
+        }
+        require(
+            statuses.len() == expected_count && statuses.contains_key("  "),
+            &format!("IMS {name} status closure or blank success drifted"),
+        )?;
+        let status_rows = statuses
+            .into_iter()
+            .map(|(code, categories)| {
+                distinct_codes.insert(code.clone());
+                StatusRow { code, categories }
+            })
+            .collect::<Vec<_>>();
+        memberships += status_rows.len();
+        status_contexts.push(StatusContext {
+            name,
+            source_topic,
+            source_sha256,
+            pcb_kinds,
+            statuses: status_rows,
+        });
+    }
+    require(
+        memberships == 205 && distinct_codes.len() == 162,
+        "IMS status membership or distinct-code denominator drifted",
+    )?;
+
+    let rules_sha256 = format!("sha256:{}", file_digest(&rules_path)?);
+    let manifest_sha256 = format!(
+        "sha256:{}",
+        text(&manifest, "topic_manifest_digest", &manifest_path)?
+    );
+    Ok((
+        format_generated_rust(render_pcb_source(&masks, &rules_sha256, &manifest_sha256))?,
+        format_generated_rust(render_status_source(
+            &status_contexts,
+            memberships,
+            distinct_codes.len(),
+        ))?,
+    ))
+}
+
+fn strings(value: &Value, field: &str, path: &Path) -> TaskResult<Vec<String>> {
+    array(value, field, path)?
+        .iter()
+        .map(|entry| {
+            entry
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| format!("{} field {field} contains non-text", path.display()))
+        })
+        .collect()
+}
+
+fn source_pair(value: &Value, path: &Path) -> TaskResult<(String, String)> {
+    Ok((
+        text(value, "topic_path", path)?.to_string(),
+        text(value, "sha256", path)?.to_string(),
+    ))
+}
+
+fn pcb_width(value: &Value, path: &Path) -> TaskResult<PcbWidth> {
+    if let Some(width) = value["fixed"].as_u64() {
+        return usize::try_from(width)
+            .map(PcbWidth::Fixed)
+            .map_err(|error| format!("{} has oversized PCB field width: {error}", path.display()));
+    }
+    if let Some(widths) = value["one_of"].as_array() {
+        return widths
+            .iter()
+            .map(|width| {
+                width
+                    .as_u64()
+                    .ok_or_else(|| format!("{} has non-integer PCB width", path.display()))
+                    .and_then(|width| usize::try_from(width).map_err(|error| error.to_string()))
+            })
+            .collect::<TaskResult<Vec<_>>>()
+            .map(PcbWidth::OneOf);
+    }
+    require(
+        value["variable"] == Value::String("key-feedback-area".into()),
+        "IMS PCB field width has an unknown form",
+    )?;
+    Ok(PcbWidth::Variable)
+}
+
+fn validate_status_code(code: &str) -> TaskResult {
+    require(
+        code == "  "
+            || (code.len() == 2
+                && code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())),
+        &format!("invalid IMS status code {code:?}"),
+    )
+}
+
+fn render_pcb_source(masks: &[PcbMask], rules_sha256: &str, manifest_sha256: &str) -> String {
+    let mut source = format!(
+        "// @generated by `cargo xtask ims-catalog`; do not edit.\n\
+         // Reviewed PCB metadata is not behavioral coverage.\n\n\
+         pub const IMS_PCB_STATUS_RULES_SHA256: &str = {rules_sha256:?};\n\
+         pub const IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256: &str = {manifest_sha256:?};\n\
+         pub const IMS_PCB_MASK_COUNT: usize = {};\n\n\
+         pub const IMS_PCB_MASKS: &[ImsPcbMaskDescriptor] = &[\n",
+        masks.len()
+    );
+    for mask in masks {
+        source.push_str("    ImsPcbMaskDescriptor {\n");
+        source.push_str(&format!(
+            "        kind: ImsPcbKind::{},\n        source_topic: {:?},\n        source_sha256: {:?},\n",
+            rust_variant(&mask.kind),
+            mask.source_topic,
+            format!("sha256:{}", mask.source_sha256)
+        ));
+        source.push_str("        allowed_contexts: &[");
+        for context in &mask.contexts {
+            source.push_str(&format!("ImsExecutionContext::{}, ", rust_variant(context)));
+        }
+        source.push_str("],\n        fields: &[\n");
+        for field in &mask.fields {
+            source.push_str("            ImsPcbFieldDescriptor {\n");
+            source.push_str(&format!(
+                "                field: ImsPcbField::{},\n",
+                rust_variant(&field.name)
+            ));
+            match &field.width {
+                PcbWidth::Fixed(width) => source.push_str(&format!(
+                    "                width: ImsPcbFieldWidth::Fixed({width}),\n"
+                )),
+                PcbWidth::OneOf(widths) => source.push_str(&format!(
+                    "                width: ImsPcbFieldWidth::OneOf(&{widths:?}),\n"
+                )),
+                PcbWidth::Variable => source
+                    .push_str("                width: ImsPcbFieldWidth::VariableKeyFeedback,\n"),
+            }
+            source.push_str(&format!(
+                "                semantic_value: ImsPcbSemanticValue::{},\n",
+                rust_variant(&field.semantic_value)
+            ));
+            source.push_str("                applicable_contexts: &[");
+            for context in &field.contexts {
+                source.push_str(&format!("ImsExecutionContext::{}, ", rust_variant(context)));
+            }
+            source.push_str("],\n            },\n");
+        }
+        source.push_str("        ],\n    },\n");
+    }
+    source.push_str("];\n");
+    source
+}
+
+fn render_status_source(
+    contexts: &[StatusContext],
+    memberships: usize,
+    distinct_codes: usize,
+) -> String {
+    let mut source = format!(
+        "// @generated by `cargo xtask ims-catalog`; do not edit.\n\
+         // Reviewed status metadata is not behavioral coverage.\n\n\
+         pub const IMS_STATUS_CONTEXT_MEMBERSHIPS: usize = {memberships};\n\
+         pub const IMS_STATUS_DISTINCT_CODE_COUNT: usize = {distinct_codes};\n\n\
+         pub const IMS_STATUS_CONTEXTS: &[ImsStatusContextDescriptor] = &[\n"
+    );
+    for context in contexts {
+        source.push_str("    ImsStatusContextDescriptor {\n");
+        source.push_str(&format!(
+            "        context: ImsStatusContext::{},\n        source_topic: {:?},\n        source_sha256: {:?},\n",
+            rust_variant(&context.name),
+            context.source_topic,
+            format!("sha256:{}", context.source_sha256)
+        ));
+        source.push_str("        pcb_kinds: &[");
+        for kind in &context.pcb_kinds {
+            source.push_str(&format!("ImsPcbKind::{}, ", rust_variant(kind)));
+        }
+        source.push_str("],\n        statuses: &[\n");
+        for status in &context.statuses {
+            source.push_str(&format!(
+                "            ImsStatusDescriptor {{ code: *b{:?}, categories: &[",
+                status.code
+            ));
+            for category in &status.categories {
+                source.push_str(&format!("ImsStatusCategory::{}, ", rust_variant(category)));
+            }
+            source.push_str("] },\n");
+        }
+        source.push_str("        ],\n    },\n");
+    }
+    source.push_str("];\n");
+    source
+}
+
 fn rust_variant(value: &str) -> String {
     value
         .split('-')
@@ -510,5 +953,61 @@ mod tests {
     fn names_reject_non_ascii_or_oversized_identities() {
         assert!(names("TOOLONGCALL", "row").is_err());
         assert!(names("é", "row").is_err());
+    }
+
+    #[test]
+    fn pcb_status_projection_has_exact_reviewed_denominators() {
+        let root = repository_root().unwrap();
+        let (pcb, status) = render_pcb_status(&root).unwrap();
+        let pcb = String::from_utf8(pcb).unwrap();
+        let status = String::from_utf8(status).unwrap();
+        assert!(pcb.contains("pub const IMS_PCB_MASK_COUNT: usize = 4;"));
+        assert!(status.contains("pub const IMS_STATUS_CONTEXT_MEMBERSHIPS: usize = 205;"));
+        assert!(status.contains("pub const IMS_STATUS_DISTINCT_CODE_COUNT: usize = 162;"));
+    }
+
+    #[test]
+    fn status_codes_accept_only_exact_two_byte_display_forms() {
+        for code in ["  ", "AB", "A1", "X9"] {
+            assert!(validate_status_code(code).is_ok());
+        }
+        for code in ["", "A", "AAA", "aB", "A ", "!A"] {
+            assert!(validate_status_code(code).is_err());
+        }
+    }
+
+    #[test]
+    fn pcb_status_generation_rejects_mutated_denominator_and_source() {
+        let source_root = repository_root().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "ims-pcb-catalog-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        for relative in [
+            PCB_STATUS_RULES_PATH,
+            PCB_STATUS_SCHEMA_PATH,
+            SSA_MANIFEST_PATH,
+        ] {
+            let destination = root.join(relative);
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::copy(source_root.join(relative), destination).unwrap();
+        }
+
+        let rules_path = root.join(PCB_STATUS_RULES_PATH);
+        let original = fs::read(&rules_path).unwrap();
+        let mut rules: Value = serde_json::from_slice(&original).unwrap();
+        rules["status_contexts"][0]["status_count"] = Value::from(88);
+        fs::write(&rules_path, serde_json::to_vec(&rules).unwrap()).unwrap();
+        assert!(render_pcb_status(&root).is_err());
+
+        rules["status_contexts"][0]["status_count"] = Value::from(87);
+        rules["source_topics"][0]["sha256"] = Value::String("0".repeat(64));
+        fs::write(&rules_path, serde_json::to_vec(&rules).unwrap()).unwrap();
+        assert!(render_pcb_status(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 }

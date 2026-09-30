@@ -15,6 +15,8 @@ mod clock;
 mod dataset;
 mod enterprise;
 mod ims;
+mod ims_pcb;
+mod ims_status;
 mod names;
 mod registry;
 mod request;
@@ -50,6 +52,18 @@ pub use ims::{
     ImsSsaFieldResolver, ImsSsaLimits, ImsSsaPredicate, ImsSsaProblem, ImsSsaRelation,
     ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
     parse_ims_ssa,
+};
+pub use ims_pcb::{
+    IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
+    IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,
+    ImsPcbFieldWidth, ImsPcbKind, ImsPcbLayout, ImsPcbLimits, ImsPcbMaskDescriptor, ImsPcbProblem,
+    ImsPcbSemanticValue, ims_pcb_layout, ims_pcb_mask, ims_pcb_masks,
+};
+pub use ims_status::{
+    IMS_STATUS_CONTEXT_MEMBERSHIPS, IMS_STATUS_CONTEXTS, IMS_STATUS_DISTINCT_CODE_COUNT,
+    ImsStatusCategory, ImsStatusCode, ImsStatusContext, ImsStatusContextDescriptor,
+    ImsStatusDescriptor, ImsStatusProblem, ims_status, ims_status_context, ims_status_contexts,
+    resolve_ims_status,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
