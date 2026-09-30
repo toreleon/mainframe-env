@@ -13506,7 +13506,9 @@ mod tests {
             ),
             (vec!["REC", "INVALID", "KEY"], b"REC01".as_slice()),
         ] {
+            // WRITE ... FROM moves into the record area first (#270), so reset it per case.
             machine.write_raw("REC", b"REC01").unwrap();
+            let from = args.contains(&"FROM");
             let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
             let step = machine.dataset_effect("write", &args).unwrap();
             let Step::Effect(effect) = step else {
@@ -13529,6 +13531,9 @@ mod tests {
                 })
                 .unwrap();
             assert_eq!(machine.resolve("FILE-STATUS").unwrap(), b"00");
+            if from {
+                assert_eq!(machine.resolve("REC").unwrap(), b"FROM2");
+            }
         }
     }
     #[test]
@@ -14320,6 +14325,7 @@ mod tests {
                 picture: "9(4)".into(),
                 digits: 4,
                 scale: 0,
+                native_binary: false,
                 signed: false,
                 sign_separate: false,
                 justified_right: false,

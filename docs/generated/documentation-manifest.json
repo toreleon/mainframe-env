@@ -909,7 +909,7 @@
       "path": "docs/decisions/0024-per-assertion-oracle-provenance.md",
       "relative_links": 0,
       "scope": "CardDemo 0.8 base-batch expected values and conformance credit",
-      "sha256": "sha256:01eed855b18a74e80125390d0b68f4504b7f850e8e102e576d0334f2bdb6807f",
+      "sha256": "sha256:90843aa45efc80794cfa11887a9fdf446234e3d21586f0b70ffd2a124b0b4359",
       "status": "Proposed for the first increment of issue #245",
       "title": "ADR-0024: Per-assertion oracle provenance for CardDemo base batch",
       "xtask_commands": 0
