@@ -11,3 +11,8 @@ The provider owns versioned Apache-2.0 behavioral compatibility definitions
 for CMQGMOV, CMQMDV, CMQODV, CMQPMOV, CMQTML, and CMQV. Callers explicitly add
 the source library to a compilation closure; the compiler has no embedded MQ
 ABI, and the inventory grants no semantic coverage credit.
+
+The IBM MQ 9.4 MQI denominator and provider authority boundary are defined in
+the [MQ programming-surface architecture](../../../docs/architecture/MQ-PROGRAMMING-SURFACE.md).
+The generated 26-call host registry preserves all 27 source-list positions but
+does not advertise execution or grant coverage.

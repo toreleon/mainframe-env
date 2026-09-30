@@ -17,6 +17,7 @@ mod enterprise;
 mod ims;
 mod ims_pcb;
 mod ims_status;
+mod mq_catalog;
 mod names;
 mod registry;
 mod request;
@@ -64,6 +65,11 @@ pub use ims_status::{
     ImsStatusCategory, ImsStatusCode, ImsStatusContext, ImsStatusContextDescriptor,
     ImsStatusDescriptor, ImsStatusProblem, ims_status, ims_status_context, ims_status_contexts,
     resolve_ims_status,
+};
+pub use mq_catalog::{
+    MQ_MQI_CALL_COUNT, MQ_MQI_CALL_IDENTITY_SET_SHA256, MQ_MQI_SOURCE_ROW_COUNT,
+    MqMqiCallIdentityDescriptor, mq_mqi_call_identities, mq_mqi_call_identity,
+    mq_mqi_call_identity_by_label,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,

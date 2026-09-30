@@ -47,6 +47,7 @@ explicitly names that authority as superseded.
 - [Coverage authority](architecture/COVERAGE-AUTHORITY.md)
 - [Dataset, VSAM, and AMS](architecture/DATASET-VSAM-AMS.md)
 - [JES execution](architecture/JES-EXECUTION.md)
+- [IBM MQ programming surface](architecture/MQ-PROGRAMMING-SURFACE.md)
 - [Application packages](architecture/APPLICATION-PACKAGES.md)
 - [Batch controller registry](architecture/BATCH-CONTROLLER-REGISTRY.md)
 - [CICS command routing](architecture/CICS-COMMAND-ROUTING.md)

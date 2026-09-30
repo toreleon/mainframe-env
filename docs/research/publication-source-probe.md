@@ -144,9 +144,9 @@ second half will be surprised by the next red run.
 | zosmf | SC27-8430-70, z/OSMF Programming Guide | 395<!--f:pins.topics.zosmf--> | 9,761,388<!--f:pins.bytes.zosmf--> | matches |
 | db2 | Db2 13 for z/OS SQL Reference | 832<!--f:pins.topics.db2--> | 29,147,264<!--f:pins.bytes.db2--> | matches on re-read; intermittently reported `differs` (see below) |
 | ims | Comparing EXEC DLI commands and DL/I calls, IMS 15.6 | 1<!--f:pins.topics.ims--> | 16,046<!--f:pins.bytes.ims--> | matches |
-| mq | IBM MQ 9.4 MQI call descriptions | 27<!--f:pins.topics.mq--> | 837,828<!--f:pins.bytes.mq--> | matches |
+| mq | IBM MQ 9.4 MQI call descriptions | 27<!--f:pins.topics.mq--> | 837,829<!--f:pins.bytes.mq--> | matches |
 
-4,488<!--f:pins.topics_total--> topics and 61,667,626<!--f:pins.bytes_total-->
+4,488<!--f:pins.topics_total--> topics and 61,667,627<!--f:pins.bytes_total-->
 bytes; both totals are the sum of the nine manifests
 in `conformance/0.2/manifests/` and can be recomputed from the tree without
 asking IBM anything. All nine tables of contents hash to their recorded
