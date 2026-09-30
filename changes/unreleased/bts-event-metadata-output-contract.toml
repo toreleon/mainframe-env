@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Decode GETNEXT EVENT and INQUIRE EVENT numeric metadata using the provider decimal payload contract, preserving legacy symbolic event outputs."

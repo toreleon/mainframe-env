@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Include mapped ISSUE CONFIRMATION and ERROR rows 0112 and 0122 in the APPC source-scoping regression expectation."

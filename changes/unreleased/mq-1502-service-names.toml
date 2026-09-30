@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed MQ queue service name handling to preserve case and reject malformed names before mutation (#342)."

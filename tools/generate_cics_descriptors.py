@@ -26,7 +26,7 @@ LOOKUP_OUTPUT_PATH = Path(
 PROVIDER_TAIL_OUTPUT_PATH = Path(
     "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
 )
-PROVIDER_INLINE_OPERATIONS = 149
+PROVIDER_INLINE_OPERATIONS = 147
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -35,6 +35,9 @@ IR_REGISTRY_OUTPUT_PATH = Path(
 )
 CONTRACT_OUTPUT_PATH = Path(
     "conformance/0.9/generated/cics-application-command-contracts.json"
+)
+CONTRACT_SCHEMA_PATH = Path(
+    "conformance/0.9/schemas/cics-application-command-contracts.schema.json"
 )
 COMPILER_SPI_COMPAT_OUTPUT_PATH = Path(
     "crates/kernel/mainframe-env-compiler/src/hir/typed/"
@@ -263,6 +266,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("IssueAbort", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0110"),
     ("IssueAdd", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0111"),
     ("IssueConfirmation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0112"),
+    ("GdsIssueConfirmation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0113"),
     ("IssueDisconnect", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0115"),
     ("IssueEnd", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0116"),
     ("IssueEndfile", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0117"),
@@ -271,6 +275,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("IssueErase", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0120"),
     ("IssueEraseAup", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0121"),
     ("IssueError", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0122"),
+    ("GdsIssueError", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0123"),
     ("IssueLoad", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0124"),
     ("IssueNote", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0125"),
     ("IssuePass", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0126"),
@@ -576,6 +581,14 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("DefineActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0032"),
     ("DefineProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0037"),
     ("DeleteActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0041"),
+    ("DeleteChannel", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0042"),
+    ("DeleteContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0043"),
+    ("GetContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0086"),
+    ("GetContainer64", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0096"),
+    ("MoveContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0144"),
+    ("PutContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0150"),
+    ("PutContainer64", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0151"),
+    ("QueryChannel", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0152"),
     ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
     ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
     ("ResumeAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0172"),
@@ -594,6 +607,25 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
     ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
     ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
+    ("BtsEndBrowseContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0060"),
+    ("BtsGetNextContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0090"),
+    ("BtsInquireContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0102"),
+    ("BtsStartBrowseContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0210"),
+    ("BtsEndBrowseEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0061"),
+    ("BtsGetNextEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0091"),
+    ("BtsInquireEvent", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0103"),
+    ("BtsStartBrowseEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0211"),
+    ("BtsEndBrowseTimer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0063"),
+    ("BtsInquireTimer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0105"),
+    ("BtsStartBrowseTimer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0213"),
+    ("BtsEndBrowseActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0059"),
+    ("BtsGetNextActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0089"),
+    ("BtsInquireActivity", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0101"),
+    ("BtsStartBrowseActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0209"),
+    ("BtsEndBrowseProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0062"),
+    ("BtsGetNextProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0092"),
+    ("BtsInquireProcess", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0104"),
+    ("BtsStartBrowseProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0212"),
 ]
 
 CONTRACT_BATCHES = (
@@ -798,6 +830,10 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "BtsEndBrowseEvent", "BtsGetNextEvent", "BtsInquireEvent", "BtsStartBrowseEvent", "BtsEndBrowseTimer", "BtsInquireTimer", "BtsStartBrowseTimer",
+        "BtsEndBrowseContainer", "BtsGetNextContainer", "BtsInquireContainer", "BtsStartBrowseContainer",
+        "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsInquireActivity", "BtsStartBrowseActivity",
+        "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsInquireProcess", "BtsStartBrowseProcess",
         "AcquireActivityId",
         "AcquireProcess",
         "CancelAcqActivity",
@@ -809,6 +845,14 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "DefineActivity",
         "DefineProcess",
         "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "GetContainer64",
+        "MoveContainer",
+        "PutContainer",
+        "PutContainer64",
+        "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
         "ResumeAcqActivity",
@@ -893,6 +937,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "IssueAbort",
         "IssueAdd",
         "IssueConfirmation",
+        "GdsIssueConfirmation",
         "IssueDisconnect",
         "IssueEnd",
         "IssueEndfile",
@@ -901,6 +946,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "IssueErase",
         "IssueEraseAup",
         "IssueError",
+        "GdsIssueError",
         "IssueLoad",
         "IssueNote",
         "IssuePass",
@@ -1185,7 +1231,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "IssueAbend": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
     "GdsIssueAbend": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
     "IssueConfirmation": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssueConfirmation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
     "IssueError": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssueError": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
     "IssuePrepare": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
     "GdsIssuePrepare": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
     "IssueSignal": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
@@ -1568,7 +1616,24 @@ _BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
 TYPED_RUNTIME_IR_EFFECTS.update(
     {
         name: _BTS_READ_EFFECTS
-        for name in ("CheckAcqActivity", "CheckAcqProcess")
+        for name in ("BtsInquireContainer", "BtsInquireActivity", "BtsInquireProcess", "BtsInquireEvent", "BtsInquireTimer")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_MUTATE_EFFECTS
+        for name in (
+            "BtsEndBrowseEvent", "BtsGetNextEvent", "BtsStartBrowseEvent", "BtsEndBrowseTimer", "BtsStartBrowseTimer",
+            "BtsEndBrowseContainer", "BtsGetNextContainer", "BtsStartBrowseContainer",
+            "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsStartBrowseActivity",
+            "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsStartBrowseProcess",
+        )
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_READ_EFFECTS
+        for name in ("CheckAcqActivity", "CheckAcqProcess", "GetContainer", "GetContainer64", "QueryChannel")
     }
 )
 TYPED_RUNTIME_IR_EFFECTS.update(
@@ -1586,6 +1651,7 @@ TYPED_RUNTIME_IR_EFFECTS.update(
             "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
             "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
             "SuspendAcqProcess", "SuspendActivity",
+            "DeleteChannel", "DeleteContainer", "MoveContainer", "PutContainer", "PutContainer64",
         )
     }
 )
@@ -1853,6 +1919,7 @@ def _load_typed_execution_registrations(
         "IssueAbort",
         "IssueAdd",
         "IssueConfirmation",
+        "GdsIssueConfirmation",
         "IssueDisconnect",
         "IssueEnd",
         "IssueEndfile",
@@ -1861,6 +1928,7 @@ def _load_typed_execution_registrations(
         "IssueErase",
         "IssueEraseAup",
         "IssueError",
+        "GdsIssueError",
         "IssueLoad",
         "IssueNote",
         "IssuePass",
@@ -1966,6 +2034,14 @@ def _load_typed_execution_registrations(
         "DefineActivity",
         "DefineProcess",
         "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "GetContainer64",
+        "MoveContainer",
+        "PutContainer",
+        "PutContainer64",
+        "QueryChannel",
         "ResetAcqProcess",
         "ResetActivity",
         "ResumeAcqActivity",
@@ -1978,6 +2054,25 @@ def _load_typed_execution_registrations(
         "SuspendAcqActivity",
         "SuspendAcqProcess",
         "SuspendActivity",
+        "BtsEndBrowseContainer",
+        "BtsGetNextContainer",
+        "BtsInquireContainer",
+        "BtsStartBrowseContainer",
+        "BtsEndBrowseEvent",
+        "BtsGetNextEvent",
+        "BtsInquireEvent",
+        "BtsStartBrowseEvent",
+        "BtsEndBrowseTimer",
+        "BtsInquireTimer",
+        "BtsStartBrowseTimer",
+        "BtsEndBrowseActivity",
+        "BtsGetNextActivity",
+        "BtsInquireActivity",
+        "BtsStartBrowseActivity",
+        "BtsEndBrowseProcess",
+        "BtsGetNextProcess",
+        "BtsInquireProcess",
+        "BtsStartBrowseProcess",
         "FetchAny",
         "FetchChild",
         "FreeChild",
@@ -4212,7 +4307,7 @@ def _semantic_contract(
             raise DescriptorError(
                 f"{command['official_row']} typed IR effects omit resolved memory flow"
             )
-        option_sensitive = operation == "Read"
+        option_sensitive = operation in {"Read", "GetContainer"}
         capability = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",
             "route": "host.cics.execute",
@@ -5690,6 +5785,23 @@ def render(root: Path = ROOT) -> str:
     return render_provider(root)
 
 
+def render_contract_schema(root: Path, contracts: dict[str, Any]) -> str:
+    schema_path = root / CONTRACT_SCHEMA_PATH
+    if not schema_path.exists():
+        schema_path = ROOT / CONTRACT_SCHEMA_PATH
+    schema = json.loads(schema_path.read_text())
+    registry_properties = schema["$defs"]["registry-summary"]["properties"]
+    count_properties = schema["$defs"]["counts"]["properties"]
+    for name in ("typed_handlers", "advertised_commands", "unready_handlers"):
+        registry_properties[name]["const"] = contracts["registry"][name]
+    for name in (
+        "runtime_backed_commands", "typed_runtime_commands",
+        "advertised_commands", "unready_commands",
+    ):
+        count_properties[name]["const"] = contracts["counts"][name]
+    return json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
+
+
 def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     contracts = build_contracts(root)
     return {
@@ -5700,6 +5812,7 @@ def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),
         IR_REGISTRY_OUTPUT_PATH: render_ir_registry(root, contracts),
         CONTRACT_OUTPUT_PATH: json.dumps(contracts, indent=2, ensure_ascii=False) + "\n",
+        CONTRACT_SCHEMA_PATH: render_contract_schema(root, contracts),
     }
 
 

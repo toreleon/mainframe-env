@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover the bounded IMS TM runtime foundation for durable queue admission, work claims, message and alternate PCB calls, conversations, replay, and admission-gap repair without application execution or conformance credit."

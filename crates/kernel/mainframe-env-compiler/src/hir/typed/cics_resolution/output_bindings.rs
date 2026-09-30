@@ -31,6 +31,32 @@ pub(super) fn inout_length(
     .flatten()
 }
 
+pub(super) fn append_inout_length(
+    outputs: &mut Vec<HirCicsOutputBinding>,
+    clauses: &Clauses,
+    operands: &[HirCicsNamedOperand],
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<()> {
+    if operation == HirCicsOperation::Retrieve
+        && let Some(length) = clauses.get("LENGTH")
+    {
+        let target = complete_data_reference(length, semantic)?;
+        require_writable(&target)?;
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::Length,
+            target,
+        });
+    } else if let Some(target) = inout_length(operands, operation) {
+        require_writable(target)?;
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::Length,
+            target: target.clone(),
+        });
+    }
+    Ok(())
+}
+
 pub(super) fn resolve(
     clauses: &Clauses,
     options: &[String],
@@ -111,7 +137,12 @@ pub(super) fn resolve(
         ("YYMMDD", HirCicsOutputName::Yymmdd),
         ("YYYYMMDD", HirCicsOutputName::Yyyymmdd),
     ] {
-        if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
+        if name == "ABSTIME"
+            && matches!(
+                operation,
+                HirCicsOperation::FormatTime | HirCicsOperation::BtsInquireTimer
+            )
+        {
             continue;
         }
         if name == "PARTN" && operation != HirCicsOperation::ReceivePartn {
@@ -120,7 +151,8 @@ pub(super) fn resolve(
         if name == "INTO"
             && matches!(
                 operation,
-                HirCicsOperation::WebReceive
+                HirCicsOperation::GetContainer
+                    | HirCicsOperation::WebReceive
                     | HirCicsOperation::WebConverse
                     | HirCicsOperation::ExtractLogonMsg
                     | HirCicsOperation::Converse

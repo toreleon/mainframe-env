@@ -167,7 +167,13 @@ fn execute(
     let mut staged = Vec::with_capacity(plan.assignments.len());
     let mut receiver_size_error = false;
     for (assignment, value) in plan.assignments.iter().zip(evaluated) {
-        match stage_receiver(machine, operation, &assignment.receiver, value) {
+        match stage_receiver(
+            machine,
+            operation,
+            &assignment.receiver,
+            value,
+            preserve_failed_receiver,
+        ) {
             Ok(write) => staged.push(write),
             Err(MachineProblem::SizeError)
                 if plan.policy.receiver_update
@@ -682,6 +688,7 @@ fn stage_receiver(
     operation: &Operation,
     receiver: &DecimalReceiver,
     value: Decimal,
+    check_edited_size: bool,
 ) -> Result<(StorageView, Vec<u8>), MachineProblem> {
     let layout = runtime_layout(machine, operation, &receiver.target, true)?;
     let view = machine.storage_view(&layout.name)?.clone();
@@ -693,6 +700,12 @@ fn stage_receiver(
     } else {
         round_to_scale(value, layout.scale, receiver.rounding)?
     };
+    if check_edited_size
+        && layout.category == LayoutCategory::NumericEdited
+        && decimal_exceeds_picture(&layout, value)
+    {
+        return Err(MachineProblem::SizeError);
+    }
     let bytes = encode_decimal(&layout, value)?;
     if bytes.len() != view.length
         || machine
