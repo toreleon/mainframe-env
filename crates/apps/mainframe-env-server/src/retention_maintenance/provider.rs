@@ -35,10 +35,11 @@ use mainframe_env_spool::{SpoolLimits, SpoolRetentionState, describe_spool_reten
 use mainframe_env_store_api::{
     EffectDigestFormat, EffectRecord, EffectState, PlatformStore, ProviderRetentionDependency,
     ProviderRetentionObservationDeletion, ProviderRetentionObservationSource, ProviderRetentionRow,
-    ProviderStateArchiveDeletion, ProviderStateIdentity, ProviderStateRecord,
-    RetentionAgeReconciliation, RetentionForecast, RetentionLegacyRow, RetentionObservation,
-    RetentionObservationProof, RetentionPolicy, RetentionReceipt, RetentionReconciliationReceipt,
-    RetentionRequest, RetentionTarget, StoreError,
+    ProviderStateArchiveDeletion, ProviderStateArchiveDeletionWithCapacity, ProviderStateIdentity,
+    ProviderStateRecord, ProviderStateWrite, RetentionAgeReconciliation, RetentionForecast,
+    RetentionLegacyRow, RetentionObservation, RetentionObservationProof, RetentionPolicy,
+    RetentionReceipt, RetentionReconciliationReceipt, RetentionRequest, RetentionTarget,
+    StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -334,6 +335,74 @@ impl RetentionPlanner {
                     observations_reused: 0,
                     stale_observations_removed: plan.stale_observations_removed,
                 });
+            }
+            if target == RetentionTarget::CicsReplay {
+                for outer in &plan.rows {
+                    let Some(private) = self
+                        .store
+                        .get_provider_state("cics-container-replay-v1", &outer.row.key)
+                        .map_err(store_problem)?
+                    else {
+                        continue;
+                    };
+                    let capacity = self
+                        .store
+                        .get_provider_state("cics-container-capacity-v1", "global")
+                        .map_err(store_problem)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    let mut payload: serde_json::Value = serde_json::from_slice(&capacity.payload)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    let count = payload["replays"]
+                        .as_u64()
+                        .and_then(|count| count.checked_sub(1))
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    payload["replays"] = count.into();
+                    let replacement = ProviderStateWrite {
+                        record: ProviderStateRecord {
+                            version: capacity
+                                .version
+                                .checked_add(1)
+                                .ok_or(HostProblem::ResourceExhausted)?,
+                            payload: serde_json::to_vec(&payload)
+                                .map_err(|_| HostProblem::InfrastructureFailure)?,
+                            ..capacity.clone()
+                        },
+                        expected_version: Some(capacity.version),
+                    };
+                    let archive = self
+                        .store
+                        .archive_provider_state_deletion_with_capacity(
+                            ProviderStateArchiveDeletionWithCapacity {
+                                deletion: ProviderStateArchiveDeletion {
+                                    expected_epoch: plan.expected_epoch,
+                                    target,
+                                    archived_tick: now_tick,
+                                    watermark_tick: plan.watermark_tick,
+                                    rows: vec![ProviderRetentionRow {
+                                        row: private,
+                                        observation: None,
+                                        ..outer.clone()
+                                    }],
+                                },
+                                outer_receipts: vec![outer.row.clone()],
+                                capacity_source: capacity,
+                                capacity_replacement: replacement,
+                            },
+                        )
+                        .map_err(store_problem)?;
+                    return Ok(RetentionReceipt {
+                        target,
+                        watermark_tick: plan.watermark_tick,
+                        examined: plan.active_records,
+                        archived: archive.rows.len(),
+                        pruned: archive.rows.len(),
+                        protected: plan.active_records.saturating_sub(eligible),
+                        archive_id: Some(archive.archive_id),
+                        observations_created: 0,
+                        observations_reused: 0,
+                        stale_observations_removed: plan.stale_observations_removed,
+                    });
+                }
             }
             let mut batch = plan.rows.len();
             let archive = loop {

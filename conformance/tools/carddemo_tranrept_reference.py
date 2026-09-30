@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,44 @@ def sha256(data):
 
 def file_sha(path):
     return sha256(Path(path).read_bytes())
+
+
+def dd_parameters(jcl, name):
+    """Return a DD card and its continuation lines from source JCL."""
+    lines = jcl.splitlines()
+    for index, line in enumerate(lines):
+        if re.match(rf"^//{re.escape(name)}\s+DD\b", line):
+            card = [line[2:]]
+            for continuation in lines[index + 1:]:
+                if not continuation.startswith("// "):
+                    break
+                card.append(continuation[2:])
+            return " ".join(card)
+    raise ValueError(f"missing {name} DD in TRANREPT JCL")
+
+
+def tranrept_dataset_metadata(jcl):
+    """Resolve SORTOUT's DCB referback through SORTIN to the backup DD."""
+    backup = dd_parameters(jcl, "PRC001.FILEOUT")
+    sortin = dd_parameters(jcl, "SORTIN")
+    sortout = dd_parameters(jcl, "SORTOUT")
+    report = dd_parameters(jcl, "TRANREPT")
+    if not re.search(r"\bDSN=AWS\.M2\.CARDDEMO\.TRANSACT\.BKUP\(\+1\)", sortin):
+        raise ValueError("SORTIN does not read the backup generation")
+    if not re.search(r"\bDCB=\(\*\.SORTIN\)", sortout):
+        raise ValueError("SORTOUT does not refer back to SORTIN DCB")
+
+    def explicit_dcb(card):
+        match = re.search(r"\bDCB=\(LRECL=(\d+),RECFM=(F|FB),BLKSIZE=\d+\)", card)
+        if not match:
+            raise ValueError("expected explicit fixed-record DCB in TRANREPT JCL")
+        return {"organization": "Sequential",
+                "recfm": {"F": "Fixed", "FB": "FixedBlocked"}[match[2]],
+                "lrecl": int(match[1]), "ccsid": 37}
+
+    source = explicit_dcb(backup)
+    output = explicit_dcb(report)
+    return source, source.copy(), output
 
 
 def field(digest, value):
@@ -173,13 +212,19 @@ def derive(cobc, corpus, out):
     cobc = Path(cobc).resolve()
     corpus = Path(corpus).resolve()
     data = (ROOT / INPUT).read_bytes()
-    source_records = records(data, 350)
     tool_version = subprocess.check_output([str(cobc), "--version"], text=True).splitlines()[0]
     tool_info = subprocess.check_output([str(cobc), "--info"], text=True)
     if "indexed file handler     : BDB" not in tool_info or "native EBCDIC            : no" not in tool_info:
         raise ValueError("GnuCOBOL must use BDB indexed files without native EBCDIC")
     jcl = corpus / "app/jcl/TRANREPT.jcl"
     jcl_text = jcl.read_text()
+    source_metadata, selected_metadata, report_metadata = tranrept_dataset_metadata(jcl_text)
+    source_metadata["version"] = 3
+    selected_metadata["version"] = 3
+    report_metadata["version"] = 522
+    if source_metadata["lrecl"] != 350 or report_metadata["lrecl"] != 133:
+        raise ValueError("TRANREPT JCL record lengths differ from the reference programs")
+    source_records = records(data, source_metadata["lrecl"])
     for parameter in ("PARM-START-DATE,C'2022-01-01'", "PARM-END-DATE,C'2022-07-06'"):
         if parameter not in jcl_text:
             raise ValueError(f"TRANREPT JCL date parameter differs: {parameter}")
@@ -216,9 +261,11 @@ def derive(cobc, corpus, out):
         "tranrept_report_records": len(report),
         "dataset_sha256": {
             "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00": framed_dataset(
-                selected, 32760, 3, record_format="Variable", record_length=350),
+                selected, selected_metadata["lrecl"], selected_metadata["version"],
+                record_format=selected_metadata["recfm"]),
             "AWS.M2.CARDDEMO.TRANREPT.G0001V00": framed_dataset(
-                report, 133, 522, record_format="FixedBlocked"),
+                report, report_metadata["lrecl"], report_metadata["version"],
+                record_format=report_metadata["recfm"]),
         },
     }
     manifest = {
@@ -228,9 +275,10 @@ def derive(cobc, corpus, out):
             "path": INPUT, "sha256": sha256(data),
             "raw_record_sha256": sha256(data),
             "framed_dataset_sha256": framed_dataset(
-                source_records, 350, 3, record_format="FixedBlocked"),
+                source_records, source_metadata["lrecl"], source_metadata["version"],
+                record_format=source_metadata["recfm"]),
             "dataset": "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
-            "record_count": len(source_records), "lrecl": 350,
+            "record_count": len(source_records), "lrecl": source_metadata["lrecl"],
         },
         "date_parameters": {"start": "2022-01-01", "end": "2022-07-06",
                             "jcl_sha256": file_sha(jcl)},
@@ -246,14 +294,8 @@ def derive(cobc, corpus, out):
             "canonicaliser_path": SCRIPT, "canonicaliser_sha256": file_sha(ROOT / SCRIPT),
             "sort_policy": "ascending 16-byte card key; equal keys retain input order",
             "sort_origin": "written translation of TRANREPT.jcl DFSORT card",
-            "dataset_metadata": {
-                "input": {"organization": "Sequential", "recfm": "FixedBlocked",
-                          "lrecl": 350, "ccsid": 37, "version": 3},
-                "selected": {"organization": "Sequential", "recfm": "Variable",
-                             "lrecl": 32760, "ccsid": 37, "version": 3},
-                "report": {"organization": "Sequential", "recfm": "FixedBlocked",
-                           "lrecl": 133, "ccsid": 37, "version": 522},
-            },
+            "dataset_metadata": {"input": source_metadata, "selected": selected_metadata,
+                                 "report": report_metadata},
         },
         "results": result,
     }

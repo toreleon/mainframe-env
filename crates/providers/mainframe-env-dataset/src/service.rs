@@ -13289,6 +13289,40 @@ mod tests {
     }
 
     #[test]
+    fn variable_blocked_dataset_preserves_twelve_and_thirty_nine_byte_records() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let name = DatasetName::new("ACCTDATA.VBPS", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format: RecordFormat::VariableBlocked,
+                    logical_record_length: 84,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                },
+                mutation: mutation(1),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Append {
+                dataset: name.clone(),
+                member: None,
+                records: vec![vec![b'A'; 12], vec![b'B'; 39]],
+                expected_version: None,
+                mutation: mutation(2),
+            })
+            .unwrap();
+        assert!(matches!(dataset.invoke(DatasetRequest::Read {
+            dataset: name, member: None, key: None, max_records: 2,
+            control: Default::default(),
+        }), Ok(DatasetResult::Records { records, .. })
+            if records.iter().map(Vec::len).collect::<Vec<_>>() == [12, 39]));
+    }
+
+    #[test]
     fn catalog_owner_expiration_retention_and_purge_are_enforced() {
         let dataset = service(Arc::new(MemoryStore::new(Default::default())));
         let name = DatasetName::new("USER.PROTECT", 44).unwrap();

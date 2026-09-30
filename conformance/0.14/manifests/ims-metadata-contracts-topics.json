@@ -1,0 +1,81 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-metadata-contracts-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 DBDGEN and PSBGEN metadata contracts for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdgenstmt.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 10,
+  "total_bytes": 3035971,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "847166149ae438081effe2f09e7a492b9417217d285d48944bafc3b17cb671d2",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdgenstmt.htm",
+      "sha256": "ae672b28c57e88f04a51ca54c152196f5f86eba67af3f91e99277b9d3676d53a",
+      "bytes": 30906,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdstmt.htm",
+      "sha256": "ce1b4b70aa0b5803d25e5d72a71004cffb071361fcbc93a658bd3ce4e17cf7cd",
+      "bytes": 642542,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_fieldstmt.htm",
+      "sha256": "94455fbdc9d5f7404c89c0fd73a813fee237fb851fc0d2348a96ba1ce9d36fcb",
+      "bytes": 696481,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_lchildstmt.htm",
+      "sha256": "518642c5f4fdbddb5f8a9ebc35dc609e5aeffa16b4951e99c2e655e285fcb9f8",
+      "bytes": 186611,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenaltpcbstmt.htm",
+      "sha256": "89b117adcbc8ee2c9c114ce98258df1068548b3b88e0fac1e19892ffa8aba2a1",
+      "bytes": 50513,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+      "sha256": "0dad54edd1a9940ca9a6988e06412836ff35a706cc2e1f7fbd36eb14fa02cfba",
+      "bytes": 141546,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenpsbgenstmt.htm",
+      "sha256": "b373ee39a66431d4217f96809f90f4e4b648813dd0e484fbe8c87eccb3895d0c",
+      "bytes": 67008,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgensensegstmt.htm",
+      "sha256": "baf8ed5e7ad87faf1ba02801da3479385ba5b4b5fc74474ca051d32d3014ebf4",
+      "bytes": 48583,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_segmstmt.htm",
+      "sha256": "014bf18fd4c89941bd6bafe3dccd66e607daf0523e618648334ca251eb2824d9",
+      "bytes": 1059423,
+      "last_modified": "unavailable-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_xdfldstmt.htm",
+      "sha256": "1954204faddc7fc6f55e5942342c3edbd2114781c136e4c0276794dc1818fce8",
+      "bytes": 112358,
+      "last_modified": "unavailable-in-retained-archive"
+    }
+  ]
+}

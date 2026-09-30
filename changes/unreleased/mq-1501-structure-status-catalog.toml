@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recovered the MQ-1501 source-bound MQI structure/status catalog and generated read-only host contracts for 26 calls and 169 parameters, including the reviewed MQHMSG normalization. No behavioral or licensed credit."

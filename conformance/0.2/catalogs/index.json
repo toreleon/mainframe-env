@@ -242,8 +242,8 @@
         "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
         "manifest": "conformance/0.2/manifests/db2-topics.json",
         "topic_count": 832,
-        "sha256": "sha256:6fd51d84b9d5c365d2017f1037f4edefb8d9af71de9277556cd50cf3e2f13757",
-        "bytes": 29147264,
+        "sha256": "sha256:83f04d82753771425aab203c7913dd9fea1c768766cf315df421100015e72463",
+        "bytes": 29147520,
         "snapshot_date": "2026-08-13",
         "extraction_method": "reviewed ordered children of the Db2 SQL Statements and SQL procedural language anchors, with SQL PL labels taken from each topic heading",
         "retained_in_repository": false
@@ -301,8 +301,8 @@
         "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
         "manifest": "conformance/0.2/manifests/mq-topics.json",
         "topic_count": 27,
-        "sha256": "sha256:c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3",
-        "bytes": 837828,
+        "sha256": "sha256:f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d",
+        "bytes": 837829,
         "snapshot_date": "2026-08-31",
         "extraction_method": "reviewed MQI call links with the repeated MQMHBUF documentation row deduplicated",
         "retained_in_repository": false

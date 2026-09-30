@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Add durable internal GDS peer SEND CONFIRM response consumption with exact basic outputs for #294."
