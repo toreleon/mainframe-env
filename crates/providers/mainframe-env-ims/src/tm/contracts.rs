@@ -9,6 +9,7 @@ pub struct TmLimits {
     pub max_transactions: usize,
     pub max_alternate_pcbs: usize,
     pub max_queued_messages: usize,
+    pub max_outbound_messages: usize,
     pub max_segments_per_message: usize,
     pub max_segment_bytes: usize,
     pub max_spa_bytes: usize,
@@ -23,6 +24,7 @@ impl Default for TmLimits {
             max_transactions: 256,
             max_alternate_pcbs: 64,
             max_queued_messages: 65_536,
+            max_outbound_messages: 65_536,
             max_segments_per_message: 256,
             max_segment_bytes: 32 * 1024,
             max_spa_bytes: 32 * 1024,
@@ -309,6 +311,7 @@ impl<'de> Deserialize<'de> for TmPcbStatus {
         match code {
             [b' ', b' '] => Ok(Self::SUCCESS),
             [b'Q', b'C'] => Ok(Self::NO_MORE_MESSAGES),
+            [b'Q', b'D'] => Ok(Self::NO_MORE_SEGMENTS),
             [b'A', b'D'] => Ok(Self::INVALID_CALL),
             [b'Q', b'F'] => Ok(Self::INVALID_SEGMENT_LENGTH),
             _ => Err(serde::de::Error::custom("unsupported IMS TM PCB status")),
@@ -319,6 +322,7 @@ impl<'de> Deserialize<'de> for TmPcbStatus {
 impl TmPcbStatus {
     pub const SUCCESS: Self = Self(*b"  ");
     pub const NO_MORE_MESSAGES: Self = Self(*b"QC");
+    pub const NO_MORE_SEGMENTS: Self = Self(*b"QD");
     pub const INVALID_CALL: Self = Self(*b"AD");
     /// QF: the message segment is shorter than the minimum length (IMS 15.6
     /// message-call status table and the QF explanation topic), not a queue-full
@@ -330,10 +334,18 @@ impl TmPcbStatus {
         match self.0 {
             [b' ', b' '] => "  ",
             [b'Q', b'C'] => "QC",
+            [b'Q', b'D'] => "QD",
             [b'A', b'D'] => "AD",
             [b'Q', b'F'] => "QF",
             _ => panic!("unsupported IMS TM PCB status"),
         }
+    }
+
+    pub(crate) const fn valid(self) -> bool {
+        matches!(
+            self.0,
+            [b' ', b' '] | [b'Q', b'C'] | [b'Q', b'D'] | [b'A', b'D'] | [b'Q', b'F']
+        )
     }
 }
 
