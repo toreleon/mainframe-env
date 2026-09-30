@@ -1,9 +1,10 @@
 use crate::service::VerifiedCobolHir;
 use crate::{CobolHir, ControlEdgeKind, ControlRole, ControlScope, DataCategory, StatementKind};
 use mainframe_env_ir::{
-    Attribute, COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES, Effect,
-    IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
-    OperationSchema, StorageReference, cobol_layout_definition_schema,
+    Attribute, COBOL_ENTRY_FORMALS_V1, COBOL_MAX_UNBOUNDED_OCCURRENCES,
+    COBOL_MAX_UNBOUNDED_STORAGE_BYTES, Effect, IrLimits, LegalityProfile, Module, ModuleBuilder,
+    OperationCatalog, OperationIdentity, OperationSchema, StorageReference,
+    cobol_layout_definition_schema,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -133,6 +134,10 @@ pub(crate) fn lower_to_core(
                 ),
                 ("display_sign".into(), Attribute::Text(display_sign.into())),
                 (
+                    COBOL_ENTRY_FORMALS_V1.into(),
+                    Attribute::Text(hir.entry_formals.join("\u{1f}")),
+                ),
+                (
                     "address_mode".into(),
                     Attribute::Text(address_mode.to_string()),
                 ),
@@ -178,6 +183,10 @@ pub(crate) fn lower_to_core(
             ),
             ("digits".into(), Attribute::Integer(layout.digits as i64)),
             ("scale".into(), Attribute::Integer(layout.scale as i64)),
+            (
+                "native_binary".into(),
+                Attribute::Integer(i64::from(layout.usage == crate::CobolUsage::NativeBinary)),
+            ),
             (
                 "signed".into(),
                 Attribute::Integer(i64::from(layout.signed)),
