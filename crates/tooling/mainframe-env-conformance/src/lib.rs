@@ -31,6 +31,7 @@ mod decimal_adapter;
 mod framework;
 mod jcl;
 mod licensed_harness;
+pub mod profile_intake;
 mod racf;
 mod racf_oracle;
 mod racf_reference;
