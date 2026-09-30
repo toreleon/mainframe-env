@@ -311,6 +311,15 @@ impl Storage64Arena {
             .ok_or(Storage64Problem::InvalidPointer)
     }
 
+    pub(crate) fn available_length(
+        &self,
+        address: u64,
+        task: &str,
+        caller_key: Storage64Key,
+    ) -> Result<usize, Storage64Problem> {
+        Ok(self.access(address, task, caller_key)?.bytes.len())
+    }
+
     pub fn write(
         &mut self,
         address: u64,

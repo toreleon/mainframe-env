@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fix #306: accept intrinsic arguments that start with a parenthesized arithmetic expression."
