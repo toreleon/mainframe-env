@@ -1,38 +1,19 @@
+mod bts_browse;
+mod common;
 mod conversation;
 mod issue;
 mod options;
 mod output;
-pub(super) use options::{option_from_tag, option_tag};
-pub(super) use output::{output_from_tag, output_tag};
-
 use super::{
     CicsAssignOutput, CicsCertificateOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem,
     CicsPlanOperation, CicsPlanOption, CicsTcpipOutput,
 };
-
+pub(super) use common::{bounded_count, require_order};
+pub(super) use options::{option_from_tag, option_tag};
+pub(super) use output::{output_from_tag, output_tag};
 const ASSIGN_OUTPUT_TAG_BASE: u16 = 13;
 const ASSIGN_OUTPUT_LEGACY_COUNT: u16 = 78;
 const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u16 = 96;
-
-pub(super) fn bounded_count(value: usize, maximum: usize) -> Result<(), CicsPlanCodecProblem> {
-    if value > maximum || u32::try_from(value).is_err() {
-        Err(CicsPlanCodecProblem::LimitExceeded)
-    } else {
-        Ok(())
-    }
-}
-
-pub(super) fn require_order<T: Copy + Ord>(
-    previous: Option<T>,
-    current: T,
-) -> Result<(), CicsPlanCodecProblem> {
-    match previous {
-        Some(previous) if previous == current => Err(CicsPlanCodecProblem::Malformed),
-        Some(previous) if previous > current => Err(CicsPlanCodecProblem::NonCanonical),
-        _ => Ok(()),
-    }
-}
-
 #[cfg(test)]
 pub(super) const TRANSFORM_OPERATION_TAGS: std::ops::RangeInclusive<u16> = 68..=71;
 #[cfg(test)]
@@ -44,6 +25,25 @@ pub(super) const TRANSFORM_OUTPUT_TAGS: std::ops::RangeInclusive<u16> = 224..=23
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
     match value {
+        CicsPlanOperation::BtsEndBrowseContainer
+        | CicsPlanOperation::BtsGetNextContainer
+        | CicsPlanOperation::BtsInquireContainer
+        | CicsPlanOperation::BtsStartBrowseContainer => bts_browse::operation_tag(value),
+        CicsPlanOperation::BtsEndBrowseEvent => 198,
+        CicsPlanOperation::BtsGetNextEvent => 203,
+        CicsPlanOperation::BtsInquireEvent => 208,
+        CicsPlanOperation::BtsStartBrowseEvent => 213,
+        CicsPlanOperation::BtsEndBrowseTimer => 200,
+        CicsPlanOperation::BtsInquireTimer => 210,
+        CicsPlanOperation::BtsStartBrowseTimer => 215,
+        CicsPlanOperation::BtsEndBrowseActivity => 196,
+        CicsPlanOperation::BtsGetNextActivity => 201,
+        CicsPlanOperation::BtsInquireActivity => 206,
+        CicsPlanOperation::BtsStartBrowseActivity => 211,
+        CicsPlanOperation::BtsEndBrowseProcess => 199,
+        CicsPlanOperation::BtsGetNextProcess => 204,
+        CicsPlanOperation::BtsInquireProcess => 209,
+        CicsPlanOperation::BtsStartBrowseProcess => 214,
         CicsPlanOperation::IssueAbend
         | CicsPlanOperation::GdsIssueAbend
         | CicsPlanOperation::IssueConfirmation
@@ -87,6 +87,14 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::SuspendAcqActivity => 185,
         CicsPlanOperation::SuspendAcqProcess => 186,
         CicsPlanOperation::SuspendActivity => 187,
+        CicsPlanOperation::DeleteChannel => 188,
+        CicsPlanOperation::DeleteContainer => 189,
+        CicsPlanOperation::GetContainer => 190,
+        CicsPlanOperation::GetContainer64 => 191,
+        CicsPlanOperation::MoveContainer => 192,
+        CicsPlanOperation::PutContainer => 193,
+        CicsPlanOperation::PutContainer64 => 194,
+        CicsPlanOperation::QueryChannel => 195,
         CicsPlanOperation::FetchAny => 216,
         CicsPlanOperation::FetchChild => 217,
         CicsPlanOperation::FreeChild => 218,
@@ -268,6 +276,22 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
 
 pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
     match value {
+        197 | 202 | 207 | 212 => bts_browse::operation_from_tag(value),
+        198 => Ok(CicsPlanOperation::BtsEndBrowseEvent),
+        203 => Ok(CicsPlanOperation::BtsGetNextEvent),
+        208 => Ok(CicsPlanOperation::BtsInquireEvent),
+        213 => Ok(CicsPlanOperation::BtsStartBrowseEvent),
+        200 => Ok(CicsPlanOperation::BtsEndBrowseTimer),
+        210 => Ok(CicsPlanOperation::BtsInquireTimer),
+        215 => Ok(CicsPlanOperation::BtsStartBrowseTimer),
+        196 => Ok(CicsPlanOperation::BtsEndBrowseActivity),
+        201 => Ok(CicsPlanOperation::BtsGetNextActivity),
+        206 => Ok(CicsPlanOperation::BtsInquireActivity),
+        211 => Ok(CicsPlanOperation::BtsStartBrowseActivity),
+        199 => Ok(CicsPlanOperation::BtsEndBrowseProcess),
+        204 => Ok(CicsPlanOperation::BtsGetNextProcess),
+        209 => Ok(CicsPlanOperation::BtsInquireProcess),
+        214 => Ok(CicsPlanOperation::BtsStartBrowseProcess),
         165 => Ok(CicsPlanOperation::AcquireActivityId),
         166 => Ok(CicsPlanOperation::AcquireProcess),
         167 => Ok(CicsPlanOperation::CancelAcqActivity),
@@ -291,6 +315,14 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         185 => Ok(CicsPlanOperation::SuspendAcqActivity),
         186 => Ok(CicsPlanOperation::SuspendAcqProcess),
         187 => Ok(CicsPlanOperation::SuspendActivity),
+        188 => Ok(CicsPlanOperation::DeleteChannel),
+        189 => Ok(CicsPlanOperation::DeleteContainer),
+        190 => Ok(CicsPlanOperation::GetContainer),
+        191 => Ok(CicsPlanOperation::GetContainer64),
+        192 => Ok(CicsPlanOperation::MoveContainer),
+        193 => Ok(CicsPlanOperation::PutContainer),
+        194 => Ok(CicsPlanOperation::PutContainer64),
+        195 => Ok(CicsPlanOperation::QueryChannel),
         216 => Ok(CicsPlanOperation::FetchAny),
         217 => Ok(CicsPlanOperation::FetchChild),
         218 => Ok(CicsPlanOperation::FreeChild),
@@ -473,6 +505,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
 
 pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
     match value {
+        CicsOperandName::BtsBrowse(name) => name.tag(),
         CicsOperandName::IssueConvid
         | CicsOperandName::IssueSession
         | CicsOperandName::IssueTermId
@@ -493,6 +526,22 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::BtsUserId => 712,
         CicsOperandName::BtsFacilityToken => 713,
         CicsOperandName::BtsChannel => 714,
+        CicsOperandName::ContainerName => 1720,
+        CicsOperandName::ContainerAs => 1721,
+        CicsOperandName::ContainerActivity => 1732,
+        CicsOperandName::ContainerFromActivity => 1733,
+        CicsOperandName::ContainerToActivity => 1734,
+        CicsOperandName::ContainerToChannel => 1722,
+        CicsOperandName::ContainerFrom => 1723,
+        CicsOperandName::ContainerFrom64 => 1735,
+        CicsOperandName::ContainerLength => 1724,
+        CicsOperandName::ContainerDatatype => 1725,
+        CicsOperandName::ContainerCcsid => 1726,
+        CicsOperandName::ContainerByteOffset => 1727,
+        CicsOperandName::ContainerIntoCcsid => 1728,
+        CicsOperandName::ContainerFromCodepage => 1729,
+        CicsOperandName::ContainerIntoCodepage => 1730,
+        CicsOperandName::ContainerConvertst => 1731,
         CicsOperandName::BtsChild => 1088,
         CicsOperandName::BtsLinkActivity => 1089,
         CicsOperandName::BtsLinkInputEvent => 1090,
@@ -804,6 +853,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
 
 pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCodecProblem> {
     match value {
+        960..=967 => super::BtsBrowseInput::from_tag(value)
+            .map(CicsOperandName::BtsBrowse)
+            .ok_or(CicsPlanCodecProblem::Malformed),
         704 => Ok(CicsOperandName::BtsActivityId),
         705 => Ok(CicsOperandName::BtsProcess),
         706 => Ok(CicsOperandName::BtsProcessType),
@@ -815,6 +867,22 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         712 => Ok(CicsOperandName::BtsUserId),
         713 => Ok(CicsOperandName::BtsFacilityToken),
         714 => Ok(CicsOperandName::BtsChannel),
+        1720 => Ok(CicsOperandName::ContainerName),
+        1721 => Ok(CicsOperandName::ContainerAs),
+        1732 => Ok(CicsOperandName::ContainerActivity),
+        1733 => Ok(CicsOperandName::ContainerFromActivity),
+        1734 => Ok(CicsOperandName::ContainerToActivity),
+        1722 => Ok(CicsOperandName::ContainerToChannel),
+        1723 => Ok(CicsOperandName::ContainerFrom),
+        1735 => Ok(CicsOperandName::ContainerFrom64),
+        1724 => Ok(CicsOperandName::ContainerLength),
+        1725 => Ok(CicsOperandName::ContainerDatatype),
+        1726 => Ok(CicsOperandName::ContainerCcsid),
+        1727 => Ok(CicsOperandName::ContainerByteOffset),
+        1728 => Ok(CicsOperandName::ContainerIntoCcsid),
+        1729 => Ok(CicsOperandName::ContainerFromCodepage),
+        1730 => Ok(CicsOperandName::ContainerIntoCodepage),
+        1731 => Ok(CicsOperandName::ContainerConvertst),
         1088 => Ok(CicsOperandName::BtsChild),
         1089 => Ok(CicsOperandName::BtsLinkActivity),
         1090 => Ok(CicsOperandName::BtsLinkInputEvent),
@@ -1122,5 +1190,115 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         292 => Ok(CicsOperandName::WebReceiveStatusLength),
         1472..=1599 => issue::operand_from_tag(value),
         _ => conversation::operand_from_tag(value),
+    }
+}
+
+#[cfg(test)]
+mod merge_tag_tests {
+    use super::*;
+    use crate::cics_plan::{BtsBrowseInput, BtsBrowseOutput};
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn channel_container_and_bts_browse_tags_are_unique_by_space() {
+        use CicsPlanOperation as P;
+        let operations = [
+            P::DeleteChannel,
+            P::DeleteContainer,
+            P::GetContainer,
+            P::GetContainer64,
+            P::MoveContainer,
+            P::PutContainer,
+            P::PutContainer64,
+            P::QueryChannel,
+            P::BtsEndBrowseContainer,
+            P::BtsGetNextContainer,
+            P::BtsInquireContainer,
+            P::BtsStartBrowseContainer,
+            P::BtsEndBrowseActivity,
+            P::BtsGetNextActivity,
+            P::BtsInquireActivity,
+            P::BtsStartBrowseActivity,
+            P::BtsEndBrowseEvent,
+            P::BtsGetNextEvent,
+            P::BtsInquireEvent,
+            P::BtsStartBrowseEvent,
+            P::BtsEndBrowseProcess,
+            P::BtsGetNextProcess,
+            P::BtsInquireProcess,
+            P::BtsStartBrowseProcess,
+            P::BtsEndBrowseTimer,
+            P::BtsInquireTimer,
+            P::BtsStartBrowseTimer,
+        ];
+        let mut seen = BTreeSet::new();
+        for operation in operations {
+            let tag = operation_tag(operation);
+            assert!(seen.insert(tag), "duplicate operation tag {tag}");
+            assert_eq!(operation_from_tag(tag), Ok(operation));
+        }
+        assert_eq!(seen.len(), 27);
+        assert_eq!(operation_tag(P::GetContainer64), 191);
+        assert_eq!(operation_tag(P::PutContainer64), 194);
+        assert!(operation_from_tag(205).is_err());
+
+        let mut seen = BTreeSet::new();
+        for tag in 1720..=1735 {
+            let operand = operand_from_tag(tag).unwrap();
+            assert!(seen.insert(operand_tag(operand)));
+            assert_eq!(operand_tag(operand), tag);
+        }
+        for field in [
+            BtsBrowseInput::ActivityId,
+            BtsBrowseInput::Process,
+            BtsBrowseInput::ProcessType,
+            BtsBrowseInput::BrowseToken,
+            BtsBrowseInput::Event,
+            BtsBrowseInput::Timer,
+        ] {
+            let operand = CicsOperandName::BtsBrowse(field);
+            let tag = operand_tag(operand);
+            assert!(seen.insert(tag), "duplicate operand tag {tag}");
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        assert_eq!(seen.len(), 22);
+
+        let mut seen = BTreeSet::new();
+        for tag in 1550..=1556 {
+            let option = option_from_tag(tag).unwrap();
+            assert!(
+                seen.insert(option_tag(option)),
+                "duplicate option tag {tag}"
+            );
+            assert_eq!(option_tag(option), tag);
+        }
+        assert_eq!(seen.len(), 7);
+
+        let mut seen = BTreeSet::new();
+        for tag in 1720..=1725 {
+            let output = output_from_tag(tag).unwrap();
+            assert!(seen.insert(output_tag(output)));
+            assert_eq!(output_tag(output), tag);
+        }
+        for field in [
+            BtsBrowseOutput::BrowseToken,
+            BtsBrowseOutput::Activity,
+            BtsBrowseOutput::ActivityId,
+            BtsBrowseOutput::Level,
+            BtsBrowseOutput::Process,
+            BtsBrowseOutput::Abcode,
+            BtsBrowseOutput::Abprogram,
+            BtsBrowseOutput::Event,
+            BtsBrowseOutput::ProcessType,
+            BtsBrowseOutput::Program,
+            BtsBrowseOutput::TransId,
+            BtsBrowseOutput::UserId,
+        ] {
+            let output = CicsOutputName::BtsBrowse(field);
+            let tag = output_tag(output);
+            assert!(seen.insert(tag), "duplicate output tag {tag}");
+            assert_eq!(output_from_tag(tag), Ok(output));
+        }
+        assert_eq!(seen.len(), 18);
     }
 }

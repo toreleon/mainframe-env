@@ -1874,6 +1874,49 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::BtsEndBrowseContainer => {
+                    crate::HirCicsOperation::BtsEndBrowseContainer
+                }
+                CicsPlanOperation::BtsGetNextContainer => {
+                    crate::HirCicsOperation::BtsGetNextContainer
+                }
+                CicsPlanOperation::BtsInquireContainer => {
+                    crate::HirCicsOperation::BtsInquireContainer
+                }
+                CicsPlanOperation::BtsStartBrowseContainer => {
+                    crate::HirCicsOperation::BtsStartBrowseContainer
+                }
+                CicsPlanOperation::BtsEndBrowseEvent => crate::HirCicsOperation::BtsEndBrowseEvent,
+                CicsPlanOperation::BtsGetNextEvent => crate::HirCicsOperation::BtsGetNextEvent,
+                CicsPlanOperation::BtsInquireEvent => crate::HirCicsOperation::BtsInquireEvent,
+                CicsPlanOperation::BtsStartBrowseEvent => {
+                    crate::HirCicsOperation::BtsStartBrowseEvent
+                }
+                CicsPlanOperation::BtsEndBrowseTimer => crate::HirCicsOperation::BtsEndBrowseTimer,
+                CicsPlanOperation::BtsInquireTimer => crate::HirCicsOperation::BtsInquireTimer,
+                CicsPlanOperation::BtsStartBrowseTimer => {
+                    crate::HirCicsOperation::BtsStartBrowseTimer
+                }
+                CicsPlanOperation::BtsStartBrowseActivity => {
+                    crate::HirCicsOperation::BtsStartBrowseActivity
+                }
+                CicsPlanOperation::BtsGetNextActivity => {
+                    crate::HirCicsOperation::BtsGetNextActivity
+                }
+                CicsPlanOperation::BtsEndBrowseActivity => {
+                    crate::HirCicsOperation::BtsEndBrowseActivity
+                }
+                CicsPlanOperation::BtsInquireActivity => {
+                    crate::HirCicsOperation::BtsInquireActivity
+                }
+                CicsPlanOperation::BtsStartBrowseProcess => {
+                    crate::HirCicsOperation::BtsStartBrowseProcess
+                }
+                CicsPlanOperation::BtsGetNextProcess => crate::HirCicsOperation::BtsGetNextProcess,
+                CicsPlanOperation::BtsEndBrowseProcess => {
+                    crate::HirCicsOperation::BtsEndBrowseProcess
+                }
+                CicsPlanOperation::BtsInquireProcess => crate::HirCicsOperation::BtsInquireProcess,
                 CicsPlanOperation::AcquireActivityId => crate::HirCicsOperation::AcquireActivityId,
                 CicsPlanOperation::AcquireProcess => crate::HirCicsOperation::AcquireProcess,
                 CicsPlanOperation::CancelAcqActivity => crate::HirCicsOperation::CancelAcqActivity,
@@ -1894,6 +1937,18 @@ mod tests {
                 CicsPlanOperation::RunAcqProcess => crate::HirCicsOperation::RunAcqProcess,
                 CicsPlanOperation::RunActivity => crate::HirCicsOperation::RunActivity,
                 CicsPlanOperation::RunTransId => crate::HirCicsOperation::RunTransId,
+                CicsPlanOperation::DeleteChannel => crate::HirCicsOperation::DeleteChannel,
+                CicsPlanOperation::DeleteContainer => crate::HirCicsOperation::DeleteContainer,
+                CicsPlanOperation::GetContainer => crate::HirCicsOperation::GetContainer,
+                CicsPlanOperation::GetContainer64 => {
+                    panic!("GET64 CONTAINER must not originate from COBOL source")
+                }
+                CicsPlanOperation::MoveContainer => crate::HirCicsOperation::MoveContainer,
+                CicsPlanOperation::PutContainer => crate::HirCicsOperation::PutContainer,
+                CicsPlanOperation::PutContainer64 => {
+                    panic!("PUT64 CONTAINER must not originate from COBOL source")
+                }
+                CicsPlanOperation::QueryChannel => crate::HirCicsOperation::QueryChannel,
                 CicsPlanOperation::SuspendAcqActivity => {
                     crate::HirCicsOperation::SuspendAcqActivity
                 }

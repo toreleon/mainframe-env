@@ -1334,6 +1334,62 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0041"
     },
     {
+      "operation": "DeleteChannel",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0042"
+    },
+    {
+      "operation": "DeleteContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0043"
+    },
+    {
+      "operation": "GetContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0086"
+    },
+    {
+      "operation": "GetContainer64",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0096"
+    },
+    {
+      "operation": "MoveContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0144"
+    },
+    {
+      "operation": "PutContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0150"
+    },
+    {
+      "operation": "PutContainer64",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0151"
+    },
+    {
+      "operation": "QueryChannel",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0152"
+    },
+    {
       "operation": "ResetAcqProcess",
       "interface": "api",
       "family": "bts-control",
@@ -1416,6 +1472,139 @@
       "family": "bts-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
+    },
+    {
+      "operation": "BtsEndBrowseContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0060"
+    },
+    {
+      "operation": "BtsGetNextContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0090"
+    },
+    {
+      "operation": "BtsInquireContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0102"
+    },
+    {
+      "operation": "BtsStartBrowseContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0210"
+    },
+    {
+      "operation": "BtsEndBrowseEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0061"
+    },
+    {
+      "operation": "BtsGetNextEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0091"
+    },
+    {
+      "operation": "BtsInquireEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0103"
+    },
+    {
+      "operation": "BtsStartBrowseEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0211"
+    },
+    {
+      "operation": "BtsEndBrowseTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0063"
+    },
+    {
+      "operation": "BtsInquireTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0105"
+    },
+    {
+      "operation": "BtsStartBrowseTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0213"
+    },
+    {
+      "operation": "BtsEndBrowseActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0059"
+    },
+    {
+      "operation": "BtsGetNextActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0089"
+    },
+    {
+      "operation": "BtsInquireActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0101"
+    },
+    {
+      "operation": "BtsStartBrowseActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0209"
+    },
+    {
+      "operation": "BtsEndBrowseProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0062"
+    },
+    {
+      "operation": "BtsGetNextProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0092"
+    },
+    {
+      "operation": "BtsInquireProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0104"
+    },
+    {
+      "operation": "BtsStartBrowseProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0212"
     },
     {
       "operation": "FetchAny",

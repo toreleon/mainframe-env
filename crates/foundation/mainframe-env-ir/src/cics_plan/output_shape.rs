@@ -2,8 +2,17 @@ use super::{CicsOutputName, CicsPlanOperation, bts_lifecycle};
 
 pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName) -> bool {
     match operation {
+        operation if super::bts_browse::is_operation(operation) => {
+            matches!(
+                output,
+                CicsOutputName::BtsBrowse(_) | CicsOutputName::Resp | CicsOutputName::Resp2
+            )
+        }
         operation if bts_lifecycle::is_bts(operation) => {
             bts_lifecycle::allowed_output(operation, output)
+        }
+        operation if super::channel_container::is_channel_container(operation) => {
+            super::channel_container::allowed_output(operation, output)
         }
         CicsPlanOperation::ReceiveConversation
         | CicsPlanOperation::GdsReceiveConversation

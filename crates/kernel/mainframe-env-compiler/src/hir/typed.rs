@@ -5387,6 +5387,111 @@ mod tests {
     }
 
     #[test]
+    fn bts_browse_nineteen_rows_lower_with_exact_receivers() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. 01 ACT-X PIC X(16). 01 ACTID-X PIC X(52). 01 PROC-X PIC X(36). 01 EVENT-X PIC X(16). 01 LEVEL-X PIC S9(9) COMP. 01 DATA-X PIC S9(9) COMP. 01 PTR-X USAGE POINTER. PROCEDURE DIVISION. ";
+        for (source, expected) in [
+            (
+                "ENDBROWSE CONTAINER BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseContainer,
+            ),
+            (
+                "GETNEXT CONTAINER(EVENT-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextContainer,
+            ),
+            (
+                "INQUIRE CONTAINER('ITEM') DATALENGTH(DATA-X) SET(PTR-X)",
+                HirCicsOperation::BtsInquireContainer,
+            ),
+            (
+                "STARTBROWSE CONTAINER CHANNEL('CH') BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseContainer,
+            ),
+            (
+                "ENDBROWSE EVENT BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseEvent,
+            ),
+            (
+                "GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextEvent,
+            ),
+            ("INQUIRE EVENT('READY')", HirCicsOperation::BtsInquireEvent),
+            (
+                "STARTBROWSE EVENT BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseEvent,
+            ),
+            (
+                "ENDBROWSE TIMER BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseTimer,
+            ),
+            ("INQUIRE TIMER('WAKE')", HirCicsOperation::BtsInquireTimer),
+            (
+                "STARTBROWSE TIMER('WAKE') BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseTimer,
+            ),
+            (
+                "ENDBROWSE ACTIVITY BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseActivity,
+            ),
+            (
+                "GETNEXT ACTIVITY(ACT-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextActivity,
+            ),
+            (
+                "INQUIRE ACTIVITYID('A1') ACTIVITY(ACT-X)",
+                HirCicsOperation::BtsInquireActivity,
+            ),
+            (
+                "STARTBROWSE ACTIVITY BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseActivity,
+            ),
+            (
+                "ENDBROWSE PROCESS BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsEndBrowseProcess,
+            ),
+            (
+                "GETNEXT PROCESS(PROC-X) BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsGetNextProcess,
+            ),
+            (
+                "INQUIRE PROCESS('P1') PROCESSTYPE('TYPE') ACTIVITYID(ACTID-X)",
+                HirCicsOperation::BtsInquireProcess,
+            ),
+            (
+                "STARTBROWSE PROCESS PROCESSTYPE('TYPE') BROWSETOKEN(TOKEN-X)",
+                HirCicsOperation::BtsStartBrowseProcess,
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let selected = hir
+                .statements
+                .iter()
+                .find_map(|statement| match &statement.resolved {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command.operation),
+                    _ => None,
+                });
+            assert_eq!(selected, Some(expected), "{source}");
+        }
+        for source in [
+            "INQUIRE EVENT('DFHINITIAL')",
+            "GETNEXT EVENT(EVENT-X) BROWSETOKEN(TOKEN-X) EVENTTYPE(LEVEL-X)",
+            "INQUIRE TIMER('WAKE') ABSTIME(LEVEL-X)",
+            "STARTBROWSE ACTIVITY PROCESS('P1') BROWSETOKEN(TOKEN-X)",
+            "GETNEXT ACTIVITY(PROC-X) BROWSETOKEN(TOKEN-X)",
+            "INQUIRE ACTIVITYID('A1') MODE(LEVEL-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_operation) in [
             (
@@ -5465,6 +5570,88 @@ mod tests {
             "P".repeat(36)
         );
         assert!(analyze(&too_long).hir.is_none());
+    }
+
+    #[test]
+    fn channel_container_compiler_selects_task_channel_and_bts_forms() {
+        let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. CNTNFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LEN-X PIC S9(9) COMP. 01 COUNT-X PIC S9(9) COMP. 01 PTR-X POINTER-32. PROCEDURE DIVISION. ";
+        for (command, expected) in [
+            ("DELETE CHANNEL('WORK')", HirCicsOperation::DeleteChannel),
+            (
+                "DELETE CONTAINER('ITEM') CHANNEL('WORK')",
+                HirCicsOperation::DeleteContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') CHANNEL('WORK') INTO(DATA-X) FLENGTH(LEN-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') CHANNEL('WORK') SET(PTR-X) FLENGTH(LEN-X) CCSID(COUNT-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') CHANNEL('WORK') NODATA FLENGTH(LEN-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "MOVE CONTAINER('ITEM') AS('NEXT') CHANNEL('WORK') TOCHANNEL('WORK')",
+                HirCicsOperation::MoveContainer,
+            ),
+            (
+                "PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) FLENGTH(8)",
+                HirCicsOperation::PutContainer,
+            ),
+            (
+                "PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) DATATYPE(DFHVALUE(CHAR)) FROMCCSID(37) APPEND",
+                HirCicsOperation::PutContainer,
+            ),
+            (
+                "QUERY CHANNEL('WORK') CONTAINERCNT(COUNT-X)",
+                HirCicsOperation::QueryChannel,
+            ),
+            (
+                "DELETE CONTAINER('ITEM') PROCESS",
+                HirCicsOperation::DeleteContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') ACQPROCESS INTO(DATA-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') ACQACTIVITY INTO(DATA-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "GET CONTAINER('ITEM') ACTIVITY('CHILD') INTO(DATA-X)",
+                HirCicsOperation::GetContainer,
+            ),
+            (
+                "PUT CONTAINER('ITEM') ACTIVITY('CHILD') FROM(DATA-X)",
+                HirCicsOperation::PutContainer,
+            ),
+            (
+                "MOVE CONTAINER('ITEM') AS('NEXT') FROMPROCESS TOPROCESS",
+                HirCicsOperation::MoveContainer,
+            ),
+        ] {
+            let source = format!("{prefix}EXEC CICS {command} END-EXEC. STOP RUN.");
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            assert!(hir.statements.iter().any(|statement| {
+                matches!(&statement.resolved, Some(HirResolvedStatement::Cics(cics)) if cics.operation == expected)
+            }));
+        }
+        for command in [
+            "DELETE CONTAINER('ITEM') CHANNEL('WORK') PROCESS",
+            "GET CONTAINER('ITEM') PROCESS ACQPROCESS INTO(DATA-X)",
+            "PUT CONTAINER('ITEM') ACTIVITY('CHILD') FROM(DATA-X) DATATYPE(DFHVALUE(BIT))",
+            "MOVE CONTAINER('ITEM') AS('NEXT') FROMPROCESS FROMACTIVITY('CHILD')",
+        ] {
+            let source = format!("{prefix}EXEC CICS {command} END-EXEC. STOP RUN.");
+            assert!(analyze(&source).hir.is_none(), "{command}");
+        }
     }
 
     #[test]
@@ -5559,7 +5746,13 @@ mod tests {
 
     #[test]
     fn cics_non_cobol_application_forms_fail_closed() {
-        for command in ["CICSMESSAGE", "GETMAIN64", "FREEMAIN64"] {
+        for command in [
+            "CICSMESSAGE",
+            "GETMAIN64",
+            "FREEMAIN64",
+            "GET64 CONTAINER('ITEM') INTO(X)",
+            "PUT64 CONTAINER('ITEM') FROM(X)",
+        ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSCOB. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );
@@ -6509,11 +6702,38 @@ mod tests {
         let reordered_application = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBTSA. DATA DIVISION. WORKING-STORAGE SECTION. 01 PGM-OUT PIC X(8). PROCEDURE DIVISION. EXEC CICS INQUIRE PROGRAM(PGM-OUT) ACTIVITYID('A1') END-EXEC. STOP RUN.",
         );
-        assert!(reordered_application.hir.is_none());
-        assert!(reordered_application.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("INQUIRE ACTIVITYID") && message.contains("handler is unready")
+        let hir = reordered_application.hir.unwrap_or_else(|| {
+            panic!(
+                "reordered INQUIRE ACTIVITYID: {:?}",
+                reordered_application.diagnostics
+            )
+        });
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match &statement.resolved {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed INQUIRE ACTIVITYID");
+        assert_eq!(command.operation, HirCicsOperation::BtsInquireActivity);
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::BtsBrowse(mainframe_env_ir::BtsBrowseOutput::Program)
+                && output.target.qualified_name == "PGM-OUT"
         }));
+
+        let unready_timer = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBTSU. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETNEXT TIMER('WAKE') BROWSETOKEN(TOKEN-X) END-EXEC. STOP RUN.",
+        );
+        assert!(unready_timer.hir.is_none());
+        assert!(
+            unready_timer.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains("GETNEXT TIMER") && message.contains("handler is unready")
+            }),
+            "{:?}",
+            unready_timer.diagnostics
+        );
     }
 
     #[test]

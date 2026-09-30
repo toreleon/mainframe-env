@@ -1,7 +1,8 @@
 #[cfg(test)]
 use mainframe_env_host_api::CicsOperation;
 use mainframe_env_ir::{
-    CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption,
+    BtsBrowseInput, BtsBrowseOutput, CicsAssignOutput, CicsOperandName, CicsOutputName,
+    CicsPlanOperation, CicsPlanOption,
 };
 
 pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Option<(usize, bool)> {
@@ -71,6 +72,8 @@ pub(super) enum SlotUse {
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::BtsBrowse(BtsBrowseInput::BrowseToken) => SlotUse::FullwordInput,
+        CicsOperandName::BtsBrowse(field) => SlotUse::BtsTextInput(field.width()),
         CicsOperandName::BtsActivityId => SlotUse::BtsTextInput(52),
         CicsOperandName::BtsProcess => SlotUse::BtsTextInput(36),
         CicsOperandName::BtsProcessType
@@ -83,6 +86,17 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::BtsLinkActivity
         | CicsOperandName::BtsLinkInputEvent
         | CicsOperandName::BtsChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::ContainerName
+        | CicsOperandName::ContainerAs
+        | CicsOperandName::ContainerActivity
+        | CicsOperandName::ContainerFromActivity
+        | CicsOperandName::ContainerToActivity
+        | CicsOperandName::ContainerToChannel => SlotUse::BtsTextInput(16),
+        CicsOperandName::ContainerFrom64 => SlotUse::Pointer64Input,
+        CicsOperandName::ContainerLength
+        | CicsOperandName::ContainerCcsid
+        | CicsOperandName::ContainerByteOffset
+        | CicsOperandName::ContainerIntoCcsid => SlotUse::FullwordInput,
         CicsOperandName::BtsFacilityToken => SlotUse::BtsExactInput(8),
         CicsOperandName::BtsChild => SlotUse::BtsExactInput(16),
         CicsOperandName::BtsTimeout => SlotUse::FullwordInput,
@@ -223,6 +237,11 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
+        CicsOutputName::BtsBrowse(
+            BtsBrowseOutput::BrowseToken | BtsBrowseOutput::Level | BtsBrowseOutput::DataLength,
+        ) => SlotUse::FullwordOutput,
+        CicsOutputName::BtsBrowse(BtsBrowseOutput::Set) => SlotUse::PointerOutput,
+        CicsOutputName::BtsBrowse(field) => SlotUse::BtsExactOutput(field.width()),
         CicsOutputName::BtsActivityId => SlotUse::BtsExactOutput(52),
         CicsOutputName::BtsAbCode => SlotUse::BtsExactOutput(4),
         CicsOutputName::BtsAbProgram => SlotUse::BtsExactOutput(8),
@@ -234,6 +253,11 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
             SlotUse::Output
         }
         CicsOutputName::BtsChildCompStatus => SlotUse::FullwordOutput,
+        CicsOutputName::ContainerLength
+        | CicsOutputName::ContainerCcsid
+        | CicsOutputName::ContainerCount => SlotUse::FullwordOutput,
+        CicsOutputName::ContainerInto | CicsOutputName::ContainerSet => SlotUse::Output,
+        CicsOutputName::ContainerInto64 => SlotUse::Pointer64Input,
         CicsOutputName::AttachIuType
         | CicsOutputName::AttachDataStream
         | CicsOutputName::AttachRecordFormat
@@ -402,6 +426,7 @@ pub(super) use super::host_operation::host_operation;
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::BtsBrowse(field) => field.name(),
         CicsOperandName::IssueConvid => "CONVID",
         CicsOperandName::IssueSession => "SESSION",
         CicsOperandName::IssueTermId => "TERMID",
@@ -422,6 +447,22 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::BtsUserId => "USERID",
         CicsOperandName::BtsFacilityToken => "FACILITYTOKN",
         CicsOperandName::BtsChannel => "CHANNEL",
+        CicsOperandName::ContainerName => "CONTAINER",
+        CicsOperandName::ContainerAs => "AS",
+        CicsOperandName::ContainerActivity => "ACTIVITY",
+        CicsOperandName::ContainerFromActivity => "FROMACTIVITY",
+        CicsOperandName::ContainerToActivity => "TOACTIVITY",
+        CicsOperandName::ContainerToChannel => "TOCHANNEL",
+        CicsOperandName::ContainerFrom => "FROM",
+        CicsOperandName::ContainerFrom64 => "FROM",
+        CicsOperandName::ContainerLength => "FLENGTH",
+        CicsOperandName::ContainerDatatype => "DATATYPE",
+        CicsOperandName::ContainerCcsid => "FROMCCSID",
+        CicsOperandName::ContainerByteOffset => "BYTEOFFSET",
+        CicsOperandName::ContainerIntoCcsid => "INTOCCSID",
+        CicsOperandName::ContainerFromCodepage => "FROMCODEPAGE",
+        CicsOperandName::ContainerIntoCodepage => "INTOCODEPAGE",
+        CicsOperandName::ContainerConvertst => "CONVERTST",
         CicsOperandName::BtsChild => "CHILD",
         CicsOperandName::BtsLinkActivity => "ACTIVITY",
         CicsOperandName::BtsLinkInputEvent => "INPUTEVENT",
@@ -784,6 +825,7 @@ pub(super) const fn operand_for(
 
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::BtsBrowse(field) => field.name(),
         CicsOutputName::IssueState => "STATE",
         CicsOutputName::IssueConvData => "CONVDATA",
         CicsOutputName::IssueRetCode => "RETCODE",
@@ -798,6 +840,12 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::BtsChildCompStatus => "COMPSTATUS",
         CicsOutputName::BtsChannel => "CHANNEL",
         CicsOutputName::BtsAbcode => "ABCODE",
+        CicsOutputName::ContainerInto => "INTO",
+        CicsOutputName::ContainerInto64 => "INTO",
+        CicsOutputName::ContainerSet => "SET",
+        CicsOutputName::ContainerLength => "FLENGTH",
+        CicsOutputName::ContainerCcsid => "CCSID",
+        CicsOutputName::ContainerCount => "CONTAINERCNT",
         CicsOutputName::AttachProcess => "PROCESS",
         CicsOutputName::AttachResource => "RESOURCE",
         CicsOutputName::AttachReturnProcess => "RPROCESS",
@@ -963,6 +1011,13 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::BtsNoSuspend => "NOSUSPEND",
         CicsPlanOption::BtsAcqActivity => "ACQACTIVITY",
         CicsPlanOption::BtsAcqProcess => "ACQPROCESS",
+        CicsPlanOption::ContainerAppend => "APPEND",
+        CicsPlanOption::ContainerNoData => "NODATA",
+        CicsPlanOption::ContainerProcess => "PROCESS",
+        CicsPlanOption::ContainerAcqProcess => "ACQPROCESS",
+        CicsPlanOption::ContainerAcqActivity => "ACQACTIVITY",
+        CicsPlanOption::ContainerFromProcess => "FROMPROCESS",
+        CicsPlanOption::ContainerToProcess => "TOPROCESS",
         CicsPlanOption::ConversationNoQueue => "NOQUEUE",
         CicsPlanOption::ConversationNotruncate => "NOTRUNCATE",
         CicsPlanOption::ConversationDefresp => "DEFRESP",

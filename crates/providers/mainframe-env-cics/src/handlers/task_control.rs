@@ -59,8 +59,10 @@ pub(in crate::service) fn new_run_with_state(
     sysid: &str,
     seed: RunSeed,
 ) -> Run {
+    let current_channel = super::task_context::current_channel(&invocation);
     let current_program = super::CurrentProgramFrame {
         current: super::task_context::current_program(&invocation),
+        channel: current_channel,
         parent_execution_id: invocation.parent_execution_id.clone(),
         initial_entry: false,
     };
