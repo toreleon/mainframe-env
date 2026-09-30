@@ -14,6 +14,7 @@ mod cics_catalog;
 mod clock;
 mod dataset;
 mod enterprise;
+mod ims;
 mod names;
 mod registry;
 mod request;
@@ -41,6 +42,15 @@ pub use dataset::{
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 pub use enterprise::{EnterpriseAuthorizer, EnterpriseResource, EnterpriseResourceClass};
+pub use ims::{
+    IMS_SSA_BOOLEAN_CONNECTORS, IMS_SSA_COMMAND_CODES, IMS_SSA_FIELD_NAME_BYTES,
+    IMS_SSA_RELATIONAL_OPERATOR_BYTES, IMS_SSA_RELATIONAL_OPERATORS, IMS_SSA_RULES_SHA256,
+    IMS_SSA_SEGMENT_NAME_BYTES, IMS_SSA_TOPIC_MANIFEST_SHA256, ImsSsa, ImsSsaBoolean,
+    ImsSsaBooleanDescriptor, ImsSsaCommand, ImsSsaCommandCodeDescriptor, ImsSsaField,
+    ImsSsaFieldResolver, ImsSsaLimits, ImsSsaPredicate, ImsSsaProblem, ImsSsaRelation,
+    ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
+    parse_ims_ssa,
+};
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
     ResourceName, RuntimeServiceName, SessionId,
