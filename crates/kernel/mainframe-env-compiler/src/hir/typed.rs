@@ -5784,7 +5784,7 @@ mod tests {
 
     #[test]
     fn registered_gds_issue_controls_remain_assembler_and_c_only() {
-        for command in ["ABEND", "PREPARE", "SIGNAL"] {
+        for command in ["ABEND", "CONFIRMATION", "ERROR", "PREPARE", "SIGNAL"] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGDS. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(4). 01 RETCODE-X PIC X(6). PROCEDURE DIVISION. EXEC CICS GDS ISSUE {command} CONVID(TOKEN-X) RETCODE(RETCODE-X) END-EXEC. STOP RUN."
             );

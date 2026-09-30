@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 258);
+        assert_eq!(typed.len(), 260);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 5);
+        assert_eq!(unready.len(), 3);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -145,6 +145,14 @@ mod tests {
 
     #[test]
     fn application_registry_exposes_option_shapes_constraints_and_source_heads() {
+        for label in [
+            &["GDS", "ISSUE", "CONFIRMATION"][..],
+            &["GDS", "ISSUE", "ERROR"][..],
+        ] {
+            let row = cics_application_registry_for_tokens(label).expect("GDS ISSUE row");
+            assert_eq!(row.readiness, CicsApplicationHandlerReadiness::TypedRuntime);
+            assert!(row.advertised);
+        }
         let read = CICS_APPLICATION_REGISTRY
             .iter()
             .find(|descriptor| descriptor.label_tokens == ["READ"])

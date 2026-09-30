@@ -672,6 +672,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::GdsIssueConfirmation,
+        syntax: "GDS ISSUE CONFIRMATION",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::IssueDisconnect,
         syntax: "ISSUE DISCONNECT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0115",
@@ -724,6 +731,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         operation: CicsOperation::IssueError,
         syntax: "ISSUE ERROR",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
+        family: CicsCommandFamily::ConversationControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::GdsIssueError,
+        syntax: "GDS ISSUE ERROR",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
         family: CicsCommandFamily::ConversationControl,
         mutating: true,
     },
@@ -1063,20 +1077,6 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         family: CicsCommandFamily::SpoolControl,
         mutating: true,
     },
-    CicsCommandDescriptor {
-        operation: CicsOperation::SpoolRead,
-        syntax: "SPOOLREAD",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0203",
-        family: CicsCommandFamily::SpoolControl,
-        mutating: true,
-    },
-    CicsCommandDescriptor {
-        operation: CicsOperation::SpoolWrite,
-        syntax: "SPOOLWRITE",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0204",
-        family: CicsCommandFamily::SpoolControl,
-        mutating: true,
-    },
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[0],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[1],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[2],
@@ -1190,6 +1190,8 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[110],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[111],
     tail::CICS_COMMAND_DESCRIPTOR_TAIL[112],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[113],
+    tail::CICS_COMMAND_DESCRIPTOR_TAIL[114],
 ];
 
 mod lookup;

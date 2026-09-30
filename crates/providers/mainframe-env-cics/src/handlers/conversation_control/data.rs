@@ -5,8 +5,9 @@
 //! because a local queue accepted its bytes.
 
 use super::{
-    ConversationContext, ConversationKind, ConversationOwner, ConversationProblem,
-    ConversationRecord, ConversationState, GdsIssueFlow,
+    ConversationContext, ConversationIndicators, ConversationKind, ConversationOwner,
+    ConversationProblem, ConversationRecord, ConversationState, GdsIssueFlow,
+    IssueValidationProblem,
 };
 use crate::service::{CicsService, mutation_problem, store_error};
 use mainframe_env_host_api::HostProblem;
@@ -138,6 +139,11 @@ pub struct ConversationDataState {
     next_send_id: u64,
     #[serde(default, skip_serializing_if = "is_zero")]
     last_acked_send_id: u64,
+    /// Immutable ID of a carrier-confirmed basic SEND CONFIRM awaiting its reply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pending_basic_confirm: Option<u64>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    last_basic_confirm_id: u64,
 }
 
 fn is_zero(value: &u64) -> bool {
@@ -145,6 +151,10 @@ fn is_zero(value: &u64) -> bool {
 }
 
 impl ConversationDataState {
+    pub(super) fn has_basic_confirm_history(&self) -> bool {
+        self.last_basic_confirm_id != 0 || self.pending_basic_confirm.is_some()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.inbound.is_empty()
             && !self.wait_eoc_observed
@@ -155,6 +165,8 @@ impl ConversationDataState {
             && self.last_peer_sequence == 0
             && self.next_send_id == 0
             && self.last_acked_send_id == 0
+            && self.pending_basic_confirm.is_none()
+            && self.last_basic_confirm_id == 0
     }
 
     pub fn validate(&self) -> Result<(), ConversationProblem> {
@@ -174,6 +186,9 @@ impl ConversationDataState {
         if bytes > MAX_QUEUED_BYTES
             || (self.last_peer_sequence == 0) != self.last_peer_digest.is_none()
             || self.last_acked_send_id > self.next_send_id
+            || self
+                .pending_basic_confirm
+                .is_some_and(|id| id == 0 || id != self.last_basic_confirm_id)
             || self
                 .outbound
                 .first()
@@ -232,9 +247,80 @@ impl ConversationDataState {
 }
 
 impl ConversationRecord {
+    /// Record a trusted, carrier-confirmed basic SEND CONFIRM. The GDS SEND
+    /// command remains unregistered; this marker is the response correlation.
+    pub fn stage_basic_send_confirm(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        send_id: u64,
+    ) -> Result<(), ConversationProblem> {
+        self.check_owner(owner, context)?;
+        if self.kind != ConversationKind::AppcBasic {
+            return Err(ConversationProblem::WrongKind);
+        }
+        if !matches!(self.sync_level, Some(1 | 2)) {
+            return Err(ConversationProblem::WrongState);
+        }
+        if !matches!(
+            self.state,
+            ConversationState::Send | ConversationState::PendReceive | ConversationState::PendFree
+        ) || self.pending_issue.is_some()
+            || self.data.pending_basic_confirm.is_some()
+            || send_id == 0
+            || send_id <= self.data.last_basic_confirm_id
+        {
+            return Err(ConversationProblem::WrongState);
+        }
+        self.next_sequence()?;
+        self.data.pending_basic_confirm = Some(send_id);
+        self.data.last_basic_confirm_id = send_id;
+        Ok(())
+    }
+
+    /// Consume the exact SEND CONFIRM response once in the conversation row.
+    pub fn accept_basic_peer_response(
+        &mut self,
+        owner: &ConversationOwner,
+        context: ConversationContext,
+        send_id: u64,
+        flow: GdsIssueFlow,
+    ) -> Result<(), IssueValidationProblem> {
+        if !matches!(flow, GdsIssueFlow::Confirmation | GdsIssueFlow::Error) {
+            return Err(IssueValidationProblem::Protocol(
+                ConversationProblem::Malformed,
+            ));
+        }
+        self.check_owner(owner, context)
+            .map_err(IssueValidationProblem::Protocol)?;
+        if self.kind != ConversationKind::AppcBasic {
+            return Err(IssueValidationProblem::Protocol(
+                ConversationProblem::WrongKind,
+            ));
+        }
+        if self.data.pending_basic_confirm != Some(send_id) {
+            return Err(IssueValidationProblem::Protocol(
+                ConversationProblem::WrongState,
+            ));
+        }
+        self.check_issue(owner, context, true, flow)?;
+        self.next_sequence()
+            .map_err(IssueValidationProblem::Protocol)?;
+        self.data.pending_basic_confirm = None;
+        if self.state == ConversationState::ConfReceive {
+            self.state = ConversationState::Receive;
+        }
+        if flow == GdsIssueFlow::Error {
+            self.data.peer_error_code = Some([0x08, 0x89, 0, 0]);
+        } else {
+            self.data.peer_error_code = None;
+        }
+        Ok(())
+    }
+
     /// Apply a partner ABEND or PREPARE in this allocation's durable record.
-    /// SIGNAL and ERROR already enter through the peer data frame path;
-    /// CONFIRMATION resolves the sender's confirmed transport attempt.
+    /// SIGNAL and ERROR data frames have their own ingress; basic responses
+    /// to SEND CONFIRM use the send-ID-correlated path above.
     pub fn accept_peer_issue(
         &mut self,
         owner: &ConversationOwner,
@@ -336,37 +422,36 @@ impl ConversationRecord {
         if self.kind != ConversationKind::AppcBasic {
             return Err(ConversationProblem::WrongKind);
         }
-        let mut block = [0; 24];
-        block[0] = u8::from(field_complete) * 0xff; // CDBCOMPL
-        block[1] = u8::from(matches!(
-            self.state,
-            ConversationState::SyncReceive
-                | ConversationState::SyncSend
-                | ConversationState::SyncFree
-        )) * 0xff; // CDBSYNC
-        block[2] = u8::from(matches!(
-            self.state,
-            ConversationState::Free | ConversationState::ConfFree | ConversationState::SyncFree
-        )) * 0xff; // CDBFREE
-        block[3] = u8::from(matches!(
-            self.state,
-            ConversationState::Receive
-                | ConversationState::ConfReceive
-                | ConversationState::SyncReceive
-        )) * 0xff; // CDBRECV
-        block[4] = u8::from(self.data.signal_pending) * 0xff; // CDBSIG
-        block[5] = u8::from(matches!(
-            self.state,
-            ConversationState::ConfReceive
-                | ConversationState::ConfSend
-                | ConversationState::ConfFree
-        )) * 0xff; // CDBCONF
-        if let Some(code) = self.data.peer_error_code {
-            block[6] = 0xff; // CDBERR
-            block[7..11].copy_from_slice(&code); // CDBERRCD
+        Ok(ConversationIndicators {
+            complete: field_complete,
+            sync_required: matches!(
+                self.state,
+                ConversationState::SyncReceive
+                    | ConversationState::SyncSend
+                    | ConversationState::SyncFree
+            ),
+            free_required: matches!(
+                self.state,
+                ConversationState::Free | ConversationState::ConfFree | ConversationState::SyncFree
+            ),
+            receive_required: matches!(
+                self.state,
+                ConversationState::Receive
+                    | ConversationState::ConfReceive
+                    | ConversationState::SyncReceive
+            ),
+            signal_received: self.data.signal_pending,
+            confirm_received: matches!(
+                self.state,
+                ConversationState::ConfReceive
+                    | ConversationState::ConfSend
+                    | ConversationState::ConfFree
+            ),
+            error_received: self.data.peer_error_code.is_some(),
+            error_code: self.data.peer_error_code.unwrap_or([0; 4]),
+            rollback_required: self.state == ConversationState::Rollback,
         }
-        block[11] = u8::from(self.state == ConversationState::Rollback) * 0xff; // CDBSYNRB
-        Ok(block)
+        .convdata())
     }
 
     /// Preserve one consumed SIGNAL in the GDS RECEIVE result while clearing
@@ -837,6 +922,135 @@ mod tests {
             error_code: None,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn basic_response_uses_existing_issue_state_rules() {
+        for state in [
+            ConversationState::ConfReceive,
+            ConversationState::Send,
+            ConversationState::Receive,
+        ] {
+            let owner = owner();
+            let mut record = ConversationRecord::allocate(
+                *b"B001",
+                "SYS1",
+                ConversationKind::AppcBasic,
+                owner.clone(),
+                false,
+            )
+            .unwrap();
+            record
+                .connect(
+                    &owner,
+                    ConversationContext::Local,
+                    true,
+                    b"PROC".to_vec(),
+                    vec![],
+                    1,
+                )
+                .unwrap();
+            record
+                .stage_basic_send_confirm(&owner, ConversationContext::Local, 1)
+                .unwrap();
+            record.state = state;
+            assert_eq!(
+                record.accept_basic_peer_response(
+                    &owner,
+                    ConversationContext::Local,
+                    1,
+                    GdsIssueFlow::Error,
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                record.state,
+                if state == ConversationState::ConfReceive {
+                    ConversationState::Receive
+                } else {
+                    state
+                }
+            );
+            assert_eq!(record.data.peer_error_code, Some([0x08, 0x89, 0, 0]));
+            assert_eq!(
+                record.accept_basic_peer_response(
+                    &owner,
+                    ConversationContext::Local,
+                    1,
+                    GdsIssueFlow::Error,
+                ),
+                Err(IssueValidationProblem::Protocol(
+                    ConversationProblem::WrongState
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn basic_send_confirm_requires_sync_one_or_two_and_sender_state() {
+        for sync_level in [0, 1, 2] {
+            for state in [
+                ConversationState::Send,
+                ConversationState::PendReceive,
+                ConversationState::PendFree,
+                ConversationState::Receive,
+                ConversationState::ConfReceive,
+            ] {
+                let owner = owner();
+                let mut record = ConversationRecord::allocate(
+                    *b"B002",
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                    owner.clone(),
+                    false,
+                )
+                .unwrap();
+                record
+                    .connect(
+                        &owner,
+                        ConversationContext::Local,
+                        true,
+                        b"PROC".to_vec(),
+                        vec![],
+                        sync_level,
+                    )
+                    .unwrap();
+                record.state = state;
+                let before = record.clone();
+                let allowed = sync_level != 0
+                    && matches!(
+                        state,
+                        ConversationState::Send
+                            | ConversationState::PendReceive
+                            | ConversationState::PendFree
+                    );
+                assert_eq!(
+                    record
+                        .stage_basic_send_confirm(&owner, ConversationContext::Local, 1)
+                        .is_ok(),
+                    allowed,
+                    "sync_level={sync_level} state={state:?}"
+                );
+                if !allowed {
+                    assert_eq!(record, before);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn basic_confirm_history_cannot_decode_on_mapped_record() {
+        let mut record = ConversationRecord::allocate(
+            *b"M001",
+            "SYS1",
+            ConversationKind::AppcMapped,
+            owner(),
+            false,
+        )
+        .unwrap();
+        record.data.pending_basic_confirm = Some(1);
+        record.data.last_basic_confirm_id = 1;
+        assert_eq!(record.validate(), Err(ConversationProblem::Malformed));
     }
 
     #[test]

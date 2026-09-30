@@ -6309,6 +6309,34 @@ mod tests {
         (invocation, session)
     }
 
+    fn connect_issue_source(
+        store: &dyn ProviderStateStore,
+        invocation: &Invocation,
+        token: [u8; 4],
+        kind: ConversationKind,
+        sync_level: u8,
+    ) {
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token)
+            .unwrap()
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                kind == ConversationKind::AppcBasic,
+                b"PROC".to_vec(),
+                vec![],
+                sync_level,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store).unwrap());
+    }
+
     fn registered_counter_run(service: &CicsService, name: &str) -> Invocation {
         let invocation = invocation_for(name, BTreeMap::new());
         let session = SessionId::new(format!("{name}-session"), 64).unwrap();
@@ -8277,7 +8305,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 260);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 262);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9053,6 +9081,13 @@ mod tests {
                 ConversationKind::AppcMapped,
             )
             .unwrap();
+        connect_issue_source(
+            store.as_ref(),
+            &invocation,
+            token,
+            ConversationKind::AppcMapped,
+            0,
+        );
         let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueAbend,
@@ -9087,7 +9122,7 @@ mod tests {
         assert!(pending.request.as_ref().unwrap().state_output);
         assert_eq!(
             first.conversation(token).unwrap().state,
-            ConversationState::Allocated
+            ConversationState::Send
         );
         assert_eq!(
             stage(&mut run, &command).unwrap().disposition,
@@ -9232,6 +9267,13 @@ mod tests {
                 ConversationKind::AppcMapped,
             )
             .unwrap();
+        connect_issue_source(
+            store.as_ref(),
+            &invocation,
+            token,
+            ConversationKind::AppcMapped,
+            0,
+        );
         let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
         let command = request(
             CicsOperation::IssueAbend,
@@ -9275,7 +9317,7 @@ mod tests {
         let attempted = ConversationLedger::load(store.as_ref()).unwrap();
         assert_eq!(
             attempted.conversation(token).unwrap().state,
-            ConversationState::Allocated
+            ConversationState::Send
         );
         assert!(
             attempted
@@ -9814,15 +9856,28 @@ mod tests {
                 BTreeMap::from([("CONVID".into(), cics_literal(&source_token))]),
                 1,
             );
+            let result = source
+                .invoke(
+                    &effect(&source_invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+                .unwrap();
+            assert_eq!(result.disposition, CicsDisposition::Complete);
             assert_eq!(
-                source
-                    .invoke(
-                        &effect(&source_invocation.run_unit_id, command.clone(), 1),
-                        command,
-                    )
+                (result.condition.as_str(), result.response, result.response2),
+                ("NORMAL", 0, 0)
+            );
+            assert_eq!(
+                ConversationLedger::load(source_store.as_ref())
                     .unwrap()
-                    .disposition,
-                CicsDisposition::Complete
+                    .conversation(source_token)
+                    .unwrap()
+                    .state,
+                if flow == GdsIssueFlow::Confirmation {
+                    ConversationState::Receive
+                } else {
+                    ConversationState::Send
+                }
             );
             let partner = ConversationLedger::load(target_store.as_ref()).unwrap();
             let exchange = partner.exchange(target_token).unwrap();
@@ -9879,6 +9934,13 @@ mod tests {
                     ConversationKind::AppcMapped,
                 )
                 .unwrap();
+            connect_issue_source(
+                store.as_ref(),
+                &invocation,
+                token,
+                ConversationKind::AppcMapped,
+                0,
+            );
             run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
             let command = request(
                 CicsOperation::IssueAbend,
@@ -9980,6 +10042,8 @@ mod tests {
 
     #[test]
     fn five_gds_issue_controls_return_exact_basic_outputs_after_carrier_confirmation() {
+        assert!(CicsOperation::GdsIssueConfirmation.supported());
+        assert!(CicsOperation::GdsIssueError.supported());
         struct Carrier;
 
         impl CicsConversationTransport for Carrier {
@@ -10009,8 +10073,8 @@ mod tests {
         for (operation, sync_level, source_state, result_state) in [
             (
                 CicsOperation::GdsIssueAbend,
-                None,
-                ConversationState::Allocated,
+                Some(0),
+                ConversationState::Send,
                 ConversationState::Free,
             ),
             (
@@ -10029,7 +10093,7 @@ mod tests {
                 CicsOperation::GdsIssuePrepare,
                 Some(2),
                 ConversationState::Send,
-                ConversationState::SyncReceive,
+                ConversationState::SyncSend,
             ),
             (
                 CicsOperation::GdsIssueSignal,
@@ -10116,6 +10180,16 @@ mod tests {
             );
             assert_eq!(first.outputs["RETCODE"].bytes(), &[0; 6], "{operation:?}");
             assert_eq!(first.outputs["CONVDATA"].bytes().len(), 24);
+            if operation == CicsOperation::GdsIssueConfirmation {
+                let mut expected = [0; 24];
+                expected[3] = 0xff;
+                assert_eq!(first.outputs["CONVDATA"].bytes(), &expected);
+                assert_eq!(first.outputs["STATE"].bytes(), b"89");
+            }
+            if operation == CicsOperation::GdsIssueError {
+                assert_eq!(first.outputs["CONVDATA"].bytes(), &[0; 24]);
+                assert_eq!(first.outputs["STATE"].bytes(), b"91");
+            }
             assert_eq!(
                 first.outputs["STATE"].bytes(),
                 result_state.cvda().to_string().as_bytes(),
@@ -10156,6 +10230,22 @@ mod tests {
             ),
             (
                 ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueConfirmation,
+                Some(1),
+                ConversationState::Receive,
+                false,
+                [3, 8, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
+                CicsOperation::GdsIssueError,
+                Some(0),
+                ConversationState::Allocated,
+                false,
+                [3, 8, 0, 0, 0, 0],
+            ),
+            (
+                ConversationKind::AppcBasic,
                 CicsOperation::GdsIssuePrepare,
                 Some(0),
                 ConversationState::Send,
@@ -10174,7 +10264,7 @@ mod tests {
                 ConversationKind::AppcBasic,
                 CicsOperation::GdsIssueSignal,
                 Some(0),
-                ConversationState::Send,
+                ConversationState::PendFree,
                 false,
                 [3, 8, 0, 0, 0, 0],
             ),
@@ -10238,18 +10328,182 @@ mod tests {
                 ]),
                 1,
             );
-            let reply = handlers::invoke_extended_control(
-                &service,
-                &mut run,
-                &command,
-                crate::generated::CicsCommandFamily::ConversationControl,
-                100,
-            )
+            let reply = if operation.supported() {
+                service.invoke(
+                    &effect(&invocation.run_unit_id, command.clone(), 1),
+                    command,
+                )
+            } else {
+                handlers::invoke_extended_control(
+                    &service,
+                    &mut run,
+                    &command,
+                    crate::generated::CicsCommandFamily::ConversationControl,
+                    100,
+                )
+            }
             .unwrap();
             assert_eq!(reply.condition, "NORMAL");
             assert_eq!(reply.response, 0);
             assert_eq!(reply.outputs["RETCODE"].bytes(), &expected, "{operation:?}");
             assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn gds_issue_response_rows_replay_exactly_after_sqlite_reopen() {
+        use std::sync::atomic::AtomicUsize;
+
+        struct Carrier(Arc<AtomicUsize>);
+
+        impl CicsConversationTransport for Carrier {
+            fn transmit(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: &ConversationDataFrame,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                Err(HostProblem::Unsupported)
+            }
+
+            fn transmit_issue(
+                &self,
+                _: &str,
+                _: [u8; 4],
+                _: u64,
+                _: GdsIssueFlow,
+                _: &Invocation,
+            ) -> Result<ConversationTransmitOutcome, HostProblem> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(ConversationTransmitOutcome::Confirmed)
+            }
+        }
+
+        for (operation, state, expected_state, expected_convdata) in [
+            (
+                CicsOperation::GdsIssueConfirmation,
+                ConversationState::ConfReceive,
+                b"89".as_slice(),
+                {
+                    let mut block = [0; 24];
+                    block[3] = 0xff;
+                    block
+                },
+            ),
+            (
+                CicsOperation::GdsIssueError,
+                ConversationState::Send,
+                b"91".as_slice(),
+                [0; 24],
+            ),
+        ] {
+            let root = std::env::temp_dir().join(format!(
+                "mainframe-env-gds-response-reopen-{}-{operation:?}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&root).unwrap();
+            let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+            let invocation = invocation_for("gds-response-reopen", BTreeMap::new());
+            let session = SessionId::new("gds-response-reopen", 64).unwrap();
+            let sent = Arc::new(AtomicUsize::new(0));
+            let command;
+            let first;
+            {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+                let service = service(store.clone());
+                service
+                    .register_conversation_system(ConversationSystemDefinition {
+                        sysid: "SYS1".into(),
+                        kind: ConversationKind::AppcMapped,
+                        capacity: 1,
+                        enabled: true,
+                    })
+                    .unwrap();
+                service.create_session(&session, 24, 80).unwrap();
+                service
+                    .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                    .unwrap();
+                let token = service
+                    .install_conversation_principal_for_run(
+                        &invocation.run_unit_id,
+                        "SYS1",
+                        ConversationKind::AppcBasic,
+                    )
+                    .unwrap();
+                let owner = ConversationOwner {
+                    execution: invocation.execution_id.as_str().into(),
+                    run_unit: invocation.run_unit_id.as_str().into(),
+                    lease_epoch: u64::from(invocation.attempt),
+                };
+                let current = ConversationLedger::load(store.as_ref()).unwrap();
+                let mut next = current.clone();
+                let record = next.conversation_mut(token).unwrap();
+                record
+                    .connect(
+                        &owner,
+                        ConversationContext::Local,
+                        true,
+                        b"PROC".to_vec(),
+                        vec![],
+                        1,
+                    )
+                    .unwrap();
+                record.state = state;
+                assert!(current.persist(&mut next, store.as_ref()).unwrap());
+                service
+                    .install_conversation_transport(Arc::new(Carrier(sent.clone())))
+                    .unwrap();
+                command = request(
+                    operation,
+                    BTreeMap::from([
+                        ("CONVID".into(), cics_literal(&token)),
+                        ("RETCODE".into(), argument(b"RETCODE-X")),
+                        ("CONVDATA".into(), argument(b"CONVDATA-X")),
+                        ("STATE".into(), argument(b"STATE-X")),
+                    ]),
+                    1,
+                );
+                first = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command.clone(),
+                    )
+                    .unwrap();
+                assert_eq!(first.outputs["RETCODE"].bytes(), &[0; 6]);
+                assert_eq!(first.outputs["CONVDATA"].bytes(), &expected_convdata);
+                assert_eq!(first.outputs["STATE"].bytes(), expected_state);
+            }
+            {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+                let service = service(store);
+                let reopened_session = SessionId::new("gds-response-reopen-second", 64).unwrap();
+                service.create_session(&reopened_session, 24, 80).unwrap();
+                service
+                    .register_run(
+                        invocation.clone(),
+                        &reopened_session,
+                        "MENU",
+                        "MEAPPL",
+                        "MESYS",
+                    )
+                    .unwrap();
+                service
+                    .install_conversation_transport(Arc::new(Carrier(sent.clone())))
+                    .unwrap();
+                assert_eq!(
+                    service.invoke(
+                        &effect(&invocation.run_unit_id, command.clone(), 1),
+                        command,
+                    ),
+                    Ok(first)
+                );
+            }
+            assert_eq!(sent.load(Ordering::SeqCst), 1);
+            std::fs::remove_dir_all(root).unwrap();
         }
     }
 
@@ -10335,6 +10589,13 @@ mod tests {
                     ConversationKind::AppcBasic,
                 )
                 .unwrap();
+            connect_issue_source(
+                store.as_ref(),
+                &invocation,
+                token,
+                ConversationKind::AppcBasic,
+                0,
+            );
             run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
             service
                 .install_conversation_transport(Arc::new(Carrier {
@@ -10517,6 +10778,15 @@ mod tests {
                     kind,
                 )
                 .unwrap();
+            if flow == GdsIssueFlow::Abend {
+                connect_issue_source(
+                    source_store.as_ref(),
+                    &source_invocation,
+                    source_token,
+                    kind,
+                    0,
+                );
+            }
             if flow == GdsIssueFlow::Prepare {
                 for (store, invocation, token, receiving) in [
                     (&source_store, &source_invocation, source_token, false),
@@ -10652,6 +10922,324 @@ mod tests {
                 ConversationLedger::load(target_store.as_ref()).unwrap(),
                 partner
             );
+        }
+    }
+
+    #[test]
+    fn peer_basic_confirmation_consumes_send_confirm_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let target = service(store.clone());
+        target
+            .register_conversation_system(ConversationSystemDefinition {
+                sysid: "SYS1".into(),
+                kind: ConversationKind::AppcMapped,
+                capacity: 1,
+                enabled: true,
+            })
+            .unwrap();
+        let (invocation, _) = registered(&target);
+        let token = target
+            .install_conversation_principal_for_run(
+                &invocation.run_unit_id,
+                "SYS1",
+                ConversationKind::AppcBasic,
+            )
+            .unwrap();
+        let owner = ConversationOwner {
+            execution: invocation.execution_id.as_str().into(),
+            run_unit: invocation.run_unit_id.as_str().into(),
+            lease_epoch: u64::from(invocation.attempt),
+        };
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .connect(
+                &owner,
+                ConversationContext::Local,
+                true,
+                b"PROC".to_vec(),
+                vec![],
+                1,
+            )
+            .unwrap();
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let missing = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "missing-7",
+            )
+            .unwrap();
+        assert_eq!(missing.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record
+            .stage_basic_send_confirm(&owner, ConversationContext::Local, 7)
+            .unwrap();
+        record.sync_level = Some(0);
+        record.state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let zero_sync = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "zero-sync-7",
+            )
+            .unwrap();
+        assert_eq!(zero_sync.outputs["RETCODE"], [3, 20, 0, 0, 0, 0]);
+        assert_eq!(zero_sync.outputs["STATE"], 84_i32.to_be_bytes());
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().sync_level = Some(1);
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let wrong_id = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                8,
+                GdsIssueFlow::Confirmation,
+                "wrong-id-8",
+            )
+            .unwrap();
+        assert_eq!(wrong_id.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().state = ConversationState::Send;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let wrong_state = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "wrong-state-7",
+            )
+            .unwrap();
+        assert_eq!(wrong_state.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        assert_eq!(wrong_state.outputs["STATE"], 91_i32.to_be_bytes());
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        next.conversation_mut(token).unwrap().state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let foreign = registered_counter_run(&target, "foreign-basic-response");
+        assert_eq!(
+            target.accept_conversation_peer_basic_response(
+                &foreign.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "foreign-7",
+            ),
+            Err(HostProblem::Unauthorized)
+        );
+        let reply = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "confirm-7",
+            )
+            .unwrap();
+        assert_eq!(reply.outputs["RETCODE"], [0; 6]);
+        assert_eq!(reply.outputs["STATE"], 89_i32.to_be_bytes());
+        assert_eq!(
+            reply.outputs["CONVDATA"],
+            [
+                0, 0, 0, 0xff, 0, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+        let committed = ConversationLedger::load(store.as_ref()).unwrap();
+        assert_eq!(
+            committed.conversation(token).unwrap().state,
+            ConversationState::Receive
+        );
+        assert_eq!(
+            target.accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Confirmation,
+                "confirm-7",
+            ),
+            Ok(reply)
+        );
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        let no_pending = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                7,
+                GdsIssueFlow::Error,
+                "second-response-7",
+            )
+            .unwrap();
+        assert_eq!(no_pending.outputs["RETCODE"], [3, 8, 0, 0, 0, 0]);
+        assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        let current = ConversationLedger::load(store.as_ref()).unwrap();
+        let mut next = current.clone();
+        let record = next.conversation_mut(token).unwrap();
+        record.state = ConversationState::Send;
+        record
+            .stage_basic_send_confirm(&owner, ConversationContext::Local, 8)
+            .unwrap();
+        record.state = ConversationState::ConfReceive;
+        assert!(current.persist(&mut next, store.as_ref()).unwrap());
+        let error = target
+            .accept_conversation_peer_basic_response(
+                &invocation.run_unit_id,
+                token,
+                8,
+                GdsIssueFlow::Error,
+                "error-8",
+            )
+            .unwrap();
+        assert_eq!(error.outputs["RETCODE"], [0; 6]);
+        assert_eq!(error.outputs["STATE"], 89_i32.to_be_bytes());
+        let mut expected = [0; 24];
+        expected[3] = 0xff;
+        expected[6] = 0xff;
+        expected[7..11].copy_from_slice(&[0x08, 0x89, 0, 0]);
+        assert_eq!(error.outputs["CONVDATA"], expected);
+    }
+
+    #[test]
+    fn peer_basic_error_replays_after_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-basic-response-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("basic-response-restart", BTreeMap::new());
+        let token;
+        let committed;
+        let reply;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind: ConversationKind::AppcMapped,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let session = SessionId::new("basic-response-first", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            token = target
+                .install_conversation_principal_for_run(
+                    &invocation.run_unit_id,
+                    "SYS1",
+                    ConversationKind::AppcBasic,
+                )
+                .unwrap();
+            let owner = ConversationOwner {
+                execution: invocation.execution_id.as_str().into(),
+                run_unit: invocation.run_unit_id.as_str().into(),
+                lease_epoch: u64::from(invocation.attempt),
+            };
+            let current = ConversationLedger::load(store.as_ref()).unwrap();
+            let mut next = current.clone();
+            let record = next.conversation_mut(token).unwrap();
+            record
+                .connect(
+                    &owner,
+                    ConversationContext::Local,
+                    true,
+                    b"PROC".to_vec(),
+                    vec![],
+                    1,
+                )
+                .unwrap();
+            record
+                .stage_basic_send_confirm(&owner, ConversationContext::Local, 11)
+                .unwrap();
+            record.state = ConversationState::ConfReceive;
+            assert!(current.persist(&mut next, store.as_ref()).unwrap());
+            reply = target
+                .accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    11,
+                    GdsIssueFlow::Error,
+                    "error-11",
+                )
+                .unwrap();
+            assert_eq!(reply.outputs["RETCODE"], [0; 6]);
+            assert_eq!(reply.outputs["STATE"], 89_i32.to_be_bytes());
+            let mut expected = [0; 24];
+            expected[3] = 0xff;
+            expected[6] = 0xff;
+            expected[7..11].copy_from_slice(&[0x08, 0x89, 0, 0]);
+            assert_eq!(reply.outputs["CONVDATA"], expected);
+            committed = ConversationLedger::load(store.as_ref()).unwrap();
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let target = service(store.clone());
+            let session = SessionId::new("basic-response-reopen", 64).unwrap();
+            target.create_session(&session, 24, 80).unwrap();
+            target
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    11,
+                    GdsIssueFlow::Error,
+                    "error-11",
+                ),
+                Ok(reply)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), committed);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn peer_basic_response_rejects_mapped_and_non_appc_conversations() {
+        for kind in [ConversationKind::AppcMapped, ConversationKind::Mro] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let target = service(store.clone());
+            target
+                .register_conversation_system(ConversationSystemDefinition {
+                    sysid: "SYS1".into(),
+                    kind,
+                    capacity: 1,
+                    enabled: true,
+                })
+                .unwrap();
+            let (invocation, _) = registered(&target);
+            let token = target
+                .install_conversation_principal_for_run(&invocation.run_unit_id, "SYS1", kind)
+                .unwrap();
+            let before = ConversationLedger::load(store.as_ref()).unwrap();
+            assert_eq!(
+                target.accept_conversation_peer_basic_response(
+                    &invocation.run_unit_id,
+                    token,
+                    1,
+                    GdsIssueFlow::Error,
+                    "wrong-kind",
+                ),
+                Err(HostProblem::Unsupported)
+            );
+            assert_eq!(ConversationLedger::load(store.as_ref()).unwrap(), before);
         }
     }
 

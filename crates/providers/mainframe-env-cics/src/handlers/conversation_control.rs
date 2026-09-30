@@ -490,6 +490,7 @@ impl ConversationRecord {
                     })
             })
             || self.validate_pending_issue().is_err()
+            || self.kind != ConversationKind::AppcBasic && self.data.has_basic_confirm_history()
             || self.mro_session_name.as_ref().is_some_and(|name| {
                 self.kind != ConversationKind::Mro
                     || name.is_empty()

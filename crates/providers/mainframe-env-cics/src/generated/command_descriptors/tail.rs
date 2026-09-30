@@ -2,7 +2,21 @@
 
 use super::*;
 
-pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 113] = [
+pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; 115] = [
+    CicsCommandDescriptor {
+        operation: CicsOperation::SpoolRead,
+        syntax: "SPOOLREAD",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0203",
+        family: CicsCommandFamily::SpoolControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::SpoolWrite,
+        syntax: "SPOOLWRITE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0204",
+        family: CicsCommandFamily::SpoolControl,
+        mutating: true,
+    },
     CicsCommandDescriptor {
         operation: CicsOperation::RemoveSubevent,
         syntax: "REMOVE SUBEVENT",
