@@ -11,6 +11,10 @@ const MAX_CONTAINER_BYTES: usize = 65_536;
 const MAX_CONTAINER_ROW_BYTES: usize = 96 * 1024;
 pub(super) const MAX_CONTAINERS: usize = 256;
 
+pub(super) fn supported_stored_ccsid(ccsid: Option<u16>) -> bool {
+    matches!(ccsid, None | Some(37))
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum ContainerOwner {
@@ -73,7 +77,7 @@ mod encoded_bytes {
 impl ContainerValue {
     fn validate(&self) -> Result<(), HostProblem> {
         if self.bytes.len() > MAX_CONTAINER_BYTES
-            || self.ccsid == Some(0)
+            || !supported_stored_ccsid(self.ccsid)
             || self.datatype == ContainerDatatype::Bit && self.ccsid.is_some()
         {
             return Err(HostProblem::Malformed);

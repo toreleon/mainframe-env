@@ -1470,6 +1470,22 @@ mod tests {
     }
 
     #[test]
+    fn gds_convdata_serializes_peer_error_as_cdberr_and_cdberrcd() {
+        let mut record = ConversationRecord::allocate(
+            *b"B001",
+            "SYS1",
+            ConversationKind::AppcBasic,
+            owner(),
+            false,
+        )
+        .unwrap();
+        record.data.peer_error_code = Some([0x08, 0x89, 0x12, 0x34]);
+        let data = record.gds_convdata(false).unwrap();
+        assert_eq!(data[6], 0xff); // DFHCDBLK CDBERR, after six one-byte indicators.
+        assert_eq!(&data[7..11], &[0x08, 0x89, 0x12, 0x34]); // CDBERRCD.
+    }
+
+    #[test]
     fn mapped_truncation_discards_remainder_and_records_end_of_chain() {
         let owner = owner();
         let mut record = ConversationRecord::allocate(

@@ -54,10 +54,111 @@ mod tests {
     };
     use crate::service::handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
-    use mainframe_env_store_api::ProviderStateStore;
+    use mainframe_env_store_api::{
+        AuditSink, ProviderStateMutation, ProviderStateRecord, ProviderStateStore,
+        ProviderStateWrite, StoreError,
+    };
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static NEXT_SQLITE: AtomicU64 = AtomicU64::new(1);
+
+    struct ChangeOwnerAfterDataRead {
+        inner: MemoryStore,
+        container_reads: AtomicU64,
+    }
+
+    impl AuditSink for ChangeOwnerAfterDataRead {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &mainframe_env_execution_api::ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
+        }
+    }
+
+    impl ProviderStateStore for ChangeOwnerAfterDataRead {
+        fn get_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+        ) -> Result<Option<ProviderStateRecord>, StoreError> {
+            let row = self.inner.get_provider_state(namespace, key)?;
+            if namespace.starts_with("cics-container-v1/")
+                && self.container_reads.fetch_add(1, Ordering::SeqCst) == 1
+            {
+                let process_key = BtsLifecycleStore::process_key("TYPE", "ORDER")
+                    .map_err(|_| StoreError::InvalidTransition)?;
+                let mut owner = self
+                    .inner
+                    .get_provider_state("cics-bts-process-v1", &process_key)?
+                    .ok_or(StoreError::NotFound)?;
+                let expected = owner.version;
+                owner.version += 1;
+                self.inner.put_provider_state(owner, Some(expected))?;
+            }
+            Ok(row)
+        }
+
+        fn list_provider_state(
+            &self,
+            namespace: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            self.inner.list_provider_state(namespace, max)
+        }
+
+        fn put_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            expected_version: Option<u64>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_state(record, expected_version)
+        }
+
+        fn delete_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .delete_provider_state(namespace, key, expected_version)
+        }
+
+        fn move_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            old_key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .move_provider_state(record, old_key, expected_version)
+        }
+
+        fn put_provider_states_atomic(
+            &self,
+            writes: Vec<ProviderStateWrite>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_states_atomic(writes)
+        }
+
+        fn mutate_provider_states_atomic(
+            &self,
+            mutations: Vec<ProviderStateMutation>,
+        ) -> Result<(), StoreError> {
+            self.inner.mutate_provider_states_atomic(mutations)
+        }
+    }
 
     fn define(store: &dyn ProviderStateStore, uow: &str) -> String {
         let lifecycle = BtsLifecycleStore::new(store);
@@ -313,6 +414,30 @@ mod tests {
     }
 
     #[test]
+    fn bts_container_read_rejects_owner_version_change_after_data_read() {
+        let store = ChangeOwnerAfterDataRead {
+            inner: MemoryStore::new(Default::default()),
+            container_reads: AtomicU64::new(0),
+        };
+        let root = define(&store, "UOW1");
+        seed_process(&store, &root, "TEXT", b"value");
+        let mut allow = |_: &str, _: &str| Ok(());
+        let mut port = ReadPort::new(&store, owner("UOW1"), &mut allow);
+        assert_eq!(
+            port.read(
+                ContainerSelector::Process {
+                    process_type: "TYPE",
+                    process_name: "ORDER",
+                    epoch: 1,
+                },
+                ReadRequest::Value("TEXT"),
+            ),
+            Err(ContainerReadError::StaleEpoch)
+        );
+        assert_eq!(store.container_reads.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
     fn bts_container_names_are_bounded() {
         let store = MemoryStore::new(Default::default());
         let root = define(&store, "UOW1");
@@ -358,6 +483,42 @@ mod tests {
             container_record(&owner, "PAYLOAD", &oversized),
             Err(mainframe_env_host_api::HostProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn decode_container_rejects_unsupported_persisted_char_ccsid() {
+        for owner in [
+            ContainerOwner::Channel {
+                execution: "EXEC".into(),
+                principal: "USER".into(),
+                run_unit: "UOW1".into(),
+                channel: "WORK".into(),
+            },
+            ContainerOwner::Process {
+                process_type: "TYPE".into(),
+                process_name: "ORDER".into(),
+                root_activity_id: "ROOT".into(),
+            },
+        ] {
+            let mut row = container_record(
+                &owner,
+                "TEXT",
+                &ContainerValue {
+                    datatype: ContainerDatatype::Character,
+                    ccsid: Some(37),
+                    read_only: false,
+                    bytes: b"text".to_vec(),
+                },
+            )
+            .unwrap();
+            let mut saved: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+            saved["value"]["ccsid"] = 1047.into();
+            row.payload = serde_json::to_vec(&saved).unwrap();
+            assert_eq!(
+                decode_container(&row, &owner),
+                Err(mainframe_env_host_api::HostProblem::InfrastructureFailure)
+            );
+        }
     }
 
     #[test]

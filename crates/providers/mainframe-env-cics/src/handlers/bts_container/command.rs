@@ -596,7 +596,7 @@ pub(in crate::service::handlers) fn invoke(
             if datatype == Some(ContainerDatatype::Bit) && ccsid.is_some() {
                 return Err(condition("INVREQ", 16, 1));
             }
-            if ccsid.is_some_and(|codepage| codepage != 37) {
+            if !super::state::supported_stored_ccsid(ccsid) {
                 return Err(HostProblem::Unsupported);
             }
             port.put_value(

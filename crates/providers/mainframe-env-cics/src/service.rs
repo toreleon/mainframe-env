@@ -52947,6 +52947,45 @@ mod tests {
     }
 
     #[test]
+    fn bit_container_get_with_conversion_options_fails_closed() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store);
+        let (invocation, _) = registered(&cics);
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CHANNEL".into(), cics_literal(b"WORK")),
+                ("CONTAINER".into(), cics_literal(b"BITDATA")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("DATATYPE".into(), cics_literal(b"BIT")),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        for (sequence, key, value) in [
+            (2, "INTOCCSID", cics_decimal(37)),
+            (3, "INTOCODEPAGE", cics_literal(b"37")),
+        ] {
+            let get = request(
+                CicsOperation::GetContainer,
+                BTreeMap::from([
+                    ("CHANNEL".into(), cics_literal(b"WORK")),
+                    ("CONTAINER".into(), cics_literal(b"BITDATA")),
+                    ("INTO".into(), argument(b"TARGET")),
+                    ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+                    (key.into(), value),
+                ]),
+                sequence,
+            );
+            assert!(matches!(
+                cics.invoke(&effect(&invocation.run_unit_id, get.clone(), sequence), get),
+                Err(HostProblem::Unsupported)
+            ));
+        }
+    }
+
+    #[test]
     fn channel_container_64_bit_provider_reuses_checked_channel_data() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let cics = service(store);

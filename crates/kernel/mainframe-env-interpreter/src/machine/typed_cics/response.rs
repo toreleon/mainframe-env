@@ -1,5 +1,28 @@
 use super::*;
 
+pub(in crate::machine) fn finish(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    container_identity: Option<&(String, Option<String>)>,
+    container_set_base: Option<usize>,
+    response: CicsResponse,
+    responded: bool,
+) -> Result<(), MachineProblem> {
+    if response.response == 0 && response.disposition == CicsDisposition::Complete {
+        container_set::on_success(machine, operation, container_identity);
+        if operation == CicsOperation::GetContainer
+            && let Some((channel, Some(container))) = container_identity
+            && let Some(base) = container_set_base
+            && machine.bases.len() == base + 1
+        {
+            container_set::record(machine, channel, container);
+        }
+    }
+    eib::write_context(machine, operation, &response)?;
+    machine.deferred_drive = drive_response(machine, operation, response, responded)?;
+    Ok(())
+}
+
 pub(in crate::machine) fn write_response_state(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,

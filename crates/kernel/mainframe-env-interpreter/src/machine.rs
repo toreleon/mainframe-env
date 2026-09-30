@@ -359,6 +359,7 @@ enum PendingKind {
         operation: CicsOperation,
         storage64_intent: Option<typed_cics::Storage64Intent>,
         argument_summary: String,
+        container: Option<(String, Option<String>)>,
         into: Option<typed_cics::CicsTarget>,
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
         response: Option<typed_cics::CicsTarget>,
@@ -2027,6 +2028,7 @@ impl ReferenceMachine {
                     operation,
                     storage64_intent,
                     argument_summary: _,
+                    container,
                     into,
                     outputs,
                     response: response_target,
@@ -2059,6 +2061,7 @@ impl ReferenceMachine {
                         &CobolValue::Bytes(response.payload.bytes().to_vec()),
                     )?;
                 }
+                let mut container_set_base = None;
                 for (name, value) in &response.outputs {
                     if typed_cics::write_runtime_output(self, operation, name, value)? {
                         continue;
@@ -2089,11 +2092,24 @@ impl ReferenceMachine {
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
+                    let base = self.bases.len();
                     typed_cics::write_output(self, operation, name, target, value, load_base)?;
+                    if operation == CicsOperation::GetContainer
+                        && name == "SET"
+                        && value.schema() == "mainframe-env.cics.payload@1"
+                        && self.bases.len() == base + 1
+                    {
+                        container_set_base = Some(base);
+                    }
                 }
-                eib::write_context(self, operation, &response)?;
-                self.deferred_drive =
-                    typed_cics::drive_response(self, operation, response, responded)?;
+                typed_cics::finish(
+                    self,
+                    operation,
+                    container.as_ref(),
+                    container_set_base,
+                    response,
+                    responded,
+                )?;
             }
             (
                 PendingKind::DatasetRead { .. }
