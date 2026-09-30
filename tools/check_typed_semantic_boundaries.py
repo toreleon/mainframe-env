@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -25,8 +26,126 @@ def require(condition: bool, message: str) -> None:
         raise BoundaryError(message)
 
 
+def skip_non_code(source: str, position: int) -> int:
+    if source.startswith("//", position):
+        end = source.find("\n", position + 2)
+        return len(source) if end < 0 else end
+    if source.startswith("/*", position):
+        depth = 1
+        cursor = position + 2
+        while cursor < len(source) and depth:
+            if source.startswith("/*", cursor):
+                depth += 1
+                cursor += 2
+            elif source.startswith("*/", cursor):
+                depth -= 1
+                cursor += 2
+            else:
+                cursor += 1
+        return cursor
+    if source[position] == "r":
+        cursor = position + 1
+        while cursor < len(source) and source[cursor] == "#":
+            cursor += 1
+        if cursor < len(source) and source[cursor] == '"':
+            delimiter = '"' + source[position + 1 : cursor]
+            end = source.find(delimiter, cursor + 1)
+            return len(source) if end < 0 else end + len(delimiter)
+    if source[position] == '"':
+        cursor = position + 1
+        while cursor < len(source):
+            if source[cursor] == "\\":
+                cursor += 2
+            elif source[cursor] == '"':
+                return cursor + 1
+            else:
+                cursor += 1
+        return len(source)
+    if source[position] == "'":
+        cursor = position + 1
+        if cursor < len(source) and source[cursor] == "\\":
+            cursor += 2
+        else:
+            cursor += 1
+        if cursor < len(source) and source[cursor] == "'":
+            return cursor + 1
+    return position
+
+
+def balanced_end(source: str, position: int, opening: str, closing: str) -> int:
+    depth = 1
+    cursor = position + 1
+    while cursor < len(source):
+        skipped = skip_non_code(source, cursor)
+        if skipped != cursor:
+            cursor = skipped
+        elif source[cursor] == opening:
+            depth += 1
+            cursor += 1
+        elif source[cursor] == closing:
+            depth -= 1
+            cursor += 1
+            if depth == 0:
+                return cursor
+        else:
+            cursor += 1
+    raise BoundaryError(f"unterminated #[cfg(test)] item: {opening}")
+
+
+def test_item_end(source: str, position: int) -> int:
+    cursor = position + len("#[cfg(test)]")
+    while True:
+        while cursor < len(source):
+            if source[cursor].isspace():
+                cursor += 1
+            elif source.startswith(("//", "/*"), cursor):
+                cursor = skip_non_code(source, cursor)
+            else:
+                break
+        if not source.startswith("#[", cursor):
+            break
+        cursor = balanced_end(source, cursor + 1, "[", "]")
+
+    # Items with an initializer can contain a braced expression before their semicolon.
+    item = source[cursor:]
+    semicolon_item = bool(re.match(r"(?:use|static|type)\b", item)) or (
+        bool(re.match(r"const\b", item))
+        and not re.match(r"const\s+(?:(?:unsafe|async)\s+)*fn\b", item)
+    )
+    while cursor < len(source):
+        skipped = skip_non_code(source, cursor)
+        if skipped != cursor:
+            cursor = skipped
+        elif source[cursor] in "([":
+            closing = ")" if source[cursor] == "(" else "]"
+            cursor = balanced_end(source, cursor, source[cursor], closing)
+        elif source[cursor] == "{":
+            cursor = balanced_end(source, cursor, "{", "}")
+            if not semicolon_item:
+                return cursor
+        elif source[cursor] == ";":
+            return cursor + 1
+        else:
+            cursor += 1
+    raise BoundaryError("unterminated #[cfg(test)] item")
+
+
 def production(source: str) -> str:
-    return source.split("#[cfg(test)]", 1)[0]
+    marker = "#[cfg(test)]"
+    kept = []
+    start = cursor = 0
+    while cursor < len(source):
+        skipped = skip_non_code(source, cursor)
+        if skipped != cursor:
+            cursor = skipped
+        elif source.startswith(marker, cursor):
+            kept.append(source[start:cursor])
+            cursor = test_item_end(source, cursor)
+            start = cursor
+        else:
+            cursor += 1
+    kept.append(source[start:])
+    return "".join(kept)
 
 
 def between(source: str, start: str, end: str) -> str:
@@ -37,6 +156,32 @@ def between(source: str, start: str, end: str) -> str:
 def reject(source: str, patterns: list[str], scope: str) -> None:
     for pattern in patterns:
         require(pattern not in source, f"{scope} contains forbidden runtime grammar path {pattern}")
+
+
+def check_cics_descriptor_entries(root: Path) -> None:
+    entries_dir = root / "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries"
+    cics_descriptor_entries = "\n".join(
+        production(read(root, path.relative_to(root).as_posix()))
+        for path in [entries_dir.with_suffix(".rs"), *sorted(entries_dir.glob("*.rs"))]
+    )
+    require(
+        re.search(
+            r"^pub (?:const|static) CICS_EXECUTABLE_DESCRIPTORS: "
+            r"\[CicsExecutableDescriptor; [0-9]+\] = \[",
+            cics_descriptor_entries,
+            re.MULTILINE,
+        )
+        is not None,
+        "typed CICS descriptor registry omits the pub const or pub static array",
+    )
+    for required in [
+        'namespace: "cics.file"',
+        'namespace: "cics.recovery"',
+        "operation: CicsPlanOperation::Read",
+        "operation: CicsPlanOperation::Rewrite",
+        "operation: CicsPlanOperation::Syncpoint",
+    ]:
+        require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
 
 
 def check(root: Path) -> None:
@@ -102,9 +247,6 @@ def check(root: Path) -> None:
     cics_descriptor_root = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
     )
-    cics_descriptor_entries = production(
-        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/executable_entries.rs")
-    )
     cics_descriptor_effects = production(
         read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor/effects.rs")
     )
@@ -123,15 +265,7 @@ def check(root: Path) -> None:
             required in cics_descriptor_effects,
             f"typed CICS descriptor effects omit {required}",
         )
-    for required in [
-        "pub const CICS_EXECUTABLE_DESCRIPTORS",
-        'namespace: "cics.file"',
-        'namespace: "cics.recovery"',
-        "operation: CicsPlanOperation::Read",
-        "operation: CicsPlanOperation::Rewrite",
-        "operation: CicsPlanOperation::Syncpoint",
-    ]:
-        require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
+    check_cics_descriptor_entries(root)
 
     lower = production(read(root, "crates/kernel/mainframe-env-compiler/src/lower.rs"))
     for required in [

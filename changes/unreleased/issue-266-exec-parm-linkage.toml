@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Batch COBOL main programs receive the EXEC PARM length and CCSID 37 text through LINKAGE."

@@ -34,6 +34,42 @@ pub(super) fn read_runtime_oracle(root: &Path, identity: &str) -> Result<Vec<u8>
     Ok(output.stdout)
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub(super) struct CorpusContract {
+    pub(super) repository: String,
+    pub(super) commit: String,
+    pub(super) tree: String,
+    pub(super) license: String,
+    pub(super) license_sha256: String,
+    pub(super) executable_content_identity: ContentIdentity,
+    pub(super) runtime_oracles: Vec<RuntimeOracleContract>,
+    pub(super) file_count_checks: Vec<FileCountContract>,
+    pub(super) external_compatibility_copybooks: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(super) struct ContentIdentity {
+    pub(super) algorithm: String,
+    pub(super) sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(super) struct RuntimeOracleContract {
+    pub(super) path: String,
+    pub(super) sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(super) struct FileCountContract {
+    pub(super) id: String,
+    pub(super) roots: Vec<String>,
+    #[serde(default)]
+    pub(super) extensions: Vec<String>,
+    #[serde(default)]
+    pub(super) excluded_names: Vec<String>,
+    pub(super) expected: usize,
+}
+
 pub(super) fn read_contract(path: &Path) -> Result<CorpusContract, CorpusProblem> {
     let bytes = fs::read(path).map_err(|error| {
         CorpusProblem::new(

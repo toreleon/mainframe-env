@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover bounded IMS TM call contracts for transactions, message PCBs, routing, conversation actions, and explicit unsupported contexts with zero execution credit."

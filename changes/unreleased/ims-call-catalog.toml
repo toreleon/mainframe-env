@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a generated IMS 15.6 call-family identity catalog preserving all 25 rows and duplicate call and command memberships without behavioral credit."

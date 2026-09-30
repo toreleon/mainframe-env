@@ -27,7 +27,10 @@ pub(super) fn encode_call_values(
 pub(super) fn decode_call_arguments(
     payload: &BoundedPayload,
 ) -> Result<Vec<Vec<u8>>, MachineProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
+    if !matches!(
+        payload.schema(),
+        "mainframe-env.cobol.call@1" | "mainframe-env.cobol.batch-main@1"
+    ) {
         return Err(MachineProblem::UnexpectedHostResult);
     }
     let mut input = SnapshotInput::new(payload.bytes());

@@ -3,7 +3,7 @@ use crate::{
     CobolFileBinding, CobolLayout, LosslessSyntax, ProcedureStatementKind, SemanticModel,
     SourceSpan,
 };
-use lifecycle::installed_lifecycle;
+use lifecycle::*;
 use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
@@ -336,6 +336,8 @@ pub struct ControlEdge {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CobolHir {
     pub program_id: String,
+    /// Qualified LINKAGE roots in PROCEDURE DIVISION USING order.
+    pub entry_formals: Vec<String>,
     /// Installed-call lifecycle contract; not inferred from diagnostic text.
     pub program_lifecycle: String,
     pub layouts: Vec<CobolLayout>,
@@ -391,6 +393,7 @@ impl CobolHir {
         let module = build_module(&statements, &semantic.layouts, mode.as_str(), limits)?;
         Ok(Self {
             program_id: semantic.program_id.clone(),
+            entry_formals: entry_formals(syntax.semantic_text(), semantic)?,
             program_lifecycle: installed_lifecycle(syntax.semantic_text(), semantic).into(),
             layouts: semantic.layouts.clone(),
             files: semantic.files.clone(),
@@ -593,14 +596,6 @@ pub(crate) fn effects(kind: StatementKind) -> Vec<Effect> {
         K::If | K::Evaluate | K::Search => vec![Effect::MemoryRead, Effect::Condition],
         _ => Vec::new(),
     }
-}
-
-fn procedure_text(source: &str) -> Option<(usize, &str)> {
-    let upper = source.to_ascii_uppercase();
-    let start = upper.find("PROCEDURE DIVISION")?;
-    let rest = &source[start..];
-    let dot = rest.find('.')?;
-    Some((start + dot + 1, &rest[dot + 1..]))
 }
 
 fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {

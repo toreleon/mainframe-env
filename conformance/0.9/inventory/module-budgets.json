@@ -18,7 +18,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/jcl_plan.rs",
-      "max_production_lines": 1791,
+      "max_production_lines": 1557,
       "responsibility": "Validated JCL statements are lowered into the immutable execution-plan contract and checked for plan invariants here.",
       "split_boundary": "Separate plan records, statement lowering, and cross-step validation without changing the serialized plan identity."
     },
@@ -30,15 +30,9 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/cobol/hardening.rs",
-      "max_production_lines": 1400,
+      "max_production_lines": 1364,
       "responsibility": "Bounded COBOL runtime hardening helpers implement several unrelated LE-compatible service families.",
       "split_boundary": "Separate date/time, numeric, character, and environment service families while retaining one bounded dispatcher."
-    },
-    {
-      "path": "crates/apps/mainframe-env-server/src/cobol.rs",
-      "max_production_lines": 1280,
-      "responsibility": "Server-side COBOL execution and runtime service helpers remain co-located while provider routing and selected-link adapters live in focused modules.",
-      "split_boundary": "Continue separating runtime service binding, installed-program lookup, and program execution adapters."
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
@@ -78,7 +72,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
-      "max_production_lines": 1733,
+      "max_production_lines": 1728,
       "responsibility": "HIR declarations, builder state, and source-to-HIR integration remain combined at the compiler stage boundary.",
       "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
     },
@@ -90,7 +84,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/semantic.rs",
-      "max_production_lines": 2780,
+      "max_production_lines": 2768,
       "responsibility": "Semantic analysis owns the cross-family model, name resolution, validation passes, and diagnostic assembly.",
       "split_boundary": "Separate model construction, symbol resolution, cross-reference validation, and diagnostics behind the semantic facade."
     },
@@ -108,7 +102,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 12879,
+      "max_production_lines": 11940,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -138,9 +132,9 @@
     },
     {
       "path": "crates/providers/mainframe-env-mq/src/service.rs",
-      "max_production_lines": 1340,
-      "responsibility": "MQ queue semantics, unit-of-work transitions, durable object rows, replay identity, and retention-clock finalization share one service authority.",
-      "split_boundary": "Extract replay envelopes and clock finalization from queue operations and durable object-row persistence behind the existing MQ service."
+      "max_production_lines": 1331,
+      "responsibility": "MQ queue semantics, unit-of-work transitions, durable object rows, replay identity, and retention-clock finalization share one service authority; host-context validation and canonical message identity are extracted.",
+      "split_boundary": "Continue extracting replay envelopes and clock finalization from queue operations and durable object-row persistence behind the existing MQ service."
     },
     {
       "path": "crates/providers/mainframe-env-racf/src/authority.rs",
@@ -198,7 +192,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 13650,
+      "max_production_lines": 13617,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
@@ -295,7 +289,19 @@
       "crates/providers/mainframe-env-cics/src/handlers/bridge_runtime.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bridge_start.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bridge_terminal.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_browse.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_browse/query.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_browse/route.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_browse/route/container.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_browse/route/event_timer.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_browse/store.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_child_link.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/bts.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/browse_read.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/channel.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/command.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/scope.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/bts_container/state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/cancel.rs",
       "crates/providers/mainframe-env-cics/src/handlers/bts_lifecycle/catalog.rs",

@@ -6204,6 +6204,7 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    include!("product/bts_browse.rs");
     use super::*;
     use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
@@ -6242,7 +6243,7 @@ mod tests {
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
-    use mainframe_env_store::SqliteStateStore;
+    use mainframe_env_store::{PostgresArtifactStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
     use std::sync::Barrier;
     use tower::ServiceExt;
@@ -6887,6 +6888,70 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    #[derive(Clone)]
+    enum RouteRestartBackend {
+        Sqlite(String),
+        Postgres(String),
+    }
+
+    impl RouteRestartBackend {
+        fn settings(&self, artifact_root: std::path::PathBuf) -> ServerConfig {
+            let mut settings = config();
+            settings.artifact_root = artifact_root;
+            match self {
+                Self::Sqlite(url) => {
+                    settings.store_profile = crate::StoreProfile::Sqlite;
+                    settings.sqlite_url = url.clone();
+                }
+                Self::Postgres(_) => {
+                    settings.store_profile = crate::StoreProfile::Postgres;
+                    settings.artifact_profile = ArtifactProfile::Shared;
+                    settings.postgres_url_reference =
+                        Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into());
+                }
+            }
+            settings
+        }
+
+        fn open_store(&self) -> Arc<dyn PlatformStore> {
+            match self {
+                Self::Sqlite(url) => {
+                    Arc::new(SqliteStateStore::open(url, 64 * 1024 * 1024, 262_144).unwrap())
+                }
+                Self::Postgres(url) => {
+                    Arc::new(PostgresStateStore::open(url, 64 * 1024 * 1024, 262_144).unwrap())
+                }
+            }
+        }
+
+        fn open_server(
+            &self,
+            settings: ServerConfig,
+            secrets: Arc<MemorySecretResolver>,
+        ) -> (Arc<ProductServer>, Arc<dyn PlatformStore>) {
+            let store = self.open_store();
+            let server = match self {
+                Self::Sqlite(_) => {
+                    ProductServer::open(settings, store.clone(), secrets, default_program_router())
+                }
+                Self::Postgres(url) => ProductServer::open_with_artifact_store(
+                    settings,
+                    store.clone(),
+                    secrets,
+                    default_program_router(),
+                    Arc::new(PostgresArtifactStore::open(url, 64 * 1024 * 1024, 262_144).unwrap()),
+                ),
+            }
+            .unwrap();
+            (server, store)
+        }
+    }
+
+    fn required_postgres_route_url() -> String {
+        std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("MAINFRAME_ENV_POSTGRES_TEST_URL is required for PostgreSQL restart tests")
     }
 
     fn published_fixture(name: &str, body: &str) -> PublishedArtifact {
@@ -11815,9 +11880,12 @@ mod tests {
             .online_machine_continuation(&session)
             .unwrap()
             .unwrap();
-        let mut restored =
-            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
-                .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
         restored
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
@@ -13546,6 +13614,557 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn compiled_online_source_resolved_channel_container_route_preserves_data_count_and_eibfn() {
+        let artifact = published_source_fixture(
+            "CNTNFLOW",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CNTNFLOW.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(6) VALUE 'ABCDEF'.\n01 OUT-X PIC X(6).\n01 LEN-X PIC S9(9) COMP VALUE 6.\n01 COUNT-X PIC S9(9) COMP.\n01 PUT-FN PIC X(2).\n01 GET-FN PIC X(2).\n01 MOVE-FN PIC X(2).\n01 QUERY-FN PIC X(2).\n01 DEL-FN PIC X(2).\n01 CHAN-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) FLENGTH(6) END-EXEC.\nMOVE EIBFN TO PUT-FN.\nEXEC CICS GET CONTAINER('ITEM') CHANNEL('WORK') INTO(OUT-X) FLENGTH(LEN-X) END-EXEC.\nMOVE EIBFN TO GET-FN.\nEXEC CICS MOVE CONTAINER('ITEM') AS('NEXT') CHANNEL('WORK') TOCHANNEL('WORK') END-EXEC.\nMOVE EIBFN TO MOVE-FN.\nEXEC CICS QUERY CHANNEL('WORK') CONTAINERCNT(COUNT-X) END-EXEC.\nMOVE EIBFN TO QUERY-FN.\nEXEC CICS DELETE CONTAINER('NEXT') CHANNEL('WORK') END-EXEC.\nMOVE EIBFN TO DEL-FN.\nEXEC CICS DELETE CHANNEL('WORK') END-EXEC.\nMOVE EIBFN TO CHAN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", None)
+            .unwrap();
+        for intent in [
+            AccessIntent::Read,
+            AccessIntent::Update,
+            AccessIntent::Alter,
+        ] {
+            server
+                .racf
+                .permit("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", intent)
+                .unwrap();
+        }
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CNTNFLOW".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CNT1".into(), "CNTNFLOW".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CNTNFLOW".into(),
+                    map: "CNTNFLOW".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("channel-container-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CNT1", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "CNT1",
+                24,
+                80,
+                "channel-container-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CNTNFLOW", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("OUT-X").unwrap().bytes(), b"ABCDEF");
+        assert_eq!(restored.variable("COUNT-X").unwrap().bytes(), &[0, 0, 0, 1]);
+        for (name, eibfn) in [
+            ("PUT-FN", [0x34, 0x16]),
+            ("GET-FN", [0x34, 0x14]),
+            ("MOVE-FN", [0x34, 0x40]),
+            ("QUERY-FN", [0x34, 0x5a]),
+            ("DEL-FN", [0x34, 0x12]),
+            ("CHAN-FN", [0x34, 0x58]),
+        ] {
+            assert_eq!(restored.variable(name).unwrap().bytes(), &eibfn, "{name}");
+        }
+    }
+
+    #[test]
+    fn compiled_channel_container_route_recovers_after_sqlite_restart() {
+        compiled_channel_container_route_recovers_after_restart(None);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+    fn postgres_compiled_channel_container_route_recovers_after_restart() {
+        compiled_channel_container_route_recovers_after_restart(
+            Some(required_postgres_route_url()),
+        );
+    }
+
+    fn compiled_channel_container_route_recovers_after_restart(postgres_url: Option<String>) {
+        let postgres = postgres_url.is_some();
+        let artifact = published_source_fixture(
+            "CNTSQL",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CNTSQL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. 01 OUT-X PIC X(6). 01 LEN-X PIC S9(9) COMP VALUE 6. 01 PUT-FN PIC X(2). 01 GET-FN PIC X(2). 01 DEL-FN PIC X(2). PROCEDURE DIVISION. EXEC CICS PUT CONTAINER('ITEM') CHANNEL('WORK') FROM(DATA-X) FLENGTH(6) END-EXEC. MOVE EIBFN TO PUT-FN. EXEC CICS SUSPEND END-EXEC. EXEC CICS GET CONTAINER('ITEM') CHANNEL('WORK') INTO(OUT-X) FLENGTH(LEN-X) END-EXEC. MOVE EIBFN TO GET-FN. EXEC CICS DELETE CHANNEL('WORK') END-EXEC. MOVE EIBFN TO DEL-FN. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-channel-container-route-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let backend = match postgres_url {
+            Some(url) => RouteRestartBackend::Postgres(url),
+            None => RouteRestartBackend::Sqlite(format!(
+                "sqlite://{}?mode=rwc",
+                root.join("state.db").display()
+            )),
+        };
+        let settings = backend.settings(root.join("artifacts"));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let session = SessionId::new("channel-container-sqlite-selected", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let invocation;
+        let replay_before;
+        let channel_before;
+        {
+            let (server, _) = backend.open_server(settings.clone(), secrets.clone());
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .racf
+                .define_profile("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", None)
+                .unwrap();
+            for intent in [
+                AccessIntent::Read,
+                AccessIntent::Update,
+                AccessIntent::Alter,
+            ] {
+                server
+                    .racf
+                    .permit("CICSCHAN", "CICS.CHANNEL.WORK", "IBMUSER", intent)
+                    .unwrap();
+            }
+            server
+                .install_online_application(OnlineApplicationDefinition {
+                    programs: vec![OnlineProgramDefinition {
+                        name: "CNTSQL".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
+                    }],
+                    transactions: BTreeMap::from([("CNSQ".into(), "CNTSQL".into())]),
+                    maps: vec![BmsMapDefinition {
+                        mapset: "CNTSQL".into(),
+                        map: "CNTSQL".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    }],
+                })
+                .unwrap();
+            invocation = server
+                .cics_invocation("IBMUSER", "CNSQ", Some(artifact_ref.clone()))
+                .unwrap();
+            server
+                .cics
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "CNSQ",
+                    24,
+                    80,
+                    "channel-container-sqlite-csrf",
+                    1,
+                    10_000,
+                )
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CNTSQL", 2)
+                .unwrap();
+            assert_eq!(
+                server
+                    .store
+                    .list_provider_state("cics-container-replay-v1", 8)
+                    .unwrap()
+                    .len(),
+                1
+            );
+            replay_before = server
+                .store
+                .list_provider_state("cics-container-replay-v1", 8)
+                .unwrap();
+            channel_before = server
+                .store
+                .list_provider_state("cics-channel-v1", 8)
+                .unwrap();
+            assert_eq!(channel_before.len(), 1);
+            let channel: serde_json::Value =
+                serde_json::from_slice(&channel_before[0].payload).unwrap();
+            assert_eq!(channel["creator_program"], "CNTSQL");
+        }
+        let (server, _) = backend.open_server(settings, secrets);
+        assert_eq!(
+            server
+                .store
+                .list_provider_state("cics-container-replay-v1", 8)
+                .unwrap(),
+            replay_before
+        );
+        assert_eq!(
+            server
+                .store
+                .list_provider_state("cics-channel-v1", 8)
+                .unwrap(),
+            channel_before
+        );
+        server
+            .run_online_exchange(&session, &principal, "CNTSQL", 3)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("OUT-X").unwrap().bytes(), b"ABCDEF");
+        assert_eq!(restored.variable("PUT-FN").unwrap().bytes(), &[0x34, 0x16]);
+        assert_eq!(restored.variable("GET-FN").unwrap().bytes(), &[0x34, 0x14]);
+        assert_eq!(restored.variable("DEL-FN").unwrap().bytes(), &[0x34, 0x58]);
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-channel-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-container-replay-v1", 8)
+                .unwrap()
+                .len()
+                >= 2
+        );
+        server
+            .run_online_exchange(&session, &principal, "CNTSQL", 4)
+            .unwrap();
+        assert!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .is_some_and(|execution| execution.state.terminal())
+        );
+        if postgres {
+            std::fs::remove_dir_all(root).unwrap();
+            return;
+        }
+        server
+            .store
+            .delete_checkpoint(&invocation.execution_id)
+            .unwrap();
+        let planner = server.retention_planner().unwrap();
+        let mut archived = 0;
+        for _ in 0..4 {
+            archived += planner
+                .archive_and_prune(RetentionTarget::CicsReplay, 2_000_000_000_000, 8)
+                .unwrap()
+                .archived;
+        }
+        assert_eq!(archived, 4);
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-container-replay-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        let capacity = server
+            .store
+            .get_provider_state("cics-container-capacity-v1", "global")
+            .unwrap()
+            .unwrap();
+        let capacity: serde_json::Value = serde_json::from_slice(&capacity.payload).unwrap();
+        assert_eq!(capacity["replays"], 0);
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-effect-replay-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn compiled_bts_container_route_uses_attached_process_fence() {
+        compiled_bts_container_route_recovers_after_restart(None);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+    fn postgres_compiled_bts_container_route_recovers_after_restart() {
+        compiled_bts_container_route_recovers_after_restart(Some(required_postgres_route_url()));
+    }
+
+    fn compiled_bts_container_route_recovers_after_restart(postgres_url: Option<String>) {
+        use mainframe_env_cics::bts_lifecycle::{
+            BtsChildDefinition, BtsLifecycleStore, BtsProcessTypeDefinition, BtsReply,
+            BtsTransactionDefinition,
+        };
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CNTBTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4) VALUE 'DATA'. 01 PROC-X PIC X(4). 01 ACT-X PIC X(4). 01 LEN-X PIC S9(9) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('ORDER') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS PUT CONTAINER('P1') PROCESS FROM(DATA-X) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS GET CONTAINER('P1') PROCESS INTO(PROC-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS MOVE CONTAINER('P1') AS('A1') FROMPROCESS TOACTIVITY('CHILD') END-EXEC. EXEC CICS GET CONTAINER('A1') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS MOVE CONTAINER('A1') AS('P2') FROMACTIVITY('CHILD') TOPROCESS END-EXEC. EXEC CICS DELETE CONTAINER('P2') PROCESS END-EXEC. EXEC CICS PUT CONTAINER('A2') ACTIVITY('CHILD') FROM(DATA-X) END-EXEC. EXEC CICS GET CONTAINER('A2') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS DELETE CONTAINER('A2') ACTIVITY('CHILD') END-EXEC. EXEC CICS SYNCPOINT END-EXEC. EXEC CICS SUSPEND END-EXEC. STOP RUN.";
+        let artifact = published_source_fixture("CNTBTS", source);
+        let worker = published_source_fixture(
+            "BTSROOT",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BTSROOT. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let worker_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(worker.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-bts-container-route-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let backend = match postgres_url {
+            Some(url) => RouteRestartBackend::Postgres(url),
+            None => RouteRestartBackend::Sqlite(format!(
+                "sqlite://{}?mode=rwc",
+                root.join("state.db").display()
+            )),
+        };
+        let settings = backend.settings(root.join("artifacts"));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let session = SessionId::new("bts-container-selected", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let invocation;
+        let process_before;
+        let replay_before;
+        {
+            let (server, store) = backend.open_server(settings.clone(), secrets.clone());
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .install_online_application(OnlineApplicationDefinition {
+                    programs: vec![
+                        OnlineProgramDefinition {
+                            name: "CNTBTS".into(),
+                            artifact: artifact_ref.clone(),
+                            payload: artifact.payload().to_vec(),
+                            manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                            semantic_identity: artifact.semantic_id().to_reference(),
+                        },
+                        OnlineProgramDefinition {
+                            name: "BTSROOT".into(),
+                            artifact: worker_ref,
+                            payload: worker.payload().to_vec(),
+                            manifest: VersionedArtifactManifest::V3(worker.manifest().clone()),
+                            semantic_identity: worker.semantic_id().to_reference(),
+                        },
+                    ],
+                    transactions: BTreeMap::from([
+                        ("CB01".into(), "CNTBTS".into()),
+                        ("BT01".into(), "BTSROOT".into()),
+                    ]),
+                    maps: vec![BmsMapDefinition {
+                        mapset: "CNTBTS".into(),
+                        map: "CNTBTS".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    }],
+                })
+                .unwrap();
+            server
+                .cics
+                .register_bts_process_type(
+                    BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+                )
+                .unwrap();
+            server
+                .cics
+                .register_bts_transaction(
+                    BtsTransactionDefinition::new("BT01", "BTSROOT", true, false).unwrap(),
+                )
+                .unwrap();
+            server
+                .racf
+                .define_profile("BTSREPO", "BTS.REPO", "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Update)
+                .unwrap();
+            let lifecycle_resource = BtsLifecycleStore::saf_resource("TYPE", "ORDER").unwrap();
+            server
+                .racf
+                .define_profile("BTSLIFE", &lifecycle_resource, "IBMUSER", None)
+                .unwrap();
+            for intent in [AccessIntent::Read, AccessIntent::Update] {
+                server
+                    .racf
+                    .permit("BTSLIFE", &lifecycle_resource, "IBMUSER", intent)
+                    .unwrap();
+            }
+            invocation = server
+                .cics_invocation("IBMUSER", "CB01", Some(artifact_ref.clone()))
+                .unwrap();
+            server
+                .cics
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "CB01",
+                    24,
+                    80,
+                    "bts-container-csrf",
+                    1,
+                    10_000,
+                )
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CNTBTS", 2)
+                .unwrap();
+            let authority = BtsLifecycleStore::new(store.as_ref());
+            let process = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+            let root_id = process.root_id;
+            let uow = invocation.run_unit_id.as_str();
+            let execution = invocation.execution_id.as_str();
+            authority
+                .mutate_process(
+                    "TYPE",
+                    "ORDER",
+                    uow,
+                    execution,
+                    "IBMUSER",
+                    "activate",
+                    [1; 32],
+                    |process| {
+                        process.start(&root_id, None, true)?;
+                        process.checkpoint(&root_id, 1, 7, "selected-checkpoint")?;
+                        Ok(BtsReply::normal())
+                    },
+                )
+                .unwrap();
+            authority
+                .define_child(
+                    "TYPE",
+                    "ORDER",
+                    &root_id,
+                    &BtsChildDefinition {
+                        name: "CHILD".into(),
+                        completion_event: "DONE".into(),
+                        program: "BTSROOT".into(),
+                        transid: "BT01".into(),
+                        userid: "IBMUSER".into(),
+                    },
+                    uow,
+                    execution,
+                    "IBMUSER",
+                    "child",
+                    [2; 32],
+                )
+                .unwrap();
+            server
+                .cics
+                .bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ORDER", &root_id, 1, 7)
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "CNTBTS", 3)
+                .unwrap();
+            process_before = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
+            replay_before = store
+                .list_provider_state("cics-container-replay-v1", 32)
+                .unwrap();
+            assert!(!replay_before.is_empty());
+        }
+        {
+            let (server, store) = backend.open_server(settings, secrets);
+            assert_eq!(
+                BtsLifecycleStore::new(store.as_ref())
+                    .load_process("TYPE", "ORDER")
+                    .unwrap(),
+                Some(process_before)
+            );
+            assert_eq!(
+                store
+                    .list_provider_state("cics-container-replay-v1", 32)
+                    .unwrap(),
+                replay_before
+            );
+            server
+                .run_online_exchange(&session, &principal, "CNTBTS", 4)
+                .unwrap();
+            let continuation = server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .unwrap();
+            let mut restored = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation,
+                CodecLimits::default(),
+            )
+            .unwrap();
+            restored
+                .restore_checkpoint(&continuation.checkpoint)
+                .unwrap();
+            assert_eq!(restored.variable("PROC-X").unwrap().bytes(), b"DATA");
+            assert_eq!(restored.variable("ACT-X").unwrap().bytes(), b"DATA");
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

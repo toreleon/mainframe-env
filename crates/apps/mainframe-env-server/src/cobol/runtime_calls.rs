@@ -3,7 +3,10 @@ use super::*;
 pub(super) fn decode_cobol_call_values(
     payload: &BoundedPayload,
 ) -> Result<Vec<Vec<u8>>, HostProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
+    if !matches!(
+        payload.schema(),
+        "mainframe-env.cobol.call@1" | "mainframe-env.cobol.batch-main@1"
+    ) {
         return Err(HostProblem::Malformed);
     }
     let bytes = payload.bytes();
@@ -49,6 +52,36 @@ pub(super) fn decode_cobol_call_values(
         return Err(HostProblem::Malformed);
     }
     Ok(values)
+}
+
+pub(super) fn batch_main_call_arguments(
+    parameter: Option<&str>,
+) -> Result<BoundedPayload, HostProblem> {
+    // The interpreter keeps DISPLAY storage in its native encoding (CP037 is applied only at
+    // dataset/JSON/national boundaries), so the PARM text is passed natively; z/OS passes the
+    // same text in EBCDIC to EBCDIC storage. JCL conversion already bounds it to 100 characters.
+    let text = parameter.unwrap_or_default().as_bytes().to_vec();
+    if text.len() > 100 {
+        return Err(HostProblem::Malformed);
+    }
+    let mut area = u16::try_from(text.len())
+        .map_err(|_| HostProblem::Malformed)?
+        .to_be_bytes()
+        .to_vec();
+    area.extend_from_slice(&text);
+    let name = b"PARM-AREA";
+    let mut bytes = 1u32.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&(name.len() as u64).to_be_bytes());
+    bytes.extend_from_slice(name);
+    bytes.push(1);
+    bytes.extend_from_slice(&(area.len() as u64).to_be_bytes());
+    bytes.extend_from_slice(&area);
+    BoundedPayload::new(
+        "mainframe-env.cobol.batch-main@1",
+        bytes,
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
 }
 
 pub(super) fn execute_ceedays(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {

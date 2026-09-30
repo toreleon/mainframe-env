@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Add typed ACTIVITY and PROCESS BTS browse and INQUIRE commands with bounded task-owned durable cursors."

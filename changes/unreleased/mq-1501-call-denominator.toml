@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recovered the MQ-1501 IBM MQ 9.4 identity-only registry for 26 unique MQI calls and all 27 pinned source-list positions; re-pinned MQINQ after owner Chrome verification (#337). No behavioral or licensed credit."

@@ -11,6 +11,20 @@ pub(super) const fn hex_nibble(value: u8) -> Option<u8> {
     }
 }
 
+pub(super) fn floating_sign_digit(
+    symbols: &[u8],
+    index: usize,
+    prefix: Option<(u8, usize)>,
+) -> bool {
+    let Some(&symbol) = symbols.get(index) else {
+        return false;
+    };
+    index > 0
+        && (prefix.is_some_and(|(floating, end)| floating == symbol && index < end)
+            || symbols[index - 1] == symbol
+            || symbols.get(index + 1) == Some(&symbol))
+}
+
 pub(super) fn data_description_clause_boundary(word: &str) -> bool {
     matches!(word, "ASCENDING" | "DEPENDING" | "DESCENDING" | "INDEXED")
         || usage_word(word).is_some()

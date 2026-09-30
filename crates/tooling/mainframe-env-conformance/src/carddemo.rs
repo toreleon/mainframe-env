@@ -6,6 +6,9 @@ use corpus_validation::*;
 mod bms;
 mod control_library;
 mod online_authorities;
+mod readacct;
+
+pub use readacct::{capture_carddemo_readacct_from_env, verify_carddemo_readacct_from_env};
 
 use online_authorities::install_base_online_authorities;
 
@@ -120,42 +123,6 @@ impl fmt::Display for CorpusProblem {
 }
 
 impl std::error::Error for CorpusProblem {}
-
-#[derive(Clone, Debug, Deserialize)]
-struct CorpusContract {
-    repository: String,
-    commit: String,
-    tree: String,
-    license: String,
-    license_sha256: String,
-    executable_content_identity: ContentIdentity,
-    runtime_oracles: Vec<RuntimeOracleContract>,
-    file_count_checks: Vec<FileCountContract>,
-    external_compatibility_copybooks: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct ContentIdentity {
-    algorithm: String,
-    sha256: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct RuntimeOracleContract {
-    path: String,
-    sha256: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct FileCountContract {
-    id: String,
-    roots: Vec<String>,
-    #[serde(default)]
-    extensions: Vec<String>,
-    #[serde(default)]
-    excluded_names: Vec<String>,
-    expected: usize,
-}
 
 #[derive(Clone, Debug, Deserialize)]
 struct CardDemoCorrectionsContract {
