@@ -192,7 +192,7 @@ pub(in crate::cics_plan) fn output_from_tag(
     value: u16,
 ) -> Result<CicsOutputName, CicsPlanCodecProblem> {
     match value {
-        1016..=1030 => super::super::BtsBrowseOutput::from_tag(value)
+        1016..=1040 => super::super::BtsBrowseOutput::from_tag(value)
             .map(CicsOutputName::BtsBrowse)
             .ok_or(CicsPlanCodecProblem::Malformed),
         1528 => Ok(CicsOutputName::IssueState),

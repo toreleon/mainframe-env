@@ -240,6 +240,16 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::BtsBrowse(
             BtsBrowseOutput::BrowseToken | BtsBrowseOutput::Level | BtsBrowseOutput::DataLength,
         ) => SlotUse::FullwordOutput,
+        CicsOutputName::BtsBrowse(
+            BtsBrowseOutput::CompStatus
+            | BtsBrowseOutput::Mode
+            | BtsBrowseOutput::SuspStatus
+            | BtsBrowseOutput::EventType
+            | BtsBrowseOutput::FireStatus
+            | BtsBrowseOutput::Predicate
+            | BtsBrowseOutput::Status,
+        ) => SlotUse::FullwordOutput,
+        CicsOutputName::BtsBrowse(BtsBrowseOutput::Abstime) => SlotUse::AbstimeOutput,
         CicsOutputName::BtsBrowse(BtsBrowseOutput::Set) => SlotUse::PointerOutput,
         CicsOutputName::BtsBrowse(field) => SlotUse::BtsExactOutput(field.width()),
         CicsOutputName::BtsActivityId => SlotUse::BtsExactOutput(52),

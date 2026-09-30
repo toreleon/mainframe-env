@@ -29,7 +29,10 @@ pub(super) const fn allowed_output(operation: P, output: O) -> bool {
             output,
             O::ContainerInto | O::ContainerSet | O::ContainerLength | O::ContainerCcsid
         ),
-        P::GetContainer64 => matches!(output, O::ContainerInto64 | O::ContainerLength),
+        P::GetContainer64 => matches!(
+            output,
+            O::ContainerInto64 | O::ContainerLength | O::ContainerCcsid
+        ),
         P::QueryChannel => matches!(output, O::ContainerCount),
         _ => false,
     }
@@ -57,7 +60,14 @@ pub(super) fn invalid_shape(
         ),
         P::GetContainer64 => (
             &[I::ContainerName, I::Abi64],
-            &[I::BtsChannel, I::ContainerLength, I::ContainerByteOffset],
+            &[
+                I::BtsChannel,
+                I::ContainerLength,
+                I::ContainerByteOffset,
+                I::ContainerIntoCcsid,
+                I::ContainerIntoCodepage,
+                I::ContainerConvertst,
+            ],
         ),
         P::MoveContainer => (
             &[I::ContainerName, I::ContainerAs],
@@ -81,7 +91,12 @@ pub(super) fn invalid_shape(
         ),
         P::PutContainer64 => (
             &[I::ContainerName, I::ContainerFrom64, I::Abi64],
-            &[I::BtsChannel, I::ContainerLength],
+            &[
+                I::BtsChannel,
+                I::ContainerLength,
+                I::ContainerDatatype,
+                I::ContainerCcsid,
+            ],
         ),
         _ => return true,
     };
@@ -114,6 +129,7 @@ pub(super) fn invalid_shape(
                 (plan.operation, option),
                 (P::PutContainer, F::ContainerAppend)
                     | (P::PutContainer64, F::ContainerAppend)
+                    | (P::GetContainer64, F::ContainerNoData)
                     | (P::GetContainer, F::ContainerNoData)
                     | (
                         P::DeleteContainer | P::GetContainer | P::PutContainer,
@@ -174,8 +190,31 @@ pub(super) fn invalid_shape(
     }
     match plan.operation {
         P::GetContainer64 => {
-            !outputs.contains(&O::ContainerInto64)
-                || outputs.contains(&O::ContainerLength) != inputs.contains(&I::ContainerLength)
+            let nodata = plan.options.contains(&F::ContainerNoData);
+            (outputs.contains(&O::ContainerInto64) == nodata)
+                || (nodata && !outputs.contains(&O::ContainerLength))
+                || (nodata && inputs.contains(&I::ContainerByteOffset))
+                || (!nodata
+                    && outputs.contains(&O::ContainerLength) != inputs.contains(&I::ContainerLength))
+                || (nodata && inputs.contains(&I::ContainerLength))
+                || (outputs.contains(&O::ContainerCcsid)
+                    && !inputs.contains(&I::ContainerConvertst))
+                || inputs.contains(&I::ContainerIntoCcsid)
+                    && inputs.contains(&I::ContainerIntoCodepage)
+                || inputs.contains(&I::ContainerIntoCcsid)
+                    && plan.operands.iter().any(|operand| {
+                        operand.name == I::ContainerIntoCcsid
+                            && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"37")
+                            && !matches!(operand.value, CicsOperandValue::Integer(37))
+                    })
+                || plan.operands.iter().any(|operand| {
+                    operand.name == I::ContainerConvertst
+                        && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"NOCONVERT")
+                        || operand.name == I::ContainerIntoCodepage
+                            && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"37")
+                        || operand.name == I::ContainerDatatype
+                            && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"BIT" || value == b"CHAR")
+                })
         }
         P::GetContainer => {
             let destinations = usize::from(outputs.contains(&O::ContainerInto))
@@ -189,6 +228,20 @@ pub(super) fn invalid_shape(
                     && outputs.contains(&O::ContainerLength)
                         != inputs.contains(&I::ContainerLength))
                 || (!outputs.contains(&O::ContainerInto) && inputs.contains(&I::ContainerLength))
+        }
+        P::PutContainer64 => {
+            let bit = plan.operands.iter().any(|operand| {
+                operand.name == I::ContainerDatatype
+                    && matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"BIT")
+            });
+            (bit && inputs.contains(&I::ContainerCcsid))
+                || plan.operands.iter().any(|operand| {
+                    (operand.name == I::ContainerDatatype
+                        && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"BIT" || value == b"CHAR"))
+                        || (operand.name == I::ContainerCcsid
+                            && !matches!(&operand.value, CicsOperandValue::Literal(value) if value == b"37")
+                            && !matches!(operand.value, CicsOperandValue::Integer(37)))
+                })
         }
         P::QueryChannel => !outputs.contains(&O::ContainerCount),
         _ => false,

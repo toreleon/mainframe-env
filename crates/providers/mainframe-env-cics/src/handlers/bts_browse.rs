@@ -164,6 +164,18 @@ pub struct BrowseItem {
     pub activity_id: Option<String>,
     pub level: u16,
     pub resource_epoch: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_metadata: Option<BrowseEventMetadata>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrowseEventMetadata {
+    pub event_type: i32,
+    pub fire_status: i32,
+    pub composite: Option<String>,
+    pub predicate: Option<i32>,
+    pub timer: Option<String>,
 }
 
 impl BrowseItem {
@@ -176,16 +188,21 @@ impl BrowseItem {
             activity_id: None,
             level: 0,
             resource_epoch: 0,
+            event_metadata: None,
         })
     }
 
     fn valid_for(&self, kind: BrowseKind) -> bool {
         if kind == BrowseKind::Container {
-            self.activity_id.is_none() && self.level == 0 && Self::container(&self.name).is_ok()
+            self.activity_id.is_none()
+                && self.event_metadata.is_none()
+                && self.level == 0
+                && Self::container(&self.name).is_ok()
         } else {
             Self::new(&self.name, self.activity_id.as_deref(), self.level).is_ok()
                 && (self.activity_id.is_some()
                     == matches!(kind, BrowseKind::Activity | BrowseKind::Process))
+                && (self.event_metadata.is_none() || kind == BrowseKind::Event)
         }
     }
 
@@ -201,6 +218,7 @@ impl BrowseItem {
             activity_id: activity_id.map(str::to_owned),
             level,
             resource_epoch: 0,
+            event_metadata: None,
         })
     }
 
@@ -210,6 +228,11 @@ impl BrowseItem {
         }
         self.resource_epoch = epoch;
         Ok(self)
+    }
+
+    pub fn with_event_metadata(mut self, metadata: BrowseEventMetadata) -> Self {
+        self.event_metadata = Some(metadata);
+        self
     }
 }
 
@@ -657,6 +680,64 @@ mod tests {
                 browse.apply(&owner, "CLOSE", [3; 32], &BrowseEffect::Close),
                 Ok(BrowseOutcome::Closed)
             );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn bts_browse_event_metadata_replays_identically_after_sqlite_restart() {
+        use super::BrowseEventMetadata;
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-bts-event-metadata-{}-{}",
+            std::process::id(),
+            NEXT_SQLITE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let owner = BrowseOwner::new("RUN", "EXEC", "USER").unwrap();
+        let item = BrowseItem::new("READY", None, 0)
+            .unwrap()
+            .with_epoch(3)
+            .unwrap()
+            .with_event_metadata(BrowseEventMetadata {
+                event_type: 226,
+                fire_status: 1000,
+                composite: None,
+                predicate: None,
+                timer: None,
+            });
+        let returned = {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let browse = BtsBrowseStore::new(&sqlite);
+            let start = BrowseEffect::Start {
+                scope: BrowseScope::new(BrowseKind::Event, "BTSEVENT", "CICS.BTS.A.BROWSE", 7)
+                    .unwrap(),
+                items: vec![item.clone()],
+            };
+            let BrowseOutcome::Token(token) =
+                browse.apply(&owner, "START", [1; 32], &start).unwrap()
+            else {
+                panic!("expected token")
+            };
+            let next = BrowseEffect::Next {
+                token,
+                kind: BrowseKind::Event,
+                live_epoch: 3,
+                expected: item.clone(),
+            };
+            browse.apply(&owner, "NEXT", [2; 32], &next).unwrap()
+        };
+        {
+            let sqlite = SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+            let browse = BtsBrowseStore::new(&sqlite);
+            assert_eq!(
+                browse.replay(&owner, "NEXT", [2; 32]).unwrap().unwrap().0,
+                returned
+            );
+            let BrowseOutcome::Item(replayed) = returned else {
+                panic!("expected item")
+            };
+            assert_eq!(replayed.event_metadata.unwrap().event_type, 226);
         }
         std::fs::remove_dir_all(directory).unwrap();
     }

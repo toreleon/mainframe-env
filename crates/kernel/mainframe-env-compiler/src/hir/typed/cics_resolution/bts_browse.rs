@@ -107,7 +107,17 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             required: &["TIMER", "BROWSETOKEN"],
         },
         HirCicsOperation::BtsGetNextEvent => CommandShape {
-            clauses: &["BROWSETOKEN", "EVENT", "RESP", "RESP2"],
+            clauses: &[
+                "BROWSETOKEN",
+                "EVENT",
+                "EVENTTYPE",
+                "FIRESTATUS",
+                "COMPOSITE",
+                "PREDICATE",
+                "TIMER",
+                "RESP",
+                "RESP2",
+            ],
             options: &["NOHANDLE"],
             required: &["BROWSETOKEN", "EVENT"],
         },
@@ -117,12 +127,30 @@ pub(super) fn shape(operation: HirCicsOperation) -> Option<CommandShape> {
             required: &["BROWSETOKEN"],
         },
         HirCicsOperation::BtsInquireEvent => CommandShape {
-            clauses: &["EVENT", "ACTIVITYID", "RESP", "RESP2"],
+            clauses: &[
+                "EVENT",
+                "ACTIVITYID",
+                "EVENTTYPE",
+                "FIRESTATUS",
+                "COMPOSITE",
+                "PREDICATE",
+                "TIMER",
+                "RESP",
+                "RESP2",
+            ],
             options: &["NOHANDLE"],
             required: &["EVENT"],
         },
         HirCicsOperation::BtsInquireTimer => CommandShape {
-            clauses: &["TIMER", "ACTIVITYID", "RESP", "RESP2"],
+            clauses: &[
+                "TIMER",
+                "ACTIVITYID",
+                "EVENT",
+                "STATUS",
+                "ABSTIME",
+                "RESP",
+                "RESP2",
+            ],
             options: &["NOHANDLE"],
             required: &["TIMER"],
         },
@@ -203,17 +231,37 @@ pub(super) fn reviewed_ambiguous_shape(
     has_value: bool,
 ) -> bool {
     has_value
-        && matches!(
-            descriptor.label_tokens,
-            ["INQUIRE", "ACTIVITYID"] if matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS")
-        )
+        && match descriptor.label_tokens {
+            ["GETNEXT", "EVENT"] => matches!(
+                name,
+                "EVENTTYPE" | "FIRESTATUS" | "COMPOSITE" | "PREDICATE" | "TIMER"
+            ),
+            ["INQUIRE", "ACTIVITYID"] => matches!(name, "COMPSTATUS" | "MODE" | "SUSPSTATUS"),
+            ["INQUIRE", "EVENT"] => matches!(
+                name,
+                "EVENTTYPE" | "FIRESTATUS" | "COMPOSITE" | "PREDICATE" | "TIMER"
+            ),
+            ["INQUIRE", "TIMER"] => matches!(name, "EVENT" | "STATUS" | "ABSTIME"),
+            _ => false,
+        }
 }
 
 pub(super) fn validate(
     clauses: &Clauses,
-    options: &[String],
+    _options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::BtsGetNextEvent
+        && ["EVENTTYPE", "FIRESTATUS", "COMPOSITE", "PREDICATE", "TIMER"]
+            .iter()
+            .filter(|name| clauses.contains_key(**name))
+            .count()
+            > 1
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS GETNEXT EVENT metadata output combinations are unsupported".into(),
+        ));
+    }
     if matches!(
         operation,
         HirCicsOperation::BtsStartBrowseContainer | HirCicsOperation::BtsInquireContainer
@@ -234,15 +282,6 @@ pub(super) fn validate(
             "CICS STARTBROWSE ACTIVITY requires PROCESS with PROCESSTYPE, or ACTIVITYID".into(),
         ));
     }
-    if operation == HirCicsOperation::BtsInquireActivity
-        && ["COMPSTATUS", "MODE", "SUSPSTATUS"]
-            .iter()
-            .any(|name| clauses.contains_key(*name) || options.iter().any(|option| option == name))
-    {
-        return Err(ResolutionFailure::Invalid(
-            "CICS INQUIRE ACTIVITYID COMPSTATUS, MODE, and SUSPSTATUS are not implemented".into(),
-        ));
-    }
     if operation == HirCicsOperation::BtsInquireEvent
         && clauses.get("EVENT").is_some_and(|tokens| {
             tokens.iter().any(|token| {
@@ -256,6 +295,20 @@ pub(super) fn validate(
         return Err(ResolutionFailure::Invalid(
             "CICS SYSTEM event inquiry is unsupported".into(),
         ));
+    }
+    if operation == HirCicsOperation::BtsInquireActivity {
+        let cvdas = ["COMPSTATUS", "MODE", "SUSPSTATUS"];
+        if cvdas.iter().any(|name| clauses.contains_key(*name))
+            && clauses
+                .keys()
+                .filter(|name| !matches!(name.as_str(), "ACTIVITYID" | "RESP" | "RESP2"))
+                .count()
+                != 1
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ACTIVITYID CVDA output combinations are unsupported".into(),
+            ));
+        }
     }
     Ok(())
 }
@@ -390,6 +443,16 @@ pub(super) fn outputs(
         O::Container,
         O::DataLength,
         O::Set,
+        O::CompStatus,
+        O::Mode,
+        O::SuspStatus,
+        O::EventType,
+        O::FireStatus,
+        O::Composite,
+        O::Predicate,
+        O::Timer,
+        O::Status,
+        O::Abstime,
     ] {
         let Some(tokens) = clauses.get(field.name()) else {
             continue;
@@ -411,7 +474,23 @@ pub(super) fn outputs(
                     HirCicsOperation::BtsStartBrowseEvent | HirCicsOperation::BtsStartBrowseTimer,
                     O::BrowseToken,
                 )
-                | (HirCicsOperation::BtsGetNextEvent, O::Event,)
+                | (
+                    HirCicsOperation::BtsGetNextEvent,
+                    O::Event
+                        | O::EventType
+                        | O::FireStatus
+                        | O::Composite
+                        | O::Predicate
+                        | O::Timer
+                )
+                | (
+                    HirCicsOperation::BtsInquireEvent,
+                    O::EventType | O::FireStatus | O::Composite | O::Predicate | O::Timer
+                )
+                | (
+                    HirCicsOperation::BtsInquireTimer,
+                    O::Event | O::Status | O::Abstime
+                )
                 | (
                     HirCicsOperation::BtsGetNextActivity,
                     O::Activity | O::ActivityId | O::Level
@@ -431,7 +510,10 @@ pub(super) fn outputs(
                         | O::ProcessType
                         | O::Program
                         | O::TransId
-                        | O::UserId,
+                        | O::UserId
+                        | O::CompStatus
+                        | O::Mode
+                        | O::SuspStatus,
                 )
         );
         if !output {
@@ -444,7 +526,25 @@ pub(super) fn outputs(
                 target.category,
                 DataCategory::Pointer | DataCategory::Pointer32
             )
-        } else if matches!(field, O::BrowseToken | O::Level | O::DataLength) {
+        } else if field == O::Abstime {
+            target.length == 8
+                && target.usage == CobolUsage::PackedDecimal
+                && target.digits == 15
+                && target.scale == 0
+                && target.signed
+        } else if matches!(
+            field,
+            O::BrowseToken
+                | O::Level
+                | O::DataLength
+                | O::CompStatus
+                | O::Mode
+                | O::SuspStatus
+                | O::EventType
+                | O::FireStatus
+                | O::Predicate
+                | O::Status
+        ) {
             fullword(&target)
         } else {
             target.length == field.width()

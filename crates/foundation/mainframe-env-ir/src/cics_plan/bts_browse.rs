@@ -78,6 +78,16 @@ pub enum BtsBrowseOutput {
     Container,
     DataLength,
     Set,
+    CompStatus,
+    Mode,
+    SuspStatus,
+    EventType,
+    FireStatus,
+    Composite,
+    Predicate,
+    Timer,
+    Status,
+    Abstime,
 }
 
 impl BtsBrowseOutput {
@@ -102,6 +112,16 @@ impl BtsBrowseOutput {
             1028 => Some(Self::Container),
             1029 => Some(Self::DataLength),
             1030 => Some(Self::Set),
+            1031 => Some(Self::CompStatus),
+            1032 => Some(Self::Mode),
+            1033 => Some(Self::SuspStatus),
+            1034 => Some(Self::EventType),
+            1035 => Some(Self::FireStatus),
+            1036 => Some(Self::Composite),
+            1037 => Some(Self::Predicate),
+            1038 => Some(Self::Timer),
+            1039 => Some(Self::Status),
+            1040 => Some(Self::Abstime),
             _ => None,
         }
     }
@@ -123,18 +143,39 @@ impl BtsBrowseOutput {
             Self::Container => "CONTAINER",
             Self::DataLength => "DATALENGTH",
             Self::Set => "SET",
+            Self::CompStatus => "COMPSTATUS",
+            Self::Mode => "MODE",
+            Self::SuspStatus => "SUSPSTATUS",
+            Self::EventType => "EVENTTYPE",
+            Self::FireStatus => "FIRESTATUS",
+            Self::Composite => "COMPOSITE",
+            Self::Predicate => "PREDICATE",
+            Self::Timer => "TIMER",
+            Self::Status => "STATUS",
+            Self::Abstime => "ABSTIME",
         }
     }
 
     pub const fn width(self) -> usize {
         match self {
-            Self::BrowseToken | Self::Level | Self::DataLength | Self::Set => 4,
+            Self::BrowseToken
+            | Self::Level
+            | Self::DataLength
+            | Self::Set
+            | Self::CompStatus
+            | Self::Mode
+            | Self::SuspStatus
+            | Self::EventType
+            | Self::FireStatus
+            | Self::Predicate
+            | Self::Status => 4,
+            Self::Abstime => 8,
             Self::Activity => 16,
             Self::ActivityId => 52,
             Self::Process => 36,
             Self::Abcode => 4,
             Self::Abprogram | Self::ProcessType | Self::Program | Self::UserId => 8,
-            Self::Event | Self::Container => 16,
+            Self::Event | Self::Container | Self::Composite | Self::Timer => 16,
             Self::TransId => 4,
         }
     }
@@ -208,14 +249,37 @@ pub(super) fn invalid_shape(
         P::BtsGetNextEvent => (
             &[I::BrowseToken],
             &[I::BrowseToken],
-            &[O::Event],
+            &[
+                O::Event,
+                O::EventType,
+                O::FireStatus,
+                O::Composite,
+                O::Predicate,
+                O::Timer,
+            ],
             &[O::Event],
         ),
         P::BtsEndBrowseEvent | P::BtsEndBrowseTimer => {
             (&[I::BrowseToken], &[I::BrowseToken], &[], &[])
         }
-        P::BtsInquireEvent => (&[I::ActivityId, I::Event], &[I::Event], &[], &[]),
-        P::BtsInquireTimer => (&[I::ActivityId, I::Timer], &[I::Timer], &[], &[]),
+        P::BtsInquireEvent => (
+            &[I::ActivityId, I::Event],
+            &[I::Event],
+            &[
+                O::EventType,
+                O::FireStatus,
+                O::Composite,
+                O::Predicate,
+                O::Timer,
+            ],
+            &[],
+        ),
+        P::BtsInquireTimer => (
+            &[I::ActivityId, I::Timer],
+            &[I::Timer],
+            &[O::Event, O::Status, O::Abstime],
+            &[],
+        ),
         P::BtsStartBrowseActivity => (
             &[I::ActivityId, I::Process, I::ProcessType],
             &[],
@@ -256,6 +320,9 @@ pub(super) fn invalid_shape(
                 O::Program,
                 O::TransId,
                 O::UserId,
+                O::CompStatus,
+                O::Mode,
+                O::SuspStatus,
             ],
             &[],
         ),
@@ -332,6 +399,17 @@ pub(super) fn invalid_shape(
         || required_outputs
             .iter()
             .any(|name| !actual_outputs.contains(name))
+        || plan.operation == P::BtsInquireActivity
+            && actual_outputs
+                .iter()
+                .any(|name| matches!(name, O::CompStatus | O::Mode | O::SuspStatus))
+            && actual_outputs.len() != 1
+        || plan.operation == P::BtsGetNextEvent
+            && actual_outputs
+                .iter()
+                .filter(|name| **name != O::Event)
+                .count()
+                > 1
         || plan.operation == P::BtsStartBrowseActivity
             && (actual_inputs.contains(&I::Process) != actual_inputs.contains(&I::ProcessType)
                 || actual_inputs.contains(&I::Process) && actual_inputs.contains(&I::ActivityId))
@@ -439,7 +517,7 @@ mod tests {
             }
         }
         assert!(BtsBrowseInput::from_tag(968).is_none());
-        assert!(BtsBrowseOutput::from_tag(1031).is_none());
+        assert!(BtsBrowseOutput::from_tag(1041).is_none());
         let mut future_tag = encode_cics_effect_plan(
             &plan(P::BtsEndBrowseActivity, &[I::BrowseToken], &[]),
             CicsPlanLimits::default(),
@@ -492,6 +570,86 @@ mod tests {
         let mut system = plan(P::BtsInquireEvent, &[I::Event], &[]);
         system.operands[0].value = CicsOperandValue::Literal(b"DFHINITIAL".to_vec());
         assert!(encode_cics_effect_plan(&system, CicsPlanLimits::default()).is_err());
+    }
+
+    #[test]
+    fn bts_browse_inquiry_output_tags_roundtrip_and_ambiguous_activity_is_fenced() {
+        use BtsBrowseInput as I;
+        use BtsBrowseOutput as O;
+        use CicsPlanOperation as P;
+        for (operation, input, fields) in [
+            (
+                P::BtsInquireActivity,
+                I::ActivityId,
+                vec![O::CompStatus, O::Mode, O::SuspStatus],
+            ),
+            (
+                P::BtsInquireEvent,
+                I::Event,
+                vec![
+                    O::EventType,
+                    O::FireStatus,
+                    O::Composite,
+                    O::Predicate,
+                    O::Timer,
+                ],
+            ),
+            (
+                P::BtsInquireTimer,
+                I::Timer,
+                vec![O::Event, O::Status, O::Abstime],
+            ),
+        ] {
+            for field in fields {
+                let valid = plan(operation, &[input], &[field]);
+                let bytes = encode_cics_effect_plan(&valid, CicsPlanLimits::default()).unwrap();
+                assert_eq!(
+                    decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+                    Ok(valid.clone())
+                );
+                assert_eq!(O::from_tag(field.tag()), Some(field));
+                if operation == P::BtsInquireActivity {
+                    let ambiguous = plan(operation, &[input], &[field, O::Activity]);
+                    assert!(
+                        encode_cics_effect_plan(&ambiguous, CicsPlanLimits::default()).is_err()
+                    );
+                }
+            }
+        }
+        assert!(
+            encode_cics_effect_plan(
+                &plan(
+                    P::BtsInquireTimer,
+                    &[I::Timer],
+                    &[O::Event, O::Status, O::Abstime]
+                ),
+                CicsPlanLimits::default()
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn bts_getnext_event_metadata_is_individual() {
+        use BtsBrowseInput as I;
+        use BtsBrowseOutput as O;
+        use CicsPlanOperation as P;
+        for field in [
+            O::EventType,
+            O::FireStatus,
+            O::Composite,
+            O::Predicate,
+            O::Timer,
+        ] {
+            let individual = plan(P::BtsGetNextEvent, &[I::BrowseToken], &[O::Event, field]);
+            assert!(encode_cics_effect_plan(&individual, CicsPlanLimits::default()).is_ok());
+        }
+        let combined = plan(
+            P::BtsGetNextEvent,
+            &[I::BrowseToken],
+            &[O::Event, O::EventType, O::FireStatus],
+        );
+        assert!(encode_cics_effect_plan(&combined, CicsPlanLimits::default()).is_err());
     }
 
     #[test]
