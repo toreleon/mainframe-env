@@ -75,6 +75,15 @@ MQCC 2 / MQRC 2012. IMS and MQ client provider enforcement remain pending.
 
 ## Coverage boundary
 
+The MQ-1506 licensed adapter at
+`conformance/0.15/oracles/mq-licensed-differential.json` binds the 26-call
+denominator to independent fixture identities and a bounded external receipt.
+Its verifier requires an authorized IBM MQ 9.4 environment, exact service and
+candidate identities, distinct product and oracle runners, normalized
+digest-only observations, and one observation per call. An absent or rejected
+receipt grants zero differential credit. The in-repository fixture index and
+mutant tests validate the contract; they are not licensed execution evidence.
+
 Catalog and generated-registry checks prove only:
 
 - the 26-call normalized denominator;

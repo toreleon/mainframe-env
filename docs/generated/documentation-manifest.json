@@ -493,7 +493,7 @@
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
       "relative_links": 0,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:d3557140cba47fb72562b1543badb7024ba4c07143951a90b50f43973e955b3f",
+      "sha256": "sha256:08e5656a5ae6c0924b0c423059e370591a1b4e9ae649f07f89b7d41efb48eba9",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -1294,7 +1294,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.15.0.md",
       "relative_links": 0,
-      "sha256": "sha256:e1daabf412ea0061626676dd1c4526a26a4a83d76b1aa042eb25dbb30871f13a",
+      "sha256": "sha256:0daf88e83b93841090cc183fa6ff7ad333cb3bc43c7d21ee3be4b50647583afd",
       "title": "mainframe-env 0.15.0 implementation status",
       "xtask_commands": 0
     },
