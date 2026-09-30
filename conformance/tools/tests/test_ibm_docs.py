@@ -539,7 +539,7 @@ class CacheTests(unittest.TestCase):
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
         self.assertEqual(
             index_digest,
-            "f82fd884a9ad21ce478c97fb593c99a5595a385a92b08ea96b1178c2456392db",
+            "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
         )
 
 
