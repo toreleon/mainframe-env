@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover bounded common static-host syntax for Db2 PREPARE, EXECUTE, and EXECUTE IMMEDIATE without whole-row recognition credit."

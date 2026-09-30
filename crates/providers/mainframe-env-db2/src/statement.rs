@@ -1,9 +1,16 @@
 //! Owned transaction-statement syntax; parsing has no execution side effects.
 
+mod dynamic;
+
+pub use dynamic::{
+    Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement, Db2ExecuteUsing,
+    Db2PrepareDescriptor, Db2PrepareStatement, parse_db2_dynamic_statement,
+};
+
 use crate::{
-    Db2AstLimits, Db2Identifier, Db2SourceLocation, Db2SourceSpan, Db2StatementId, Db2Symbol,
-    Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenCursor,
-    Db2TokenKind, lex_db2,
+    Db2AstLimits, Db2HostIdentifier, Db2HostReference, Db2Identifier, Db2SourceLocation,
+    Db2SourceSpan, Db2StatementId, Db2Symbol, Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode,
+    Db2SyntaxLimits, Db2Token, Db2TokenCursor, Db2TokenKind, lex_db2,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,6 +43,9 @@ pub enum Db2StatementKind {
     Commit(Db2CommitStatement),
     Rollback(Db2RollbackStatement),
     Savepoint(Db2SavepointStatement),
+    Prepare(Db2PrepareStatement),
+    Execute(Db2ExecuteStatement),
+    ExecuteImmediate(Db2ExecuteImmediateStatement),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -292,6 +302,46 @@ impl<'a> StatementParser<'a> {
         Ok(identifier)
     }
 
+    fn host_identifier(&mut self, label: &str) -> Result<Db2HostIdentifier, Db2SyntaxDiagnostic> {
+        let Some(token) = self.cursor.peek() else {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::MissingToken,
+                &format!("missing Db2 {label}"),
+            ));
+        };
+        let Db2TokenKind::HostVariable(value) = &token.kind else {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::UnexpectedToken,
+                &format!("Db2 {label} must be a colon-prefixed host identifier"),
+            ));
+        };
+        let identifier =
+            Db2HostIdentifier::new(value.clone(), self.ast_limits).map_err(|problem| {
+                Db2SyntaxDiagnostic::new(
+                    Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                    token.span.start,
+                    &problem.message,
+                )
+            })?;
+        self.advance();
+        Ok(identifier)
+    }
+
+    fn host_reference(&mut self, label: &str) -> Result<Db2HostReference, Db2SyntaxDiagnostic> {
+        let variable = self.host_identifier(label)?;
+        let indicator_keyword = self.take_word("INDICATOR");
+        let indicator = if indicator_keyword
+            || matches!(
+                self.cursor.peek().map(|token| &token.kind),
+                Some(Db2TokenKind::HostVariable(_))
+            ) {
+            Some(self.host_identifier("indicator variable")?)
+        } else {
+            None
+        };
+        Ok(Db2HostReference::new(variable, indicator))
+    }
+
     fn expect_word(&mut self, expected: &str) -> Result<(), Db2SyntaxDiagnostic> {
         if self.take_word(expected) {
             Ok(())
@@ -353,7 +403,7 @@ impl<'a> StatementParser<'a> {
         if self.cursor.peek().is_some() {
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::UnexpectedToken,
-                "unexpected token after Db2 transaction statement",
+                "unexpected token after Db2 statement",
             ));
         }
         Ok(())

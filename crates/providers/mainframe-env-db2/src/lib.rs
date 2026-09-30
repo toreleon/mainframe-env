@@ -36,8 +36,10 @@ pub use retention::{
 };
 pub use service::{Db2Limits, Db2ReplayClock, Db2Service, db2_providers};
 pub use statement::{
-    Db2CommitStatement, Db2RollbackStatement, Db2RollbackTarget, Db2SavepointStatement,
-    Db2Statement, Db2StatementKind, parse_db2_transaction_statement,
+    Db2CommitStatement, Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement,
+    Db2ExecuteUsing, Db2PrepareDescriptor, Db2PrepareStatement, Db2RollbackStatement,
+    Db2RollbackTarget, Db2SavepointStatement, Db2Statement, Db2StatementKind,
+    parse_db2_dynamic_statement, parse_db2_transaction_statement,
 };
 pub use syntax::{
     Db2LexedStatement, Db2SourceLocation, Db2SourceSpan, Db2StringKind, Db2Symbol,
