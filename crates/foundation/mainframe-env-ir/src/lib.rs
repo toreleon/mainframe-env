@@ -12,6 +12,7 @@ mod cobol_layout;
 mod cobol_reserved_words;
 mod codec;
 mod decimal_plan;
+mod ims_call;
 mod model;
 mod semantic_verify;
 mod verify;
@@ -76,6 +77,12 @@ pub use decimal_plan::{
     DecimalReceiverUpdatePolicy, DecimalRoundingPolicy, DecimalStorageAbi, DecimalStorageSlot,
     LEGACY_DECIMAL_ASSIGNMENT_PLAN_CONTRACT, decimal_assignment_plan_wire_version,
     decode_decimal_assignment_plan, encode_decimal_assignment_plan,
+};
+pub use ims_call::{
+    IMS_CALL_BASELINE, IMS_CALL_CATALOG_SHA256, IMS_CALL_FAMILIES, IMS_CALL_FAMILY_COUNT,
+    IMS_CALL_NAME_MEMBERSHIPS, IMS_CALL_REGISTRY_SHA256, IMS_CALL_SOURCE_TOPIC,
+    IMS_CALL_SOURCE_TOPIC_SHA256, IMS_COMMAND_NAME_MEMBERSHIPS, ImsCallFamilyDescriptor,
+    ims_call_families_for_call, ims_call_families_for_command, ims_call_family_for_row,
 };
 pub use model::{
     Attribute, Block, BlockId, Effect, IrLimits, IrProblem, Module, ModuleBuilder, Operation,

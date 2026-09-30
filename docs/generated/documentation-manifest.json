@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 216,
+    "markdown_documents": 217,
     "navigation_groups": 5,
     "normative_documents": 56,
-    "xtask_commands": 202
+    "xtask_commands": 204
   },
   "documents": [
     {
@@ -194,9 +194,9 @@
       "normative": false,
       "path": "crates/foundation/mainframe-env-ir/README.md",
       "relative_links": 0,
-      "sha256": "sha256:2aaf31b4c56244dc06231853576199ee9968cd1b3b313012efc6773be8e2db58",
+      "sha256": "sha256:e5db7bdb495948239e8915bf49d6257a8d41a4b5275cabc0d3f4d3286d12214e",
       "title": "mainframe-env-ir",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "normative": false,
@@ -1272,6 +1272,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.14.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:c01c477580f34693c17ae6f60d5adb9d34451a5086c73cfcf9099b36728a4761",
+      "title": "mainframe-env 0.14.0 implementation status",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.16.0.md",
       "relative_links": 0,
       "sha256": "sha256:8eea5c205d72a78044f43acc2dc86d26a9b92e6cc6b4091a7b38ba1bed94d373",
@@ -1762,7 +1770,7 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:37302bab0348eab33739ad6289d93ed0bdebc84455cdde4413ca9b0633dde479",
+      "sha256": "sha256:d69951b6da34cfbfc3f23bff27ddc5a470ff50a189d9bf8985a9edc467f0fb92",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
