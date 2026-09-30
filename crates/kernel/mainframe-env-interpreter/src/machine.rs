@@ -114,6 +114,7 @@ struct LayoutMetadata {
     picture: String,
     digits: usize,
     scale: u32,
+    native_binary: bool,
     signed: bool,
     sign_separate: bool,
     justified_right: bool,
@@ -5337,10 +5338,10 @@ impl ReferenceMachine {
             return self.add_or_subtract(name, args, preserve_failed_receiver);
         }
         if name == "multiply" {
-            return self.multiply_statement(args).map(|()| false);
+            return self.multiply_statement(args, preserve_failed_receiver);
         }
         if name == "divide" {
-            return self.divide_statement(args).map(|()| false);
+            return self.divide_statement(args, preserve_failed_receiver);
         }
         let rounded = args.iter().any(|argument| argument == "ROUNDED");
         let (target, value) = match name {
@@ -5448,11 +5449,17 @@ impl ReferenceMachine {
             }
             _ => return Err(MachineProblem::InvalidOperation),
         };
-        self.write_decimal_mode(&target, value, rounded)
-            .map(|()| false)
+        self.commit_decimal_assignments_receiver_local(
+            vec![(vec![target], value, rounded)],
+            preserve_failed_receiver,
+        )
     }
 
-    fn multiply_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn multiply_statement(
+        &mut self,
+        args: &[String],
+        preserve_failed_receiver: bool,
+    ) -> Result<bool, MachineProblem> {
         let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
         let giving = position(args, "GIVING");
         let left = value_decimal(self.eval_value(&args[..by])?)?;
@@ -5474,14 +5481,21 @@ impl ReferenceMachine {
         if target.is_empty() {
             return Err(MachineProblem::InvalidOperation);
         }
-        self.commit_decimal_assignments(vec![(
-            target,
-            decimal_multiply(self.arithmetic_mode, left, right)?,
-            args.iter().any(|token| token == "ROUNDED"),
-        )])
+        self.commit_decimal_assignments_receiver_local(
+            vec![(
+                target,
+                decimal_multiply(self.arithmetic_mode, left, right)?,
+                args.iter().any(|token| token == "ROUNDED"),
+            )],
+            preserve_failed_receiver,
+        )
     }
 
-    fn divide_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
+    fn divide_statement(
+        &mut self,
+        args: &[String],
+        preserve_failed_receiver: bool,
+    ) -> Result<bool, MachineProblem> {
         let giving = position(args, "GIVING");
         let remainder = position(args, "REMAINDER");
         let rounded = args.iter().any(|token| token == "ROUNDED");
@@ -5519,12 +5533,12 @@ impl ReferenceMachine {
             return Err(MachineProblem::InvalidOperation);
         }
         let target_reference = self.reference(&target)?;
-        let mut quotient = decimal_divide(
-            self.arithmetic_mode,
-            dividend,
-            divisor,
-            target_reference.layout.scale,
-        )?;
+        let quotient_scale = target_reference
+            .layout
+            .scale
+            .checked_add(u32::from(rounded))
+            .ok_or(MachineProblem::SizeError)?;
+        let mut quotient = decimal_divide(self.arithmetic_mode, dividend, divisor, quotient_scale)?;
         quotient = if rounded {
             decimal_rescale_rounded(quotient, target_reference.layout.scale)?
         } else {
@@ -5543,7 +5557,7 @@ impl ReferenceMachine {
             )?;
             assignments.push((vec![target], value, false));
         }
-        self.commit_decimal_assignments(assignments)
+        self.commit_decimal_assignments_receiver_local(assignments, preserve_failed_receiver)
     }
 
     fn add_or_subtract(
@@ -7990,17 +8004,22 @@ impl ReferenceMachine {
                 if reference.length == reference.layout.length
                     && is_numeric(reference.layout.category) =>
             {
-                encode_decimal(
-                    &reference.layout,
-                    if matches!(
-                        reference.layout.category,
-                        LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                    ) {
-                        *value
-                    } else {
-                        decimal_rescale(*value, reference.layout.scale)?
-                    },
-                )?
+                let scaled = if matches!(
+                    reference.layout.category,
+                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                ) {
+                    *value
+                } else {
+                    decimal_rescale(*value, reference.layout.scale)?
+                };
+                let scaled = if reference.layout.category == LayoutCategory::Binary
+                    && !reference.layout.native_binary
+                {
+                    truncate_to_picture(&reference.layout, scaled)?
+                } else {
+                    scaled
+                };
+                encode_decimal(&reference.layout, scaled)?
             }
             CobolValue::Decimal(value) => {
                 FixedValue::fit(decimal_string(*value).as_bytes(), reference.length, false)
@@ -9414,6 +9433,9 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
             digits: usize_attribute(operation, "digits")?,
             scale: u32::try_from(usize_attribute(operation, "scale")?)
                 .map_err(|_| MachineProblem::InvalidOperation)?,
+            native_binary: optional_integer_attribute(operation, "native_binary")
+                .unwrap_or_default()
+                != 0,
             signed: integer_attribute(operation, "signed")? != 0,
             sign_separate: integer_attribute(operation, "sign_separate")? != 0,
             justified_right: optional_integer_attribute(operation, "justified_right")
@@ -10865,6 +10887,9 @@ fn decode_decimal(layout: &LayoutMetadata, bytes: &[u8]) -> Result<Decimal, Mach
     let coefficient = match layout.category {
         LayoutCategory::NumericDisplay => decode_display(bytes, layout.sign_separate)?,
         LayoutCategory::PackedDecimal => decode_packed(bytes)?,
+        LayoutCategory::Binary if layout.native_binary && !layout.signed => bytes
+            .iter()
+            .fold(0i128, |value, byte| (value << 8) | i128::from(*byte)),
         LayoutCategory::Binary => decode_binary_integer(bytes)?,
         LayoutCategory::NumericEdited => {
             decimal_text(&String::from_utf8_lossy(bytes))
@@ -10991,11 +11016,22 @@ fn decode_binary_integer(bytes: &[u8]) -> Result<i128, MachineProblem> {
     Ok(i128::from_be_bytes(value))
 }
 
+fn truncate_to_picture(layout: &LayoutMetadata, value: Decimal) -> Result<Decimal, MachineProblem> {
+    let digits = u32::try_from(layout.digits).map_err(|_| MachineProblem::SizeError)?;
+    Ok(Decimal {
+        coefficient: value.coefficient % ten_power(digits)?,
+        scale: value.scale,
+    })
+}
+
 fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
     let digits = value.coefficient.unsigned_abs().to_string();
+    // The product has no TRUNC option: ordinary binary uses TRUNC(STD), while
+    // COMP-5 uses its full native storage range.
     if layout.digits > 0
         && digits.len() > layout.digits
         && layout.category != LayoutCategory::NumericEdited
+        && !(layout.category == LayoutCategory::Binary && layout.native_binary)
     {
         return Err(MachineProblem::SizeError);
     }
@@ -11040,7 +11076,14 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
         LayoutCategory::Binary => {
             let bytes = value.coefficient.to_be_bytes();
             let output = bytes[bytes.len() - layout.length..].to_vec();
-            if decode_binary_integer(&output)? != value.coefficient {
+            let stored = if layout.native_binary && !layout.signed {
+                output
+                    .iter()
+                    .fold(0i128, |value, byte| (value << 8) | i128::from(*byte))
+            } else {
+                decode_binary_integer(&output)?
+            };
+            if stored != value.coefficient {
                 return Err(MachineProblem::SizeError);
             }
             Ok(output)
@@ -12939,6 +12982,7 @@ mod tests {
                 picture: "9(11)".into(),
                 digits: 11,
                 scale: 0,
+                native_binary: false,
                 signed: false,
                 sign_separate: false,
                 justified_right: false,
@@ -13353,6 +13397,7 @@ mod tests {
             picture: String::new(),
             digits: length,
             scale,
+            native_binary: false,
             signed,
             sign_separate: false,
             justified_right: false,
@@ -13672,6 +13717,7 @@ mod tests {
             picture: "9(9).99-".into(),
             digits: 11,
             scale: 2,
+            native_binary: false,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13959,6 +14005,7 @@ mod tests {
             picture: picture.into(),
             digits,
             scale,
+            native_binary: false,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13992,6 +14039,7 @@ mod tests {
             picture: "----9".into(),
             digits: 5,
             scale: 0,
+            native_binary: false,
             signed: true,
             sign_separate: false,
             justified_right: false,

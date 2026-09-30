@@ -184,6 +184,10 @@ pub(crate) fn lower_to_core(
             ("digits".into(), Attribute::Integer(layout.digits as i64)),
             ("scale".into(), Attribute::Integer(layout.scale as i64)),
             (
+                "native_binary".into(),
+                Attribute::Integer(i64::from(layout.usage == crate::CobolUsage::NativeBinary)),
+            ),
+            (
                 "signed".into(),
                 Attribute::Integer(i64::from(layout.signed)),
             ),
