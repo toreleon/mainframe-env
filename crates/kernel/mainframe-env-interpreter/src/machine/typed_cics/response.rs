@@ -1,5 +1,28 @@
 use super::*;
 
+pub(in crate::machine) fn finish(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    container_identity: Option<&(String, Option<String>)>,
+    container_set_base: Option<usize>,
+    response: CicsResponse,
+    responded: bool,
+) -> Result<(), MachineProblem> {
+    if response.response == 0 && response.disposition == CicsDisposition::Complete {
+        container_set::on_success(machine, operation, container_identity);
+        if operation == CicsOperation::GetContainer
+            && let Some((channel, Some(container))) = container_identity
+            && let Some(base) = container_set_base
+            && machine.bases.len() == base + 1
+        {
+            container_set::record(machine, channel, container);
+        }
+    }
+    eib::write_context(machine, operation, &response)?;
+    machine.deferred_drive = drive_response(machine, operation, response, responded)?;
+    Ok(())
+}
+
 pub(in crate::machine) fn write_response_state(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
@@ -11,6 +34,14 @@ pub(in crate::machine) fn write_response_state(
     response: &CicsResponse,
 ) -> Result<Option<usize>, MachineProblem> {
     storage64::validate_response(operation, storage64_intent, response)?;
+    if let (CicsOperation::GetContainer64, Some(Storage64Intent::GetContainer(Some((address, _))))) =
+        (operation, storage64_intent)
+        && let Some(value) = response.outputs.get("INTO")
+    {
+        machine
+            .write_storage64(address, 0, value.bytes())
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    }
     web_service_control::validate_response(operation, outputs, response)?;
     for (target, value) in [
         (response_target, response.response),
@@ -48,6 +79,9 @@ pub(in crate::machine) fn write_runtime_output(
         return Ok(true);
     }
     if retrieve::release_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
+    if operation == CicsOperation::GetContainer64 && name == "INTO" {
         return Ok(true);
     }
     if storage64::release_output(machine, operation, name, value)? {

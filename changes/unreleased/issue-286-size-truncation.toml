@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Truncate excess high-order digits when moving numeric values into DISPLAY and COMP-3 receivers."

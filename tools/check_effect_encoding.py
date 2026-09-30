@@ -113,7 +113,7 @@ def check(root: Path) -> None:
             f"{name} replay",
         )
     require(
-        production_source(providers["MQ"][0]),
+        production_source(root / "crates/providers/mainframe-env-mq/src/message.rs"),
         ('b"mainframe-env.mq-message-id@1\\0"', "canonical_message_id"),
         "MQ generated message identity",
     )

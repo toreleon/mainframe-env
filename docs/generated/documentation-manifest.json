@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 214,
+    "markdown_documents": 221,
     "navigation_groups": 5,
-    "normative_documents": 54,
-    "xtask_commands": 198
+    "normative_documents": 57,
+    "xtask_commands": 208
   },
   "documents": [
     {
@@ -162,7 +162,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
       "relative_links": 0,
-      "sha256": "sha256:f8eac8afc1fb03909d081687c907f71089f6bb6107bd3aee9361f14b766cbc3d",
+      "sha256": "sha256:12af0b229d7ae888564285da5dd7facb114f2be1915c976861a2cf187d4cd500",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -194,9 +194,9 @@
       "normative": false,
       "path": "crates/foundation/mainframe-env-ir/README.md",
       "relative_links": 0,
-      "sha256": "sha256:2aaf31b4c56244dc06231853576199ee9968cd1b3b313012efc6773be8e2db58",
+      "sha256": "sha256:e5db7bdb495948239e8915bf49d6257a8d41a4b5275cabc0d3f4d3286d12214e",
       "title": "mainframe-env-ir",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "normative": false,
@@ -234,7 +234,7 @@
       "normative": false,
       "path": "crates/kernel/mainframe-env-interpreter/README.md",
       "relative_links": 0,
-      "sha256": "sha256:c536404f7eac111792bba51b98722f81afd7eafa8454c82a965cb2511219e1e4",
+      "sha256": "sha256:96de29fcca957ea958f816e5e65ca0259e44d5cf9864a46996b20f304ababad4",
       "title": "mainframe-env-interpreter",
       "xtask_commands": 0
     },
@@ -265,16 +265,16 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:8be91953090b8952cdd1008e32f8cc4f84d549432dc56b1958a3766d05fe52f4",
+      "relative_links": 2,
+      "sha256": "sha256:576de82f510956d61cd0af7ae22eebf55a817af010420e46d1b029c490bf6ba2",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-mq/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:ebae6caf992399ae8a25d34aabe655f4d3b306132ab810abe37b040e880e63a8",
+      "relative_links": 2,
+      "sha256": "sha256:498623982e1a9c951a477e58014752aca447894010cf9fb77b74a8a226a78874",
       "title": "mainframe-env-mq",
       "xtask_commands": 0
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 91,
-      "sha256": "sha256:eec6e5da20e73dd7effdad44fa144b35438dc7f4366d8cc0a1926a5f457aba9b",
+      "relative_links": 95,
+      "sha256": "sha256:84656413b6d4fc01b4c90722eafc7246d82341ed3bb456303158d5509d20c3f1",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -361,7 +361,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:4251639af133995505cca70a3d3c92add7bc380169a41bda33b236825bd9ffe5",
+      "sha256": "sha256:31abe3ef7b062b1c9a9dc4294bae8385e099a89271a2b9cce004a97c224f68ee",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -485,6 +485,18 @@
       "status": "Normative from mainframe-env 0.8.0",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
+      "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
+      "relative_links": 0,
+      "scope": "MQI denominator, source provenance, host context and semantic authority",
+      "sha256": "sha256:5bb3cce7bcfcf7c15ec569cc4cd3f21bb1f4ce0bad5c53f06b84acb4072dc7c9",
+      "status": "Normative identity boundary; semantics are implemented incrementally",
+      "title": "IBM MQ programming-surface ownership",
+      "xtask_commands": 0
     },
     {
       "applies_from": "mainframe-env 0.1.0",
@@ -909,16 +921,40 @@
       "path": "docs/decisions/0024-per-assertion-oracle-provenance.md",
       "relative_links": 0,
       "scope": "CardDemo 0.8 base-batch expected values and conformance credit",
-      "sha256": "sha256:01eed855b18a74e80125390d0b68f4504b7f850e8e102e576d0334f2bdb6807f",
+      "sha256": "sha256:90843aa45efc80794cfa11887a9fdf446234e3d21586f0b70ffd2a124b0b4359",
       "status": "Proposed for the first increment of issue #245",
       "title": "ADR-0024: Per-assertion oracle provenance for CardDemo base batch",
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.17 licensed-evidence planning, subject to acceptance",
+      "normative": true,
+      "owner": "repository owner",
+      "path": "docs/decisions/0025-licence-and-provenance-policy.md",
+      "relative_links": 4,
+      "scope": "licensed IBM oracles, customer captures, and IBM-derived material",
+      "sha256": "sha256:07c16b23d5eb236e87df668bdac57db8e91f017e42c1a288029ed327021f64cb",
+      "status": "Proposed",
+      "title": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.8 run bundle v1",
+      "normative": true,
+      "owner": "conformance and xtask maintainers",
+      "path": "docs/decisions/0026-run-bundle.md",
+      "relative_links": 0,
+      "scope": "0.8 READACCT batch regression evidence",
+      "sha256": "sha256:bba7bdb3c90b2a71d6fe7c9da29e2eaddef6505e4bb2ba13369c1530c293e671",
+      "status": "Proposed",
+      "title": "ADR-0026: Self-recorded CardDemo run bundle",
+      "xtask_commands": 1
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 24,
-      "sha256": "sha256:eaa1cb3a27b0a4c77cb15f245535c6aad312a4fd19c14be75572e9212a62bc2f",
+      "relative_links": 26,
+      "sha256": "sha256:7814b7dc1e8622f600c88a43c8b3ebb3c44bdb94be49c4528b801078005e28b5",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1057,8 +1093,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.15.0.md",
-      "relative_links": 2,
-      "sha256": "sha256:6ef74c56bd3964d10c45ba6f3271cddd06311a1332a01a9551cd083d2df274a6",
+      "relative_links": 3,
+      "sha256": "sha256:9da09a8d7b9444fe232b5b6e7f7c72746831eeb165d0b7d709c3a49cb4b469f3",
       "title": "mainframe-env 0.15.0 — Complete IBM MQ 9.4 programming surface",
       "xtask_commands": 0
     },
@@ -1193,8 +1229,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/GITHUB-PROJECT.md",
-      "relative_links": 64,
-      "sha256": "sha256:817db9bfc52c077be93dad07f7d8fe897ec1eb2b55fa8eae7dec2375cbbde58f",
+      "relative_links": 181,
+      "sha256": "sha256:b3eafb16fc9349625c715efcbddf19522a0b5858aad912d82ea3520b3d146c72",
       "title": "GitHub Project synchronization",
       "xtask_commands": 0
     },
@@ -1260,6 +1296,22 @@
       "relative_links": 1,
       "sha256": "sha256:497d56d83c2d47ee5247878ec324897c6a83c22348afe2dd353b1de577d4a291",
       "title": "mainframe-env 0.12.0 implementation status",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.14.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:5c91b7a8e61e9587c14ba38c4c18fd4ace15e90d852fa1280215361d6eb1caae",
+      "title": "mainframe-env 0.14.0 implementation status",
+      "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.15.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:70efbfa10fc354c127eb326efe78713cbf54a3b1d2d13e92aa1bd698f63db6f2",
+      "title": "mainframe-env 0.15.0 implementation status",
       "xtask_commands": 0
     },
     {
@@ -1338,7 +1390,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:6dc65ba345c10069d0aa9851ec23fdbe3a61aa642a23399d83a4c7fc9ef287c9",
+      "sha256": "sha256:73c9ae5905f5f1a10f77d896ccc8f904d38e48a100afe50038045d18e76e7395",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },
@@ -1674,7 +1726,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:1779bbdc68a10b01f70db5d9ea94a0d9255c5ab4521f635cf8f5a852b42cc0a4",
+      "sha256": "sha256:d2dcf298e98d1d9953b24ce90b6ac0f4653ecbe37235e64b81513e8fdc70a44d",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -1728,6 +1780,14 @@
     },
     {
       "normative": false,
+      "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md",
+      "relative_links": 1,
+      "sha256": "sha256:396634191e01c20881b3543c7ebbc6e8d752ea8ee8838056a328f25a82cddff1",
+      "title": "CardDemo READACCT run bundle",
+      "xtask_commands": 2
+    },
+    {
+      "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
       "sha256": "sha256:616ea9f5b00f2dfb2c8898bbb667c7bb72dfc863746790f19a1008f904f6e1a9",
@@ -1736,9 +1796,17 @@
     },
     {
       "normative": false,
+      "path": "docs/runbooks/COBOL-DIFFERENTIAL.md",
+      "relative_links": 0,
+      "sha256": "sha256:ccffa273c310b031cc96a96f59a5e2e15d1464f7346d2d1e08ec0e74d2e2d945",
+      "title": "COBOL semantic differential pilot",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:37302bab0348eab33739ad6289d93ed0bdebc84455cdde4413ca9b0633dde479",
+      "sha256": "sha256:d69951b6da34cfbfc3f23bff27ddc5a470ff50a189d9bf8985a9edc467f0fb92",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
@@ -1930,9 +1998,9 @@
       "normative": false,
       "path": "xtask/README.md",
       "relative_links": 0,
-      "sha256": "sha256:8fc22e749f9635c2c50ace94439b4cf328d67c996a9aeea673d81ad56bf0e81c",
+      "sha256": "sha256:e3fc66d28c38005caa33900ddc8fd0f9e6bd4f6e0e7a00be97a127bc89784cc3",
       "title": "xtask",
-      "xtask_commands": 9
+      "xtask_commands": 10
     }
   ],
   "navigation": [
@@ -1981,6 +2049,10 @@
         {
           "label": "JES execution",
           "path": "docs/architecture/JES-EXECUTION.md"
+        },
+        {
+          "label": "IBM MQ programming surface",
+          "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
         },
         {
           "label": "Application packages",
@@ -2140,6 +2212,14 @@
           "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"
         },
         {
+          "label": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+          "path": "docs/decisions/0025-licence-and-provenance-policy.md"
+        },
+        {
+          "label": "ADR-0026: CardDemo run bundle",
+          "path": "docs/decisions/0026-run-bundle.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2218,6 +2298,10 @@
         {
           "label": "CardDemo operator guide",
           "path": "docs/runbooks/CARDDEMO-OPERATOR.md"
+        },
+        {
+          "label": "CardDemo READACCT run bundle",
+          "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md"
         },
         {
           "label": "CICS licensed pilot",
@@ -2311,7 +2395,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:649695fce111440aa4254c57088bf8a0cfe1355a505a59a6cd7ec65403a278d7",
+  "registry_sha256": "sha256:1bc898d0d807e0b4d782e834f7e290811797f0db4623f2b6d05cca3a7dc9cad1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

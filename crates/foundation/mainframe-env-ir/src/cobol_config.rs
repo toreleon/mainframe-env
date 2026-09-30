@@ -9,6 +9,8 @@ pub const COBOL_RUNTIME_CONFIG_NAMESPACE: &str = "mainframe.core.cobol";
 pub const COBOL_RUNTIME_CONFIG_NAME: &str = "config";
 /// Current major version of the COBOL runtime-configuration operation.
 pub const COBOL_RUNTIME_CONFIG_MAJOR: u16 = 1;
+/// Versioned config attribute carrying ordered PROCEDURE DIVISION USING roots.
+pub const COBOL_ENTRY_FORMALS_V1: &str = "entry_formals_v1";
 /// Manifest key binding the effective arithmetic context to the payload.
 pub const COBOL_EFFECTIVE_ARITH_OPTION: &str = "cobol.effective-arith";
 /// Manifest key binding the effective display-sign convention to the payload.
@@ -89,6 +91,7 @@ pub enum CobolRuntimeConfigProblem {
     InvalidArithmeticMode,
     InvalidDisplaySign,
     InvalidAddressMode,
+    InvalidEntryFormals,
 }
 
 impl fmt::Display for CobolRuntimeConfigProblem {
@@ -98,6 +101,40 @@ impl fmt::Display for CobolRuntimeConfigProblem {
 }
 
 impl std::error::Error for CobolRuntimeConfigProblem {}
+
+/// `None` identifies a historical payload without entry-formal metadata.
+pub fn cobol_entry_formals(
+    module: &Module,
+) -> Result<Option<Vec<String>>, CobolRuntimeConfigProblem> {
+    let mut configurations = module
+        .regions()
+        .iter()
+        .flat_map(|region| &region.blocks)
+        .flat_map(|block| &block.operations)
+        .filter(|operation| {
+            operation.identity.namespace() == COBOL_RUNTIME_CONFIG_NAMESPACE
+                && operation.identity.name() == COBOL_RUNTIME_CONFIG_NAME
+                && operation.identity.major() == COBOL_RUNTIME_CONFIG_MAJOR
+        });
+    let Some(config) = configurations.next() else {
+        return Ok(None);
+    };
+    if configurations.next().is_some() {
+        return Err(CobolRuntimeConfigProblem::Duplicate);
+    }
+    match config.attributes.get(COBOL_ENTRY_FORMALS_V1) {
+        None => Ok(None),
+        Some(Attribute::Text(value)) if value.is_empty() => Ok(Some(Vec::new())),
+        Some(Attribute::Text(value)) => {
+            let names = value.split('\u{1f}').map(str::to_owned).collect::<Vec<_>>();
+            if names.iter().any(|name| name.is_empty()) {
+                return Err(CobolRuntimeConfigProblem::InvalidEntryFormals);
+            }
+            Ok(Some(names))
+        }
+        _ => Err(CobolRuntimeConfigProblem::InvalidEntryFormals),
+    }
+}
 
 /// Decode the single COBOL runtime configuration, if the module carries one.
 ///
@@ -240,6 +277,42 @@ mod tests {
                 false,
             )),
             Err(CobolRuntimeConfigProblem::InvalidArithmeticMode)
+        );
+    }
+
+    #[test]
+    fn entry_formals_distinguish_legacy_empty_and_ordered_payloads() {
+        let base = BTreeMap::from([("arithmetic_mode".into(), Attribute::Text("extended".into()))]);
+        assert_eq!(
+            cobol_entry_formals(&module(base.clone(), false)).unwrap(),
+            None
+        );
+        let mut empty = base.clone();
+        empty.insert(
+            COBOL_ENTRY_FORMALS_V1.into(),
+            Attribute::Text(String::new()),
+        );
+        assert_eq!(
+            cobol_entry_formals(&module(empty, false)).unwrap(),
+            Some(vec![])
+        );
+        let mut ordered = base.clone();
+        ordered.insert(
+            COBOL_ENTRY_FORMALS_V1.into(),
+            Attribute::Text("SECOND\u{1f}FIRST".into()),
+        );
+        let ordered_module = module(ordered, false);
+        let binary = crate::encode_binary(&ordered_module, crate::CodecLimits::default()).unwrap();
+        let restored = crate::decode_binary(&binary, crate::CodecLimits::default()).unwrap();
+        assert_eq!(
+            cobol_entry_formals(&restored).unwrap(),
+            Some(vec!["SECOND".into(), "FIRST".into()])
+        );
+        let mut invalid = base;
+        invalid.insert(COBOL_ENTRY_FORMALS_V1.into(), Attribute::Integer(1));
+        assert_eq!(
+            cobol_entry_formals(&module(invalid, false)),
+            Err(CobolRuntimeConfigProblem::InvalidEntryFormals)
         );
     }
 }

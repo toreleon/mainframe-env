@@ -99,6 +99,54 @@ impl<'a> BtsLifecycleStore<'a> {
         Ok(Some(process))
     }
 
+    /// Enumerate a bounded process-type snapshot from the shared lifecycle
+    /// namespace. A concurrent change fails the snapshot instead of mixing
+    /// versions from separate reads.
+    pub fn list_processes(
+        &self,
+        process_type: &str,
+        uow: &str,
+    ) -> Result<Vec<BtsProcess>, HostProblem> {
+        validate_name(process_type, 8, true)?;
+        validate_identifier(uow, 256)?;
+        let rows = self
+            .store
+            .list_provider_state(PROCESS_NAMESPACE, MAX_ACTIVITIES + 1)
+            .map_err(store_error)?;
+        if rows.len() > MAX_ACTIVITIES {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let mut prefix = String::with_capacity(process_type.len() * 2 + 1);
+        for byte in process_type.bytes() {
+            prefix.push_str(&format!("{byte:02x}"));
+        }
+        prefix.push('/');
+        let mut processes = Vec::new();
+        for row in rows.into_iter().filter(|row| row.key.starts_with(&prefix)) {
+            if row.version == 0 || row.payload.len() > MAX_ROW_BYTES {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let identity: BtsProcess = serde_json::from_slice(&row.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if identity.process_type != process_type
+                || Self::process_key(&identity.process_type, &identity.name)? != row.key
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let process = self
+                .load_process(process_type, &identity.name)?
+                .ok_or(HostProblem::IdempotencyConflict)?;
+            if process.row_version != row.version {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            if process.visible_to(uow) {
+                processes.push(process);
+            }
+        }
+        processes.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(processes)
+    }
+
     pub fn load_acquisition(&self, run_unit: &str) -> Result<Option<BtsAcquisition>, HostProblem> {
         validate_identifier(run_unit, 256)?;
         let Some(row) = self
@@ -803,6 +851,12 @@ impl<'a> BtsLifecycleStore<'a> {
                 delete_process,
             )?);
             if delete_process {
+                writes.extend(super::super::bts_container::cleanup_bts_containers(
+                    self.store,
+                    &process,
+                    &[process.root_id.clone()],
+                    true,
+                )?);
                 writes.push(ProviderStateMutation::Delete {
                     namespace: PROCESS_NAMESPACE.into(),
                     key,

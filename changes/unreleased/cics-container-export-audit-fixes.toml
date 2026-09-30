@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fix #326 GET CONTAINER SET area lifetimes and #327 recovery of unsupported persisted container CCSIDs."
