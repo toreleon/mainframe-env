@@ -237,7 +237,7 @@
         "toc_sha256": "b083904697db57a7e746e79491f73c22c7e58c267dd83ea6e4ce39eb401071fb",
         "manifest": "conformance/0.2/manifests/db2-topics.json",
         "topic_count": 832,
-        "sha256": "6fd51d84b9d5c365d2017f1037f4edefb8d9af71de9277556cd50cf3e2f13757"
+        "sha256": "83f04d82753771425aab203c7913dd9fea1c768766cf315df421100015e72463"
       },
       "units": [
         {"name": "sql-statements", "total": 158, "current_internal_operations": 14, "current_statement_equivalent_estimate": 12, "comparable": false},

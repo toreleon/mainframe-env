@@ -1,6 +1,6 @@
 {
   "catalog_index": "conformance/0.2/catalogs/index.json",
-  "catalog_index_sha256": "sha256:f82fd884a9ad21ce478c97fb593c99a5595a385a92b08ea96b1178c2456392db",
+  "catalog_index_sha256": "sha256:f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
   "contract": "mainframe-env.generated-semantic-identity@1",
   "coverage_credit": 0,
   "handler_registration_count": 0,
