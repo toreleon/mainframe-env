@@ -165,7 +165,15 @@ impl ReferenceMachine {
             } else {
                 decimal_rescale(value, reference.layout.scale)
             }?;
-            match encode_decimal(&reference.layout, value) {
+            let encoded = if preserve_failed_receiver
+                && reference.layout.category == LayoutCategory::NumericEdited
+                && decimal_exceeds_picture(&reference.layout, value)
+            {
+                Err(MachineProblem::SizeError)
+            } else {
+                encode_decimal(&reference.layout, value)
+            };
+            match encoded {
                 Ok(bytes) => staged.push((reference, bytes)),
                 Err(MachineProblem::SizeError) => {
                     receiver_size_error = true;

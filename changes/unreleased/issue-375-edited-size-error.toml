@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Arithmetic SIZE ERROR now checks numeric-edited receiver capacity, and floating sign pictures reserve their leftmost insertion position (#375)."
