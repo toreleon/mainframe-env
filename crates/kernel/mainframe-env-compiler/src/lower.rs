@@ -323,6 +323,10 @@ pub(crate) fn lower_to_core(
                 Attribute::Text(file.record_name.clone().unwrap_or_default()),
             ),
             (
+                "record_names".into(),
+                Attribute::Text(file.record_names.join("\u{1f}")),
+            ),
+            (
                 "organization".into(),
                 Attribute::Text(file.organization.clone()),
             ),
