@@ -21,8 +21,8 @@ pub use structure::{
 use crate::syntax::{SourceOrigin, SourceSpan};
 use crate::{IntrinsicFunctionKind, SpecialRegisterKind};
 use mainframe_env_ir::{
-    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_index_name_is_valid,
-    cobol_layout_reference_matches,
+    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_floating_currency_prefix,
+    cobol_index_name_is_valid, cobol_layout_reference_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -2466,15 +2466,7 @@ struct PictureDetails {
 
 fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
     let bytes = expanded_picture_symbols(pic)?;
-    let floating_currency_prefix = bytes
-        .iter()
-        .take_while(|&&byte| matches!(byte, b'$' | b','))
-        .count();
-    let floating_currency = bytes[..floating_currency_prefix]
-        .iter()
-        .filter(|&&byte| byte == b'$')
-        .count()
-        >= 2;
+    let floating_currency_prefix = cobol_floating_currency_prefix(&bytes);
     let mut currency_symbols_seen = 0usize;
     let mut storage = 0usize;
     let mut digits = 0usize;
@@ -2572,7 +2564,7 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
             b'$' => {
                 alphabetic = false;
                 edited = true;
-                if floating_currency && index < floating_currency_prefix {
+                if index < floating_currency_prefix {
                     if currency_symbols_seen > 0 {
                         numeric = true;
                         digits += 1;
@@ -3020,6 +3012,23 @@ mod tests {
                 "{picture}"
             );
             assert_eq!(details.storage, picture.len(), "{picture}");
+        }
+    }
+
+    #[test]
+    fn floating_insertion_metadata_covers_signs_decimal_and_whole_field() {
+        for (picture, digits, scale, signed) in [
+            ("$$V99", 3, 2, false),
+            ("$$$$", 3, 0, false),
+            ("+++,++9.99", 8, 2, true),
+            ("----9", 5, 0, true),
+        ] {
+            let details = picture_details(picture).unwrap();
+            assert_eq!(
+                (details.digits, details.scale, details.signed),
+                (digits, scale, signed),
+                "{picture}"
+            );
         }
     }
 
