@@ -2,6 +2,7 @@ use mainframe_env_ir::{CicsAssignOutput, CicsCertificateOutput, CicsTcpipOutput}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
+    BtsBrowse(mainframe_env_ir::BtsBrowseOutput),
     IssueState,
     BtsActivityId,
     BtsCompStatus,
@@ -14,6 +15,11 @@ pub enum HirCicsOutputName {
     BtsChildCompStatus,
     BtsChannel,
     BtsAbcode,
+    ContainerInto,
+    ContainerSet,
+    ContainerLength,
+    ContainerCcsid,
+    ContainerCount,
     AttachProcess,
     AttachResource,
     AttachReturnProcess,

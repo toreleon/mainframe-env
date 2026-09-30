@@ -18,9 +18,27 @@ use super::*;
 const INDEX_PATH: &str = "conformance/0.2/catalogs/index.json";
 const MANIFEST_DIRECTORY: &str = "conformance/0.2/manifests";
 const MANIFEST_PREFIX: &str = "conformance/0.2/manifests/";
-const LATER_REGISTRY_PATH: &str = "conformance/0.9/manifests/index.json";
-const LATER_MANIFEST_DIRECTORY: &str = "conformance/0.9/manifests";
-const LATER_MANIFEST_PREFIX: &str = "conformance/0.9/manifests/";
+struct LaterRegistry {
+    registry_path: &'static str,
+    manifest_directory: &'static str,
+    manifest_prefix: &'static str,
+    target_version: &'static str,
+}
+
+const LATER_REGISTRIES: &[LaterRegistry] = &[
+    LaterRegistry {
+        registry_path: "conformance/0.9/manifests/index.json",
+        manifest_directory: "conformance/0.9/manifests",
+        manifest_prefix: "conformance/0.9/manifests/",
+        target_version: "0.9.0",
+    },
+    LaterRegistry {
+        registry_path: "conformance/0.14/manifests/index.json",
+        manifest_directory: "conformance/0.14/manifests",
+        manifest_prefix: "conformance/0.14/manifests/",
+        target_version: "0.14.0",
+    },
+];
 
 /// The one definition of `topic_manifest_digest`, stated the same way the
 /// manifest schema states it as a `const` and `conformance/tools/docs_api.py`
@@ -33,6 +51,7 @@ const DIGEST_DEFINITION: &str = "sha256 over the concatenation, sorted by topic_
 pub(super) fn check(root: &Path) -> TaskResult {
     let index_path = root.join(INDEX_PATH);
     let index = json(&index_path)?;
+    let manifest_schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))?;
     let mut pinned = BTreeSet::new();
     for baseline in array(&index, "baselines", &index_path)? {
         let id = text(baseline, "id", &index_path)?;
@@ -49,6 +68,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
         )?;
         let manifest_path = manifest_path(root, relative, id)?;
         let manifest = json(&manifest_path)?;
+        validate_schema_instance(&manifest_schema, &manifest, &manifest_path)?;
         let digest = recompute(&manifest, &manifest_path)?;
         require(
             text(&manifest, "topic_manifest_digest", &manifest_path)? == digest,
@@ -131,14 +151,24 @@ pub(super) fn check(root: &Path) -> TaskResult {
         present == pinned,
         "conformance/0.2/manifests holds a manifest no baseline pins, or is missing one",
     )?;
-    check_later_registry(root)
+    for registry in LATER_REGISTRIES {
+        check_later_registry(root, registry)?;
+    }
+    Ok(())
 }
 
-fn check_later_registry(root: &Path) -> TaskResult {
-    let registry_path = root.join(LATER_REGISTRY_PATH);
+fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
+    let registry_path = root.join(config.registry_path);
     let registry = json(&registry_path)?;
     let registry_schema = root.join("conformance/0.9/schemas/topic-manifest-registry.schema.json");
     validate_schema_instance(&json(&registry_schema)?, &registry, &registry_path)?;
+    require(
+        text(&registry, "target_version", &registry_path)? == config.target_version,
+        &format!(
+            "{} does not own target version {}",
+            config.registry_path, config.target_version
+        ),
+    )?;
     let manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
     let mut pinned = BTreeSet::new();
     let mut scopes = BTreeSet::new();
@@ -153,7 +183,7 @@ fn check_later_registry(root: &Path) -> TaskResult {
             pinned.insert(relative.to_string()),
             &format!("later topic manifest {relative} is registered twice"),
         )?;
-        let path = later_manifest_path(root, relative, scope)?;
+        let path = later_manifest_path(root, relative, scope, config)?;
         let manifest_sha256 = format!(
             "sha256:{:x}",
             Sha256::digest(
@@ -165,7 +195,7 @@ fn check_later_registry(root: &Path) -> TaskResult {
         let digest = recompute(&manifest, &path)?;
         require(
             text(&manifest, "schema_version", &path)? == "mainframe-env.topic-manifest@1"
-                && text(&manifest, "target_version", &path)? == "0.9.0"
+                && text(&manifest, "target_version", &path)? == config.target_version
                 && text(&manifest, "baseline_id", &path)?
                     == text(entry, "baseline_id", &registry_path)?
                 && text(&manifest, "subsystem", &path)?
@@ -183,7 +213,7 @@ fn check_later_registry(root: &Path) -> TaskResult {
             &format!("later topic manifest {relative} disagrees with scope {scope}"),
         )?;
     }
-    let directory = root.join(LATER_MANIFEST_DIRECTORY);
+    let directory = root.join(config.manifest_directory);
     let mut present = BTreeSet::new();
     for entry in
         fs::read_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?
@@ -196,11 +226,14 @@ fn check_later_registry(root: &Path) -> TaskResult {
             .file_name()
             .and_then(OsStr::to_str)
             .ok_or_else(|| format!("{} has an unreadable name", path.display()))?;
-        present.insert(format!("{LATER_MANIFEST_PREFIX}{name}"));
+        present.insert(format!("{}{name}", config.manifest_prefix));
     }
     require(
         present == pinned,
-        "conformance/0.9/manifests holds an unregistered manifest or is missing one",
+        &format!(
+            "{} holds an unregistered manifest or is missing one",
+            config.manifest_directory
+        ),
     )
 }
 
@@ -256,13 +289,18 @@ fn manifest_path(root: &Path, relative: &str, owner: &str) -> TaskResult<PathBuf
     Ok(root.join(relative))
 }
 
-fn later_manifest_path(root: &Path, relative: &str, owner: &str) -> TaskResult<PathBuf> {
+fn later_manifest_path(
+    root: &Path,
+    relative: &str,
+    owner: &str,
+    config: &LaterRegistry,
+) -> TaskResult<PathBuf> {
     require(
-        relative.starts_with(LATER_MANIFEST_PREFIX)
+        relative.starts_with(config.manifest_prefix)
             && relative.ends_with(".json")
             && !relative.contains("..")
-            && relative[LATER_MANIFEST_PREFIX.len()..].find('/').is_none()
-            && relative != LATER_REGISTRY_PATH,
+            && relative[config.manifest_prefix.len()..].find('/').is_none()
+            && relative != config.registry_path,
         &format!("{owner} names an unsafe later topic manifest path {relative}"),
     )?;
     Ok(root.join(relative))
@@ -388,6 +426,20 @@ mod tests {
     #[test]
     fn every_committed_manifest_reproduces_the_digest_its_receipt_pins() {
         check(&repository_root().expect("repository root")).expect("topic manifests");
+    }
+
+    #[test]
+    fn repins_use_the_same_schema_as_a_single_repin() {
+        let root = repository_root().expect("repository root");
+        let schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))
+            .expect("manifest schema");
+        let mut manifest =
+            json(&root.join("conformance/0.2/manifests/mq-topics.json")).expect("MQ manifest");
+        let repin = manifest.as_object_mut().unwrap().remove("repin").unwrap();
+        manifest["repins"] = json!([repin]);
+        validate_schema_instance(&schema, &manifest, Path::new("in-memory")).expect("valid repins");
+        manifest["repins"][0]["superseded_sha256"] = json!("bad");
+        assert!(validate_schema_instance(&schema, &manifest, Path::new("in-memory")).is_err());
     }
 
     /// Every locator in `conformance/0.3/cobol/language.json` -- the 173 official

@@ -1,6 +1,9 @@
 //! RUN TRANSID local child request, source conditions, and token response.
 
 use super::*;
+use crate::service::handlers::bts_container::ContainerDatatype;
+use crate::service::handlers::bts_container::ContainerReadError;
+use crate::service::handlers::bts_container::{ContainerSelector, ReadReply, ReadRequest};
 use mainframe_env_host_api::{HostRequest, canonical_request_digest};
 use std::collections::BTreeMap;
 
@@ -41,13 +44,11 @@ pub(super) fn invoke(
             HostProblem::Unauthorized => condition("NOTAUTH", 70, 101),
             other => other,
         })?;
-    // The transform-container map is shared by channel name and cannot prove
-    // task ownership. The sibling BTS channel authority must supply the
-    // issue-time snapshot before this option can be admitted.
-    if channel.is_some() {
-        return Err(HostProblem::Unsupported);
-    }
-    let containers = BTreeMap::new();
+    let containers = if let Some(channel) = channel.as_deref() {
+        channel_snapshot(service, run, channel)?
+    } else {
+        BTreeMap::new()
+    };
     let mutation = request
         .mutation
         .as_ref()
@@ -62,7 +63,7 @@ pub(super) fn invoke(
     if tick == 0 {
         return Err(HostProblem::UnknownOutcome);
     }
-    let record = authority.start_transid(
+    let record = authority.start_transid_with_channel_access(
         run.invocation.run_unit_id.as_str(),
         run.invocation.execution_id.as_str(),
         run.invocation.principal.id().as_str(),
@@ -71,6 +72,7 @@ pub(super) fn invoke(
         &transaction,
         &definition.program,
         channel.as_deref(),
+        false,
         containers,
         tick,
         run.invocation.priority,
@@ -89,6 +91,67 @@ pub(super) fn invoke(
             ("mainframe-env.cics.payload@1", record.token.to_vec()),
         )]),
     )
+}
+
+fn channel_snapshot(
+    service: &CicsService,
+    run: &mut Run,
+    channel: &str,
+) -> Result<BTreeMap<String, BtsTransidContainer>, HostProblem> {
+    let before = service
+        .store
+        .get_provider_state("cics-container-capacity-v1", "global")
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let names = match service.read_bts_container(
+        run,
+        ContainerSelector::Channel(channel),
+        ReadRequest::Names { max: 256 },
+    ) {
+        Ok(ReadReply::Names(names)) => names,
+        Ok(_) => return Err(HostProblem::InfrastructureFailure),
+        Err(error) => return Err(channel_read_problem(error)),
+    };
+    let mut containers = BTreeMap::new();
+    for name in names {
+        let value = match service.read_bts_container(
+            run,
+            ContainerSelector::Channel(channel),
+            ReadRequest::Value(&name),
+        ) {
+            Ok(ReadReply::Value(Some(value))) => value,
+            Ok(ReadReply::Value(None)) => return Err(HostProblem::UnknownOutcome),
+            Ok(_) => return Err(HostProblem::InfrastructureFailure),
+            Err(error) => return Err(channel_read_problem(error)),
+        };
+        containers.insert(
+            name,
+            BtsTransidContainer {
+                character: value.datatype == ContainerDatatype::Character,
+                ccsid: value.ccsid,
+                read_only: value.read_only,
+                bytes: value.bytes,
+            },
+        );
+    }
+    let after = service
+        .store
+        .get_provider_state("cics-container-capacity-v1", "global")
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if before != after {
+        return Err(HostProblem::UnknownOutcome);
+    }
+    Ok(containers)
+}
+
+fn channel_read_problem(error: ContainerReadError) -> HostProblem {
+    match error {
+        ContainerReadError::NotFound => condition("CHANNELERR", 122, 2),
+        ContainerReadError::Unauthorized => condition("CHANNELERR", 122, 6),
+        ContainerReadError::Bounds => condition("CHANNELERR", 122, 1),
+        ContainerReadError::Changed => HostProblem::UnknownOutcome,
+        ContainerReadError::StaleEpoch => condition("INVREQ", 16, 1),
+        ContainerReadError::Backend(problem) => problem,
+    }
 }
 
 fn channel_name(request: &CicsRequest) -> Result<String, HostProblem> {
