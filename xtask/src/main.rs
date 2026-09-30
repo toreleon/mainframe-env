@@ -3,12 +3,16 @@
 #![forbid(unsafe_code)]
 
 mod carddemo_base_batch_provenance;
+mod carddemo_readacct;
 mod carddemo_v09_host;
 mod changelog;
+mod cobol_differential;
 mod docs;
 mod evidence_seal;
+mod ims_catalog;
 mod jcl_catalog;
 mod jcl_conformance;
+mod profile_intake;
 mod racf_catalog;
 mod release_attestation;
 mod release_licenses;
@@ -92,6 +96,18 @@ struct CheckArgs {
 }
 
 #[derive(Debug, Args)]
+struct ProfileIntakeArgs {
+    #[arg(long)]
+    manifest: PathBuf,
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long)]
+    json: PathBuf,
+    #[arg(long)]
+    markdown: PathBuf,
+}
+
+#[derive(Debug, Args)]
 struct ReleaseArgs {
     #[arg(long)]
     target: String,
@@ -168,6 +184,7 @@ enum EvidenceCommand {
 
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
+    ProfileIntake(ProfileIntakeArgs),
     Versions(CheckArgs),
     Changelog(CheckArgs),
     Docs(CheckArgs),
@@ -210,10 +227,12 @@ enum XtaskCommand {
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
+    CobolDifferential(cobol_differential::Args),
     CicsOracle(CicsOracleArgs),
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
+    ImsCatalog(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
     WorkPackageSeal(WorkPackageSealArgs),
@@ -244,6 +263,7 @@ enum XtaskCommand {
     CarddemoUtilities(CheckArgs),
     CarddemoBatchPrograms(CheckArgs),
     CarddemoBaseBatch(CheckArgs),
+    CarddemoReadacct(CheckArgs),
     CarddemoDb2(CheckArgs),
     CarddemoIms(CheckArgs),
     CarddemoMqAuthorization(CheckArgs),
@@ -288,6 +308,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         };
     }
     match command {
+        XtaskCommand::ProfileIntake(args) => {
+            ("profile-intake", false, profile_intake::run(root, &args))
+        }
         XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
         XtaskCommand::Changelog(args) => checked!(
             "changelog",
@@ -475,6 +498,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             args,
             check_cobol_reference(root, &args.receipt)
         ),
+        XtaskCommand::CobolDifferential(args) => (
+            "cobol-differential",
+            args.check,
+            cobol_differential::run(root, &args),
+        ),
         XtaskCommand::CicsOracle(args) => (
             "cics-oracle",
             false,
@@ -505,6 +533,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             }
         ),
         XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
+        XtaskCommand::ImsCatalog(args) => checked!(
+            "ims-catalog",
+            args,
+            if args.check {
+                ims_catalog::check(root)
+            } else {
+                ims_catalog::generate(root)
+            }
+        ),
         XtaskCommand::RacfCatalog(args) => (
             "racf-catalog",
             args.check,
@@ -613,6 +650,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::CarddemoBaseBatch(args) => {
             checked!("carddemo-base-batch", args, check_carddemo_base_batch(root))
         }
+        XtaskCommand::CarddemoReadacct(args) => {
+            checked!(
+                "carddemo-readacct",
+                args,
+                carddemo_readacct::run(root, args.check)
+            )
+        }
         XtaskCommand::CarddemoDb2(args) => {
             checked!("carddemo-db2", args, check_carddemo_db2(root))
         }
@@ -670,6 +714,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    ims_catalog::check(root)?;
     racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;
@@ -711,6 +756,7 @@ fn check_spec(root: &Path) -> TaskResult {
                 "cobol-language.schema.json",
                 "cobol-gnucobol-reference-allowlist.schema.json",
                 "cobol-gnucobol-reference-receipt.schema.json",
+                "cobol-differential-receipt.schema.json",
                 "cobol-licensed-differential-adapter.schema.json",
                 "cobol-licensed-differential-receipt.schema.json",
                 "cobol-condition-fixtures.schema.json",
@@ -8591,6 +8637,7 @@ fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
         }
     }
     files.sort();
+    files.retain(|file| !file.components().any(|part| part.as_os_str() == "vendor"));
     Ok(files)
 }
 

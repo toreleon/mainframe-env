@@ -7,7 +7,10 @@ pub(super) fn validate_runtime_plan(
 ) -> Result<(), MachineProblem> {
     if matches!(
         plan.operation,
-        CicsPlanOperation::Getmain64 | CicsPlanOperation::Freemain64
+        CicsPlanOperation::Getmain64
+            | CicsPlanOperation::Freemain64
+            | CicsPlanOperation::GetContainer64
+            | CicsPlanOperation::PutContainer64
     ) && machine
         .invocation
         .bindings
@@ -23,7 +26,10 @@ pub(super) fn validate_runtime_plan(
     }
     if matches!(
         plan.operation,
-        CicsPlanOperation::Getmain64 | CicsPlanOperation::Freemain64
+        CicsPlanOperation::Getmain64
+            | CicsPlanOperation::Freemain64
+            | CicsPlanOperation::GetContainer64
+            | CicsPlanOperation::PutContainer64
     ) && machine
         .invocation
         .bindings

@@ -1,0 +1,379 @@
+use super::navigation::{field_value, optional_field_value};
+use super::*;
+
+impl DatabaseEngine {
+    pub fn insert(&mut self, request: InsertRequest) -> Result<RecordView, EngineProblem> {
+        if self.records.len() >= self.limits.max_records {
+            return Err(EngineProblem::LimitExceeded);
+        }
+        let definition = self.segment(&request.segment)?.clone();
+        self.validate_data(&definition, &request.data)?;
+        match (&definition.parent, request.parent) {
+            (None, None) => {}
+            (Some(expected), Some(parent))
+                if self
+                    .records
+                    .get(&parent)
+                    .is_some_and(|record| &record.segment == expected) =>
+            {
+                let children = &self.records[&parent].children;
+                if children.len() >= self.limits.max_children_per_parent {
+                    return Err(EngineProblem::LimitExceeded);
+                }
+            }
+            _ => return Err(EngineProblem::InvalidRequest),
+        }
+        if self.definition.organization == DatabaseOrganization::Gsam
+            && (request.parent.is_some() || request.segment != self.definition.segments[0].name)
+        {
+            return Err(EngineProblem::Unsupported);
+        }
+        let key = self.primary_key(&definition, &request.data)?;
+        if let Some(key) = &key
+            && self.siblings(request.parent).iter().any(|id| {
+                self.records
+                    .get(id)
+                    .filter(|record| record.segment == request.segment)
+                    .and_then(|record| self.primary_key(&definition, &record.data).ok().flatten())
+                    .as_ref()
+                    == Some(key)
+            })
+        {
+            return Err(EngineProblem::Duplicate);
+        }
+        let index_values = self.index_values(&request.segment, &request.data)?;
+        self.validate_index_uniqueness(&index_values, None)?;
+        let id = RecordId(self.next_id);
+        let next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or(EngineProblem::LimitExceeded)?;
+        let revision = self
+            .revision
+            .checked_add(1)
+            .ok_or(EngineProblem::LimitExceeded)?;
+        let record = Record {
+            id,
+            segment: request.segment,
+            parent: request.parent,
+            data: request.data,
+            children: Vec::new(),
+            version: 1,
+        };
+        self.records.insert(id, record);
+        if let Some(parent) = request.parent {
+            let mut children = self.records[&parent].children.clone();
+            children.push(id);
+            self.sort_ids(&mut children, true);
+            self.records
+                .get_mut(&parent)
+                .ok_or(EngineProblem::InvalidRequest)?
+                .children = children;
+        } else {
+            let mut roots = self.roots.clone();
+            roots.push(id);
+            let keyed = matches!(
+                self.definition.organization,
+                DatabaseOrganization::Hidam
+                    | DatabaseOrganization::Hisam
+                    | DatabaseOrganization::Shisam
+            );
+            self.sort_ids(&mut roots, keyed);
+            self.roots = roots;
+        }
+        for (name, value) in index_values {
+            if let Some(value) = value {
+                self.indexes
+                    .get_mut(&name)
+                    .ok_or(EngineProblem::InvalidDefinition)?
+                    .entry(value)
+                    .or_default()
+                    .insert(id);
+            }
+        }
+        self.next_id = next_id;
+        self.revision = revision;
+        Ok(self.view(id))
+    }
+
+    /// Execute GU/GN/GNP-style selection while updating the caller-owned PCB
+    /// position only according to the selected navigation family.
+    pub fn replace(
+        &mut self,
+        position: &mut PcbPosition,
+        data: &[u8],
+    ) -> Result<RecordView, EngineProblem> {
+        if self.definition.organization == DatabaseOrganization::Gsam {
+            return Err(EngineProblem::Unsupported);
+        }
+        let held = self.current_hold(position)?;
+        let record = self
+            .records
+            .get(&held.id)
+            .ok_or(EngineProblem::StaleHold)?
+            .clone();
+        let definition = self.segment(&record.segment)?.clone();
+        self.validate_data(&definition, data)?;
+        if self.primary_key(&definition, &record.data)? != self.primary_key(&definition, data)? {
+            return Err(EngineProblem::KeyChange);
+        }
+        let old_values = self.index_values(&record.segment, &record.data)?;
+        let new_values = self.index_values(&record.segment, data)?;
+        self.validate_index_uniqueness(&new_values, Some(record.id))?;
+        let version = record
+            .version
+            .checked_add(1)
+            .ok_or(EngineProblem::LimitExceeded)?;
+        let revision = self
+            .revision
+            .checked_add(1)
+            .ok_or(EngineProblem::LimitExceeded)?;
+        let mut indexes = self.indexes.clone();
+        update_indexes(&mut indexes, record.id, &old_values, &new_values)?;
+        let updated = self
+            .records
+            .get_mut(&record.id)
+            .ok_or(EngineProblem::StaleHold)?;
+        updated.data = data.to_vec();
+        updated.version = version;
+        self.indexes = indexes;
+        self.revision = revision;
+        position.held = None;
+        Ok(self.view(record.id))
+    }
+
+    /// Physically delete the current held occurrence and all physical
+    /// dependents, updating every secondary index atomically.
+    pub fn delete(&mut self, position: &mut PcbPosition) -> Result<usize, EngineProblem> {
+        if self.definition.organization == DatabaseOrganization::Gsam {
+            return Err(EngineProblem::Unsupported);
+        }
+        let held = self.current_hold(position)?;
+        let record = self
+            .records
+            .get(&held.id)
+            .ok_or(EngineProblem::StaleHold)?
+            .clone();
+        let mut removed = BTreeSet::new();
+        let mut pending = vec![record.id];
+        while let Some(id) = pending.pop() {
+            if removed.insert(id) {
+                let current = self.records.get(&id).ok_or(EngineProblem::StaleHold)?;
+                pending.extend(current.children.iter().copied());
+                if removed.len() > self.limits.max_records {
+                    return Err(EngineProblem::LimitExceeded);
+                }
+            }
+        }
+        let revision = self
+            .revision
+            .checked_add(1)
+            .ok_or(EngineProblem::LimitExceeded)?;
+        let mut records = self.records.clone();
+        let mut roots = self.roots.clone();
+        let mut indexes = self.indexes.clone();
+        for id in &removed {
+            let deleted = records.remove(id).ok_or(EngineProblem::StaleHold)?;
+            let values = self.index_values(&deleted.segment, &deleted.data)?;
+            remove_index_values(&mut indexes, *id, &values)?;
+        }
+        if let Some(parent) = record.parent {
+            records
+                .get_mut(&parent)
+                .ok_or(EngineProblem::StaleHold)?
+                .children
+                .retain(|id| !removed.contains(id));
+        } else {
+            roots.retain(|id| !removed.contains(id));
+        }
+        self.records = records;
+        self.roots = roots;
+        self.indexes = indexes;
+        self.revision = revision;
+        position.current = record.parent;
+        position.held = None;
+        position.after_end = false;
+        if position.parentage.is_some_and(|id| removed.contains(&id)) {
+            position.parentage = None;
+        }
+        Ok(removed.len())
+    }
+
+    /// Resolve an exact secondary-index value in current hierarchical order.
+    pub(super) fn current_hold(&self, position: &PcbPosition) -> Result<HeldRecord, EngineProblem> {
+        let held = position.held.ok_or(EngineProblem::HoldRequired)?;
+        if position.current != Some(held.id)
+            || self.records.get(&held.id).map(|record| record.version) != Some(held.version)
+        {
+            return Err(EngineProblem::StaleHold);
+        }
+        Ok(held)
+    }
+
+    pub(super) fn segment(&self, name: &str) -> Result<&SegmentDefinition, EngineProblem> {
+        self.definition
+            .segments
+            .iter()
+            .find(|segment| segment.name == name)
+            .ok_or(EngineProblem::InvalidRequest)
+    }
+
+    pub(super) fn validate_data(
+        &self,
+        definition: &SegmentDefinition,
+        data: &[u8],
+    ) -> Result<(), EngineProblem> {
+        if data.len() < definition.min_length
+            || data.len() > definition.max_length
+            || data.len() > self.limits.max_segment_bytes
+        {
+            Err(EngineProblem::InvalidData)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(super) fn primary_key(
+        &self,
+        definition: &SegmentDefinition,
+        data: &[u8],
+    ) -> Result<Option<Vec<u8>>, EngineProblem> {
+        definition
+            .key_field
+            .as_ref()
+            .map(|name| field_value(definition, name, data).ok_or(EngineProblem::InvalidData))
+            .transpose()
+    }
+
+    pub(super) fn siblings(&self, parent: Option<RecordId>) -> &[RecordId] {
+        parent
+            .and_then(|id| {
+                self.records
+                    .get(&id)
+                    .map(|record| record.children.as_slice())
+            })
+            .unwrap_or(&self.roots)
+    }
+
+    pub(super) fn index_values(
+        &self,
+        segment: &str,
+        data: &[u8],
+    ) -> Result<IndexValues, EngineProblem> {
+        let definition = self.segment(segment)?;
+        self.definition
+            .secondary_indexes
+            .iter()
+            .filter(|index| index.source_segment == segment)
+            .map(|index| {
+                Ok((
+                    index.name.clone(),
+                    optional_field_value(definition, &index.field, data)?,
+                ))
+            })
+            .collect()
+    }
+
+    pub(super) fn validate_index_uniqueness(
+        &self,
+        values: &IndexValues,
+        replacing: Option<RecordId>,
+    ) -> Result<(), EngineProblem> {
+        for (name, value) in values {
+            let Some(value) = value else { continue };
+            let definition = self
+                .definition
+                .secondary_indexes
+                .iter()
+                .find(|index| index.name == *name)
+                .ok_or(EngineProblem::InvalidDefinition)?;
+            if definition.unique
+                && self.indexes[name]
+                    .get(value)
+                    .is_some_and(|ids| ids.iter().any(|id| Some(*id) != replacing))
+            {
+                return Err(EngineProblem::IndexConflict);
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn sort_ids(&self, ids: &mut [RecordId], keyed: bool) {
+        if !keyed {
+            return;
+        }
+        ids.sort_by(|left, right| {
+            self.sort_value(*left)
+                .cmp(&self.sort_value(*right))
+                .then_with(|| left.cmp(right))
+        });
+    }
+
+    pub(super) fn sort_value(&self, id: RecordId) -> (usize, Option<&[u8]>) {
+        let record = &self.records[&id];
+        let level = self
+            .definition
+            .segments
+            .iter()
+            .position(|segment| segment.name == record.segment)
+            .unwrap_or(self.definition.segments.len());
+        let key = self
+            .definition
+            .segments
+            .get(level)
+            .and_then(|segment| segment.key_field.as_ref().map(|name| (segment, name)))
+            .and_then(|(segment, name)| segment.fields.iter().find(|field| &field.name == name))
+            .and_then(|field| record.data.get(field.offset..field.offset + field.length));
+        (level, key)
+    }
+
+    pub(super) fn view(&self, id: RecordId) -> RecordView {
+        let record = &self.records[&id];
+        RecordView {
+            id,
+            segment: record.segment.clone(),
+            parent: record.parent,
+            data: record.data.clone(),
+        }
+    }
+}
+
+fn update_indexes(
+    indexes: &mut BTreeMap<String, BTreeMap<Vec<u8>, BTreeSet<RecordId>>>,
+    id: RecordId,
+    old_values: &IndexValues,
+    new_values: &IndexValues,
+) -> Result<(), EngineProblem> {
+    remove_index_values(indexes, id, old_values)?;
+    for (name, value) in new_values {
+        if let Some(value) = value {
+            indexes
+                .get_mut(name)
+                .ok_or(EngineProblem::InvalidDefinition)?
+                .entry(value.clone())
+                .or_default()
+                .insert(id);
+        }
+    }
+    Ok(())
+}
+
+fn remove_index_values(
+    indexes: &mut BTreeMap<String, BTreeMap<Vec<u8>, BTreeSet<RecordId>>>,
+    id: RecordId,
+    values: &IndexValues,
+) -> Result<(), EngineProblem> {
+    for (name, value) in values {
+        let Some(value) = value else { continue };
+        let entries = indexes
+            .get_mut(name)
+            .ok_or(EngineProblem::InvalidDefinition)?;
+        if let Some(ids) = entries.get_mut(value) {
+            ids.remove(&id);
+            if ids.is_empty() {
+                entries.remove(value);
+            }
+        }
+    }
+    Ok(())
+}

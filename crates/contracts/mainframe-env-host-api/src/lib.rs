@@ -14,6 +14,9 @@ mod cics_catalog;
 mod clock;
 mod dataset;
 mod enterprise;
+mod ims;
+mod ims_pcb;
+mod ims_status;
 mod mq_catalog;
 mod names;
 mod registry;
@@ -42,6 +45,27 @@ pub use dataset::{
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 pub use enterprise::{EnterpriseAuthorizer, EnterpriseResource, EnterpriseResourceClass};
+pub use ims::{
+    IMS_SSA_BOOLEAN_CONNECTORS, IMS_SSA_COMMAND_CODES, IMS_SSA_FIELD_NAME_BYTES,
+    IMS_SSA_RELATIONAL_OPERATOR_BYTES, IMS_SSA_RELATIONAL_OPERATORS, IMS_SSA_RULES_SHA256,
+    IMS_SSA_SEGMENT_NAME_BYTES, IMS_SSA_TOPIC_MANIFEST_SHA256, ImsSsa, ImsSsaBoolean,
+    ImsSsaBooleanDescriptor, ImsSsaCommand, ImsSsaCommandCodeDescriptor, ImsSsaField,
+    ImsSsaFieldResolver, ImsSsaLimits, ImsSsaPredicate, ImsSsaProblem, ImsSsaRelation,
+    ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
+    parse_ims_ssa,
+};
+pub use ims_pcb::{
+    IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
+    IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,
+    ImsPcbFieldWidth, ImsPcbKind, ImsPcbLayout, ImsPcbLimits, ImsPcbMaskDescriptor, ImsPcbProblem,
+    ImsPcbSemanticValue, ims_pcb_layout, ims_pcb_mask, ims_pcb_masks,
+};
+pub use ims_status::{
+    IMS_STATUS_CONTEXT_MEMBERSHIPS, IMS_STATUS_CONTEXTS, IMS_STATUS_DISTINCT_CODE_COUNT,
+    ImsStatusCategory, ImsStatusCode, ImsStatusContext, ImsStatusContextDescriptor,
+    ImsStatusDescriptor, ImsStatusProblem, ims_status, ims_status_context, ims_status_contexts,
+    resolve_ims_status,
+};
 pub use mq_catalog::{
     MQ_MQI_CALL_COUNT, MQ_MQI_CALL_IDENTITY_SET_SHA256, MQ_MQI_SOURCE_ROW_COUNT,
     MqMqiCallIdentityDescriptor, mq_mqi_call_identities, mq_mqi_call_identity,

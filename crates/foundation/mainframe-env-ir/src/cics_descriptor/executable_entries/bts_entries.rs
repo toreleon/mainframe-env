@@ -1,5 +1,48 @@
 use super::*;
 
+pub(super) const CHANNEL_CONTAINER_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 8] = [
+    descriptor(
+        CicsPlanOperation::DeleteChannel,
+        "delete-channel",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::DeleteContainer,
+        "delete-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::GetContainer,
+        "get-container",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::MoveContainer,
+        "move-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::PutContainer,
+        "put-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::QueryChannel,
+        "query-channel",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::GetContainer64,
+        "get64-container",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::PutContainer64,
+        "put64-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+];
+
 const fn descriptor(
     operation: CicsPlanOperation,
     name: &'static str,
@@ -15,7 +58,7 @@ const fn descriptor(
     }
 }
 
-pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
+pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 48] = [
     descriptor(
         CicsPlanOperation::AcquireActivityId,
         "acquire-activityid",
@@ -179,4 +222,99 @@ pub(super) const BTS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
         effects: CONTROL_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseActivity,
+        "endbrowse-activity",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextActivity,
+        "getnext-activity",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireActivity,
+        "inquire-activityid",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseActivity,
+        "startbrowse-activity",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseProcess,
+        "endbrowse-process",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextProcess,
+        "getnext-process",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireProcess,
+        "inquire-process",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseProcess,
+        "startbrowse-process",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseEvent,
+        "endbrowse-event",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextEvent,
+        "getnext-event",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireEvent,
+        "inquire-event",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseEvent,
+        "startbrowse-event",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseTimer,
+        "endbrowse-timer",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireTimer,
+        "inquire-timer",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseTimer,
+        "startbrowse-timer",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsEndBrowseContainer,
+        "endbrowse-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsGetNextContainer,
+        "getnext-container",
+        BTS_MUTATE_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsInquireContainer,
+        "inquire-container",
+        BTS_READ_EFFECTS,
+    ),
+    descriptor(
+        CicsPlanOperation::BtsStartBrowseContainer,
+        "startbrowse-container",
+        BTS_MUTATE_EFFECTS,
+    ),
 ];
