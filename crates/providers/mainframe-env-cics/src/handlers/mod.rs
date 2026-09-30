@@ -5,7 +5,9 @@ mod bridge_profile;
 mod bridge_runtime;
 mod bridge_start;
 mod bridge_terminal;
+pub mod bts_browse;
 mod bts_child_link;
+mod bts_container;
 pub mod bts_lifecycle;
 mod bts_link;
 mod builtin_function;
@@ -240,6 +242,7 @@ pub use conversation_control::{
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
+#[cfg(test)]
 pub(in crate::service) use conversation_control::{
     confirm_issue_control, mark_issue_control_attempted,
 };
@@ -403,6 +406,37 @@ pub(super) fn invoke_extended_control(
             }
         }
         crate::generated::CicsCommandFamily::BtsControl => match request.operation {
+            mainframe_env_host_api::CicsOperation::BtsEndBrowseContainer
+            | mainframe_env_host_api::CicsOperation::BtsGetNextContainer
+            | mainframe_env_host_api::CicsOperation::BtsInquireContainer
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseContainer
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseEvent
+            | mainframe_env_host_api::CicsOperation::BtsGetNextEvent
+            | mainframe_env_host_api::CicsOperation::BtsInquireEvent
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseEvent
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseTimer
+            | mainframe_env_host_api::CicsOperation::BtsInquireTimer
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseTimer
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseActivity
+            | mainframe_env_host_api::CicsOperation::BtsGetNextActivity
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseActivity
+            | mainframe_env_host_api::CicsOperation::BtsInquireActivity
+            | mainframe_env_host_api::CicsOperation::BtsStartBrowseProcess
+            | mainframe_env_host_api::CicsOperation::BtsGetNextProcess
+            | mainframe_env_host_api::CicsOperation::BtsEndBrowseProcess
+            | mainframe_env_host_api::CicsOperation::BtsInquireProcess => {
+                bts_browse::invoke(service, run, request)
+            }
+            CicsOperation::DeleteChannel
+            | CicsOperation::DeleteContainer
+            | CicsOperation::GetContainer
+            | CicsOperation::GetContainer64
+            | CicsOperation::MoveContainer
+            | CicsOperation::PutContainer
+            | CicsOperation::PutContainer64
+            | CicsOperation::QueryChannel => {
+                bts_container::invoke_channel_container(service, run, request)
+            }
             mainframe_env_host_api::CicsOperation::FetchAny
             | mainframe_env_host_api::CicsOperation::FetchChild
             | mainframe_env_host_api::CicsOperation::FreeChild => {
@@ -463,6 +497,7 @@ pub(super) fn invoke_interval_or_spool_control(
 }
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    bts_browse::release_task(service, run)?;
     bts_child_link::release_task(service, run)?;
     bts_link::release_task(service, run)?;
     task_enqueue::release_task(service, run)?;

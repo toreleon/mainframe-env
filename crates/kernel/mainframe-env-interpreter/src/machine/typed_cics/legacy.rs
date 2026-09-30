@@ -285,6 +285,7 @@ pub(crate) fn execute_legacy(
             mutation,
         }),
         PendingKind::Cics {
+            container: None,
             operation,
             storage64_intent: None,
             argument_summary,

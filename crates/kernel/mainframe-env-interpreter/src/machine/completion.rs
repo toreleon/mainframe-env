@@ -17,6 +17,7 @@ impl ReferenceMachine {
                 .map_err(|_| MachineProblem::ResourceExhausted)?,
         };
         self.release_storage64_task();
+        typed_cics::container_set::release_all(self);
         Ok(completion)
     }
 }

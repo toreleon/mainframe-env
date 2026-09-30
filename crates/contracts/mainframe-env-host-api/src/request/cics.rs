@@ -9,6 +9,25 @@ mod parse;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    BtsEndBrowseContainer,
+    BtsGetNextContainer,
+    BtsInquireContainer,
+    BtsStartBrowseContainer,
+    BtsEndBrowseEvent,
+    BtsGetNextEvent,
+    BtsInquireEvent,
+    BtsStartBrowseEvent,
+    BtsEndBrowseTimer,
+    BtsInquireTimer,
+    BtsStartBrowseTimer,
+    BtsStartBrowseActivity,
+    BtsGetNextActivity,
+    BtsEndBrowseActivity,
+    BtsInquireActivity,
+    BtsStartBrowseProcess,
+    BtsGetNextProcess,
+    BtsEndBrowseProcess,
+    BtsInquireProcess,
     AcquireActivityId,
     AcquireProcess,
     CancelAcqActivity,
@@ -29,6 +48,14 @@ pub enum CicsOperation {
     RunAcqProcess,
     RunActivity,
     RunTransId,
+    DeleteChannel,
+    DeleteContainer,
+    GetContainer,
+    GetContainer64,
+    MoveContainer,
+    PutContainer,
+    PutContainer64,
+    QueryChannel,
     SuspendAcqActivity,
     SuspendAcqProcess,
     SuspendActivity,
@@ -424,6 +451,25 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::BtsEndBrowseContainer => "BtsEndBrowseContainer",
+            Self::BtsGetNextContainer => "BtsGetNextContainer",
+            Self::BtsInquireContainer => "BtsInquireContainer",
+            Self::BtsStartBrowseContainer => "BtsStartBrowseContainer",
+            Self::BtsEndBrowseEvent => "BtsEndBrowseEvent",
+            Self::BtsGetNextEvent => "BtsGetNextEvent",
+            Self::BtsInquireEvent => "BtsInquireEvent",
+            Self::BtsStartBrowseEvent => "BtsStartBrowseEvent",
+            Self::BtsEndBrowseTimer => "BtsEndBrowseTimer",
+            Self::BtsInquireTimer => "BtsInquireTimer",
+            Self::BtsStartBrowseTimer => "BtsStartBrowseTimer",
+            Self::BtsStartBrowseActivity => "BtsStartBrowseActivity",
+            Self::BtsGetNextActivity => "BtsGetNextActivity",
+            Self::BtsEndBrowseActivity => "BtsEndBrowseActivity",
+            Self::BtsInquireActivity => "BtsInquireActivity",
+            Self::BtsStartBrowseProcess => "BtsStartBrowseProcess",
+            Self::BtsGetNextProcess => "BtsGetNextProcess",
+            Self::BtsEndBrowseProcess => "BtsEndBrowseProcess",
+            Self::BtsInquireProcess => "BtsInquireProcess",
             Self::AcquireActivityId => "AcquireActivityId",
             Self::AcquireProcess => "AcquireProcess",
             Self::CancelAcqActivity => "CancelAcqActivity",
@@ -444,6 +490,14 @@ impl CicsOperation {
             Self::RunAcqProcess => "RunAcqProcess",
             Self::RunActivity => "RunActivity",
             Self::RunTransId => "RunTransId",
+            Self::DeleteChannel => "DeleteChannel",
+            Self::DeleteContainer => "DeleteContainer",
+            Self::GetContainer => "GetContainer",
+            Self::GetContainer64 => "GetContainer64",
+            Self::MoveContainer => "MoveContainer",
+            Self::PutContainer => "PutContainer",
+            Self::PutContainer64 => "PutContainer64",
+            Self::QueryChannel => "QueryChannel",
             Self::SuspendAcqActivity => "SuspendAcqActivity",
             Self::SuspendAcqProcess => "SuspendAcqProcess",
             Self::SuspendActivity => "SuspendActivity",
@@ -688,7 +742,21 @@ impl CicsOperation {
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::AcquireActivityId
+            Self::BtsEndBrowseContainer
+                | Self::BtsGetNextContainer
+                | Self::BtsStartBrowseContainer
+                | Self::BtsEndBrowseEvent
+                | Self::BtsGetNextEvent
+                | Self::BtsStartBrowseEvent
+                | Self::BtsEndBrowseTimer
+                | Self::BtsStartBrowseTimer
+                | Self::BtsStartBrowseActivity
+                | Self::BtsGetNextActivity
+                | Self::BtsEndBrowseActivity
+                | Self::BtsStartBrowseProcess
+                | Self::BtsGetNextProcess
+                | Self::BtsEndBrowseProcess
+                | Self::AcquireActivityId
                 | Self::AcquireProcess
                 | Self::CancelAcqActivity
                 | Self::CancelAcqProcess
@@ -706,6 +774,11 @@ impl CicsOperation {
                 | Self::RunAcqProcess
                 | Self::RunActivity
                 | Self::RunTransId
+                | Self::DeleteChannel
+                | Self::DeleteContainer
+                | Self::MoveContainer
+                | Self::PutContainer
+                | Self::PutContainer64
                 | Self::SuspendAcqActivity
                 | Self::SuspendAcqProcess
                 | Self::SuspendActivity
@@ -897,10 +970,7 @@ impl CicsOperation {
 
     #[must_use]
     pub const fn supported(self) -> bool {
-        !matches!(
-            self,
-            Self::GdsIssueConfirmation | Self::GdsIssueError | Self::IssueCopy
-        )
+        !matches!(self, Self::IssueCopy)
     }
 }
 
@@ -987,7 +1057,7 @@ mod issue_tests {
     use super::CicsOperation;
 
     #[test]
-    fn exact_issue_heads_are_distinct_with_17_executable_rows() {
+    fn exact_issue_heads_are_distinct_with_19_executable_rows() {
         let heads = [
             ("ISSUE ABEND", CicsOperation::IssueAbend),
             ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
@@ -1030,6 +1100,8 @@ mod issue_tests {
                         | CicsOperation::IssuePrepare
                         | CicsOperation::IssueSignal
                         | CicsOperation::GdsIssueAbend
+                        | CicsOperation::GdsIssueConfirmation
+                        | CicsOperation::GdsIssueError
                         | CicsOperation::GdsIssuePrepare
                         | CicsOperation::GdsIssueSignal
                         | CicsOperation::IssueEndoutput

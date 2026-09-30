@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.modernize.ai/p4-common/1.0.0",
+  "$defs": {
+    "digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "artifactId": {"type":"string","pattern":"^art_sha256_[0-9a-f]{64}$"},
+    "version": {"type":"string","pattern":"^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "identifier": {"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9_.:/-]+$"},
+    "authority": {"const":"lab-simulated"},
+    "sensitivity": {"enum":["public","internal","confidential","restricted"]},
+    "partition": {"enum":["maker-corpus","hidden-holdout"]},
+    "severity": {"enum":["critical","high","medium","low","info"]},
+    "comparisonLayer": {"enum":["byte","structural","semantic","side-effect","operational"]},
+    "verdict": {"enum":["equivalent","divergent","blocked","error"]},
+    "divergenceStatus": {"enum":["open","accepted","fixed","false-positive","superseded"]},
+    "repairability": {"enum":["automatic","approval-required","manual","none"]},
+    "riskTier": {"enum":["critical","high","medium","low"]},
+    "channelOrdering": {"enum":["ordered","keyed","set"]},
+    "terminationKind": {"enum":["return-code","abend"]},
+    "dbOperation": {"enum":["insert","update","delete"]},
+    "fileOperation": {"enum":["create","modify","delete"]},
+    "collectionSemantics": {"enum":["ordered","keyed","set"]},
+    "binding": {
+      "type":"object","additionalProperties":false,
+      "required":["artifactId","envelopeDigest","payloadDigest","artifactType","schemaVersion","role"],
+      "properties":{
+        "artifactId":{"$ref":"#/$defs/artifactId"},
+        "envelopeDigest":{"$ref":"#/$defs/digest"},
+        "payloadDigest":{"$ref":"#/$defs/digest"},
+        "artifactType":{"enum":[
+          "SourceSnapshot","SystemGraph","BehaviorPacket","MigrationSpec","EvidenceBundle",
+          "CutoverLedger","Observation","Divergence","TechnologyPackManifest","RuleCatalog",
+          "CapturePlan","ReplayManifest","PacketSet","CoverageLedger","StateSnapshot",
+          "LabRunnerBuild","VerificationResult","ReproBundleManifest"
+        ]},
+        "schemaVersion":{"$ref":"#/$defs/version"},
+        "role":{"type":"string","minLength":1,"maxLength":80}
+      }
+    },
+    "artifactRef": {
+      "type":"object","additionalProperties":false,
+      "required":["artifactId","digest"],
+      "properties":{
+        "artifactId":{"$ref":"#/$defs/artifactId"},
+        "digest":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "typedValue": {
+      "oneOf":[
+        {"type":"object","additionalProperties":false,"required":["type"],"properties":{"type":{"const":"null"}}},
+        {"type":"object","additionalProperties":false,"required":["type","value"],"properties":{"type":{"const":"text"},"value":{"type":"string"}}},
+        {"type":"object","additionalProperties":false,"required":["type","value"],"properties":{"type":{"const":"decimal"},"value":{"type":"string","pattern":"^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"}}},
+        {"type":"object","additionalProperties":false,"required":["type","value"],"properties":{"type":{"const":"integer"},"value":{"type":"string","pattern":"^-?(?:0|[1-9][0-9]*)$"}}},
+        {"type":"object","additionalProperties":false,"required":["type","value"],"properties":{"type":{"const":"bytes"},"value":{"type":"string","pattern":"^(?:[0-9a-f]{2})*$"}}},
+        {"type":"object","additionalProperties":false,"required":["type","value"],"properties":{"type":{"const":"boolean"},"value":{"type":"boolean"}}}
+      ]
+    },
+    "rawSpan": {
+      "type":"object","additionalProperties":false,
+      "required":["offset","length","digest"],
+      "properties":{
+        "offset":{"type":"integer","minimum":0},
+        "length":{"type":"integer","minimum":0},
+        "digest":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "decodedField": {
+      "type":"object","additionalProperties":false,
+      "required":["fieldPath","value","rawOffset","rawLength","rawDigest"],
+      "properties":{
+        "fieldPath":{"type":"string","minLength":1,"maxLength":512},
+        "value":{"$ref":"#/$defs/typedValue"},
+        "rawOffset":{"type":"integer","minimum":0},
+        "rawLength":{"type":"integer","minimum":0},
+        "rawDigest":{"$ref":"#/$defs/digest"},
+        "rawBytesHex":{"type":"string","pattern":"^(?:[0-9a-f]{2})*$"}
+      }
+    },
+    "recordEntry": {
+      "type":"object","additionalProperties":false,
+      "required":["sequence","entityKey","layoutProfileId","layoutProfileVersion","fields","rawDigest"],
+      "properties":{
+        "sequence":{"type":"integer","minimum":0},
+        "entityKey":{"type":"string","minLength":1,"maxLength":256},
+        "layoutProfileId":{"$ref":"#/$defs/identifier"},
+        "layoutProfileVersion":{"$ref":"#/$defs/version"},
+        "fields":{"type":"array","items":{"$ref":"#/$defs/decodedField"}},
+        "rawDigest":{"$ref":"#/$defs/digest"},
+        "rawBytesHex":{"type":"string","pattern":"^(?:[0-9a-f]{2})*$"},
+        "rdwHex":{"type":["string","null"],"pattern":"^[0-9a-f]{8}$"}
+      }
+    },
+    "fileOutput": {
+      "type":"object","additionalProperties":false,
+      "required":["logicalPath","mediaType","sizeBytes","digest","records","ordering"],
+      "properties":{
+        "logicalPath":{"type":"string","pattern":"^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"},
+        "mediaType":{"type":"string","minLength":1},
+        "sizeBytes":{"type":"integer","minimum":0},
+        "digest":{"$ref":"#/$defs/digest"},
+        "records":{"type":"array","items":{"$ref":"#/$defs/recordEntry"}},
+        "ordering":{"$ref":"#/$defs/collectionSemantics"}
+      }
+    },
+    "dbMutation": {
+      "type":"object","additionalProperties":false,
+      "required":["sequence","transactionId","table","key","operation","before","after","rolledBack"],
+      "properties":{
+        "sequence":{"type":"integer","minimum":0},
+        "transactionId":{"type":"string","minLength":1},
+        "table":{"type":"string","minLength":1},
+        "key":{"type":"string","minLength":1},
+        "operation":{"$ref":"#/$defs/dbOperation"},
+        "before":{"oneOf":[{"type":"object","additionalProperties":true},{"type":"null"}]},
+        "after":{"oneOf":[{"type":"object","additionalProperties":true},{"type":"null"}]},
+        "rolledBack":{"type":"boolean"}
+      }
+    },
+    "spoolLine": {
+      "type":"object","additionalProperties":false,
+      "required":["lineNumber","text","digest"],
+      "properties":{
+        "lineNumber":{"type":"integer","minimum":0},
+        "text":{"type":"string"},
+        "digest":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "spoolStream": {
+      "type":"object","additionalProperties":false,
+      "required":["streamName","lines","ordering"],
+      "properties":{
+        "streamName":{"type":"string","minLength":1},
+        "lines":{"type":"array","items":{"$ref":"#/$defs/spoolLine"}},
+        "ordering":{"$ref":"#/$defs/collectionSemantics"}
+      }
+    },
+    "eventPlaceholder": {
+      "type":"object","additionalProperties":false,
+      "required":["eventId","kind","correlationKeys","ordering"],
+      "properties":{
+        "eventId":{"type":"string","minLength":1},
+        "kind":{"type":"string","minLength":1},
+        "correlationKeys":{"type":"array","items":{"type":"string","minLength":1}},
+        "ordering":{"$ref":"#/$defs/collectionSemantics"}
+      }
+    },
+    "terminationInfo": {
+      "type":"object","additionalProperties":false,
+      "required":["kind","code","reason"],
+      "properties":{
+        "kind":{"$ref":"#/$defs/terminationKind"},
+        "code":{"type":"integer"},
+        "reason":{"type":"string","minLength":1},
+        "abendCode":{"type":["string","null"]},
+        "failurePoint":{"type":["string","null"]}
+      }
+    },
+    "timingEnvelope": {
+      "type":"object","additionalProperties":false,
+      "required":["deterministicDurationMicros"],
+      "properties":{
+        "deterministicDurationMicros":{"type":["integer","null"],"minimum":0},
+        "rawWallDurationMicros":{"type":["integer","null"],"minimum":0}
+      }
+    },
+    "resourceEnvelope": {
+      "type":"object","additionalProperties":false,
+      "required":[],
+      "properties":{
+        "peakMemoryBytes":{"type":["integer","null"],"minimum":0},
+        "cpuMillis":{"type":["integer","null"],"minimum":0}
+      }
+    },
+    "provenanceBlock": {
+      "type":"object","additionalProperties":false,
+      "required":["authority","runnerBuildId","runnerImplementation","packetRef","replayRef"],
+      "properties":{
+        "authority":{"$ref":"#/$defs/authority"},
+        "runnerBuildId":{"type":"string","minLength":1},
+        "runnerImplementation":{"type":"string","minLength":1},
+        "packetRef":{"type":["string","null"]},
+        "replayRef":{"type":["string","null"]},
+        "graphRef":{"type":["string","null"]},
+        "ruleCatalogRef":{"type":["string","null"]},
+        "packRef":{"type":["string","null"]},
+        "normalizationPolicyRef":{"type":["string","null"]}
+      }
+    },
+    "fingerprintPreimage": {
+      "type":"object","additionalProperties":false,
+      "required":["fingerprintContractVersion","profileId","profileVersion","comparisonLayer","comparatorId","comparatorVersion","reasonCode","entityKey","fieldPath","legacyValueDigest","candidateValueDigest","causalGraphIds","causalRuleIds"],
+      "properties":{
+        "fingerprintContractVersion":{"const":"1.0.0"},
+        "profileId":{"$ref":"#/$defs/identifier"},
+        "profileVersion":{"$ref":"#/$defs/version"},
+        "comparisonLayer":{"$ref":"#/$defs/comparisonLayer"},
+        "comparatorId":{"$ref":"#/$defs/identifier"},
+        "comparatorVersion":{"$ref":"#/$defs/version"},
+        "reasonCode":{"$ref":"#/$defs/identifier"},
+        "entityKey":{"type":"string","minLength":1,"maxLength":256},
+        "fieldPath":{"type":"string","minLength":1,"maxLength":512},
+        "legacyValueDigest":{"$ref":"#/$defs/digest"},
+        "candidateValueDigest":{"$ref":"#/$defs/digest"},
+        "causalGraphIds":{"type":"array","items":{"type":"string","minLength":1}},
+        "causalRuleIds":{"type":"array","items":{"type":"string","minLength":1}},
+        "policyRuleId":{"type":["string","null"]},
+        "policyRuleVersion":{"type":["string","null"]}
+      }
+    }
+  }
+}
