@@ -77,12 +77,24 @@ coverage or licensed execution credit.
 ## Register later source-review manifests
 
 The immutable 0.2 catalog index remains unchanged. Later zero-credit source
-sets are registered separately in
-`conformance/0.9/manifests/index.json`. Each registry row binds the exact
-manifest bytes, topic-set digest, count, baseline, subsystem and scope while
-fixing `semantic_authority=false` and `coverage_credit=0`. The shared topic
-manifest schema and xtask checker reject unregistered, missing, changed or
-cross-version manifests.
+sets are registered separately in a target-owned
+`conformance/<minor>/manifests/index.json`. The shared offline reader currently
+loads the 0.9 and 0.14 registries. Each registry row binds the exact manifest
+bytes, topic-set digest, count, baseline, subsystem and scope while fixing
+`semantic_authority=false` and `coverage_credit=0`. The shared registry schema,
+offline reader, and xtask checker reject unregistered, missing, changed or
+cross-version manifests. Adding another target registry requires extending the
+shared bounded registry list; do not create a target-specific reader.
+
+The 0.14 IMS programming-contract scope is checked offline with:
+
+```bash
+python3 -B conformance/tools/ibm_docs.py status --scope ims-programming-contracts
+```
+
+It pins only the reviewed SSA, PCB/status, get/position, processing-option and
+call-family topics needed by the declared IMS contract slices. It grants no
+behavioral or licensed differential credit.
 
 For a new CICS source corpus:
 

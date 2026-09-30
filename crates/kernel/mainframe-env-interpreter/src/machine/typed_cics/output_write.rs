@@ -166,7 +166,10 @@ pub(in crate::machine) fn write_output(
             }),
         );
     }
-    if matches!(name, "EVENTTYPE" | "FIRESTATUS") {
+    if let Some(number) = bts_event_number(operation, name, value)? {
+        return write_target(machine, target, &CobolValue::Decimal(number));
+    }
+    if matches!(name, "EVENTTYPE" | "FIRESTATUS") && operation != CicsOperation::BtsInquireEvent {
         if value.schema() != "mainframe-env.cics.cvda@1" {
             return Err(MachineProblem::UnexpectedHostResult);
         }
@@ -291,6 +294,33 @@ pub(in crate::machine) fn write_output(
     }
 }
 
+// The BTS browse and inquiry providers emit numeric CVDAs. They do not use
+// the legacy symbolic EVENTTYPE/FIRESTATUS payloads handled above.
+fn bts_event_number(
+    operation: CicsOperation,
+    name: &str,
+    value: &BoundedPayload,
+) -> Result<Option<Decimal>, MachineProblem> {
+    if !matches!(
+        operation,
+        CicsOperation::BtsGetNextEvent | CicsOperation::BtsInquireEvent
+    ) || !matches!(name, "EVENTTYPE" | "FIRESTATUS")
+    {
+        return Ok(None);
+    }
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let coefficient = std::str::from_utf8(value.bytes())
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?
+        .parse::<i128>()
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    Ok(Some(Decimal {
+        coefficient,
+        scale: 0,
+    }))
+}
+
 fn write_resolved_prefix(
     machine: &mut ReferenceMachine,
     slot: &CicsStorageSlot,
@@ -299,4 +329,76 @@ fn write_resolved_prefix(
     let mut reference = resolved_slot(machine, slot)?;
     reference.length = value.len();
     machine.write_reference(&reference, value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bts_event_metadata_accepts_numeric_provider_payloads() {
+        for operation in [
+            CicsOperation::BtsGetNextEvent,
+            CicsOperation::BtsInquireEvent,
+        ] {
+            for (name, coefficient) in [
+                ("EVENTTYPE", 226i128),
+                ("EVENTTYPE", 1002),
+                ("EVENTTYPE", 1003),
+                ("EVENTTYPE", 1004),
+                ("FIRESTATUS", 1000),
+                ("FIRESTATUS", 1001),
+            ] {
+                let value = payload(
+                    "mainframe-env.cics.decimal@1",
+                    coefficient.to_string().into_bytes(),
+                )
+                .unwrap();
+                assert_eq!(
+                    bts_event_number(operation, name, &value),
+                    Ok(Some(Decimal {
+                        coefficient,
+                        scale: 0,
+                    }))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn bts_event_metadata_rejects_wrong_schema_and_malformed_numbers() {
+        for operation in [
+            CicsOperation::BtsGetNextEvent,
+            CicsOperation::BtsInquireEvent,
+        ] {
+            for name in ["EVENTTYPE", "FIRESTATUS"] {
+                for (schema, bytes) in [
+                    ("mainframe-env.cics.cvda@1", b"INPUT".as_slice()),
+                    ("mainframe-env.cics.payload@1", b"226".as_slice()),
+                    ("mainframe-env.cics.decimal@1", b"INPUT".as_slice()),
+                    ("mainframe-env.cics.decimal@1", b"".as_slice()),
+                    ("mainframe-env.cics.decimal@1", b"\xff".as_slice()),
+                ] {
+                    let value = payload(schema, bytes.to_vec()).unwrap();
+                    assert_eq!(
+                        bts_event_number(operation, name, &value),
+                        Err(MachineProblem::UnexpectedHostResult)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bts_event_metadata_does_not_intercept_other_output_contracts() {
+        let value = payload("mainframe-env.cics.payload@1", b"READY".to_vec()).unwrap();
+        assert_eq!(
+            bts_event_number(CicsOperation::BtsGetNextEvent, "EVENT", &value),
+            Ok(None)
+        );
+        assert_eq!(
+            bts_event_number(CicsOperation::CheckTimer, "EVENTTYPE", &value),
+            Ok(None)
+        );
+    }
 }

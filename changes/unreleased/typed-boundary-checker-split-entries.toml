@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fix #322 by checking typed CICS descriptor literals across the split executable entry modules."

@@ -1,0 +1,141 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-database-contracts-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 database engine contracts for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topic_count": 20,
+  "total_bytes": 110015,
+  "topic_manifest_digest": "3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b",
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_damdball.htm",
+      "sha256": "a27054fc946043db089c678b85c42423fdcb6b219db016bd8c6a14d2aea6ba7c",
+      "bytes": 12050,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_hisamdb.htm",
+      "sha256": "c9ae318dce4e56d6300babb016648ab5141972d1c49ea3fa052b561f05cee4d0",
+      "bytes": 4889,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_shshisamsdataaccess.htm",
+      "sha256": "f2f2295961cc003e66358049069435502e1dc0cf168924b866be0170019077d4",
+      "bytes": 1810,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_processinggsamdb.htm",
+      "sha256": "709a5195deb5a7b505f5d70d456d9a004bcf19078994583390f7edd0640f80c5",
+      "bytes": 7018,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_hidamdirectsequential.htm",
+      "sha256": "0d578612cf99f1f684cfba67645595447fb1442a3595c89c480dfcae62f9229c",
+      "bytes": 6013,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_implicationselectvariable.htm",
+      "sha256": "41f467f841d42218adf8a4ae29d805d4d8678ecada3a009540fee1d77042e7e2",
+      "bytes": 10618,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_secondaryindexlogicalrelationships.htm",
+      "sha256": "e924f4e2c9c336d4ecdc8a6e2ccf4ff0369b0ab2332788ca015e215c14d5bd53",
+      "bytes": 3792,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssassecondaryindex.htm",
+      "sha256": "4b3a1ee3cc0eabbbb4984d23a0eb60fe93be50887e1853643e0f382710139900",
+      "bytes": 4114,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_processinglogicalrelationships.htm",
+      "sha256": "ae5f2c81859d6631c28380eaa7d6744735b16ba99c9337cdd701f9d54bc0bfee",
+      "bytes": 8052,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_retrieveinsertgsamdb.htm",
+      "sha256": "8dcb020dc55ed37c1cdf304e3cc7f6c0a724edb2868c910f4055e81ce2bd2ae1",
+      "bytes": 12818,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_gsamstatuscodes.htm",
+      "sha256": "a8531909e5276c69924ffb11b89a1e09d148ac0ff1ab8c8fec6843e107422592",
+      "bytes": 2952,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_insertdelseg.htm",
+      "sha256": "6a048f9b794ed466655100a69892afceed54805bbdc9e3329f5843a2f38295d5",
+      "bytes": 2289,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
+      "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
+      "bytes": 1807,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_issuedeletecall.htm",
+      "sha256": "f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23",
+      "bytes": 2232,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howseindexmaint.htm",
+      "sha256": "910d3494d8be6d834eb24844d86153ce675f67566fd49a455056d8da230cb086",
+      "bytes": 5100,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_gsamrecordformats.htm",
+      "sha256": "c6eb5c8d24469ed275cd153ab191ff89f9ccee98b6e3cb921bbb0d7943aa50d4",
+      "bytes": 4204,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howhierrstruc_fullfunction.htm",
+      "sha256": "8535859c6dfc8e9683b34d307535bc524321cdc445bb6b94c1143d8d0206d1ca",
+      "bytes": 5010,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_varlengthseg.htm",
+      "sha256": "a565890e0371da0ccb641c071f7f6696cf21d0efc89b66f4f9bdadbb44f3a01c",
+      "bytes": 4982,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howhdamphdamstored.htm",
+      "sha256": "4d8052332291708f230fed52da1d7eb685972ec0672f21daa4897c8af7ab547d",
+      "bytes": 7114,
+      "last_modified": "unavailable-in-retained-metadata"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howhidamphidamstored.htm",
+      "sha256": "e1fcb5036972925376effcfe275cf56d602356d22f440a7d720b357e8407e16e",
+      "bytes": 3151,
+      "last_modified": "unavailable-in-retained-metadata"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Resolve reordered BTS INQUIRE selectors and preserve option diagnostics for unsupported INQUIRE forms."
