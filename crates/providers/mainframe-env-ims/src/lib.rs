@@ -2,9 +2,18 @@
 
 #![forbid(unsafe_code)]
 
+mod metadata;
 mod retention;
 mod service;
 mod tm;
+
+pub use metadata::{
+    IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,
+    ImsDbLevel, ImsFieldMetadata, ImsLogicalRelationshipMetadata, ImsMetadataCatalog,
+    ImsMetadataIdentity, ImsMetadataLimits, ImsMetadataProblem, ImsPcbMetadata, ImsPsbMetadata,
+    ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
+    ImsTerminalPcbMetadata, validate_ims_metadata,
+};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

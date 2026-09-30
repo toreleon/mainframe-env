@@ -11,6 +11,7 @@ const GENERATED_SSA_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_ssa_rules.rs";
 const PCB_STATUS_RULES_PATH: &str = "conformance/0.14/ims/pcb-status-rules.json";
 const PCB_STATUS_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-pcb-status-rules.schema.json";
+const METADATA_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-metadata.schema.json";
 const GENERATED_PCB_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_pcb_masks.rs";
 const GENERATED_STATUS_PATH: &str =
@@ -70,6 +71,7 @@ struct StatusContext {
 }
 
 pub(super) fn generate(root: &Path) -> TaskResult {
+    validate_metadata_schema(root)?;
     let (generated_pcb, generated_status) = render_pcb_status(root)?;
     for (relative, generated) in [
         (GENERATED_PATH, render(root)?),
@@ -86,6 +88,7 @@ pub(super) fn generate(root: &Path) -> TaskResult {
 }
 
 pub(super) fn check(root: &Path) -> TaskResult {
+    validate_metadata_schema(root)?;
     let (generated_pcb, generated_status) = render_pcb_status(root)?;
     for (relative, expected) in [
         (GENERATED_PATH, render(root)?),
@@ -98,6 +101,68 @@ pub(super) fn check(root: &Path) -> TaskResult {
         require(
             actual == expected,
             &format!("{relative} is stale; run cargo xtask ims-catalog"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_metadata_schema(root: &Path) -> TaskResult {
+    let path = root.join(METADATA_SCHEMA_PATH);
+    let schema = json(&path)?;
+    let validator = compile_draft_2020_12_schema(&schema, &path)?;
+    let instance = json!({
+        "schema_version": "mainframe-env.ims-metadata@1",
+        "databases": [{
+            "name": "AUTHDB", "version": 7, "organization": "HIDAM",
+            "segments": [
+                {"name": "ROOT", "parent": null, "min_length": 16, "max_length": 16,
+                 "fields": [{"name": "ROOTKEY", "offset": 0, "length": 8,
+                             "sequence": true, "unique": true}]},
+                {"name": "CHILD", "parent": "ROOT", "min_length": 16, "max_length": 16,
+                 "fields": [{"name": "CHILDKEY", "offset": 0, "length": 8,
+                             "sequence": true, "unique": true}]}
+            ],
+            "secondary_indexes": [{"name": "AUTHX", "target_segment": "CHILD",
+                                   "source_segment": "CHILD", "source_fields": ["CHILDKEY"]}],
+            "logical_relationships": [{"parent_database": "AUTHDB", "parent_segment": "ROOT",
+                                       "child_database": "AUTHDB", "child_segment": "CHILD",
+                                       "paired": true}]
+        }],
+        "psbs": [{
+            "name": "AUTHPSB", "database_level": "current", "pcbs": [
+                {"kind": "database", "name": "AUTHPCB", "database": "AUTHDB",
+                 "database_version": 7, "processing_options": "AP",
+                 "sensitive_segments": [
+                     {"name": "ROOT", "parent": null, "processing_options": null},
+                     {"name": "CHILD", "parent": "ROOT", "processing_options": "G"}
+                 ]},
+                {"kind": "alternate-terminal", "name": "ALTPCB", "destination": "OUT",
+                 "modifiable": false, "express": false, "same_terminal": false,
+                 "response_mode": false}
+            ]
+        }]
+    });
+    require(
+        validator.is_valid(&instance),
+        "IMS metadata schema rejected its representative v1 document",
+    )?;
+    let mut unknown = instance.clone();
+    unknown["unexpected"] = json!(true);
+    let mut bad_name = instance.clone();
+    bad_name["databases"][0]["segments"][0]["name"] = json!("TOO-LONG");
+    let mut bad_kind = instance.clone();
+    bad_kind["psbs"][0]["pcbs"][1]["kind"] = json!("io");
+    let mut bad_bound = instance;
+    bad_bound["databases"][0]["segments"][0]["max_length"] = json!(32769);
+    for (label, mutation) in [
+        ("unknown field", unknown),
+        ("invalid name", bad_name),
+        ("unsupported PCB kind", bad_kind),
+        ("segment bound", bad_bound),
+    ] {
+        require(
+            !validator.is_valid(&mutation),
+            &format!("IMS metadata schema accepted {label} mutation"),
         )?;
     }
     Ok(())
