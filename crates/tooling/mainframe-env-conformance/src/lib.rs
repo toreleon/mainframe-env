@@ -11,6 +11,7 @@ mod cobol_assurance;
 mod cobol_clauses;
 mod cobol_conditions;
 mod cobol_data;
+mod cobol_differential;
 mod cobol_exit;
 mod cobol_files;
 mod cobol_frontend;

@@ -522,7 +522,7 @@ fn pinned_tool(
     })
 }
 
-fn run_bounded(
+pub(crate) fn run_bounded(
     program: &Path,
     arguments: &[OsString],
     directory: &Path,
