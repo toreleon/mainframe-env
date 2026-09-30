@@ -16,18 +16,18 @@
     },
     "source_corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "file_sha256": "sha256:8354c5e2731c4b6664ce884493a96bb5f570254a642ddafafa83b9cb299ebeb8",
-      "logical_sha256": "sha256:2363282fe7341e80cafc5693dd8fac9b67025192962a0bc421ff83e734bee162"
+      "file_sha256": "sha256:61bd5aff47c9628237531e1a4ff78cd0d08cb6ae3c21fb00f12cd952f35b5c09",
+      "logical_sha256": "sha256:3dace7b92117fb9136c4c816282dfc663aa92ada2aa5ec8f5ad26d30aba3d5ed"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "file_sha256": "sha256:8acb506c0e5d6084235d94f5bb015d66c37b7f792a85713bcb3c7d0fb6b563ba",
-      "logical_sha256": "sha256:f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc"
+      "file_sha256": "sha256:06d0e4229080df35e1810d33525caf3a753f819ff8950cfc943b59a5cab096b5",
+      "logical_sha256": "sha256:28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498"
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-b-extraction.json",
-      "file_sha256": "sha256:e214324ff1606bc7df5315ca0f382c7d836b9c166cc098f479574c969baf3575",
-      "logical_sha256": "sha256:09cb5e9e3c32096e9673b7c6a2b25d3f7ca2fcfb6cb957e042ce1bca7957f621"
+      "file_sha256": "sha256:970916e0538c3b503bd8c475aa22c8b748963f5be68bada7fcbdc0d9697b2384",
+      "logical_sha256": "sha256:69ed87f044c4bee973b72d7a8ee042b63b0e338a141482926de3f8c3e808816f"
     }
   },
   "extractor": {
@@ -7895,7 +7895,7 @@
         },
         {
           "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
-          "topic_sha256": "03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
+          "topic_sha256": "21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
           "source_role": "one-hop-context"
         },
         {
@@ -9441,27 +9441,6 @@
               }
             },
             {
-              "candidate_id": "cics-b-0094-execution-context-81c1031231d1",
-              "kind": "source-context",
-              "key": "one-hop-target-93cd5333d562c3a8",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
-                "topic_sha256": "sha256:03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:b3ddd677564b3cdee6bea2c8f4829f1b29cc60c433048d06de0b956b69bfa747"
-              }
-            },
-            {
               "candidate_id": "cics-b-0094-execution-context-856997b15998",
               "kind": "source-context",
               "key": "one-hop-source-3898b09070502ec6",
@@ -9522,6 +9501,27 @@
                 "tag": "ul",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/div[1]/ul[1]",
                 "fragment_sha256": "sha256:ecf1e1d0f2cd81d8cf69117b331aeaa9c1e1dab410a085ee9c236d07bb8ba03e"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0094-execution-context-b2eb32a8fa09",
+              "kind": "source-context",
+              "key": "one-hop-target-93cd5333d562c3a8",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
+                "topic_sha256": "sha256:21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:a6a8e38d5a45061fde298323b9a6ad73c3d9f3c4532d1ac79017a2c7b8cd7a13"
               }
             },
             {
@@ -9699,7 +9699,7 @@
         },
         {
           "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
-          "topic_sha256": "03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
+          "topic_sha256": "21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
           "source_role": "one-hop-context"
         },
         {
@@ -11062,27 +11062,6 @@
               }
             },
             {
-              "candidate_id": "cics-b-0095-execution-context-2bdafedb7993",
-              "kind": "source-context",
-              "key": "one-hop-target-78f34963d12fb62b",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
-                "topic_sha256": "sha256:03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:b3ddd677564b3cdee6bea2c8f4829f1b29cc60c433048d06de0b956b69bfa747"
-              }
-            },
-            {
               "candidate_id": "cics-b-0095-execution-context-3095e4185ee7",
               "kind": "source-context",
               "key": "global-command-format",
@@ -11410,6 +11389,27 @@
                 "tag": "article",
                 "structural_path": "div[1]/article[1]",
                 "fragment_sha256": "sha256:65a12a0619b6814eaaadaa591d83f017bed2462a153d24d38a8429b7fb6b03d2"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0095-execution-context-e506f52db1bf",
+              "kind": "source-context",
+              "key": "one-hop-target-78f34963d12fb62b",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html",
+                "topic_sha256": "sha256:21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:a6a8e38d5a45061fde298323b9a6ad73c3d9f3c4532d1ac79017a2c7b8cd7a13"
               }
             },
             {
@@ -63416,7 +63416,7 @@
         },
         {
           "topic_path": "SSJL4D_6.x/troubleshooting/java/troubleshooting_web_ref.html",
-          "topic_sha256": "b07229031a6b7b9d622586842457c3c71f06fc9fe087a5dfd3a334f621e2e5a5",
+          "topic_sha256": "4f3daa22b3c1667c0ecbb76d5c033cdb630d2b08fe222f9eece0f46dff3084ef",
           "source_role": "one-hop-context"
         }
       ],
@@ -66311,27 +66311,6 @@
               }
             },
             {
-              "candidate_id": "cics-b-0138-execution-context-454968f113f5",
-              "kind": "source-context",
-              "key": "one-hop-target-1e8f1d0338617da7",
-              "candidate_value": {
-                "type": "context",
-                "selector_id": "mapped-one-hop-context",
-                "association": "mapping-edge-source-fragment-and-target-fragment"
-              },
-              "evidence": {
-                "topic_path": "SSJL4D_6.x/troubleshooting/java/troubleshooting_web_ref.html",
-                "topic_sha256": "sha256:b07229031a6b7b9d622586842457c3c71f06fc9fe087a5dfd3a334f621e2e5a5",
-                "source_role": "one-hop-context",
-                "source_product": "SSJL4D_6.x",
-                "target_authority_boundary": "target-product-authority",
-                "section_id": "__topic__",
-                "tag": "article",
-                "structural_path": "div[1]/article[1]",
-                "fragment_sha256": "sha256:e40729b5b57780b169a4bc96b5efd33a8da117af43243b5505ab7bb9db5989ff"
-              }
-            },
-            {
               "candidate_id": "cics-b-0138-execution-context-63926ca6fcf6",
               "kind": "source-context",
               "key": "dpl-server-restrictions",
@@ -66373,6 +66352,27 @@
                 "tag": "p",
                 "structural_path": "div[1]/article[1]/div[2]/section[1]/p[2]",
                 "fragment_sha256": "sha256:0d3e987eaa923c4b0748d6a535e94fa1d065e3d18869571c3f50083dbe06dafb"
+              }
+            },
+            {
+              "candidate_id": "cics-b-0138-execution-context-69b18a48e3a6",
+              "kind": "source-context",
+              "key": "one-hop-target-1e8f1d0338617da7",
+              "candidate_value": {
+                "type": "context",
+                "selector_id": "mapped-one-hop-context",
+                "association": "mapping-edge-source-fragment-and-target-fragment"
+              },
+              "evidence": {
+                "topic_path": "SSJL4D_6.x/troubleshooting/java/troubleshooting_web_ref.html",
+                "topic_sha256": "sha256:4f3daa22b3c1667c0ecbb76d5c033cdb630d2b08fe222f9eece0f46dff3084ef",
+                "source_role": "one-hop-context",
+                "source_product": "SSJL4D_6.x",
+                "target_authority_boundary": "target-product-authority",
+                "section_id": "__topic__",
+                "tag": "article",
+                "structural_path": "div[1]/article[1]",
+                "fragment_sha256": "sha256:e40729b5b57780b169a4bc96b5efd33a8da117af43243b5505ab7bb9db5989ff"
               }
             },
             {
@@ -158119,5 +158119,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:a0ed9c29573f6ea2c6357f8ec11f56382d7d1e70f307dec3c56335d525ff05b5"
+  "projection_sha256": "sha256:df39bcf3937c694e1c3a517dc2b32839b191015a53d942584c4af02305885f9c"
 }

@@ -13,10 +13,10 @@
   },
   "topic_manifest": {
     "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-    "file_sha256": "sha256:8acb506c0e5d6084235d94f5bb015d66c37b7f792a85713bcb3c7d0fb6b563ba",
-    "topic_manifest_sha256": "sha256:f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc",
+    "file_sha256": "sha256:06d0e4229080df35e1810d33525caf3a753f819ff8950cfc943b59a5cab096b5",
+    "topic_manifest_sha256": "sha256:28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498",
     "topic_count": 176,
-    "total_bytes": 4122948
+    "total_bytes": 4174613
   },
   "counts": {
     "mapping_rows": 88,
@@ -493,5 +493,5 @@
   "supplemental_topics": [],
   "source_resolutions": [],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, supplemental topics, and source resolutions",
-  "corpus_sha256": "sha256:2363282fe7341e80cafc5693dd8fac9b67025192962a0bc421ff83e734bee162"
+  "corpus_sha256": "sha256:3dace7b92117fb9136c4c816282dfc663aa92ada2aa5ec8f5ad26d30aba3d5ed"
 }

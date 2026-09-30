@@ -821,11 +821,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-a-candidates.json",
-          "file_sha256": "sha256:dbc5ffaafc4e447dbbf0554a10ce62c128009b60a8353fc347c92410859643c1"
+          "file_sha256": "sha256:9defd690586b691db9a633b512f13e7197764fdf1a55be9212e849ba19d042f2"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-a-review.json",
-          "file_sha256": "sha256:97334e789a5ebf79d15732320bf0f372fdcb09522f8eb483f205a36095645f2c",
+          "file_sha256": "sha256:d9d7bf1f16fc9c7004b2f9f10a52b0264a9674b81bac1159df7057c5820a2869",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -96025,7 +96025,7 @@
                     "association": "exact-topic-root-no-link-expansion"
                   },
                   "candidate_ids": [
-                    "cics-a-0056-execution-context-1d5c00d44420",
+                    "cics-a-0056-execution-context-3049914304c6",
                     "cics-a-0056-execution-context-81c0b90239e1"
                   ]
                 },
@@ -96905,7 +96905,7 @@
               "handler_sha256": "sha256:e927113ccee0e869947453a0b71ac43b3651a7c60682e55c0170dd397b3ec7dc"
             }
           },
-          "row_contract_sha256": "sha256:8796336c689f5876f31abc301239fcec7b8b417bc3c35faf101d2639baafed60"
+          "row_contract_sha256": "sha256:e3abac7f525f0508ad2403fe37f0091732761a1caebc13dee7adbae11caeaf11"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0057",
@@ -146425,11 +146425,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-b-candidates.json",
-          "file_sha256": "sha256:bd1a4501b759fb5dfc73614f9df962145adf00871141485f1661208f99403bdb"
+          "file_sha256": "sha256:e8ae011c3aa8b09661bfc21dc65ff6fd2515c8323f4d12bf162fb947da4aca6e"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-b-review.json",
-          "file_sha256": "sha256:580daafd5e84401f37df622c7b46cd80319dd032d108f9a895626403569487be",
+          "file_sha256": "sha256:0ea21b54479feb03622ceb8cb6f98e572ef4c15fb75c09e71b89ba0494ede61d",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -153853,8 +153853,8 @@
                     "cics-b-0094-execution-context-1f8692ba936d",
                     "cics-b-0094-execution-context-2a89c8440f8b",
                     "cics-b-0094-execution-context-44bb49efd221",
-                    "cics-b-0094-execution-context-81c1031231d1",
                     "cics-b-0094-execution-context-856997b15998",
+                    "cics-b-0094-execution-context-b2eb32a8fa09",
                     "cics-b-0094-execution-context-b3951fc65b4e",
                     "cics-b-0094-execution-context-d0d44182c82a",
                     "cics-b-0094-execution-context-ee1c0a6f0d29"
@@ -154601,7 +154601,7 @@
               "handler_sha256": "sha256:958c9699200065a60e255be6543ef4d1b4fab38cfd0135248b274268b31a0ee3"
             }
           },
-          "row_contract_sha256": "sha256:5f7b0e4065b674ea1dca763a367eabd009de19234d5e396bb436a9ac269d82c2"
+          "row_contract_sha256": "sha256:a5989061785754fefd182c9fa51c42aa514527b09f84984f45140f63d99d544f"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0095",
@@ -155317,12 +155317,12 @@
                   },
                   "candidate_ids": [
                     "cics-b-0095-execution-context-033a47ba2b3b",
-                    "cics-b-0095-execution-context-2bdafedb7993",
                     "cics-b-0095-execution-context-3810ec68f606",
                     "cics-b-0095-execution-context-7faae58ad8a2",
                     "cics-b-0095-execution-context-99280c2ccc59",
                     "cics-b-0095-execution-context-c6c87bba209f",
                     "cics-b-0095-execution-context-c76a1d89e1d9",
+                    "cics-b-0095-execution-context-e506f52db1bf",
                     "cics-b-0095-execution-context-f7e9b446134e"
                   ]
                 },
@@ -156054,7 +156054,7 @@
               "handler_sha256": "sha256:13597f7ee7a0237e4283626ea46d6305a8904191f1892928b4f25f44738309bc"
             }
           },
-          "row_contract_sha256": "sha256:df564d679824f09ac529add0a4103c3a3ce5e5eb840818cbd3bcf856aa7f9bcd"
+          "row_contract_sha256": "sha256:d754595cc3b27c1ce9ff1e36f215d80eabc560ddd19db4947d5b009f26eaf545"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0096",
@@ -207416,7 +207416,7 @@
                     "cics-b-0138-execution-context-1adc80e86c0e",
                     "cics-b-0138-execution-context-38a6b87f367c",
                     "cics-b-0138-execution-context-40c5b01546c1",
-                    "cics-b-0138-execution-context-454968f113f5",
+                    "cics-b-0138-execution-context-69b18a48e3a6",
                     "cics-b-0138-execution-context-6dd150bbbc51",
                     "cics-b-0138-execution-context-7bba0785c676",
                     "cics-b-0138-execution-context-8f822ae096f4",
@@ -209011,7 +209011,7 @@
               "handler_sha256": "sha256:9076279c437df55f08fec8dccd80baca1cd4981088d15c2dac09ec0743ad0250"
             }
           },
-          "row_contract_sha256": "sha256:5fcd110a9ac2e58eef83a453c9dbe0374651e452b17d5f5d4edc6a102eb09b60"
+          "row_contract_sha256": "sha256:ad651623b21f351d4018108929e477a64ba1a28ce61dfde6284e45a864dd8bf5"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0139",
@@ -274371,11 +274371,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-c-candidates.json",
-          "file_sha256": "sha256:ad41dee8755bbf0322964b7e41040532bce021ce2c5e2115d760fc328856601c"
+          "file_sha256": "sha256:cad6a1c2f7911e6482fb4f6487bf41394350fa66100243fb85d40a55c36be823"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-c-review.json",
-          "file_sha256": "sha256:194fd819c68ac8f6ec8c9e59cc70c684132944b7534412f71e8b786a29565207",
+          "file_sha256": "sha256:40ca81ca8144496d8caedfee3400c329c6d5bd4c1575dd597dfac87cb2c2fb88",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -337923,8 +337923,8 @@
                     "cics-c-0205-execution-context-d835833d13e9",
                     "cics-c-0205-execution-context-dc3f77bac7be",
                     "cics-c-0205-execution-context-dd781f9f942b",
-                    "cics-c-0205-execution-context-f246bd71e6c7",
-                    "cics-c-0205-execution-context-f57354a13fb6"
+                    "cics-c-0205-execution-context-e8b113f9ea76",
+                    "cics-c-0205-execution-context-f246bd71e6c7"
                   ]
                 },
                 {
@@ -339962,7 +339962,7 @@
               "handler_sha256": "sha256:3f04ffdd88e1eaa863b8451cbbf4ca1d283bc6f970323183a871da5ab2f7d304"
             }
           },
-          "row_contract_sha256": "sha256:30559399cfd07b086855d37752095cb8235a7f68cae2723b1ca5de16948e53da"
+          "row_contract_sha256": "sha256:4073a33e604bf279974281da776b51397a154fb20945f512bde85381436b9ff1"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0206",
@@ -402148,13 +402148,13 @@
                     "association": "mapping-edge-source-fragment-and-target-fragment"
                   },
                   "candidate_ids": [
-                    "cics-c-0246-execution-context-02b117f8ad63",
+                    "cics-c-0246-execution-context-361c7e593d8d",
                     "cics-c-0246-execution-context-3c7ccfba2ed1",
                     "cics-c-0246-execution-context-3f71b065ee86",
                     "cics-c-0246-execution-context-45918b8073f1",
-                    "cics-c-0246-execution-context-77c2595f1343",
                     "cics-c-0246-execution-context-8ea1c5b168e8",
                     "cics-c-0246-execution-context-b811bdae31f5",
+                    "cics-c-0246-execution-context-cdb5b4610bf1",
                     "cics-c-0246-execution-context-cf9e424cdea9",
                     "cics-c-0246-execution-context-ef5c6b374ff7",
                     "cics-c-0246-execution-context-f97aa0435adf"
@@ -403789,7 +403789,7 @@
               "handler_sha256": "sha256:9c6504293d13606f1809c30663634125c684d775667c524ccfa92b7a35b9168f"
             }
           },
-          "row_contract_sha256": "sha256:315fd44ead88d59ca5ed6b2c665ed8a556e404cacf48132b00361342a888dd74"
+          "row_contract_sha256": "sha256:c453884e4dbbdde2fac27210bd1022df75a3cf396cf50da3f543af7f37d990e6"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0247",
@@ -405297,10 +405297,10 @@
                   },
                   "candidate_ids": [
                     "cics-c-0247-execution-context-36f6562f2b81",
+                    "cics-c-0247-execution-context-43e459eb42f4",
                     "cics-c-0247-execution-context-50f69fabe478",
                     "cics-c-0247-execution-context-55aec99d3c05",
-                    "cics-c-0247-execution-context-5c745b1aad42",
-                    "cics-c-0247-execution-context-a43ff8d4f7ba",
+                    "cics-c-0247-execution-context-9bc5bd37fa93",
                     "cics-c-0247-execution-context-cad32ffe8b1a"
                   ]
                 },
@@ -406636,7 +406636,7 @@
               "handler_sha256": "sha256:ad4a1d86cb6520297d4bbaac807b19d1ad9884d3e02a7068fd995d13248ca71d"
             }
           },
-          "row_contract_sha256": "sha256:9f602a7a718033169a33af472024fb45c919548d59d7e52ad113af23c5bc8c08"
+          "row_contract_sha256": "sha256:f28be2ed5a67ba165735071ca18ab85fdb690090b8fad3eb60acbd5e4859b73d"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0248",
@@ -423276,12 +423276,12 @@
                     "association": "mapping-edge-source-fragment-and-target-fragment"
                   },
                   "candidate_ids": [
+                    "cics-c-0251-execution-context-273f56fac416",
                     "cics-c-0251-execution-context-2f05a00756ad",
                     "cics-c-0251-execution-context-32dfa935ed2e",
                     "cics-c-0251-execution-context-608c2845f35e",
                     "cics-c-0251-execution-context-6d9a5b42c28f",
-                    "cics-c-0251-execution-context-925f45eb0264",
-                    "cics-c-0251-execution-context-9fee31721e9e"
+                    "cics-c-0251-execution-context-925f45eb0264"
                   ]
                 },
                 {
@@ -424550,7 +424550,7 @@
               "handler_sha256": "sha256:09253f79e9b07e0a910cddd7f7534f6402bea8ba2df1505be66c68f2f6d29c04"
             }
           },
-          "row_contract_sha256": "sha256:d6834c28aa190037fe1ed6f076eec3412848ac30b85ee301a910506b08c7efd0"
+          "row_contract_sha256": "sha256:d08efde7d598af09e0cfef55bc61c7ebc8b09604d552571cfb79d2aeb6038151"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0252",
@@ -447406,5 +447406,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:6616523f9ec4a35e3c41929aed0b0a8b1dc0632bd69cd02263ede2cf212f275f"
+  "contract_sha256": "sha256:ffb3fce8466254c7910fa95d35e014e1a045bd25b6de408b1d86bc706f35e0ac"
 }

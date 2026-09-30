@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Accept the static CICS executable descriptor array in the typed semantic boundary checker (#334)."

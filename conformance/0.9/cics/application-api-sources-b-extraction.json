@@ -14,12 +14,12 @@
     },
     "corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "sha256": "sha256:2363282fe7341e80cafc5693dd8fac9b67025192962a0bc421ff83e734bee162"
+      "sha256": "sha256:3dace7b92117fb9136c4c816282dfc663aa92ada2aa5ec8f5ad26d30aba3d5ed"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "file_sha256": "sha256:8acb506c0e5d6084235d94f5bb015d66c37b7f792a85713bcb3c7d0fb6b563ba",
-      "topic_manifest_sha256": "sha256:f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc"
+      "file_sha256": "sha256:06d0e4229080df35e1810d33525caf3a753f819ff8950cfc943b59a5cab096b5",
+      "topic_manifest_sha256": "sha256:28d3ae10ec38005f1ff93e42303037ebf192efa4136b55b03f20cbf7a1b80498"
     },
     "cache_scope": "cics-application-api-sources-b"
   },
@@ -329,5 +329,5 @@
   "conflict_expectations": [],
   "source_resolutions": [],
   "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
-  "extraction_sha256": "sha256:09cb5e9e3c32096e9673b7c6a2b25d3f7ca2fcfb6cb957e042ce1bca7957f621"
+  "extraction_sha256": "sha256:69ed87f044c4bee973b72d7a8ee042b63b0e338a141482926de3f8c3e808816f"
 }
