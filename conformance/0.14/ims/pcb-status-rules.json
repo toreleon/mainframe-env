@@ -1,0 +1,179 @@
+{
+  "schema_version": "mainframe-env.ims-pcb-status-rules@1",
+  "target_version": "0.14.0",
+  "source_scope": "ims-programming-contracts",
+  "source_topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_imsdbdbpcbmask.htm",
+      "sha256": "699a551e0c2804db26725d0997be3b1f9fdc91379a69f490c8e509d76fcc61b3"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_pcbmaskgsamdb.htm",
+      "sha256": "033ee82b96d160db01409f168a44f9076429bd090e70a49d83585f774755dcd3"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingiopcb.htm",
+      "sha256": "d85982dd9c913de3bd6e387717c5e830e24c795b4dad51347f251a898ff18ced"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingalternatepcb.htm",
+      "sha256": "5cc97ec11a47a33ab39ba7dd3c4cec3b5acbc1b98cdc8a8e2e02cf741c1e35a2"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
+      "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_systemservicecalls.htm",
+      "sha256": "6ca2da6ccfaee04998c9d11306725b7a9d5523270f304aefa08e019fe93ad81c"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_messagecalls.htm",
+      "sha256": "c18deaa4db069bc24064071bb2ca50be736dde1ea8a324ca452d546df58d2955"
+    }
+  ],
+  "execution_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"],
+  "pcb_masks": [
+    {
+      "kind": "database",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_imsdbdbpcbmask.htm",
+        "sha256": "699a551e0c2804db26725d0997be3b1f9fdc91379a69f490c8e509d76fcc61b3"
+      },
+      "allowed_contexts": ["db-dc", "dbctl", "db-batch"],
+      "fields": [
+        {"field": "database-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "segment-level-number", "width": {"fixed": 2}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "status-code", "width": {"fixed": 2}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "processing-options", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "reserved-for-ims", "width": {"fixed": 4}, "semantic_value": "reserved", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "segment-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "key-feedback-length", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "sensitive-segment-count", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]},
+        {"field": "key-feedback-area", "width": {"variable": "key-feedback-area"}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "db-batch"]}
+      ]
+    },
+    {
+      "kind": "gsam",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_pcbmaskgsamdb.htm",
+        "sha256": "033ee82b96d160db01409f168a44f9076429bd090e70a49d83585f774755dcd3"
+      },
+      "allowed_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"],
+      "fields": [
+        {"field": "database-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "segment-level-number", "width": {"fixed": 2}, "semantic_value": "unused", "applicable_contexts": []},
+        {"field": "status-code", "width": {"fixed": 2}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "processing-options", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "reserved-for-ims", "width": {"fixed": 4}, "semantic_value": "reserved", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "segment-name", "width": {"fixed": 8}, "semantic_value": "unused", "applicable_contexts": []},
+        {"field": "key-feedback-and-undefined-length", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "sensitive-segment-count", "width": {"fixed": 4}, "semantic_value": "unused", "applicable_contexts": []},
+        {"field": "record-search-argument", "width": {"one_of": [8, 12]}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "undefined-record-length", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]}
+      ]
+    },
+    {
+      "kind": "io",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingiopcb.htm",
+        "sha256": "d85982dd9c913de3bd6e387717c5e830e24c795b4dad51347f251a898ff18ced"
+      },
+      "allowed_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"],
+      "fields": [
+        {"field": "logical-terminal-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "reserved-for-ims", "width": {"fixed": 2}, "semantic_value": "reserved", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "status-code", "width": {"fixed": 2}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]},
+        {"field": "local-date", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "local-time", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "input-message-sequence-number", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "message-output-descriptor-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "user-id", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "group-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "extended-date", "width": {"fixed": 4}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "extended-time", "width": {"fixed": 6}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "utc-offset", "width": {"fixed": 2}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "user-id-indicator", "width": {"fixed": 1}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "reserved-extension", "width": {"fixed": 3}, "semantic_value": "reserved", "applicable_contexts": []}
+      ]
+    },
+    {
+      "kind": "alternate",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingalternatepcb.htm",
+        "sha256": "5cc97ec11a47a33ab39ba7dd3c4cec3b5acbc1b98cdc8a8e2e02cf741c1e35a2"
+      },
+      "allowed_contexts": ["db-dc", "dcctl"],
+      "fields": [
+        {"field": "logical-terminal-name", "width": {"fixed": 8}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "reserved-for-ims", "width": {"fixed": 2}, "semantic_value": "reserved", "applicable_contexts": ["db-dc", "dcctl"]},
+        {"field": "status-code", "width": {"fixed": 2}, "semantic_value": "application", "applicable_contexts": ["db-dc", "dcctl"]}
+      ]
+    }
+  ],
+  "status_categories": [
+    "exceptional-valid-completed",
+    "warning-with-data-completed",
+    "warning-no-data-completed",
+    "improper-user-specification",
+    "system-io-security-error",
+    "unavailable-data",
+    "lock-timeout"
+  ],
+  "status_contexts": [
+    {
+      "context": "database",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
+        "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f"
+      },
+      "pcb_kinds": ["database", "gsam"],
+      "status_count": 87,
+      "category_groups": [
+        {"category": "exceptional-valid-completed", "codes": ["GB", "GD", "GE", "L2", "LB", "LS", "NI", "UC", "US", "UX", "  "]},
+        {"category": "warning-with-data-completed", "codes": ["FW", "GA", "GK"]},
+        {"category": "warning-no-data-completed", "codes": ["FD", "FF", "FH", "FS", "FV", "GC", "II", "NE"]},
+        {"category": "improper-user-specification", "codes": ["AB", "AC", "AD", "AF", "AG", "AH", "AJ", "AK", "AM", "AT", "AU", "DA", "DE", "DJ", "DX", "FA", "FC", "FE", "FG", "FI", "FM", "FN", "FP", "FT", "FY", "GL", "GP", "IX", "LC", "LD", "LE", "LF", "RX", "SD", "SF", "TH", "TI", "TO", "TP", "TR", "V1", "V2", "V3", "V4", "V5", "V6"]},
+        {"category": "system-io-security-error", "codes": ["AI", "AO", "FR", "GG", "NO", "TY", "TZ", "XX"]},
+        {"category": "unavailable-data", "codes": ["BA", "BB", "BC", "FD", "NA", "NU"]},
+        {"category": "lock-timeout", "codes": ["BD"]}
+      ],
+      "uncategorized_codes": ["EM", "FX", "HT", "OS", "RR"]
+    },
+    {
+      "context": "system-service",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_systemservicecalls.htm",
+        "sha256": "6ca2da6ccfaee04998c9d11306725b7a9d5523270f304aefa08e019fe93ad81c"
+      },
+      "pcb_kinds": ["io"],
+      "status_count": 50,
+      "category_groups": [
+        {"category": "exceptional-valid-completed", "codes": ["GE", "XD", "  "]},
+        {"category": "warning-with-data-completed", "codes": ["GA"]},
+        {"category": "warning-no-data-completed", "codes": ["FD", "FF", "FH", "FS", "FV", "QC"]},
+        {"category": "improper-user-specification", "codes": ["AB", "AC", "AD", "AG", "AJ", "AL", "AP", "AQ", "AT", "BE", "BF", "BG", "FA", "FI", "GL", "NL", "QE", "QF", "RA", "RC", "SB", "TC", "TL", "TP", "TR", "V2", "V7"]},
+        {"category": "system-io-security-error", "codes": ["SA", "SC", "SY", "TA", "TE", "TJ", "TN", "TY", "TZ"]},
+        {"category": "unavailable-data", "codes": ["BJ", "BK", "NA", "NU"]}
+      ],
+      "uncategorized_codes": []
+    },
+    {
+      "context": "message",
+      "source_topic": {
+        "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_messagecalls.htm",
+        "sha256": "c18deaa4db069bc24064071bb2ca50be736dde1ea8a324ca452d546df58d2955"
+      },
+      "pcb_kinds": ["io", "alternate"],
+      "status_count": 68,
+      "category_groups": [
+        {"category": "exceptional-valid-completed", "codes": ["  "]},
+        {"category": "warning-with-data-completed", "codes": ["CC", "CE", "CF", "CG", "CI", "CJ", "CK", "CL"]},
+        {"category": "warning-no-data-completed", "codes": ["CM", "FF", "FH", "FS", "FV", "QC", "QD"]},
+        {"category": "improper-user-specification", "codes": ["AA", "AB", "AD", "AH", "AJ", "AL", "AP", "AR", "AS", "AT", "AY", "AZ", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "CA", "CB", "CD", "CN", "E1", "E2", "E3", "FI", "MR", "QE", "QF", "QH", "TG", "TP", "XA", "XB", "XC", "XE", "XF", "XG", "X2", "X3", "X4", "X5", "X6", "X7", "X9"]},
+        {"category": "system-io-security-error", "codes": ["AX", "CH", "TY", "TZ"]}
+      ],
+      "uncategorized_codes": []
+    }
+  ]
+}

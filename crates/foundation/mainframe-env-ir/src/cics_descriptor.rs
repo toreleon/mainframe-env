@@ -78,7 +78,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 231);
+        assert_eq!(typed.len(), 260);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -96,7 +96,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 32);
+        assert_eq!(unready.len(), 3);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -145,6 +145,14 @@ mod tests {
 
     #[test]
     fn application_registry_exposes_option_shapes_constraints_and_source_heads() {
+        for label in [
+            &["GDS", "ISSUE", "CONFIRMATION"][..],
+            &["GDS", "ISSUE", "ERROR"][..],
+        ] {
+            let row = cics_application_registry_for_tokens(label).expect("GDS ISSUE row");
+            assert_eq!(row.readiness, CicsApplicationHandlerReadiness::TypedRuntime);
+            assert!(row.advertised);
+        }
         let read = CICS_APPLICATION_REGISTRY
             .iter()
             .find(|descriptor| descriptor.label_tokens == ["READ"])
@@ -297,6 +305,33 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::BtsEndBrowseContainer,
+                CicsPlanOperation::BtsGetNextContainer,
+                CicsPlanOperation::BtsInquireContainer,
+                CicsPlanOperation::BtsStartBrowseContainer,
+                CicsPlanOperation::BtsEndBrowseEvent,
+                CicsPlanOperation::BtsGetNextEvent,
+                CicsPlanOperation::BtsInquireEvent,
+                CicsPlanOperation::BtsStartBrowseEvent,
+                CicsPlanOperation::BtsEndBrowseTimer,
+                CicsPlanOperation::BtsInquireTimer,
+                CicsPlanOperation::BtsStartBrowseTimer,
+                CicsPlanOperation::BtsStartBrowseActivity,
+                CicsPlanOperation::BtsGetNextActivity,
+                CicsPlanOperation::BtsEndBrowseActivity,
+                CicsPlanOperation::BtsInquireActivity,
+                CicsPlanOperation::BtsStartBrowseProcess,
+                CicsPlanOperation::BtsGetNextProcess,
+                CicsPlanOperation::BtsEndBrowseProcess,
+                CicsPlanOperation::BtsInquireProcess,
+                CicsPlanOperation::DeleteChannel,
+                CicsPlanOperation::DeleteContainer,
+                CicsPlanOperation::GetContainer,
+                CicsPlanOperation::GetContainer64,
+                CicsPlanOperation::MoveContainer,
+                CicsPlanOperation::PutContainer,
+                CicsPlanOperation::PutContainer64,
+                CicsPlanOperation::QueryChannel,
                 CicsPlanOperation::AcquireActivityId,
                 CicsPlanOperation::AcquireProcess,
                 CicsPlanOperation::CancelAcqActivity,

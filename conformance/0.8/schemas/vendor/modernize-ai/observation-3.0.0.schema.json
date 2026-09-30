@@ -1,0 +1,9 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.modernize.ai/observation/3.0.0",
+  "title":"Observation 3.0.0 (P5 runtime)","type":"object","additionalProperties":false,
+  "required":["observationVersion","provenance","fileOutputs","dbMutations","spoolStreams","eventPlaceholders","termination","timing","resources","runtimeTrace","faultBoundary","faultPhase","runtimeChannels"],
+  "properties": {
+    "observationVersion":{"const":"3.0.0"},"provenance":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/runtimeProvenance"},
+    "fileOutputs":{"type":"array","items":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/fileOutput"}},"dbMutations":{"type":"array","items":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/dbMutation"}},"spoolStreams":{"type":"array","items":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/spoolStream"}},"eventPlaceholders":{"type":"array","items":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/eventPlaceholder"}},"termination":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/terminationInfo"},"timing":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/timingEnvelope"},"resources":{"$ref":"https://schemas.modernize.ai/p4-common/1.0.0#/$defs/resourceEnvelope"},"runtimeTrace":{"type":"array","items":{"$ref":"https://schemas.modernize.ai/p5-common/1.0.0#/$defs/runtimeTraceRecord"}},"faultBoundary":{"type":["string","null"],"minLength":1},"faultPhase":{"type":["string","null"],"minLength":1},"runtimeChannels":{"type":"object","additionalProperties":false,"required":["jobSteps","checkpoints","transactions","idempotency"],"properties":{"jobSteps":{"enum":["observed","not-observed"]},"checkpoints":{"enum":["observed","not-observed"]},"transactions":{"enum":["observed","not-observed"]},"idempotency":{"enum":["observed","not-observed"]}}}
+  }
+}

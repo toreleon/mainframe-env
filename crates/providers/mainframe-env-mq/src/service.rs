@@ -14,6 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::host_context::reject_host_owned_syncpoint;
+use crate::message::canonical_message_id;
+use crate::object::{canonical_definition, canonical_name as normalize, is_canonical_name};
 use crate::retention::{
     MqReplayOwnerKind, mq_pending_replay_matches, prepare_mq_replay, resolve_mq_replay,
     validate_mq_recorded_result,
@@ -276,6 +279,8 @@ impl MqService {
         &self,
         definitions: Vec<MqQueueDefinition>,
     ) -> Result<MqInstallReceipt, HostProblem> {
+        let definitions = (definitions.into_iter().map(canonical_definition))
+            .collect::<Result<Vec<_>, HostProblem>>()?;
         validate_definitions(&definitions, self.limits)?;
         let identity = format!(
             "sha256:{:x}",
@@ -293,12 +298,9 @@ impl MqService {
         let mut next = durable.state.scoped_snapshot();
         for definition in &definitions {
             next.queues.insert(
-                normalize(&definition.name),
+                definition.name.clone(),
                 Arc::new(Queue {
-                    trigger_program: definition
-                        .trigger_program
-                        .as_ref()
-                        .map(|value| normalize(value)),
+                    trigger_program: definition.trigger_program.clone(),
                     messages: Vec::new(),
                 }),
             );
@@ -324,6 +326,12 @@ impl MqService {
     ) -> Result<MqResult, HostProblem> {
         if resolution_lower_bound == 0 {
             return Err(HostProblem::Malformed);
+        }
+        if let Some(queue) = request.queue.as_deref() {
+            normalize(queue)?;
+        }
+        if let Some(rejection) = reject_host_owned_syncpoint(invocation, request)? {
+            return Ok(rejection);
         }
         let mut durable = self.lock()?;
         refresh_replay(&*self.store, self.limits, &mut durable)?;
@@ -477,19 +485,21 @@ impl MqService {
     }
 
     pub fn queue_depth(&self, queue: &str) -> Result<usize, HostProblem> {
+        let queue = normalize(queue)?;
         self.lock()?
             .state
             .queues
-            .get(&normalize(queue))
+            .get(&queue)
             .map(|queue| queue.messages.len())
             .ok_or(HostProblem::NotFound)
     }
 
     pub fn queue_messages(&self, queue: &str) -> Result<Vec<Vec<u8>>, HostProblem> {
+        let queue = normalize(queue)?;
         self.lock()?
             .state
             .queues
-            .get(&normalize(queue))
+            .get(&queue)
             .map(|queue| {
                 queue
                     .messages
@@ -933,7 +943,7 @@ fn open(
     request: &MqRequest,
     limits: MqLimits,
 ) -> Result<MqResult, HostProblem> {
-    let queue = normalize(request.queue.as_deref().ok_or(HostProblem::Malformed)?);
+    let queue = normalize(request.queue.as_deref().ok_or(HostProblem::Malformed)?)?;
     if !state.queues.contains_key(&queue) {
         return Ok(condition(2, 2085));
     }
@@ -1027,16 +1037,6 @@ fn put(
     })
 }
 
-fn canonical_message_id(run: &str, request: &MqRequest) -> Result<Vec<u8>, HostProblem> {
-    let request_digest = canonical_mq_request_digest(request)?;
-    let mut digest = Sha256::new();
-    digest.update(b"mainframe-env.mq-message-id@1\0");
-    digest.update(u64::try_from(run.len()).unwrap_or(u64::MAX).to_be_bytes());
-    digest.update(run.as_bytes());
-    digest.update(request_digest);
-    Ok(digest.finalize()[..24].to_vec())
-}
-
 fn get(state: &mut State, run: &str, request: &MqRequest) -> Result<MqResult, HostProblem> {
     let queue_name = resolve_queue(state, run, request)?;
     let queue = state
@@ -1109,7 +1109,7 @@ fn rollback(state: &mut State, run: &str, limits: MqLimits) -> Result<MqResult, 
 
 fn resolve_queue(state: &State, run: &str, request: &MqRequest) -> Result<String, HostProblem> {
     if let Some(queue) = &request.queue {
-        return Ok(normalize(queue));
+        return normalize(queue);
     }
     let handle = request.handle.ok_or(HostProblem::Malformed)?;
     state
@@ -1166,15 +1166,14 @@ fn validate_definitions(
     let names = definitions
         .iter()
         .map(|definition| normalize(&definition.name))
-        .collect::<BTreeSet<_>>();
+        .collect::<Result<BTreeSet<_>, _>>()?;
     if names.len() != definitions.len()
         || definitions.iter().any(|definition| {
-            definition.name.is_empty()
-                || definition.name.len() > 128
+            !is_canonical_name(&definition.name)
                 || definition
                     .trigger_program
                     .as_ref()
-                    .is_some_and(|program| program.is_empty() || program.len() > 128)
+                    .is_some_and(|program| !is_canonical_name(program))
         })
     {
         Err(HostProblem::Malformed)
@@ -1216,6 +1215,7 @@ fn validate_state(state: &State, limits: MqLimits) -> Result<(), HostProblem> {
         return Err(HostProblem::ResourceExhausted);
     }
     if state.next_handle == 0
+        || !state.queues.keys().all(|name| is_canonical_name(name))
         || state
             .handles
             .values()
@@ -1231,23 +1231,18 @@ fn validate_state(state: &State, limits: MqLimits) -> Result<(), HostProblem> {
     }
     match &state.definitions {
         Some(definitions) => {
-            validate_definitions(definitions, limits)?;
+            validate_definitions(definitions, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
             let defined = definitions
                 .iter()
-                .map(|definition| normalize(&definition.name))
+                .map(|definition| definition.name.clone())
                 .collect::<BTreeSet<_>>();
             if defined != state.queues.keys().cloned().collect()
                 || definitions.iter().any(|definition| {
                     state
                         .queues
-                        .get(&normalize(&definition.name))
-                        .is_none_or(|queue| {
-                            queue.trigger_program
-                                != definition
-                                    .trigger_program
-                                    .as_ref()
-                                    .map(|program| normalize(program))
-                        })
+                        .get(&definition.name)
+                        .is_none_or(|queue| queue.trigger_program != definition.trigger_program)
                 })
             {
                 return Err(HostProblem::InfrastructureFailure);
@@ -1273,10 +1268,6 @@ fn valid_message(message: &Message, limits: MqLimits) -> bool {
 
 fn request_digest(request: &MqRequest) -> Result<[u8; 32], HostProblem> {
     canonical_mq_request_digest(request)
-}
-
-fn normalize(value: &str) -> String {
-    value.trim().to_ascii_uppercase()
 }
 
 fn store_error(problem: StoreError) -> HostProblem {
@@ -1342,8 +1333,8 @@ pub fn mq_providers(
 mod tests {
     use super::*;
     use mainframe_env_execution_api::{
-        ArtifactRef, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
-        ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+        ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Principal, PrincipalId,
+        RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::Mutation;
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
@@ -1509,6 +1500,303 @@ mod tests {
                 transaction: Some("MQ-TEST".into()),
             }),
         }
+    }
+
+    #[test]
+    fn lowercase_queue_names_are_preserved_and_distinct() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store.clone(), Default::default()).unwrap();
+        service
+            .install(vec![
+                MqQueueDefinition {
+                    name: "queue".into(),
+                    trigger_program: None,
+                },
+                MqQueueDefinition {
+                    name: "QUEUE".into(),
+                    trigger_program: None,
+                },
+            ])
+            .unwrap();
+        let mut put = request(MqOperation::PutOne, 1);
+        put.queue = Some("queue".into());
+        put.message = b"lowercase".to_vec();
+        service.execute(&invocation("case-distinct"), &put).unwrap();
+        assert_eq!(service.queue_depth("queue"), Ok(1));
+        assert_eq!(service.queue_depth("QUEUE"), Ok(0));
+        drop(service);
+        let reopened = MqService::open(store, Default::default()).unwrap();
+        assert_eq!(
+            reopened.queue_messages("queue"),
+            Ok(vec![b"lowercase".to_vec()])
+        );
+        assert_eq!(reopened.queue_depth("QUEUE"), Ok(0));
+    }
+
+    #[test]
+    fn leading_blank_queue_name_is_rejected_before_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store.clone(), Default::default()).unwrap();
+        assert_eq!(
+            service.install(vec![MqQueueDefinition {
+                name: " queue".into(),
+                trigger_program: None,
+            }]),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .list_provider_state(QUEUE_NAMESPACE, 2)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            service.install(vec![MqQueueDefinition {
+                name: "queue".into(),
+                trigger_program: Some(" bad".into()),
+            }]),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .list_provider_state(QUEUE_NAMESPACE, 2)
+                .unwrap()
+                .is_empty()
+        );
+        service
+            .install(vec![MqQueueDefinition {
+                name: "queue".into(),
+                trigger_program: Some("trigger".into()),
+            }])
+            .unwrap();
+        let mut open = request(MqOperation::Open, 1);
+        open.queue = Some(" queue".into());
+        assert_eq!(
+            service.execute(&invocation("leading-blank"), &open),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .list_provider_state(REPLAY_NAMESPACE, 2)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(service.queue_depth("queue"), Ok(0));
+    }
+
+    #[test]
+    fn trailing_blank_and_null_queue_names_use_canonical_identity() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store.clone(), Default::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "queue   ".into(),
+                trigger_program: Some("trigger\0padding".into()),
+            }])
+            .unwrap();
+        let mut put = request(MqOperation::PutOne, 1);
+        put.queue = Some("queue\0padding".into());
+        put.message = b"canonical".to_vec();
+        service
+            .execute(&invocation("canonical-name"), &put)
+            .unwrap();
+        drop(service);
+        let reopened = MqService::open(store, Default::default()).unwrap();
+        assert_eq!(
+            reopened.queue_messages("queue"),
+            Ok(vec![b"canonical".to_vec()])
+        );
+    }
+
+    fn cics_invocation(run: &str) -> Invocation {
+        let mut invocation = invocation(run);
+        let (binding, schema) = crate::host_context::cics_execution_context_contract();
+        invocation.bindings.insert(
+            binding.into(),
+            BoundedPayload::new(schema, b"local".to_vec(), InvocationLimits::default()).unwrap(),
+        );
+        invocation
+    }
+
+    fn cics_coordinator_invocation(run: &str, key: &IdempotencyKey, outer: &str) -> Invocation {
+        let mut invocation = cics_invocation(run);
+        invocation.bindings.insert(
+            crate::retention::CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                crate::retention::CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                key.as_str().as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        invocation.bindings.insert(
+            crate::retention::CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                crate::retention::CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+                outer.as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        invocation
+    }
+
+    fn cics_coordinator_request(operation: MqOperation, run: &str, sequence: u64) -> MqRequest {
+        let mut request = request(operation, sequence);
+        request.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("cics:{run}:{sequence}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        request
+    }
+
+    #[test]
+    fn cics_direct_commit_and_backout_are_rejected_but_host_syncpoint_can_coordinate() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store, Default::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "CICS.SYNC.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let run = "cics-syncpoint-owner";
+
+        let mut first_put = request(MqOperation::PutOne, 1);
+        first_put.queue = Some("CICS.SYNC.Q".into());
+        first_put.message = b"COMMIT".to_vec();
+        first_put.options = 2;
+        service.execute(&invocation(run), &first_put).unwrap();
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(0));
+
+        let direct_commit = request(MqOperation::Commit, 2);
+        let rejected = service
+            .execute(&cics_invocation(run), &direct_commit)
+            .unwrap();
+        assert_eq!((rejected.completion_code, rejected.reason_code), (2, 2012));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(0));
+
+        let coordinated_commit = cics_coordinator_request(MqOperation::Commit, run, 3);
+        let commit_key = coordinated_commit
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .clone();
+        let committed = service
+            .execute(
+                &cics_coordinator_invocation(run, &commit_key, "outer-cics-commit"),
+                &coordinated_commit,
+            )
+            .unwrap();
+        assert_eq!((committed.completion_code, committed.reason_code), (0, 0));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(1));
+
+        let mut second_put = request(MqOperation::PutOne, 4);
+        second_put.queue = Some("CICS.SYNC.Q".into());
+        second_put.message = b"ROLLBACK".to_vec();
+        second_put.options = 2;
+        service.execute(&invocation(run), &second_put).unwrap();
+
+        let direct_backout = request(MqOperation::Rollback, 5);
+        let rejected = service
+            .execute(&cics_invocation(run), &direct_backout)
+            .unwrap();
+        assert_eq!((rejected.completion_code, rejected.reason_code), (2, 2012));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(1));
+
+        let coordinated_backout = cics_coordinator_request(MqOperation::Rollback, run, 6);
+        let backout_key = coordinated_backout
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .clone();
+        let backed_out = service
+            .execute(
+                &cics_coordinator_invocation(run, &backout_key, "outer-cics-backout"),
+                &coordinated_backout,
+            )
+            .unwrap();
+        assert_eq!((backed_out.completion_code, backed_out.reason_code), (0, 0));
+        assert_eq!(service.queue_depth("CICS.SYNC.Q"), Ok(1));
+    }
+
+    #[test]
+    fn malformed_or_partial_cics_syncpoint_provenance_fails_closed() {
+        let service = MqService::open(
+            Arc::new(MemoryStore::new(Default::default())),
+            Default::default(),
+        )
+        .unwrap();
+        let request = request(MqOperation::Commit, 10);
+        let mut malformed = invocation("malformed-cics-context");
+        let (binding, schema) = crate::host_context::cics_execution_context_contract();
+        malformed.bindings.insert(
+            binding.into(),
+            BoundedPayload::new(schema, b"unknown".to_vec(), InvocationLimits::default()).unwrap(),
+        );
+        assert_eq!(
+            service.execute(&malformed, &request),
+            Err(HostProblem::Malformed)
+        );
+
+        let mut partial = cics_invocation("partial-cics-context");
+        partial.bindings.insert(
+            crate::retention::CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                crate::retention::CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                b"cics:partial-cics-context:10".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            service.execute(&partial, &request),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn cics_nested_owner_mismatch_preserves_pending_work() {
+        let service = MqService::open(
+            Arc::new(MemoryStore::new(Default::default())),
+            Default::default(),
+        )
+        .unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "CICS.OWNER.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let run = "cics-owner-mismatch";
+        let mut put = request(MqOperation::PutOne, 1);
+        put.queue = Some("CICS.OWNER.Q".into());
+        put.message = b"pending".to_vec();
+        put.options = 2;
+        service.execute(&invocation(run), &put).unwrap();
+
+        let commit = cics_coordinator_request(MqOperation::Commit, run, 2);
+        let wrong_key =
+            IdempotencyKey::new("cics:other-run:2", InvocationLimits::default()).unwrap();
+        let wrong_owner = cics_coordinator_invocation(run, &wrong_key, "outer-cics-commit");
+        assert_eq!(
+            service.execute(&wrong_owner, &commit),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(service.queue_depth("CICS.OWNER.Q"), Ok(0));
+
+        let key = commit.mutation.as_ref().unwrap().idempotency_key.clone();
+        let accepted = service
+            .execute(
+                &cics_coordinator_invocation(run, &key, "outer-cics-commit"),
+                &commit,
+            )
+            .unwrap();
+        assert_eq!((accepted.completion_code, accepted.reason_code), (0, 0));
+        assert_eq!(service.queue_depth("CICS.OWNER.Q"), Ok(1));
     }
 
     fn retain_as_legacy_replay(

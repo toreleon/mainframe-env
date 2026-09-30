@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Floating currency and sign editing now includes embedded and immediately following simple-insertion symbols in the floating string (#369)."

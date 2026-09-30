@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Profile intake reads source, copybooks and licence bytes from the pinned Git tree; symlinks and gitlinks fail closed, and local replacement objects are ignored."

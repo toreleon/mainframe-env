@@ -48,12 +48,22 @@ impl<'a> BtsLifecycleStore<'a> {
         validate_identifier(run_unit, 256)?;
         validate_identifier(owner_execution, 256)?;
         validate_identifier(owner_principal, 256)?;
-        if let Some(context) = self.load_context_row(run_unit)? {
-            if context.owner_execution != owner_execution
-                || context.owner_principal != owner_principal
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
+        let context = self.load_context_row(run_unit)?;
+        let acquisition = self.load_acquisition(run_unit)?;
+        if let Some(context) = &context
+            && (context.owner_execution != owner_execution
+                || context.owner_principal != owner_principal)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        if let Some(acquisition) = &acquisition
+            && (acquisition.owner_execution != owner_execution
+                || acquisition.owner_principal != owner_principal)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        super::super::bts_container::settle_bts_container_uow(self.store, run_unit, commit)?;
+        if let Some(context) = context {
             self.finish_child_uow(
                 &context.process_type,
                 &context.process_name,
@@ -61,23 +71,18 @@ impl<'a> BtsLifecycleStore<'a> {
                 commit,
             )?;
         }
-        if let Some(acquisition) = self.load_acquisition(run_unit)? {
-            if acquisition.owner_execution != owner_execution
-                || acquisition.owner_principal != owner_principal
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            if acquisition.is_held() {
-                self.finish_uow(run_unit, owner_execution, owner_principal, commit)
-                    .map_err(|problem| match problem {
-                        HostProblem::Condition {
-                            name,
-                            response: 108,
-                            response2: 2,
-                        } if commit && name == "PROCESSERR" => HostProblem::UnknownOutcome,
-                        other => other,
-                    })?;
-            }
+        if let Some(acquisition) = acquisition
+            && acquisition.is_held()
+        {
+            self.finish_uow(run_unit, owner_execution, owner_principal, commit)
+                .map_err(|problem| match problem {
+                    HostProblem::Condition {
+                        name,
+                        response: 108,
+                        response2: 2,
+                    } if commit && name == "PROCESSERR" => HostProblem::UnknownOutcome,
+                    other => other,
+                })?;
         }
         Ok(())
     }

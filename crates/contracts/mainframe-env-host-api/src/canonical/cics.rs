@@ -5,6 +5,29 @@ use super::*;
 impl Canonical for CicsOperation {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
+            Self::BtsEndBrowseContainer => out.variant("CicsOperation", "BtsEndBrowseContainer", 0),
+            Self::BtsGetNextContainer => out.variant("CicsOperation", "BtsGetNextContainer", 0),
+            Self::BtsInquireContainer => out.variant("CicsOperation", "BtsInquireContainer", 0),
+            Self::BtsStartBrowseContainer => {
+                out.variant("CicsOperation", "BtsStartBrowseContainer", 0)
+            }
+            Self::BtsEndBrowseEvent => out.variant("CicsOperation", "BtsEndBrowseEvent", 0),
+            Self::BtsGetNextEvent => out.variant("CicsOperation", "BtsGetNextEvent", 0),
+            Self::BtsInquireEvent => out.variant("CicsOperation", "BtsInquireEvent", 0),
+            Self::BtsStartBrowseEvent => out.variant("CicsOperation", "BtsStartBrowseEvent", 0),
+            Self::BtsEndBrowseTimer => out.variant("CicsOperation", "BtsEndBrowseTimer", 0),
+            Self::BtsInquireTimer => out.variant("CicsOperation", "BtsInquireTimer", 0),
+            Self::BtsStartBrowseTimer => out.variant("CicsOperation", "BtsStartBrowseTimer", 0),
+            Self::BtsStartBrowseActivity => {
+                out.variant("CicsOperation", "BtsStartBrowseActivity", 0)
+            }
+            Self::BtsGetNextActivity => out.variant("CicsOperation", "BtsGetNextActivity", 0),
+            Self::BtsEndBrowseActivity => out.variant("CicsOperation", "BtsEndBrowseActivity", 0),
+            Self::BtsInquireActivity => out.variant("CicsOperation", "BtsInquireActivity", 0),
+            Self::BtsStartBrowseProcess => out.variant("CicsOperation", "BtsStartBrowseProcess", 0),
+            Self::BtsGetNextProcess => out.variant("CicsOperation", "BtsGetNextProcess", 0),
+            Self::BtsEndBrowseProcess => out.variant("CicsOperation", "BtsEndBrowseProcess", 0),
+            Self::BtsInquireProcess => out.variant("CicsOperation", "BtsInquireProcess", 0),
             Self::AcquireActivityId => out.variant("CicsOperation", "AcquireActivityId", 0),
             Self::AcquireProcess => out.variant("CicsOperation", "AcquireProcess", 0),
             Self::CancelAcqActivity => out.variant("CicsOperation", "CancelAcqActivity", 0),
@@ -25,6 +48,14 @@ impl Canonical for CicsOperation {
             Self::RunAcqProcess => out.variant("CicsOperation", "RunAcqProcess", 0),
             Self::RunActivity => out.variant("CicsOperation", "RunActivity", 0),
             Self::RunTransId => out.variant("CicsOperation", "RunTransId", 0),
+            Self::DeleteChannel => out.variant("CicsOperation", "DeleteChannel", 0),
+            Self::DeleteContainer => out.variant("CicsOperation", "DeleteContainer", 0),
+            Self::GetContainer => out.variant("CicsOperation", "GetContainer", 0),
+            Self::GetContainer64 => out.variant("CicsOperation", "GetContainer64", 0),
+            Self::MoveContainer => out.variant("CicsOperation", "MoveContainer", 0),
+            Self::PutContainer => out.variant("CicsOperation", "PutContainer", 0),
+            Self::PutContainer64 => out.variant("CicsOperation", "PutContainer64", 0),
+            Self::QueryChannel => out.variant("CicsOperation", "QueryChannel", 0),
             Self::SuspendAcqActivity => out.variant("CicsOperation", "SuspendAcqActivity", 0),
             Self::SuspendAcqProcess => out.variant("CicsOperation", "SuspendAcqProcess", 0),
             Self::SuspendActivity => out.variant("CicsOperation", "SuspendActivity", 0),

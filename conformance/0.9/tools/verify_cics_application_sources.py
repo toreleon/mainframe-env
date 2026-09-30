@@ -136,6 +136,15 @@ CONTEXT_SELECTORS = frozenset(
         "traceid-dfhcmp-compatibility",
         "source-resolution-context",
         "global-response-codes",
+        "gds-send-response-contract",
+        "appc-basic-state-transitions",
+        "appc-basic-state-transitions-sl0",
+        "appc-basic-state-transitions-sl1",
+        "appc-basic-state-transitions-sl2",
+        "appc-mapped-state-transitions",
+        "appc-mapped-state-transitions-sl0",
+        "appc-mapped-state-transitions-sl1",
+        "appc-mapped-state-transitions-sl2",
     }
 )
 
@@ -897,7 +906,46 @@ def load_supplements(
         b"mainframe-env.cics-source-supplement-identity@1\0"
         + "".join(sorted(identity_lines)).encode("utf-8")
     )
-    if capture.get("identity_sha256") != identity:
+    repin = receipt.get("repin")
+    if repin is not None:
+        if not isinstance(repin, dict) or repin.get("historical_receipt_path") != (
+            "conformance/0.9/cics/application-api-sources-a-supplements-2026-09-10.json"
+        ):
+            raise VerificationError("supplement repin history path differs")
+        historical_path = root / repin["historical_receipt_path"]
+        historical = read_object(historical_path)
+        if (
+            repin.get("historical_receipt_sha256") != file_sha256(historical_path)
+            or historical.get("capture") != capture
+            or not isinstance(historical.get("topics"), list)
+        ):
+            raise VerificationError("supplement historical capture differs")
+        old_lines = sorted(
+            f"{row['topic_path']} {row['bytes']} {row['sha256']}\n"
+            for row in historical["topics"]
+        )
+        old_identity = "sha256:" + sha256_bytes(
+            b"mainframe-env.cics-source-supplement-identity@1\0"
+            + "".join(old_lines).encode("utf-8")
+        )
+        changed = [
+            (old, new)
+            for old, new in zip(historical["topics"], raw_topics)
+            if old != new
+        ]
+        if (
+            capture.get("identity_sha256") != old_identity
+            or len(changed) != 1
+            or changed[0][0].get("topic_path") != repin.get("topic_path")
+            or changed[0][1].get("topic_path") != repin.get("topic_path")
+            or changed[0][1].get("sha256") != repin.get("topic_sha256")
+            or changed[0][1].get("bytes") != repin.get("topic_bytes")
+            or repin.get("issue") != 173
+            or repin.get("verified_on") != "2026-09-28"
+            or repin.get("verification_method") != "user-chrome-browser-control"
+        ):
+            raise VerificationError("supplement repin identity differs")
+    elif capture.get("identity_sha256") != identity:
         raise VerificationError("supplement capture identity digest differs")
     return topics, entries
 
@@ -2658,6 +2706,42 @@ def candidate_category(
             if "applicability" in value:
                 return "mismatch", "unexpected-context-applicability"
             return "verified", "global-context-binding"
+        if (selector == "gds-send-response-contract"
+            or selector.startswith("appc-basic-state-transitions")
+            or selector.startswith("appc-mapped-state-transitions")):
+            contract = next(
+                (
+                    item for item in snapshot.plan.get("manual_context_selectors", [])
+                    if item.get("id") == selector
+                ),
+                None,
+            )
+            evidence = candidate["evidence"]
+            topic = snapshot.topics[str(evidence["topic_path"])]
+            node = resolve_path(topic.document, str(evidence["structural_path"]))
+            fragments = (contract or {}).get("fragment_selectors", [])
+            selected = any(
+                node.tag == fragment["tag"]
+                and (
+                    node.attrs.get("id") == fragment.get("id")
+                    if "id" in fragment else any(
+                        child.tag == "h2"
+                        and child.attrs.get("id") == fragment.get("heading_id")
+                        for child in node.children
+                    )
+                )
+                for fragment in fragments
+            )
+            if (
+                contract is None
+                or row["official_row"] not in contract["applies_to"]["official_rows"]
+                or evidence["topic_path"] != contract["topic_path"]
+                or value.get("association") != "row-specific-context"
+                or "applicability" in value
+                or not selected
+            ):
+                return "mismatch", "row-specific-context-escaped-boundary"
+            return "verified", "independent-row-specific-context"
         if selector == "mapped-inline-execution-context":
             direct = {
                 source["topic_path"] for source in row.get("topics", []) if isinstance(source, dict)

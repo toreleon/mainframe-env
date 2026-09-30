@@ -697,6 +697,38 @@ amendment. Generated descriptors never contain behavior, and handler modules
 are never generator-owned. [ADR-0010](../decisions/0010-rust-module-review-budgets.md)
 records the hard limits and exact legacy ceiling policy.
 
+## Task-channel context
+
+The task-channel container route scopes a channel to the authenticated
+execution, run unit, and principal. A program's current channel is initialized
+from a validated `cics.channel` invocation binding when that program enters
+the CICS provider. Container commands without CHANNEL use this value; when it
+is absent, they return INVREQ before a channel read or mutation. An explicit
+CHANNEL names an owner-scoped channel and does not change the current channel.
+The provider records the creating program on a channel; DELETE CHANNEL rejects
+a different program and the current channel. RUN TRANSID CHANNEL reads the
+owner-scoped channel at issue time and passes its bytes and metadata to the
+existing child snapshot authority.
+
+The same typed container operations also select BTS owners when issued in a
+fenced activity context or with PROCESS, ACTIVITY, ACQPROCESS, or ACQACTIVITY.
+The command route resolves the owner through the shared lifecycle process row,
+authorizes its BTSLIFE resource, and stages mutations under the owning UOW.
+Each staging write CAS-fences the process row and saves the replay receipt in
+the same atomic batch. UOW settlement publishes or discards staged contents;
+activity removal and completion delete their containers in the lifecycle
+transition batch. GET ACQPROCESS under an acquired descendant is rejected
+because the pinned GET and ACQUIRE topics do not settle that selector.
+
+GET64 CONTAINER and PUT64 CONTAINER use distinct typed operations over the
+same task-channel port. The MCEP profile requires the non-LE AMODE(64) ABI
+marker; the interpreter checks the caller binding, eight-byte virtual pointer,
+task ownership, data key, and fullword FLENGTH before a data transfer. Provider
+responses are checked before the interpreter copies GET64 bytes into its
+checkpointed virtual allocation. COBOL source cannot select these rows.
+Conversion, SET/NODATA, and PUT64 DATATYPE/CCSID variants remain fenced until
+their source-bounded semantics are implemented.
+
 ## Verification
 
 ```bash

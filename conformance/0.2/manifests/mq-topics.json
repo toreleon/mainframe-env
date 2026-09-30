@@ -13,8 +13,18 @@
   "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
   "topic_count": 27,
-  "topic_manifest_digest": "c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3",
+  "topic_manifest_digest": "f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "repin": {
+    "issue": 337,
+    "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html",
+    "superseded_sha256": "60696d9bd5eac33c80fde18d6b0a1bb0849ebc8897c12a490ba7138763393ef9",
+    "superseded_bytes": 112179,
+    "superseded_last_modified": "2026-05-18",
+    "superseded_manifest_file_sha256": "37e1d1fe649b4399c07030586af7fccfc054596119fcebc8ba70b5f6f1e77bb8",
+    "verification_method": "Chrome IBM docs content API fetch, owner-approved re-pin",
+    "verified_on": "2026-09-29"
+  },
   "topics": [
     {
       "bytes": 10245,
@@ -113,9 +123,9 @@
       "topic_path": "SSFKSJ_9.4.0/refdev/q101830_.html"
     },
     {
-      "bytes": 112179,
-      "last_modified": "2026-05-18",
-      "sha256": "60696d9bd5eac33c80fde18d6b0a1bb0849ebc8897c12a490ba7138763393ef9",
+      "bytes": 112180,
+      "last_modified": "2026-09-10",
+      "sha256": "03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b",
       "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html"
     },
     {
@@ -179,5 +189,5 @@
       "topic_path": "SSFKSJ_9.4.0/refdev/q101940_.html"
     }
   ],
-  "total_bytes": 837828
+  "total_bytes": 837829
 }
