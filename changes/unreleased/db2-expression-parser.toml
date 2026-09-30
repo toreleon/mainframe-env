@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover bounded owned parsing of common Db2 expressions without execution or whole-row recognition credit."

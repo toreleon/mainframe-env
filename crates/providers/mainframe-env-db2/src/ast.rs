@@ -363,6 +363,7 @@ impl Db2ExpressionId {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Db2ExpressionKind {
+    Wildcard,
     Literal(Db2Literal),
     Column(Db2QualifiedName),
     HostVariable(Db2HostReference),
@@ -514,7 +515,8 @@ fn validate_kind_bounds(kind: &Db2ExpressionKind, limits: Db2AstLimits) -> Resul
 
 fn expression_references(kind: &Db2ExpressionKind) -> Vec<Db2ExpressionId> {
     match kind {
-        Db2ExpressionKind::Literal(_)
+        Db2ExpressionKind::Wildcard
+        | Db2ExpressionKind::Literal(_)
         | Db2ExpressionKind::Column(_)
         | Db2ExpressionKind::HostVariable(_)
         | Db2ExpressionKind::ParameterMarker => Vec::new(),
