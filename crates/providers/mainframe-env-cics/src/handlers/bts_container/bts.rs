@@ -439,24 +439,24 @@ pub(super) fn invoke(
             {
                 return Err(command::condition("INVREQ", 16, 1));
             }
-            let maximum = command::number(request, "FLENGTH")?
-                .map(|value| {
-                    usize::try_from(value).map_err(|_| command::condition("LENGERR", 22, 1))
-                })
-                .transpose()?;
             if into {
+                // Only INTO reads FLENGTH. SET and NODATA return its actual
+                // value regardless of the receiving field's incoming bytes.
+                let maximum = command::number(request, "FLENGTH")?
+                    .map(|value| {
+                        usize::try_from(value.max(0))
+                            .map_err(|_| command::condition("LENGERR", 22, 11))
+                    })
+                    .transpose()?;
                 let capacity = command::number(request, "INTO.MAXLENGTH")?
                     .and_then(|value| usize::try_from(value).ok())
                     .ok_or(HostProblem::Malformed)?;
-                let copied = value
-                    .bytes
-                    .len()
-                    .min(capacity)
-                    .min(maximum.unwrap_or(capacity));
-                if copied < value.bytes.len() {
+                let maximum = maximum.unwrap_or(capacity);
+                let copied = value.bytes.len().min(capacity).min(maximum);
+                if maximum != value.bytes.len() || copied < value.bytes.len() {
                     response.condition = "LENGERR".into();
                     response.response = 22;
-                    response.response2 = 1;
+                    response.response2 = 11;
                 }
                 command::output(
                     &mut response,

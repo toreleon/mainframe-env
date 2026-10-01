@@ -3641,6 +3641,121 @@ impl<'a> Reader<'a> {
 
 #[cfg(test)]
 mod tests {
+    fn bts_get_length_fixture() -> (Arc<CicsService>, Invocation) {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let run = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run).unwrap();
+        BtsLifecycleStore::new(store.as_ref())
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", principal, run).unwrap(),
+                run,
+                execution,
+                principal,
+            )
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        (cics, invocation)
+    }
+
+    #[test]
+    fn bts_get_container_into_unequal_lengths_return_exact_lengerr() {
+        let (cics, invocation) = bts_get_length_fixture();
+        for (index, maximum) in [Some(-1), Some(0), Some(2), Some(4), Some(8), None]
+            .into_iter()
+            .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]);
+            if let Some(maximum) = maximum {
+                arguments.insert("FLENGTH".into(), cics_decimal(maximum));
+            }
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 2);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 2),
+                    get,
+                )
+                .unwrap();
+            let has_length = maximum.is_some();
+            let maximum = maximum.unwrap_or(8).max(0) as usize;
+            assert_eq!(
+                (
+                    &response.condition[..],
+                    response.response,
+                    response.response2
+                ),
+                if maximum == 4 {
+                    ("NORMAL", 0, 0)
+                } else {
+                    ("LENGERR", 22, 11)
+                }
+            );
+            assert_eq!(response.outputs["INTO"].bytes(), &b"DATA"[..maximum.min(4)]);
+            assert_eq!(response.outputs.contains_key("FLENGTH"), has_length);
+            if has_length {
+                assert_eq!(response.outputs["FLENGTH"].bytes(), b"4");
+            }
+        }
+    }
+
+    #[test]
+    fn bts_get_container_set_and_nodata_never_read_flength_contents() {
+        let (cics, invocation) = bts_get_length_fixture();
+        for (index, (set, length)) in [
+            (true, cics_decimal(-1)),
+            (false, cics_decimal(-1)),
+            (true, cics_literal(&[0xff])),
+            (false, cics_literal(&[0xff])),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FLENGTH".into(), length),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]);
+            if set {
+                arguments.insert("SET".into(), cics_literal(b"PTR"));
+                arguments.insert("SET.MAXLENGTH".into(), cics_decimal(8));
+            } else {
+                arguments.insert("OPTION.NODATA".into(), cics_option());
+            }
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 2);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 2),
+                    get,
+                )
+                .unwrap();
+            assert_eq!((response.response, response.response2), (0, 0));
+            assert_eq!(response.outputs["FLENGTH"].bytes(), b"4");
+            assert_eq!(
+                response.outputs.get("SET").map(|value| value.bytes()),
+                set.then_some(b"DATA".as_slice())
+            );
+            assert!(!response.outputs.contains_key("INTO"));
+        }
+    }
     use super::*;
     use crate::{CicsEventPostMode, CicsEventPurgeMode};
     use mainframe_env_execution_api::{

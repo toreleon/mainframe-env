@@ -13952,7 +13952,38 @@ mod tests {
             BtsChildDefinition, BtsLifecycleStore, BtsProcessTypeDefinition, BtsReply,
             BtsTransactionDefinition,
         };
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CNTBTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(4) VALUE 'DATA'. 01 PROC-X PIC X(4). 01 ACT-X PIC X(4). 01 LEN-X PIC S9(9) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS DEFINE PROCESS('ORDER') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS PUT CONTAINER('P1') PROCESS FROM(DATA-X) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS GET CONTAINER('P1') PROCESS INTO(PROC-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS MOVE CONTAINER('P1') AS('A1') FROMPROCESS TOACTIVITY('CHILD') END-EXEC. EXEC CICS GET CONTAINER('A1') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS MOVE CONTAINER('A1') AS('P2') FROMACTIVITY('CHILD') TOPROCESS END-EXEC. EXEC CICS DELETE CONTAINER('P2') PROCESS END-EXEC. EXEC CICS PUT CONTAINER('A2') ACTIVITY('CHILD') FROM(DATA-X) END-EXEC. EXEC CICS GET CONTAINER('A2') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. EXEC CICS DELETE CONTAINER('A2') ACTIVITY('CHILD') END-EXEC. EXEC CICS SYNCPOINT END-EXEC. EXEC CICS SUSPEND END-EXEC. STOP RUN.";
+        let source = concat!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CNTBTS. DATA DIVISION. WORKING-STORAGE SECTION. ",
+            "01 DATA-X PIC X(4) VALUE 'DATA'. 01 PROC-X PIC X(4). 01 ACT-X PIC X(4). ",
+            "01 LEN-X PIC S9(9) COMP VALUE 4. 01 WIDE-X PIC X(8) VALUE ALL 'Z'. ",
+            "01 SHORT-X PIC X(4) VALUE ALL 'Y'. 01 ZERO-X PIC X(4) VALUE ALL 'Q'. ",
+            "01 WIDE-LEN PIC S9(9) COMP VALUE 8. 01 SHORT-LEN PIC S9(9) COMP VALUE 2. ",
+            "01 ZERO-LEN PIC S9(9) COMP VALUE -1. 01 SET-LEN PIC S9(9) COMP VALUE -1. ",
+            "01 ND-LEN PIC S9(9) COMP VALUE -1. 01 PTR-X POINTER. 01 SET-X PIC X(4). ",
+            "01 WIDE-R PIC S9(9) COMP. 01 WIDE-R2 PIC S9(9) COMP. ",
+            "01 SHORT-R PIC S9(9) COMP. 01 SHORT-R2 PIC S9(9) COMP. ",
+            "01 ZERO-R PIC S9(9) COMP. 01 ZERO-R2 PIC S9(9) COMP. ",
+            "01 LEN-RESP PIC S9(9) COMP. 01 LEN-RESP2 PIC S9(9) COMP. ",
+            "LINKAGE SECTION. 01 LINK-X PIC X(4). PROCEDURE DIVISION. ",
+            "EXEC CICS DEFINE PROCESS('ORDER') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. ",
+            "EXEC CICS SUSPEND END-EXEC. EXEC CICS PUT CONTAINER('P1') PROCESS FROM(DATA-X) END-EXEC. ",
+            "EXEC CICS SUSPEND END-EXEC. EXEC CICS GET CONTAINER('P1') PROCESS INTO(PROC-X) FLENGTH(LEN-X) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('P1') PROCESS INTO(WIDE-X) FLENGTH(WIDE-LEN) RESP(WIDE-R) RESP2(WIDE-R2) END-EXEC. ",
+            "MOVE EIBRESP TO LEN-RESP. MOVE EIBRESP2 TO LEN-RESP2. ",
+            "EXEC CICS GET CONTAINER('P1') PROCESS INTO(SHORT-X) FLENGTH(SHORT-LEN) RESP(SHORT-R) RESP2(SHORT-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('P1') PROCESS INTO(ZERO-X) FLENGTH(ZERO-LEN) RESP(ZERO-R) RESP2(ZERO-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('P1') PROCESS SET(PTR-X) FLENGTH(SET-LEN) END-EXEC. ",
+            "SET ADDRESS OF LINK-X TO PTR-X. MOVE LINK-X TO SET-X. ",
+            "EXEC CICS GET CONTAINER('P1') PROCESS NODATA FLENGTH(ND-LEN) END-EXEC. ",
+            "EXEC CICS MOVE CONTAINER('P1') AS('A1') FROMPROCESS TOACTIVITY('CHILD') END-EXEC. ",
+            "EXEC CICS GET CONTAINER('A1') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. ",
+            "EXEC CICS MOVE CONTAINER('A1') AS('P2') FROMACTIVITY('CHILD') TOPROCESS END-EXEC. ",
+            "EXEC CICS DELETE CONTAINER('P2') PROCESS END-EXEC. ",
+            "EXEC CICS PUT CONTAINER('A2') ACTIVITY('CHILD') FROM(DATA-X) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('A2') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. ",
+            "EXEC CICS DELETE CONTAINER('A2') ACTIVITY('CHILD') END-EXEC. ",
+            "EXEC CICS SYNCPOINT END-EXEC. EXEC CICS SUSPEND END-EXEC. STOP RUN."
+        );
         let artifact = published_source_fixture("CNTBTS", source);
         let worker = published_source_fixture(
             "BTSROOT",
@@ -14163,6 +14194,28 @@ mod tests {
                 .unwrap();
             assert_eq!(restored.variable("PROC-X").unwrap().bytes(), b"DATA");
             assert_eq!(restored.variable("ACT-X").unwrap().bytes(), b"DATA");
+            assert_eq!(restored.variable("WIDE-X").unwrap().bytes(), b"DATAZZZZ");
+            assert_eq!(restored.variable("SHORT-X").unwrap().bytes(), b"DAYY");
+            assert_eq!(restored.variable("ZERO-X").unwrap().bytes(), b"QQQQ");
+            assert_eq!(restored.variable("SET-X").unwrap().bytes(), b"DATA");
+            for field in ["WIDE-LEN", "SHORT-LEN", "ZERO-LEN", "SET-LEN", "ND-LEN"] {
+                assert_eq!(
+                    restored.variable(field).unwrap().bytes(),
+                    &4_i32.to_be_bytes()
+                );
+            }
+            for field in ["WIDE-R", "SHORT-R", "ZERO-R", "LEN-RESP"] {
+                assert_eq!(
+                    restored.variable(field).unwrap().bytes(),
+                    &22_i32.to_be_bytes()
+                );
+            }
+            for field in ["WIDE-R2", "SHORT-R2", "ZERO-R2", "LEN-RESP2"] {
+                assert_eq!(
+                    restored.variable(field).unwrap().bytes(),
+                    &11_i32.to_be_bytes()
+                );
+            }
         }
         std::fs::remove_dir_all(root).unwrap();
     }
