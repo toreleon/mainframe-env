@@ -380,18 +380,17 @@ pub(super) fn resources(
     if let ImsSystemCall::Query { target_pcb } = &system.call {
         databases.insert(normalize(metadata_pcb(state, &psb, *target_pcb)?.0));
     }
-    if matches!(&system.call, ImsSystemCall::Dequeue { .. }) {
-        if let Some(row) = state.system.get(ROW_KEY) {
-            for (key, reservation) in &row.reservations {
-                if reservation.owner == run
-                    && database
-                        .as_ref()
-                        .is_none_or(|name| key.starts_with(&format!("{name}:")))
-                {
-                    if let Some(name) = key.split(':').next() {
-                        databases.insert(name.into());
-                    }
-                }
+    if matches!(&system.call, ImsSystemCall::Dequeue { .. })
+        && let Some(row) = state.system.get(ROW_KEY)
+    {
+        for (key, reservation) in &row.reservations {
+            if reservation.owner == run
+                && database
+                    .as_ref()
+                    .is_none_or(|name| key.starts_with(&format!("{name}:")))
+                && let Some(name) = key.split(':').next()
+            {
+                databases.insert(name.into());
             }
         }
     }
@@ -758,15 +757,14 @@ pub(super) fn observe_database_call(
         request.operation,
         ImsOperation::Replace | ImsOperation::Delete
     ) && result.status == "  "
+        && let Some(row) = state.system.get_mut(ROW_KEY)
     {
-        if let Some(row) = state.system.get_mut(ROW_KEY) {
-            for reservation in Arc::make_mut(row)
-                .reservations
-                .values_mut()
-                .filter(|reservation| reservation.owner == run && reservation.current)
-            {
-                reservation.modified = true;
-            }
+        for reservation in Arc::make_mut(row)
+            .reservations
+            .values_mut()
+            .filter(|reservation| reservation.owner == run && reservation.current)
+        {
+            reservation.modified = true;
         }
     }
     Ok(())
